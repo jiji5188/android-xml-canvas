@@ -97,4 +97,28 @@ describe("M2a 复合控件占位渲染", () => {
     expect(root.style.width).toBe("400px");
     expect(root.children).toHaveLength(0);
   });
+
+  it("gravity=center 让文本真的居中（flex 对齐 + text-align）", () => {
+    const root = model(`<Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        android:text="@string/button_ok"
+        android:gravity="center" />`).root;
+    // .axv-text 是 flex 容器，真正定位靠 justify/align，textAlign 只管多行行内
+    expect(root.style.justifyContent).toBe("center");
+    expect(root.style.alignItems).toBe("center");
+    expect(root.style.textAlign).toBe("center");
+  });
+
+  it("gravity=end|center_vertical 只贴右并垂直居中", () => {
+    const root = model(`<TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end|center_vertical"
+        android:text="hi" />`).root;
+    expect(root.style.justifyContent).toBe("flex-end");
+    expect(root.style.alignItems).toBe("center");
+    expect(root.style.textAlign).toBe("right");
+  });
 });

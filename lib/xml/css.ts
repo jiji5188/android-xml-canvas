@@ -106,6 +106,26 @@ function gravityToTextAlign(g: string): "left" | "center" | "right" | undefined 
   return undefined;
 }
 
+/** 文本类控件的 gravity → flex 对齐（.axv-text 是 flex 容器，textAlign 管不到匿名文本项） */
+function gravityToFlexAlign(g: string): Record<string, string> {
+  const v: Record<string, string> = {};
+  if (!g) return v;
+  const parts = g.split("|");
+  const has = (...vals: string[]) => parts.some((p) => vals.includes(p));
+  if (has("center")) {
+    v.justifyContent = "center";
+    v.alignItems = "center";
+    return v;
+  }
+  if (has("center_horizontal")) v.justifyContent = "center";
+  else if (has("start", "left")) v.justifyContent = "flex-start";
+  else if (has("end", "right")) v.justifyContent = "flex-end";
+  if (has("center_vertical")) v.alignItems = "center";
+  else if (has("top")) v.alignItems = "flex-start";
+  else if (has("bottom")) v.alignItems = "flex-end";
+  return v;
+}
+
 function layoutGravityToSelf(g: string): Record<string, string> {
   const v: Record<string, string> = {};
   if (!g) return v;
@@ -220,9 +240,16 @@ export function buildRenderModel(
       const tc = (attrs["textColor"] as string) || "#1D1B20";
       style.color = tc;
       const align = (attrs["textAlignment"] as string) || "";
-      const ga = gravityToTextAlign((attrs["gravity"] as string) || "");
-      if (align === "center" || ga === "center") style.textAlign = "center";
-      else if (ga) style.textAlign = ga;
+      const gRaw = (attrs["gravity"] as string) || "";
+      const ga = gravityToTextAlign(gRaw);
+      // flex 容器里真正决定位置的是 justify-content / align-items
+      Object.assign(style, gravityToFlexAlign(gRaw));
+      if (align === "center" || ga === "center") {
+        style.textAlign = "center";
+        style.justifyContent = style.justifyContent ?? "center";
+      } else if (ga) {
+        style.textAlign = ga;
+      }
       if ((attrs["textAllCaps"] as boolean)) style.textTransform = "uppercase";
       if ((attrs["textStyle"] as string) === "bold") style.fontWeight = 600;
       // Button/EditText 默认样式

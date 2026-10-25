@@ -52,6 +52,7 @@ function parseElement(s: string, pos: { i: number }, path: string, issues: XmlIs
   }
 
   const attrs: Record<string, string> = {};
+  const nsDecls: Record<string, string> = {};
   let selfClosed = false; // <tag ... /> 无子元素
   // 解析属性
   while (true) {
@@ -75,10 +76,33 @@ function parseElement(s: string, pos: { i: number }, path: string, issues: XmlIs
       pos.i++;
       continue;
     }
-    // 命名空间前缀归一化：android:xxx → xxx；tools: 是设计期属性，不存
+    // 命名空间声明（xmlns:xxx）不存入 attrs，否则回写时会变成 android:android="..."
     const colonIdx = name.indexOf(":");
-    const isTools = colonIdx !== -1 && name.slice(0, colonIdx) === "tools";
+    const prefix = colonIdx !== -1 ? name.slice(0, colonIdx) : "";
+    const isTools = prefix === "tools";
+    const isXmlns = prefix === "xmlns" || name.startsWith("xmlns");
     const localName = colonIdx !== -1 ? name.slice(colonIdx + 1) : name;
+    if (isXmlns) {
+      // 命名空间声明存进 nsDecls（writeback 时补回，不进 attrs）
+      skipWs(s, pos);
+      if (s[pos.i] === "=") {
+        pos.i++;
+        skipWs(s, pos);
+        const q = s[pos.i];
+        if (q === '"' || q === "'") {
+          pos.i++;
+          const vStart = pos.i;
+          while (pos.i < s.length && s[pos.i] !== q) pos.i++;
+          nsDecls[localName] = s.slice(vStart, pos.i);
+          pos.i++; // 过引号
+        } else {
+          const vStart = pos.i;
+          while (pos.i < s.length && !/[>\s]/.test(s[pos.i])) pos.i++;
+          nsDecls[localName] = s.slice(vStart, pos.i);
+        }
+      }
+      continue;
+    }
     skipWs(s, pos);
     let value = "";
     if (s[pos.i] === "=") {
@@ -100,7 +124,7 @@ function parseElement(s: string, pos: { i: number }, path: string, issues: XmlIs
     if (!isTools) attrs[localName] = value;
   }
 
-  const node: XmlNode = { tag, attrs, children: [], path };
+  const node: XmlNode = { tag, attrs, nsDecls: Object.keys(nsDecls).length ? nsDecls : undefined, children: [], path };
 
   // 自闭合标签没有子元素，直接返回（不要吞掉后面的兄弟节点）
   if (selfClosed) return node;
@@ -202,17 +226,28 @@ export function rewriteNodeAttrs(
 
 /** 序列化：把归一化树写回 XML 文本 */
 export function serialize(node: XmlNode, indent = ""): string {
+  // 命名空间声明补回（xmlns:android="..."），单独一行；再是 android: 属性
+  const nsLine = Object.entries(node.nsDecls ?? {})
+    .map(([p, uri]) => `xmlns:${p}="${uri}"`)
+    .join(" ");
   const attrsStr = Object.entries(node.attrs)
     .map(([k, v]) => `    android:${k}="${v}"`)
     .join("\n");
-  if (node.children.length === 0) {
-    return attrsStr
-      ? `${indent}<${node.tag}\n${attrsStr}\n${indent}/>`
-      : `${indent}<${node.tag} />`;
-  }
-  const open = attrsStr
-    ? `${indent}<${node.tag}\n${attrsStr}\n${indent}>`
-    : `${indent}<${node.tag}>`;
+
+  const buildOpen = (selfClosed: boolean): string => {
+    const lines: string[] = [`${indent}<${node.tag}`];
+    if (nsLine) lines.push(`    ${nsLine}`);
+    if (attrsStr) lines.push(attrsStr);
+    const tagEnd = selfClosed ? "/>" : ">";
+    if (lines.length === 1) {
+      // 无属性：单行
+      return selfClosed ? `${indent}<${node.tag} />` : `${indent}<${node.tag}>`;
+    }
+    return lines.join("\n") + "\n" + indent + tagEnd;
+  };
+
+  if (node.children.length === 0) return buildOpen(true);
+  const open = buildOpen(false);
   const inner = node.children.map((c) => serialize(c, indent + "  ")).join("\n");
   return `${open}\n${inner}\n${indent}</${node.tag}>`;
 }

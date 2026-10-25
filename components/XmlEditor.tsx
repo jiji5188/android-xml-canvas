@@ -1,19 +1,27 @@
-// components/XmlEditor.tsx — M1a 主入口：左侧 XML 代码区 + 右侧画布 + 底部属性面板
-// "use client"；粘贴 XML 或载入样例 → 实时渲染；点画布选中节点 → 属性面板可看可改（M1b）。
+// components/XmlEditor.tsx — M1a 主入口（v3：M3E 式三栏）
+// 左滑面板：[组件 | 图层] 两页 + 底部 [代码 | 资源] 两个 tab
+// 画布：手机屏（可接收组件面板拖放）
+// 右滑面板：选中节点的属性面板
 
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { parseLayoutXml } from "@/lib/xml/parser";
+import { parseLayoutXml, findNode, serialize } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
-import type { ResourceTable } from "@/lib/xml/types";
+import type { ResolvedNode, ResourceTable } from "@/lib/xml/types";
+import { writebackAttrs } from "@/lib/xml/writeback";
+import { insertChild, insertSiblingAfter, moveSibling } from "@/lib/xml/insert";
 import { XmlCanvas } from "./XmlCanvas";
+import { AttrPanel } from "./AttrPanel";
+import { AddAttrModal } from "./AddAttrModal";
+import { defaultFor } from "./attr-catalog";
+import { WidgetPalette } from "./WidgetPalette";
+import { LayerTree } from "./LayerTree";
+import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
 
-type Tab = "list" | "toolbar" | "frame" | "custom";
-
-const SAMPLES: Record<Exclude<Tab, "custom">, string> = {
+const SAMPLES: Record<string, string> = {
   list: `<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -53,97 +61,54 @@ const SAMPLES: Record<Exclude<Tab, "custom">, string> = {
       android:background="@color/primary"
       android:textColor="@color/white"/>
 </LinearLayout>`,
-  toolbar: `<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="56dp"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:background="@color/primary">
-
-  <TextView
-      android:layout_width="0dp"
-      android:layout_height="match_parent"
-      android:layout_weight="1"
-      android:gravity="center_vertical"
-      android:paddingStart="16dp"
-      android:paddingEnd="16dp"
-      android:text="标题栏"
-      android:textSize="18sp"
-      android:textColor="@color/white"/>
-
-  <Button
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="@string/button_cancel"
-      android:background="@color/transparent"
-      android:textColor="@color/white"
-      android:layout_marginEnd="16dp"/>
-</LinearLayout>`,
-  frame: `<?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/page_bg">
-
-  <ScrollView
-      android:layout_width="match_parent"
-      android:layout_height="match_parent"
-      android:padding="24dp">
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
-      <TextView
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:text="主体内容"
-          android:textSize="16sp"/>
-      <EditText
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:layout_marginTop="16dp"
-          android:hint="输入框"
-          android:padding="12dp"/>
-      <ImageView
-          android:layout_width="match_parent"
-          android:layout_height="120dp"
-          android:layout_marginTop="16dp"
-          android:background="@color/card_bg"
-          android:adjustViewBounds="true"/>
-      <ProgressBar
-          android:layout_width="match_parent"
-          android:layout_height="wrap_content"
-          android:layout_marginTop="16dp"
-          android:style="?android:attr/progressBarStyleHorizontal"/>
-    </LinearLayout>
-  </ScrollView>
-
-  <ImageView
-      android:layout_width="48dp"
-      android:layout_height="48dp"
-      android:layout_gravity="bottom|end"
-      android:layout_margin="24dp"
-      android:background="@color/accent"/>
-</FrameLayout>`,
 };
 
 const SCALE = 2; // 1dp = 2px
 
+function findResolvedNode(root: ResolvedNode, path: string): ResolvedNode | null {
+  if (root.path === path) return root;
+  for (const c of root.children ?? []) {
+    const r = findResolvedNode(c, path);
+    if (r) return r;
+  }
+  return null;
+}
+
+/** 把 path 拆成父级 + 索引 */
+function splitPath(path: string): { parentPath: string; index: number } {
+  const segs = path.split("/").filter(Boolean);
+  const index = Number(segs[segs.length - 1]);
+  const parentPath = "#" + segs.slice(0, -1).join("/");
+  return { parentPath, index };
+}
+
+/** 去掉片段里的 xmlns 声明（根节点已有；否则序列化会重复写） */
+const stripNs = (frag: string) => frag.replace(/\s+xmlns:android="[^"]*"/g, "");
+
 export function XmlEditor() {
-  const [tab, setTab] = useState<Tab>("list");
-  const [xml, setXml] = useState<string>(SAMPLES.list);
+  const [xml, setXml] = useState(SAMPLES.list);
   const [resourceFragment, setResourceFragment] = useState("");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
 
-  const [mobileView, setMobileView] = useState<"preview" | "code">("preview");
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
+  const [leftView, setLeftView] = useState<"parts" | "layers" | "code" | "res">("parts");
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [dropHint, setDropHint] = useState<string | null>(null);
 
-  const resources: ResourceTable = useMemo(() => {
-    return resourceFragment.trim() ? mergeResourceFragment(resourceFragment) : DEFAULT_RESOURCES;
-  }, [resourceFragment]);
+  // 窄屏默认收起两个面板
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 1100) {
+      setLeftOpen(false);
+      setRightOpen(false);
+    }
+  }, []);
+
+  const resources: ResourceTable = useMemo(
+    () => (resourceFragment.trim() ? mergeResourceFragment(resourceFragment) : DEFAULT_RESOURCES),
+    [resourceFragment],
+  );
 
   const { model, issues, parseErr } = useMemo(() => {
     const { root, issues } = parseLayoutXml(xml);
@@ -151,148 +116,122 @@ export function XmlEditor() {
     return { model: buildRenderModel(root, resources, SCALE), issues, parseErr: false };
   }, [xml, resources]);
 
-  // 切换 tab / 载入样例时清空选中
-  useEffect(() => setSelectedPath(null), [xml]);
+  /** 图层树用的原始节点树（不经渲染模型） */
+  const treeRoot = useMemo(() => (parseErr ? null : parseLayoutXml(xml).root), [xml, parseErr]);
 
-  const setTabAndXml = (t: Exclude<Tab, "custom">) => {
-    setTab(t);
-    setXml(SAMPLES[t]);
+  // ===== 组件插入（点击 / 拖放）=====
+  // 有选中节点：插到它的同级（兄弟）；否则插到根节点末尾
+  const insertWidget = (w: WidgetDef) => {
+    const frag = stripNs(w.xml);
+    const target = selectedPath && selectedPath !== "#0" ? selectedPath : "#0";
+    const res =
+      target !== "#0"
+        ? insertSiblingAfter(xml, target, frag, w.label)
+        : insertChild(xml, "#0", frag, w.label);
+    if (res.ok) {
+      setXml(res.xml);
+      if (res.insertedPath) setSelectedPath(res.insertedPath);
+    }
   };
 
-  // 找选中节点的 rawAttrs（M1a 只读展示；M1b 改）
-  const selectedAttrs = useMemo(() => {
+  /** 画布拖放：简化走同级 / 根逻辑，精确落位后续 M2c */
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const key = e.dataTransfer.getData(DRAG_WIDGET_MIME);
+    setDropHint(null);
+    if (!key) return;
+    const w = WIDGET_MAP[key];
+    if (w) insertWidget(w);
+  };
+
+  // ===== 图层操作 =====
+  const onMoveSibling = (targetPath: string, toIndex: number) => {
+    const r = moveSibling(xml, targetPath, toIndex);
+    if (r.ok) {
+      setXml(r.xml);
+      if (r.newPath) setSelectedPath(r.newPath);
+    }
+  };
+
+  const onRemoveNode = (path: string) => {
+    if (path === "#0") return;
+    const { parentPath, index } = splitPath(path);
+    const { root } = parseLayoutXml(xml);
+    if (!root) return;
+    const parent = findNode(root, parentPath);
+    if (!parent) return;
+    parent.children.splice(index, 1);
+    for (let i = 0; i < parent.children.length; i++) {
+      const fix = (n: import("@/lib/xml/types").XmlNode, p: string) => {
+        n.path = p;
+        n.children.forEach((c, j) => fix(c, `${p}/${j}`));
+      };
+      fix(parent.children[i], `${parentPath}/${i}`);
+    }
+    const out = serialize(root);
+    const decl = xml.match(/^<\?xml[\s\S]*?\?>/i);
+    setXml((decl ? decl[0] + "\n" : "") + out);
+    setSelectedPath(null);
+  };
+
+  // ===== 属性回写（M1b 双向）=====
+  const commitAttr = (name: string, value: string) => {
+    if (!selectedPath) return;
+    const r = writebackAttrs(xml, selectedPath, { [name]: value });
+    if (r.changed) setXml(r.xml);
+  };
+
+  const removeAttr = (name: string) => {
+    if (!selectedPath) return;
+    const r = writebackAttrs(xml, selectedPath, {}, [name]);
+    if (r.changed) setXml(r.xml);
+  };
+
+  const addAttr = (name: string) => {
+    if (!selectedPath) return;
+    const r = writebackAttrs(xml, selectedPath, { [name]: defaultFor(name) });
+    if (r.changed) setXml(r.xml);
+  };
+
+  const selectedNode: ResolvedNode | null = useMemo(() => {
     if (!selectedPath || !model) return null;
-    const find = (n: (typeof model.root | any), path: string): any => {
-      if (n.path === path) return n;
-      for (const c of n.children ?? []) {
-        const r = find(c, path);
-        if (r) return r;
-      }
-      return null;
-    };
-    return find(model.root, selectedPath)?.rawAttrs ?? null;
+    return findResolvedNode(model.root, selectedPath);
   }, [selectedPath, model]);
 
-  const widthPx = Math.round(412 * SCALE * scale); // 手机屏 412dp 基准
+  const widthPx = Math.round(412 * SCALE * scale);
   const heightPx = Math.round(892 * SCALE * scale);
 
+  const shortTag = (t: string) => (t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t);
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      {/* 顶部工具条 */}
-      <div className="axv-toolbar">
-        <span style={{ fontWeight: 700, fontSize: 14, marginRight: 12 }}>Android 可视化布局编辑器</span>
-        {(["list", "toolbar", "frame"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTabAndXml(t)}
-            style={{
-              padding: "5px 12px", borderRadius: 8, cursor: "pointer",
-              background: tab === t ? "#6750A4" : "transparent",
-              color: tab === t ? "#fff" : "#cdd6f4",
-              border: "1px solid " + (tab === t ? "#6750A4" : "#45455e"),
-              fontSize: 13,
-            }}
-          >
-            {t === "list" ? "竖列表" : t === "toolbar" ? "横工具栏" : "悬浮布局"}
-          </button>
-        ))}
-        <button
-          onClick={() => setTab("custom")}
-          style={{
-            padding: "5px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13,
-            background: tab === "custom" ? "#6750A4" : "transparent",
-            color: tab === "custom" ? "#fff" : "#cdd6f4",
-            border: "1px solid " + (tab === "custom" ? "#6750A4" : "#45455e"),
-          }}
-        >
-          自定义
-        </button>
-        <div style={{ flex: 1 }} />
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#8a8fa3" }}>
-          缩放 {scale.toFixed(2)}×
-          <input type="range" min={0.4} max={1.5} step={0.1} value={scale} onChange={(e) => setScale(parseFloat(e.target.value))} style={{ width: 90 }} />
-        </label>
-      </div>
-
-      {/* 移动端视图切换：手机屏幕小，代码区与画布不同屏显示 */}
-      <div className="axv-mobile-tabs">
-        <button className={mobileView === "preview" ? "active" : ""} onClick={() => setMobileView("preview")}>预览</button>
-        <button className={mobileView === "code" ? "active" : ""} onClick={() => setMobileView("code")}>XML 代码</button>
-      </div>
-
-      {/* 主体：左 XML / 右画布 */}
-      <div className={`axv-split axv-view-${mobileView}`}>
-        {/* 左：XML 代码区 */}
-        <div className="axv-left-pane">
-          <div style={{ padding: "6px 12px", fontSize: 11, color: "#8a8fa3", background: "#181825", borderBottom: "1px solid #313244" }}>
-            res/layout/{tab === "custom" ? "custom" : tab === "list" ? "list" : tab === "toolbar" ? "toolbar" : "floating"}.xml（M1a 实时预览，可直接编辑下方内容）
-          </div>
-          <textarea
-            className="axv-pane"
-            value={xml}
-            spellCheck={false}
-            onChange={(e) => { setXml(e.target.value); setTab("custom"); }}
-            style={{ border: "none", outline: "none", display: "block", width: "100%", flex: 1, resize: "none", background: "#181825", color: "#cdd6f4", font: "inherit" }}
-          />
-          <details style={{ padding: "8px 12px", fontSize: 12, color: "#8a8fa3", background: "#181825", borderTop: "1px solid #313244" }}>
-            <summary style={{ cursor: "pointer" }}>资源表（@string / @dimen / @color 自定义）</summary>
-            <textarea
-              value={resourceFragment}
-              onChange={(e) => setResourceFragment(e.target.value)}
-              placeholder={'<resources>\n  <string name="app_name">My App</string>\n  <dimen name="margin_small">8dp</dimen>\n  <color name="primary">#FF0000</color>\n</resources>'}
-              style={{ width: "100%", height: 120, marginTop: 6, background: "#1e1e2e", color: "#cdd6f4", border: "1px solid #45455e", borderRadius: 8, font: "inherit", padding: 8, boxSizing: "border-box" }}
-            />
-          </details>
-        </div>
-
-        {/* 右：画布 */}
-        <div className="axv-right-pane">
-          <div className="axv-stage" style={{ flex: 1 }}>
-            {parseErr ? (
-              <div className="axv-canvas-empty">XML 解析失败，请检查结构</div>
-            ) : model ? (
-              <div
-                style={{
-                  width: widthPx,
-                  minHeight: heightPx,
-                  border: "2px solid #45455e",
-                  borderRadius: 24,
-                  overflow: "hidden",
-                  background: model.root.style.background || "#fff",
-                  boxShadow: "0 12px 40px rgba(0,0,0,0.18)",
-                }}
-              >
-                <XmlCanvas node={model.root} selectedPath={selectedPath} onSelect={setSelectedPath} />
-              </div>
-            ) : null}
-          </div>
-
-          {/* 属性面板 */}
-          <div className="axv-prop-panel" style={{ height: 168, borderTop: "1px solid #e0e0e0" }}>
-            {selectedAttrs ? (
-              <div>
-                <div className="axv-prop-title">
-                  选中：{selectedPath}（{model?.root.path === selectedPath ? "根节点" : "子节点"}）
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px", maxHeight: 120, overflowY: "auto" }}>
-                  {Object.entries(selectedAttrs).map(([k, v]) => (
-                    <div className="axv-prop-row" key={k}>
-                      <label>{k}</label>
-                      <input readOnly value={String(v)} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div style={{ color: "#8a8fa3", fontSize: 13, padding: "8px 4px" }}>
-                在画布上点任意控件查看属性（M1a 只读；M1b 改后回写 XML）
-              </div>
-            )}
-          </div>
-
-          {/* issue 提示 */}
+    <div className="axv-editor">
+      <div className="axv-main">
+        {/* 画布舞台 */}
+        <div className={"axv-stage" + (leftOpen ? " pad-l" : "") + (rightOpen ? " pad-r" : "")}>
+          {parseErr ? (
+            <div className="axv-canvas-empty">XML 解析失败，请检查结构</div>
+          ) : model ? (
+            <div
+              className={"axv-phone" + (dropHint ? " axv-drop-target" : "")}
+              style={{
+                width: widthPx,
+                minHeight: heightPx,
+                background: model.root.style.background || model.root.style.backgroundColor || "#fff",
+              }}
+              onDragOver={(e) => {
+                if (e.dataTransfer.types.includes(DRAG_WIDGET_MIME)) {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "copy";
+                  setDropHint("drop");
+                }
+              }}
+              onDragLeave={() => setDropHint(null)}
+              onDrop={onDrop}
+            >
+              <XmlCanvas node={model.root} selectedPath={selectedPath} onSelect={setSelectedPath} />
+            </div>
+          ) : null}
           {issues.length > 0 && (
-            <div style={{ maxHeight: 90, overflowY: "auto", background: "#fff8e1", color: "#7a5b00", fontSize: 12, padding: "8px 12px", borderTop: "1px solid #f0e6b0" }}>
+            <div className="axv-issues">
               <strong>{issues.length} 条提示：</strong>
               {issues.slice(0, 8).map((i, idx) => (
                 <div key={idx}>[{i.level}] {i.nodePath} {i.message}</div>
@@ -301,6 +240,245 @@ export function XmlEditor() {
             </div>
           )}
         </div>
+
+      {/* 左侧滑面板：52px 图标条 + 内容列（M3E 同款布局） */}
+      <aside className={"axv-slide-left" + (leftOpen ? " axv-open" : "")}>
+        <div className="axv-rail">
+          <button
+            className={"axv-rail-btn" + (leftView === "parts" ? " on" : "")}
+            title="组件"
+            aria-label="组件"
+            aria-pressed={leftView === "parts"}
+            onClick={() => {
+              setLeftView("parts");
+              setLeftOpen(true);
+            }}
+          >
+            <span className="msr" aria-hidden="true" data-fill={leftView === "parts" ? "1" : "0"} style={{ fontSize: 24 }}>
+              widgets
+            </span>
+          </button>
+          <button
+            className={"axv-rail-btn" + (leftView === "layers" ? " on" : "")}
+            title="图层"
+            aria-label="图层"
+            aria-pressed={leftView === "layers"}
+            onClick={() => {
+              setLeftView("layers");
+              setLeftOpen(true);
+            }}
+          >
+            <span className="msr" aria-hidden="true" data-fill={leftView === "layers" ? "1" : "0"} style={{ fontSize: 24 }}>
+              account_tree
+            </span>
+          </button>
+          <div className="axv-rail-gap" />
+          <button
+            className={"axv-rail-btn" + (leftView === "code" ? " on" : "")}
+            title="XML 代码"
+            aria-label="XML 代码"
+            aria-pressed={leftView === "code"}
+            onClick={() => {
+              setLeftView("code");
+              setLeftOpen(true);
+            }}
+          >
+            <span className="msr" aria-hidden="true" data-fill={leftView === "code" ? "1" : "0"} style={{ fontSize: 24 }}>
+              code
+            </span>
+          </button>
+          <button
+            className={"axv-rail-btn" + (leftView === "res" ? " on" : "")}
+            title="资源"
+            aria-label="资源"
+            aria-pressed={leftView === "res"}
+            onClick={() => {
+              setLeftView("res");
+              setLeftOpen(true);
+            }}
+          >
+            <span className="msr" aria-hidden="true" data-fill={leftView === "res" ? "1" : "0"} style={{ fontSize: 24 }}>
+              folder_open
+            </span>
+          </button>
+        </div>
+
+        <div className="axv-rail-body">
+          <div className="axv-rail-head">
+            <span className="axv-rail-title">
+              {leftView === "parts"
+                ? "组件"
+                : leftView === "layers"
+                  ? "图层"
+                  : leftView === "code"
+                    ? "XML 代码"
+                    : "资源"}
+            </span>
+            <button
+              className="axv-icon-btn"
+              title="关闭面板"
+              aria-label="关闭面板"
+              onClick={() => setLeftOpen(false)}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 24 }}>left_panel_close</span>
+            </button>
+          </div>
+
+          {leftView === "parts" && (
+            <div className="axv-rail-scroll">
+              <WidgetPalette onInsert={insertWidget} hasSelection={!!selectedPath} />
+            </div>
+          )}
+          {leftView === "layers" && (
+            <div className="axv-rail-scroll">
+              <LayerTree
+                root={treeRoot}
+                selectedPath={selectedPath}
+                onSelect={setSelectedPath}
+                onMove={onMoveSibling}
+                onRemove={onRemoveNode}
+              />
+            </div>
+          )}
+          {leftView === "code" && (
+            <textarea
+              className="axv-pane"
+              value={xml}
+              spellCheck={false}
+              onChange={(e) => setXml(e.target.value)}
+            />
+          )}
+          {leftView === "res" && (
+            <div className="axv-res-box">
+              <textarea
+                value={resourceFragment}
+                onChange={(e) => setResourceFragment(e.target.value)}
+                placeholder={'<resources>\n  <string name="app_name">My App</string>\n  <dimen name="margin_small">8dp</dimen>\n  <color name="primary">#FF0000</color>\n</resources>'}
+              />
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* 右侧滑面板：属性 */}
+      <aside className={"axv-slide-right" + (rightOpen ? " axv-open" : "")}>
+        <div className="axv-slide-head">
+          <span>属性</span>
+          <button
+            className="axv-icon-btn"
+            title="关闭面板"
+            aria-label="关闭面板"
+            onClick={() => setRightOpen(false)}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 24 }}>right_panel_close</span>
+          </button>
+        </div>
+        <div className="axv-slide-body">
+          {selectedNode ? (
+            <AttrPanel
+              node={selectedNode}
+              onCommit={commitAttr}
+              onRemove={removeAttr}
+              onAddAttr={() => setAddModalOpen(true)}
+            />
+          ) : (
+            <div className="axv-attr-hint">在画布或图层树上点任意控件查看并编辑属性</div>
+          )}
+        </div>
+      </aside>
+
+      {/* 添加属性弹窗 */}
+      <AddAttrModal
+        open={addModalOpen}
+        existing={selectedNode ? Object.keys(selectedNode.rawAttrs) : []}
+        tag={selectedNode ? shortTag(selectedNode.tag) : undefined}
+        onClose={() => setAddModalOpen(false)}
+        onPick={(name) => addAttr(name)}
+      />
+
+      {/* 顶部工具栏（M3E 式悬浮胶囊组：最左 ☰，最右属性） */}
+      <div className="axv-toolbar-v2">
+        <div className="axv-tb-group">
+          <button
+            className={"axv-tb-btn" + (leftOpen ? " on" : "")}
+            title="显示 / 隐藏左侧面板"
+            aria-label="左侧面板"
+            aria-pressed={leftOpen}
+            onClick={() => setLeftOpen((v) => !v)}
+          >
+            <span className="msr" aria-hidden="true" data-fill={leftOpen ? "1" : "0"} style={{ fontSize: 23 }}>
+              menu_open
+            </span>
+          </button>
+        </div>
+
+        <div className="axv-tb-group">
+          <div className="axv-seg" role="radiogroup" aria-label="视图">
+            <button
+              className={"axv-seg-btn" + (leftView === "parts" ? " on" : "")}
+              role="radio"
+              aria-checked={leftView === "parts"}
+              title="组件"
+              onClick={() => {
+                setLeftView("parts");
+                setLeftOpen(true);
+              }}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>widgets</span>
+            </button>
+            <button
+              className={"axv-seg-btn" + (leftView === "code" ? " on" : "")}
+              role="radio"
+              aria-checked={leftView === "code"}
+              title="XML 代码"
+              onClick={() => {
+                setLeftView("code");
+                setLeftOpen(true);
+              }}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>code</span>
+            </button>
+          </div>
+          <select
+            className="axv-tb-select"
+            title="载入示例"
+            value=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v && SAMPLES[v]) setXml(SAMPLES[v]);
+            }}
+          >
+            <option value="">示例…</option>
+            <option value="list">竖列表</option>
+          </select>
+          <div className="axv-zoom">
+            <input
+              type="range"
+              min={0.4}
+              max={1.5}
+              step={0.1}
+              value={scale}
+              onChange={(e) => setScale(parseFloat(e.target.value))}
+              aria-label="缩放"
+            />
+            <span>{scale.toFixed(2)}×</span>
+          </div>
+        </div>
+
+        <div className="axv-tb-group">
+          <button
+            className={"axv-tb-btn" + (rightOpen ? " on" : "")}
+            title="显示 / 隐藏右侧属性面板"
+            aria-label="右侧属性面板"
+            aria-pressed={rightOpen}
+            onClick={() => setRightOpen((v) => !v)}
+          >
+            <span className="msr" aria-hidden="true" data-fill={rightOpen ? "1" : "0"} style={{ fontSize: 23 }}>
+              tune
+            </span>
+          </button>
+        </div>
+      </div>
       </div>
     </div>
   );

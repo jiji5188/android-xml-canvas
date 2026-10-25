@@ -142,6 +142,48 @@
   }
 }
 
+/* ===== 移动端视图切换标签（仅窄屏显示，手机分「预览 / XML 代码」两屏） ===== */
+.axv-mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .axv-mobile-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #11111b;
+    border-bottom: 1px solid #313244;
+  }
+  .axv-mobile-tabs button {
+    flex: 1;
+    padding: 10px 0;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border: 1px solid #45455e;
+  }
+  .axv-mobile-tabs button.active {
+    background: #6750A4;
+    color: #fff;
+    border-color: #6750A4;
+  }
+  /* 两个视图互斥：窄屏一次只显示一个 */
+  .axv-split.axv-view-preview .axv-left-pane {
+    display: none;
+  }
+  .axv-split.axv-view-code .axv-right-pane {
+    display: none;
+  }
+  .axv-split.axv-view-code .axv-left-pane {
+    height: auto;
+    flex: 1;
+    min-height: 0;
+  }
+}
+
 .axv-prop-panel {
   background: #fff;
   color: #1d1b20;

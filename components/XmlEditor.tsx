@@ -139,6 +139,8 @@ export function XmlEditor() {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
 
+  const [mobileView, setMobileView] = useState<"preview" | "code">("preview");
+
   const resources: ResourceTable = useMemo(() => {
     return resourceFragment.trim() ? mergeResourceFragment(resourceFragment) : DEFAULT_RESOURCES;
   }, [resourceFragment]);
@@ -212,8 +214,14 @@ export function XmlEditor() {
         </label>
       </div>
 
+      {/* 移动端视图切换：手机屏幕小，代码区与画布不同屏显示 */}
+      <div className="axv-mobile-tabs">
+        <button className={mobileView === "preview" ? "active" : ""} onClick={() => setMobileView("preview")}>预览</button>
+        <button className={mobileView === "code" ? "active" : ""} onClick={() => setMobileView("code")}>XML 代码</button>
+      </div>
+
       {/* 主体：左 XML / 右画布 */}
-      <div className="axv-split">
+      <div className={`axv-split axv-view-${mobileView}`}>
         {/* 左：XML 代码区 */}
         <div className="axv-left-pane">
           <div style={{ padding: "6px 12px", fontSize: 11, color: "#8a8fa3", background: "#181825", borderBottom: "1px solid #313244" }}>

@@ -181,5 +181,11 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   // LinearLayout 专用
   out["orientation"] = a["orientation"] ?? "vertical";
 
+  // M2a：复合控件占位所需
+  out["checked"] = a["checked"] === "true";
+  out["progress"] = a["progress"] !== undefined ? parseFloat(a["progress"]) || 0 : 0;
+  out["max"] = a["max"] !== undefined ? parseFloat(a["max"]) || 100 : 100;
+  out["cardCornerRadius"] = a["cardCornerRadius"] !== undefined ? (resolveSize(a["cardCornerRadius"], res, issues, path, "cardCornerRadius").kind as string === "dp" ? (resolveSize(a["cardCornerRadius"], res, issues, path, "cardCornerRadius") as { kind: "dp"; value: number }).value : 0) : 0;
+
   return { attrs: out, issues };
 }

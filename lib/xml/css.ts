@@ -8,20 +8,56 @@ import type { ResolvedAttrs } from "./resolve";
 
 const DP = (n: number, scale = 2) => n * scale;
 
+/** 全限定类名 → 短名：androidx.recyclerview.widget.RecyclerView → RecyclerView */
+function shortTag(tag: string): string {
+  return tag.includes(".") ? tag.slice(tag.lastIndexOf(".") + 1) : tag;
+}
+
 /** 控件类名（占位渲染用） */
-function viewClass(tag: string, a: ResolvedAttrs): string {
+function viewClass(rawTag: string, a: ResolvedAttrs): string {
+  const tag = shortTag(rawTag);
   switch (tag) {
     case "TextView":
+    case "AppCompatTextView":
     case "Button":
+    case "AppCompatButton":
+    case "MaterialButton":
     case "EditText":
+    case "AppCompatEditText":
+    case "TextInputEditText":
       return "axv-text";
     case "ImageView":
+    case "AppCompatImageView":
       return "axv-image";
     case "ProgressBar":
       return "axv-progress";
     case "View":
     case "Space":
       return "axv-view";
+    // M2a：复合 / 常用控件占位
+    case "CardView":
+    case "MaterialCardView":
+      return "axv-card";
+    case "RecyclerView":
+    case "ListView":
+      return "axv-list";
+    case "Switch":
+    case "SwitchMaterial":
+    case "SwitchCompat":
+      return "axv-switch";
+    case "CheckBox":
+    case "AppCompatCheckBox":
+      return "axv-check";
+    case "RadioButton":
+    case "AppCompatRadioButton":
+      return "axv-radio";
+    case "SeekBar":
+    case "Slider":
+      return "axv-seek";
+    case "Spinner":
+      return "axv-spinner";
+    case "include":
+      return "axv-include";
     default:
       return "axv-container";
   }
@@ -78,23 +114,26 @@ export function buildRenderModel(
     const { attrs, issues: nIssues } = resolveNodeAttrs(node, res);
     issues.push(...nIssues);
     const style: Record<string, string | number> = {};
+    const tag = shortTag(node.tag); // 全限定类名归一化
 
     // 容器
-    if (node.tag === "LinearLayout" || node.tag === "FrameLayout" || node.tag === "ScrollView" || node.tag === "HorizontalScrollView") {
+    if (tag === "LinearLayout" || tag === "FrameLayout" || tag === "ScrollView" || tag === "HorizontalScrollView" || tag === "CardView" || tag === "MaterialCardView") {
       style.display = "flex";
-      if (node.tag === "ScrollView") {
+      if (tag === "ScrollView") {
         style.flexDirection = "column";
         style.overflowY = "auto";
-      } else if (node.tag === "HorizontalScrollView") {
+      } else if (tag === "HorizontalScrollView") {
         style.flexDirection = "row";
         style.overflowX = "auto";
-      } else if (node.tag === "LinearLayout") {
+      } else if (tag === "LinearLayout") {
         const o = orientationAlign((attrs["orientation"] as string) || "vertical");
         style.flexDirection = o.flexDirection;
         const g = gravityToJustify((attrs["gravity"] as string) || "");
         Object.assign(style, g);
         style.justifyContent = g.justifyContent ?? "flex-start";
         style.alignItems = g.alignItems ?? "stretch";
+      } else if (tag === "CardView" || tag === "MaterialCardView") {
+        style.flexDirection = "column";
       } else {
         // FrameLayout
         style.position = "relative";
@@ -166,17 +205,20 @@ export function buildRenderModel(
       if ((attrs["textAllCaps"] as boolean)) style.textTransform = "uppercase";
       if ((attrs["textStyle"] as string) === "bold") style.fontWeight = 600;
       // Button/EditText 默认样式
-      if (node.tag === "Button") {
+      if (tag === "Button" || tag === "MaterialButton" || tag === "AppCompatButton") {
         style.backgroundColor = bg || "#6750A4";
         style.color = tc || "#FFFFFF";
         style.borderRadius = style.borderRadius ?? `${DP(20, scale)}px`;
         style.fontWeight = 500;
         style.cursor = "pointer";
       }
-      if (node.tag === "EditText") {
+      if (tag === "EditText" || tag === "AppCompatEditText" || tag === "TextInputEditText") {
         style.border = style.border ?? "1px solid #E0D9E3";
         style.borderRadius = style.borderRadius ?? `${DP(8, scale)}px`;
         style.backgroundColor = style.backgroundColor ?? "#FFFFFF";
+        if (attrs["hint"] && !(attrs["text"] as string)) {
+          style.color = "#9A9AA8";
+        }
       }
       style.minHeight = (attrs["minHeight"] as number) ? `${DP(attrs["minHeight"] as number, scale)}px` : style.minHeight;
     }
@@ -202,23 +244,88 @@ export function buildRenderModel(
       }
     }
 
+    // ===== M2a：复合 / 常用控件占位渲染 =====
+    if (cls === "axv-card") {
+      const cr = (attrs["cardCornerRadius"] as number) || 12;
+      style.background = bg || "#FFFFFF";
+      style.borderRadius = `${DP(cr, scale)}px`;
+      if (!el || (el.value ?? 0) <= 0) style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)";
+      style.overflow = "hidden";
+    }
+
+    if (cls === "axv-list") {
+      style.background = style.background || "#FFFFFF";
+      style.minHeight = style.minHeight || `${DP(160, scale)}px`;
+    }
+
+    if (cls === "axv-switch") {
+      style.minWidth = `${DP(56, scale)}px`;
+      style.minHeight = `${DP(32, scale)}px`;
+      style.borderRadius = `${DP(16, scale)}px`;
+      style.background = style.background || (attrs["checked"] ? "#6750A4" : "#E0D9E3");
+      style.boxSizing = "border-box";
+    }
+
+    if (cls === "axv-check" || cls === "axv-radio") {
+      style.minWidth = `${DP(24, scale)}px`;
+      style.minHeight = `${DP(24, scale)}px`;
+      style.boxSizing = "border-box";
+      style.background = style.background || (attrs["checked"] ? "#6750A4" : "#FFFFFF");
+      style.border = "2px solid " + (attrs["checked"] ? "#6750A4" : "#79747E");
+      style.borderRadius = cls === "axv-radio" ? "50%" : `${DP(4, scale)}px`;
+    }
+
+    if (cls === "axv-seek") {
+      style.minWidth = `${DP(120, scale)}px`;
+      style.minHeight = `${DP(24, scale)}px`;
+      style.background = style.background || "#E0D9E3";
+      style.borderRadius = `${DP(2, scale)}px`;
+      const p = (attrs["progress"] as number) || 0;
+      const maxV = (attrs["max"] as number) || 100;
+      style["--axv-progress"] = String(Math.min(1, maxV > 0 ? p / maxV : 0));
+    }
+
+    if (cls === "axv-spinner") {
+      style.minHeight = `${DP(40, scale)}px`;
+      style.border = "1px solid #79747E";
+      style.borderRadius = `${DP(8, scale)}px`;
+      style.background = style.background || "#FFFFFF";
+      style.paddingRight = `${DP(28, scale)}px`;
+    }
+
+    if (cls === "axv-include") {
+      style.minHeight = `${DP(48, scale)}px`;
+      style.border = "1px dashed #B0AEB8";
+      style.borderRadius = `${DP(4, scale)}px`;
+    }
+
     // layout_gravity（FrameLayout / LinearLayout 子项）
     const lg = layoutGravityToSelf((attrs["layoutGravity"] as string) || "");
     Object.assign(style, lg);
     // FrameLayout 子项绝对定位
-    if (node.tag !== "FrameLayout" && node.tag !== "LinearLayout" && node.tag !== "ScrollView" && node.tag !== "HorizontalScrollView") {
+    if (tag !== "FrameLayout" && tag !== "LinearLayout" && tag !== "ScrollView" && tag !== "HorizontalScrollView" && tag !== "CardView" && tag !== "MaterialCardView") {
       if (findParentTag(root, node) === "FrameLayout") {
         style.position = "absolute";
         style.zIndex = "1";
       }
     }
 
+    // 开关/勾选类不渲染文字到框里（会在 title 提示里显示）
+    let text = (attrs["text"] as string) || "";
+    if (cls === "axv-switch" || cls === "axv-check" || cls === "axv-radio" || cls === "axv-seek") {
+      text = "";
+    } else if (cls === "axv-include") {
+      text = "⟳ include " + ((node.attrs["layout"] as string) || "");
+    } else if (cls === "axv-text" && !text && (attrs["hint"] as string)) {
+      text = attrs["hint"] as string;
+    }
+
     const resolved: ResolvedNode = {
       tag: node.tag,
       path: node.path,
       style,
-      className: cls,
-      text: (attrs["text"] as string) || "",
+      className: cls + (attrs["checked"] ? " axv-checked" : ""),
+      text,
       issues: nIssues,
       children: node.children.map(resolveAll),
       rawAttrs: node.attrs,

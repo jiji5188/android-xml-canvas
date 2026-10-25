@@ -34,7 +34,7 @@ describe("M1a 渲染引擎（XML → CSS 树）", () => {
 
     const btn = root.children[4];
     expect(btn.tag).toBe("Button");
-    expect(btn.style.background).toBe("#6750A4");
+    expect(btn.style.backgroundColor).toBe("#6750A4");
     expect(btn.text).toBe("确定");
     expect(btn.style.marginTop).toBe("48px");
   });
@@ -83,7 +83,7 @@ describe("M1a 渲染引擎（XML → CSS 树）", () => {
     const line = m.root.children[1];
     expect(line.style.marginTop).toBe("20px");
     const btn = m.root.children[4];
-    expect(btn.style.background).toBe("#FF0000");
+    expect(btn.style.backgroundColor).toBe("#FF0000");
   });
 
   it("issues：未定义 @string 给 warn 不阻断", () => {

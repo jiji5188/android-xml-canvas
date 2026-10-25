@@ -42,8 +42,10 @@ function parseElement(s: string, pos: { i: number }, path: string, issues: XmlIs
   if (!s.startsWith("<", pos.i)) return null;
   pos.i++;
   const tagStart = pos.i;
-  while (pos.i < s.length && !/[>\s]/.test(s[pos.i])) pos.i++;
-  const tag = s.slice(tagStart, pos.i).trim();
+  while (pos.i < s.length && !/[>\s/]/.test(s[pos.i])) pos.i++;
+  let tag = s.slice(tagStart, pos.i).trim();
+  // 自闭合标签 <tag/> 的 tag 可能吃到 “/”（例如 <TextView/>），去掉斜杠
+  if (tag.endsWith("/")) tag = tag.slice(0, -1).trim();
   if (tag === "") {
     issues.push({ level: "warn", nodePath: path, message: "空标签名" });
     return null;

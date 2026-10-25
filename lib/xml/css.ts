@@ -3,8 +3,9 @@
 // 单位：画布 scale 默认 1dp=2px（可通过 scale 参数调）。
 
 import type { XmlNode, ResourceTable, RenderModel, ResolvedNode } from "./types";
-import { resolveNodeAttrs } from "./resolve";
+import { resolveNodeAttrs, resolveSize } from "./resolve";
 import type { ResolvedAttrs } from "./resolve";
+import { solveConstraintChildren } from "./constraints";
 
 const DP = (n: number, scale = 2) => n * scale;
 
@@ -79,13 +80,30 @@ function sizeToCss(s: unknown, scale: number): string {
 function gravityToJustify(g: string): Record<string, string> {
   const v: Record<string, string> = {};
   if (!g) return v;
-  const has = (k: string) => g.includes(k);
-  // 水平主轴（vertical 容器的 justify-content）
-  if (has("center_horizontal")) v.justifyContent = "center";
-  if (has("end") || has("right")) v.justifyContent = "flex-end";
-  if (has("start") || has("left")) v.justifyContent = "flex-start";
-  if (has("center_vertical")) v.alignItems = "center";
+  const parts = g.split("|");
+  const has = (...vals: string[]) => parts.some((p) => vals.includes(p));
+  if (has("center")) {
+    v.justifyContent = "center";
+    v.alignItems = "center";
+  } else {
+    if (has("top")) v.justifyContent = "flex-start";
+    if (has("bottom")) v.justifyContent = "flex-end";
+    if (has("center_vertical")) v.justifyContent = "center";
+    if (has("start") || has("left")) v.alignItems = "flex-start";
+    if (has("end") || has("right")) v.alignItems = "flex-end";
+    if (has("center_horizontal")) v.alignItems = "center";
+  }
   return v;
+}
+
+/** 文本类控件的 gravity → text-align（Button/TextView/EditText 语义） */
+function gravityToTextAlign(g: string): "left" | "center" | "right" | undefined {
+  if (!g) return undefined;
+  const parts = g.split("|");
+  if (parts.includes("center") || parts.includes("center_horizontal")) return "center";
+  if (parts.includes("start") || parts.includes("left")) return "left";
+  if (parts.includes("end") || parts.includes("right")) return "right";
+  return undefined;
 }
 
 function layoutGravityToSelf(g: string): Record<string, string> {
@@ -117,7 +135,8 @@ export function buildRenderModel(
     const tag = shortTag(node.tag); // 全限定类名归一化
 
     // 容器
-    if (tag === "LinearLayout" || tag === "FrameLayout" || tag === "ScrollView" || tag === "HorizontalScrollView" || tag === "CardView" || tag === "MaterialCardView") {
+    const isCL = tag === "ConstraintLayout" || tag === "ConstraintSet";
+    if (tag === "LinearLayout" || tag === "FrameLayout" || tag === "ScrollView" || tag === "HorizontalScrollView" || tag === "CardView" || tag === "MaterialCardView" || isCL) {
       style.display = "flex";
       if (tag === "ScrollView") {
         style.flexDirection = "column";
@@ -135,7 +154,7 @@ export function buildRenderModel(
       } else if (tag === "CardView" || tag === "MaterialCardView") {
         style.flexDirection = "column";
       } else {
-        // FrameLayout
+        // FrameLayout / ConstraintLayout
         style.position = "relative";
       }
     }
@@ -178,7 +197,7 @@ export function buildRenderModel(
 
     // 背景 / 圆角 / 阴影
     const bg = (attrs["background"] as string) || "";
-    if (bg) style.background = bg;
+    if (bg) style.backgroundColor = bg;
     const r = (attrs["radius"] as number) || 0;
     if (r) style.borderRadius = `${DP(r, scale)}px`;
     const el = attrs["elevation"] as { kind?: string; value?: number } | null;
@@ -201,7 +220,9 @@ export function buildRenderModel(
       const tc = (attrs["textColor"] as string) || "#1D1B20";
       style.color = tc;
       const align = (attrs["textAlignment"] as string) || "";
-      if (align === "center") style.textAlign = "center";
+      const ga = gravityToTextAlign((attrs["gravity"] as string) || "");
+      if (align === "center" || ga === "center") style.textAlign = "center";
+      else if (ga) style.textAlign = ga;
       if ((attrs["textAllCaps"] as boolean)) style.textTransform = "uppercase";
       if ((attrs["textStyle"] as string) === "bold") style.fontWeight = 600;
       // Button/EditText 默认样式
@@ -226,7 +247,7 @@ export function buildRenderModel(
     if (cls === "axv-image") {
       if (attrs["adjustViewBounds"]) style.aspectRatio = "1 / 1";
       if (!(attrs["src"] as string)) {
-        style.background = style.background || "#E0D9E3";
+        style.backgroundColor = style.backgroundColor || "#E0D9E3";
         style.minHeight = style.minHeight || `${DP(48, scale)}px`;
       }
     }
@@ -235,7 +256,7 @@ export function buildRenderModel(
       const styleAttr = (attrs["progressStyle"] as string) || "";
       if (styleAttr.includes("horizontal")) {
         style.height = style.height || `${DP(4, scale)}px`;
-        style.background = style.background || "#E0D9E3";
+        style.backgroundColor = style.backgroundColor || "#E0D9E3";
         style.borderRadius = `${DP(2, scale)}px`;
         style.overflow = "hidden";
       } else {
@@ -247,14 +268,14 @@ export function buildRenderModel(
     // ===== M2a：复合 / 常用控件占位渲染 =====
     if (cls === "axv-card") {
       const cr = (attrs["cardCornerRadius"] as number) || 12;
-      style.background = bg || "#FFFFFF";
+      style.backgroundColor = bg || "#FFFFFF";
       style.borderRadius = `${DP(cr, scale)}px`;
       if (!el || (el.value ?? 0) <= 0) style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)";
       style.overflow = "hidden";
     }
 
     if (cls === "axv-list") {
-      style.background = style.background || "#FFFFFF";
+      style.backgroundColor = style.backgroundColor || "#FFFFFF";
       style.minHeight = style.minHeight || `${DP(160, scale)}px`;
     }
 
@@ -262,7 +283,7 @@ export function buildRenderModel(
       style.minWidth = `${DP(56, scale)}px`;
       style.minHeight = `${DP(32, scale)}px`;
       style.borderRadius = `${DP(16, scale)}px`;
-      style.background = style.background || (attrs["checked"] ? "#6750A4" : "#E0D9E3");
+      style.backgroundColor = style.backgroundColor || (attrs["checked"] ? "#6750A4" : "#E0D9E3");
       style.boxSizing = "border-box";
     }
 
@@ -270,7 +291,7 @@ export function buildRenderModel(
       style.minWidth = `${DP(24, scale)}px`;
       style.minHeight = `${DP(24, scale)}px`;
       style.boxSizing = "border-box";
-      style.background = style.background || (attrs["checked"] ? "#6750A4" : "#FFFFFF");
+      style.backgroundColor = style.backgroundColor || (attrs["checked"] ? "#6750A4" : "#FFFFFF");
       style.border = "2px solid " + (attrs["checked"] ? "#6750A4" : "#79747E");
       style.borderRadius = cls === "axv-radio" ? "50%" : `${DP(4, scale)}px`;
     }
@@ -278,7 +299,7 @@ export function buildRenderModel(
     if (cls === "axv-seek") {
       style.minWidth = `${DP(120, scale)}px`;
       style.minHeight = `${DP(24, scale)}px`;
-      style.background = style.background || "#E0D9E3";
+      style.backgroundColor = style.backgroundColor || "#E0D9E3";
       style.borderRadius = `${DP(2, scale)}px`;
       const p = (attrs["progress"] as number) || 0;
       const maxV = (attrs["max"] as number) || 100;
@@ -289,7 +310,7 @@ export function buildRenderModel(
       style.minHeight = `${DP(40, scale)}px`;
       style.border = "1px solid #79747E";
       style.borderRadius = `${DP(8, scale)}px`;
-      style.background = style.background || "#FFFFFF";
+      style.backgroundColor = style.backgroundColor || "#FFFFFF";
       style.paddingRight = `${DP(28, scale)}px`;
     }
 
@@ -303,11 +324,10 @@ export function buildRenderModel(
     const lg = layoutGravityToSelf((attrs["layoutGravity"] as string) || "");
     Object.assign(style, lg);
     // FrameLayout 子项绝对定位
-    if (tag !== "FrameLayout" && tag !== "LinearLayout" && tag !== "ScrollView" && tag !== "HorizontalScrollView" && tag !== "CardView" && tag !== "MaterialCardView") {
-      if (findParentTag(root, node) === "FrameLayout") {
-        style.position = "absolute";
-        style.zIndex = "1";
-      }
+    const parentTag = shortTag(findParentTag(root, node) ?? "");
+    if (parentTag === "FrameLayout") {
+      style.position = "absolute";
+      style.zIndex = "1";
     }
 
     // 开关/勾选类不渲染文字到框里（会在 title 提示里显示）
@@ -334,7 +354,60 @@ export function buildRenderModel(
   };
 
   const rootNode = resolveAll(root);
+
+  // M2b：ConstraintLayout 子项约束定位（后处理：对每个 CL 节点求解直接子项）
+  const patchCL = (n: ResolvedNode): void => {
+    if (shortTag(n.tag) !== "ConstraintLayout") {
+      for (const c of n.children) patchCL(c);
+      return;
+    }
+    // CL 自身内容区尺寸（px）：取自身 style 的 width/height，"100%"/auto/undefined 时回落到手机屏默认
+    const toPx = (v: unknown, fallback: number): number => {
+      const s2 = String(v ?? "");
+      if (s2.endsWith("px")) return parseFloat(s2);
+      if (s2 === "100%" || s2 === "" || s2 === "auto") return fallback;
+      const m = s2.match(/^(-?[0-9.]+)/);
+      if (m && !s2.includes("%")) return parseFloat(m[1]);
+      return fallback;
+    };
+    const cw = toPx(n.style.width, 412 * scale);
+    const ch = toPx(n.style.height, 892 * scale);
+    const sourceCL = findSourceNode(root, n.path);
+    if (!sourceCL) return;
+    const solved = solveConstraintChildren(sourceCL, res, cw, ch);
+    issues.push(...solved.issues);
+    for (const child of n.children) {
+      const box = solved.boxes.get(child.path);
+      if (!box) continue;
+      child.style.position = "absolute";
+      child.style.left = `${box.left}px`;
+      child.style.top = `${box.top}px`;
+      child.style.width = `${box.width}px`;
+      child.style.height = `${box.height}px`;
+      child.style.boxSizing = "border-box";
+      delete child.style.marginTop;
+      delete child.style.marginRight;
+      delete child.style.marginBottom;
+      delete child.style.marginLeft;
+      for (const gc of child.children) patchCL(gc);
+    }
+  };
+  patchCL(rootNode);
+
   return { root: rootNode, issues };
+}
+
+/** 按 path 在源 XML 树里找节点（ConstraintLayout 求解需要 XmlNode.attrs） */
+function findSourceNode(root: XmlNode, path: string): XmlNode | null {
+  const walk = (n: XmlNode): XmlNode | null => {
+    if (n.path === path) return n;
+    for (const c of n.children) {
+      const r = walk(c);
+      if (r) return r;
+    }
+    return null;
+  };
+  return walk(root);
 }
 
 /** 从 root 找某 node 的父节点 tag（M1 简化：FrameLayout 子项绝对定位判断） */

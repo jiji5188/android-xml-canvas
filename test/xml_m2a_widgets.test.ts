@@ -29,7 +29,7 @@ describe("M2a 复合控件占位渲染", () => {
     expect(card).not.toBeNull();
     expect(card.className).toBe("axv-card");
     expect(card.style.display).toBe("flex");
-    expect(card.style.background).toBe("#FFFFFF");
+    expect(card.style.backgroundColor).toBe("#FFFFFF");
     expect(card.style.borderRadius).toBe("16px"); // 8dp @2x
   });
 
@@ -52,7 +52,7 @@ describe("M2a 复合控件占位渲染", () => {
     </LinearLayout>`).root;
     const sw = findByTag(root, "Switch");
     expect(sw.className).toBe("axv-switch axv-checked");
-    expect(sw.style.background).toBe("#6750A4");
+    expect(sw.style.backgroundColor).toBe("#6750A4");
     expect(sw.text).toBe(""); // 文字不画进开关里
   });
 
@@ -63,9 +63,9 @@ describe("M2a 复合控件占位渲染", () => {
     const off = findByTag(model(xml("false")).root, "CheckBox");
     const on = findByTag(model(xml("true")).root, "CheckBox");
     expect(off.className).toBe("axv-check");
-    expect(off.style.background).toBe("#FFFFFF");
+    expect(off.style.backgroundColor).toBe("#FFFFFF");
     expect(on.className).toBe("axv-check axv-checked");
-    expect(on.style.background).toBe("#6750A4");
+    expect(on.style.backgroundColor).toBe("#6750A4");
   });
 
   it("RadioButton 是圆形", () => {

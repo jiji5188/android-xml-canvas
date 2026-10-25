@@ -1,0 +1,44 @@
+{
+  "name": "m3e-canvas",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "npx serve out",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "html-to-image": "^1.11.13",
+    "motion": "^13.4.4",
+    "next": "16.4.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "^7.0.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "jsdom": "^25.0.1",
+    "tailwindcss": "^4",
+    "vitest": "^3.2.4"
+  },
+  "description": "Sketch Material 3 Expressive screens in the browser and turn them into vibe-coding prompts.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lnkiai/m3e-canvas.git"
+  },
+  "homepage": "https://lnkiai.github.io/m3e-canvas/"
+}

@@ -1,0 +1,216 @@
+// lib/xml/parser.ts — XML 文本 → 归一化树（M1：基础布局子集）
+// 纯函数，浏览器/Node 双端可用（不依赖 DOMParser，自带轻量 XML 解析器，
+// 规避 M3E 运行环境里 Node 冒烟脚本拿不到 DOM 的问题）。
+
+import type { XmlNode, XmlIssue } from "./types";
+
+/** M1 支持的标签（其余走 unknown 占位，不阻断） */
+export const KNOWN_TAGS = new Set([
+  "LinearLayout", "FrameLayout", "ScrollView", "HorizontalScrollView",
+  "TextView", "Button", "ImageView", "EditText", "ProgressBar", "View",
+  "Space", "ImageView",
+]);
+
+/** 轻量 XML 解析（支持属性、嵌套、注释、自闭合；不支持 CDATA/实体除标准五件套） */
+export function parseLayoutXml(xml: string, resourceDeclOk = true): { root: XmlNode | null; issues: XmlIssue[] } {
+  const issues: XmlIssue[] = [];
+  // 去掉 XML 声明与 doctype
+  const text = xml
+    .replace(/^<\?xml[\s\S]*?\?>/i, "")
+    .replace(/<!DOCTYPE[\s\S]*?>/i, "");
+
+  const pos = { i: 0 };
+  const root = parseElement(text, pos, "#0", issues);
+  if (!root && text.trim() !== "") {
+    issues.push({ level: "error", nodePath: "#0", message: "无法解析根元素（XML 可能不完整）" });
+  }
+  return { root, issues };
+}
+
+function skipWs(s: string, pos: { i: number }): void {
+  while (pos.i < s.length && /\s/.test(s[pos.i])) pos.i++;
+}
+
+function parseElement(s: string, pos: { i: number }, path: string, issues: XmlIssue[]): XmlNode | null {
+  skipWs(s, pos);
+  // 注释：跳过并继续找元素
+  while (s.startsWith("<!--", pos.i)) {
+    const end = s.indexOf("-->", pos.i);
+    pos.i = end === -1 ? s.length : end + 3;
+    skipWs(s, pos);
+  }
+  if (!s.startsWith("<", pos.i)) return null;
+  pos.i++;
+  const tagStart = pos.i;
+  while (pos.i < s.length && !/[>\s]/.test(s[pos.i])) pos.i++;
+  const tag = s.slice(tagStart, pos.i).trim();
+  if (tag === "") {
+    issues.push({ level: "warn", nodePath: path, message: "空标签名" });
+    return null;
+  }
+
+  const attrs: Record<string, string> = {};
+  let selfClosed = false; // <tag ... /> 无子元素
+  // 解析属性
+  while (true) {
+    skipWs(s, pos);
+    if (pos.i >= s.length) break;
+    const ch = s[pos.i];
+    if (ch === "/") {
+      pos.i++;
+      selfClosed = true;
+      break;
+    }
+    if (ch === ">") {
+      pos.i++;
+      break;
+    }
+    // 属性名
+    const nameStart = pos.i;
+    while (pos.i < s.length && !/[=\s>\/]/.test(s[pos.i])) pos.i++;
+    const name = s.slice(nameStart, pos.i).trim();
+    if (name === "") {
+      pos.i++;
+      continue;
+    }
+    // 命名空间前缀归一化：android:xxx → xxx；tools: 是设计期属性，不存
+    const colonIdx = name.indexOf(":");
+    const isTools = colonIdx !== -1 && name.slice(0, colonIdx) === "tools";
+    const localName = colonIdx !== -1 ? name.slice(colonIdx + 1) : name;
+    skipWs(s, pos);
+    let value = "";
+    if (s[pos.i] === "=") {
+      pos.i++;
+      skipWs(s, pos);
+      const q = s[pos.i];
+      if (q === '"' || q === "'") {
+        pos.i++;
+        const vStart = pos.i;
+        while (pos.i < s.length && s[pos.i] !== q) pos.i++;
+        value = unescapeXml(s.slice(vStart, pos.i));
+        pos.i++; // 过引号
+      } else {
+        const vStart = pos.i;
+        while (pos.i < s.length && !/[>\s]/.test(s[pos.i])) pos.i++;
+        value = unescapeXml(s.slice(vStart, pos.i));
+      }
+    }
+    if (!isTools) attrs[localName] = value;
+  }
+
+  const node: XmlNode = { tag, attrs, children: [], path };
+
+  // 自闭合标签没有子元素，直接返回（不要吞掉后面的兄弟节点）
+  if (selfClosed) return node;
+
+  // 子元素
+  while (true) {
+    skipWs(s, pos);
+    while (s.startsWith("<!--", pos.i)) {
+      const end = s.indexOf("-->", pos.i);
+      pos.i = end === -1 ? s.length : end + 3;
+      skipWs(s, pos);
+    }
+    if (pos.i >= s.length) break;
+    if (s.startsWith(`</${tag}`, pos.i)) {
+      pos.i += 2 + tag.length; // 跳过 </tag
+      skipWs(s, pos);
+      if (s[pos.i] === ">") pos.i++;
+      break;
+    }
+    if (s.startsWith("<", pos.i)) {
+      // 遇到别的开标签但没有子元素容器（如 <resources>）—— M1 不处理，直接跳过该标签块
+      const nextTagMatch = s.slice(pos.i).match(/^<\s*([A-Za-z_][\w.:-]*)/);
+      if (nextTagMatch) {
+        const nextTag = nextTagMatch[1];
+        const child = parseElement(s, pos, `${path}/${node.children.length}`, issues);
+        if (child) node.children.push(child);
+        else pos.i++;
+        void nextTag;
+        continue;
+      }
+      // 无法识别：跳过这个字符继续
+      pos.i++;
+      continue;
+    }
+    // 文本节点：M1 忽略（TextView 文本走 android:text 属性）
+    while (pos.i < s.length && s[pos.i] !== "<") pos.i++;
+  }
+  return node;
+}
+
+function unescapeXml(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+/** 按 path（#0/1/0 风格）定位节点 */
+export function findNode(root: XmlNode, path: string): XmlNode | null {
+  // path 形如 #0 / #0/1 / #0/1/0：#0 恒为根；其后每段是父节点的 children 下标，逐段步进
+  let cur: XmlNode | null = root;
+  const segs = path.slice(path.startsWith("#") ? 1 : 0).split("/");
+  for (let i = 1; i < segs.length; i++) {
+    const n = parseInt(segs[i], 10);
+    if (!cur || isNaN(n) || n < 0 || n >= cur.children.length) return null;
+    cur = cur.children[n];
+  }
+  return cur;
+}
+
+/**
+ * 把原 XML 文本中 path 对应节点的属性替换后重新序列化（保留其他部分原文）。
+ * M1b 用：整文档重序列化 + 注释保留（先注释锚点后拼回）。
+ */
+export function rewriteNodeAttrs(
+  xml: string,
+  path: string,
+  newAttrs: Record<string, string>,
+  removedAttrs?: string[],
+): string {
+  // 简化策略：重新 parse → 改属性 → serialize。
+  // 保留注释：先扫出原注释文本，序列化后再按出现顺序插回。
+  const { root } = parseLayoutXml(xml);
+  if (!root) return xml;
+  const target = findNode(root, path);
+  if (!target) return xml;
+  const attrs = { ...target.attrs };
+  for (const [k, v] of Object.entries(newAttrs)) attrs[k] = v;
+  for (const k of removedAttrs ?? []) delete attrs[k];
+  target.attrs = attrs;
+
+  const comments: { text: string }[] = [];
+  const re = /<!--[\s\S]*?-->/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml)) !== null) comments.push({ text: m[0] });
+
+  const serialized = serialize(root);
+  // 注释简单追加到文档尾（M1b 够用；M2 再做原位保留）
+  const withComments = comments.length
+    ? serialized + "\n" + comments.map((c) => c.text).join("\n") + "\n"
+    : serialized;
+
+  // 把 XML 声明拼回
+  const decl = xml.match(/^<\?xml[\s\S]*?\?>/i);
+  return (decl ? decl[0] + "\n" : "") + withComments;
+}
+
+/** 序列化：把归一化树写回 XML 文本 */
+export function serialize(node: XmlNode, indent = ""): string {
+  const attrsStr = Object.entries(node.attrs)
+    .map(([k, v]) => `    android:${k}="${v}"`)
+    .join("\n");
+  if (node.children.length === 0) {
+    return attrsStr
+      ? `${indent}<${node.tag}\n${attrsStr}\n${indent}/>`
+      : `${indent}<${node.tag} />`;
+  }
+  const open = attrsStr
+    ? `${indent}<${node.tag}\n${attrsStr}\n${indent}>`
+    : `${indent}<${node.tag}>`;
+  const inner = node.children.map((c) => serialize(c, indent + "  ")).join("\n");
+  return `${open}\n${inner}\n${indent}</${node.tag}>`;
+}

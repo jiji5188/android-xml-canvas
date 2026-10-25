@@ -4,7 +4,7 @@
 import type { XmlNode, XmlIssue, ResourceTable } from "./types";
 import { parseDimenToDp } from "./resources";
 
-export type ResolvedAttrs = Record<string, string | number>;
+export type ResolvedAttrs = Record<string, string | number | boolean | SizeSpec | null>;
 
 /** 尺寸类属性解析：match_parent/wrap_content/0dp/具体值/引用 */
 export type SizeSpec =

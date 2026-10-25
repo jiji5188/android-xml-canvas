@@ -89,7 +89,59 @@
   text-align: center;
 }
 
-/* 属性面板 */
+/* 顶部工具条（窄屏自动换行） */
+.axv-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #232334;
+  color: #cdd6f4;
+  border-bottom: 1px solid #313244;
+}
+
+/* 主体左右分栏 */
+.axv-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.axv-left-pane {
+  width: 44%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #313244;
+}
+
+.axv-right-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 窄屏（手机/平板竖屏）：上下堆叠，XML 在上、画布在下 */
+@media (max-width: 900px) {
+  .axv-split {
+    flex-direction: column;
+  }
+  .axv-left-pane {
+    width: 100%;
+    height: 45%;
+    min-height: 220px;
+    border-right: none;
+    border-bottom: 1px solid #313244;
+  }
+  .axv-right-pane {
+    min-height: 0;
+  }
+  .axv-prop-panel {
+    height: 140px;
+  }
+}
+
 .axv-prop-panel {
   background: #fff;
   color: #1d1b20;

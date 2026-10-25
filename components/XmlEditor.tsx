@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { parseLayoutXml } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
-import { mergeResourceFragment } from "@/lib/xml/resources";
+import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import type { ResourceTable } from "@/lib/xml/types";
 import { XmlCanvas } from "./XmlCanvas";
 import "./xml-canvas.css";
@@ -140,7 +140,7 @@ export function XmlEditor() {
   const [scale, setScale] = useState(1);
 
   const resources: ResourceTable = useMemo(() => {
-    return resourceFragment.trim() ? mergeResourceFragment(resourceFragment) : undefined;
+    return resourceFragment.trim() ? mergeResourceFragment(resourceFragment) : DEFAULT_RESOURCES;
   }, [resourceFragment]);
 
   const { model, issues, parseErr } = useMemo(() => {
@@ -152,7 +152,7 @@ export function XmlEditor() {
   // 切换 tab / 载入样例时清空选中
   useEffect(() => setSelectedPath(null), [xml]);
 
-  const setTabAndXml = (t: Tab) => {
+  const setTabAndXml = (t: Exclude<Tab, "custom">) => {
     setTab(t);
     setXml(SAMPLES[t]);
   };
@@ -177,7 +177,7 @@ export function XmlEditor() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       {/* 顶部工具条 */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "#232334", color: "#cdd6f4", borderBottom: "1px solid #313244" }}>
+      <div className="axv-toolbar">
         <span style={{ fontWeight: 700, fontSize: 14, marginRight: 12 }}>Android 可视化布局编辑器</span>
         {(["list", "toolbar", "frame"] as const).map((t) => (
           <button
@@ -213,9 +213,9 @@ export function XmlEditor() {
       </div>
 
       {/* 主体：左 XML / 右画布 */}
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <div className="axv-split">
         {/* 左：XML 代码区 */}
-        <div style={{ width: "44%", display: "flex", flexDirection: "column", borderRight: "1px solid #313244" }}>
+        <div className="axv-left-pane">
           <div style={{ padding: "6px 12px", fontSize: 11, color: "#8a8fa3", background: "#181825", borderBottom: "1px solid #313244" }}>
             res/layout/{tab === "custom" ? "custom" : tab === "list" ? "list" : tab === "toolbar" ? "toolbar" : "floating"}.xml（M1a 实时预览，可直接编辑下方内容）
           </div>
@@ -238,7 +238,7 @@ export function XmlEditor() {
         </div>
 
         {/* 右：画布 */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <div className="axv-right-pane">
           <div className="axv-stage" style={{ flex: 1 }}>
             {parseErr ? (
               <div className="axv-canvas-empty">XML 解析失败，请检查结构</div>

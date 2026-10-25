@@ -143,7 +143,10 @@ export function buildRenderModel(
     const r = (attrs["radius"] as number) || 0;
     if (r) style.borderRadius = `${DP(r, scale)}px`;
     const el = attrs["elevation"] as { kind?: string; value?: number } | null;
-    if (el && el.kind === "dp" && (el.value ?? 0) > 0) style.boxShadow = `0 ${el.value * scale * 2}px ${el.value * scale * 4}px rgba(0,0,0,0.18)`;
+    if (el && el.kind === "dp" && (el.value ?? 0) > 0) {
+      const ev = el.value ?? 0;
+      style.boxShadow = `0 ${ev * scale * 2}px ${ev * scale * 4}px rgba(0,0,0,0.18)`;
+    }
 
     // 可见性
     const vis = (attrs["visibility"] as string) || "visible";
@@ -179,7 +182,7 @@ export function buildRenderModel(
     }
 
     if (cls === "axv-image") {
-      style.aspectRatio = (attrs["adjustViewBounds"] as boolean) ? "1 / 1" : undefined;
+      if (attrs["adjustViewBounds"]) style.aspectRatio = "1 / 1";
       if (!(attrs["src"] as string)) {
         style.background = style.background || "#E0D9E3";
         style.minHeight = style.minHeight || `${DP(48, scale)}px`;

@@ -124,7 +124,10 @@ export function XmlCodeEditor({ value, onChange, errors, className }: Props) {
         </div>
         <div className="axv-code-wrap">
           <pre className="axv-code-hl" ref={preRef} aria-hidden="true">
-            <code dangerouslySetInnerHTML={{ __html: highlightXml(value) + "\n" }} />
+            <code
+              className="axv-code-code"
+              dangerouslySetInnerHTML={{ __html: highlightXml(value) }}
+            />
           </pre>
           <div className="axv-code-bands" ref={bandRef} aria-hidden="true">
             {[...errLines.keys()].map((ln) => (

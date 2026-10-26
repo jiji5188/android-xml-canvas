@@ -302,7 +302,6 @@ export function XmlEditor() {
   const [resourceFragment, setResourceFragment] = useState("");
   /** 上传 res/ 目录解析出的附加资源（drawable/vector/styles/values 原文） */
   const [resExtras, setResExtras] = useState<ResourceExtras | null>(null);
-  const resInputRef = useRef<HTMLInputElement | null>(null);
   const resDirRef = useRef<HTMLInputElement | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
  const [exportNote, setExportNote] = useState<string>(" ");
@@ -894,7 +893,6 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
     } catch {
       /* ignore */
     }
-    if (resInputRef.current) resInputRef.current.value = "";
     if (resDirRef.current) resDirRef.current.value = "";
     setExportNote("已清除上传的 res 资源");
     window.setTimeout(() => setExportNote(""), 2400);
@@ -948,18 +946,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
 
   return (
     <div className="axv-editor">
-      {/* 上传资源：两个入口——散件多选（含图片/xml）与整目录（webkitdirectory） */}
-      <input
-        ref={resInputRef}
-        type="file"
-        multiple
-        accept=".xml,.png,.webp,.jpg,.jpeg,.gif,.bmp"
-        style={{ display: "none" }}
-        onChange={(e) => {
-          void onPickRes(e.target.files);
-          e.target.value = "";
-        }}
-      />
+      {/* 上传资源：整目录（webkitdirectory）入口 */}
       <input
         ref={resDirRef}
         type="file"
@@ -1190,6 +1177,33 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           )}
           {leftView === "res" && (
             <div className="axv-rail-scroll">
+              {/* 资源操作按钮（横向排列，树形框上方） */}
+              <div style={{ display: "flex", gap: 8, padding: "8px 12px 6px" }}>
+                <button
+                  className="axv-rail-mini-btn"
+                  title="选择整个 res 目录（推荐：一次导入 drawable / values / mipmap）"
+                  onClick={() => resDirRef.current?.click()}
+                >
+                  📁 选择res目录
+                </button>
+                <button
+                  className="axv-rail-mini-btn"
+                  title="打开 XML 文件"
+                  onClick={openProject}
+                >
+                  📄 打开xml
+                </button>
+                {resExtras ? (
+                  <button
+                    className="axv-rail-mini-btn axv-rail-mini-btn-danger"
+                    style={{ flex: "0 0 auto" }}
+                    title="清除已上传的 res 资源"
+                    onClick={clearRes}
+                  >
+                    ✖
+                  </button>
+                ) : null}
+              </div>
               {resExtras?.tree ? (
                 <ResTree
                   tree={resExtras.tree}
@@ -1308,34 +1322,11 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>redo</span>
           </button>
-          <button className="axv-tb-btn" title="打开 XML 文件" aria-label="打开" onClick={openProject}>
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>folder_open</span>
-          </button>
           <button className="axv-tb-btn" title="保存为 XML 文件" aria-label="保存" onClick={saveProject}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save</span>
           </button>
           <button className="axv-tb-btn" title="复制生成的 XML" aria-label="复制 XML" onClick={copyExportedXml}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>content_copy</span>
-          </button>
-          <button
-            className={"axv-tb-btn" + (resExtras ? " axv-tb-active" : "")}
-            title={
-              resExtras
-                ? "重新选择资源文件（已加载 " + resExtras.counts.images + " 张图 / " + resExtras.counts.values + " 个 values）"
-                : "选择 res 资源文件（可多选：drawable 图片 / values xml / styles.xml）"
-            }
-            aria-label="选择 res 文件"
-            onClick={() => resInputRef.current?.click()}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>perm_media</span>
-          </button>
-          <button
-            className="axv-tb-btn"
-            title="选择整个 res 目录（推荐：一次导入 drawable / values / mipmap）"
-            aria-label="选择 res 目录"
-            onClick={() => resDirRef.current?.click()}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>create_new_folder</span>
           </button>
           {resExtras ? (
             <button className="axv-tb-btn" title="清除已上传的 res 资源" aria-label="清除 res" onClick={clearRes}>

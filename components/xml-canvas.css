@@ -133,6 +133,27 @@
 .axv-tree-count { font-size: 11px; color: #9CA3AF; }
 .axv-tree-clickable { font-weight: 500; color: #2563EB; }
 
+/* 左侧资源面板 mini 操作按钮（树形框上方） */
+.axv-rail-mini-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid #D1D5DB;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.axv-rail-mini-btn:hover { background: #F3F4F6; border-color: #9CA3AF; }
+.axv-rail-mini-btn-danger { color: #B42318; border-color: #F3B4B4; }
+.axv-rail-mini-btn-danger:hover { background: #FEF2F2; border-color: #FCA5A5; }
+
 /* 颜色 swatch 触发 color picker */
 .axv-attr-sw { position: relative; display: inline-block; width: 28px; height: 28px; border-radius: 4px; flex: 0 0 28px; }
 
@@ -1247,9 +1268,14 @@
   font-size: 13px;
   line-height: 21px; /* 必须与 XmlCodeEditor 的 CODE_LINE_HEIGHT 一致（行号/错误色带定位靠它） */
   tab-size: 2;
+  /* 禁用连字：Cascadia/JetBrains Mono 的编程连字（::, =>, # 等）会两字合一、
+     宽度小于两字符，导致 pre 高亮层与 textarea 光标逐字累积偏移（~2 字符） */
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
   white-space: pre;
   word-wrap: normal;
-  overflow: auto;
+  /* 两侧始终预留相同的滚动槽宽度，避免 overflow:auto 与 hidden 的 gutter 差异让两层错位 */
+  scrollbar-gutter: stable;
   position: absolute;
   inset: 0;
   box-sizing: border-box;
@@ -1259,6 +1285,18 @@
   color: #24292F;
   background: #FFFFFF;
   overflow: hidden;
+}
+/* 关键：<pre> 里的 <code> 会被浏览器 UA 样式表强制 font-family: monospace，
+   直接声明优先于从 pre 继承的值 → 高亮层字体与透明 textarea 不一致 →
+   字符宽度逐字累积偏差（选中位置偏移 ~2 字符）。font: inherit 把它拉回同一字体。 */
+.axv-code-hl code,
+.axv-code-code {
+  font: inherit;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  letter-spacing: 0;
+  white-space: pre;
+  display: block;
 }
 .axv-code-ta {
   border: none;

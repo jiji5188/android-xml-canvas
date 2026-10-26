@@ -49,3 +49,4 @@ next-env.d.ts
 /promo
 
 _commitmsg.txt
+\n# 一次性补丁脚本 / 构建日志\n_patch*.js\n_scan.js\n_wire*.js\n_ext*.js\nbuild.log\n

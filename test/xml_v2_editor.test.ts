@@ -66,7 +66,7 @@ describe("attr-catalog", () => {
   it("editorFor：已知属性走目录，未知属性启发式", () => {
     expect(editorFor("orientation").editor).toBe("enum");
     expect(editorFor("orientation").options).toEqual(["horizontal", "vertical"]);
-    expect(editorFor("layout_width", "match_parent").editor).toBe("size");
+    expect(editorFor("layout_width", "match_parent").editor).toBe("size_input");
     // 未知属性 + 颜色值 → color
     expect(editorFor("androidX", "#FF0000").editor).toBe("color");
     // 未知属性默认 → string

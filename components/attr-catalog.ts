@@ -4,6 +4,7 @@
 export type AttrEditor =
   | "enum" // 下拉选择
   | "size" // match_parent / wrap_content / 0dp / 自定义 dp
+  | "size_input" // 可编辑尺寸输入（input + datalist 预设过滤），替代纯 select
   | "dimen" // 带单位数值（8dp / 16sp）
   | "number"
   | "color"
@@ -25,8 +26,8 @@ export interface AttrSpec {
 
 export const ATTR_CATALOG: AttrSpec[] = [
   // ===== 布局 =====
-  { name: "layout_width", editor: "size", options: ["match_parent", "wrap_content", "0dp"], default: "wrap_content", group: "布局", desc: "宽度" },
-  { name: "layout_height", editor: "size", options: ["match_parent", "wrap_content", "0dp"], default: "wrap_content", group: "布局", desc: "高度" },
+  { name: "layout_width", editor: "size_input", options: ["match_parent", "wrap_content", "0dp"], default: "wrap_content", group: "布局", desc: "宽度" },
+  { name: "layout_height", editor: "size_input", options: ["match_parent", "wrap_content", "0dp"], default: "wrap_content", group: "布局", desc: "高度" },
   { name: "layout_margin", editor: "dimen", default: "8dp", group: "布局", desc: "四周边距" },
   { name: "layout_marginTop", editor: "dimen", default: "8dp", group: "布局" },
   { name: "layout_marginBottom", editor: "dimen", default: "8dp", group: "布局" },
@@ -101,7 +102,7 @@ export function editorFor(name: string, current?: string): { editor: AttrEditor;
   // 未收录属性：启发式
   if (current === "true" || current === "false") return { editor: "bool", options: ["true", "false"] };
   if (/^#[0-9a-fA-F]{3,8}$/.test(current ?? "")) return { editor: "color" };
-  if (name === "layout_width" || name === "layout_height") return { editor: "size", options: ["match_parent", "wrap_content", "0dp"] };
+  if (name === "layout_width" || name === "layout_height") return { editor: "size_input", options: ["match_parent", "wrap_content", "0dp"] };
   if (name.includes("constraint") && name.endsWith("Of")) return { editor: "ref" };
   if (/margin|padding|TextSize$|elevation/i.test(name) || name === "textSize") return { editor: "dimen" };
   if (name.endsWith("bias") || name === "weight" || name === "maxLines" || name === "max") return { editor: "number" };

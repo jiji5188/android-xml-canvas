@@ -25,6 +25,7 @@ import { defaultFor } from "./attr-catalog";
 import { WidgetPalette } from "./WidgetPalette";
 import { ConstraintPanel, type SibOption } from "./ConstraintPanel";
 import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } from "@/lib/xml/autoconstrain";
+import { ResTree } from "./ResTree";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
@@ -762,6 +763,19 @@ export function XmlEditor() {
     if (r.changed) setXmlAndTrack(r.xml);
   };
 
+  /** M2d：画布自由拖动 / 四角拉伸 → 写回 layout_marginStart/Top（XY）+ layout_width/height（宽高，dp） */
+  const onGeometryChange = (path: string, g: { x: number; y: number; w: number; h: number }) => {
+    const r1 = (n: number) => Math.round(n);
+    const set: Record<string, string> = {
+      layout_width: `${r1(g.w)}dp`,
+      layout_height: `${r1(g.h)}dp`,
+      layout_marginStart: `${r1(g.x)}dp`,
+      layout_marginTop: `${r1(g.y)}dp`,
+    };
+    const r = writebackAttrs(xml, path, set, []);
+    if (r.changed) setXmlAndTrack(r.xml);
+  };
+
   const removeAttr = (name: string) => {
     if (!selectedPath) return;
     const r = writebackAttrs(xml, selectedPath, {}, [name]);
@@ -1030,6 +1044,8 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                 onSelect={setSelectedPath}
                 onDropWidget={onDropWidget}
                 onConstraintDraw={onConstraintDraw}
+                onGeometryChange={onGeometryChange}
+                scale={SCALE}
               />
             </div>
             </div>
@@ -1173,12 +1189,27 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             </div>
           )}
           {leftView === "res" && (
-            <div className="axv-res-box">
-              <textarea
-                value={resourceFragment}
-                onChange={(e) => setResourceFragment(e.target.value)}
-                placeholder={'<resources>\n  <string name="app_name">My App</string>\n  <dimen name="margin_small">8dp</dimen>\n  <color name="primary">#FF0000</color>\n</resources>'}
-              />
+            <div className="axv-rail-scroll">
+              {resExtras?.tree ? (
+                <ResTree
+                  tree={resExtras.tree}
+                  layouts={resExtras.layouts}
+                  onOpenLayout={(fileName, content) => setXmlAndTrack(content)}
+                />
+              ) : (
+                <>
+                  <div style={{ padding: "8px 12px 4px", fontSize: 12, color: "#6B7280", lineHeight: 1.5 }}>
+                    上传 res/ 目录后可在这里以树形浏览资源文件，点击 layout/*.xml 直接预览。
+                  </div>
+                  <div className="axv-res-box">
+                    <textarea
+                      value={resourceFragment}
+                      onChange={(e) => setResourceFragment(e.target.value)}
+                      placeholder={'<resources>\n  <string name="app_name">My App</string>\n  <dimen name="margin_small">8dp</dimen>\n  <color name="primary">#FF0000</color>\n</resources>'}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1215,6 +1246,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                 onCommit={commitAttr}
                 onRemove={removeAttr}
                 onAddAttr={() => setAddModalOpen(true)}
+                resExtras={resExtras}
               />
             </div>
           ) : (

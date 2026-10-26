@@ -571,6 +571,26 @@ export function buildRenderModel(
   };
   patchCL(rootNode);
 
+  // M2d：FrameLayout 子项定位修正——absolute 子项补默认 left/top，父容器补明确宽高
+  const patchFrame = (n: ResolvedNode): void => {
+    const st = shortTag(n.tag);
+    if (st === "FrameLayout" || st === "ScrollView" || st === "HorizontalScrollView") {
+      // 父容器宽高留空时补 100%（match_parent 子项百分比需要父有确定尺寸）
+      if (String(n.style.width ?? "") === "") n.style.width = "100%";
+      if (String(n.style.height ?? "") === "") n.style.height = "100%";
+      for (const c of n.children) {
+        if (c.style.position === "absolute") {
+          if (c.style.left === undefined || c.style.left === "") c.style.left = "0px";
+          if (c.style.top === undefined || c.style.top === "") c.style.top = "0px";
+        }
+        patchFrame(c);
+      }
+      return;
+    }
+    for (const c of n.children) patchFrame(c);
+  };
+  patchFrame(rootNode);
+
   return { root: rootNode, issues };
 }
 

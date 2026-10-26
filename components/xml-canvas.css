@@ -75,6 +75,68 @@
 .axv-handle-bottom { bottom: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
 .axv-handle:hover { background: #BE123C; transform: scale(1.25); }
 
+/* ===== M2d：自由拖动 / 四角拉伸手柄 ===== */
+.axv-geom-move {
+  position: absolute;
+  left: -18px;
+  top: -20px;
+  width: 26px;
+  height: 26px;
+  line-height: 24px;
+  text-align: center;
+  background: #059669;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 13px;
+  cursor: grab;
+  z-index: 30;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  user-select: none;
+  touch-action: none;
+}
+.axv-geom-move:active { cursor: grabbing; }
+.axv-geom-resize {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  background: #2563EB;
+  border: 2px solid #fff;
+  border-radius: 2px;
+  z-index: 30;
+  touch-action: none;
+}
+.axv-geom-nw { left: -6px; top: -6px; cursor: nwse-resize; }
+.axv-geom-ne { right: -6px; top: -6px; cursor: nesw-resize; }
+.axv-geom-sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
+.axv-geom-se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+
+/* ===== 资源树 ===== */
+.axv-restree { padding: 6px 4px 16px; font-size: 13px; }
+.axv-treenode {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  color: #374151;
+  font-size: 13px;
+  text-align: left;
+}
+.axv-treenode:hover { background: #F3F4F6; }
+.axv-tree-caret { width: 12px; flex: 0 0 auto; font-size: 11px; color: #6B7280; }
+.axv-tree-ico { width: 18px; flex: 0 0 auto; font-size: 13px; }
+.axv-tree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.axv-tree-count { font-size: 11px; color: #9CA3AF; }
+.axv-tree-clickable { font-weight: 500; color: #2563EB; }
+
+/* 颜色 swatch 触发 color picker */
+.axv-attr-sw { position: relative; display: inline-block; width: 28px; height: 28px; border-radius: 4px; flex: 0 0 28px; }
+
+
 /* 拖拽中的临时连线（fixed 全屏，坐标 = 视口 px） */
 .axv-constraint-drag {
   position: fixed;

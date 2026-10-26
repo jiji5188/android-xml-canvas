@@ -12,6 +12,18 @@ export interface StyleRecord {
   attrs: Record<string, string>;
 }
 
+export interface ResTreeDir {
+  name: string;
+  children: Record<string, ResTreeDir | ResTreeFile>;
+}
+export interface ResTreeFile {
+  /** 相对 res/ 的完整路径，如 layout/activity_main.xml */
+  rel: string;
+  /** 仅 .xml 布局/资源文件存文本；二进制文件存 null */
+  text: string | null;
+  kind: "layout" | "values" | "drawable" | "mipmap" | "menu" | "xml" | "other";
+}
+
 export interface ResourceExtras {
   /** drawable 名（无扩展名、无密度后缀）→ dataURL */
   drawables: Record<string, string>;
@@ -25,6 +37,10 @@ export interface ResourceExtras {
   sourceFiles: string[];
   /** 各类计数，给 UI 打提示 */
   counts: { images: number; vectors: number; values: number; styles: number };
+  /** res/ 目录树（仅含读到的文件） */
+  tree?: ResTreeDir;
+  /** res/layout/*.xml 全文缓存（点击树里布局文件 → 画到预览） */
+  layouts?: Record<string, string>;
 }
 
 export interface ResUploadItem {
@@ -64,6 +80,7 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
     sourceFiles: [],
     counts: { images: 0, vectors: 0, values: 0, styles: 0 },
   };
+  const tree = { name: 'res' as const, children: {} as Record<string, ResTreeDir | ResTreeFile> };
 
   const valuesParts: string[] = [];
   const rawStyles = new Map<string, { parent?: string; attrs: Record<string, string> }>();
@@ -96,6 +113,7 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
         extras.counts.styles = rawStyles.size;
       }
       extras.sourceFiles.push(rel);
+      upsertTree(tree, rel, item.file);
       continue;
     }
 
@@ -109,6 +127,17 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
         best.set(name, { score, url: await fileToDataUrl(item.file) });
       }
       extras.sourceFiles.push(rel);
+      upsertTree(tree, rel, item.file);
+      continue;
+    }
+
+    // ---- res/layout/*.xml：存全文，画布可点选预览 ----
+    if (file.endsWith(".xml") && /(^|\/)layout\//.test(rel)) {
+      const text = await item.file.text();
+      extras.layouts = extras.layouts || {};
+      extras.layouts[file] = text;
+      extras.sourceFiles.push(rel);
+      upsertTree(tree, rel, item.file, text);
       continue;
     }
 
@@ -122,6 +151,7 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
           extras.counts.vectors++;
         }
         extras.sourceFiles.push(rel);
+        upsertTree(tree, rel, item.file, text);
       }
       continue;
     }
@@ -136,6 +166,7 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
     extras.styles[name] = expandStyle(name, st, rawStyles, new Set());
   }
 
+  extras.tree = tree as ResTreeDir;
   return extras;
 }
 
@@ -201,4 +232,29 @@ function expandStyle(
   }
   merged = { ...merged, ...st.attrs };
   return { name, parent: st.parent, attrs: merged };
+}
+
+
+// ===== 目录树构建（散件上传时按文件名推断目录） =====
+function upsertTree(root: ResTreeDir, rel: string, file: File, textContent?: string | null) {
+  const parts = rel.split('/').filter(Boolean);
+  let node = root;
+  const last = parts.pop()!;
+  for (const p of parts) {
+    if (!(p in node.children)) node.children[p] = { name: p, children: {} };
+    node = node.children[p] as ResTreeDir;
+  }
+  const ext = last.includes('.') ? last.slice(last.lastIndexOf('.')) : '';
+  const kind: ResTreeFile['kind'] =
+    /(^|\/)layout\//.test(rel) ? 'layout'
+    : /(^|\/)values/.test(rel) ? 'values'
+    : /(^|\/)drawable/.test(rel) ? 'drawable'
+    : /(^|\/)mipmap/.test(rel) ? 'mipmap'
+    : /(^|\/)menu/.test(rel) ? 'menu'
+    : ext === '.xml' ? 'xml' : 'other';
+  node.children[last] = {
+    rel: parts.concat([last]).join('/'),
+    text: textContent != null ? textContent : null,
+    kind,
+  };
 }

@@ -1,15 +1,25 @@
 // components/XmlCanvas.tsx — M1a React 渲染层
 // 把 RenderModel 递归渲染成 div，支持选中（data-path + 高亮）与拖放落位高亮。
 // M2c：ConstraintLayout 子项被选中时，四边出现约束手柄，拖到目标控件上即可建立约束。
+// M2d：非 ConstraintLayout 父容器下，选中节点可自由拖动（改 XY）+ 四角拉伸（改宽高）。
 
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ResolvedNode } from "@/lib/xml/types";
 import { DRAG_WIDGET_MIME } from "./widget-catalog";
 import { isContainerTag } from "@/lib/xml/insert";
 
 export type ConstraintSide = "start" | "end" | "top" | "bottom";
+export type GeomMode = "move" | "nw" | "ne" | "sw" | "se";
+
+/** 画布几何变化（单位 dp，相对父容器左上角） */
+export interface GeomPatch {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 interface XmlCanvasProps {
   node: ResolvedNode;
@@ -24,6 +34,10 @@ interface XmlCanvasProps {
     targetPath: string,
     targetSide: ConstraintSide,
   ) => void;
+  /** M2d：自由拖动 / 拉伸改 XY 与宽高（dp） */
+  onGeometryChange?: (path: string, patch: GeomPatch) => void;
+  /** 1dp = scale px（默认 2，与 css.ts 一致） */
+  scale?: number;
   /** 递归用：父节点 path / tag / 是否 ConstraintLayout */
   _parentPath?: string;
   _parentTag?: string;
@@ -42,10 +56,34 @@ interface DragState {
   y2: number;
 }
 
-export function XmlCanvas({ node, selectedPath, onSelect, onDropWidget, onConstraintDraw, _parentPath, _parentTag }: XmlCanvasProps) {
+interface GeomDrag {
+  mode: GeomMode;
+  px: number;
+  py: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  parentLeft: number;
+  parentTop: number;
+}
+
+export function XmlCanvas({
+  node,
+  selectedPath,
+  onSelect,
+  onDropWidget,
+  onConstraintDraw,
+  onGeometryChange,
+  scale = 2,
+  _parentPath,
+  _parentTag,
+}: XmlCanvasProps) {
   const [dropHit, setDropHit] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  const [geomLive, setGeomLive] = useState<{ dx: number; dy: number; dw: number; dh: number } | null>(null);
   const selfRef = useRef<HTMLDivElement | null>(null);
+  const geomRef = useRef<GeomDrag | null>(null);
 
   const isSel = selectedPath === node.path;
   const isContainer = node.children.length > 0 || isContainerTag(node.tag);
@@ -58,11 +96,25 @@ export function XmlCanvas({ node, selectedPath, onSelect, onDropWidget, onConstr
     outline: isSel ? "2px solid #E11D48" : undefined,
     outlineOffset: isSel ? 1 : undefined,
   };
+  // 拖动时视觉跟随（松手才写回 XML）
+  if (isSel && geomLive) {
+    const t: string[] = [];
+    if (geomLive.dx || geomLive.dy) t.push(`translate(${geomLive.dx}px, ${geomLive.dy}px)`);
+    if (style.transform) t.push(String(style.transform));
+    style.transform = t.join(" ");
+    if (geomLive.dw || geomLive.dh) {
+      style.width = `calc(${String(style.width ?? "auto")} + ${geomLive.dw}px)`;
+      style.height = `calc(${String(style.height ?? "auto")} + ${geomLive.dh}px)`;
+    }
+    style.zIndex = 50;
+  }
 
   // 是否显示约束手柄：自己选中 + 父是 ConstraintLayout + 自己不是 Guideline/Barrier
   const inCL = _parentTag !== undefined && shortTag(_parentTag) === "ConstraintLayout";
   const st = shortTag(node.tag);
   const showHandles = !!onConstraintDraw && isSel && inCL && st !== "Guideline" && st !== "Barrier";
+  // 自由几何手柄：选中 + 非 CL 父 + 不是辅助节点
+  const showGeom = !!onGeometryChange && isSel && !inCL && st !== "Guideline" && st !== "Barrier";
 
   const beginDrag = (side: ConstraintSide) => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -89,11 +141,10 @@ export function XmlCanvas({ node, selectedPath, onSelect, onDropWidget, onConstr
     // 命中测试：找光标下的节点（优先非自身）
     const els = document.elementsFromPoint(x, y) as HTMLElement[];
     let targetEl: HTMLElement | null = null;
-    let hitSelf = false;
     for (const el of els) {
       const p = el.dataset?.path;
       if (!p) continue;
-      if (p === node.path) { hitSelf = true; continue; }
+      if (p === node.path) continue;
       targetEl = el;
       break;
     }
@@ -101,7 +152,6 @@ export function XmlCanvas({ node, selectedPath, onSelect, onDropWidget, onConstr
     const isParentHit = !targetEl || targetEl.dataset.path === _parentPath;
 
     if (isParentHit) {
-      // parent 侧：同边对接
       onConstraintDraw?.(node.path, side, "CL", side);
       return;
     }
@@ -115,6 +165,77 @@ export function XmlCanvas({ node, selectedPath, onSelect, onDropWidget, onConstr
       ? beforeCenter ? "start" : "end"
       : beforeCenter ? "top" : "bottom";
     onConstraintDraw?.(node.path, side, targetEl.dataset.path!, targetSide);
+  };
+
+  // ===== M2d：自由拖动 / 四角拉伸 =====
+  const beginGeom = (mode: GeomMode) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = selfRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const prect = el.parentElement?.getBoundingClientRect();
+    geomRef.current = {
+      mode,
+      px: e.clientX,
+      py: e.clientY,
+      x: rect.left,
+      y: rect.top,
+      w: rect.width,
+      h: rect.height,
+      parentLeft: prect?.left ?? 0,
+      parentTop: prect?.top ?? 0,
+    };
+    setGeomLive({ dx: 0, dy: 0, dw: 0, dh: 0 });
+
+    const move = (ev: PointerEvent) => {
+      const g = geomRef.current;
+      if (!g) return;
+      const dx = ev.clientX - g.px;
+      const dy = ev.clientY - g.py;
+      if (g.mode === "move") setGeomLive({ dx, dy, dw: 0, dh: 0 });
+      else {
+        const dw = g.mode === "ne" || g.mode === "se" ? dx : g.mode === "nw" || g.mode === "sw" ? -dx : 0;
+        const dh = g.mode === "sw" || g.mode === "se" ? dy : g.mode === "nw" || g.mode === "ne" ? -dy : 0;
+        setGeomLive({
+          dx: g.mode === "nw" || g.mode === "sw" ? dx : 0,
+          dy: g.mode === "nw" || g.mode === "ne" ? dy : 0,
+          dw,
+          dh,
+        });
+      }
+    };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      const g = geomRef.current;
+      geomRef.current = null;
+      setGeomLive(null);
+      if (!g) return;
+      const dx = ev.clientX - g.px;
+      const dy = ev.clientY - g.py;
+      let nx = g.x;
+      let ny = g.y;
+      let nw = g.w;
+      let nh = g.h;
+      if (g.mode === "move") {
+        nx += dx;
+        ny += dy;
+      } else {
+        if (g.mode === "nw" || g.mode === "sw") { nx += dx; nw -= dx; }
+        if (g.mode === "ne" || g.mode === "se") { nw += dx; }
+        if (g.mode === "nw" || g.mode === "ne") { ny += dy; nh -= dy; }
+        if (g.mode === "sw" || g.mode === "se") { nh += dy; }
+      }
+      nw = Math.max(8, nw);
+      nh = Math.max(8, nh);
+      const relX = (nx - g.parentLeft) / scale;
+      const relY = (ny - g.parentTop) / scale;
+      const r1 = (n: number) => Math.round(n * 10) / 10;
+      onGeometryChange?.(node.path, { x: r1(relX), y: r1(relY), w: r1(nw / scale), h: r1(nh / scale) });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   };
 
   return (
@@ -215,6 +336,8 @@ export function XmlCanvas({ node, selectedPath, onSelect, onDropWidget, onConstr
           onSelect={onSelect}
           onDropWidget={onDropWidget}
           onConstraintDraw={onConstraintDraw}
+          onGeometryChange={onGeometryChange}
+          scale={scale}
           _parentPath={node.path}
           _parentTag={node.tag}
         />
@@ -240,6 +363,28 @@ export function XmlCanvas({ node, selectedPath, onSelect, onDropWidget, onConstr
               <circle cx={drag.x2} cy={drag.y2} r={4} />
             </svg>
           ) : null}
+        </>
+      ) : null}
+
+      {showGeom ? (
+        <>
+          <span
+            className="axv-geom-move"
+            title="拖动我移动控件（写回 layout_marginStart / layout_marginTop）"
+            onPointerDown={beginGeom("move")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            ✥
+          </span>
+          {(["nw", "ne", "sw", "se"] as GeomMode[]).map((m) => (
+            <span
+              key={m}
+              className={"axv-geom-resize axv-geom-" + m}
+              title="拖动改宽高（写回 layout_width / layout_height）"
+              onPointerDown={beginGeom(m)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ))}
         </>
       ) : null}
     </div>

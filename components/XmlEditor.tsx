@@ -13,7 +13,7 @@ import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, type ResourceExtras } from "@/lib/xml/resdir";
 import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
-import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults } from "@/lib/xml/insert";
+import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild } from "@/lib/xml/insert";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml } from "@/lib/xml/lint";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
@@ -688,19 +688,49 @@ export function XmlEditor() {
 
   const insertWidget = (w: WidgetDef) => {
     const frag = stripNs(w.xml);
-    const target = selectedPath && selectedPath !== "#0" ? selectedPath : "#0";
-    const res =
-      target !== "#0"
-        ? insertSiblingAfter(xml, target, frag, w.label)
-        : insertChild(xml, "#0", frag, w.label);
+    const { root } = parseLayoutXml(xml);
+    const targetNode = selectedPath && selectedPath !== "#0" && root ? findNode(root, selectedPath) : null;
+    // 优先：选中的是容器且还能接收子控件 → 插入为它的子节点
+    if (targetNode) {
+      const chk = canAcceptChild(targetNode.tag, targetNode.children.length);
+      if (chk.ok) {
+        const res = insertChild(xml, selectedPath!, frag, w.label);
+        if (res.ok) {
+          const withDef = res.insertedPath ? applyConstraintDefaults(res.xml, res.insertedPath) : res.xml;
+          setXmlAndTrack(withDef);
+          if (res.insertedPath) setSelectedPath(res.insertedPath);
+          return;
+        }
+        // 插入失败（理论上 chk.ok 时不会，但保险）：提示后退回兄弟插入
+        setExportNote(res.issues[0]?.message || "插入失败");
+        window.setTimeout(() => setExportNote(""), 3000);
+      } else {
+        // 选中叶子节点 / 单 child 容器已满 → 作为兄弟插到它后面
+        const res = insertSiblingAfter(xml, selectedPath!, frag, w.label);
+        if (res.ok) {
+          const withDef = res.insertedPath ? applyConstraintDefaults(res.xml, res.insertedPath) : res.xml;
+          setXmlAndTrack(withDef);
+          if (res.insertedPath) setSelectedPath(res.insertedPath);
+          return;
+        }
+        setExportNote(res.issues[0]?.message || "插入失败");
+        window.setTimeout(() => setExportNote(""), 3000);
+        return;
+      }
+    }
+    // 无选中 / 选中是根节点 / 选中叶子但兄弟插入失败 → 插入到根末尾
+    const res = insertChild(xml, "#0", frag, w.label);
     if (res.ok) {
       const withDef = res.insertedPath ? applyConstraintDefaults(res.xml, res.insertedPath) : res.xml;
       setXmlAndTrack(withDef);
       if (res.insertedPath) setSelectedPath(res.insertedPath);
+    } else if (res.issues[0]) {
+      setExportNote(res.issues[0].message);
+      window.setTimeout(() => setExportNote(""), 3000);
     }
   };
 
-  /** 画布拖放：容器→追加为子节点；普通控件→插到它后面作为兄弟 */
+  /** 画布拖放：落到容器上→校验能否接收后追加为子节点；落到叶子→插到它后面作为兄弟 */
   const onDropWidget = (path: string, key: string, isContainer: boolean) => {
     const w = WIDGET_MAP[key];
     if (!w) return;
@@ -708,11 +738,23 @@ export function XmlEditor() {
     if (isContainer) {
       const { root } = parseLayoutXml(xml);
       const target = root ? findNode(root, path) : null;
+      // 校验：该容器还能接收子控件吗？
+      if (target) {
+        const chk = canAcceptChild(target.tag, target.children.length);
+        if (!chk.ok) {
+          setExportNote(chk.reason || "无法插入");
+          window.setTimeout(() => setExportNote(""), 3000);
+          return;
+        }
+      }
       const r = insertAt(xml, path, target ? target.children.length : 0, frag, w.label);
       if (r.ok) {
         const withDef = r.insertedPath ? applyConstraintDefaults(r.xml, r.insertedPath) : r.xml;
         setXmlAndTrack(withDef);
         if (r.insertedPath) setSelectedPath(r.insertedPath);
+      } else if (r.issues[0]) {
+        setExportNote(r.issues[0].message);
+        window.setTimeout(() => setExportNote(""), 3000);
       }
       return;
     }
@@ -721,6 +763,9 @@ export function XmlEditor() {
       const withDef = r.insertedPath ? applyConstraintDefaults(r.xml, r.insertedPath) : r.xml;
       setXmlAndTrack(withDef);
       if (r.insertedPath) setSelectedPath(r.insertedPath);
+    } else if (r.issues[0]) {
+      setExportNote(r.issues[0].message);
+      window.setTimeout(() => setExportNote(""), 3000);
     }
   };
 

@@ -44,7 +44,35 @@ export function isContainerTag(rawTag: string): boolean {
   return CONTAINER_TAGS.has(tag);
 }
 
-/** 在 parentPath 下（末尾）插入一个节点，返回新 XML */
+/** 短标签名（全限定名取尾段） */
+function shortTag(raw: string): string {
+  return raw.includes(".") ? raw.slice(raw.lastIndexOf(".") + 1) : raw;
+}
+
+/** 只允许 1 个子控件的容器（ScrollView 家族、CardView 虽允许多个但惯例放 1 个，这里只列硬约束的） */
+const SINGLE_CHILD_TAGS = new Set([
+  "ScrollView",
+  "HorizontalScrollView",
+  "NestedScrollView",
+]);
+
+/** 容器还能不能再塞子控件？
+ *  - 不是容器 → 不能（reason: “不支持子控件”）
+ *  - 是单 child 容器且已有 1 个 → 不能（reason: “只支持 1 个子控件”）
+ *  - 其它 → 能 */
+export function canAcceptChild(rawTag: string, childCount: number): { ok: boolean; reason?: string } {
+  const tag = shortTag(rawTag);
+  if (!CONTAINER_TAGS.has(tag)) {
+    return { ok: false, reason: `${tag} 不支持子控件` };
+  }
+  if (SINGLE_CHILD_TAGS.has(tag) && childCount >= 1) {
+    return { ok: false, reason: `${tag} 只支持 1 个子控件，已存在 1 个` };
+  }
+  return { ok: true };
+}
+
+/** 在 parentPath 下（末尾）插入一个节点，返回新 XML。
+ *  插入前校验父容器是否还能接收子控件（单 child 容器已满 / 叶子节点都拒绝）。 */
 export function insertChild(xml: string, parentPath: string, snippetXml: string, tagLabel: string): InsertResult {
   const issues: XmlIssue[] = [];
   const { root } = parseLayoutXml(xml);
@@ -55,6 +83,12 @@ export function insertChild(xml: string, parentPath: string, snippetXml: string,
   const parent = findNode(root, parentPath);
   if (!parent) {
     issues.push({ level: "error", nodePath: parentPath, message: "找不到父节点 " + parentPath });
+    return { xml, insertedPath: null, issues, ok: false };
+  }
+  // 校验：父容器还能接收子控件吗？
+  const chk = canAcceptChild(parent.tag, parent.children.length);
+  if (!chk.ok) {
+    issues.push({ level: "error", nodePath: parentPath, message: `无法在 ${shortTag(parent.tag)} 内插入：${chk.reason}` });
     return { xml, insertedPath: null, issues, ok: false };
   }
   // 解析片段（可能带 <?xml 声明，parser 会剥掉）
@@ -177,7 +211,8 @@ export function insertSiblingAfter(xml: string, targetPath: string, snippetXml: 
   return { xml: (decl ? decl[0] + "\n" : "") + out, insertedPath: newPath, issues, ok: true };
 }
 
-/** 在 parentPath 下、指定 index 处插入（拖放精确落位） */
+/** 在 parentPath 下、指定 index 处插入（拖放精确落位）。
+ *  同样校验父容器还能接收子控件（单 child 容器已满则拒绝）。 */
 export function insertAt(xml: string, parentPath: string, index: number, snippetXml: string, tagLabel: string): InsertResult {
   const issues: XmlIssue[] = [];
   const { root } = parseLayoutXml(xml);
@@ -188,6 +223,11 @@ export function insertAt(xml: string, parentPath: string, index: number, snippet
   const parent = findNode(root, parentPath);
   if (!parent) {
     issues.push({ level: "error", nodePath: parentPath, message: "找不到父节点 " + parentPath });
+    return { xml, insertedPath: null, issues, ok: false };
+  }
+  const chk = canAcceptChild(parent.tag, parent.children.length);
+  if (!chk.ok) {
+    issues.push({ level: "error", nodePath: parentPath, message: `无法在 ${shortTag(parent.tag)} 内插入：${chk.reason}` });
     return { xml, insertedPath: null, issues, ok: false };
   }
   const parsed = parseLayoutXml(snippetXml);

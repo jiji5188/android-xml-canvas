@@ -8,7 +8,8 @@
 // - layout_width/height = 0dp（match constraints）/ wrap_content / dp / match_parent
 // - layout_constraintHorizontal_bias / Vertical_bias（默认 0.5）
 // - layout_margin* 生效（layout_margin 作为兜底，分边优先）
-// - Guideline、chainStyle、嵌套链求解：本期不做（M2c）
+// - Guideline（orientation/guidelineBegin/guidelinePercent）与 Barrier（barrierDirection/constraintReference）可作锚点
+// - chain 链式排布：End_toStartOf / Start_toEndOf 串联 + chainStyle spread/spread_inside/centered/packed
 
 import type { XmlNode, ResourceTable, XmlIssue } from "./types";
 import { resolveSize } from "./resolve";
@@ -91,6 +92,10 @@ export function estSize(node: XmlNode): { w: number; h: number } {
       return { w: 160, h: 32 };
     case "ProgressBar":
       return { w: 160, h: 24 };
+    case "Guideline":
+      return { w: 412, h: 1 };
+    case "Barrier":
+      return { w: 412, h: 1 };
     default:
       return { w: 120, h: 48 };
   }
@@ -140,7 +145,7 @@ export function solveConstraintChildren(
   const SCALE = 2; // 1dp = 2px，与画布默认一致
   const toPx = (v: number, unit: "dp" | "px") => (unit === "px" ? v : v * SCALE);
 
-  // id → 节点
+  // id → 节点（含 Guideline / Barrier，它们可作为锚点但不进 box 主求解）
   const byId = new Map<string, XmlNode>();
   for (const c of children) {
     const id = c.attrs["id"];
@@ -148,6 +153,84 @@ export function solveConstraintChildren(
     const cid = cleanId(id);
     if (cid) byId.set(cid, c);
   }
+
+  /** 解析一条 Guideline / Barrier 的盒子（它们自己也是节点，可被引用为锚点） */
+  const specVisiting = new Set<string>();
+  const specialBox = (id: string): ConstraintBox | null => {
+    const n = byId.get(id);
+    if (!n) return null;
+    if (specVisiting.has(id)) return null; // Barrier 互引护栏
+    specVisiting.add(id);
+    try {
+      return specialBoxInner(n);
+    } finally {
+      specVisiting.delete(id);
+    }
+  };
+  const specialBoxInner = (n: XmlNode): ConstraintBox | null => {
+    const st = n.tag.includes(".") ? n.tag.slice(n.tag.lastIndexOf(".") + 1) : n.tag;
+    const a = n.attrs;
+    const toLen = (raw: string | undefined): number => {
+      if (!raw) return 0;
+      const spec = resolveSize(raw, res, out.issues, n.path, st.toLowerCase());
+      return spec.kind === "dp" ? (spec.value ?? 0) * SCALE : spec.kind === "px" ? (spec.value ?? 0) : 0;
+    };
+    if (st === "Guideline") {
+      // 水平 Guideline：一条横线的 Y 位置；垂直：X 位置
+      // 真实属性：android:orientation + app:layout_constraintGuide_begin/end/percent
+      const orientation = (a["orientation"] ?? "vertical").toLowerCase();
+      const pctRaw = a["layout_constraintGuide_percent"];
+      const percent = pctRaw !== undefined ? parseFloat(pctRaw) : NaN;
+      const begin = toLen(a["layout_constraintGuide_begin"]);
+      const endRaw = a["layout_constraintGuide_end"];
+      const fromEnd = endRaw !== undefined && endRaw !== "";
+      const totalLen = orientation === "horizontal" ? parentContentH : parentContentW;
+      const pos = Number.isFinite(percent)
+        ? totalLen * percent
+        : fromEnd
+          ? totalLen - toLen(endRaw)
+          : begin;
+      return orientation === "horizontal"
+        ? { left: 0, top: pos, width: 0, height: 0 }
+        : { left: pos, top: 0, width: 0, height: 0 };
+    }
+    if (st === "Barrier") {
+      const dir = (a["barrierDirection"] ?? "top").toLowerCase();
+      // 真实属性：app:constraint_referenced_ids="id1,id2"
+      const refs = (a["constraint_referenced_ids"] ?? "").split(/[\s,]+/).filter(Boolean);
+      const margin = toLen(a["barrierMargin"]);
+      // constraint_referenced_ids 存的是 id（如 btnA），boxCache 键是 path，需先转 path
+      const members = refs
+        .map((r) => {
+          const n2 = byId.get(cleanId(r));
+          if (!n2) return null;
+          const b = boxCache.get(n2.path);
+          if (b) return b;
+          return specialBox(cleanId(r));
+        })
+        .filter(Boolean) as ConstraintBox[];
+      // 若引用的子项还没解出来（循环），退回 0
+      const bb: ConstraintBox = {
+        left: 0,
+        top: 0,
+        width: parentContentW,
+        height: parentContentH,
+      };
+      if (members.length === 0) {
+        if (dir === "top") bb.top = margin;
+        else if (dir === "bottom") bb.top = parentContentH - margin;
+        else if (dir === "start") bb.left = margin;
+        else if (dir === "end") bb.left = parentContentW - margin;
+        return bb;
+      }
+      if (dir === "top") bb.top = Math.min(...members.map((m) => m.top)) + margin;
+      else if (dir === "bottom") bb.top = Math.max(...members.map((m) => m.top + m.height)) - margin;
+      else if (dir === "start") bb.left = Math.min(...members.map((m) => m.left)) + margin;
+      else if (dir === "end") bb.left = Math.max(...members.map((m) => m.left + m.width)) - margin;
+      return bb;
+    }
+    return null;
+  };
 
   // 第一遍：估尺寸
   const dims = new Map<string, { w: number; h: number; kindW: DimKind; kindH: DimKind; unitW: "dp" | "px"; unitH: "dp" | "px" }>();
@@ -204,6 +287,13 @@ export function solveConstraintChildren(
       if (ref === undefined) return 0;
       if (ref.id === "parent" || ref.id === "0") return ref.toEnd ? parentContentW : 0;
       const target = byId.get(ref.id);
+      if (target) {
+        const st = target.tag.includes(".") ? target.tag.slice(target.tag.lastIndexOf(".") + 1) : target.tag;
+        if (st === "Guideline" || st === "Barrier") {
+          const sb = specialBox(ref.id);
+          if (sb) return ref.toEnd ? sb.left + sb.width : sb.left;
+        }
+      }
       if (!target) {
         out.issues.push({
           level: "warn",
@@ -231,6 +321,13 @@ export function solveConstraintChildren(
       if (ref === undefined) return 0;
       if (ref.id === "parent" || ref.id === "0") return ref.toEnd ? parentContentH : 0;
       const target = byId.get(ref.id);
+      if (target) {
+        const st = target.tag.includes(".") ? target.tag.slice(target.tag.lastIndexOf(".") + 1) : target.tag;
+        if (st === "Guideline" || st === "Barrier") {
+          const sb = specialBox(ref.id);
+          if (sb) return ref.toEnd ? sb.top + sb.height : sb.top;
+        }
+      }
       if (!target) {
         out.issues.push({
           level: "warn",
@@ -308,5 +405,181 @@ export function solveConstraintChildren(
   for (const c of children) {
     out.boxes.set(c.path, positionOf(c));
   }
+
+  // M2c：链式排布（chain）。先解出每个子项的位置后，找出链并重新分配水平/垂直自由空间。
+  applyChains(out, children, parentContentW, parentContentH, SCALE, toPx, boxCache, dims, res, out.issues);
+
+  // Guideline / Barrier 的盒子不是普通布局算出来的（它们是参考线）：用 specialBox 覆写
+  for (const c of children) {
+    const st = c.tag.includes(".") ? c.tag.slice(c.tag.lastIndexOf(".") + 1) : c.tag;
+    if (st === "Guideline" || st === "Barrier") {
+      const cid = cleanId(c.attrs["id"] ?? "");
+      if (cid) {
+        const bb = specialBox(cid);
+        if (bb) out.boxes.set(c.path, bb);
+      }
+    }
+  }
+
   return out;
+}
+
+/**
+ * M2c：链式排布。
+ * 水平链形态：A.End_toStartOf=B 且 B.Start_toEndOf=A（首尾分别锚父容器）。
+ * 支持 chainStyle：spread（默认）/ spread_inside / centered / packed。
+ */
+function applyChains(
+  out: SolveResult,
+  children: XmlNode[],
+  parentW: number,
+  parentH: number,
+  scale: number,
+  toPx: (v: number, u: "dp" | "px") => number,
+  boxCache: Map<string, ConstraintBox>,
+  dims: Map<string, { w: number; h: number; kindW: string; kindH: string; unitW: "dp" | "px"; unitH: "dp" | "px" }>,
+  res: ResourceTable,
+  issues: XmlIssue[],
+): void {
+  const byId = new Map<string, XmlNode>();
+  for (const c of children) {
+    const id = c.attrs["id"];
+    if (id) byId.set(cleanId(id), c);
+  }
+
+  /** 某方向边上的锚点（读同名边优先，再读跨边） */
+  const anchor = (c: XmlNode, side: "Start" | "End" | "Top" | "Bottom"): AnchorRef | undefined =>
+    readAnchor(c.attrs, side);
+
+  const rightAnchor = (c: XmlNode, horiz: boolean) => anchor(c, horiz ? "End" : "Bottom");
+  const leftAnchor = (c: XmlNode, horiz: boolean) => anchor(c, horiz ? "Start" : "Top");
+
+  /** 正向找链：c 的右端 glue 到下一个节点的左端 */
+  const buildChain = (start: XmlNode, horiz: boolean): { nodes: XmlNode[]; spanEndId: string } | null => {
+    const seq: XmlNode[] = [start];
+    let cur = start;
+    for (let i = 0; i < 32; i++) {
+      const r = rightAnchor(cur, horiz);
+      if (!r || r.toEnd) break; // 右端必须 glue 到别人的左端
+      const next = byId.get(r.id);
+      if (!next || next === start) break;
+      seq.push(next);
+      cur = next;
+    }
+    if (seq.length < 2) return null;
+    // 校验相邻互指（A.End_toStartOf=B 且 B.Start_toEndOf=A）
+    for (let i = 0; i < seq.length - 1; i++) {
+      const aR = rightAnchor(seq[i], horiz);
+      const bL = leftAnchor(seq[i + 1], horiz);
+      if (!aR || aR.toEnd) return null;
+      if (!bL || !bL.toEnd) return null;
+      if (aR.id !== cleanId(seq[i + 1].attrs["id"] ?? "")) return null;
+      if (bL.id !== cleanId(seq[i].attrs["id"] ?? "")) return null;
+    }
+    const lastR = rightAnchor(seq[seq.length - 1], horiz);
+    const spanEndId = lastR ? lastR.id : "parent";
+    return { nodes: seq, spanEndId };
+  };
+
+  const seen = new Set<string>();
+  for (const c of children) {
+    const st = c.tag.includes(".") ? c.tag.slice(c.tag.lastIndexOf(".") + 1) : c.tag;
+    if (st === "Guideline" || st === "Barrier") continue;
+    const cid = cleanId(c.attrs["id"] ?? "");
+    if (!cid || seen.has(cid)) continue;
+
+    const hStart = leftAnchor(c, true);
+    const vStart = leftAnchor(c, false);
+    const hOk = hStart?.id === "parent" && !hStart.toEnd;
+    const vOk = vStart?.id === "parent" && !vStart.toEnd;
+
+    // 水平、垂直都要试：先水平，链不成立再试垂直
+    const candidates: boolean[] = [];
+    if (hOk) candidates.push(true);
+    if (vOk) candidates.push(false);
+    if (candidates.length === 0) continue;
+
+    let chain: { nodes: XmlNode[]; spanEndId: string } | null = null;
+    let horiz = true;
+    for (const h of candidates) {
+      const r = buildChain(c, h);
+      if (r && r.nodes.length >= 2) {
+        chain = r;
+        horiz = h;
+        break;
+      }
+    }
+    seen.add(cid);
+    if (!chain) continue;
+    chain.nodes.forEach((n) => seen.add(cleanId(n.attrs["id"] ?? "")));
+
+    const styleRaw = (c.attrs[horiz ? "layout_constraintHorizontal_chainStyle" : "layout_constraintVertical_chainStyle"] ?? "spread").toLowerCase();
+    const sizes = chain.nodes.map((m) => {
+      const d = dims.get(m.path)!;
+      return horiz ? toPx(d.w, d.unitW as "dp" | "px") : toPx(d.h, d.unitH as "dp" | "px");
+    });
+    const isZero = chain.nodes.map((m) => {
+      const d = dims.get(m.path)!;
+      return horiz ? d.kindW === "zero" : d.kindH === "zero";
+    });
+    const boxes = chain.nodes.map((m) => boxCache.get(m.path)!).filter(Boolean);
+    if (boxes.length !== chain.nodes.length) continue;
+
+    const total = sizes.reduce((a, b) => a + b, 0);
+    const endNode = chain.spanEndId === "parent" ? null : byId.get(chain.spanEndId);
+    let spanStart = 0;
+    let spanEnd = horiz ? parentW : parentH;
+    if (endNode) {
+      const b = boxCache.get(endNode.path);
+      if (b) spanEnd = horiz ? b.left : b.top;
+    }
+    const free = Math.max(spanEnd - spanStart - total, 0);
+    void res;
+    void issues;
+
+    const put = (i: number, pos: number) => {
+      if (horiz) {
+        boxes[i].left = Math.round(pos);
+        if (isZero[i]) boxes[i].width = Math.round(sizes[i]);
+      } else {
+        boxes[i].top = Math.round(pos);
+        if (isZero[i]) boxes[i].height = Math.round(sizes[i]);
+      }
+    };
+
+    if (styleRaw === "spread_inside") {
+      const g = chain.nodes.length > 1 ? free / (chain.nodes.length - 1) : 0;
+      let cur = spanStart;
+      for (let i = 0; i < chain.nodes.length; i++) {
+        put(i, cur);
+        cur += sizes[i] + g;
+      }
+    } else if (styleRaw === "centered" || styleRaw === "packed" || styleRaw === "pack") {
+      let cur = spanStart + (styleRaw === "centered" ? free / 2 : 0);
+      for (let i = 0; i < chain.nodes.length; i++) {
+        put(i, cur);
+        cur += sizes[i];
+      }
+    } else {
+      // spread：若成员是 0dp（match constraints），剩余空间均分进尺寸，无间隙；
+      // 否则按 N+1 个等距间隙排布（Android 语义）
+      const allZero = isZero.every(Boolean);
+      if (allZero && free > 0) {
+        const each = free / chain.nodes.length;
+        let cur = spanStart;
+        for (let i = 0; i < chain.nodes.length; i++) {
+          if (horiz) { boxes[i].left = Math.round(cur); boxes[i].width = Math.round(each); }
+          else { boxes[i].top = Math.round(cur); boxes[i].height = Math.round(each); }
+          cur += each;
+        }
+      } else {
+        const g = free / (chain.nodes.length + 1);
+        let cur = spanStart + g;
+        for (let i = 0; i < chain.nodes.length; i++) {
+          put(i, cur);
+          cur += sizes[i] + g;
+        }
+      }
+    }
+  }
 }

@@ -9,6 +9,8 @@ export const KNOWN_TAGS = new Set([
   "LinearLayout", "FrameLayout", "ScrollView", "HorizontalScrollView",
   "TextView", "Button", "ImageView", "EditText", "ProgressBar", "View",
   "Space", "ImageView",
+  // M2c：ConstraintLayout 专用辅助节点
+  "Guideline", "Barrier",
 ]);
 
 /** 轻量 XML 解析（支持属性、嵌套、注释、自闭合；不支持 CDATA/实体除标准五件套） */
@@ -226,7 +228,7 @@ export function rewriteNodeAttrs(
 
 /** 序列化：把归一化树写回 XML 文本 */
 /** ConstraintLayout / MotionLayout 专用属性：序列化时必须用 app: 前缀 */
-const APP_ATTR_RE = /^(layout_constraint|layout_guideline|layout_barrier|layout_wrapBehavior|layout_optimizationLevel|flow_|motion_|constraintReference)/;
+const APP_ATTR_RE = /^(layout_constraint|layout_guideline|layout_barrier|layout_wrapBehavior|layout_optimizationLevel|flow_|motion_|constraint_referenced_ids|barrierDirection|barrierMargin|barrierAllowsGoneWidgets)/;
 const APP_NS = "http://schemas.android.com/apk/res-auto";
 
 /** 子树里是否用了 app: 命名空间的属性 */

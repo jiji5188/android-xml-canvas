@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue } f
 import { parseLayoutXml, findNode, serialize } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
-import type { ResolvedNode, ResourceTable } from "@/lib/xml/types";
+import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults } from "@/lib/xml/insert";
 import { formatXml } from "@/lib/xml/format";
@@ -294,6 +294,70 @@ export function XmlEditor() {
     if (Object.keys(set).length === 0 && del.length === 0) return;
     const res = writebackAttrs(xml, selectedPath, set, del);
     if (res.changed) setXmlAndTrack(res.xml);
+  };
+
+  /**
+   * M2c：画布拖手柄建约束。
+   * side=被拖的子控件边；targetPath="CL" 表示父容器，否则是兄弟节点 path。
+   * 写入 app:layout_constraint<Side>_to<TargetSide>Of，并清掉同侧另一种写法。
+   */
+  const onConstraintDraw = (
+    childPath: string,
+    side: "start" | "end" | "top" | "bottom",
+    targetPath: string,
+    targetSide: "start" | "end" | "top" | "bottom",
+  ) => {
+    const Cap = (s2: string) => s2.charAt(0).toUpperCase() + s2.slice(1);
+    const attrKey = `layout_constraint${Cap(side)}_to${Cap(targetSide)}Of`;
+    const marginKey =
+      side === "start" ? "layout_marginStart" : side === "end" ? "layout_marginEnd" : side === "top" ? "layout_marginTop" : "layout_marginBottom";
+    // 同侧另一种写法（toStartOf vs toEndOf）必须清掉，否则过度约束
+    const otherKey =
+      side === "start"
+        ? `layout_constraintStart_to${targetSide === "start" ? "End" : "Start"}Of`
+        : side === "end"
+          ? `layout_constraintEnd_to${targetSide === "start" ? "End" : "Start"}Of`
+          : side === "top"
+            ? `layout_constraintTop_to${targetSide === "top" ? "Bottom" : "Top"}Of`
+            : `layout_constraintBottom_to${targetSide === "top" ? "Bottom" : "Top"}Of`;
+
+    let ref = "parent";
+    let xml2 = xml;
+    let targetIdToWrite: [string, string] | null = null;
+
+    if (targetPath !== "CL") {
+      const tn: XmlNode | null = treeRoot ? findNode(treeRoot, targetPath) : null;
+      const tid = tn ? (tn.attrs.id ?? "").trim() : "";
+      if (tid) {
+        ref = tid;
+      } else if (tn) {
+        // 目标没 id：同一次操作里补一个
+        const nid = nextViewId(collectIds(treeRoot, []));
+        ref = nid;
+        targetIdToWrite = [nid, targetPath];
+      }
+    }
+
+    const childNode: XmlNode | null = treeRoot ? findNode(treeRoot, childPath) : null;
+    if (!childNode) return;
+    const changes: [string, string | null][] = [[attrKey, ref], [otherKey, null]];
+    // 该侧没 margin 时给 8dp，和插入控件时的默认约束保持一致
+    if (childNode.attrs[marginKey] === undefined && childNode.attrs["layout_margin"] === undefined) {
+      changes.push([marginKey, "8dp"]);
+    }
+
+    if (targetIdToWrite) {
+      const r0 = writebackAttrs(xml2, targetIdToWrite[1], { id: targetIdToWrite[0] }, []);
+      if (r0.changed) xml2 = r0.xml;
+    }
+    const set: Record<string, string> = {};
+    const del: string[] = [];
+    for (const [k, v] of changes) {
+      if (v === null) del.push(k);
+      else set[k] = v;
+    }
+    const r = writebackAttrs(xml2, childPath, set, del);
+    if (r.changed) setXmlAndTrack(r.xml);
   };
 
   /** 自动约束：按当前渲染位置就近推断（无约束时智能堆叠） */
@@ -621,6 +685,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                 selectedPath={selectedPath}
                 onSelect={setSelectedPath}
                 onDropWidget={onDropWidget}
+                onConstraintDraw={onConstraintDraw}
               />
             </div>
             </div>

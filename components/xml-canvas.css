@@ -56,6 +56,44 @@
   z-index: 5;
 }
 
+/* ===== M2c：约束拖拽手柄 ===== */
+.axv-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #E11D48;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: crosshair;
+  z-index: 20;
+  touch-action: none;
+}
+.axv-handle-start { left: -6px; top: 50%; margin-top: -6px; cursor: ew-resize; }
+.axv-handle-end { right: -6px; top: 50%; margin-top: -6px; cursor: ew-resize; }
+.axv-handle-top { top: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.axv-handle-bottom { bottom: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.axv-handle:hover { background: #BE123C; transform: scale(1.25); }
+
+/* 拖拽中的临时连线（fixed 全屏，坐标 = 视口 px） */
+.axv-constraint-drag {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: visible;
+}
+.axv-constraint-drag line {
+  stroke: #E11D48;
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+.axv-constraint-drag circle {
+  fill: #E11D48;
+}
+
 /* 拖组件到画布上的落点高亮（容器 = 会变成子节点；普通控件 = 插到它后面） */
 .axv-node.axv-drop-hit {
   box-shadow: inset 0 0 0 2px #04409F;

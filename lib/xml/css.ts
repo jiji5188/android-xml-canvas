@@ -57,6 +57,11 @@ function viewClass(rawTag: string, a: ResolvedAttrs): string {
       return "axv-seek";
     case "Spinner":
       return "axv-spinner";
+    // M2c：ConstraintLayout 辅助节点（渲染为参考线）
+    case "Guideline":
+      return "axv-guideline";
+    case "Barrier":
+      return "axv-barrier";
     case "include":
       return "axv-include";
     default:
@@ -341,6 +346,15 @@ export function buildRenderModel(
       style.paddingRight = `${DP(28, scale)}px`;
     }
 
+    // ===== M2c：Guideline / Barrier 渲染为参考线（位置尺寸由 patchCL 求解写入） =====
+    if (cls === "axv-guideline") {
+      style.backgroundColor = "rgba(103,80,164,0.55)";
+      style.zIndex = "2";
+    } else if (cls === "axv-barrier") {
+      style.backgroundColor = "rgba(255,111,0,0.45)";
+      style.zIndex = "2";
+    }
+
     if (cls === "axv-include") {
       style.minHeight = `${DP(48, scale)}px`;
       style.border = "1px dashed #B0AEB8";
@@ -412,7 +426,28 @@ export function buildRenderModel(
     for (const child of n.children) {
       const box = solved.boxes.get(child.path);
       if (!box) continue;
+      const cTag = shortTag(child.tag);
       child.style.position = "absolute";
+      // M2c：Guideline / Barrier 参考线——0 维盒子展开成 2px 线
+      if (cTag === "Guideline" || cTag === "Barrier") {
+        const o = (child.rawAttrs["orientation"] ?? "vertical").toLowerCase();
+        const dir = (child.rawAttrs["barrierDirection"] ?? "top").toLowerCase();
+        const isHorizLine = cTag === "Guideline" ? o === "horizontal" : dir === "top" || dir === "bottom";
+        if (isHorizLine) {
+          child.style.left = "0px";
+          child.style.top = `${box.top}px`;
+          child.style.width = `${cw}px`;
+          child.style.height = "2px";
+        } else {
+          child.style.left = `${box.left}px`;
+          child.style.top = "0px";
+          child.style.width = "2px";
+          child.style.height = `${ch}px`;
+        }
+        child.style.boxSizing = "border-box";
+        for (const gc of child.children) patchCL(gc);
+        continue;
+      }
       child.style.left = `${box.left}px`;
       child.style.top = `${box.top}px`;
       child.style.width = `${box.width}px`;

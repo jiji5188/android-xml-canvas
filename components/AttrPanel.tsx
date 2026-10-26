@@ -15,6 +15,8 @@ interface Props {
   onCommit: (name: string, value: string) => void;
   /** 删除属性 */
   onRemove: (name: string) => void;
+  /** 删除当前选中的节点（控件） */
+  onDeleteNode?: () => void;
   /** 打开「添加属性」弹窗 */
   onAddAttr: () => void;
   /** 已上传 res 资源（可选；提供后 background/src 可弹 drawable 列表） */
@@ -38,7 +40,7 @@ function drawableNames(extras: ResourceExtras | null | undefined): string[] {
   return Array.from(names).sort();
 }
 
-export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras }: Props) {
+export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras, onDeleteNode }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   // 换节点时清空草稿
   useEffect(() => setDrafts({}), [node.path]);
@@ -228,6 +230,16 @@ export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras }: Pr
       <div className="axv-attr-head">
         <span className="axv-attr-tag">{tag}</span>
         {node.rawAttrs.id ? <span className="axv-attr-id">{node.rawAttrs.id}</span> : null}
+        {onDeleteNode ? (
+          <button
+            className="axv-attr-del-node"
+            title="删除当前选中的控件"
+            aria-label="删除当前选中的控件"
+            onClick={onDeleteNode}
+          >
+            🗑 删除
+          </button>
+        ) : null}
       </div>
       <div className="axv-attr-rows">
         {rows.length === 0 && <div className="axv-attr-empty">该节点还没有属性</div>}

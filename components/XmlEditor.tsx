@@ -981,6 +981,22 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>phone_android</span>
             预览
           </button>
+          <select
+            className="axv-tb-select axv-tab-sample"
+            title="载入示例"
+            value=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v && SAMPLES[v]) setXmlAndTrack(SAMPLES[v]);
+            }}
+            style={{ margin: "0 8px" }}
+          >
+            <option value="">示例…</option>
+            <option value="cl">约束布局</option>
+            <option value="chain">链式排布 + Guideline</option>
+            <option value="barrier">Barrier 屏障</option>
+            <option value="list">竖列表</option>
+          </select>
           <button
             role="tab"
             aria-selected={mobileTab === "xml"}
@@ -1261,6 +1277,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                 onRemove={removeAttr}
                 onAddAttr={() => setAddModalOpen(true)}
                 resExtras={resExtras}
+                onDeleteNode={() => onRemoveNode(selectedNode.path)}
               />
             </div>
           ) : (
@@ -1333,21 +1350,6 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>hide_image</span>
             </button>
           ) : null}
-          <select
-            className="axv-tb-select"
-            title="载入示例"
-            value=""
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v && SAMPLES[v]) setXmlAndTrack(SAMPLES[v]);
-            }}
-          >
-            <option value="">示例…</option>
-            <option value="cl">约束布局</option>
-                <option value="chain">链式排布 + Guideline</option>
-                <option value="barrier">Barrier 屏障</option>
-            <option value="list">竖列表</option>
-          </select>
           <button
             className="axv-tb-btn"
             title="格式化代码（重排缩进，保留注释）"

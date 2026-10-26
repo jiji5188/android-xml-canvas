@@ -1,11 +1,12 @@
-// components/XmlEditor.tsx — M1a 主入口（v3：M3E 式三栏）
-// 左滑面板：[组件 | 图层] 两页 + 底部 [代码 | 资源] 两个 tab
-// 画布：手机屏（可接收组件面板拖放）
-// 右滑面板：选中节点的属性面板
+// components/XmlEditor.tsx — M1a 主入口（v4：桌面端按 M3E 原版三栏布局拓展功能 + 移动端 75% 侧滑 + 蒙版）
+// 桌面：左 320 停靠（52px 图标条：组件/图层 + 代码/资源）| 中间画布 | 右 320 属性
+// 工具栏：☰ 撤销 重做 打开 保存（中段），最右 ⇔ 属性
+// 移动端（≤840px 或粗指针+≤1024px）：两侧滑面板宽 75vw，背后加蒙版，点蒙版关闭；
+// 画布区顶部 tab 切换 XML 代码 / 预览
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { parseLayoutXml, findNode, serialize } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
@@ -96,13 +97,48 @@ export function XmlEditor() {
   const [leftView, setLeftView] = useState<"parts" | "layers" | "code" | "res">("parts");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [dropHint, setDropHint] = useState<string | null>(null);
+  const [mobileTab, setMobileTab] = useState<"preview" | "xml">("preview");
+  const [history, setHistory] = useState<string[]>([SAMPLES.list]);
+  const [histIdx, setHistIdx] = useState(0);
 
-  // 窄屏默认收起两个面板
+  /** 撤销 / 重做（M3E 同款：每次结构性变更压栈） */
+  const pushHistory = useCallback((nextXml: string) => {
+    setHistory((h) => [...h.slice(0, histIdx + 1), nextXml].slice(-50));
+    setHistIdx((i) => Math.min(i + 1, 49));
+  }, [histIdx]);
+  const canUndo = histIdx > 0;
+  const canRedo = histIdx < history.length - 1;
+  const undo = () => {
+    if (!canUndo) return;
+    setHistIdx((i) => i - 1);
+    setXml(history[histIdx - 1]);
+  };
+  const redo = () => {
+    if (!canRedo) return;
+    setHistIdx((i) => i + 1);
+    setXml(history[histIdx + 1]);
+  };
+
+  // 移动端判定（与 M3E 原版同口径：max-width:840 或 粗指针且 max-width:1024）
+  const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 1100) {
-      setLeftOpen(false);
-      setRightOpen(false);
-    }
+    const mq = window.matchMedia("(max-width: 840px), (pointer: coarse) and (max-width: 1024px)");
+    const apply = () => {
+      const m = mq.matches;
+      setIsMobile(m);
+      // 进移动端：两侧面板收起，默认看预览 tab
+      if (m) {
+        setLeftOpen(false);
+        setRightOpen(false);
+        setMobileTab("preview");
+      } else {
+        setLeftOpen(true);
+        setRightOpen(true);
+      }
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
   }, []);
 
   const resources: ResourceTable = useMemo(
@@ -121,6 +157,14 @@ export function XmlEditor() {
 
   // ===== 组件插入（点击 / 拖放）=====
   // 有选中节点：插到它的同级（兄弟）；否则插到根节点末尾
+  const setXmlAndTrack = useCallback(
+    (next: string) => {
+      setXml(next);
+      pushHistory(next);
+    },
+    [pushHistory],
+  );
+
   const insertWidget = (w: WidgetDef) => {
     const frag = stripNs(w.xml);
     const target = selectedPath && selectedPath !== "#0" ? selectedPath : "#0";
@@ -129,7 +173,7 @@ export function XmlEditor() {
         ? insertSiblingAfter(xml, target, frag, w.label)
         : insertChild(xml, "#0", frag, w.label);
     if (res.ok) {
-      setXml(res.xml);
+      setXmlAndTrack(res.xml);
       if (res.insertedPath) setSelectedPath(res.insertedPath);
     }
   };
@@ -148,7 +192,7 @@ export function XmlEditor() {
   const onMoveSibling = (targetPath: string, toIndex: number) => {
     const r = moveSibling(xml, targetPath, toIndex);
     if (r.ok) {
-      setXml(r.xml);
+      setXmlAndTrack(r.xml);
       if (r.newPath) setSelectedPath(r.newPath);
     }
   };
@@ -170,7 +214,7 @@ export function XmlEditor() {
     }
     const out = serialize(root);
     const decl = xml.match(/^<\?xml[\s\S]*?\?>/i);
-    setXml((decl ? decl[0] + "\n" : "") + out);
+    setXmlAndTrack((decl ? decl[0] + "\n" : "") + out);
     setSelectedPath(null);
   };
 
@@ -178,19 +222,19 @@ export function XmlEditor() {
   const commitAttr = (name: string, value: string) => {
     if (!selectedPath) return;
     const r = writebackAttrs(xml, selectedPath, { [name]: value });
-    if (r.changed) setXml(r.xml);
+    if (r.changed) setXmlAndTrack(r.xml);
   };
 
   const removeAttr = (name: string) => {
     if (!selectedPath) return;
     const r = writebackAttrs(xml, selectedPath, {}, [name]);
-    if (r.changed) setXml(r.xml);
+    if (r.changed) setXmlAndTrack(r.xml);
   };
 
   const addAttr = (name: string) => {
     if (!selectedPath) return;
     const r = writebackAttrs(xml, selectedPath, { [name]: defaultFor(name) });
-    if (r.changed) setXml(r.xml);
+    if (r.changed) setXmlAndTrack(r.xml);
   };
 
   const selectedNode: ResolvedNode | null = useMemo(() => {
@@ -202,10 +246,64 @@ export function XmlEditor() {
   const heightPx = Math.round(892 * SCALE * scale);
 
   const shortTag = (t: string) => (t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t);
+  const openProject = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xml";
+    input.onchange = () => {
+      const f = input.files?.[0];
+      if (!f) return;
+      f.text().then((txt) => setXmlAndTrack(txt));
+    };
+    input.click();
+  };
+
+  const saveProject = () => {
+    const blob = new Blob([xml], { type: "application/xml" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "layout.xml";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   return (
     <div className="axv-editor">
       <div className="axv-main">
-        {/* 画布舞台 */}
+      {/* 移动端：两侧滑面板背后的蒙版（点蒙版关闭对应面板） */}
+      {isMobile && leftOpen && (
+        <div className="axv-backdrop" onClick={() => setLeftOpen(false)} aria-hidden="true" />
+      )}
+      {isMobile && rightOpen && (
+        <div className="axv-backdrop" onClick={() => setRightOpen(false)} aria-hidden="true" />
+      )}
+
+      {/* 移动端：画布区顶部 tab 切换「XML 代码 / 预览」 */}
+      {isMobile && (
+        <div className="axv-mob-tabs" role="tablist" aria-label="视图">
+          <button
+            role="tab"
+            aria-selected={mobileTab === "preview"}
+            className={mobileTab === "preview" ? "on" : ""}
+            onClick={() => setMobileTab("preview")}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>phone_android</span>
+            预览
+          </button>
+          <button
+            role="tab"
+            aria-selected={mobileTab === "xml"}
+            className={mobileTab === "xml" ? "on" : ""}
+            onClick={() => setMobileTab("xml")}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>{"</>"}</span>
+            XML 代码
+          </button>
+        </div>
+      )}
+
+      {/* 画布舞台 */}
+      {!(isMobile && mobileTab === "xml") && (
         <div className={"axv-stage" + (leftOpen ? " pad-l" : "") + (rightOpen ? " pad-r" : "")}>
           {parseErr ? (
             <div className="axv-canvas-empty">XML 解析失败，请检查结构</div>
@@ -240,8 +338,36 @@ export function XmlEditor() {
             </div>
           )}
         </div>
+      )}
 
-      {/* 左侧滑面板：52px 图标条 + 内容列（M3E 同款布局） */}
+      {/* 移动端：XML 代码 tab 的编辑器 */}
+      {isMobile && mobileTab === "xml" && (
+        <div className="axv-mob-xml">
+          <textarea
+            className="axv-pane"
+            value={xml}
+            spellCheck={false}
+            onChange={(e) => setXml(e.target.value)}
+          />
+          <div className="axv-mob-xml-tools">
+            <select
+              className="axv-tb-select"
+              title="载入示例"
+              value=""
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v && SAMPLES[v]) setXmlAndTrack(SAMPLES[v]);
+              }}
+            >
+              <option value="">示例…</option>
+              <option value="list">竖列表</option>
+            </select>
+            <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
+          </div>
+        </div>
+      )}
+
+      {/* 左侧滑面板：52px 图标条 + 内容列（M3E 同款布局；移动端宽 75vw） */}
       <aside className={"axv-slide-left" + (leftOpen ? " axv-open" : "")}>
         <div className="axv-rail">
           <button
@@ -360,7 +486,7 @@ export function XmlEditor() {
         </div>
       </aside>
 
-      {/* 右侧滑面板：属性 */}
+      {/* 右侧滑面板：属性（移动端宽 75vw） */}
       <aside className={"axv-slide-right" + (rightOpen ? " axv-open" : "")}>
         <div className="axv-slide-head">
           <span>属性</span>
@@ -396,61 +522,50 @@ export function XmlEditor() {
         onPick={(name) => addAttr(name)}
       />
 
-      {/* 顶部工具栏（M3E 式悬浮胶囊组：最左 ☰，最右属性） */}
+      {/* 顶部工具栏（M3E 式悬浮胶囊组：☰ 撤销 重做 打开 保存 …… 最右 ⇔ 属性） */}
       <div className="axv-toolbar-v2">
         <div className="axv-tb-group">
           <button
             className={"axv-tb-btn" + (leftOpen ? " on" : "")}
-            title="显示 / 隐藏左侧面板"
-            aria-label="左侧面板"
+            title="展开 / 收起左侧面板"
+            aria-label="展开左侧面板"
             aria-pressed={leftOpen}
             onClick={() => setLeftOpen((v) => !v)}
           >
             <span className="msr" aria-hidden="true" data-fill={leftOpen ? "1" : "0"} style={{ fontSize: 23 }}>
-              menu_open
+              {leftOpen ? "menu_open" : "left_panel_open"}
             </span>
           </button>
         </div>
 
         <div className="axv-tb-group">
-          <div className="axv-seg" role="radiogroup" aria-label="视图">
-            <button
-              className={"axv-seg-btn" + (leftView === "parts" ? " on" : "")}
-              role="radio"
-              aria-checked={leftView === "parts"}
-              title="组件"
-              onClick={() => {
-                setLeftView("parts");
-                setLeftOpen(true);
-              }}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>widgets</span>
-            </button>
-            <button
-              className={"axv-seg-btn" + (leftView === "code" ? " on" : "")}
-              role="radio"
-              aria-checked={leftView === "code"}
-              title="XML 代码"
-              onClick={() => {
-                setLeftView("code");
-                setLeftOpen(true);
-              }}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>code</span>
-            </button>
-          </div>
-          <select
-            className="axv-tb-select"
-            title="载入示例"
-            value=""
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v && SAMPLES[v]) setXml(SAMPLES[v]);
-            }}
+          <button
+            className="axv-tb-btn"
+            title="撤销"
+            aria-label="撤销"
+            disabled={!canUndo}
+            onClick={undo}
           >
-            <option value="">示例…</option>
-            <option value="list">竖列表</option>
-          </select>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>undo</span>
+          </button>
+          <button
+            className="axv-tb-btn"
+            title="重做"
+            aria-label="重做"
+            disabled={!canRedo}
+            onClick={redo}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>redo</span>
+          </button>
+          <button className="axv-tb-btn" title="打开 XML 文件" aria-label="打开" onClick={openProject}>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>folder_open</span>
+          </button>
+          <button className="axv-tb-btn" title="保存为 XML 文件" aria-label="保存" onClick={saveProject}>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save</span>
+          </button>
+        </div>
+
+        <div className="axv-tb-group">
           <div className="axv-zoom">
             <input
               type="range"
@@ -468,18 +583,18 @@ export function XmlEditor() {
         <div className="axv-tb-group">
           <button
             className={"axv-tb-btn" + (rightOpen ? " on" : "")}
-            title="显示 / 隐藏右侧属性面板"
+            title="展开 / 收起右侧属性面板"
             aria-label="右侧属性面板"
             aria-pressed={rightOpen}
             onClick={() => setRightOpen((v) => !v)}
           >
             <span className="msr" aria-hidden="true" data-fill={rightOpen ? "1" : "0"} style={{ fontSize: 23 }}>
-              tune
+              {rightOpen ? "panel_right" : "right_panel_open"}
             </span>
           </button>
         </div>
       </div>
       </div>
-    </div>
+      </div>
   );
 }

@@ -878,20 +878,106 @@
   text-align: center;
 }
 
-/* 窄屏：滑面板变全宽抽屉 */
-@media (max-width: 900px) {
+/* 移动端：两侧滑面板背后蒙版（点蒙版关闭面板） */
+.axv-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.38);
+  z-index: 25;
+  transition: opacity 0.18s ease;
+}
+
+/* 移动端：画布区顶部 XML 代码 / 预览 tab */
+.axv-mob-tabs {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  z-index: 45;
+  padding: 4px;
+  border-radius: 20px;
+  background: #F3F3F9;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.axv-mob-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 17px;
+  background: transparent;
+  color: #3A3A45;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.axv-mob-tabs button.on {
+  background: #04409F;
+  color: #fff;
+}
+.axv-mob-xml {
+  position: absolute;
+  inset: 110px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.axv-mob-xml .axv-pane {
+  flex: 1;
+  min-height: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #F9F9FF;
+}
+.axv-mob-xml-tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.axv-mob-tool-btn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  border: none;
+  background: #04409F;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* 移动端（与 M3E 原版同口径：≤840px 或 粗指针且 ≤1024px）：
+   两侧滑面板宽 75vw，舞台不再让位 */
+@media (max-width: 840px), (pointer: coarse) and (max-width: 1024px) {
   .axv-slide-left,
   .axv-slide-right {
-    width: 86vw;
+    width: 75vw;
   }
-  .axv-stage.pad-l {
-    padding-left: 20px;
+  .axv-stage {
+    padding: 76px 8px 12px;
   }
+  .axv-stage.pad-l,
   .axv-stage.pad-r {
-    padding-right: 20px;
+    padding-left: 8px;
+    padding-right: 8px;
   }
-  .axv-attr-rows {
-    max-height: 52vh;
+  .axv-toolbar-v2 {
+    padding: 0 8px;
+    gap: 6px;
+  }
+  .axv-slide-left .axv-rail {
+    width: 48px;
+  }
+  .axv-slide-left .axv-rail-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
   }
 }
 

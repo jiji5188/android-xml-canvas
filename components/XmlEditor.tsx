@@ -303,6 +303,15 @@ export function XmlEditor() {
   /** 上传 res/ 目录解析出的附加资源（drawable/vector/styles/values 原文） */
   const [resExtras, setResExtras] = useState<ResourceExtras | null>(null);
   const resDirRef = useRef<HTMLInputElement | null>(null);
+  /** 双保险：mount 后 setAttribute 强制写入 webkitdirectory/directory，
+   *  避免 React 渲染空字符串属性时某些浏览器不识别（导致弹出文件选择器而非目录选择器） */
+  useEffect(() => {
+    const el = resDirRef.current;
+    if (el) {
+      el.setAttribute("webkitdirectory", "");
+      el.setAttribute("directory", "");
+    }
+  }, []);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
  const [exportNote, setExportNote] = useState<string>(" ");
   const [scale, setScale] = useState(1);
@@ -856,6 +865,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
   for (const c of n.children as { attrs: Record<string, string>; children: unknown[] }[]) collectIds(c, out);
   return out;
 }
+  /** 打开 .xml 文件：校验类型/大小，try/catch 读取，载入后检查可解析性，解析不了就提示而不留坏文件 */
   const openProject = () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -863,27 +873,76 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
     input.onchange = () => {
       const f = input.files?.[0];
       if (!f) return;
-      f.text().then((txt) => setXmlAndTrack(txt));
+      // 1) 类型校验：后缀必须 .xml
+      if (!/\.xml$/i.test(f.name)) {
+        setExportNote(`「${f.name}」不是 .xml 文件，已忽略`);
+        window.setTimeout(() => setExportNote(""), 3600);
+        return;
+      }
+      // 2) 大小上限（5MB），防止巨型文件卡死浏览器
+      if (f.size > 5 * 1024 * 1024) {
+        setExportNote(`「${f.name}」超过 5MB，不加载`);
+        window.setTimeout(() => setExportNote(""), 4000);
+        return;
+      }
+      // 3) 读取（try/catch，File.text() 会 reject）
+      f.text()
+        .then((txt) => {
+          // 4) 载入前预检：能解析出根元素吗？解析不了 → 报错不写入，画布保持原内容
+          const { root, issues } = parseLayoutXml(txt);
+          if (!root) {
+            const errIssues = issues.filter((i) => i.level === "error");
+            const detail = errIssues.length > 0 ? `：${errIssues[0].message}` : "";
+            setExportNote(`「${f.name}」无法解析为布局 XML${detail}，未载入（画布保持不变）`);
+            window.setTimeout(() => setExportNote(""), 5000);
+            return;
+          }
+          setXmlAndTrack(txt);
+          // 5) 载入后语义检查：有 error 级问题给出提示（不阻断，用户可继续编辑）
+          const errs = issues.filter((i) => i.level === "error");
+          if (errs.length > 0) {
+            setExportNote(`已载入「${f.name}」，但检测到 ${errs.length} 条结构错误，切「XML 代码」tab 查看行号提示`);
+            window.setTimeout(() => setExportNote(""), 6000);
+          }
+        })
+        .catch((err) => {
+          console.error("[axv] 读取 xml 文件失败", err);
+          setExportNote(`读取「${f.name}」失败，请重试`);
+          window.setTimeout(() => setExportNote(""), 4000);
+        });
     };
     input.click();
   };
 
-  /** M3b：上传 res/ 目录（或散件），解析 drawable/vector/values/styles */
+  /** M3b：上传 res/ 目录，解析 drawable/vector/values/styles。
+   *  带容错：文件数为空、全部不是 res 结构、buildResourceExtras 抛错都有友好提示 */
   const onPickRes = async (fileList: FileList | null) => {
-    if (!fileList || fileList.length === 0) return;
+    if (!fileList || fileList.length === 0) {
+      setExportNote("未选择任何文件（目录选择器取消或目录为空）");
+      window.setTimeout(() => setExportNote(""), 3000);
+      return;
+    }
     const items = Array.from(fileList).map((f) => {
       const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name;
       return { name: f.name, path: rel, file: f };
     });
+    // 提示：选到的是目录吗？（webkitRelativePath 存在 = 目录模式；否则 = 散件模式）
+    const isDirMode = items.some((it) => it.path !== it.name);
+    if (!isDirMode) {
+      setExportNote("提示：选中的是散文件，建议选整个 res 目录（含 drawable/ values/ layout/）效果最佳");
+    }
     try {
       const extras = await buildResourceExtras(items);
       setResExtras(extras);
       const c = extras.counts;
-      setExportNote(`已读取 res：图片 ${c.images} / 矢量 ${c.vectors} / values ${c.values} / 样式 ${c.styles}`);
+      setExportNote(
+        `已读取 res：图片 ${c.images} / 矢量 ${c.vectors} / values ${c.values} / 样式 ${c.styles}` +
+          (isDirMode ? "" : "（散件模式，可能不完整）"),
+      );
       window.setTimeout(() => setExportNote(""), 3600);
     } catch (err) {
       console.error("[axv] 读取 res 失败", err);
-      setExportNote("读取 res 失败，看 console");
+      setExportNote("读取 res 失败，请确认目录结构合法（参考 console）");
       window.setTimeout(() => setExportNote(""), 4000);
     }
   };
@@ -950,12 +1009,12 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
 
   return (
     <div className="axv-editor">
-      {/* 上传资源：整目录（webkitdirectory）入口 */}
+      {/* 上传资源：整目录入口 */}
       <input
         ref={resDirRef}
         type="file"
         multiple
-        // @ts-expect-error 非标准属性，Chrome/Edge/Safari 支持
+        // @ts-expect-error 非标准属性，Chrome/Edge 用 webkitdirectory；Firefox 用 directory；双写双保险
         webkitdirectory=""
         directory=""
         style={{ display: "none" }}

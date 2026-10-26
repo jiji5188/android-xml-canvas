@@ -154,8 +154,8 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["textAlignment"] = a["textAlignment"] ?? "";
   out["hint"] = a["hint"] !== undefined ? resolveText(a["hint"], res, issues, path) : "";
 
-  // 图片
-  out["src"] = a["src"] ?? "";
+  // 图片：@drawable/xxx / @mipmap/xxx 优先查上传的 res 目录，查不到再原样
+  out["src"] = resolveDrawable(a["src"] ?? a["srcCompat"] ?? "", res, issues, path, "src");
 
   // 可见性 / 可用性
   out["visibility"] = a["visibility"] ?? "visible";
@@ -188,4 +188,32 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["cardCornerRadius"] = a["cardCornerRadius"] !== undefined ? (resolveSize(a["cardCornerRadius"], res, issues, path, "cardCornerRadius").kind as string === "dp" ? (resolveSize(a["cardCornerRadius"], res, issues, path, "cardCornerRadius") as { kind: "dp"; value: number }).value : 0) : 0;
 
   return { attrs: out, issues };
+}
+
+
+/** 图片引用解析：@drawable/x、@mipmap/x 查 res.drawables（上传的 res/ 目录），找不到原样保留（画布显示占位） */
+export function resolveDrawable(
+  raw: string,
+  res: ResourceTable,
+  issues: import("./types").XmlIssue[],
+  path: string,
+  prop: string,
+): string {
+  const v = raw.trim();
+  if (v === "") return "";
+  const m = v.match(/^@(drawable|mipmap)\/(.+)$/);
+  if (m) {
+    const [, kind, name] = m;
+    const url = res.drawables?.[name] ?? res.drawables?.[name.replace(/\.\w+$/, "")];
+    if (url) return url;
+    // 矢量名单里（vector xml）标记为占位
+    if (res.vectorNames?.includes(name)) {
+      issues.push({ level: "warn", nodePath: path, message: `${prop} 引用矢量 @${kind}/${name}，按占位渲染` });
+      return "vector:" + name;
+    }
+    issues.push({ level: "warn", nodePath: path, message: `${prop} 引用 @${kind}/${name} 未找到（可上传 res/ 目录），按占位显示` });
+    return "missing:" + kind + "/" + name;
+  }
+  // @color 当背景用（如 src 少见）或直连 dataURL/普通值
+  return v;
 }

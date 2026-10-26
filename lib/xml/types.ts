@@ -18,11 +18,16 @@ export interface XmlIssue {
   message: string;
 }
 
-/** 资源表：string/dimen/color 三类 */
+/** 资源表：string/dimen/color 三类 + 上传的 res/ 目录附加资源 */
 export interface ResourceTable {
   strings: Record<string, string>;
   dimens: Record<string, number>;   // 统一存 dp 数值
   colors: Record<string, string>;   // css 颜色值
+  /** 可选：上传 res/ 目录后填充（@drawable/@mipmap 名 → dataURL，矢量名列表） */
+  drawables?: Record<string, string>;
+  vectorNames?: string[];
+  /** 可选：styles.xml 解析后的展开样式（@style/xxx → attrs） */
+  styles?: Record<string, { name: string; parent?: string; attrs: Record<string, string> }>;
 }
 
 /** 解析完成、引用已展开的节点（供 css.ts 用） */

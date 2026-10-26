@@ -1506,3 +1506,6 @@
   z-index: 30;
   pointer-events: none;
 }
+
+/* M3b 上传 res 资源按钮激活态 */
+.axv-tb-btn.axv-tb-active { background: #4f46e5; color: #fff; }

@@ -277,11 +277,24 @@ export function buildRenderModel(
     }
 
     if (cls === "axv-image") {
-      if (attrs["adjustViewBounds"]) style.aspectRatio = "1 / 1";
-      if (!(attrs["src"] as string)) {
+      const src = attrs["src"] as string;
+      if (src && !src.startsWith("missing:")) {
+        // 真图（dataURL）或矢量占位
+        if (src.startsWith("vector:")) {
+          // 矢量图：虚线紫框占位（真实 vector 路径不渲染，避免误导）
+          style.backgroundColor = style.backgroundColor || "#EDE7F6";
+          style.border = "1.5px dashed #9575CD";
+        } else {
+          // dataURL 直接做 background
+          style.backgroundImage = `url(${src})`;
+          style.backgroundSize = "100% 100%";
+          style.backgroundColor = style.backgroundColor || "transparent";
+        }
+      } else if (!src) {
         style.backgroundColor = style.backgroundColor || "#E0D9E3";
         style.minHeight = style.minHeight || `${DP(48, scale)}px`;
       }
+      if (attrs["adjustViewBounds"]) style.aspectRatio = "1 / 1";
     }
 
     if (cls === "axv-progress") {

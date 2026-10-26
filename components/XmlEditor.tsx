@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue } f
 import { parseLayoutXml, findNode, serialize } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
+import { buildResourceExtras, type ResourceExtras } from "@/lib/xml/resdir";
 import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults } from "@/lib/xml/insert";
@@ -277,6 +278,10 @@ export function XmlEditor() {
   /** 解析用（低优先级）：敲代码时让输入不卡，解析滞后几帧 */
   const parsedXml = useDeferredValue(xml);
   const [resourceFragment, setResourceFragment] = useState("");
+  /** 上传 res/ 目录解析出的附加资源（drawable/vector/styles/values 原文） */
+  const [resExtras, setResExtras] = useState<ResourceExtras | null>(null);
+  const resInputRef = useRef<HTMLInputElement | null>(null);
+  const resDirRef = useRef<HTMLInputElement | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
  const [exportNote, setExportNote] = useState<string>(" ");
   const [scale, setScale] = useState(1);
@@ -357,10 +362,21 @@ export function XmlEditor() {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  const resources: ResourceTable = useMemo(
-    () => (resourceFragment.trim() ? mergeResourceFragment(resourceFragment) : DEFAULT_RESOURCES),
-    [resourceFragment],
-  );
+  const resources: ResourceTable = useMemo(() => {
+    // 顺序：内置默认 → 上传 res/ 里的 values（真实 color/dimen/string）→ 用户手贴片段（最高优先）
+    let base: ResourceTable = DEFAULT_RESOURCES;
+    const fragment = [resExtras?.valuesXml ?? "", resourceFragment].filter((x) => x.trim()).join("\n");
+    if (fragment.trim()) base = mergeResourceFragment(fragment);
+    if (resExtras) {
+      base = {
+        ...base,
+        drawables: resExtras.drawables,
+        vectorNames: resExtras.vectorNames,
+        styles: resExtras.styles,
+      };
+    }
+    return base;
+  }, [resourceFragment, resExtras]);
 
   const { model, issues, parseErr } = useMemo(() => {
     const { root, issues } = parseLayoutXml(parsedXml);
@@ -725,6 +741,35 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
     input.click();
   };
 
+  /** M3b：上传 res/ 目录（或散件），解析 drawable/vector/values/styles */
+  const onPickRes = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const items = Array.from(fileList).map((f) => {
+      const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name;
+      return { name: f.name, path: rel, file: f };
+    });
+    try {
+      const extras = await buildResourceExtras(items);
+      setResExtras(extras);
+      const c = extras.counts;
+      setExportNote(`已读取 res：图片 ${c.images} / 矢量 ${c.vectors} / values ${c.values} / 样式 ${c.styles}`);
+      window.setTimeout(() => setExportNote(""), 3600);
+    } catch (err) {
+      console.error("[axv] 读取 res 失败", err);
+      setExportNote("读取 res 失败，看 console");
+      window.setTimeout(() => setExportNote(""), 4000);
+    }
+  };
+
+  /** 清掉已上传的资源，回到内置默认 */
+  const clearRes = () => {
+    setResExtras(null);
+    if (resInputRef.current) resInputRef.current.value = "";
+    if (resDirRef.current) resDirRef.current.value = "";
+    setExportNote("已清除上传的 res 资源");
+    window.setTimeout(() => setExportNote(""), 2400);
+  };
+
   /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续 */
   const saveProject = () => {
     const check = exportChecks(xml);
@@ -773,6 +818,31 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
 
   return (
     <div className="axv-editor">
+      {/* 上传资源：两个入口——散件多选（含图片/xml）与整目录（webkitdirectory） */}
+      <input
+        ref={resInputRef}
+        type="file"
+        multiple
+        accept=".xml,.png,.webp,.jpg,.jpeg,.gif,.bmp"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          void onPickRes(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={resDirRef}
+        type="file"
+        multiple
+        // @ts-expect-error 非标准属性，Chrome/Edge/Safari 支持
+        webkitdirectory=""
+        directory=""
+        style={{ display: "none" }}
+        onChange={(e) => {
+          void onPickRes(e.target.files);
+          e.target.value = "";
+        }}
+      />
       <div className="axv-main">
       {/* 移动端：两侧滑面板背后的蒙版（点蒙版关闭对应面板） */}
       {isMobile && leftOpen && (
@@ -1099,6 +1169,31 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           <button className="axv-tb-btn" title="复制生成的 XML" aria-label="复制 XML" onClick={copyExportedXml}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>content_copy</span>
           </button>
+          <button
+            className={"axv-tb-btn" + (resExtras ? " axv-tb-active" : "")}
+            title={
+              resExtras
+                ? "重新选择资源文件（已加载 " + resExtras.counts.images + " 张图 / " + resExtras.counts.values + " 个 values）"
+                : "选择 res 资源文件（可多选：drawable 图片 / values xml / styles.xml）"
+            }
+            aria-label="选择 res 文件"
+            onClick={() => resInputRef.current?.click()}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>perm_media</span>
+          </button>
+          <button
+            className="axv-tb-btn"
+            title="选择整个 res 目录（推荐：一次导入 drawable / values / mipmap）"
+            aria-label="选择 res 目录"
+            onClick={() => resDirRef.current?.click()}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>create_new_folder</span>
+          </button>
+          {resExtras ? (
+            <button className="axv-tb-btn" title="清除已上传的 res 资源" aria-label="清除 res" onClick={clearRes}>
+              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>hide_image</span>
+            </button>
+          ) : null}
           <select
             className="axv-tb-select"
             title="载入示例"

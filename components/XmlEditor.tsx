@@ -245,6 +245,21 @@ export function XmlEditor() {
   const widthPx = Math.round(412 * SCALE * scale);
   const heightPx = Math.round(892 * SCALE * scale);
 
+  /** 窄屏：把 824px 的机屏等比缩到可视宽度内（保留 dp→px 内部尺寸不变） */
+  const [vw, setVw] = useState(0);
+  useEffect(() => {
+    const onResize = () => setVw(window.innerWidth);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const fitRatio = (() => {
+    if (!vw) return 1;
+    const panels = isMobile ? 0 : (leftOpen ? 320 : 0) + (rightOpen ? 320 : 0);
+    const avail = vw - panels - (isMobile ? 28 : 48);
+    return Math.min(1, avail / widthPx);
+  })();
+
   const shortTag = (t: string) => (t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t);
   const openProject = () => {
     const input = document.createElement("input");
@@ -279,7 +294,7 @@ export function XmlEditor() {
       )}
 
       {/* 移动端：画布区顶部 tab 切换「XML 代码 / 预览」 */}
-      {isMobile && (
+      {isMobile && !leftOpen && !rightOpen && (
         <div className="axv-mob-tabs" role="tablist" aria-label="视图">
           <button
             role="tab"
@@ -309,11 +324,20 @@ export function XmlEditor() {
             <div className="axv-canvas-empty">XML 解析失败，请检查结构</div>
           ) : model ? (
             <div
+              style={{
+                width: widthPx * fitRatio,
+                height: heightPx * fitRatio,
+                flex: "0 0 auto",
+              }}
+            >
+            <div
               className={"axv-phone" + (dropHint ? " axv-drop-target" : "")}
               style={{
                 width: widthPx,
                 minHeight: heightPx,
                 background: model.root.style.background || model.root.style.backgroundColor || "#fff",
+                transform: fitRatio < 1 ? `scale(${fitRatio})` : undefined,
+                transformOrigin: "top left",
               }}
               onDragOver={(e) => {
                 if (e.dataTransfer.types.includes(DRAG_WIDGET_MIME)) {
@@ -326,6 +350,7 @@ export function XmlEditor() {
               onDrop={onDrop}
             >
               <XmlCanvas node={model.root} selectedPath={selectedPath} onSelect={setSelectedPath} />
+            </div>
             </div>
           ) : null}
           {issues.length > 0 && (
@@ -565,7 +590,7 @@ export function XmlEditor() {
           </button>
         </div>
 
-        <div className="axv-tb-group">
+        <div className="axv-tb-group axv-tb-zoom">
           <div className="axv-zoom">
             <input
               type="range"

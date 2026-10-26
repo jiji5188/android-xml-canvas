@@ -1491,3 +1491,19 @@
   margin-bottom: 10px;
   color: #1d1b20;
 }
+
+/* M3 导出提示浮层 */
+.axv-export-note {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  transform: translateX(-50%);
+  background: #323232;
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  z-index: 30;
+  pointer-events: none;
+}
+

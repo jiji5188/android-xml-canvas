@@ -15,6 +15,7 @@ import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults } from "@/lib/xml/insert";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml } from "@/lib/xml/lint";
+import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { XmlCanvas } from "./XmlCanvas";
 import { XmlCodeEditor } from "./XmlCodeEditor";
 import { AttrPanel } from "./AttrPanel";
@@ -277,6 +278,7 @@ export function XmlEditor() {
   const parsedXml = useDeferredValue(xml);
   const [resourceFragment, setResourceFragment] = useState("");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+ const [exportNote, setExportNote] = useState<string>(" ");
   const [scale, setScale] = useState(1);
 
   const [leftOpen, setLeftOpen] = useState(true);
@@ -723,13 +725,50 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
     input.click();
   };
 
+  /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续 */
   const saveProject = () => {
-    const blob = new Blob([xml], { type: "application/xml" });
+    const check = exportChecks(xml);
+    if (check.errors > 0) {
+      alert(`有 ${check.errors} 个结构错误，先修复再导出（切到「XML 代码」tab 看行号提示）`);
+      return;
+    }
+    let body = exportLayoutXml(xml);
+    if (check.notes.length > 0) {
+      const ok = confirm(
+        "导出前检查发现 " +
+          check.notes.length +
+          " 条提示：\n" +
+          check.notes.slice(0, 8).join("\n") +
+          "\n\n继续导出？",
+      );
+      if (!ok) return;
+    }
+    void body;
+    const blob = new Blob([body], { type: "application/xml" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "layout.xml";
+    a.download = "activity_main.xml";
     a.click();
     URL.revokeObjectURL(a.href);
+  };
+
+  /** M3：复制生成的 XML 到剪贴板（与下载同一份内容） */
+  const copyExportedXml = async () => {
+    const check = exportChecks(xml);
+    if (check.errors > 0) {
+      alert(`有 ${check.errors} 个结构错误，先修复再复制`);
+      return;
+    }
+    const body = exportLayoutXml(xml);
+    try {
+      await navigator.clipboard.writeText(body);
+      setExportNote("已复制到剪贴板");
+    } catch {
+      // 剪贴板 API 不可用（非 https / 旧浏览器）时退化成下载
+      saveProject();
+      setExportNote("剪贴板不可用，已改为下载");
+    }
+    window.setTimeout(() => setExportNote(""), 2600);
   };
 
   return (
@@ -809,7 +848,10 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             </div>
             </div>
           ) : null}
-          {issues.length > 0 && (
+          {exportNote ? (
+              <div className="axv-export-note">{exportNote}</div>
+            ) : null}
+            {issues.length > 0 && (
             <div className="axv-issues">
               <strong>{issues.length} 条提示：</strong>
               {issues.slice(0, 8).map((i, idx) => (
@@ -1053,6 +1095,9 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           </button>
           <button className="axv-tb-btn" title="保存为 XML 文件" aria-label="保存" onClick={saveProject}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save</span>
+          </button>
+          <button className="axv-tb-btn" title="复制生成的 XML" aria-label="复制 XML" onClick={copyExportedXml}>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>content_copy</span>
           </button>
           <select
             className="axv-tb-select"

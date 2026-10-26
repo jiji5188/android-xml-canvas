@@ -11,7 +11,7 @@ import { DRAG_WIDGET_MIME } from "./widget-catalog";
 import { isContainerTag } from "@/lib/xml/insert";
 
 export type ConstraintSide = "start" | "end" | "top" | "bottom";
-export type GeomMode = "move" | "nw" | "ne" | "sw" | "se";
+export type GeomMode = "move" | "left" | "right" | "top" | "bottom";
 
 /** 画布几何变化（单位 dp，相对父容器左上角） */
 export interface GeomPatch {
@@ -83,7 +83,15 @@ export function XmlCanvas({
 }: XmlCanvasProps) {
   const [dropHit, setDropHit] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
-  const [geomLive, setGeomLive] = useState<{ dx: number; dy: number; dw: number; dh: number } | null>(null);
+  const [geomLive, setGeomLive] = useState<{
+    dx: number;
+    dy: number;
+    dw: number;
+    dh: number;
+    /** 拖拽开始时的实际测得尺寸（px），用于 resize 预览：auto/百分比也能跟手 */
+    baseW?: number;
+    baseH?: number;
+  } | null>(null);
   const selfRef = useRef<HTMLDivElement | null>(null);
   const geomRef = useRef<GeomDrag | null>(null);
 
@@ -103,10 +111,13 @@ export function XmlCanvas({
     const t: string[] = [];
     if (geomLive.dx || geomLive.dy) t.push(`translate(${geomLive.dx}px, ${geomLive.dy}px)`);
     if (style.transform) t.push(String(style.transform));
-    style.transform = t.join(" ");
-    if (geomLive.dw || geomLive.dh) {
-      style.width = `calc(${String(style.width ?? "auto")} + ${geomLive.dw}px)`;
-      style.height = `calc(${String(style.height ?? "auto")} + ${geomLive.dh}px)`;
+    if (t.length > 0) style.transform = t.join(" ");
+    // 用拖拽起点的实际尺寸 + 增量做预览，auto / calc(100% - Npx) / 百分比都能跟手
+    if (geomLive.dw && geomLive.baseW !== undefined) {
+      style.width = `${Math.max(8, geomLive.baseW + geomLive.dw)}px`;
+    }
+    if (geomLive.dh && geomLive.baseH !== undefined) {
+      style.height = `${Math.max(8, geomLive.baseH + geomLive.dh)}px`;
     }
     style.zIndex = 50;
   }
@@ -188,24 +199,34 @@ export function XmlCanvas({
       parentLeft: prect?.left ?? 0,
       parentTop: prect?.top ?? 0,
     };
-    setGeomLive({ dx: 0, dy: 0, dw: 0, dh: 0 });
+    setGeomLive({ dx: 0, dy: 0, dw: 0, dh: 0, baseW: rect.width, baseH: rect.height });
 
     const move = (ev: PointerEvent) => {
       const g = geomRef.current;
       if (!g) return;
       const dx = ev.clientX - g.px;
       const dy = ev.clientY - g.py;
-      if (g.mode === "move") setGeomLive({ dx, dy, dw: 0, dh: 0 });
-      else {
-        const dw = g.mode === "ne" || g.mode === "se" ? dx : g.mode === "nw" || g.mode === "sw" ? -dx : 0;
-        const dh = g.mode === "sw" || g.mode === "se" ? dy : g.mode === "nw" || g.mode === "ne" ? -dy : 0;
-        setGeomLive({
-          dx: g.mode === "nw" || g.mode === "sw" ? dx : 0,
-          dy: g.mode === "nw" || g.mode === "ne" ? dy : 0,
-          dw,
-          dh,
-        });
+      if (g.mode === "move") {
+        setGeomLive({ dx, dy, dw: 0, dh: 0, baseW: g.w, baseH: g.h });
+        return;
       }
+      // 四条边手柄：左右只影响宽（及 x 平移），上下只影响高（及 y 平移）
+      let dw = 0;
+      let dh = 0;
+      let pdx = 0;
+      let pdy = 0;
+      if (g.mode === "left") {
+        dw = -dx;
+        pdx = dx;
+      } else if (g.mode === "right") {
+        dw = dx;
+      } else if (g.mode === "top") {
+        dh = -dy;
+        pdy = dy;
+      } else if (g.mode === "bottom") {
+        dh = dy;
+      }
+      setGeomLive({ dx: pdx, dy: pdy, dw, dh, baseW: g.w, baseH: g.h });
     };
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move);
@@ -223,23 +244,36 @@ export function XmlCanvas({
       if (g.mode === "move") {
         nx += dx;
         ny += dy;
-      } else {
-        if (g.mode === "nw" || g.mode === "sw") { nx += dx; nw -= dx; }
-        if (g.mode === "ne" || g.mode === "se") { nw += dx; }
-        if (g.mode === "nw" || g.mode === "ne") { ny += dy; nh -= dy; }
-        if (g.mode === "sw" || g.mode === "se") { nh += dy; }
+      } else if (g.mode === "left") {
+        // 左边手柄：右缘固定 → x 跟着走，宽反向变
+        nx += dx;
+        nw -= dx;
+      } else if (g.mode === "right") {
+        nw += dx;
+      } else if (g.mode === "top") {
+        // 上边手柄：下缘固定 → y 跟着走，高反向变
+        ny += dy;
+        nh -= dy;
+      } else if (g.mode === "bottom") {
+        nh += dy;
       }
       nw = Math.max(8, nw);
       nh = Math.max(8, nh);
       const relX = (nx - g.parentLeft) / scale;
       const relY = (ny - g.parentTop) / scale;
       const r1 = (n: number) => Math.round(n * 10) / 10;
-      // move 手柄：只写 x/y（保留原 w/h 语义：match_parent / wrap_content 不被破坏）
-      // 四角 resize：只写 w/h（不改 x/y，避免同时改写 margin）
+      // move 手柄：只写 x/y（保留 match_parent / wrap_content 语义）
+      // 左右边手柄：只写宽（左边额外带 x）；上下边手柄：只写高（上边额外带 y）
       if (g.mode === "move") {
         onGeometryChange?.(node.path, { x: r1(relX), y: r1(relY) });
-      } else {
-        onGeometryChange?.(node.path, { w: r1(nw / scale), h: r1(nh / scale) });
+      } else if (g.mode === "left") {
+        onGeometryChange?.(node.path, { x: r1(relX), w: r1(nw / scale) });
+      } else if (g.mode === "right") {
+        onGeometryChange?.(node.path, { w: r1(nw / scale) });
+      } else if (g.mode === "top") {
+        onGeometryChange?.(node.path, { y: r1(relY), h: r1(nh / scale) });
+      } else if (g.mode === "bottom") {
+        onGeometryChange?.(node.path, { h: r1(nh / scale) });
       }
     };
     window.addEventListener("pointermove", move);
@@ -384,11 +418,19 @@ export function XmlCanvas({
           >
             ✥
           </span>
-          {(["nw", "ne", "sw", "se"] as GeomMode[]).map((m) => (
+          {(["left", "right", "top", "bottom"] as GeomMode[]).map((m) => (
             <span
               key={m}
               className={"axv-geom-resize axv-geom-" + m}
-              title="拖动改宽高（写回 layout_width / layout_height）"
+              title={
+                m === "left"
+                  ? "拖动改宽度（左边）"
+                  : m === "right"
+                    ? "拖动改宽度（右边）"
+                    : m === "top"
+                      ? "拖动改高度（上边）"
+                      : "拖动改高度（下边）"
+              }
               onPointerDown={beginGeom(m)}
               onClick={(e) => e.stopPropagation()}
             />

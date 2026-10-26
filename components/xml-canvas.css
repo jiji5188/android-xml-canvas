@@ -75,7 +75,7 @@
 .axv-handle-bottom { bottom: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
 .axv-handle:hover { background: #BE123C; transform: scale(1.25); }
 
-/* ===== M2d：自由拖动 / 四角拉伸手柄 ===== */
+/* ===== M2d/M2k：自由拖动 + 四边拉伸手柄（不用四角，避免宽高混在一起） ===== */
 .axv-geom-move {
   position: absolute;
   left: -18px;
@@ -105,10 +105,13 @@
   z-index: 30;
   touch-action: none;
 }
-.axv-geom-nw { left: -6px; top: -6px; cursor: nwse-resize; }
-.axv-geom-ne { right: -6px; top: -6px; cursor: nesw-resize; }
-.axv-geom-sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
-.axv-geom-se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+.axv-geom-left { left: -6px; top: 50%; margin-top: -5.5px; cursor: ew-resize; }
+.axv-geom-right { right: -6px; top: 50%; margin-top: -5.5px; cursor: ew-resize; }
+.axv-geom-top { top: -6px; left: 50%; margin-left: -5.5px; cursor: ns-resize; }
+.axv-geom-bottom { bottom: -6px; left: 50%; margin-left: -5.5px; cursor: ns-resize; }
+/* 四边手柄略加高/加宽，便于点中（宽/高按方向调） */
+.axv-geom-left, .axv-geom-right { height: 16px; margin-top: -8px; border-radius: 3px; }
+.axv-geom-top, .axv-geom-bottom { width: 16px; margin-left: -8px; border-radius: 3px; }
 
 /* ===== 资源树 ===== */
 .axv-restree { padding: 6px 4px 16px; font-size: 13px; }

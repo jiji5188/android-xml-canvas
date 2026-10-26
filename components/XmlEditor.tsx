@@ -6,13 +6,13 @@
 
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue } from "react";
 import { parseLayoutXml, findNode, serialize } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import type { ResolvedNode, ResourceTable } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
-import { insertChild, insertSiblingAfter, moveSibling } from "@/lib/xml/insert";
+import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag } from "@/lib/xml/insert";
 import { XmlCanvas } from "./XmlCanvas";
 import { XmlCodeEditor } from "./XmlCodeEditor";
 import { AttrPanel } from "./AttrPanel";
@@ -89,6 +89,8 @@ const stripNs = (frag: string) => frag.replace(/\s+xmlns:android="[^"]*"/g, "");
 
 export function XmlEditor() {
   const [xml, setXml] = useState(SAMPLES.list);
+  /** 解析用（低优先级）：敲代码时让输入不卡，解析滞后几帧 */
+  const parsedXml = useDeferredValue(xml);
   const [resourceFragment, setResourceFragment] = useState("");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
@@ -102,22 +104,49 @@ export function XmlEditor() {
   const [history, setHistory] = useState<string[]>([SAMPLES.list]);
   const [histIdx, setHistIdx] = useState(0);
 
-  /** 撤销 / 重做（M3E 同款：每次结构性变更压栈） */
-  const pushHistory = useCallback((nextXml: string) => {
-    setHistory((h) => [...h.slice(0, histIdx + 1), nextXml].slice(-50));
-    setHistIdx((i) => Math.min(i + 1, 49));
-  }, [histIdx]);
+  /* ===== 撤销 / 重做 =====
+     用 ref 存栈，避开 setState 异步导致连续操作串位置的问题。
+     结构变更立即入栈；手动敲代码则防抖 500ms 合并成一步。 */
+  const histRef = useRef<{ stack: string[]; idx: number }>({ stack: [SAMPLES.list], idx: 0 });
+  const textTimer = useRef<number | null>(null);
+
+  const syncHist = () => {
+    setHistory(histRef.current.stack);
+    setHistIdx(histRef.current.idx);
+  };
+  const commitHistory = useCallback((next: string) => {
+    const h = histRef.current;
+    if (h.stack[h.idx] === next) return;
+    const kept = h.stack.slice(0, h.idx + 1);
+    kept.push(next);
+    const capped = kept.length > 60 ? kept.slice(kept.length - 60) : kept;
+    histRef.current = { stack: capped, idx: capped.length - 1 };
+    syncHist();
+  }, []);
+  const flushTextTimer = useCallback(() => {
+    if (textTimer.current !== null) {
+      window.clearTimeout(textTimer.current);
+      textTimer.current = null;
+    }
+  }, []);
+
   const canUndo = histIdx > 0;
   const canRedo = histIdx < history.length - 1;
   const undo = () => {
-    if (!canUndo) return;
-    setHistIdx((i) => i - 1);
-    setXml(history[histIdx - 1]);
+    flushTextTimer();
+    const h = histRef.current;
+    if (h.idx <= 0) return;
+    h.idx -= 1;
+    setXml(h.stack[h.idx]);
+    syncHist();
   };
   const redo = () => {
-    if (!canRedo) return;
-    setHistIdx((i) => i + 1);
-    setXml(history[histIdx + 1]);
+    flushTextTimer();
+    const h = histRef.current;
+    if (h.idx >= h.stack.length - 1) return;
+    h.idx += 1;
+    setXml(h.stack[h.idx]);
+    syncHist();
   };
 
   // 移动端判定（与 M3E 原版同口径：max-width:840 或 粗指针且 max-width:1024）
@@ -148,22 +177,36 @@ export function XmlEditor() {
   );
 
   const { model, issues, parseErr } = useMemo(() => {
-    const { root, issues } = parseLayoutXml(xml);
+    const { root, issues } = parseLayoutXml(parsedXml);
     if (!root) return { model: null, issues, parseErr: true };
     return { model: buildRenderModel(root, resources, SCALE), issues, parseErr: false };
-  }, [xml, resources]);
+  }, [parsedXml, resources]);
 
   /** 图层树用的原始节点树（不经渲染模型） */
-  const treeRoot = useMemo(() => (parseErr ? null : parseLayoutXml(xml).root), [xml, parseErr]);
+  const treeRoot = useMemo(() => (parseErr ? null : parseLayoutXml(parsedXml).root), [parsedXml, parseErr]);
 
   // ===== 组件插入（点击 / 拖放）=====
   // 有选中节点：插到它的同级（兄弟）；否则插到根节点末尾
   const setXmlAndTrack = useCallback(
     (next: string) => {
+      flushTextTimer();
       setXml(next);
-      pushHistory(next);
+      commitHistory(next);
     },
-    [pushHistory],
+    [flushTextTimer, commitHistory],
+  );
+
+  /** 手敲代码：立即上屏，历史防抖 500ms 合并 */
+  const onChangeXmlText = useCallback(
+    (next: string) => {
+      setXml(next);
+      flushTextTimer();
+      textTimer.current = window.setTimeout(() => {
+        textTimer.current = null;
+        commitHistory(next);
+      }, 500);
+    },
+    [flushTextTimer, commitHistory],
   );
 
   const insertWidget = (w: WidgetDef) => {
@@ -179,7 +222,29 @@ export function XmlEditor() {
     }
   };
 
-  /** 画布拖放：简化走同级 / 根逻辑，精确落位后续 M2c */
+  /** 画布拖放：容器→追加为子节点；普通控件→插到它后面作为兄弟 */
+  const onDropWidget = (path: string, key: string, isContainer: boolean) => {
+    const w = WIDGET_MAP[key];
+    if (!w) return;
+    const frag = stripNs(w.xml);
+    if (isContainer) {
+      const { root } = parseLayoutXml(xml);
+      const target = root ? findNode(root, path) : null;
+      const r = insertAt(xml, path, target ? target.children.length : 0, frag, w.label);
+      if (r.ok) {
+        setXmlAndTrack(r.xml);
+        if (r.insertedPath) setSelectedPath(r.insertedPath);
+      }
+      return;
+    }
+    const r = insertSiblingAfter(xml, path, frag, w.label);
+    if (r.ok) {
+      setXmlAndTrack(r.xml);
+      if (r.insertedPath) setSelectedPath(r.insertedPath);
+    }
+  };
+
+  /** 画布空白处拖放（手机屏背景）：追加到根末尾 */
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const key = e.dataTransfer.getData(DRAG_WIDGET_MIME);
@@ -350,7 +415,12 @@ export function XmlEditor() {
               onDragLeave={() => setDropHint(null)}
               onDrop={onDrop}
             >
-              <XmlCanvas node={model.root} selectedPath={selectedPath} onSelect={setSelectedPath} />
+              <XmlCanvas
+                node={model.root}
+                selectedPath={selectedPath}
+                onSelect={setSelectedPath}
+                onDropWidget={onDropWidget}
+              />
             </div>
             </div>
           ) : null}
@@ -383,7 +453,7 @@ export function XmlEditor() {
           <XmlCodeEditor
             className="axv-code-fill"
             value={xml}
-            onChange={(v) => setXml(v)}
+            onChange={onChangeXmlText}
           />
           <div className="axv-mob-xml-tools">
             <select

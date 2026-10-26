@@ -56,6 +56,12 @@
   z-index: 5;
 }
 
+/* 拖组件到画布上的落点高亮（容器 = 会变成子节点；普通控件 = 插到它后面） */
+.axv-node.axv-drop-hit {
+  box-shadow: inset 0 0 0 2px #04409F;
+  background-color: rgba(4, 64, 159, 0.06);
+}
+
 /* 画布舞台（旧版规则已移除，见下方 v3 骨架） */
 
 .axv-canvas-empty {

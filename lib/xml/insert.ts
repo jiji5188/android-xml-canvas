@@ -13,6 +13,36 @@ export interface InsertResult {
   ok: boolean;
 }
 
+/** 可用作父容器的控件（拖放落位判定用） */
+const CONTAINER_TAGS = new Set([
+  "LinearLayout",
+  "LinearLayoutCompat",
+  "FrameLayout",
+  "RelativeLayout",
+  "ConstraintLayout",
+  "GridLayout",
+  "TableLayout",
+  "TableRow",
+  "ScrollView",
+  "HorizontalScrollView",
+  "NestedScrollView",
+  "CoordinatorLayout",
+  "DrawerLayout",
+  "AppBarLayout",
+  "CardView",
+  "MaterialCardView",
+  "SwipeRefreshLayout",
+  "ViewFlipper",
+  "ViewAnimator",
+  "RadioGroup",
+]);
+
+/** 标签是否容器（全限定名取尾段，如 androidx.constraintlayout.widget.ConstraintLayout） */
+export function isContainerTag(rawTag: string): boolean {
+  const tag = rawTag.includes(".") ? rawTag.slice(rawTag.lastIndexOf(".") + 1) : rawTag;
+  return CONTAINER_TAGS.has(tag);
+}
+
 /** 在 parentPath 下（末尾）插入一个节点，返回新 XML */
 export function insertChild(xml: string, parentPath: string, snippetXml: string, tagLabel: string): InsertResult {
   const issues: XmlIssue[] = [];
@@ -71,7 +101,8 @@ export function insertSiblingAfter(xml: string, targetPath: string, snippetXml: 
     return { xml, insertedPath: null, issues, ok: false };
   }
   // 找父级
-  const segs = targetPath.split("/").filter(Boolean); // ["0","1",...]
+  // 注意：targetPath 形如 #0/1，直接 split 后首段会带 '#'，要先剥掉再拼（否则得到 ##0）
+  const segs = targetPath.slice(targetPath.startsWith("#") ? 1 : 0).split("/").filter(Boolean);
   const parentPath = "#" + segs.slice(0, -1).join("/");
   const parent = findNode(root, parentPath);
   if (!parent) {
@@ -169,7 +200,7 @@ export function moveSibling(xml: string, targetPath: string, toIndex: number): M
     issues.push({ level: "error", nodePath: targetPath, message: "根节点不能移动" });
     return { xml, ok: false, issues, newPath: null };
   }
-  const segs = targetPath.split("/").filter(Boolean);
+  const segs = targetPath.slice(targetPath.startsWith("#") ? 1 : 0).split("/").filter(Boolean);
   const parentPath = "#" + segs.slice(0, -1).join("/");
   const parent = findNode(root, parentPath);
   if (!parent) {

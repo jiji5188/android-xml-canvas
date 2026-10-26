@@ -63,8 +63,8 @@ describe("M2b ConstraintLayout 四向约束", () => {
       `<View android:id="@+id/bottom" android:layout_width="100dp" android:layout_height="50dp" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintBottom_toBottomOf="parent"/>`,
     );
     const s = styleOf(xml, "bottom");
-    // 892*2=1784 - 100(50dp高度px) = 1684
-    expect(s!.top).toBe("1684px");
+    // 内容区高（屏高 - 状态栏 - 导航栏）= 820dp * 2 = 1640，减去 50dp 高 = 100px
+    expect(s!.top).toBe("1540px");
   });
 
   test("05 start 锚兄弟右缘 → 左=兄弟右缘", () => {
@@ -127,9 +127,9 @@ describe("M2b ConstraintLayout 四向约束", () => {
     const cl = parseLayoutXml(CL(
       `<View android:id="@+id/fill" android:layout_width="100dp" android:layout_height="0dp" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent" app:layout_constraintBottom_toBottomOf="parent"/>`,
     )).root!;
-    const res = solveConstraintChildren(cl, DEFAULT_RESOURCES, 824, 1784);
+    const res = solveConstraintChildren(cl, DEFAULT_RESOURCES, 824, 1640);
     const box = res.boxes.get(cl.children[0].path)!;
     expect(box.width).toBe(200);
-    expect(box.height).toBe(1784);
+    expect(box.height).toBe(1640);
   });
 });

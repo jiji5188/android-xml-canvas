@@ -1,0 +1,29 @@
+M2m: 预览框模拟手机状态栏/导航栏 + 根布局 match_parent 真正填满
+
+1) 根布局填不满预览框（两条根因）
+- `.axv-phone` 之前只有 `minHeight`：CSS 里 `height: 100%` 需要一个【确定高度】的父级，
+  父级只有 min-height 时百分比高度解析成 auto → 根布局塌成内容高，底部大片空白。
+  改为 `height: heightPx`（+ boxSizing: border-box + flex 列布局）。
+- 预览框多出边框宽度：`width: widthPx` + border-box 会让内容区变成 410dp。
+  改为外壳 `widthPx + 2*边框`，内容区严格 412x892dp。
+- `patchCL` 把 `100%` 落实成 px 时用的是整屏 412x892，现在内容区只有 820dp 高
+  （扣掉状态栏 24 + 导航栏 48），所以高度回落值改走 `phoneBodyDp()`，
+  否则 CL 根比内容区高 72dp → 底部被导航栏压住 / 溢出。
+- 根节点的 layout_margin 在预览里一律忽略（resolveAll 的 isRoot 参数）：
+  根在窗口里总是填满，残留的 margin 只会造成"左右不对称的间隙"。
+- 根节点不再显示 ✥ 移动手柄（写 layout_marginStart/Top 对根没意义）。
+
+2) 手机外壳：状态栏 + 导航栏
+- 顶部状态栏 24dp：9:41 + 信号/WiFi/电池图标
+- 底部三键导航栏 48dp：返回 / 主页 / 多任务
+- 颜色按根布局背景自动反色（lib/xml/theme.ts 的 readableOn：深底白字、浅底黑字）
+- 两栏都是"系统 chrome"，不属于布局 XML，不参与选择/拖拽
+
+3) 移动端浮层遮挡
+- 工具栏(≈58) + tab 行(≈72+42~62) 在窄屏会顶到手机框，把状态栏盖住
+- 舞台 padding-top 124 → 150（`axv-mob-xml` inset 同步）
+
+新增 lib/xml/theme.ts（纯函数，可单测）+ test/xml_m2m_phone_chrome.test.ts（12 项）
+同步修正 3 个老测试里硬编码的整屏高度 1784 → 内容区 1640
+
+全量 1020 测试绿，tsc 0，next build 通过

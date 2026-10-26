@@ -124,6 +124,10 @@ export function XmlCanvas({
   const showHandles = !!onConstraintDraw && isSel && inCL && st !== "Guideline" && st !== "Barrier";
   // 自由几何手柄：选中 + 非 CL 父 + 不是辅助节点
   const showGeom = !!onGeometryChange && isSel && !inCL && st !== "Guideline" && st !== "Barrier";
+  // 根布局不能「移动」：它在窗口里总是填满内容区，写 layout_marginStart/Top 只会
+  // 让根四边出现不对称间隙（预览已忽略根 margin，这里也不再给拖动手柄）
+  const isRootNode = node.path === "#0";
+  const showMoveHandle = showGeom && !isRootNode;
 
   const beginDrag = (side: ConstraintSide) => (e: React.PointerEvent) => {
     e.preventDefault();
@@ -403,14 +407,16 @@ export function XmlCanvas({
 
       {showGeom ? (
         <>
-          <span
-            className="axv-geom-move"
-            title="拖动我移动控件（写回 layout_marginStart / layout_marginTop）"
-            onPointerDown={beginGeom("move")}
-            onClick={(e) => e.stopPropagation()}
-          >
-            ✥
-          </span>
+          {showMoveHandle ? (
+            <span
+              className="axv-geom-move"
+              title="拖动我移动控件（写回 layout_marginStart / layout_marginTop）"
+              onPointerDown={beginGeom("move")}
+              onClick={(e) => e.stopPropagation()}
+            >
+              ✥
+            </span>
+          ) : null}
           {(["left", "right", "top", "bottom"] as GeomMode[]).map((m) => (
             <span
               key={m}

@@ -6,6 +6,7 @@ import type { XmlNode, ResourceTable, RenderModel, ResolvedNode } from "./types"
 import { resolveNodeAttrs, resolveSize } from "./resolve";
 import type { ResolvedAttrs } from "./resolve";
 import { solveConstraintChildren } from "./constraints";
+import { SCREEN_DP, phoneBodyDp } from "./theme";
 
 const DP = (n: number, scale = 2) => n * scale;
 
@@ -155,7 +156,10 @@ export function buildRenderModel(
 ): RenderModel {
   const issues: import("./types").XmlIssue[] = [];
 
-  const resolveAll = (node: XmlNode): ResolvedNode => {
+  /** isRoot：根布局在窗口里总是填满内容区，它的 layout_margin 在 Android 里也不会
+   *  产生「缩进」，但会让人误以为填充不满（拖动根节点留下的残值就属于这种）。
+   *  预览忽略根节点 margin，保证 match_parent 的根一定贴边填满预览框。 */
+  const resolveAll = (node: XmlNode, isRoot = false): ResolvedNode => {
     const { attrs, issues: nIssues } = resolveNodeAttrs(node, res);
     issues.push(...nIssues);
     const style: Record<string, string | number> = {};
@@ -200,10 +204,11 @@ export function buildRenderModel(
     }
 
     // 边距（用 longhand，便于 M1b 属性面板逐边编辑 + 回写）
-    const mt = DP((attrs["marginT"] as number) || 0, scale);
-    const mr = DP((attrs["marginR"] as number) || 0, scale);
-    const mb = DP((attrs["marginB"] as number) || 0, scale);
-    const ml = DP((attrs["marginL"] as number) || 0, scale);
+    // 根节点强制归零：见 resolveAll 的 isRoot 说明
+    const mt = isRoot ? 0 : DP((attrs["marginT"] as number) || 0, scale);
+    const mr = isRoot ? 0 : DP((attrs["marginR"] as number) || 0, scale);
+    const mb = isRoot ? 0 : DP((attrs["marginB"] as number) || 0, scale);
+    const ml = isRoot ? 0 : DP((attrs["marginL"] as number) || 0, scale);
 
     // 内边距（longhand）
     const pt = DP((attrs["paddingT"] as number) || 0, scale);
@@ -517,13 +522,13 @@ export function buildRenderModel(
       className: cls + (attrs["checked"] ? " axv-checked" : ""),
       text,
       issues: nIssues,
-      children: node.children.map(resolveAll),
+      children: node.children.map((c) => resolveAll(c)),
       rawAttrs: node.attrs,
     };
     return resolved;
   };
 
-  const rootNode = resolveAll(root);
+  const rootNode = resolveAll(root, true);
 
   // M2b：ConstraintLayout 子项约束定位（后处理：对每个 CL 节点求解直接子项）
   const patchCL = (n: ResolvedNode): void => {
@@ -543,8 +548,10 @@ export function buildRenderModel(
       if (m && !s2.includes("%")) return parseFloat(m[1]);
       return fallback;
     };
-    const cw = toPx(n.style.width, 412 * scale);
-    const ch = toPx(n.style.height, 892 * scale);
+    const cw = toPx(n.style.width, SCREEN_DP.w * scale);
+    // 高度回落值 = 内容区高度（屏高 - 状态栏 - 导航栏），否则 CL 根会按整屏高算出
+    // 比内容区还高的盒子 → 底部被导航栏遮住 / 溢出预览框
+    const ch = toPx(n.style.height, phoneBodyDp() * scale);
     // CL 自身尺寸必须落实成 px：父级只有 min-height 时 100% 解析不出来，
     // 子项全 absolute 又撑不起来 → 容器会塔成 0 高（真 bug，会看到控件跑出屏幕）
     const wStr = String(n.style.width ?? "");

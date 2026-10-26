@@ -29,6 +29,7 @@ import { ResTree } from "./ResTree";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
+import { readableOn } from "@/lib/xml/theme";
 
 const SAMPLES: Record<string, string> = {
   cl: `<?xml version="1.0" encoding="utf-8"?>
@@ -866,6 +867,22 @@ export function XmlEditor() {
 
   const widthPx = Math.round(412 * SCALE * scale);
   const heightPx = Math.round(892 * SCALE * scale);
+  /** 屏 dp → px（含用户缩放） */
+  const DPX = SCALE * scale;
+  /** 手机外壳边框宽（px）；内容区保持 412x892dp 不被边框吃算 */
+  const PHONE_BORDER = 2;
+  const outerW = widthPx + PHONE_BORDER * 2;
+  const outerH = heightPx + PHONE_BORDER * 2;
+  /** 状态栏 24dp（Android 默认高度） */
+  const STATUS_BAR_H = Math.round(24 * DPX);
+  /** 三键导航栏 48dp */
+  const NAV_BAR_H = Math.round(48 * DPX);
+  /** 按根布局背景色推导状态栏/导航栏文字颜色（深底浅字 / 浅底深字） */
+  const phoneTheme = readableOn(
+    String(model?.root?.style?.backgroundColor ?? model?.root?.style?.background ?? ""),
+  );
+  const phoneBg = phoneTheme.bg;
+  const phoneFg = phoneTheme.fg;
 
   /** 窄屏：把 824px 的机屏等比缩到可视宽度内（保留 dp→px 内部尺寸不变） */
   const [vw, setVw] = useState(0);
@@ -879,7 +896,7 @@ export function XmlEditor() {
     if (!vw) return 1;
     const panels = isMobile ? 0 : (leftOpen ? 320 : 0) + (rightOpen ? 320 : 0);
     const avail = vw - panels - (isMobile ? 28 : 48);
-    return Math.min(1, avail / widthPx);
+    return Math.min(1, avail / (widthPx + PHONE_BORDER * 2));
   })();
 
   function shortTag(t: string): string {
@@ -1139,17 +1156,19 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           ) : model ? (
             <div
               style={{
-                width: widthPx * fitRatio,
-                height: heightPx * fitRatio,
+                width: outerW * fitRatio,
+                height: outerH * fitRatio,
                 flex: "0 0 auto",
               }}
             >
             <div
               className={"axv-phone" + (dropHint ? " axv-drop-target" : "")}
               style={{
-                width: widthPx,
-                minHeight: heightPx,
-                background: model.root.style.background || model.root.style.backgroundColor || "#fff",
+                width: outerW,
+                height: outerH,
+                boxSizing: "border-box",
+                background: phoneBg,
+                color: phoneFg,
                 transform: fitRatio < 1 ? `scale(${fitRatio})` : undefined,
                 transformOrigin: "top left",
               }}
@@ -1163,15 +1182,53 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               onDragLeave={() => setDropHint(null)}
               onDrop={onDrop}
             >
-              <XmlCanvas
-                node={model.root}
-                selectedPath={selectedPath}
-                onSelect={setSelectedPath}
-                onDropWidget={onDropWidget}
-                onConstraintDraw={onConstraintDraw}
-                onGeometryChange={onGeometryChange}
-                scale={SCALE}
-              />
+              {/* 状态栏（系统窗口，不属于布局 XML）：时间 + 信号/WiFi/电池 */}
+              <div className="axv-statusbar" style={{ height: STATUS_BAR_H }}>
+                <span className="axv-sb-time">9:41</span>
+                <span className="axv-sb-icons">
+                  <span className="msr" aria-hidden="true">
+                    signal_cellular_alt
+                  </span>
+                  <span className="msr" aria-hidden="true">
+                    wifi
+                  </span>
+                  <span className="msr" aria-hidden="true">
+                    battery_full
+                  </span>
+                </span>
+              </div>
+
+              {/* 应用内容区：根布局填满这里 */}
+              <div className="axv-phone-body">
+                <XmlCanvas
+                  node={model.root}
+                  selectedPath={selectedPath}
+                  onSelect={setSelectedPath}
+                  onDropWidget={onDropWidget}
+                  onConstraintDraw={onConstraintDraw}
+                  onGeometryChange={onGeometryChange}
+                  scale={SCALE}
+                />
+              </div>
+
+              {/* 导航栏（三键导航：返回 / 主页 / 多任务） */}
+              <div className="axv-navbar" style={{ height: NAV_BAR_H }}>
+                <span className="axv-nav-btn" title="返回">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M15 4 7 12l8 8z" fill="currentColor" />
+                  </svg>
+                </span>
+                <span className="axv-nav-btn" title="主页">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                </span>
+                <span className="axv-nav-btn" title="多任务">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="5.5" y="5.5" width="13" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                </span>
+              </div>
             </div>
             </div>
           ) : null}

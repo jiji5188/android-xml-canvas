@@ -243,6 +243,73 @@
   overflow: hidden;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
   flex: 0 0 auto;
+  /* 竖向三段：状态栏 / 应用内容区 / 导航栏。显式 flex 列布局 +
+     明确高度，根布局的 height:100% 才有参照物（之前父级只有 min-height，
+     percentage 高度父级无确定高度 → 根布局高度塔缩到内容高，底部留空）。 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== 模拟系统状态栏（时间 + 信号/WiFi/电池）===== */
+.axv-statusbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  user-select: none;
+  pointer-events: none;
+  /* 颜色由内联 color 控制（按根布局背景推导） */
+}
+.axv-sb-time {
+  font-variant-numeric: tabular-nums;
+}
+.axv-sb-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* ===== 应用内容区（根布局填满这里）===== */
+.axv-phone-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  /* 不裁切：选中描边/手柄/约束线可以露出来 */
+  overflow: visible;
+}
+/* 注：不给根节点加 flex:1 —— 否则 wrap_content 的根会被拉伸。
+   match_parent 由模型给出的 width/height:100% 生效（父级已有确定高）。 */
+
+/* ===== 模拟三键导航栏 ===== */
+.axv-navbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 24px;
+  user-select: none;
+  pointer-events: none;
+  /* 与状态栏同色系：跟随内联 color */
+  background: rgba(0, 0, 0, 0.04);
+}
+.axv-nav-btn {
+  display: grid;
+  place-items: center;
+  opacity: 0.75;
+}
+.axv-nav-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 /* ===== 顶部悬浮工具栏（胶囊组，M3E 同款）===== */
@@ -1437,7 +1504,9 @@
     top: 72px;
   }
   .axv-stage {
-    padding: 124px 8px 12px;
+    /* 工具栏（top:10 + ≈48）+ 移动端 tab 行（top:72 + 最多两行≈62）≈ 134，再留余量；
+       窄屏 tab 文字可能换行，留 150 保证手机框顶部（含新建的状态栏）不被浮层遮住 */
+    padding: 150px 8px 16px;
   }
   .axv-stage.pad-l,
   .axv-stage.pad-r {
@@ -1445,7 +1514,7 @@
     padding-right: 8px;
   }
   .axv-mob-xml {
-    inset: 124px 12px 12px;
+    inset: 150px 12px 12px;
   }
   .axv-slide-left .axv-rail {
     width: 48px;

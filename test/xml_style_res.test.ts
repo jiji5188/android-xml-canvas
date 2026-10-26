@@ -145,9 +145,9 @@ describe("比例与百分比约束", () => {
     );
     const model = buildRenderModel(root!, baseRes(), 2);
     const v = model.root.children[0];
-    // 高度撑满父（892dp*2=1784px），宽度 = 高 / 2
-    expect(v.style.height).toBe("1784px");
-    expect(v.style.width).toBe("892px");
+    // 高度撑满父内容区（820dp*2=1640px），宽度 = 高 / 2
+    expect(v.style.height).toBe("1640px");
+    expect(v.style.width).toBe("820px");
   });
 
   it("layout_constraintWidth_percent 0.5 → 父宽一半", () => {
@@ -172,7 +172,7 @@ describe("比例与百分比约束", () => {
     );
     const model = buildRenderModel(root!, baseRes(), 2);
     const v = model.root.children[0];
-    expect(v.style.height).toBe("446px"); // 892*2*0.25 = 446
+    expect(v.style.height).toBe("410px"); // 820*2*0.25 = 410
   });
 });
 

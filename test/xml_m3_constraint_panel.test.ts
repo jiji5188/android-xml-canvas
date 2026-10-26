@@ -165,7 +165,7 @@ describe("ConstraintLayout 渲染（回归）", () => {
   it("100% 高度的 CL 容器要落实成 px（否则子项全 absolute 时容器塔成 0 高）", () => {
     const { root } = parseLayoutXml(src);
     const model = buildRenderModel(root!, DEFAULT_RESOURCES, 2);
-    expect(String(model.root.style.height)).toBe("1784px");
+    expect(String(model.root.style.height)).toBe("1640px"); // 内容区 820dp * 2
     expect(String(model.root.style.width)).toBe("824px");
   });
 });

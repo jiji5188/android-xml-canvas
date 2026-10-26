@@ -965,11 +965,11 @@
   .axv-slide-left,
   .axv-slide-right {
     width: 75vw;
-    /* 不遮工具栏：面板从工具栏下方开始 */
-    top: 64px;
+    /* 工具栏层级已降到蒙版之下，面板从顶覆盖全高，不再给它让位 */
+    top: 0;
   }
   .axv-rail {
-    padding-top: 4px;
+    padding-top: 10px;
   }
   /* 手机上不需要缩放滑条，隐掉腾出位置 */
   .axv-tb-zoom {

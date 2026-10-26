@@ -1,0 +1,22 @@
+M2n: 修根布局 match_parent + padding 时右侧/底部凭空出现间隙
+
+根因：M2j 为修「match_parent + margin 右侧溢出」引入了
+`width: calc(100% - (ml+mr+pl+pr)px)`，把 **padding 也一起扣了**。
+但 `.axv-node` 是 border-box，padding 本来就在盒内 —— 再扣一次等于盒子
+凭空变窄/变矮，且缩在左上角 → 表现就是「右边和下方各留一道间隙」。
+
+- 修正：calc 只扣 margin（`ml+mr` / `mt+mb`）
+  · margin 在盒外，`100%` 是父内容宽 → 必须扣，否则溢出
+  · padding 在盒内（border-box）→ 不能扣
+  · 父容器的 padding 已由百分比解析自动扣过，无需额外处理
+- 有 padding 时显式写 `boxSizing: border-box`，不依赖样式表
+
+实测：根 LinearLayout padding=16dp + match_parent 时
+  root 的 rect 与 .axv-phone-body 完全重合（559x1113 both），无间隙
+  旧代码会是 calc(100% - 64px) → 右侧/底部各 32px 缝
+
+测试 xml_m2j_margin：原「match_parent + padding → calc(100% - 64px)」是错的
+断言，改为「仍为 100% + padding 32px + border-box」；新增「margin+padding 同时
+存在时只扣 margin」用例
+
+全量 1021 测试绿，tsc 0，next build 通过

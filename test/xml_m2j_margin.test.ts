@@ -40,7 +40,7 @@ describe("M2j match_parent + margin：用 calc 扣掉，不溢出右侧", () => 
     expect(child.style.width).toBe("calc(100% - 40px)");
   });
 
-  it("match_parent 宽 + padding 16dp → width calc(100% - 64px)", () => {
+  it("match_parent 宽 + padding 16dp → 仍是 100%（padding 在 border-box 内部，不能再扣）", () => {
     const m = model(`<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout ${A} android:layout_width="match_parent" android:layout_height="match_parent">
   <TextView ${A}
@@ -50,7 +50,22 @@ describe("M2j match_parent + margin：用 calc 扣掉，不溢出右侧", () => 
       android:text="hi"/>
 </LinearLayout>`);
     const child = m.root.children[0];
-    expect(child.style.width).toBe("calc(100% - 64px)");
+    expect(child.style.width).toBe("100%");
+    expect(child.style.paddingLeft).toBe("32px");
+    expect(child.style.boxSizing).toBe("border-box");
+  });
+
+  it("match_parent + margin 和 padding 同时存在 → 只扣 margin", () => {
+    const m = model(`<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout ${A} android:layout_width="match_parent" android:layout_height="match_parent">
+  <TextView ${A}
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_margin="8dp"
+      android:padding="16dp"
+      android:text="hi"/>
+</LinearLayout>`);
+    expect(m.root.children[0].style.width).toBe("calc(100% - 32px)");
   });
 
   it("match_parent 且无 margin/padding → 保持 100%（不无谓 calc）", () => {

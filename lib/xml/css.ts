@@ -216,22 +216,24 @@ export function buildRenderModel(
     const pb = DP((attrs["paddingB"] as number) || 0, scale);
     const pl = DP((attrs["paddingL"] as number) || 0, scale);
 
-    // ===== match_parent + 边距/内边距：必须用 calc 扣掉，否则右侧溢出屏幕 =====
-    // Android 语义：layout_width="match_parent" 的可视宽度 = 父宽 - marginLeft - marginRight，
-    // padding 在视图内部。CSS 的 width:100% 是【内容宽】，margin 外挂、padding 外扩，
-    // 直接写 100% 会导致「100% + 左右 margin」超宽 → 右边出屏 / 左右间隙不对称。
+    // ===== match_parent + margin：必须用 calc 扣掉，否则右侧溢出屏幕 =====
+    // Android 语义：layout_width="match_parent" 的可视宽度 = 父内容宽 - 左右 margin。
+    // CSS 里 `width:100%` 已经是父内容宽（父 padding 已被百分比解析扣过），而 margin 是
+    // 外挂的 → 100% + margin 会超宽，所以只扣 margin。
+    // ⚠ padding 不能扣：`.axv-node` 是 border-box，padding 已经在盒内，
+    //   再扣一次会让盒子变窄，右侧/底部凭空出现一道间隙（根布局 match_parent 尤其明显）。
     const isMatchW = w === "100%";
     const isMatchH = h === "100%";
     let finalW = isMatchW ? "100%" : w;
     let finalH = isMatchH ? "100%" : h;
-    if (isMatchW && (ml || mr || pl || pr)) {
-      const ded = ml + mr + pl + pr;
-      finalW = `calc(100% - ${ded}px)`;
+    if (isMatchW && (ml || mr)) {
+      finalW = `calc(100% - ${ml + mr}px)`;
     }
-    if (isMatchH && (mt || mb || pt || pb)) {
-      const ded = mt + mb + pt + pb;
-      finalH = `calc(100% - ${ded}px)`;
+    if (isMatchH && (mt || mb)) {
+      finalH = `calc(100% - ${mt + mb}px)`;
     }
+    // 有 padding 时显式声明 border-box（Android 的 padding 永远在盒内）
+    if (pt || pr || pb || pl) style.boxSizing = "border-box";
 
     // 尺寸
     style.width = w === "0px" && weight === 0 ? "auto" : finalW;

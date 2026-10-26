@@ -248,6 +248,8 @@ export function solveConstraintChildren(
   }
 
   const boxCache = new Map<string, ConstraintBox>();
+  /** 解算过程中遇到循环引用而兜底的节点：其结果不可进缓存（同节点其它轴可能已算对） */
+  const degraded = new Set<string>();
   const visiting = new Set<string>();
 
   const positionOf = (c: XmlNode): ConstraintBox => {
@@ -282,6 +284,14 @@ export function solveConstraintChildren(
     const hBias = biasOf(a["layout_constraintHorizontal_bias"]);
     const vBias = biasOf(a["layout_constraintVertical_bias"]);
 
+    /** 目标是否也反向引用了本节点（= 链式互相引用，非错误环） */
+    const pointsBack = (target: XmlNode, horiz: boolean): boolean => {
+      const cid = cleanId(c.attrs["id"] ?? "");
+      if (!cid) return false;
+      const sides = horiz ? (["Start", "End"] as const) : (["Top", "Bottom"] as const);
+      return sides.some((sd) => readAnchor(target.attrs, sd)?.id === cid);
+    };
+
     /** 解析一条水平约束 → 目标边的 CSS px 坐标 */
     const resolveH = (ref: AnchorRef | undefined): number => {
       if (ref === undefined) return 0;
@@ -303,11 +313,14 @@ export function solveConstraintChildren(
         return ref.toEnd ? parentContentW : 0;
       }
       if (visiting.has(target.path)) {
-        out.issues.push({
-          level: "warn",
-          nodePath: c.path,
-          message: `约束目标 @+id/${ref.id} 存在循环引用，按 parent 兜底`,
-        });
+        if (!pointsBack(target, true)) {
+          out.issues.push({
+            level: "warn",
+            nodePath: c.path,
+            message: `约束目标 @+id/${ref.id} 存在循环引用，按 parent 兜底`,
+          });
+        }
+        degraded.add(c.path);
         return ref.toEnd ? parentContentW : 0;
       }
       visiting.add(c.path);
@@ -337,11 +350,14 @@ export function solveConstraintChildren(
         return ref.toEnd ? parentContentH : 0;
       }
       if (visiting.has(target.path)) {
-        out.issues.push({
-          level: "warn",
-          nodePath: c.path,
-          message: `约束目标 @+id/${ref.id} 存在循环引用，按 parent 兜底`,
-        });
+        if (!pointsBack(target, false)) {
+          out.issues.push({
+            level: "warn",
+            nodePath: c.path,
+            message: `约束目标 @+id/${ref.id} 存在循环引用，按 parent 兜底`,
+          });
+        }
+        degraded.add(c.path);
         return ref.toEnd ? parentContentH : 0;
       }
       visiting.add(c.path);
@@ -398,7 +414,8 @@ export function solveConstraintChildren(
       width: Math.round(w),
       height: Math.round(h),
     };
-    boxCache.set(c.path, box);
+    if (degraded.has(c.path)) boxCache.delete(c.path);
+    else boxCache.set(c.path, box);
     return box;
   };
 
@@ -522,15 +539,34 @@ function applyChains(
       const d = dims.get(m.path)!;
       return horiz ? d.kindW === "zero" : d.kindH === "zero";
     });
-    const boxes = chain.nodes.map((m) => boxCache.get(m.path)!).filter(Boolean);
+    const boxes = chain.nodes.map((m) => out.boxes.get(m.path)).filter(Boolean) as ConstraintBox[];
     if (boxes.length !== chain.nodes.length) continue;
 
-    const total = sizes.reduce((a, b) => a + b, 0);
+    // 链内每个成员的起/止 margin（dp → px）：链排布必须把 margin 算进总量，否则会溢出
+    const tag0 = chain.nodes[0].tag.includes(".") ? chain.nodes[0].tag.slice(chain.nodes[0].tag.lastIndexOf(".") + 1) : chain.nodes[0].tag;
+    const dm = (raw: string | undefined): number => {
+      if (!raw) return 0;
+      const spec = resolveSize(raw, res, issues, tag0.toLowerCase(), "margin");
+      return spec.kind === "dp" ? (spec.value ?? 0) * scale : 0;
+    };
+    const mStart = chain.nodes.map((m) => {
+      const k = horiz ? "layout_marginStart" : "layout_marginTop";
+      const alt = horiz ? "layout_marginLeft" : "layout_marginTop";
+      return dm(m.attrs[k] ?? m.attrs[alt] ?? m.attrs["layout_margin"]);
+    });
+    const mEnd = chain.nodes.map((m) => {
+      const k = horiz ? "layout_marginEnd" : "layout_marginBottom";
+      const alt = horiz ? "layout_marginRight" : "layout_marginBottom";
+      return dm(m.attrs[k] ?? m.attrs[alt] ?? m.attrs["layout_margin"]);
+    });
+
+    const total =
+      sizes.reduce((a, b) => a + b, 0) + mStart.reduce((a, b) => a + b, 0) + mEnd.reduce((a, b) => a + b, 0);
     const endNode = chain.spanEndId === "parent" ? null : byId.get(chain.spanEndId);
     let spanStart = 0;
     let spanEnd = horiz ? parentW : parentH;
     if (endNode) {
-      const b = boxCache.get(endNode.path);
+      const b = out.boxes.get(endNode.path) ?? boxCache.get(endNode.path);
       if (b) spanEnd = horiz ? b.left : b.top;
     }
     const free = Math.max(spanEnd - spanStart - total, 0);
@@ -548,36 +584,43 @@ function applyChains(
     };
 
     if (styleRaw === "spread_inside") {
+      // 首尾贴边，中间均分间隙
       const g = chain.nodes.length > 1 ? free / (chain.nodes.length - 1) : 0;
-      let cur = spanStart;
+      let cur = spanStart + mStart[0];
       for (let i = 0; i < chain.nodes.length; i++) {
         put(i, cur);
-        cur += sizes[i] + g;
+        cur += sizes[i] + mEnd[i] + g + (mStart[i + 1] ?? 0);
       }
     } else if (styleRaw === "centered" || styleRaw === "packed" || styleRaw === "pack") {
-      let cur = spanStart + (styleRaw === "centered" ? free / 2 : 0);
+      // 整块贴起点 / 居中，成员之间只留 margin
+      let cur = spanStart + (styleRaw === "centered" ? free / 2 : 0) + mStart[0];
       for (let i = 0; i < chain.nodes.length; i++) {
         put(i, cur);
-        cur += sizes[i];
+        cur += sizes[i] + mEnd[i] + (mStart[i + 1] ?? 0);
       }
     } else {
-      // spread：若成员是 0dp（match constraints），剩余空间均分进尺寸，无间隙；
+      // spread：成员全是 0dp（match constraints）时剩余空间均分进尺寸，不留额外间隙；
       // 否则按 N+1 个等距间隙排布（Android 语义）
       const allZero = isZero.every(Boolean);
-      if (allZero && free > 0) {
+      if (allZero) {
         const each = free / chain.nodes.length;
-        let cur = spanStart;
+        let cur = spanStart + mStart[0];
         for (let i = 0; i < chain.nodes.length; i++) {
-          if (horiz) { boxes[i].left = Math.round(cur); boxes[i].width = Math.round(each); }
-          else { boxes[i].top = Math.round(cur); boxes[i].height = Math.round(each); }
-          cur += each;
+          if (horiz) {
+            boxes[i].left = Math.round(cur);
+            boxes[i].width = Math.round(each);
+          } else {
+            boxes[i].top = Math.round(cur);
+            boxes[i].height = Math.round(each);
+          }
+          cur += each + mEnd[i] + (mStart[i + 1] ?? 0);
         }
       } else {
         const g = free / (chain.nodes.length + 1);
-        let cur = spanStart + g;
+        let cur = spanStart + g + mStart[0];
         for (let i = 0; i < chain.nodes.length; i++) {
           put(i, cur);
-          cur += sizes[i] + g;
+          cur += sizes[i] + mEnd[i] + g + (mStart[i + 1] ?? 0);
         }
       }
     }

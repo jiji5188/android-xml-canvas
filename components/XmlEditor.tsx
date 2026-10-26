@@ -89,6 +89,125 @@ const SAMPLES: Record<string, string> = {
       android:textSize="13sp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>`,
+  chain: `<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+  <TextView
+      android:id="@+id/tvHead"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="16dp"
+      android:layout_marginTop="24dp"
+      android:text="chain 链式排布 + Guideline"
+      android:textSize="18sp"
+      android:textStyle="bold"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toTopOf="parent" />
+
+  <androidx.constraintlayout.widget.Guideline
+      android:id="@+id/guide10"
+      android:orientation="horizontal"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      app:layout_constraintGuide_percent="0.12" />
+
+  <Button
+      android:id="@+id/b1"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:text="一"
+      app:layout_constraintHorizontal_chainStyle="spread"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintEnd_toStartOf="@+id/b2"
+      app:layout_constraintTop_toBottomOf="@+id/guide10"
+      android:layout_marginStart="16dp"
+      android:layout_marginEnd="8dp" />
+
+  <Button
+      android:id="@+id/b2"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:text="二"
+      app:layout_constraintStart_toEndOf="@+id/b1"
+      app:layout_constraintEnd_toStartOf="@+id/b3"
+      app:layout_constraintTop_toTopOf="@+id/b1"
+      android:layout_marginStart="8dp"
+      android:layout_marginEnd="8dp" />
+
+  <Button
+      android:id="@+id/b3"
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:text="三"
+      app:layout_constraintStart_toEndOf="@+id/b2"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintTop_toTopOf="@+id/b1"
+      android:layout_marginStart="8dp"
+      android:layout_marginEnd="16dp" />
+
+  <TextView
+      android:id="@+id/tvNote"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="24dp"
+      android:text="三个 0dp 按钮在 spread 链里平分宽度"
+      android:textSize="13sp"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/b1" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>`,
+  barrier: `<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+  <TextView
+      android:id="@+id/tvL"
+      android:layout_width="120dp"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="16dp"
+      android:layout_marginTop="24dp"
+      android:text="左边一段较长的说明文字，会把高度撑高"
+      android:textSize="14sp"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toTopOf="parent" />
+
+  <TextView
+      android:id="@+id/tvR"
+      android:layout_width="120dp"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="16dp"
+      android:layout_marginTop="24dp"
+      android:text="右边短"
+      android:textSize="14sp"
+      app:layout_constraintStart_toEndOf="@+id/tvL"
+      app:layout_constraintTop_toTopOf="parent" />
+
+  <androidx.constraintlayout.widget.Barrier
+      android:id="@+id/barBottom"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      app:barrierDirection="bottom"
+      app:constraint_referenced_ids="tvL,tvR" />
+
+  <Button
+      android:id="@+id/btnBelow"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="16dp"
+      android:text="我跟着较高的那个往下排"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/barBottom" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>`,
   list: `<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -737,6 +856,8 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             >
               <option value="">示例…</option>
               <option value="cl">约束布局</option>
+                <option value="chain">链式排布 + Guideline</option>
+                <option value="barrier">Barrier 屏障</option>
               <option value="list">竖列表</option>
             </select>
             <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
@@ -944,6 +1065,8 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           >
             <option value="">示例…</option>
             <option value="cl">约束布局</option>
+                <option value="chain">链式排布 + Guideline</option>
+                <option value="barrier">Barrier 屏障</option>
             <option value="list">竖列表</option>
           </select>
           <button

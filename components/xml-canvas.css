@@ -89,7 +89,7 @@
   align-items: flex-start;
   /* safe center：手机屏比可见区宽时从左侧对齐，不会被裁掉左边 */
   justify-content: safe center;
-  padding: 76px 20px 24px;
+  padding: 124px 20px 24px;
   box-sizing: border-box;
   transition: padding 0.22s cubic-bezier(0.2, 0, 0, 1);
 }

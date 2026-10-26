@@ -367,7 +367,18 @@ export function XmlEditor() {
 
       {/* XML 代码视图（tab 切过来的全屏编辑器） */}
       {mobileTab === "xml" && (
-        <div className="axv-mob-xml">
+        <div
+          className="axv-mob-xml"
+          style={
+            isMobile
+              ? undefined
+              : {
+                  left: (leftOpen ? 320 : 0) + 16,
+                  right: (rightOpen ? 320 : 0) + 16,
+                  transition: "left 0.22s, right 0.22s",
+                }
+          }
+        >
           <textarea
             className="axv-pane"
             value={xml}
@@ -425,20 +436,6 @@ export function XmlEditor() {
           </button>
           <div className="axv-rail-gap" />
           <button
-            className={"axv-rail-btn" + (leftView === "code" ? " on" : "")}
-            title="XML 代码"
-            aria-label="XML 代码"
-            aria-pressed={leftView === "code"}
-            onClick={() => {
-              setLeftView("code");
-              setLeftOpen(true);
-            }}
-          >
-            <span className="msr" aria-hidden="true" data-fill={leftView === "code" ? "1" : "0"} style={{ fontSize: 24 }}>
-              code
-            </span>
-          </button>
-          <button
             className={"axv-rail-btn" + (leftView === "res" ? " on" : "")}
             title="资源"
             aria-label="资源"
@@ -457,13 +454,7 @@ export function XmlEditor() {
         <div className="axv-rail-body">
           <div className="axv-rail-head">
             <span className="axv-rail-title">
-              {leftView === "parts"
-                ? "组件"
-                : leftView === "layers"
-                  ? "图层"
-                  : leftView === "code"
-                    ? "XML 代码"
-                    : "资源"}
+              {leftView === "parts" ? "组件" : leftView === "layers" ? "图层" : "资源"}
             </span>
             <button
               className="axv-icon-btn"
@@ -539,8 +530,19 @@ export function XmlEditor() {
         onPick={(name) => addAttr(name)}
       />
 
-      {/* 顶部工具栏（M3E 式悬浮胶囊组：☰ 撤销 重做 打开 保存 …… 最右 ⇔ 属性） */}
-      <div className="axv-toolbar-v2">
+      {/* 顶部工具栏（桌面端只占两侧面板之间的画布区，不重叠侧栏） */}
+      <div
+        className="axv-toolbar-v2"
+        style={
+          isMobile
+            ? undefined
+            : {
+                left: leftOpen ? 320 : 0,
+                right: rightOpen ? 320 : 0,
+                transition: "left 0.22s, right 0.22s",
+              }
+        }
+      >
         <div className="axv-tb-group">
           <button
             className={"axv-tb-btn" + (leftOpen ? " on" : "")}

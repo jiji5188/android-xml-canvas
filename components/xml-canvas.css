@@ -935,6 +935,73 @@
   background: #F9F9FF;
 }
 
+/* ===== XML 代码高亮编辑器（textarea + 高亮层叠） ===== */
+.axv-code {
+  position: relative;
+  min-height: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #FFFFFF;
+  overflow: hidden;
+}
+.axv-code-fill {
+  flex: 1;
+  min-height: 0;
+}
+.axv-code-hl,
+.axv-code-ta {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 2;
+  white-space: pre;
+  word-wrap: normal;
+  overflow: auto;
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+}
+.axv-code-hl {
+  pointer-events: none;
+  color: #24292F;
+  background: #FFFFFF;
+  overflow: hidden;
+}
+.axv-code-ta {
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  /* 文字透明，只留光标（高亮层负责显示） */
+  color: transparent;
+  caret-color: #24292F;
+  overflow: auto;
+}
+.axv-code-ta::selection {
+  background: rgba(4, 64, 159, 0.18);
+  color: transparent;
+}
+
+/* 高亮色（浅色主题） */
+.x-p {
+  color: #0550AE;
+} /* 标签名 */
+.x-a {
+  color: #953800;
+} /* 属性名 */
+.x-s {
+  color: #0A7B34;
+} /* 字符串值 */
+.x-c {
+  color: #6E7781;
+  font-style: italic;
+} /* 注释 */
+.x-m {
+  color: #8250DF;
+} /* XML 声明 */
+
 /* 桌面端：代码 tab 也占满画布区（在 tab 条下方） */
 @media (min-width: 841px) {
   .axv-mob-xml {

@@ -14,6 +14,7 @@ import type { ResolvedNode, ResourceTable } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, moveSibling } from "@/lib/xml/insert";
 import { XmlCanvas } from "./XmlCanvas";
+import { XmlCodeEditor } from "./XmlCodeEditor";
 import { AttrPanel } from "./AttrPanel";
 import { AddAttrModal } from "./AddAttrModal";
 import { defaultFor } from "./attr-catalog";
@@ -379,11 +380,10 @@ export function XmlEditor() {
                 }
           }
         >
-          <textarea
-            className="axv-pane"
+          <XmlCodeEditor
+            className="axv-code-fill"
             value={xml}
-            spellCheck={false}
-            onChange={(e) => setXml(e.target.value)}
+            onChange={(v) => setXml(v)}
           />
           <div className="axv-mob-xml-tools">
             <select
@@ -543,17 +543,15 @@ export function XmlEditor() {
               }
         }
       >
-        <div className="axv-tb-group">
+        <div className="axv-tb-group" style={{ visibility: leftOpen ? "hidden" : "visible" }}>
           <button
-            className={"axv-tb-btn" + (leftOpen ? " on" : "")}
-            title="展开 / 收起左侧面板"
+            className="axv-tb-btn"
+            title="展开左侧面板"
             aria-label="展开左侧面板"
-            aria-pressed={leftOpen}
-            onClick={() => setLeftOpen((v) => !v)}
+            aria-pressed={false}
+            onClick={() => setLeftOpen(true)}
           >
-            <span className="msr" aria-hidden="true" data-fill={leftOpen ? "1" : "0"} style={{ fontSize: 23 }}>
-              {leftOpen ? "menu_open" : "left_panel_open"}
-            </span>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>left_panel_open</span>
           </button>
         </div>
 
@@ -599,17 +597,15 @@ export function XmlEditor() {
           </div>
         </div>
 
-        <div className="axv-tb-group">
+        <div className="axv-tb-group" style={{ visibility: rightOpen ? "hidden" : "visible" }}>
           <button
-            className={"axv-tb-btn" + (rightOpen ? " on" : "")}
-            title="展开 / 收起右侧属性面板"
+            className="axv-tb-btn"
+            title="展开右侧属性面板"
             aria-label="右侧属性面板"
-            aria-pressed={rightOpen}
-            onClick={() => setRightOpen((v) => !v)}
+            aria-pressed={false}
+            onClick={() => setRightOpen(true)}
           >
-            <span className="msr" aria-hidden="true" data-fill={rightOpen ? "1" : "0"} style={{ fontSize: 23 }}>
-              {rightOpen ? "panel_right" : "right_panel_open"}
-            </span>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>right_panel_open</span>
           </button>
         </div>
       </div>

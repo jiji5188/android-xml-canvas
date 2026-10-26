@@ -311,7 +311,7 @@ export function XmlEditor() {
             className={mobileTab === "xml" ? "on" : ""}
             onClick={() => setMobileTab("xml")}
           >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>{"</>"}</span>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
             XML 代码
           </button>
         </div>

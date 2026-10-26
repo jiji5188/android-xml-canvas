@@ -225,13 +225,26 @@ export function rewriteNodeAttrs(
 }
 
 /** 序列化：把归一化树写回 XML 文本 */
+/** ConstraintLayout / MotionLayout 专用属性：序列化时必须用 app: 前缀 */
+const APP_ATTR_RE = /^(layout_constraint|layout_guideline|layout_barrier|layout_wrapBehavior|layout_optimizationLevel|flow_|motion_|constraintReference)/;
+const APP_NS = "http://schemas.android.com/apk/res-auto";
+
+/** 子树里是否用了 app: 命名空间的属性 */
+function usesAppNs(n: XmlNode): boolean {
+  if (Object.keys(n.attrs).some((k) => APP_ATTR_RE.test(k))) return true;
+  return n.children.some(usesAppNs);
+}
+
 export function serialize(node: XmlNode, indent = ""): string {
-  // 命名空间声明补回（xmlns:android="..."），单独一行；再是 android: 属性
-  const nsLine = Object.entries(node.nsDecls ?? {})
+  const isRoot = indent === "";
+  // 命名空间声明补回（xmlns:android / xmlns:app），单独一行；再是属性
+  const decls: Record<string, string> = { ...(node.nsDecls ?? {}) };
+  if (isRoot && usesAppNs(node) && !decls.app) decls.app = APP_NS;
+  const nsLine = Object.entries(decls)
     .map(([p, uri]) => `xmlns:${p}="${uri}"`)
     .join(" ");
   const attrsStr = Object.entries(node.attrs)
-    .map(([k, v]) => `    android:${k}="${v}"`)
+    .map(([k, v]) => `    ${APP_ATTR_RE.test(k) ? "app:" : "android:"}${k}="${v}"`)
     .join("\n");
 
   const buildOpen = (selfClosed: boolean): string => {

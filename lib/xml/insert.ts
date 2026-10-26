@@ -4,6 +4,7 @@
 
 import { parseLayoutXml, findNode, rewriteNodeAttrs, serialize } from "./parser";
 import type { XmlNode, XmlIssue } from "./types";
+import { nextViewId } from "./autoconstrain";
 
 export interface InsertResult {
   xml: string;
@@ -85,6 +86,44 @@ export function insertChild(xml: string, parentPath: string, snippetXml: string,
     issues,
     ok: true,
   };
+}
+
+/**
+ * 新插入的控件若落在 ConstraintLayout 里，补一套默认约束（避免全部叠在左上角）。
+ * 规则：id 缺失则补 @+id/view_N；start 贴父容器 + marginStart；top 接上一个兄弟（无则贴父顶）。
+ */
+export function applyConstraintDefaults(xml: string, path: string, gapDp = 8): string {
+  const { root } = parseLayoutXml(xml);
+  if (!root) return xml;
+  const node = findNode(root, path);
+  if (!node) return xml;
+  const segs = path.slice(path.startsWith("#") ? 1 : 0).split("/").filter(Boolean);
+  const parent = findNode(root, "#" + segs.slice(0, -1).join("/"));
+  if (!parent) return xml;
+  const pt = parent.tag.includes(".") ? parent.tag.slice(parent.tag.lastIndexOf(".") + 1) : parent.tag;
+  if (pt !== "ConstraintLayout") return xml;
+  if (Object.keys(node.attrs).some((k) => k.startsWith("layout_constraint"))) return xml;
+
+  const add: Record<string, string> = {};
+  if (!node.attrs.id) {
+    const ids: string[] = [];
+    const walk = (n: XmlNode) => {
+      if (n.attrs.id) ids.push(n.attrs.id);
+      n.children.forEach(walk);
+    };
+    walk(root);
+    add.id = nextViewId(ids);
+  }
+  add.layout_constraintStart_toStartOf = "parent";
+  add.layout_marginStart = `${gapDp}dp`;
+  const idx = parent.children.findIndex((c) => c.path === path);
+  const prev = idx > 0 ? parent.children[idx - 1] : null;
+  add.layout_constraintTop_toBottomOf = prev && prev.attrs.id ? prev.attrs.id : "parent";
+  add.layout_constraintTop_toTopOf = prev && prev.attrs.id ? "0" : "parent";
+  if (prev && prev.attrs.id) delete add.layout_constraintTop_toTopOf;
+  add.layout_marginTop = `${gapDp}dp`;
+
+  return rewriteNodeAttrs(xml, path, add, []);
 }
 
 /** 在 targetPath 的同一父级里，作为 target 的下一个兄弟插入 */

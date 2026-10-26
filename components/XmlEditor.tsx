@@ -12,7 +12,7 @@ import { buildRenderModel } from "@/lib/xml/css";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import type { ResolvedNode, ResourceTable } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
-import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag } from "@/lib/xml/insert";
+import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults } from "@/lib/xml/insert";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml } from "@/lib/xml/lint";
 import { XmlCanvas } from "./XmlCanvas";
@@ -21,11 +21,74 @@ import { AttrPanel } from "./AttrPanel";
 import { AddAttrModal } from "./AddAttrModal";
 import { defaultFor } from "./attr-catalog";
 import { WidgetPalette } from "./WidgetPalette";
+import { ConstraintPanel, type SibOption } from "./ConstraintPanel";
+import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } from "@/lib/xml/autoconstrain";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
 
 const SAMPLES: Record<string, string> = {
+  cl: `<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+  <TextView
+      android:id="@+id/tvTitle"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="16dp"
+      android:layout_marginTop="24dp"
+      android:text="约束布局示例"
+      android:textSize="20sp"
+      android:textStyle="bold"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toTopOf="parent" />
+
+  <TextView
+      android:id="@+id/tvSub"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="16dp"
+      android:layout_marginTop="8dp"
+      android:text="选中控件后在右侧编辑四条边的约束"
+      android:textColor="#6B7280"
+      android:textSize="13sp"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/tvTitle" />
+
+  <View
+      android:id="@+id/bar"
+      android:layout_width="0dp"
+      android:layout_height="120dp"
+      android:layout_marginStart="16dp"
+      android:layout_marginTop="20dp"
+      android:layout_marginEnd="16dp"
+      android:background="#E8EEFA"
+      app:layout_constraintEnd_toEndOf="parent"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toBottomOf="@+id/tvSub" />
+
+  <Button
+      android:id="@+id/btnOk"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginEnd="16dp"
+      android:layout_marginBottom="24dp"
+      android:text="确定"
+      app:layout_constraintBottom_toBottomOf="parent"
+      app:layout_constraintEnd_toEndOf="parent" />
+
+  <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="我没约束（选中我点「自动约束」）"
+      android:textSize="13sp" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>`,
   list: `<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -196,6 +259,89 @@ export function XmlEditor() {
     if (next !== xml) setXmlAndTrack(next);
   };
 
+  /* ===== ConstraintLayout 约束编辑（一期：表单 + 自动推断） ===== */
+  const [autoNotes, setAutoNotes] = useState<string[]>([]);
+  useEffect(() => setAutoNotes([]), [selectedPath]);
+
+  /** 选中节点的父节点（XmlNode） */
+  const selectedParent = useMemo(() => {
+    if (!selectedPath || selectedPath === "#0" || !treeRoot) return null;
+    const segs = selectedPath.slice(1).split("/").filter(Boolean);
+    return findNode(treeRoot, "#" + segs.slice(0, -1).join("/"));
+  }, [selectedPath, treeRoot]);
+
+  const isChildOfCL = !!selectedParent && shortTag(selectedParent.tag) === "ConstraintLayout";
+
+  const clSiblings: SibOption[] = useMemo(() => {
+    if (!isChildOfCL || !selectedParent) return [];
+    return selectedParent.children
+      .filter((c) => c.path !== selectedPath && !!c.attrs.id)
+      .map((c) => ({
+        ref: c.attrs.id as string,
+        label: `${(c.attrs.id as string).replace(/^@\+?id\//, "")} · ${shortTag(c.tag)}`,
+      }));
+  }, [isChildOfCL, selectedParent, selectedPath]);
+
+  /** 批量提交属性（一次 rewrite，历史里只算一步） */
+  const commitMany = (changes: [string, string | null][]) => {
+    if (!selectedPath) return;
+    const set: Record<string, string> = {};
+    const del: string[] = [];
+    for (const [k, v] of changes) {
+      if (v === null) del.push(k);
+      else set[k] = v;
+    }
+    if (Object.keys(set).length === 0 && del.length === 0) return;
+    const res = writebackAttrs(xml, selectedPath, set, del);
+    if (res.changed) setXmlAndTrack(res.xml);
+  };
+
+  /** 自动约束：按当前渲染位置就近推断（无约束时智能堆叠） */
+  const runAutoConstrain = () => {
+    if (!selectedPath || !selectedParent || !model) return;
+    const nodeRes = findResolved(model.root, selectedPath);
+    const parentRes = findResolved(model.root, selectedParent.path);
+    const box = boxOf(nodeRes);
+    const pbox = boxOf(parentRes);
+    if (!box || !pbox) {
+      setAutoNotes(["该控件还拿不到布局坐标，先切到预览看一眼再试"]);
+      return;
+    }
+    const attrs = { ...(nodeRes?.rawAttrs ?? {}) };
+    const changes: [string, string | null][] = [];
+    if (!attrs.id) {
+      const ids = collectIds(treeRoot, []);
+      const nid = nextViewId(ids);
+      attrs.id = nid;
+      changes.push(["id", nid]);
+    }
+
+    const sibs: SibInfo[] = [];
+    for (const c of selectedParent.children) {
+      if (c.path === selectedPath) continue;
+      if (!c.attrs.id) continue;
+      const rb = boxOf(findResolved(model.root, c.path));
+      if (!rb) continue;
+      sibs.push({ ref: c.attrs.id, tag: shortTag(c.tag), box: rb });
+    }
+    const idx = selectedParent.children.findIndex((c) => c.path === selectedPath);
+    const prevNode = idx > 0 ? selectedParent.children[idx - 1] : null;
+    const prev = prevNode && prevNode.attrs.id ? sibs.find((s) => s.ref === prevNode.attrs.id) ?? null : null;
+
+    const res = autoConstrain({ attrs, box, parent: pbox, siblings: sibs, prev, scale: SCALE });
+    commitMany([...changes, ...res.changes]);
+    setAutoNotes(res.notes);
+  };
+
+  /** 清除该控件所有约束 */
+  const clearConstraints = () => {
+    if (!selectedNode) return;
+    const del = Object.keys(selectedNode.rawAttrs).filter((k) => k.startsWith("layout_constraint"));
+    if (del.length === 0) return;
+    commitMany(del.map((k) => [k, null] as [string, null]));
+    setAutoNotes([]);
+  };
+
   // ===== 组件插入（点击 / 拖放）=====
   // 有选中节点：插到它的同级（兄弟）；否则插到根节点末尾
   const setXmlAndTrack = useCallback(
@@ -228,7 +374,8 @@ export function XmlEditor() {
         ? insertSiblingAfter(xml, target, frag, w.label)
         : insertChild(xml, "#0", frag, w.label);
     if (res.ok) {
-      setXmlAndTrack(res.xml);
+      const withDef = res.insertedPath ? applyConstraintDefaults(res.xml, res.insertedPath) : res.xml;
+      setXmlAndTrack(withDef);
       if (res.insertedPath) setSelectedPath(res.insertedPath);
     }
   };
@@ -243,14 +390,16 @@ export function XmlEditor() {
       const target = root ? findNode(root, path) : null;
       const r = insertAt(xml, path, target ? target.children.length : 0, frag, w.label);
       if (r.ok) {
-        setXmlAndTrack(r.xml);
+        const withDef = r.insertedPath ? applyConstraintDefaults(r.xml, r.insertedPath) : r.xml;
+        setXmlAndTrack(withDef);
         if (r.insertedPath) setSelectedPath(r.insertedPath);
       }
       return;
     }
     const r = insertSiblingAfter(xml, path, frag, w.label);
     if (r.ok) {
-      setXmlAndTrack(r.xml);
+      const withDef = r.insertedPath ? applyConstraintDefaults(r.xml, r.insertedPath) : r.xml;
+      setXmlAndTrack(withDef);
       if (r.insertedPath) setSelectedPath(r.insertedPath);
     }
   };
@@ -337,7 +486,48 @@ export function XmlEditor() {
     return Math.min(1, avail / widthPx);
   })();
 
-  const shortTag = (t: string) => (t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t);
+  function shortTag(t: string): string {
+  return t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t;
+}
+
+/** style 里的 "123px" / 123 → 数字；百分比、auto 返回 null */
+const pxNum = (v: unknown): number | null => {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const s = String(v ?? "").trim();
+  if (/^-?[0-9.]+$/.test(s)) return parseFloat(s);
+  const m = /^(-?[0-9.]+)px$/.exec(s);
+  return m ? parseFloat(m[1]) : null;
+};
+
+/** 从渲染模型取绝对盒子（仅当 style 里有 px 定位，即 ConstraintLayout 子项） */
+function boxOf(n: ResolvedNode | null | undefined): CBox | null {
+  if (!n) return null;
+  const width = pxNum(n.style.width);
+  const height = pxNum(n.style.height);
+  if (width === null || height === null) return null;
+  // 未约束的 CL 子项没有 left/top（按静态位置渲染）→ 当 0 处理
+  const left = pxNum(n.style.left) ?? 0;
+  const top = pxNum(n.style.top) ?? 0;
+  return { left, top, width, height };
+}
+
+/** 在渲染模型里按 path 找节点 */
+function findResolved(n: ResolvedNode, path: string): ResolvedNode | null {
+  if (n.path === path) return n;
+  for (const c of n.children) {
+    const f = findResolved(c, path);
+    if (f) return f;
+  }
+  return null;
+}
+
+/** 收集全文档的 id 引用（生成不重复 id 用） */
+function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | null, out: string[]): string[] {
+  if (!n) return out;
+  if (n.attrs.id) out.push(n.attrs.id);
+  for (const c of n.children as { attrs: Record<string, string>; children: unknown[] }[]) collectIds(c, out);
+  return out;
+}
   const openProject = () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -481,6 +671,7 @@ export function XmlEditor() {
               }}
             >
               <option value="">示例…</option>
+              <option value="cl">约束布局</option>
               <option value="list">竖列表</option>
             </select>
             <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
@@ -594,12 +785,24 @@ export function XmlEditor() {
         </div>
         <div className="axv-slide-body">
           {selectedNode ? (
-            <AttrPanel
-              node={selectedNode}
-              onCommit={commitAttr}
-              onRemove={removeAttr}
-              onAddAttr={() => setAddModalOpen(true)}
-            />
+            <div className="axv-panel-stack">
+              {isChildOfCL && (
+                <ConstraintPanel
+                  node={selectedNode}
+                  siblings={clSiblings}
+                  onCommitMany={commitMany}
+                  onAuto={runAutoConstrain}
+                  onClear={clearConstraints}
+                  autoNotes={autoNotes}
+                />
+              )}
+              <AttrPanel
+                node={selectedNode}
+                onCommit={commitAttr}
+                onRemove={removeAttr}
+                onAddAttr={() => setAddModalOpen(true)}
+              />
+            </div>
           ) : (
             <div className="axv-attr-hint">在画布或图层树上点任意控件查看并编辑属性</div>
           )}
@@ -664,6 +867,27 @@ export function XmlEditor() {
           </button>
           <button className="axv-tb-btn" title="保存为 XML 文件" aria-label="保存" onClick={saveProject}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save</span>
+          </button>
+          <select
+            className="axv-tb-select"
+            title="载入示例"
+            value=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v && SAMPLES[v]) setXmlAndTrack(SAMPLES[v]);
+            }}
+          >
+            <option value="">示例…</option>
+            <option value="cl">约束布局</option>
+            <option value="list">竖列表</option>
+          </select>
+          <button
+            className="axv-tb-btn"
+            title="格式化代码（重排缩进，保留注释）"
+            aria-label="格式化"
+            onClick={doFormat}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 22 }}>format_shapes</span>
           </button>
         </div>
 

@@ -21,9 +21,12 @@ export function XmlCanvas({ node, selectedPath, onSelect, onDropWidget }: XmlCan
 
   const isSel = selectedPath === node.path;
   const isContainer = node.children.length > 0 || isContainerTag(node.tag);
+  // 注意：不能无条件写 position:relative —— ConstraintLayout 子项由求解器指定 absolute，
+  // 覆盖成 relative 后 left/top 会变成「flow 位置 + 偏移」，约束布局预览就会全错位。
+  const pos = (node.style.position as React.CSSProperties["position"]) ?? "relative";
   const style: React.CSSProperties = {
     ...(node.style as React.CSSProperties),
-    position: "relative",
+    position: pos,
     outline: isSel ? "2px solid #E11D48" : undefined,
     outlineOffset: isSel ? 1 : undefined,
   };

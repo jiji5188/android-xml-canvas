@@ -1025,6 +1025,116 @@
   background: #DC2626;
   flex: 0 0 auto;
 }
+
+/* ===== 约束面板（ConstraintLayout） ===== */
+.axv-panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.axv-constraint {
+  border: 1px solid rgba(4, 64, 159, 0.18);
+  background: #F7F9FE;
+  border-radius: 12px;
+  padding: 10px 10px 12px;
+}
+.axv-constraint-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #04409F;
+  margin-bottom: 8px;
+}
+.axv-constraint-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4B5563;
+  background: #E8EEFA;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+.axv-constraint-side {
+  padding: 6px 0;
+  border-top: 1px solid rgba(4, 64, 159, 0.08);
+}
+.axv-constraint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.axv-constraint-sub {
+  margin-top: 6px;
+}
+.axv-constraint-ctl {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.axv-constraint-ctl .axv-attr-select {
+  flex: 1;
+  min-width: 0;
+}
+.axv-constraint-bias {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.axv-bias-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #374151;
+}
+.axv-bias-row input[type="range"] {
+  flex: 1;
+  accent-color: #04409F;
+}
+.axv-bias-val {
+  width: 42px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #04409F;
+  font-weight: 600;
+}
+.axv-constraint-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.axv-constraint-btn {
+  flex: 1;
+  height: 34px;
+  border-radius: 17px;
+  border: none;
+  background: #04409F;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.axv-constraint-btn.axv-ghost {
+  background: #E8EEFA;
+  color: #04409F;
+}
+.axv-constraint-notes {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: #0A7B34;
+  line-height: 1.6;
+}
+.axv-constraint-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #6B7280;
+  line-height: 1.55;
+}
 .axv-code-fill {
   flex: 1;
   min-height: 0;

@@ -399,6 +399,12 @@ export function buildRenderModel(
     };
     const cw = toPx(n.style.width, 412 * scale);
     const ch = toPx(n.style.height, 892 * scale);
+    // CL 自身尺寸必须落实成 px：父级只有 min-height 时 100% 解析不出来，
+    // 子项全 absolute 又撑不起来 → 容器会塔成 0 高（真 bug，会看到控件跑出屏幕）
+    const wStr = String(n.style.width ?? "");
+    const hStr = String(n.style.height ?? "");
+    if (wStr === "100%" || wStr === "auto" || wStr === "") n.style.width = `${cw}px`;
+    if (hStr === "100%" || hStr === "auto" || hStr === "") n.style.height = `${ch}px`;
     const sourceCL = findSourceNode(root, n.path);
     if (!sourceCL) return;
     const solved = solveConstraintChildren(sourceCL, res, cw, ch);

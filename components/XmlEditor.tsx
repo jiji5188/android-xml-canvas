@@ -762,15 +762,19 @@ export function XmlEditor() {
     if (r.changed) setXmlAndTrack(r.xml);
   };
 
-  /** M2d：画布自由拖动 / 四角拉伸 → 写回 layout_marginStart/Top（XY）+ layout_width/height（宽高，dp） */
-  const onGeometryChange = (path: string, g: { x: number; y: number; w: number; h: number }) => {
+  /** M2d：画布自由拖动 / 四角拉伸 → 写回 layout_marginStart/Top（XY）或 layout_width/height（宽高，dp）
+   *  move 手柄只改 x/y（不碰 w/h）；四角 resize 只改 w/h（不碰 x/y） */
+  const onGeometryChange = (
+    path: string,
+    g: { x?: number; y?: number; w?: number; h?: number },
+  ) => {
     const r1 = (n: number) => Math.round(n);
-    const set: Record<string, string> = {
-      layout_width: `${r1(g.w)}dp`,
-      layout_height: `${r1(g.h)}dp`,
-      layout_marginStart: `${r1(g.x)}dp`,
-      layout_marginTop: `${r1(g.y)}dp`,
-    };
+    const set: Record<string, string> = {};
+    if (g.x !== undefined) set.layout_marginStart = `${r1(g.x)}dp`;
+    if (g.y !== undefined) set.layout_marginTop = `${r1(g.y)}dp`;
+    if (g.w !== undefined) set.layout_width = `${r1(g.w)}dp`;
+    if (g.h !== undefined) set.layout_height = `${r1(g.h)}dp`;
+    if (Object.keys(set).length === 0) return;
     const r = writebackAttrs(xml, path, set, []);
     if (r.changed) setXmlAndTrack(r.xml);
   };

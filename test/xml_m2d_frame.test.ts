@@ -108,7 +108,33 @@ describe("M2d LinearLayout 子项 match_parent 生效", () => {
 });
 
 describe("M2d 自由几何写回（画布拖动 → XML）", () => {
-  it("拖动 FrameLayout 子项 → 写回 layout_marginStart/Top + layout_width/height（dp）", () => {
+  it("移动手柄 → 只写 layout_marginStart/Top，不动 layout_width/height（保留 match_parent 语义）", () => {
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+  <View
+      android:id="@+id/v1"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content" />
+</FrameLayout>`;
+    const { root } = parseLayoutXml(xml);
+    if (!root) throw new Error("parse fail");
+    const childPath = root.children[0].path;
+    // move 手柄：只写 x/y
+    const r = writebackAttrs(xml, childPath, {
+      layout_marginStart: "20dp",
+      layout_marginTop: "10dp",
+    }, []);
+    expect(r.changed).toBe(true);
+    expect(r.xml).toContain("layout_marginStart=\"20dp\"");
+    expect(r.xml).toContain("layout_marginTop=\"10dp\"");
+    // layout_width 保持 match_parent 不被破坏
+    expect(r.xml).toContain("layout_width=\"match_parent\"");
+    expect(r.xml).toContain("layout_height=\"wrap_content\"");
+  });
+
+  it("四角 resize → 只写 layout_width/height，不动 layout_marginStart/Top", () => {
     const xml = `<?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -116,21 +142,21 @@ describe("M2d 自由几何写回（画布拖动 → XML）", () => {
   <View
       android:id="@+id/v1"
       android:layout_width="100dp"
-      android:layout_height="80dp" />
+      android:layout_height="80dp"
+      android:layout_marginStart="20dp"
+      android:layout_marginTop="10dp" />
 </FrameLayout>`;
     const { root } = parseLayoutXml(xml);
     if (!root) throw new Error("parse fail");
     const childPath = root.children[0].path;
-    const set = {
+    const r = writebackAttrs(xml, childPath, {
       layout_width: "240dp",
       layout_height: "160dp",
-      layout_marginStart: "20dp",
-      layout_marginTop: "10dp",
-    };
-    const r = writebackAttrs(xml, childPath, set, []);
+    }, []);
     expect(r.changed).toBe(true);
     expect(r.xml).toContain("layout_width=\"240dp\"");
     expect(r.xml).toContain("layout_height=\"160dp\"");
+    // margin 保持不变
     expect(r.xml).toContain("layout_marginStart=\"20dp\"");
     expect(r.xml).toContain("layout_marginTop=\"10dp\"");
   });

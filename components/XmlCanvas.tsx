@@ -15,10 +15,10 @@ export type GeomMode = "move" | "nw" | "ne" | "sw" | "se";
 
 /** 画布几何变化（单位 dp，相对父容器左上角） */
 export interface GeomPatch {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
 }
 
 interface XmlCanvasProps {
@@ -34,7 +34,9 @@ interface XmlCanvasProps {
     targetPath: string,
     targetSide: ConstraintSide,
   ) => void;
-  /** M2d：自由拖动 / 拉伸改 XY 与宽高（dp） */
+  /** M2d：自由拖动 / 拉伸改 XY 与宽高（dp）
+   *  - move 手柄 → 只写 x/y（layout_marginStart/Top）
+   *  - 四角 resize → 只写 w/h（layout_width/height） */
   onGeometryChange?: (path: string, patch: GeomPatch) => void;
   /** 1dp = scale px（默认 2，与 css.ts 一致） */
   scale?: number;
@@ -232,7 +234,13 @@ export function XmlCanvas({
       const relX = (nx - g.parentLeft) / scale;
       const relY = (ny - g.parentTop) / scale;
       const r1 = (n: number) => Math.round(n * 10) / 10;
-      onGeometryChange?.(node.path, { x: r1(relX), y: r1(relY), w: r1(nw / scale), h: r1(nh / scale) });
+      // move 手柄：只写 x/y（保留原 w/h 语义：match_parent / wrap_content 不被破坏）
+      // 四角 resize：只写 w/h（不改 x/y，避免同时改写 margin）
+      if (g.mode === "move") {
+        onGeometryChange?.(node.path, { x: r1(relX), y: r1(relY) });
+      } else {
+        onGeometryChange?.(node.path, { w: r1(nw / scale), h: r1(nh / scale) });
+      }
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);

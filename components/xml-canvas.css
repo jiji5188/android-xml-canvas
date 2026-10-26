@@ -1492,7 +1492,7 @@
   color: #1d1b20;
 }
 
-/* M3 导出提示浮层 */
+/* M3 瀵煎嚭鎻愮ず娴眰 */
 .axv-export-note {
   position: absolute;
   left: 50%;
@@ -1506,4 +1506,3 @@
   z-index: 30;
   pointer-events: none;
 }
-

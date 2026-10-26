@@ -103,6 +103,20 @@ export function estSize(node: XmlNode): { w: number; h: number } {
 
 type DimKind = "zero" | "wrap" | "match" | "dp";
 
+/**
+ * layout_constraintDimensionRatio → 宽/高比值（w/h）。
+ * 支持 "16:9"、"W,16:9"、"H,1:1"；返回 w/h，解析失败返回 null。
+ */
+function parseDimensionRatio(raw: string): number | null {
+  const body = raw.includes(",") ? raw.split(",").slice(1).join(",") : raw;
+  const m = body.trim().match(/^\s*(\d+(?:\.\d+)?)\s*[:/]\s*(\d+(?:\.\d+)?)\s*$/);
+  if (!m) return null;
+  const w = parseFloat(m[1]);
+  const h = parseFloat(m[2]);
+  if (h === 0 || !Number.isFinite(w) || !Number.isFinite(h)) return null;
+  return w / h;
+}
+
 /** 子项某方向的尺寸（dp 或 CSS px 由 resolveSize 决定） */
 function dimDp(
   node: XmlNode,
@@ -381,6 +395,28 @@ export function solveConstraintChildren(
     }
     if (d.kindH === "match" || d.kindH === "zero") {
       if (vTop || vBottom) h = spanH;
+    }
+
+    // layout_constraintWidth_percent / Height_percent：按父内容区百分比定尺寸（0..1）
+    const pctW = parseFloat(a["layout_constraintWidth_percent"] ?? "");
+    if (Number.isFinite(pctW) && pctW > 0) w = parentContentW * Math.min(pctW, 1);
+    const pctH = parseFloat(a["layout_constraintHeight_percent"] ?? "");
+    if (Number.isFinite(pctH) && pctH > 0) h = parentContentH * Math.min(pctH, 1);
+
+    // layout_constraintDimensionRatio（"W,16:9" / "H,1:1" / "16:9"）：宽或高未定（0dp/match_constraint）时按比反推
+    const ratio = parseDimensionRatio(a["layout_constraintDimensionRatio"] ?? "");
+    if (ratio) {
+      const hint = String(a["layout_constraintDimensionRatio"]).split(",")[0]?.trim().toUpperCase();
+      // 哪一维是“未定”：0dp / match_constraint
+      const wUndetermined = d.kindW === "zero" || d.kindW === "match";
+      const hUndetermined = d.kindH === "zero" || d.kindH === "match";
+      if (hint === "W" && hUndetermined) h = w / ratio;
+      else if (hint === "H" && wUndetermined) w = h * ratio;
+      else if (wUndetermined && hUndetermined) {
+        // 两维都 0dp：按宽度撑满后的值反推高度（与 Android 实测行为一致）
+        if (w > 0) h = w / ratio;
+      } else if (wUndetermined) w = h * ratio;
+      else if (hUndetermined) h = w / ratio;
     }
 
     // 位置

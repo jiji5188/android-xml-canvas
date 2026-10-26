@@ -273,8 +273,29 @@ function splitPath(path: string): { parentPath: string; index: number } {
 /** 去掉片段里的 xmlns 声明（根节点已有；否则序列化会重复写） */
 const stripNs = (frag: string) => frag.replace(/\s+xmlns:android="[^"]*"/g, "");
 
+/** localStorage 自动保存：刷新/关页面不丢工作 */
+const LS_KEY_XML = "axv.autosave.xml";
+const LS_KEY_HIST = "axv.autosave.history";
+const LS_KEY_RES = "axv.autosave.resources";
+
+/** 安全读 localStorage（无 SSR、禁用存储模式都要不炸） */
+function lsGet(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function lsSet(key: string, val: string) {
+  try {
+    window.localStorage.setItem(key, val);
+  } catch {
+    // 超配额/隐私模式：静默放弃，不影响主流程
+  }
+}
+
 export function XmlEditor() {
-  const [xml, setXml] = useState(SAMPLES.list);
+  const [xml, setXml] = useState<string>(() => lsGet(LS_KEY_XML) ?? SAMPLES.list);
   /** 解析用（低优先级）：敲代码时让输入不卡，解析滞后几帧 */
   const parsedXml = useDeferredValue(xml);
   const [resourceFragment, setResourceFragment] = useState("");
@@ -292,13 +313,40 @@ export function XmlEditor() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [dropHint, setDropHint] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<"preview" | "xml">("preview");
-  const [history, setHistory] = useState<string[]>([SAMPLES.list]);
-  const [histIdx, setHistIdx] = useState(0);
+  const [history, setHistory] = useState<string[]>(() => {
+    const raw = lsGet(LS_KEY_HIST);
+    if (raw) {
+      try {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length > 0 && arr.every((x) => typeof x === "string")) {
+          return arr;
+        }
+      } catch {
+        /* 损坏则用默认 */
+      }
+    }
+    return [lsGet(LS_KEY_XML) ?? SAMPLES.list];
+  });
+  const [histIdx, setHistIdx] = useState(() => {
+    const raw = lsGet(LS_KEY_HIST);
+    if (raw) {
+      try {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length > 0) return Math.max(arr.length - 1, 0);
+      } catch {
+        /* 损坏则用默认 */
+      }
+    }
+    return 0;
+  });
 
   /* ===== 撤销 / 重做 =====
      用 ref 存栈，避开 setState 异步导致连续操作串位置的问题。
      结构变更立即入栈；手动敲代码则防抖 500ms 合并成一步。 */
-  const histRef = useRef<{ stack: string[]; idx: number }>({ stack: [SAMPLES.list], idx: 0 });
+  const histRef = useRef<{ stack: string[]; idx: number }>({
+    stack: history,
+    idx: histIdx,
+  });
   const textTimer = useRef<number | null>(null);
 
   const syncHist = () => {
@@ -360,6 +408,68 @@ export function XmlEditor() {
     apply();
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
+  }, []);
+
+  // ===== 键盘快捷键：Ctrl/⌘ + Z 撤销 / Y 重做 / S 保存 / F 格式化 =====
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const k = e.key.toLowerCase();
+      if (k === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (k === "y") {
+        e.preventDefault();
+        redo();
+      } else if (k === "s") {
+        e.preventDefault();
+        saveProject();
+      } else if (k === "f") {
+        e.preventDefault();
+        doFormat();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  // ===== 自动保存：xml / 历史 / 资源 变更即写 localStorage（防抖 400ms） =====
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      lsSet(LS_KEY_XML, xml);
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [xml]);
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      lsSet(LS_KEY_HIST, JSON.stringify(history));
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [history]);
+  useEffect(() => {
+    // resExtras 里 dataURL 可能很大，写前检查配额
+    if (!resExtras) return;
+    try {
+      const blob = JSON.stringify({ extras: resExtras, fragment: resourceFragment });
+      if (blob.length < 4_500_000) lsSet(LS_KEY_RES, blob);
+    } catch {
+      /* 超配额放弃 */
+    }
+  }, [resExtras, resourceFragment]);
+
+  // 启动时恢复资源（一次性）
+  useEffect(() => {
+    const raw = lsGet(LS_KEY_RES);
+    if (!raw) return;
+    try {
+      const { extras, fragment } = JSON.parse(raw);
+      if (extras && typeof extras === "object" && extras.drawables) setResExtras(extras);
+      if (typeof fragment === "string" && fragment) setResourceFragment(fragment);
+    } catch {
+      /* 损坏忽略 */
+    }
   }, []);
 
   const resources: ResourceTable = useMemo(() => {
@@ -764,6 +874,12 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
   /** 清掉已上传的资源，回到内置默认 */
   const clearRes = () => {
     setResExtras(null);
+    setResourceFragment("");
+    try {
+      window.localStorage.removeItem(LS_KEY_RES);
+    } catch {
+      /* ignore */
+    }
     if (resInputRef.current) resInputRef.current.value = "";
     if (resDirRef.current) resDirRef.current.value = "";
     setExportNote("已清除上传的 res 资源");

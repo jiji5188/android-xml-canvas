@@ -257,6 +257,23 @@ export function buildRenderModel(
       }
       if ((attrs["textAllCaps"] as boolean)) style.textTransform = "uppercase";
       if ((attrs["textStyle"] as string) === "bold") style.fontWeight = 600;
+      // 排版细节：letterSpacing / lineSpacingExtra / maxLines / ellipsize
+      const fsPx = parseFloat(String(style.fontSize ?? "28")) || 28;
+      const ls = attrs["letterSpacing"] as number;
+      if (ls) style.letterSpacing = `${(ls * fsPx).toFixed(2)}px`;
+      const lse = attrs["lineSpacingExtra"] as number;
+      if (lse) style.lineHeight = `${(fsPx * 1.2 + lse * scale).toFixed(1)}px`;
+      const ml = attrs["maxLines"] as number;
+      const ellip = (attrs["ellipsize"] as string) || "";
+      if (ml > 0 || ellip) {
+        if (ml > 0) {
+          style.display = "-webkit-box";
+          style.WebkitLineClamp = String(ml);
+          style.overflow = "hidden";
+        }
+        if (ellip === "end") style.textOverflow = "ellipsis";
+        else if (ellip === "start") style.textAlign = "right";
+      }
       // Button/EditText 默认样式
       if (tag === "Button" || tag === "MaterialButton" || tag === "AppCompatButton") {
         style.backgroundColor = bg || "#6750A4";
@@ -295,6 +312,13 @@ export function buildRenderModel(
         style.minHeight = style.minHeight || `${DP(48, scale)}px`;
       }
       if (attrs["adjustViewBounds"]) style.aspectRatio = "1 / 1";
+      // CL 里的宽高比（0dp + layout_constraintDimensionRatio 在非 CL 容器时也吃）
+      const ratioRaw = (attrs["dimensionRatio"] as string) || "";
+      if (ratioRaw) {
+        const body = ratioRaw.includes(",") ? ratioRaw.split(",").slice(1).join(",") : ratioRaw;
+        const m = body.match(/^(\d+(?:\.\d+)?)\s*[:/]\s*(\d+(?:\.\d+)?)/);
+        if (m && parseFloat(m[2]) > 0) style.aspectRatio = `${parseFloat(m[1])} / ${parseFloat(m[2])}`;
+      }
     }
 
     if (cls === "axv-progress") {

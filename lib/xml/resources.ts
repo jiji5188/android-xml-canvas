@@ -54,6 +54,112 @@ export const DEFAULT_RESOURCES: ResourceTable = {
 };
 
 /** 解析用户粘贴的 <resources>...</resources> 片段，合并进默认表（用户优先） */
+/**
+ * @android:color/xxx 框架内置色（常用子集，够预览用；未命中走 resolveColor 兜底）
+ * 颜色取自 AOSP values/colors.xml（近似值即可，预览工具不做像素级还原）
+ */
+export const FRAMEWORK_COLORS: Record<string, string> = {
+  white: "#FFFFFF",
+  black: "#000000",
+  transparent: "transparent",
+  background_light: "#FFFFFF",
+  background_dark: "#303030",
+  background_holo_light: "#F5F5F5",
+  background_holo_dark: "#F3303030",
+  primary_light: "#FFFFFF",
+  primary_dark: "#212121",
+  primary_light_dark: "#303030",
+  primary_dark_light: "#EEEEEE",
+  holo_blue_light: "#33B5E5",
+  holo_blue_dark: "#0099CC",
+  holo_red_light: "#FF4444",
+  holo_green_light: "#669900",
+  holo_orange_light: "#FF8800",
+  highlight_blue_bright: "#FFFF4444",
+  bright_foreground_light: "#000000",
+  bright_foreground_dark: "#FFFFFF",
+  bright_foreground_disabled_light: "#BEBEBE",
+  bright_foreground_disabled_dark: "#80FFFFFF",
+  dark_foreground_light: "#DEDEDE",
+  dark_foreground_dark: "#434343",
+  hint_foreground_light: "#80808080",
+  hint_foreground_dark: "#80CCCCCC",
+  primary_text_light: "#DE000000",
+  primary_text_dark: "#DEFFFFFF",
+  primary_text_disabled_light: "#42000000",
+  primary_text_disabled_dark: "#42FFFFFF",
+  secondary_text_light: "#8A000000",
+  secondary_text_dark: "#8AFFFFFF",
+  secondary_text_disabled_light: "#42000000",
+  secondary_text_disabled_dark: "#42FFFFFF",
+  activated_text_light: "#FF000000",
+  activated_text_dark: "#FFFFFFFF",
+  link_text_light: "#FF0000EE",
+  link_text_dark: "#FF0099CC",
+  gray: "#808080",
+  grey: "#808080",
+  darker_gray: "#444444",
+  lighter_gray: "#CCCCCC",
+  dkgray: "#444444",
+  ltgray: "#CCCCCC",
+  light_grey: "#EEEEEE",
+  dark_grey: "#333333",
+  tab_indicator_selected: "#FF0099CC",
+  tab_indicator_unselected: "#40000000",
+  button_normal: "#FFFFFF",
+  button_pressed: "#33000000",
+  suggestion_background: "#33000000",
+};
+
+/**
+ * @android:style / ?android:attr 里常见 TextAppearance 的内置展开
+ * 覆盖 Material 主题高频引用项；未命中静默忽略（不误报 warn，因为框架样式表太大）
+ */
+export const FRAMEWORK_STYLES: Record<string, { attrs: Record<string, string> }> = {
+  "TextAppearance.AppCompat.Body1": {
+    attrs: { "textSize": "14sp", "textColor": "?attr/textColorPrimary" },
+  },
+  "TextAppearance.AppCompat.Body2": {
+    attrs: { "textSize": "14sp", "textColor": "?attr/textColorSecondary" },
+  },
+  "TextAppearance.AppCompat.Caption": {
+    attrs: { "textSize": "12sp", "textColor": "?attr/textColorSecondary" },
+  },
+  "TextAppearance.AppCompat.Subhead": {
+    attrs: { "textSize": "14sp", "textColor": "?attr/textColorPrimary" },
+  },
+  "TextAppearance.AppCompat.Title": {
+    attrs: { "textSize": "16sp", "textColor": "?attr/textColorPrimary", "textStyle": "bold" },
+  },
+  "TextAppearance.Material.Body1": {
+    attrs: { "textSize": "14sp", "textColor": "#DE000000" },
+  },
+  "TextAppearance.Material.Body2": {
+    attrs: { "textSize": "14sp", "textColor": "#8A000000" },
+  },
+  "TextAppearance.Material.Caption": {
+    attrs: { "textSize": "12sp", "textColor": "#8A000000" },
+  },
+  "TextAppearance.Material.Headline": {
+    attrs: { "textSize": "20sp", "textColor": "#DE000000" },
+  },
+  "TextAppearance.Material.Title": {
+    attrs: { "textSize": "16sp", "textColor": "#DE000000", "textStyle": "bold" },
+  },
+  "TextAppearance.Material.Widget.Button": {
+    attrs: { "textSize": "14sp", "textAllCaps": "true", "textColor": "#FFFFFF" },
+  },
+  "Widget.Material.Button": {
+    attrs: { "background": "#6750A4", "textColor": "#FFFFFF", "textSize": "14sp", "textAllCaps": "true" },
+  },
+  "Widget.Material.Button.Colored": {
+    attrs: { "background": "#6750A4", "textColor": "#FFFFFF", "textSize": "14sp", "textAllCaps": "true" },
+  },
+  "Widget.AppCompat.Button": {
+    attrs: { "textSize": "14sp", "textAllCaps": "true" },
+  },
+};
+
 export function mergeResourceFragment(xmlFragment: string): ResourceTable {
   const merged: ResourceTable = {
     strings: { ...DEFAULT_RESOURCES.strings },
@@ -75,6 +181,13 @@ export function mergeResourceFragment(xmlFragment: string): ResourceTable {
     if (kind === "string") merged.strings[name] = val;
     else if (kind === "dimen") merged.dimens[name] = parseDimenToDp(val);
     else if (kind === "color") merged.colors[name] = val;
+  }
+  // 框架样式兜底：项目 styles 没有时补 @android:style/* 常见项（键去 android: 前缀存）
+  if (!merged.styles) {
+    merged.styles = {};
+  }
+  for (const [k, v] of Object.entries(FRAMEWORK_STYLES)) {
+    if (!merged.styles[k]) merged.styles[k] = { name: k, attrs: v.attrs };
   }
   return merged;
 }

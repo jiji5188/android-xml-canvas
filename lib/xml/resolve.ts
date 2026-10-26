@@ -2,7 +2,7 @@
 // 返回每个属性一份「已解析」映射；解析不到走内置兜底 + issue 提示。
 
 import type { XmlNode, XmlIssue, ResourceTable } from "./types";
-import { parseDimenToDp } from "./resources";
+import { parseDimenToDp, FRAMEWORK_COLORS, FRAMEWORK_STYLES } from "./resources";
 
 export type ResolvedAttrs = Record<string, string | number | boolean | SizeSpec | null>;
 
@@ -40,11 +40,35 @@ export function resolveSize(raw: string, res: ResourceTable, issues: XmlIssue[],
   return { kind: "dp", value: n };
 }
 
-/** 颜色解析：#hex / @color/xxx / ?attr/xxx / 命名色（白/黑/transparent） */
+/** 颜色解析：#hex / @color/xxx / @android:color/xxx / ?attr/xxx / 命名色（白/黑/transparent） */
+// ===== Android ARGB → CSS 颜色 =====
+// Android 8 位 hex 是 #AARRGGBB，CSS 8 位 hex 是 #RRGGBBAA
+function argbToCss(hex: string): string {
+  const m = hex.match(/^#([0-9a-fA-F]{8})$/);
+  if (!m) return hex;
+  const arrgb = m[1];
+  const a = arrgb.slice(0, 2);
+  const rr = arrgb.slice(2, 4);
+  const gg = arrgb.slice(4, 6);
+  const bb = arrgb.slice(6, 8);
+  if (a === "FF") return `#${rr}${gg}${bb}`; // 不透明：丢 alpha
+  if (a === "00") return "transparent";
+  const alpha = Math.round(parseInt(a, 16) / 255 * 100) / 100;
+  const num = parseInt(rr, 16), g = parseInt(gg, 16), b = parseInt(bb, 16);
+  return `rgba(${num}, ${g}, ${b}, ${alpha})`;
+}
+
 export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[], path: string, prop: string): string {
   const v = raw.trim();
   if (v === "" || v === "@null") return "transparent";
-  if (v.startsWith("#")) return v;
+  if (v.startsWith("#")) return argbToCss(v);
+  if (v.startsWith("@android:color/")) {
+    const name = v.slice("@android:color/".length);
+    const c = FRAMEWORK_COLORS[name];
+    if (c !== undefined) return c;
+    issues.push({ level: "warn", nodePath: path, message: `${prop} 引用 @android:color/${name} 未收录，用兜底色` });
+    return "#888888";
+  }
   if (v.startsWith("@color/")) {
     const name = v.slice("@color/".length);
     const c = res.colors[name];
@@ -56,6 +80,23 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
     const name = v.slice("?attr/".length);
     const c = res.colors[name]; // 主题属性名与 color 名同名时命中默认主题表
     if (c !== undefined) return c;
+    // 常见 Material3 主题属性→默认色（未上传 styles 时的预览兜底）
+    const themeAttrs: Record<string, string> = {
+      colorPrimary: "#6750A4",
+      colorOnPrimary: "#FFFFFF",
+      colorPrimaryContainer: "#EADDFF",
+      colorOnPrimaryContainer: "#21005D",
+      colorSecondary: "#625B71",
+      colorOnSecondary: "#FFFFFF",
+      colorOnBackground: "#1D1B20",
+      colorOnSurface: "#1D1B20",
+      colorSurface: "#FEF7FF",
+      colorBackground: "#FEF7FF",
+      colorError: "#B3261E",
+      textColorPrimary: "#1D1B20",
+      textColorSecondary: "#49454F",
+    };
+    if (themeAttrs[name] !== undefined) return themeAttrs[name];
     issues.push({ level: "warn", nodePath: path, message: `${prop} 引用 ?attr/${name} 未定义，用兜底色` });
     return "#888888";
   }
@@ -95,6 +136,44 @@ export function resolveText(raw: string, res: ResourceTable, issues: XmlIssue[],
   return v;
 }
 
+/** 把 @style/xxx、textAppearance 展开并入节点属性（显式属性优先，Android 语义） */
+function applyStyleRefs(
+  base: XmlNode["attrs"],
+  res: ResourceTable,
+  issues: XmlIssue[],
+  path: string,
+): XmlNode["attrs"] {
+  const out: Record<string, string> = { ...base };
+  const refs = [out["style"], out["textAppearance"]].filter(Boolean);
+  for (const rawRef of refs) {
+    const ref = String(rawRef).trim();
+    if (!ref) continue;
+    let name: string;
+    if (ref.startsWith("@android:style/")) {
+      name = ref.slice("@android:style/".length);
+    } else if (ref.startsWith("@style/")) {
+      name = ref.slice("@style/".length);
+    } else if (ref.startsWith("?")) {
+      // ?attr/textAppearance* 等——预览阶段不展开，静默
+      continue;
+    } else {
+      continue;
+    }
+    const st = res.styles?.[name] ?? FRAMEWORK_STYLES[name];
+    if (!st) {
+      if (ref.startsWith("@style/")) {
+        issues.push({ level: "warn", nodePath: path, message: `style 引用 @style/${name} 未定义，忽略` });
+      }
+      continue;
+    }
+    for (const [k, v] of Object.entries(st.attrs)) {
+      const key = k.replace(/^(android:|app:)/, "");
+      if (out[key] === undefined) out[key] = v; // 显式属性优先于 style
+    }
+  }
+  return out;
+}
+
 /**
  * 解析某节点的全部「关心属性」成 ResolvedAttrs
  * 返回键：width/height/weight/gravity/margin 四边/padding 四边/background/text/textSize/textColor/src/visibility 等
@@ -102,7 +181,8 @@ export function resolveText(raw: string, res: ResourceTable, issues: XmlIssue[],
 export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: ResolvedAttrs; issues: XmlIssue[] } {
   const issues: XmlIssue[] = [];
   const path = node.path;
-  const a = node.attrs; // 已归一化（无前缀）
+  // @style/xxx + textAppearance 展开（显式属性优先）
+  const a = applyStyleRefs(node.attrs, res, issues, path);
   const out: ResolvedAttrs = {};
 
   // 尺寸
@@ -166,6 +246,26 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
 
   // 进度条样式
   out["progressStyle"] = a["style"] ?? "";
+
+  // 宽高比 / 百分比（CL 与 ImageView 用；求解器读 dimensionRatio / percent）
+  out["dimensionRatio"] = a["layout_constraintDimensionRatio"] ?? "";
+  out["widthPercent"] = a["layout_constraintWidth_percent"]
+    ? parseFloat(a["layout_constraintWidth_percent"]) || 0
+    : 0;
+  out["heightPercent"] = a["layout_constraintHeight_percent"]
+    ? parseFloat(a["layout_constraintHeight_percent"]) || 0
+    : 0;
+
+  // 文字排版细节
+  out["letterSpacing"] = a["letterSpacing"] !== undefined ? parseFloat(a["letterSpacing"]) || 0 : 0;
+  out["lineSpacingExtra"] =
+    a["lineSpacingExtra"] !== undefined
+      ? resolveSize(a["lineSpacingExtra"], res, issues, path, "lineSpacingExtra").kind === "dp"
+        ? (resolveSize(a["lineSpacingExtra"], res, issues, path, "lineSpacingExtra") as { kind: "dp"; value: number }).value
+        : 0
+      : 0;
+  out["maxLines"] = a["maxLines"] !== undefined ? parseInt(a["maxLines"], 10) || 0 : 0;
+  out["ellipsize"] = a["ellipsize"] ?? "";
 
   // 圆角 / 阴影（elevation）
   out["elevation"] = a["elevation"] !== undefined ? resolveSize(a["elevation"], res, issues, path, "elevation") : null;

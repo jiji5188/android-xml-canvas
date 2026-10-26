@@ -78,21 +78,29 @@
 /* ===== M2d/M2k：自由拖动 + 四边拉伸手柄（不用四角，避免宽高混在一起） ===== */
 .axv-geom-move {
   position: absolute;
-  left: -18px;
-  top: -20px;
-  width: 26px;
-  height: 26px;
-  line-height: 24px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  line-height: 22px;
   text-align: center;
   background: #059669;
   color: #fff;
   border-radius: 50%;
-  font-size: 13px;
+  font-size: 12px;
   cursor: grab;
-  z-index: 30;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  z-index: 31;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.4);
   user-select: none;
   touch-action: none;
+  /* 半透明：不抢视觉，但仍在中间方便抓；悬停/按下恢复不透明 */
+  opacity: 0.68;
+  transition: opacity 120ms;
+}
+.axv-geom-move:hover,
+.axv-geom-move:active {
+  opacity: 1;
 }
 .axv-geom-move:active { cursor: grabbing; }
 .axv-geom-resize {

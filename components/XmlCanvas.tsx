@@ -62,12 +62,13 @@ interface GeomDrag {
   mode: GeomMode;
   px: number;
   py: number;
+  /** 起点：布局 px（未受父级 transform 缩放影响） */
   x: number;
   y: number;
   w: number;
   h: number;
-  parentLeft: number;
-  parentTop: number;
+  /** 视觉缩放比（外层 transform: scale(fitRatio)），屏幕位移 ÷ 它 = 布局位移 */
+  vs: number;
 }
 
 export function XmlCanvas({
@@ -84,13 +85,12 @@ export function XmlCanvas({
   const [dropHit, setDropHit] = useState<string | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [geomLive, setGeomLive] = useState<{
-    dx: number;
-    dy: number;
-    dw: number;
-    dh: number;
-    /** 拖拽开始时的实际测得尺寸（px），用于 resize 预览：auto/百分比也能跟手 */
-    baseW?: number;
-    baseH?: number;
+    mode: GeomMode;
+    /** 下面四个都是「布局 px」的绝对值（与写回 XML 的结果一一对应） */
+    x: number;
+    y: number;
+    w: number;
+    h: number;
   } | null>(null);
   const selfRef = useRef<HTMLDivElement | null>(null);
   const geomRef = useRef<GeomDrag | null>(null);
@@ -106,19 +106,15 @@ export function XmlCanvas({
     outline: isSel ? "2px solid #E11D48" : undefined,
     outlineOffset: isSel ? 1 : undefined,
   };
-  // 拖动时视觉跟随（松手才写回 XML）
+  // 拖动时视觉跟随（松手才写回 XML）。
+  // ⚠ 预览直接改 margin/width 的绝对值（不用 translate），这样松手后写回 XML 渲染出来的
+  //   位置与拖拽时完全一致 → 不会出现「松手先弹回再跳到新位置」的双跳。
   if (isSel && geomLive) {
-    const t: string[] = [];
-    if (geomLive.dx || geomLive.dy) t.push(`translate(${geomLive.dx}px, ${geomLive.dy}px)`);
-    if (style.transform) t.push(String(style.transform));
-    if (t.length > 0) style.transform = t.join(" ");
-    // 用拖拽起点的实际尺寸 + 增量做预览，auto / calc(100% - Npx) / 百分比都能跟手
-    if (geomLive.dw && geomLive.baseW !== undefined) {
-      style.width = `${Math.max(8, geomLive.baseW + geomLive.dw)}px`;
-    }
-    if (geomLive.dh && geomLive.baseH !== undefined) {
-      style.height = `${Math.max(8, geomLive.baseH + geomLive.dh)}px`;
-    }
+    const g = geomLive;
+    if (g.mode === "move" || g.mode === "left") style.marginLeft = `${g.x}px`;
+    if (g.mode === "move" || g.mode === "top") style.marginTop = `${g.y}px`;
+    if (g.mode === "left" || g.mode === "right") style.width = `${g.w}px`;
+    if (g.mode === "top" || g.mode === "bottom") style.height = `${g.h}px`;
     style.zIndex = 50;
   }
 
@@ -180,104 +176,101 @@ export function XmlCanvas({
     onConstraintDraw?.(node.path, side, targetEl.dataset.path!, targetSide);
   };
 
-  // ===== M2d：自由拖动 / 四角拉伸 =====
+  // ===== M2d：自由拖动 / 四边拉伸 =====
+  // ⚠ 关键：画布外层有 transform: scale(fitRatio) 缩放。getBoundingClientRect() 拿到的是
+  // 【视觉尺寸】，直接 /scale 转 dp 会在松手时按 fitRatio 缩小一次（拖大反而变小）。
+  // 所以统一换算成【布局 px】：尺寸用 offsetWidth/offsetHeight，位移用屏幕位移 ÷ vs，
+  // 起点坐标直接读 computedStyle 的 margin（就是 layout_marginStart/Top 的实际值）。
   const beginGeom = (mode: GeomMode) => (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const el = selfRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const prect = el.parentElement?.getBoundingClientRect();
+    const cs = window.getComputedStyle(el);
+    const layoutW = el.offsetWidth || rect.width;
+    const layoutH = el.offsetHeight || rect.height;
+    // 视觉缩放比：视觉宽 ÷ 布局宽（无 transform 时为 1）
+    const vs = layoutW > 0 && rect.width > 0 ? rect.width / layoutW : 1;
     geomRef.current = {
       mode,
       px: e.clientX,
       py: e.clientY,
-      x: rect.left,
-      y: rect.top,
-      w: rect.width,
-      h: rect.height,
-      parentLeft: prect?.left ?? 0,
-      parentTop: prect?.top ?? 0,
+      x: parseFloat(cs.marginLeft) || 0,
+      y: parseFloat(cs.marginTop) || 0,
+      w: layoutW,
+      h: layoutH,
+      vs,
     };
-    setGeomLive({ dx: 0, dy: 0, dw: 0, dh: 0, baseW: rect.width, baseH: rect.height });
+    setGeomLive({ mode, x: parseFloat(cs.marginLeft) || 0, y: parseFloat(cs.marginTop) || 0, w: layoutW, h: layoutH });
+
+    /** 统一的几何推导：屏幕位移 → 绝对布局 px（预览与写回共用，保证两者完全一致） */
+    const derive = (g: GeomDrag, ev: PointerEvent) => {
+      // 屏幕位移 → 布局位移（除掉外层 transform 缩放）
+      const dx = (ev.clientX - g.px) / g.vs;
+      const dy = (ev.clientY - g.py) / g.vs;
+      let x = g.x;
+      let y = g.y;
+      let w = g.w;
+      let h = g.h;
+      if (g.mode === "move") {
+        x += dx;
+        y += dy;
+      } else if (g.mode === "left") {
+        // 左边手柄：右缘固定 → x 跟着走，宽反向变
+        x += dx;
+        w -= dx;
+      } else if (g.mode === "right") {
+        w += dx;
+      } else if (g.mode === "top") {
+        // 上边手柄：下缘固定 → y 跟着走，高反向变
+        y += dy;
+        h -= dy;
+      } else if (g.mode === "bottom") {
+        h += dy;
+      }
+      w = Math.max(8, w);
+      h = Math.max(8, h);
+      return { x, y, w, h };
+    };
 
     const move = (ev: PointerEvent) => {
       const g = geomRef.current;
       if (!g) return;
-      const dx = ev.clientX - g.px;
-      const dy = ev.clientY - g.py;
-      if (g.mode === "move") {
-        setGeomLive({ dx, dy, dw: 0, dh: 0, baseW: g.w, baseH: g.h });
-        return;
-      }
-      // 四条边手柄：左右只影响宽（及 x 平移），上下只影响高（及 y 平移）
-      let dw = 0;
-      let dh = 0;
-      let pdx = 0;
-      let pdy = 0;
-      if (g.mode === "left") {
-        dw = -dx;
-        pdx = dx;
-      } else if (g.mode === "right") {
-        dw = dx;
-      } else if (g.mode === "top") {
-        dh = -dy;
-        pdy = dy;
-      } else if (g.mode === "bottom") {
-        dh = dy;
-      }
-      setGeomLive({ dx: pdx, dy: pdy, dw, dh, baseW: g.w, baseH: g.h });
+      const n = derive(g, ev);
+      setGeomLive({ mode: g.mode, ...n });
     };
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
       const g = geomRef.current;
       geomRef.current = null;
+      if (!g) {
+        setGeomLive(null);
+        return;
+      }
+      const n = derive(g, ev);
+      // 布局 px → dp（除以 dp 比例，与 css.ts 的 DP() 互逆）
+      const r1 = (v: number) => Math.round(v * 10) / 10;
+      const px2dp = (v: number) => r1(v / scale);
+      // 关键：先写出新 XML（新节点样式）再清预览，避免「先弹回原位再跳到新位置」的双跳
+      if (g.mode === "move") {
+        onGeometryChange?.(node.path, { x: px2dp(n.x), y: px2dp(n.y) });
+      } else if (g.mode === "left") {
+        onGeometryChange?.(node.path, { x: px2dp(n.x), w: px2dp(n.w) });
+      } else if (g.mode === "right") {
+        onGeometryChange?.(node.path, { w: px2dp(n.w) });
+      } else if (g.mode === "top") {
+        onGeometryChange?.(node.path, { y: px2dp(n.y), h: px2dp(n.h) });
+      } else if (g.mode === "bottom") {
+        onGeometryChange?.(node.path, { h: px2dp(n.h) });
+      }
       setGeomLive(null);
-      if (!g) return;
-      const dx = ev.clientX - g.px;
-      const dy = ev.clientY - g.py;
-      let nx = g.x;
-      let ny = g.y;
-      let nw = g.w;
-      let nh = g.h;
-      if (g.mode === "move") {
-        nx += dx;
-        ny += dy;
-      } else if (g.mode === "left") {
-        // 左边手柄：右缘固定 → x 跟着走，宽反向变
-        nx += dx;
-        nw -= dx;
-      } else if (g.mode === "right") {
-        nw += dx;
-      } else if (g.mode === "top") {
-        // 上边手柄：下缘固定 → y 跟着走，高反向变
-        ny += dy;
-        nh -= dy;
-      } else if (g.mode === "bottom") {
-        nh += dy;
-      }
-      nw = Math.max(8, nw);
-      nh = Math.max(8, nh);
-      const relX = (nx - g.parentLeft) / scale;
-      const relY = (ny - g.parentTop) / scale;
-      const r1 = (n: number) => Math.round(n * 10) / 10;
-      // move 手柄：只写 x/y（保留 match_parent / wrap_content 语义）
-      // 左右边手柄：只写宽（左边额外带 x）；上下边手柄：只写高（上边额外带 y）
-      if (g.mode === "move") {
-        onGeometryChange?.(node.path, { x: r1(relX), y: r1(relY) });
-      } else if (g.mode === "left") {
-        onGeometryChange?.(node.path, { x: r1(relX), w: r1(nw / scale) });
-      } else if (g.mode === "right") {
-        onGeometryChange?.(node.path, { w: r1(nw / scale) });
-      } else if (g.mode === "top") {
-        onGeometryChange?.(node.path, { y: r1(relY), h: r1(nh / scale) });
-      } else if (g.mode === "bottom") {
-        onGeometryChange?.(node.path, { h: r1(nh / scale) });
-      }
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   };
 
   return (

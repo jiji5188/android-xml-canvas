@@ -35,6 +35,8 @@ export interface ResolvedNode {
   tag: string;
   path: string;
   style: Record<string, string | number>; // css.ts 生成的样式
+  /** 组合图标（drawableLeft/Top/Right/Bottom 解析结果，渲染层画 img） */
+  compound?: { start?: string; end?: string; top?: string; bottom?: string; gap: number };
   className: string;                      // 控件类名（渲染占位用）
   text: string;                           // TextView/Button/EditText 文本
   issues: XmlIssue[];

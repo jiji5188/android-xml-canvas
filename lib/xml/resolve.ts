@@ -267,6 +267,56 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["maxLines"] = a["maxLines"] !== undefined ? parseInt(a["maxLines"], 10) || 0 : 0;
   out["ellipsize"] = a["ellipsize"] ?? "";
 
+  // ===== 组合图标（drawableLeft / Start / Top / Right / End / Bottom）=====
+  const dl = a["drawableStart"] ?? a["drawableLeft"]; // RTL: Start 优先
+  const dr = a["drawableEnd"] ?? a["drawableRight"];
+  out["drawableStart"] = dl !== undefined ? resolveDrawable(dl, res, issues, path, "drawableStart") : "";
+  out["drawableEnd"] = dr !== undefined ? resolveDrawable(dr, res, issues, path, "drawableEnd") : "";
+  out["drawableTop"] =
+    a["drawableTop"] !== undefined ? resolveDrawable(a["drawableTop"], res, issues, path, "drawableTop") : "";
+  out["drawableBottom"] =
+    a["drawableBottom"] !== undefined ? resolveDrawable(a["drawableBottom"], res, issues, path, "drawableBottom") : "";
+  out["drawablePadding"] =
+    a["drawablePadding"] !== undefined
+      ? (() => {
+          const s = resolveSize(a["drawablePadding"], res, issues, path, "drawablePadding");
+          return s.kind === "dp" ? s.value : s.kind === "px" ? s.value : 0;
+        })()
+      : 0;
+
+  // ===== 变换（rotation / scale / alpha / translation）=====
+  const numAttr = (k: string, def: number): number => {
+    if (a[k] === undefined || a[k] === "") return def;
+    const f = parseFloat(a[k]);
+    return Number.isFinite(f) ? f : def;
+  };
+  out["rotation"] = numAttr("rotation", 0);
+  out["rotationX"] = numAttr("rotationX", 0);
+  out["rotationY"] = numAttr("rotationY", 0);
+  out["scaleX"] = numAttr("scaleX", 1);
+  out["scaleY"] = numAttr("scaleY", 1);
+  out["alpha"] = numAttr("alpha", 1);
+  const dimToDp = (k: string): number => {
+    if (a[k] === undefined) return 0;
+    const s = resolveSize(a[k], res, issues, path, k);
+    return s.kind === "dp" ? s.value : s.kind === "px" ? s.value : 0;
+  };
+  out["translationX"] = dimToDp("translationX");
+  out["translationY"] = dimToDp("translationY");
+  out["pivotX"] = a["pivotX"] ?? "50%";
+  out["pivotY"] = a["pivotY"] ?? "50%";
+
+  // ===== 前景 / 着色（tint）=====
+  out["foreground"] =
+    a["foreground"] !== undefined ? resolveDrawable(a["foreground"], res, issues, path, "foreground") : "";
+  out["backgroundTint"] =
+    a["backgroundTint"] !== undefined ? resolveColor(a["backgroundTint"], res, issues, path, "backgroundTint") : "";
+  out["tint"] = a["tint"] !== undefined ? resolveColor(a["tint"], res, issues, path, "tint") : "";
+
+  // ===== ViewStub =====
+  out["layout"] = a["layout"] ?? "";
+  out["inflatedId"] = a["inflatedId"] ?? "";
+
   // 圆角 / 阴影（elevation）
   out["elevation"] = a["elevation"] !== undefined ? resolveSize(a["elevation"], res, issues, path, "elevation") : null;
   out["radius"] = a["radius"] !== undefined ? (resolveSize(a["radius"], res, issues, path, "radius").kind as string === "dp" ? (resolveSize(a["radius"], res, issues, path, "radius") as { kind: "dp"; value: number }).value : 0) : 0;

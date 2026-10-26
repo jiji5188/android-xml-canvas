@@ -168,7 +168,45 @@ export function XmlCanvas({ node, selectedPath, onSelect, onDropWidget, onConstr
       }
       title={node.tag + (node.rawAttrs.id ? " · " + node.rawAttrs.id : "") + (node.text ? " · " + node.text : "")}
     >
-      {node.text ? <span>{node.text}</span> : null}
+      {(() => {
+        const c = node.compound;
+        if (!c) return node.text ? <span>{node.text}</span> : null;
+        const icon = (src?: string) =>
+          src ? (
+            src.startsWith("data:") ? (
+              <img
+                className="axv-cdraw"
+                src={src}
+                alt=""
+                style={{ width: "1em", height: "1em", objectFit: "contain", flex: "0 0 auto", marginRight: c.gap ? undefined : "0.25em" }}
+              />
+            ) : (
+              <span
+                className="axv-cdraw-ph"
+                style={{
+                  width: "1em",
+                  height: "1em",
+                  display: "inline-block",
+                  border: "1px dashed #B0AEB8",
+                  borderRadius: 2,
+                  marginRight: c.gap ? undefined : "0.25em",
+                  fontSize: 10,
+                }}
+              />
+            )
+          ) : null;
+        return (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: c.gap ? `${c.gap}px` : undefined, flexDirection: c.top || c.bottom ? "column" : "row" }}>
+            {c.top ? icon(c.top) : null}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: c.start ? `${c.gap}px` : undefined }}>
+              {c.start ? icon(c.start) : null}
+              {node.text ? <span>{node.text}</span> : null}
+              {c.end ? icon(c.end) : null}
+            </span>
+            {c.bottom ? icon(c.bottom) : null}
+          </span>
+        );
+      })()}
       {node.children.map((c) => (
         <XmlCanvas
           key={c.path}

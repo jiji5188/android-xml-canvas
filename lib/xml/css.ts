@@ -42,6 +42,8 @@ function viewClass(rawTag: string, a: ResolvedAttrs): string {
     case "RecyclerView":
     case "ListView":
       return "axv-list";
+    case "ViewStub":
+      return "axv-viewstub";
     case "Switch":
     case "SwitchMaterial":
     case "SwitchCompat":
@@ -236,6 +238,37 @@ export function buildRenderModel(
     if (vis === "gone") style.display = "none";
     else if (vis === "invisible") style.visibility = "hidden";
 
+    // ===== 变换：rotation / scale / alpha / translation =====
+    const rot = (attrs["rotation"] as number) || 0;
+    const rotX = (attrs["rotationX"] as number) || 0;
+    const rotY = (attrs["rotationY"] as number) || 0;
+    const sx = attrs["scaleX"] !== undefined ? (attrs["scaleX"] as number) : 1;
+    const sy = attrs["scaleY"] !== undefined ? (attrs["scaleY"] as number) : 1;
+    const tx = (attrs["translationX"] as number) || 0;
+    const ty = (attrs["translationY"] as number) || 0;
+    const parts: string[] = [];
+    if (tx || ty) parts.push(`translate(${DP(tx, scale)}px, ${DP(ty, scale)}px)`);
+    if (rot) parts.push(`rotate(${rot}deg)`);
+    if (rotX) parts.push(`rotateX(${rotX}deg)`);
+    if (rotY) parts.push(`rotateY(${rotY}deg)`);
+    if (sx !== 1 || sy !== 1) parts.push(`scale(${sx}, ${sy})`);
+    if (parts.length > 0) {
+      style.transform = parts.join(" ");
+      const pv = (attrs["pivotX"] as string) || "50%";
+      const pvY = (attrs["pivotY"] as string) || "50%";
+      style.transformOrigin = `${pv} ${pvY}`;
+    }
+    const alpha = attrs["alpha"] !== undefined ? (attrs["alpha"] as number) : 1;
+    if (alpha !== 1) style.opacity = alpha;
+
+    // 前景（foreground 覆盖层，CardView / FrameLayout 常见）
+    const fg = (attrs["foreground"] as string) || "";
+    if (fg && fg.startsWith("data:")) {
+      style.backgroundImage = `url(${fg})`;
+      style.backgroundSize = "cover";
+      style.backgroundPosition = "center";
+    }
+
     // 文本类
     const cls = viewClass(node.tag, attrs);
     if (cls === "axv-text") {
@@ -398,6 +431,20 @@ export function buildRenderModel(
       style.borderRadius = `${DP(4, scale)}px`;
     }
 
+    // ViewStub：画个虚线占位框，标上将被填充的 layout 名
+    if (cls === "axv-viewstub") {
+      style.minHeight = `${DP(56, scale)}px`;
+      style.border = "1px dashed #99C9A8";
+      style.borderRadius = `${DP(4, scale)}px`;
+      style.display = "flex";
+      style.alignItems = "center";
+      style.justifyContent = "center";
+      style.fontStyle = "italic";
+      style.color = "#6B8F7B";
+      style.fontSize = "12px";
+      style.backgroundColor = "rgba(153,201,168,0.08)";
+    }
+
     // layout_gravity（FrameLayout / LinearLayout 子项）
     const lg = layoutGravityToSelf((attrs["layoutGravity"] as string) || "");
     Object.assign(style, lg);
@@ -414,14 +461,39 @@ export function buildRenderModel(
       text = "";
     } else if (cls === "axv-include") {
       text = "⟳ include " + ((node.attrs["layout"] as string) || "");
+    } else if (cls === "axv-viewstub") {
+      const layoutRef = (node.attrs["layout"] as string) || "";
+      const layoutName = layoutRef.startsWith("@layout/") ? layoutRef.slice(8) : layoutRef;
+      text = `⚡ ViewStub → @layout/${layoutName || "?"}`;
     } else if (cls === "axv-text" && !text && (attrs["hint"] as string)) {
       text = attrs["hint"] as string;
+    }
+
+    // ===== 组合图标（drawableLeft 等）：交给渲染层画 img =====
+    const cdStart = (attrs["drawableStart"] as string) || "";
+    const cdEnd = (attrs["drawableEnd"] as string) || "";
+    const cdTop = (attrs["drawableTop"] as string) || "";
+    const cdBottom = (attrs["drawableBottom"] as string) || "";
+    const compound =
+      cdStart || cdEnd || cdTop || cdBottom
+        ? {
+            start: cdStart,
+            end: cdEnd,
+            top: cdTop,
+            bottom: cdBottom,
+            gap: DP((attrs["drawablePadding"] as number) || 4, scale),
+          }
+        : undefined;
+    if (compound && !compound.top && !compound.bottom) {
+      style.flexDirection = style.flexDirection ?? "row";
+      style.alignItems = "center";
     }
 
     const resolved: ResolvedNode = {
       tag: node.tag,
       path: node.path,
       style,
+      compound,
       className: cls + (attrs["checked"] ? " axv-checked" : ""),
       text,
       issues: nIssues,

@@ -293,8 +293,8 @@ export function XmlEditor() {
         <div className="axv-backdrop" onClick={() => setRightOpen(false)} aria-hidden="true" />
       )}
 
-      {/* 移动端：画布区顶部 tab 切换「XML 代码 / 预览」 */}
-      {isMobile && !leftOpen && !rightOpen && (
+      {/* 画布区顶部 tab 切换「预览 / XML 代码」（桌面 + 移动端均可用） */}
+      {(!isMobile || (!leftOpen && !rightOpen)) && (
         <div className="axv-mob-tabs" role="tablist" aria-label="视图">
           <button
             role="tab"
@@ -318,7 +318,7 @@ export function XmlEditor() {
       )}
 
       {/* 画布舞台 */}
-      {!(isMobile && mobileTab === "xml") && (
+      {mobileTab === "preview" && (
         <div className={"axv-stage" + (leftOpen ? " pad-l" : "") + (rightOpen ? " pad-r" : "")}>
           {parseErr ? (
             <div className="axv-canvas-empty">XML 解析失败，请检查结构</div>
@@ -365,8 +365,8 @@ export function XmlEditor() {
         </div>
       )}
 
-      {/* 移动端：XML 代码 tab 的编辑器 */}
-      {isMobile && mobileTab === "xml" && (
+      {/* XML 代码视图（tab 切过来的全屏编辑器） */}
+      {mobileTab === "xml" && (
         <div className="axv-mob-xml">
           <textarea
             className="axv-pane"
@@ -490,14 +490,6 @@ export function XmlEditor() {
                 onRemove={onRemoveNode}
               />
             </div>
-          )}
-          {leftView === "code" && (
-            <textarea
-              className="axv-pane"
-              value={xml}
-              spellCheck={false}
-              onChange={(e) => setXml(e.target.value)}
-            />
           )}
           {leftView === "res" && (
             <div className="axv-res-box">

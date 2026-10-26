@@ -890,7 +890,7 @@
 /* 移动端：画布区顶部 XML 代码 / 预览 tab */
 .axv-mob-tabs {
   position: absolute;
-  top: 64px;
+  top: 72px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -922,7 +922,7 @@
 }
 .axv-mob-xml {
   position: absolute;
-  inset: 110px 12px 12px;
+  inset: 124px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -933,6 +933,13 @@
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #F9F9FF;
+}
+
+/* 桌面端：代码 tab 也占满画布区（在 tab 条下方） */
+@media (min-width: 841px) {
+  .axv-mob-xml {
+    inset: 128px 20px 20px;
+  }
 }
 .axv-mob-xml-tools {
   display: flex;
@@ -973,6 +980,8 @@
     padding: 0 10px;
     gap: 6px;
     flex-wrap: nowrap;
+    /* 层级低于蒙版（25）：面板打开时工具栏一起被遮罩盖住 */
+    z-index: 20;
   }
   .axv-tb-group {
     padding: 5px;

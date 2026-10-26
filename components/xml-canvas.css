@@ -949,6 +949,81 @@
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #FFFFFF;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.axv-code-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+/* 行号栏 */
+.axv-gutter {
+  flex: 0 0 52px;
+  width: 52px;
+  overflow: hidden;
+  background: #FAFAFC;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  position: relative;
+}
+.axv-gutter-inner {
+  padding: 12px 0;
+  will-change: transform;
+}
+.axv-ln {
+  height: 21px;
+  line-height: 21px;
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  text-align: right;
+  padding-right: 8px;
+  color: #98A2B3;
+  user-select: none;
+}
+.axv-ln-err {
+  color: #B42318;
+  font-weight: 700;
+  background: rgba(220, 38, 38, 0.1);
+}
+.axv-code-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+/* 错误行色带（跟着滚动走） */
+.axv-code-bands {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+.axv-code-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 21px;
+  background: rgba(220, 38, 38, 0.07);
+  border-left: 3px solid rgba(220, 38, 38, 0.55);
+}
+/* 底部错误提示条 */
+.axv-code-errbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #FEF3F2;
+  border-top: 1px solid #FDA29B;
+  color: #B42318;
+  font-size: 12px;
+  line-height: 1.5;
+  flex: 0 0 auto;
+}
+.axv-err-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #DC2626;
+  flex: 0 0 auto;
 }
 .axv-code-fill {
   flex: 1;
@@ -960,7 +1035,7 @@
   padding: 12px 14px;
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 21px; /* 必须与 XmlCodeEditor 的 CODE_LINE_HEIGHT 一致（行号/错误色带定位靠它） */
   tab-size: 2;
   white-space: pre;
   word-wrap: normal;
@@ -1030,6 +1105,13 @@
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+}
+.axv-mob-tool-btn.axv-ghost {
+  background: #EEF1F6;
+  color: #1F2937;
+}
+.axv-mob-tool-btn.axv-ghost:hover {
+  background: #E3E8F0;
 }
 
 /* 移动端：与 M3E 原版同口径（≤840px 或 粗指针且 ≤1024px）：

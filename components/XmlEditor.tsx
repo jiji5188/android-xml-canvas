@@ -13,6 +13,8 @@ import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import type { ResolvedNode, ResourceTable } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag } from "@/lib/xml/insert";
+import { formatXml } from "@/lib/xml/format";
+import { lintXml } from "@/lib/xml/lint";
 import { XmlCanvas } from "./XmlCanvas";
 import { XmlCodeEditor } from "./XmlCodeEditor";
 import { AttrPanel } from "./AttrPanel";
@@ -184,6 +186,15 @@ export function XmlEditor() {
 
   /** 图层树用的原始节点树（不经渲染模型） */
   const treeRoot = useMemo(() => (parseErr ? null : parseLayoutXml(parsedXml).root), [parsedXml, parseErr]);
+
+  /** 代码视图的结构检查（带行号，标红用） */
+  const lints = useMemo(() => lintXml(parsedXml), [parsedXml]);
+
+  /** 一键格式化：重排缩进，保留注释，可撤销 */
+  const doFormat = () => {
+    const next = formatXml(xml, 2);
+    if (next !== xml) setXmlAndTrack(next);
+  };
 
   // ===== 组件插入（点击 / 拖放）=====
   // 有选中节点：插到它的同级（兄弟）；否则插到根节点末尾
@@ -454,8 +465,12 @@ export function XmlEditor() {
             className="axv-code-fill"
             value={xml}
             onChange={onChangeXmlText}
+            errors={lints}
           />
           <div className="axv-mob-xml-tools">
+            <button className="axv-mob-tool-btn axv-ghost" onClick={doFormat} title="重排缩进（保留注释）">
+              格式化
+            </button>
             <select
               className="axv-tb-select"
               title="载入示例"

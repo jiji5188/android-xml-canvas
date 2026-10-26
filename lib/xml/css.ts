@@ -198,25 +198,45 @@ export function buildRenderModel(
         style.flexBasis = "0px";
       }
     }
-    // 尺寸
-    style.width = w === "0px" && weight === 0 ? "auto" : w;
-    style.height = h === "0px" ? "auto" : h;
 
     // 边距（用 longhand，便于 M1b 属性面板逐边编辑 + 回写）
     const mt = DP((attrs["marginT"] as number) || 0, scale);
     const mr = DP((attrs["marginR"] as number) || 0, scale);
     const mb = DP((attrs["marginB"] as number) || 0, scale);
     const ml = DP((attrs["marginL"] as number) || 0, scale);
-    if (mt) style.marginTop = `${mt}px`;
-    if (mr) style.marginRight = `${mr}px`;
-    if (mb) style.marginBottom = `${mb}px`;
-    if (ml) style.marginLeft = `${ml}px`;
 
     // 内边距（longhand）
     const pt = DP((attrs["paddingT"] as number) || 0, scale);
     const pr = DP((attrs["paddingR"] as number) || 0, scale);
     const pb = DP((attrs["paddingB"] as number) || 0, scale);
     const pl = DP((attrs["paddingL"] as number) || 0, scale);
+
+    // ===== match_parent + 边距/内边距：必须用 calc 扣掉，否则右侧溢出屏幕 =====
+    // Android 语义：layout_width="match_parent" 的可视宽度 = 父宽 - marginLeft - marginRight，
+    // padding 在视图内部。CSS 的 width:100% 是【内容宽】，margin 外挂、padding 外扩，
+    // 直接写 100% 会导致「100% + 左右 margin」超宽 → 右边出屏 / 左右间隙不对称。
+    const isMatchW = w === "100%";
+    const isMatchH = h === "100%";
+    let finalW = isMatchW ? "100%" : w;
+    let finalH = isMatchH ? "100%" : h;
+    if (isMatchW && (ml || mr || pl || pr)) {
+      const ded = ml + mr + pl + pr;
+      finalW = `calc(100% - ${ded}px)`;
+    }
+    if (isMatchH && (mt || mb || pt || pb)) {
+      const ded = mt + mb + pt + pb;
+      finalH = `calc(100% - ${ded}px)`;
+    }
+
+    // 尺寸
+    style.width = w === "0px" && weight === 0 ? "auto" : finalW;
+    style.height = h === "0px" ? "auto" : finalH;
+
+    if (mt) style.marginTop = `${mt}px`;
+    if (mr) style.marginRight = `${mr}px`;
+    if (mb) style.marginBottom = `${mb}px`;
+    if (ml) style.marginLeft = `${ml}px`;
+
     if (pt) style.paddingTop = `${pt}px`;
     if (pr) style.paddingRight = `${pr}px`;
     if (pb) style.paddingBottom = `${pb}px`;
@@ -515,6 +535,9 @@ export function buildRenderModel(
     const toPx = (v: unknown, fallback: number): number => {
       const s2 = String(v ?? "");
       if (s2.endsWith("px")) return parseFloat(s2);
+      // match_parent + margin/padding 会生成 calc(100% - Npx)：用 fallback 减去 N 得到真实宽
+      const mCalc = s2.match(/^calc\(100%\s*-\s*([0-9.]+)px\)$/);
+      if (mCalc) return Math.max(0, fallback - parseFloat(mCalc[1]));
       if (s2 === "100%" || s2 === "" || s2 === "auto") return fallback;
       const m = s2.match(/^(-?[0-9.]+)/);
       if (m && !s2.includes("%")) return parseFloat(m[1]);

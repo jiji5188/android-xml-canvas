@@ -812,7 +812,21 @@ export function XmlEditor() {
   // ===== 属性回写（M1b 双向）=====
   const commitAttr = (name: string, value: string) => {
     if (!selectedPath) return;
-    const r = writebackAttrs(xml, selectedPath, { [name]: value });
+    // 设四周边距简写 layout_margin 时，顺手清掉可能残留的单边 margin（Start/End/Left/Right/Top/Bottom）。
+    // 否则单边值会覆盖简写（Android 语义）→ 视觉上左右间隙不对称，非常迷惑。
+    const remove: string[] = [];
+    if (name === "layout_margin") {
+      remove.push(
+        "layout_marginTop",
+        "layout_marginBottom",
+        "layout_marginStart",
+        "layout_marginEnd",
+        "layout_marginLeft",
+        "layout_marginRight",
+      );
+    }
+    // 反之：单独设某一边时，若简写存在也不动它（单边优先，符合 Android 语义）
+    const r = writebackAttrs(xml, selectedPath, { [name]: value }, remove);
     if (r.changed) setXmlAndTrack(r.xml);
   };
 

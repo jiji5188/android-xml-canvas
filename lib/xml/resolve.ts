@@ -197,6 +197,8 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["layoutGravity"] = a["layout_gravity"] ?? "";
 
   // 四角 margin/padding（支持简写 padding="16dp" 展开四边；Start/End 是 RTL 语义，映射到 Left/Right）
+  // Android 语义：简写值先铺四边，单独属性只覆盖自己那一边。
+  // （旧实现：只要存在任何一个单独边就直接返回四边值，其余边变 0 → 会出现左右不对称）
   const expandQuad = (key: string): number[] => {
     const single = a[key];
     const toDp = (raw?: string, prop?: string): number => {
@@ -204,18 +206,18 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
       const s = resolveSize(raw, res, issues, path, prop ?? key);
       return s.kind === "zero" ? 0 : s.kind === "dp" ? s.value : s.kind === "px" ? s.value : 0;
     };
-    const top = toDp(a[key + "Top"], key + "Top");
-    const bottom = toDp(a[key + "Bottom"], key + "Bottom");
+    // 简写值作为每边兜底（没写单独边时用它）
+    const shallow = toDp(single, key);
+    const pick = (raw: string | undefined, prop: string): number =>
+      raw === undefined || raw === "" ? shallow : toDp(raw, prop);
+    const top = pick(a[key + "Top"], key + "Top");
+    const bottom = pick(a[key + "Bottom"], key + "Bottom");
     // right = layout_marginRight 或 layout_marginEnd；left = layout_marginLeft 或 layout_marginStart
     const rightRaw = a[key + "Right"] ?? a[key + "End"];
     const leftRaw = a[key + "Left"] ?? a[key + "Start"];
-    const right = toDp(rightRaw, (rightRaw !== undefined ? key : key) + "Right");
-    const left = toDp(leftRaw, key + "Left");
-    if (a[key + "Top"] !== undefined || rightRaw !== undefined || a[key + "Bottom"] !== undefined || leftRaw !== undefined) {
-      return [top, right, bottom, left];
-    }
-    const s = toDp(single, key);
-    return [s, s, s, s];
+    const right = pick(rightRaw, key + "Right");
+    const left = pick(leftRaw, key + "Left");
+    return [top, right, bottom, left];
   };
   const pad = expandQuad("padding");
   out["paddingT"] = pad[0]; out["paddingR"] = pad[1]; out["paddingB"] = pad[2]; out["paddingL"] = pad[3];

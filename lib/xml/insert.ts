@@ -5,6 +5,7 @@
 import { parseLayoutXml, findNode, rewriteNodeAttrs, serialize } from "./parser";
 import type { XmlNode, XmlIssue } from "./types";
 import { nextViewId } from "./autoconstrain";
+import { moveSiblingRaw } from "./reorder";
 
 export interface InsertResult {
   xml: string;
@@ -268,41 +269,14 @@ export interface MoveResult {
 
 /** 在父级兄弟列表里移动：fromIndex → toIndex（toIndex 是目标在「删除 from 之后」的列表里的位置） */
 export function moveSibling(xml: string, targetPath: string, toIndex: number): MoveResult {
-  const issues: XmlIssue[] = [];
-  const { root } = parseLayoutXml(xml);
-  if (!root) {
-    issues.push({ level: "error", nodePath: targetPath, message: "原 XML 无法解析" });
-    return { xml, ok: false, issues, newPath: null };
-  }
-  const target = findNode(root, targetPath);
-  if (!target || targetPath === "#0") {
-    issues.push({ level: "error", nodePath: targetPath, message: "根节点不能移动" });
-    return { xml, ok: false, issues, newPath: null };
-  }
-  const segs = targetPath.slice(targetPath.startsWith("#") ? 1 : 0).split("/").filter(Boolean);
-  const parentPath = "#" + segs.slice(0, -1).join("/");
-  const parent = findNode(root, parentPath);
-  if (!parent) {
-    issues.push({ level: "error", nodePath: parentPath, message: "找不到父节点" });
-    return { xml, ok: false, issues, newPath: null };
-  }
-  const fromIndex = Number(segs[segs.length - 1]);
-  if (fromIndex < 0 || fromIndex >= parent.children.length) {
-    issues.push({ level: "error", nodePath: targetPath, message: "节点索引越界" });
-    return { xml, ok: false, issues, newPath: null };
-  }
-  const node = parent.children.splice(fromIndex, 1)[0];
-  const clamped = Math.max(0, Math.min(toIndex, parent.children.length));
-  parent.children.splice(clamped, 0, node);
-  // 重新编号 path
-  for (let i = 0; i < parent.children.length; i++) {
-    const fix = (n: XmlNode, p: string) => {
-      n.path = p;
-      n.children.forEach((c, j) => fix(c, `${p}/${j}`));
-    };
-    fix(parent.children[i], `${parentPath}/${i}`);
-  }
-  const out = serialize(root);
-  const decl3 = xml.match(/^<\?xml[\s\S]*?\?>/i);
-  return { xml: (decl3 ? decl3[0] + "\n" : "") + out, ok: true, issues, newPath: `${parentPath}/${clamped}` };
+  // M3b：改用 lib/xml/reorder.ts 的纯文本切片实现。
+  // 旧实现走 parse → serialize，会把注释搬到文件末尾、属性顺序与缩进重写，
+  // 层级调整这种高频操作每次都把用户排版洗一遍不可接受。
+  const r = moveSiblingRaw(xml, targetPath, toIndex);
+  return {
+    xml: r.xml,
+    ok: r.ok,
+    issues: r.issues.map((i) => ({ level: i.level, nodePath: targetPath, message: i.message })),
+    newPath: r.newPath,
+  };
 }

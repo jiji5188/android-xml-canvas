@@ -56,6 +56,33 @@
   z-index: 5;
 }
 
+/* M3b：选中高亮强化 —— 虚线框 + 左上角 tag 标签头 */
+.axv-node.axv-selected {
+  outline: 2px dashed #04409F;
+  outline-offset: -2px;
+}
+.axv-node.axv-selected::before {
+  content: attr(data-tag);
+  position: absolute;
+  top: -18px;
+  left: -2px;
+  z-index: 6;
+  background: #04409F;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: ui-monospace, Consolas, monospace;
+  padding: 1px 6px;
+  border-radius: 4px 4px 4px 0;
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 1.4;
+}
+/* 标签头被父容器裁切时（overflow:hidden）不显示，只留虚线框 */
+.axv-node.axv-selected::after {
+  content: none;
+}
+
 /* ===== M2c：约束拖拽手柄 ===== */
 .axv-handle {
   position: absolute;
@@ -860,6 +887,14 @@
 .axv-lt-actions button.danger:hover {
   background: #FDE8EC;
   color: #E11D48;
+}
+/* M3b：已在顶/底时按钮置灰（看一眼就知道不能再移） */
+.axv-lt-actions button:disabled {
+  color: #C9C9D4;
+  cursor: default;
+}
+.axv-lt-actions button:disabled:hover {
+  background: transparent;
 }
 
 /* 拖放目标高亮 */

@@ -36,9 +36,11 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove }: Pr
     return n.tag;
   };
 
-  const renderItem = (n: XmlNode, depth: number) => {
+  const renderItem = (n: XmlNode, depth: number, siblingCount: number) => {
     const kids = n.children;
     const open = !collapsed.has(n.path) && kids.length > 0;
+    /** 同一父级下的兄弟中我排第几（从 path 末段取） */
+    const myIndex = Number(n.path.split("/").pop());
     return (
       <div key={n.path}>
         <div
@@ -65,17 +67,19 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove }: Pr
           <span className="axv-lt-tag">{n.tag}</span>
           <span className="axv-lt-label">{label(n)}</span>
           <span className="axv-lt-actions">
-            <button title="上移" aria-label="上移" onClick={(e) => { e.stopPropagation(); onMove(n.path, Number(n.path.split("/").pop()) - 1); }}>↑</button>
-            <button title="下移" aria-label="下移" onClick={(e) => { e.stopPropagation(); onMove(n.path, Number(n.path.split("/").pop()) + 1); }}>↓</button>
+            <button title="上移一层" aria-label="上移" disabled={myIndex <= 0} onClick={(e) => { e.stopPropagation(); onMove(n.path, myIndex - 1); }}>↑</button>
+            <button title="下移一层" aria-label="下移" disabled={myIndex >= siblingCount - 1} onClick={(e) => { e.stopPropagation(); onMove(n.path, myIndex + 1); }}>↓</button>
+            <button title="置顶（画在最上层）" aria-label="置顶" disabled={myIndex <= 0} onClick={(e) => { e.stopPropagation(); onMove(n.path, 0); }}>⤒</button>
+            <button title="置底（画在最下层）" aria-label="置底" disabled={myIndex >= siblingCount - 1} onClick={(e) => { e.stopPropagation(); onMove(n.path, siblingCount); }}>⤓</button>
             <button title="删除" aria-label="删除" className="danger" onClick={(e) => { e.stopPropagation(); onRemove(n.path); }}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>delete</span>
             </button>
           </span>
         </div>
-        {open && kids.map((c) => renderItem(c, depth + 1))}
+        {open && kids.map((c) => renderItem(c, depth + 1, kids.length))}
       </div>
     );
   };
 
-  return <div className="axv-lt">{renderItem(root, 0)}</div>;
+  return <div className="axv-lt">{renderItem(root, 0, 1)}</div>;
 }

@@ -176,14 +176,14 @@ export function AttrPanel({
       } else if (isRes && genXml && /<vector/.test(genXml)) {
         try {
           const url = vectorToDataUrl(genXml);
-          btnBg = { background: "#fff url(" + url + ") center / 20px no-repeat" };
+          btnBg = { background: "#fff url(" + url + ") center / 18px 18px no-repeat" };
         } catch {
           /* 缩略失败保持占位 */
         }
-        btnLabel = "🖼";
+        btnLabel = "";
       } else if (isRes && resExtras?.drawables?.[resName]) {
-        btnBg = { background: "#fff url(" + resExtras.drawables[resName] + ") center / 20px no-repeat" };
-        btnLabel = "🖼";
+        btnBg = { background: "#fff url(" + resExtras.drawables[resName] + ") center / cover no-repeat" };
+        btnLabel = "";
       }
       return (
         <div className="axv-attr-color axv-dp-row" style={{ display: "flex", gap: 6, alignItems: "center", width: "100%" }}>
@@ -202,7 +202,6 @@ export function AttrPanel({
           />
           <button
             className={"axv-dp-btn" + (isHex || isRes ? "" : " is-empty")}
-            style={btnBg}
             title={
               isHex
                 ? `当前是纯色 ${value}。点按钮可换成资源、改色或自定义形状`
@@ -213,7 +212,7 @@ export function AttrPanel({
             aria-label={`选择 ${name} 的背景`}
             onClick={() => setDpOpen(name)}
           >
-            {btnLabel}
+            {btnLabel ? <span className="axv-dp-btn-label">{btnLabel}</span> : <span className="axv-dp-prev" style={btnBg} />}
           </button>
         </div>
       );

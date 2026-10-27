@@ -128,7 +128,10 @@ export function XmlCanvas({
   }, [node]);
 
   const isSel = selectedPath === node.path;
-  const isContainer = node.children.length > 0 || isContainerTag(node.tag);
+  // M4g：能否接收子控件只看标签（只有 ViewGroup 才算容器）。
+  // 叶子节点即使因为粘贴错误已经有子节点，也不当容器用 —— 拖进去只能插成兄弟。
+  const isContainer = isContainerTag(node.tag);
+  const leafWithChildren = !isContainer && node.children.length > 0;
   // 注意：不能无条件写 position:relative —— ConstraintLayout 子项由求解器指定 absolute，
   // 覆盖成 relative 后 left/top 会变成「flow 位置 + 偏移」，约束布局预览就会全错位。
   const pos = (node.style.position as React.CSSProperties["position"]) ?? "relative";
@@ -423,7 +426,8 @@ export function XmlCanvas({
         node.className +
         (isSel ? " axv-selected" : "") +
         (dropHit === node.path ? " axv-drop-hit" : "") +
-        (isContainer ? " axv-container" : "")
+        (isContainer ? " axv-container" : "") +
+        (leafWithChildren ? " axv-leaf-invalid" : "")
       }
       style={style}
       onClick={(e) => {

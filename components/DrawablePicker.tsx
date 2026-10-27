@@ -8,8 +8,9 @@
 //   ⬛ 编辑/创建 xml 形状：打开全屏 ShapeEditor（选已有资源 = 编辑，新名字 = 创建）
 //   📦 图标：弹 IconPickerPanel（Material Symbols → 生成 vector drawable）
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
+import { isValidResName } from "@/lib/xml/resname";
 
 interface DrawableItem {
   name: string;
@@ -57,6 +58,10 @@ export function DrawablePicker({
 }: Props) {
   const [tab, setTab] = useState<"color" | "res" | "shape" | "icon">("color");
   const [filter, setFilter] = useState("");
+  /** 资源 ID 输入框草稿（不与属性实时同步，回车/失焦才写回，避免污染 XML） */
+  const [idDraft, setIdDraft] = useState(value);
+  useEffect(() => setIdDraft(value), [value]);
+  const idError = validateAttrValue(idDraft);
 
   const items = useMemo<DrawableItem[]>(() => {
     const out: DrawableItem[] = [];
@@ -120,23 +125,27 @@ export function DrawablePicker({
           </button>
         </div>
 
-        {/* 资源 ID 行：输入框 + 选择按钮（按钮已打开本对话框，这里保留输入直填能力） */}
+        {/* 资源 ID 行：输入框 + 校验（Android 资源名只能 a-z0-9_，颜色不能当文件名） */}
         <div className="axv-dp-idrow">
           <code className="axv-dp-idlabel">@drawable/ 或 #hex</code>
           <input
-            className="axv-attr-input axv-dp-id"
-            value={value}
+            className={"axv-attr-input axv-dp-id" + (idError ? " is-bad" : "")}
+            value={idDraft}
             placeholder="@drawable/bg_card 或 #FFFFFF"
             spellCheck={false}
+            onChange={(e) => setIdDraft(e.target.value)}
+            onBlur={() => {
+              if (!idError && idDraft.trim() !== value) onCommit(idDraft.trim());
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                onCommit((e.target as HTMLInputElement).value);
+                if (!idError && idDraft.trim() !== value) onCommit(idDraft.trim());
                 onClose();
               }
             }}
-            onChange={(e) => onCommit(e.target.value)}
           />
         </div>
+        {idError ? <div className="axv-dp-iderr">⛔ {idError}</div> : null}
 
         <div className="axv-dp-tabs">
           {(
@@ -260,6 +269,23 @@ export function DrawablePicker({
       </div>
     </div>
   );
+}
+
+/** 校验属性值：颜色 或 @drawable|mipmap/合法名 或 @color/合法名，其余报错
+ *  （尤其别让 #00C853 这种当成文件名——aapt 会报 “invalid resource name”） */
+function validateAttrValue(v: string): string | null {
+  const s = v.trim();
+  if (!s) return null; // 空值 = 没设，允许
+  if (/^#(?:[0-9a-fA-F]{3,8})$/.test(s)) return null;
+  if (/^\?(?:attr|android:attr)\//.test(s)) return null;
+  const m = /^@(?:android:)?([a-z]+)\/(.+)$/.exec(s);
+  if (!m) return "格式应为 #RRGGBB、@drawable/名字 或 @color/名字";
+  const [, kind, rawName] = m;
+  const name = rawName.replace(/\.xml$/, "");
+  if (!isValidResName(name)) {
+    return `资源名 “${name}” 不合法：只能用小写字母、数字、下划线，且不能以数字开头（颜色请直接填 #RRGGBB）`;
+  }
+  return kind === "drawable" || kind === "mipmap" || kind === "color" ? null : null;
 }
 
 /** #AARRGGBB / #RRGGBB / #RGB → input[type=color] 需要的 #RRGGBB */

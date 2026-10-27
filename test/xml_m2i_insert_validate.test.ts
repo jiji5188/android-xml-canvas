@@ -59,7 +59,7 @@ describe("insertChild 校验", () => {
     const root = rootOf(xml);
     const r = insertChild(xml, "#0", W, "View");
     expect(r.ok).toBe(false);
-    expect(r.issues[0].message).toContain("TextView 不支持子控件");
+    expect(r.issues[0].message).toContain("TextView 不是 ViewGroup，不支持子控件");
   });
 
   it("往空 ScrollView insertChild → 允许", () => {

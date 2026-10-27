@@ -15,8 +15,10 @@ export interface InsertResult {
   ok: boolean;
 }
 
-/** 可用作父容器的控件（拖放落位判定用） */
+/** 可用作父容器的控件（拖放落位判定用）
+ *  注：按用户口径，「View」在这里当作可放子控件的容器用（做占位容器）。 */
 const CONTAINER_TAGS = new Set([
+  "View",
   "LinearLayout",
   "LinearLayoutCompat",
   "FrameLayout",
@@ -39,10 +41,50 @@ const CONTAINER_TAGS = new Set([
   "RadioGroup",
 ]);
 
-/** 标签是否容器（全限定名取尾段，如 androidx.constraintlayout.widget.ConstraintLayout） */
+/** 标签是否容器（全限定名取尾段，如 androidx.constraintlayout.widget.ConstraintLayout）
+ *  铁律：不在这个集合里的控件（包括 View 自己、TextView、Button、ImageView 等所有 View 子类）
+ *  都不能包含子控件 —— Android 里只有 ViewGroup 才能 addView。 */
 export function isContainerTag(rawTag: string): boolean {
   const tag = rawTag.includes(".") ? rawTag.slice(rawTag.lastIndexOf(".") + 1) : rawTag;
   return CONTAINER_TAGS.has(tag);
+}
+
+/** 已知的叶子控件（继承自 View 但不是 ViewGroup）——只用于 lint 提示，不参与插入判定 */
+const KNOWN_LEAF_TAGS = new Set([
+  "TextView",
+  "Button",
+  "ImageButton",
+  "MaterialButton",
+  "EditText",
+  "TextInputEditText",
+  "AutoCompleteTextView",
+  "ImageView",
+  "ImageButton",
+  "CheckBox",
+  "RadioButton",
+  "Switch",
+  "SwitchCompat",
+  "ToggleButton",
+  "SeekBar",
+  "ProgressBar",
+  "RatingBar",
+  "Spinner",
+  "Space",
+  "ViewStub",
+  "Chip",
+  "FloatingActionButton",
+  "ExtendedFloatingActionButton",
+  "TextClock",
+  "Chronometer",
+  "WebView",
+  "SurfaceView",
+  "TextureView",
+  "VideoView",
+]);
+
+/** 已知叶子控件（供 lint 判断「这个不符」而不是「不认识的标签」） */
+export function isKnownLeafTag(rawTag: string): boolean {
+  return KNOWN_LEAF_TAGS.has(shortTag(rawTag));
 }
 
 /** 短标签名（全限定名取尾段） */
@@ -69,7 +111,7 @@ export function isSingleChildTag(rawTag: string): boolean {
 export function canAcceptChild(rawTag: string, childCount: number): { ok: boolean; reason?: string } {
   const tag = shortTag(rawTag);
   if (!CONTAINER_TAGS.has(tag)) {
-    return { ok: false, reason: `${tag} 不支持子控件` };
+    return { ok: false, reason: `${tag} 不是 ViewGroup，不支持子控件` };
   }
   if (SINGLE_CHILD_TAGS.has(tag) && childCount >= 1) {
     return { ok: false, reason: `${tag} 只支持 1 个子控件，已存在 1 个` };

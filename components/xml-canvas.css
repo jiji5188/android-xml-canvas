@@ -2682,3 +2682,47 @@
 .axv-dp-btn:hover { border-color: rgba(0, 0, 0, 0.34); }
 .axv-dp-btn:active { transform: scale(0.97); }
 .axv-dp-btn.is-empty { color: #5d5d69; font-size: 11px; }
+
+/* ===== M4g 叶子控件（继承自 View，非 ViewGroup）不该有子节点：画布上打个警示框 ===== */
+.axv-node.axv-leaf-invalid {
+  outline: 1px dashed #b3261e;
+  outline-offset: 1px;
+}
+.axv-node.axv-leaf-invalid::before {
+  content: "⛔ 不是 ViewGroup，不能有子控件";
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateY(-100%);
+  padding: 1px 6px;
+  border-radius: 4px 4px 0 0;
+  background: #b3261e;
+  color: #fff;
+  font-size: 9.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* 预览按钮内部的绘制层：颜色 / 形状 / 图标都画在这里，避免和按钮自身背景冲突 */
+.axv-dp-btn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  background: #fff;
+  padding: 0;
+  overflow: hidden;
+}
+.axv-dp-prev {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.axv-dp-btn-label {
+  position: relative;
+  color: #5d5d69;
+  font-size: 11px;
+  line-height: 1;
+}

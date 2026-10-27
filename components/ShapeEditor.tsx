@@ -14,6 +14,7 @@ import {
   type ShapeKind,
   type ShapeSpec,
 } from "@/lib/xml/shape-gen";
+import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
 
 interface Props {
   /** 正在编辑的属性名（background / foreground …） */
@@ -54,9 +55,11 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
   const [perCorner, setPerCorner] = useState<boolean>(!!initial.corners);
   const [dashed, setDashed] = useState<boolean>(!!initial.stroke?.dashWidth);
   const [name, setName] = useState<string>(() => {
-    const cur = value.replace(/^@(?:drawable|mipmap)\//, "").replace(/\.xml$/, "");
-    if (cur && !/^bg_/.test(cur)) return cur; // 用户自己起的名字沿用
-    return cur || shapeResourceName(initial, existingNames);
+    // 只有「合法的 @drawable/名字」才沿用已有名；
+    // 纯色（#00C853）等值绝不能当文件名 —— Android 资源名只能 a-z0-9_ 且不能以数字开头
+    const cur = resNameFromValue(value);
+    if (cur) return cur;
+    return shapeResourceName(initial, existingNames);
   });
   /** 名字是否被别的资源占用（编辑自己时不算冲突） */
   const nameConflicts = existingNames.includes(name) && !existingXml;
@@ -113,8 +116,9 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
   }, [onClose]);
 
   const save = () => {
-    if (!name.trim() || nameConflicts) return;
-    onSave(name.trim(), xml);
+    const safe = sanitizeResName(name);
+    if (!safe || nameConflicts) return;
+    onSave(safe, xml);
   };
 
   const grad = spec.gradient;
@@ -488,7 +492,8 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                   className="axv-attr-input"
                   value={name}
                   spellCheck={false}
-                  onChange={(e) => setName(e.target.value.replace(/[^A-Za-z0-9_]/g, "_").toLowerCase())}
+                  placeholder="bg_card"
+                  onChange={(e) => setName(sanitizeResName(e.target.value, ""))}
                 />
               </div>
               {nameConflicts ? <div className="axv-shape-warn">这个名字已被占用，换一个或改已有资源</div> : null}

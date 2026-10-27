@@ -2,6 +2,8 @@
 // 只做「能不能被 Android 吃下」级别的检查：标签配对、注释/CDATA/声明闭合、非法标签名。
 // 不做属性语义校验（那是渲染层 issues 的事）。
 
+import { isContainerTag, isKnownLeafTag } from "./insert";
+
 export interface LintIssue {
   line: number;
   level: "error" | "warn";
@@ -17,6 +19,8 @@ function lineAt(src: string, offset: number): number {
 export function lintXml(src: string): LintIssue[] {
   const issues: LintIssue[] = [];
   const stack: { tag: string; line: number }[] = [];
+  /** 已提示过的父标签行号（同一个非容器不重复报） */
+  const warned = new Set<number>();
   /** 出现过配对错误时，栈里剩下的「未闭合」不可信（错一个就会连锁），不再报 */
   let hadPairError = false;
   let i = 0;
@@ -103,6 +107,16 @@ export function lintXml(src: string): LintIssue[] {
       continue;
     }
     if (/\/>$/.test(raw.trimEnd())) continue; // 自闭合
+    // M4g：父节点是叶子控件（继承自 View，非 ViewGroup）却写了子节点 → aapt 会报错
+    const parent = stack[stack.length - 1];
+    if (parent && !isContainerTag(parent.tag) && isKnownLeafTag(parent.tag) && !warned.has(parent.line)) {
+      warned.add(parent.line);
+      issues.push({
+        line: parent.line,
+        level: "warn",
+        message: `<${parent.tag}> 不是 ViewGroup，不能包含子控件（<${name}>）`,
+      });
+    }
     stack.push({ tag: name, line: startLine });
   }
 

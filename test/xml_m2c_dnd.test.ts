@@ -28,9 +28,13 @@ describe("isContainerTag — 拖放落位判定", () => {
   });
 
   it("叶子控件返回 false", () => {
-    for (const t of ["TextView", "Button", "ImageView", "View", "Switch"]) {
+    for (const t of ["TextView", "Button", "ImageView", "Switch"]) {
       expect(isContainerTag(t), t).toBe(false);
     }
+  });
+
+  it("裸 View 按占位容器处理（M4f 用户口径）", () => {
+    expect(isContainerTag("View")).toBe(true);
   });
 });
 

@@ -21,6 +21,7 @@ import { formatXml } from "@/lib/xml/format";
 import { lintXml } from "@/lib/xml/lint";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { buildResBundle, missingDrawables } from "@/lib/xml/bundle";
+import { sanitizeResName } from "@/lib/xml/resname";
 import { makeZip, downloadBytes } from "@/lib/xml/zip";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { ExportCheckModal, type ExportReport } from "./ExportCheckModal";
@@ -595,12 +596,14 @@ export function XmlEditor() {
   /** M3g：选中图标 → 存矢量原文 + 把属性写成 @drawable/资源名 */
   const onPickIcon = useCallback(
     (attrName: string, resourceName: string, vectorXml: string) => {
-      setGeneratedDrawables((m) => ({ ...m, [resourceName]: vectorXml }));
+      // M4f：资源名必须是 aapt 合法的 a-z0-9_，否则会落成 #00c853.xml 之类编译不过的文件
+      const safe = sanitizeResName(resourceName, "ic");
+      setGeneratedDrawables((m) => ({ ...m, [safe]: vectorXml }));
       if (selectedPath) {
         // 通过 commitAttr 把属性改成 @drawable/<资源名>
-        commitAttrRef.current(attrName, `@drawable/${resourceName}`);
+        commitAttrRef.current(attrName, `@drawable/${safe}`);
       }
-      setExportNote(`已生成 res/drawable/${resourceName}.xml，属性指向它（导出 res 包时会自动包含）`);
+      setExportNote(`已生成 res/drawable/${safe}.xml，属性指向它（导出 res 包时会自动包含）`);
       window.setTimeout(() => setExportNote(""), 3600);
     },
     [selectedPath],
@@ -609,9 +612,10 @@ export function XmlEditor() {
   /** M3h：形状 → 存 xml + 把属性写成 @drawable/资源名（与图标同一存储） */
   const onSaveShape = useCallback(
     (attrName: string, resourceName: string, shapeXml: string) => {
-      setGeneratedDrawables((m) => ({ ...m, [resourceName]: shapeXml }));
-      if (selectedPath) commitAttrRef.current(attrName, `@drawable/${resourceName}`);
-      setExportNote(`已生成 res/drawable/${resourceName}.xml（含水波纹？${shapeXml.includes("<ripple") ? "是" : "否"}），属性指向它`);
+      const safe = sanitizeResName(resourceName, "bg");
+      setGeneratedDrawables((m) => ({ ...m, [safe]: shapeXml }));
+      if (selectedPath) commitAttrRef.current(attrName, `@drawable/${safe}`);
+      setExportNote(`已生成 res/drawable/${safe}.xml（含水波纹？${shapeXml.includes("<ripple") ? "是" : "否"}），属性指向它`);
       window.setTimeout(() => setExportNote(""), 3600);
     },
     [selectedPath],

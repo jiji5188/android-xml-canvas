@@ -850,6 +850,26 @@ export function buildRenderModel(
   };
   patchFrame(rootNode);
 
+  // M4k：flex 容器里 wrap_content 的交叉轴尺寸不能被拉满
+  // 病因：LinearLayout 竖直方向 = CSS flex column，而 flex 默认 align-items: stretch，
+  // 子项 width:auto（= wrap_content）会被拉成父宽 → 按钮/文字看着像 match_parent。
+  // Android 里 wrap_content 的交叉轴永远是内容尺寸，所以显式 align-self: flex-start。
+  // 已带 layout_gravity / alignSelf 的不动。
+  const patchWrapCross = (n: ResolvedNode): void => {
+    const st = shortTag(n.tag);
+    // TableLayout/TableRow 在 Android 里子项行为是表格列宽，不是 flex 交叉轴，跳过
+    if (n.style.display === "flex" && st !== "TableLayout" && st !== "TableRow") {
+      const col = String(n.style.flexDirection ?? "row") === "column";
+      for (const c of n.children) {
+        if (c.style.position === "absolute" || c.style.alignSelf) continue;
+        const cross = col ? String(c.style.width ?? "") : String(c.style.height ?? "");
+        if (cross === "auto" || cross === "") c.style.alignSelf = "flex-start";
+      }
+    }
+    for (const c of n.children) patchWrapCross(c);
+  };
+  patchWrapCross(rootNode);
+
   return { root: rootNode, issues };
 }
 

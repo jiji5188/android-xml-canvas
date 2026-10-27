@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue } f
 import { parseLayoutXml, findNode, serialize } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
 import type { MeasuredMap } from "@/lib/xml/constraints";
+import { commitHistoryState, EMPTY_MARK, type MergeMark } from "@/lib/xml/history";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, type ResourceExtras } from "@/lib/xml/resdir";
 import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
@@ -413,13 +414,17 @@ export function XmlEditor() {
     setHistory(histRef.current.stack);
     setHistIdx(histRef.current.idx);
   };
-  const commitHistory = useCallback((next: string) => {
-    const h = histRef.current;
-    if (h.stack[h.idx] === next) return;
-    const kept = h.stack.slice(0, h.idx + 1);
-    kept.push(next);
-    const capped = kept.length > 60 ? kept.slice(kept.length - 60) : kept;
-    histRef.current = { stack: capped, idx: capped.length - 1 };
+  /** M2u：合并窗口——同一手势 key 在 900ms 内连续提交 → 只覆盖栈顶，不新增撤销点 */
+  const lastCommitRef = useRef<MergeMark>(EMPTY_MARK);
+  const commitHistory = useCallback((next: string, key = "") => {
+    const res = commitHistoryState(histRef.current, next, {
+      key,
+      now: Date.now(),
+      mark: lastCommitRef.current,
+    });
+    if (res.unchanged) return;
+    histRef.current = res.state;
+    lastCommitRef.current = res.mark;
     syncHist();
   }, []);
   const flushTextTimer = useCallback(() => {
@@ -436,6 +441,7 @@ export function XmlEditor() {
     const h = histRef.current;
     if (h.idx <= 0) return;
     h.idx -= 1;
+    lastCommitRef.current = EMPTY_MARK; // M2u：撤销后断开合并链，新操作必须新建撤销点
     setXml(h.stack[h.idx]);
     syncHist();
   };
@@ -444,6 +450,7 @@ export function XmlEditor() {
     const h = histRef.current;
     if (h.idx >= h.stack.length - 1) return;
     h.idx += 1;
+    lastCommitRef.current = EMPTY_MARK;
     setXml(h.stack[h.idx]);
     syncHist();
   };
@@ -769,10 +776,10 @@ export function XmlEditor() {
   // ===== 组件插入（点击 / 拖放）=====
   // 有选中节点：插到它的同级（兄弟）；否则插到根节点末尾
   const setXmlAndTrack = useCallback(
-    (next: string) => {
+    (next: string, /** M2u：同一手势 key 在 900ms 内合并成一步撤销 */ mergeKey?: string) => {
       flushTextTimer();
       setXml(next);
-      commitHistory(next);
+      commitHistory(next, mergeKey ?? "");
     },
     [flushTextTimer, commitHistory],
   );
@@ -931,7 +938,8 @@ export function XmlEditor() {
     }
     // 反之：单独设某一边时，若简写存在也不动它（单边优先，符合 Android 语义）
     const r = writebackAttrs(xml, selectedPath, { [name]: value }, remove);
-    if (r.changed) setXmlAndTrack(r.xml);
+    // M2u：属性面板连续改同一属性（拖动滑杆/输入）合并成一步撤销
+    if (r.changed) setXmlAndTrack(r.xml, `attr:${selectedPath}:${name}`);
   };
 
   /** M2d：画布自由拖动 / 四角拉伸 → 写回 layout_marginStart/Top（XY）或 layout_width/height（宽高，dp）
@@ -948,7 +956,8 @@ export function XmlEditor() {
     if (g.h !== undefined) set.layout_height = `${r1(g.h)}dp`;
     if (Object.keys(set).length === 0) return;
     const r = writebackAttrs(xml, path, set, []);
-    if (r.changed) setXmlAndTrack(r.xml);
+    // M2u：同一节点连续拖动/拉伸（900ms 内）合并成一步撤销；换节点则重新计数
+    if (r.changed) setXmlAndTrack(r.xml, `geom:${path}`);
   };
 
   const removeAttr = (name: string) => {

@@ -1,7 +1,8 @@
 // M3f：控件文档扩充（Material 组件 + 平台常用控件）
 import { describe, expect, it } from "vitest";
 import { getWidgetDoc, docAttrs, docForAttr, shortDocTag } from "../lib/xml/widget-docs";
-import { WIDGETS } from "../components/widget-catalog";
+import { WIDGETS, WIDGET_GROUPS, GROUP_ICON } from "../components/widget-catalog";
+import { parseLayoutXml } from "../lib/xml/parser";
 
 describe("M3f 新增控件文档", () => {
   it("组件面板里每个控件都有专属文档（不留兜底）", () => {
@@ -178,6 +179,49 @@ describe("M3f2 分类拆分（Material 组与平台组分开）", () => {
         expect(a.name.trim().length).toBeGreaterThan(0);
         expect(a.desc.length).toBeGreaterThanOrEqual(2);
       }
+    }
+  });
+});
+
+describe("M3f3 组件面板：Material 组与平台组分开", () => {
+  it("面板里存在独立的 Material 分组，且在最后", () => {
+    expect(WIDGET_GROUPS).toContain("Material");
+    expect(WIDGET_GROUPS[WIDGET_GROUPS.length - 1]).toBe("Material");
+    expect(GROUP_ICON.Material).toBeTruthy();
+  });
+
+  it("Material 组的组件数量合理（≥12）", () => {
+    expect(WIDGETS.filter((w) => w.group === "Material").length).toBeGreaterThanOrEqual(12);
+  });
+
+  it("Material 组的每个组件都有 Material 分类的文档", () => {
+    for (const w of WIDGETS.filter((x) => x.group === "Material")) {
+      const d = getWidgetDoc(w.tag);
+      expect({ tag: w.tag, cat: d.category }).toEqual({ tag: w.tag, cat: "Material" });
+    }
+  });
+
+  it("平台组里不再混 Material 控件（滑块已归入 Material）", () => {
+    const platform = WIDGETS.filter((w) => w.group !== "Material");
+    for (const w of platform) {
+      expect(getWidgetDoc(w.tag).category).not.toBe("Material");
+    }
+    expect(WIDGETS.find((w) => w.key === "slider")?.group).toBe("Material");
+  });
+
+  it("新增 Material 模板都能被解析（无 error 级问题）", () => {
+    for (const w of WIDGETS.filter((x) => x.group === "Material")) {
+      const { root, issues } = parseLayoutXml(w.xml);
+      expect({ key: w.key, ok: !!root }).toEqual({ key: w.key, ok: true });
+      const errs = issues.filter((i) => i.level === "error");
+      expect({ key: w.key, errs: errs.length }).toEqual({ key: w.key, errs: 0 });
+    }
+  });
+
+  it("Material 模板带 app: 属性时都声明了 xmlns:app", () => {
+    for (const w of WIDGETS.filter((x) => x.group === "Material")) {
+      const usesApp = /\sapp:[\w_]+=/.test(w.xml);
+      if (usesApp) expect({ key: w.key, ns: w.xml.includes("xmlns:app") }).toEqual({ key: w.key, ns: true });
     }
   });
 });

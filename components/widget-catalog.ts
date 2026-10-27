@@ -7,7 +7,7 @@ export interface WidgetDef {
   label: string; // 中文名
   tag: string; // 短标签（标题栏用）
   icon: string; // Material Symbol 名（.msr 字联体）
-  group: "布局" | "文本" | "输入" | "控件" | "进度" | "图片";
+  group: "布局" | "文本" | "输入" | "控件" | "进度" | "图片" | "Material";
   /** 模板 XML（不含 <?xml 声明；xmlns:android 可省，parser 会忽略） */
   xml: string;
 }
@@ -221,7 +221,7 @@ export const WIDGETS: WidgetDef[] = [
     android:progress="40"/>`,
   },
   {
-    key: "slider", label: "滑杆（Material）", tag: "Slider", icon: "input_range", group: "控件",
+    key: "slider", label: "滑杆（Material）", tag: "Slider", icon: "input_range", group: "Material",
     xml: `<com.google.android.material.slider.Slider ${A}
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -267,13 +267,169 @@ export const WIDGETS: WidgetDef[] = [
     android:layout_height="48dp"
     android:background="#E0E0E0"/>`,
   },
+
+  // ===== Material Components（Material 库，与平台控件分开） =====
+  {
+    key: "mat_button", label: "M 按钮", tag: "MaterialButton", icon: "smart_button", group: "Material",
+    xml: `<com.google.android.material.button.MaterialButton ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="按钮"/>`,
+  },
+  {
+    key: "mat_fab", label: "浮动按钮", tag: "FloatingActionButton", icon: "add_circle", group: "Material",
+    xml: `<com.google.android.material.floatingactionbutton.FloatingActionButton ${A}
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    app:srcCompat="@drawable/ic_add"/>`,
+  },
+  {
+    key: "mat_fab_ext", label: "扩展浮动按钮", tag: "ExtendedFloatingActionButton", icon: "add_circle", group: "Material",
+    xml: `<com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="新建"/>`,
+  },
+  {
+    key: "mat_card", label: "M 卡片", tag: "MaterialCardView", icon: "screenshot", group: "Material",
+    xml: `<com.google.android.material.card.MaterialCardView ${A}
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp">
+</com.google.android.material.card.MaterialCardView>`,
+  },
+  {
+    key: "mat_textfield", label: "M 输入框", tag: "TextInputLayout", icon: "edit_note", group: "Material",
+    xml: `<com.google.android.material.textfield.TextInputLayout ${A}
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:hint="标签">
+
+    <com.google.android.material.textfield.TextInputEditText ${A}
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+</com.google.android.material.textfield.TextInputLayout>`,
+  },
+  {
+    key: "mat_toolbar", label: "顶部栏", tag: "MaterialToolbar", icon: "web_asset", group: "Material",
+    xml: `<com.google.android.material.appbar.MaterialToolbar ${A}
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="?attr/actionBarSize"
+    app:title="标题"/>`,
+  },
+  {
+    key: "mat_appbar", label: "应用栏容器", tag: "AppBarLayout", icon: "expand_more", group: "Material",
+    xml: `<com.google.android.material.appbar.AppBarLayout ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+</com.google.android.material.appbar.AppBarLayout>`,
+  },
+  {
+    key: "mat_bottom_nav", label: "底部导航", tag: "BottomNavigationView", icon: "bottom_navigation", group: "Material",
+    xml: `<com.google.android.material.bottomnavigation.BottomNavigationView ${A}
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:menu="@menu/bottom_nav"/>`,
+  },
+  {
+    key: "mat_tabs", label: "标签页", tag: "TabLayout", icon: "tab", group: "Material",
+    xml: `<com.google.android.material.tabs.TabLayout ${A}
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:tabMode="fixed">
+
+    <com.google.android.material.tabs.TabItem
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="标签一"/>
+
+    <com.google.android.material.tabs.TabItem
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="标签二"/>
+</com.google.android.material.tabs.TabLayout>`,
+  },
+  {
+    key: "mat_chip", label: "芯片", tag: "Chip", icon: "label", group: "Material",
+    xml: `<com.google.android.material.chip.Chip ${A}
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="标签"
+    app:chipStrokeWidth="1dp"/>`,
+  },
+  {
+    key: "mat_chip_group", label: "芯片组", tag: "ChipGroup", icon: "label", group: "Material",
+    xml: `<com.google.android.material.chip.ChipGroup ${A}
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:chipSpacingHorizontal="8dp">
+
+    <com.google.android.material.chip.Chip ${A}
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="芯片一"/>
+
+    <com.google.android.material.chip.Chip ${A}
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="芯片二"/>
+</com.google.android.material.chip.ChipGroup>`,
+  },
+  {
+    key: "mat_switch", label: "M 开关", tag: "SwitchMaterial", icon: "toggle_on", group: "Material",
+    xml: `<com.google.android.material.switchmaterial.SwitchMaterial ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:checked="true"/>`,
+  },
+  {
+    key: "mat_progress_circle", label: "M 圆形进度", tag: "CircularProgressIndicator", icon: "progress_activity", group: "Material",
+    xml: `<com.google.android.material.progressindicator.CircularProgressIndicator ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:indeterminate="true"/>`,
+  },
+  {
+    key: "mat_progress_linear", label: "M 条形进度", tag: "LinearProgressIndicator", icon: "hourglass_bottom", group: "Material",
+    xml: `<com.google.android.material.progressindicator.LinearProgressIndicator ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:progress="60"/>`,
+  },
+  {
+    key: "mat_swipe", label: "下拉刷新", tag: "SwipeRefreshLayout", icon: "refresh", group: "Material",
+    xml: `<androidx.swiperefreshlayout.widget.SwipeRefreshLayout ${A}
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <androidx.recyclerview.widget.RecyclerView ${A}
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>`,
+  },
+  {
+    key: "mat_pager2", label: "翻页容器", tag: "ViewPager2", icon: "swipe", group: "Material",
+    xml: `<androidx.viewpager2.widget.ViewPager2 ${A}
+    android:layout_width="match_parent"
+    android:layout_height="200dp"/>`,
+  },
 ];
 
 /** 组件 key → 定义 */
 export const WIDGET_MAP: Record<string, WidgetDef> = Object.fromEntries(WIDGETS.map((w) => [w.key, w]));
 
 /** 分组顺序（面板展示用） */
-export const WIDGET_GROUPS: WidgetDef["group"][] = ["布局", "文本", "输入", "控件", "进度", "图片"];
+export const WIDGET_GROUPS: WidgetDef["group"][] = ["布局", "文本", "输入", "控件", "进度", "图片", "Material"];
 
 /** 分组图标 */
 export const GROUP_ICON: Record<WidgetDef["group"], string> = {
@@ -283,6 +439,7 @@ export const GROUP_ICON: Record<WidgetDef["group"], string> = {
   控件: "touch_app",
   进度: "progress_activity",
   图片: "image",
+  Material: "extension",
 };
 
 /** 拖拽时写入 dataTransfer 的 MIME */

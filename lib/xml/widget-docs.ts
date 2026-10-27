@@ -159,6 +159,146 @@ const CONTAINER_LIST_ATTRS: AttrDoc[] = [
   { name: "itemSpacing", type: "尺寸", desc: "列表项间距" },
 ];
 
+const MATERIAL_FAB_ATTRS: AttrDoc[] = [
+  { name: "srcCompat", type: "drawable", desc: "图标（推荐用 vector drawable）", values: ["@drawable/ic_add"] },
+  { name: "backgroundTint", type: "颜色", desc: "按钮底色（默认取主题 primaryContainer）", values: ["?attr/colorPrimaryContainer"] },
+  { name: "tint", type: "颜色", desc: "图标颜色", values: ["?attr/colorOnPrimaryContainer"] },
+  { name: "fabSize", type: "枚举", desc: "尺寸：normal 56dp / mini 40dp", values: ["normal", "mini"] },
+  { name: "app:layout_anchor", type: "引用", desc: "在 CoordinatorLayout 里锚定到某个控件", values: ["@id/xxx"] },
+];
+
+const APP_BAR_ATTRS: AttrDoc[] = [
+  { name: "layout_scrollFlags", type: "枚举", desc: "随滚动行为：scroll 跟着滚 / enterAlways 下拉即现 / exitUntilCollapsed 折叠留一部分", values: ["scroll|enterAlways", "scroll|exitUntilCollapsed"] },
+  { name: "liftOnScroll", type: "布尔", desc: "滚动时自动加阴影（Material 3 常用）", values: ["true"] },
+];
+
+const TOOLBAR_ATTRS: AttrDoc[] = [
+  { name: "title", type: "文本", desc: "标题文字", values: ["@string/app_name", "订单详情"] },
+  { name: "subtitle", type: "文本", desc: "副标题" },
+  { name: "titleTextColor", type: "颜色", desc: "标题颜色" },
+  { name: "navigationIcon", type: "drawable", desc: "左侧导航图标（通常是返回箭头或汉堡菜单）", values: ["@drawable/ic_menu"] },
+  { name: "logo", type: "drawable", desc: "Logo 图标" },
+  { name: "app:menu", type: "引用", desc: "菜单资源（右上角动作按钮）", values: ["@menu/main"] },
+  { name: "app:titleCentered", type: "布尔", desc: "标题是否居中（MaterialToolbar 专有）" },
+];
+
+const COLLAPSING_ATTRS: AttrDoc[] = [
+  { name: "layout_collapseMode", type: "枚举", desc: "子控件的折叠方式：pin 固定在顶上 / parallax 视差滚动", values: ["pin", "parallax"] },
+  { name: "layout_collapseParallaxMultiplier", type: "数值", desc: "视差系数 0~1", values: ["0.5"] },
+  { name: "contentScrim", type: "颜色", desc: "完全折叠后盖上的颜色", values: ["?attr/colorPrimary"] },
+  { name: "expandedTitleTextAppearance", type: "引用", desc: "展开时大标题样式" },
+  { name: "collapsedTitleTextAppearance", type: "引用", desc: "折叠后小标题样式" },
+];
+
+const BOTTOM_NAV_ATTRS: AttrDoc[] = [
+  { name: "app:menu", type: "引用", desc: "底部菜单资源（每项一个图标 + 文字）", values: ["@menu/bottom_nav"] },
+  { name: "app:itemIconTint", type: "颜色", desc: "图标颜色（常配合 selector）" },
+  { name: "app:itemTextColor", type: "颜色", desc: "文字颜色（常配合 selector）" },
+  { name: "app:itemActiveIndicatorStyle", type: "引用", desc: "选中项的胶囊底色样式（Material 3）" },
+  { name: "app:labelVisibilityMode", type: "枚举", desc: "文字显示策略：labeled 总显示 / unlabeled 只显示选中 / auto 自动", values: ["labeled", "auto"] },
+];
+
+const NAV_VIEW_ATTRS: AttrDoc[] = [
+  { name: "app:menu", type: "引用", desc: "侧边抽屉菜单资源", values: ["@menu/drawer"] },
+  { name: "app:headerLayout", type: "引用", desc: "菜单顶部的头部布局", values: ["@layout/nav_header"] },
+  { name: "app:itemIconTint", type: "颜色", desc: "菜单项图标颜色" },
+  { name: "app:itemBackground", type: "drawable", desc: "菜单项背景" },
+];
+
+const TAB_ATTRS: AttrDoc[] = [
+  { name: "app:tabMode", type: "枚举", desc: "标签模式：fixed 平分宽度 / scrollable 可滚动", values: ["fixed", "scrollable"] },
+  { name: "app:tabGravity", type: "枚举", desc: "标签对齐：fill 撑满 / center 居中", values: ["fill", "center"] },
+  { name: "app:tabIndicatorColor", type: "颜色", desc: "底部指示条颜色" },
+  { name: "app:tabTextColor", type: "颜色", desc: "标签文字颜色" },
+  { name: "app:tabSelectedTextColor", type: "颜色", desc: "选中标签的文字颜色" },
+  { name: "app:tabIndicatorFullWidth", type: "布尔", desc: "指示条是否撑满整个标签宽度" },
+];
+
+const CHIP_ATTRS: AttrDoc[] = [
+  { name: "text", type: "文本", desc: "芯片文字", values: ["已发货"] },
+  { name: "chipIcon", type: "drawable", desc: "左侧图标" },
+  { name: "app:checkedIcon", type: "drawable", desc: "选中态图标（可勾选的 chip）" },
+  { name: "app:chipBackgroundColor", type: "颜色", desc: "芯片底色", values: ["#FF0000"] },
+  { name: "app:chipStrokeWidth", type: "尺寸", desc: "描边宽度", values: ["1dp"] },
+  { name: "app:chipStrokeColor", type: "颜色", desc: "描边颜色" },
+  { name: "app:checkable", type: "布尔", desc: "是否可勾选（筛选场景常用）" },
+  { name: "app:closeIcon", type: "drawable", desc: "右侧删除图标（可删除的标签）" },
+  { name: "app:chipSpacingHorizontal", type: "尺寸", desc: "ChipGroup 里芯片横向间距", values: ["8dp"] },
+];
+
+const SWIPE_REFRESH_ATTRS: AttrDoc[] = [
+  { name: "app:refreshing", type: "布尔", desc: "是否正在刷新（预览里显示转圈）" },
+  { name: "app:progressBackgroundColor", type: "颜色", desc: "转圈底色" },
+  { name: "app:progressViewStartOffset", type: "尺寸", desc: "转圈起始位置偏移" },
+];
+
+const VIEWPAGER_ATTRS: AttrDoc[] = [
+  { name: "app:orientation", type: "枚举", desc: "滑动方向：horizontal 横滑 / vertical 竖滑", values: ["horizontal", "vertical"] },
+  { name: "app:offscreenPageLimit", type: "数值", desc: "左右各预加载几页", values: ["1", "2"] },
+  { name: "app:userInputEnabled", type: "布尔", desc: "是否允许手指滑动翻页" },
+];
+
+const AUTOCOMPLETE_ATTRS: AttrDoc[] = [
+  { name: "app:simpleItems", type: "文本", desc: "简单下拉候选列表（字符串数组资源）", values: ["@array/cities"] },
+  { name: "completionThreshold", type: "数值", desc: "输几个字符开始提示", values: ["1", "2"] },
+  { name: "dropDownWidth", type: "尺寸", desc: "下拉框宽度" },
+  { name: "dropDownHeight", type: "尺寸", desc: "下拉框高度" },
+];
+
+const RATING_ATTRS: AttrDoc[] = [
+  { name: "numStars", type: "数值", desc: "总共几颗星（默认 5）", values: ["5"] },
+  { name: "rating", type: "数值", desc: "当前评分（可为小数）", values: ["3.5"] },
+  { name: "stepSize", type: "数值", desc: "每次调整的步长", values: ["0.5", "1"] },
+  { name: "isIndicator", type: "布尔", desc: "只展示不可点（评分展示场景）" },
+];
+
+const PICKER_ATTRS: AttrDoc[] = [
+  { name: "android:datePickerMode", type: "枚举", desc: "日历还是滚轮：calendar / spinner", values: ["calendar"] },
+  { name: "android:firstDayOfWeek", type: "数值", desc: "一周从周几开始（1=周日）" },
+  { name: "android:timePickerMode", type: "枚举", desc: "时钟样式：clock 表盘 / spinner 滚轮", values: ["clock", "spinner"] },
+  { name: "android:is24HourView", type: "布尔", desc: "是否 24 小时制" },
+  { name: "android:calendarViewShown", type: "布尔", desc: "是否显示日历视图" },
+  { name: "android:showWeekNumber", type: "布尔", desc: "是否显示周数" },
+];
+
+const TOGGLE_ATTRS: AttrDoc[] = [
+  { name: "textOn", type: "文本", desc: "打开时显示的文字", values: ["开"] },
+  { name: "textOff", type: "文本", desc: "关闭时显示的文字", values: ["关"] },
+  { name: "disabledAlpha", type: "数值", desc: "禁用状态下的透明度" },
+];
+
+const WEB_ATTRS: AttrDoc[] = [
+  { name: "android:initialUrl", type: "文本", desc: "初始网址（实际项目里多在代码里 loadUrl）" },
+  { name: "android:javascriptEnabled", type: "布尔", desc: "是否开启 JS（需代码 WebSettings 设置）" },
+  { name: "android:allowFileAccess", type: "布尔", desc: "是否允许访问本地文件" },
+];
+
+const VIDEO_ATTRS: AttrDoc[] = [
+  { name: "android:src", type: "drawable", desc: "视频资源（raw 或 uri），实际多在代码里 setVideoPath" },
+  { name: "android:keepScreenOn", type: "布尔", desc: "播放时保持屏幕常亮" },
+];
+
+const FLIPPER_ATTRS: AttrDoc[] = [
+  { name: "android:inAnimation", type: "引用", desc: "切入动画", values: ["@android:anim/fade_in"] },
+  { name: "android:outAnimation", type: "引用", desc: "切出动画" },
+  { name: "android:autoStart", type: "布尔", desc: "是否自动开始切换" },
+  { name: "android:flipInterval", type: "数值", desc: "自动切换间隔（毫秒）", values: ["3000"] },
+];
+
+const MOTION_ATTRS: AttrDoc[] = [
+  { name: "app:layoutDescription", type: "引用", desc: "场景文件（描述动画怎么走的 XML）", values: ["@xml/scene"] },
+  { name: "app:motionProgress", type: "数值", desc: "动画进度 0~1（预览停在某帧很有用）", values: ["0", "0.5", "1"] },
+  { name: "app:layout_constraintTop_toTopOf", type: "引用", desc: "MotionLayout 继承 ConstraintLayout，约束属性全都可用" },
+];
+
+const FLOW_ATTRS: AttrDoc[] = [
+  { name: "app:constraint_referenced_ids", type: "文本", desc: "参与流式排布的控件 id（逗号分隔）", values: ["tv1,tv2,tv3"] },
+  { name: "app:flow_wrapMode", type: "枚举", desc: "换行模式：none / chain / align", values: ["chain", "align"] },
+  { name: "app:flow_horizontalGap", type: "尺寸", desc: "水平间距", values: ["8dp"] },
+  { name: "app:flow_verticalGap", type: "尺寸", desc: "垂直间距", values: ["8dp"] },
+  { name: "app:flow_maxElementsWrap", type: "数值", desc: "每行最多几个", values: ["3"] },
+];
+
 const PARSED: Record<string, WidgetDoc> = {
   LinearLayout: {
     title: "线性布局",
@@ -477,6 +617,301 @@ const PARSED: Record<string, WidgetDoc> = {
     category: "其他",
     attrs: [{ name: "layout", type: "引用", desc: "要延迟加载的布局" }],
   },
+
+  /* ===== Material Components（M3f 补全） ===== */
+  Slider: {
+    title: "滑块",
+    summary: "Material 3 的滑动选值控件（取代 SeekBar），常用于音量、价格区间。",
+    category: "选择",
+    attrs: [
+      { name: "android:value", type: "数值", desc: "当前值", values: ["50"] },
+      { name: "android:valueFrom", type: "数值", desc: "最小值", values: ["0"] },
+      { name: "android:valueTo", type: "数值", desc: "最大值", values: ["100"] },
+      { name: "android:stepSize", type: "数值", desc: "每次调整的步长", values: ["1", "5"] },
+      { name: "app:labelBehavior", type: "枚举", desc: "拖动时数值气泡：floating 悬浮 / gone 不显示 / withinBounds 限制在轨道内", values: ["floating", "gone"] },
+      { name: "app:thumbColor", type: "颜色", desc: "滑块颜色" },
+      { name: "app:trackColorActive", type: "颜色", desc: "已选轨道颜色" },
+      { name: "app:trackColorInactive", type: "颜色", desc: "未选轨道颜色" },
+    ],
+    notes: ["Material 3 项目用 Slider，不要再新写 SeekBar"],
+  },
+  FloatingActionButton: {
+    title: "浮动按钮",
+    summary: "屏幕右下角的圆形主操作按钮（新建/添加），一个界面最多一个。",
+    category: "其他",
+    attrs: MATERIAL_FAB_ATTRS,
+    notes: [
+      "默认尺寸 56dp，图标 24dp；用 FrameLayout/CoordinatorLayout 包起来并加 layout_gravity=\"bottom|end\"",
+      "周围留 16dp 外边距才不贴边",
+    ],
+  },
+  ExtendedFloatingActionButton: {
+    title: "带文字的浮动按钮",
+    summary: "胶囊形浮动按钮，图标 + 文字，适合文字较长的主操作。",
+    category: "其他",
+    attrs: [
+      ...MATERIAL_FAB_ATTRS,
+      { name: "android:text", type: "文本", desc: "按钮文字", values: ["新建订单"] },
+      { name: "app:icon", type: "drawable", desc: "左侧图标", values: ["@drawable/ic_add"] },
+      { name: "app:iconPadding", type: "尺寸", desc: "图标与文字间距" },
+    ],
+  },
+  MaterialButtonToggleGroup: {
+    title: "按钮切换组",
+    summary: "多个 MaterialButton 互斥或可多选的分段控件（相当于一组 RadioButton）。",
+    category: "选择",
+    attrs: [
+      { name: "app:singleSelection", type: "布尔", desc: "是否只能选一个", values: ["true"] },
+      { name: "app:selectionRequired", type: "布尔", desc: "是否必须保留一个选中" },
+      { name: "app:checkedButton", type: "引用", desc: "默认选中的按钮 id", values: ["@id/btn1"] },
+    ],
+    notes: ["子项必须是 MaterialButton，普通 Button 无效"],
+  },
+  Toolbar: {
+    title: "工具栏",
+    summary: "应用顶部的标题栏（替代旧 ActionBar），可放返回、标题、菜单。",
+    category: "容器",
+    attrs: TOOLBAR_ATTRS,
+    notes: ["高度一般用 ?attr/actionBarSize（56dp）；放 AppBarLayout 里才能随滚动收起"],
+  },
+  MaterialToolbar: {
+    title: "Material 工具栏",
+    summary: "Material 风格的 Toolbar，额外支持标题居中、副标题样式。",
+    category: "容器",
+    attrs: TOOLBAR_ATTRS,
+  },
+  AppBarLayout: {
+    title: "应用栏容器",
+    summary: "装 Toolbar / TabLayout 的竖向容器，负责随列表滚动收起展开。",
+    category: "容器",
+    attrs: APP_BAR_ATTRS,
+    notes: ["子控件要写 app:layout_scrollFlags 才会跟着滚动；父级必须是 CoordinatorLayout 才生效"],
+  },
+  CollapsingToolbarLayout: {
+    title: "可折叠标题栏",
+    summary: "顶部大图随滚动收成小标题栏（详情页经典效果）。",
+    category: "容器",
+    attrs: COLLAPSING_ATTRS,
+    notes: [
+      "外层必须是 AppBarLayout，且自己是 AppBarLayout 的子项",
+      "里面放 ImageView 用 layout_collapseMode=\"parallax\"，Toolbar 用 \"pin\"",
+    ],
+  },
+  BottomNavigationView: {
+    title: "底部导航",
+    summary: "底部 3~5 个页签的主导航（首页/订单/我的）。",
+    category: "选择",
+    attrs: BOTTOM_NAV_ATTRS,
+    notes: ["菜单项上限 5 个，超过会挤压变形；高度固定 80dp"],
+  },
+  NavigationView: {
+    title: "侧边抽屉菜单",
+    summary: "左侧滑出的菜单（配合 DrawerLayout 用）。",
+    category: "容器",
+    attrs: NAV_VIEW_ATTRS,
+    notes: ["必须放在 DrawerLayout 里并写 layout_gravity=\"start\"，否则会铺满整屏"],
+  },
+  TabLayout: {
+    title: "标签页",
+    summary: "顶部横排标签（页签切换），常配合 ViewPager2 左右滑动。",
+    category: "选择",
+    attrs: TAB_ATTRS,
+  },
+  TabItem: {
+    title: "标签项",
+    summary: "TabLayout 里的单个标签（也可以用代码添加）。",
+    category: "其他",
+    attrs: [
+      { name: "android:text", type: "文本", desc: "标签文字", values: ["待处理"] },
+      { name: "android:icon", type: "drawable", desc: "标签图标" },
+    ],
+  },
+  Chip: {
+    title: "芯片",
+    summary: "圆角小标签，用于状态标识、筛选条件、多选标签。",
+    category: "选择",
+    attrs: CHIP_ATTRS,
+    notes: ["多个 Chip 要放 ChipGroup 里才会自动换行排列"],
+  },
+  ChipGroup: {
+    title: "芯片组",
+    summary: "多个 Chip 的容器，自动换行/横排排列。",
+    category: "容器",
+    attrs: [
+      { name: "app:singleSelection", type: "布尔", desc: "是否只能选一个（筛选场景常用）", values: ["true"] },
+      { name: "app:chipSpacingHorizontal", type: "尺寸", desc: "横向间距", values: ["8dp"] },
+      { name: "app:chipSpacingVertical", type: "尺寸", desc: "纵向间距", values: ["8dp"] },
+      { name: "app:selectionRequired", type: "布尔", desc: "是否必须保留一个选中" },
+    ],
+  },
+  SwipeRefreshLayout: {
+    title: "下拉刷新",
+    summary: "包住列表，下拉时出现转圈刷新（只允许一个直接子控件）。",
+    category: "容器",
+    attrs: SWIPE_REFRESH_ATTRS,
+    notes: ["只能包一个子控件（通常是 RecyclerView/ScrollView）"],
+  },
+  ViewPager2: {
+    title: "滑动翻页容器",
+    summary: "左右滑动的页面容器（引导页、轮播图、配合 TabLayout）。",
+    category: "容器",
+    attrs: VIEWPAGER_ATTRS,
+    notes: ["每个子项通常用 FragmentContainerView，适配器用 FragmentStateAdapter"],
+  },
+
+  /* ===== 平台常用控件（M3f 补全） ===== */
+  AutoCompleteTextView: {
+    title: "自动补全输入框",
+    summary: "输入时弹出候选列表的输入框（选城市、选商品）。",
+    category: "输入",
+    attrs: [...INPUT_ATTRS, ...AUTOCOMPLETE_ATTRS],
+  },
+  CheckedTextView: {
+    title: "带勾选的文本",
+    summary: "一行文字 + 右侧勾选框，常用于列表多选（配合 ListView 的 choiceMode）。",
+    category: "选择",
+    attrs: [
+      { name: "android:text", type: "文本", desc: "文字内容" },
+      { name: "android:checkMark", type: "drawable", desc: "勾选标记图标", values: ["?android:attr/listChoiceIndicatorMultiple"] },
+      { name: "android:checked", type: "布尔", desc: "是否勾选" },
+    ],
+  },
+  ToggleButton: {
+    title: "开关按钮",
+    summary: "带开启/关闭两种文字的开关（现在多用 Switch 代替）。",
+    category: "选择",
+    attrs: TOGGLE_ATTRS,
+  },
+  RatingBar: {
+    title: "星级评分",
+    summary: "五星评分控件，可只展示也可让用户点选。",
+    category: "选择",
+    attrs: RATING_ATTRS,
+  },
+  NumberPicker: {
+    title: "数字滚轮",
+    summary: "上下滚动的数字选择器（数量、年龄）。",
+    category: "选择",
+    attrs: [
+      { name: "android:minValue", type: "数值", desc: "最小值", values: ["1"] },
+      { name: "android:maxValue", type: "数值", desc: "最大值", values: ["99"] },
+      { name: "android:value", type: "数值", desc: "当前值" },
+      { name: "android:wrapSelectorWheel", type: "布尔", desc: "到头后是否循环" },
+    ],
+  },
+  SearchView: {
+    title: "搜索框",
+    summary: "带放大镜图标的搜索输入框，可配搜索建议。",
+    category: "输入",
+    attrs: [
+      { name: "android:queryHint", type: "文本", desc: "搜索提示文字", values: ["搜索订单号"] },
+      { name: "android:iconifiedByDefault", type: "布尔", desc: "默认是否收成图标", values: ["false"] },
+      { name: "android:submitButtonEnabled", type: "布尔", desc: "是否显示搜索按钮" },
+    ],
+  },
+  WebView: {
+    title: "网页视图",
+    summary: "内嵌浏览器，用于展示 HTML 页面（协议、帮助文档）。",
+    category: "其他",
+    attrs: WEB_ATTRS,
+    notes: ["预览里只能画占位框，真实网页需在代码里 loadUrl"],
+  },
+  VideoView: {
+    title: "视频播放器",
+    summary: "播放本地/网络视频的简单控件（无自定义控制条）。",
+    category: "其他",
+    attrs: VIDEO_ATTRS,
+  },
+  SurfaceView: {
+    title: "绘图表面",
+    summary: "独立绘图层，用于相机预览、游戏、视频（异线程绘制）。",
+    category: "其他",
+    attrs: [
+      { name: "android:type", type: "枚举", desc: "表面类型：surface / texture" },
+      { name: "android:zOrderOnTop", type: "布尔", desc: "是否画在窗口最上层" },
+    ],
+  },
+  ViewFlipper: {
+    title: "轮播容器",
+    summary: "多个子控件轮番显示（公告轮播、广告位），可自动定时切换。",
+    category: "容器",
+    attrs: FLIPPER_ATTRS,
+    notes: ["每个子控件占满一屏，靠 showNext() 或 flipInterval 自动切换"],
+  },
+  MotionLayout: {
+    title: "动效布局",
+    summary: "ConstraintLayout 的动画版，一个场景文件描述控件从状态 A 走到状态 B。",
+    category: "布局",
+    attrs: MOTION_ATTRS,
+    notes: ["本质就是 ConstraintLayout，约束属性全都可用；复杂动效才需要它"],
+  },
+  Flow: {
+    title: "流式布局助手",
+    summary: "ConstraintLayout 的虚拟布局，把一堆控件自动按行排（类似 Flexbox 换行）。",
+    category: "布局",
+    attrs: FLOW_ATTRS,
+    notes: ["自己不画东西，靠 constraint_referenced_ids 收集别的控件来排"],
+  },
+  FragmentContainerView: {
+    title: "Fragment 容器",
+    summary: "专门装 Fragment 的容器（比 FrameLayout 更安全，官方推荐）。",
+    category: "容器",
+    attrs: [
+      { name: "android:name", type: "文本", desc: "要加载的 Fragment 全限定类名", values: ["com.xxx.HomeFragment"] },
+      { name: "android:tag", type: "文本", desc: "Fragment 标识" },
+    ],
+  },
+  DatePicker: {
+    title: "日期选择",
+    summary: "日历或滚轮式日期选择器。",
+    category: "选择",
+    attrs: PICKER_ATTRS,
+    notes: ["实际项目里常用 DatePickerDialog 弹窗而不是直接摆控件"],
+  },
+  TimePicker: {
+    title: "时间选择",
+    summary: "表盘或滚轮式时间选择器。",
+    category: "选择",
+    attrs: PICKER_ATTRS,
+  },
+  CalendarView: {
+    title: "日历",
+    summary: "可滚动翻月的日历，用于选日期或展示有数据的日期。",
+    category: "选择",
+    attrs: PICKER_ATTRS,
+  },
+  ExpandableListView: {
+    title: "可展开列表",
+    summary: "分组可折叠的列表（旧控件，新项目多用 RecyclerView 多类型实现）。",
+    category: "列表",
+    attrs: [
+      { name: "android:groupIndicator", type: "drawable", desc: "分组展开/折叠图标" },
+      { name: "android:childDivider", type: "drawable", desc: "子项分隔线" },
+      { name: "android:indicatorStart", type: "尺寸", desc: "展开图标距起始边距离" },
+    ],
+  },
+  CircularProgressIndicator: {
+    title: "圆形进度（Material 3）",
+    summary: "Material 3 的转圈进度，可确定百分比也可不确定。",
+    category: "其他",
+    attrs: [
+      { name: "android:indeterminate", type: "布尔", desc: "是否无限转圈" },
+      { name: "app:indicatorSize", type: "尺寸", desc: "圆环直径", values: ["48dp"] },
+      { name: "app:trackThickness", type: "尺寸", desc: "圆环粗细", values: ["4dp"] },
+      { name: "app:indicatorColor", type: "颜色", desc: "进度颜色" },
+    ],
+  },
+  LinearProgressIndicator: {
+    title: "条形进度（Material 3）",
+    summary: "Material 3 的水平进度条。",
+    category: "其他",
+    attrs: [
+      { name: "android:progress", type: "数值", desc: "当前进度 0~100", values: ["60"] },
+      { name: "android:indeterminate", type: "布尔", desc: "是否不确定进度" },
+      { name: "app:trackThickness", type: "尺寸", desc: "条的高度", values: ["4dp"] },
+      { name: "app:trackCornerRadius", type: "尺寸", desc: "条的圆角" },
+    ],
+  },
 };
 
 /** 全限定类名 → 短名（androidx.cardview.widget.CardView → CardView） */
@@ -497,6 +932,12 @@ const ALIAS: Record<string, string> = {
   AppCompatRadioButton: "RadioButton",
   ConstraintHelper: "Barrier",
   androidxConstraintLayoutHelper: "Barrier",
+  // M3f：Material / 平台变体归一
+  MaterialTextView: "TextView",
+  MaterialCheckBox: "CheckBox",
+  MaterialRadioButton: "RadioButton",
+  MaterialAutoCompleteTextView: "AutoCompleteTextView",
+  LinearLayoutCompat: "LinearLayout",
 };
 
 /** 取控件文档；未知控件返回兜底（仅通用属性说明） */

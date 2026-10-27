@@ -143,8 +143,8 @@ describe("M2q include 展开 — 边界", () => {
     expect(issues.filter((i) => /未找到/.test(i.message))).toHaveLength(1);
   });
 
-  it("没传 layouts 表时不展开、不报循环，只报未解析（无表）", () => {
-    const { root } = expand(
+  it("没传 layouts 表时不展开、只报未解析（无表）", () => {
+    const { root, issues } = expand(
       `<LinearLayout ${A} android:layout_width="match_parent" android:layout_height="match_parent">
         <include android:layout="@layout/header" />
       </LinearLayout>`,
@@ -152,6 +152,7 @@ describe("M2q include 展开 — 边界", () => {
     );
     // null 触发 layouts undefined 分支（JS 默认参数只覆盖 undefined 不覆盖 null）
     expect(root.children[0].tag).toBe("include");
+    expect(issues.some((i) => /无法解析/.test(i.message))).toBe(true);
   });
 
   it("展开后的节点进渲染模型且 sourceFile 传下去", () => {

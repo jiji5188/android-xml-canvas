@@ -7,7 +7,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue } from "react";
-import { parseLayoutXml, findNode, serialize } from "@/lib/xml/parser";
+import { parseLayoutXml, findNode, serialize, nodeAtLine } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
 import type { MeasuredMap } from "@/lib/xml/constraints";
 import { commitHistoryState, EMPTY_MARK, type MergeMark } from "@/lib/xml/history";
@@ -621,6 +621,16 @@ export function XmlEditor() {
 
   /** 代码视图的结构检查（带行号，标红用） */
   const lints = useMemo(() => lintXml(parsedXml), [parsedXml]);
+
+  /** M2y：代码编辑器光标行 → 选中对应画布节点（反跳，和画布 → 行号正跳对称） */
+  const onCodeCursorLine = useCallback(
+    (line: number) => {
+      if (!treeRoot || line < 1) return;
+      const n = nodeAtLine(treeRoot, line);
+      if (n && n.path !== selectedPath) setSelectedPath(n.path);
+    },
+    [treeRoot, selectedPath],
+  );
 
   /** 一键格式化：重排缩进，保留注释，可撤销 */
   const doFormat = () => {
@@ -1401,6 +1411,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             errors={lints}
             focusLine={focusLine}
             focusTick={focusTick}
+            onCursorLine={onCodeCursorLine}
           />
           <div className="axv-mob-xml-tools">
             <button className="axv-mob-tool-btn axv-ghost" onClick={doFormat} title="重排缩进（保留注释）">

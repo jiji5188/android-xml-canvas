@@ -21,7 +21,21 @@ export function parseLayoutXml(xml: string, resourceDeclOk = true): { root: XmlN
     .replace(/^<\?xml[\s\S]*?\?>/i, "")
     .replace(/<!DOCTYPE[\s\S]*?>/i, "");
 
-  const pos = { i: 0 };
+  // M2y：行号索引（记录每一行首字符的偏移，offset → 1 基行号）
+  const lineStarts: number[] = [0];
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "\n") lineStarts.push(i + 1);
+  }
+  const lineOf = (offset: number): number => {
+    let lo = 0, hi = lineStarts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (lineStarts[mid] <= offset) lo = mid; else hi = mid - 1;
+    }
+    return lo + 1;
+  };
+
+  const pos = { i: 0, lineOf } as { i: number; lineOf: (o: number) => number };
   const root = parseElement(text, pos, "#0", issues);
   if (!root && text.trim() !== "") {
     issues.push({ level: "error", nodePath: "#0", message: "无法解析根元素（XML 可能不完整）" });
@@ -33,7 +47,7 @@ function skipWs(s: string, pos: { i: number }): void {
   while (pos.i < s.length && /\s/.test(s[pos.i])) pos.i++;
 }
 
-function parseElement(s: string, pos: { i: number }, path: string, issues: XmlIssue[]): XmlNode | null {
+function parseElement(s: string, pos: { i: number; lineOf?: (o: number) => number }, path: string, issues: XmlIssue[]): XmlNode | null {
   skipWs(s, pos);
   // 注释：跳过并继续找元素
   while (s.startsWith("<!--", pos.i)) {
@@ -42,6 +56,7 @@ function parseElement(s: string, pos: { i: number }, path: string, issues: XmlIs
     skipWs(s, pos);
   }
   if (!s.startsWith("<", pos.i)) return null;
+  const openIdx = pos.i; // M2y：标签起始偏移（取行号用）
   pos.i++;
   const tagStart = pos.i;
   while (pos.i < s.length && !/[>\s/]/.test(s[pos.i])) pos.i++;
@@ -126,7 +141,7 @@ function parseElement(s: string, pos: { i: number }, path: string, issues: XmlIs
     if (!isTools) attrs[localName] = value;
   }
 
-  const node: XmlNode = { tag, attrs, nsDecls: Object.keys(nsDecls).length ? nsDecls : undefined, children: [], path };
+  const node: XmlNode = { tag, attrs, nsDecls: Object.keys(nsDecls).length ? nsDecls : undefined, children: [], path, line: pos.lineOf ? pos.lineOf(openIdx) : undefined };
 
   // 自闭合标签没有子元素，直接返回（不要吞掉后面的兄弟节点）
   if (selfClosed) return node;
@@ -174,6 +189,21 @@ function unescapeXml(s: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&amp;/g, "&");
+}
+
+/** M2y：按行号找最深节点（DFS 序里最后一个开标签行 <= 目标行的节点），用于代码编辑器 → 画布选中 */
+export function nodeAtLine(root: XmlNode, line: number): XmlNode {
+  let deepest: XmlNode = root;
+  const walk = (n: XmlNode) => {
+    for (const c of n.children) {
+      if (c.line !== undefined && c.line <= line) {
+        deepest = c; // DFS 序：更晚开始标签的更深/更右兄弟覆盖前值
+        walk(c);
+      }
+    }
+  };
+  walk(root);
+  return deepest;
 }
 
 /** 按 path（#0/1/0 风格）定位节点 */

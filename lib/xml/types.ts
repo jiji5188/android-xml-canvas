@@ -7,6 +7,8 @@ export interface XmlNode {
   attrs: Record<string, string>; // 原始属性（未解析引用）
   /** 命名空间声明（xmlns:android="..."），writeback 序列化时补回，不进 attrs */
   nsDecls?: Record<string, string>;
+  /** M2y：源文件行号（1 基，标签 < 所在行），用于代码 → 画布反跳 */
+  line?: number;
   children: XmlNode[];
   path: string;                // 节点路径（#0/1/0 风格，writeback 定位用）
   /** M2q：该子树是从哪个 include 展开来的（文件名，如 "header.xml"）。

@@ -83,9 +83,24 @@ interface Props {
   focusLine?: number;
   /** 与 focusLine 配合的自增序号（同一行二次跳转也能生效） */
   focusTick?: number;
+  /** M2y：光标所在行（1 基）变化时回调，用于代码 → 画布反跳选中对应节点 */
+  onCursorLine?: (line: number) => void;
 }
 
-export function XmlCodeEditor({ value, onChange, errors, className, focusLine, focusTick }: Props) {
+function lineFromCursor(ta: HTMLTextAreaElement): number {
+  // 键盘移动光标后读选区起点；无选区时按当前行估算
+  const before = ta.value.slice(0, ta.selectionStart ?? 0);
+  return before.split("\n").length;
+}
+
+function lineFromEvent(ta: HTMLTextAreaElement, x: number, y: number): number {
+  // 点击：用几何估算（与 CODE_LINE_HEIGHT 一致的行高）
+  const rect = ta.getBoundingClientRect();
+  const relY = y - rect.top + ta.scrollTop;
+  return Math.max(1, Math.floor(relY / CODE_LINE_HEIGHT) + 1);
+}
+
+export function XmlCodeEditor({ value, onChange, errors, className, focusLine, focusTick, onCursorLine }: Props) {
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const preRef = useRef<HTMLPreElement | null>(null);
   const gutRef = useRef<HTMLDivElement | null>(null);
@@ -166,6 +181,9 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
             wrap="off"
             onChange={(e) => onChange(e.target.value)}
             onScroll={sync}
+            onClick={(e) => onCursorLine?.(lineFromEvent(e.currentTarget, e.clientX, e.clientY))}
+            onKeyUp={(e) => onCursorLine?.(lineFromCursor(e.currentTarget))}
+            onKeyDown={(e) => onCursorLine?.(lineFromCursor(e.currentTarget))}
           />
         </div>
       </div>

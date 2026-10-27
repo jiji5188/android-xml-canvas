@@ -1194,10 +1194,17 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             style={{ margin: "0 8px" }}
           >
             <option value="">示例…</option>
-            <option value="cl">约束布局</option>
-            <option value="chain">链式排布 + Guideline</option>
-            <option value="barrier">Barrier 屏障</option>
-            <option value="list">竖列表</option>
+            <optgroup label="新建（空白）">
+              <option value="blank-cl">ConstraintLayout</option>
+              <option value="blank-ll">LinearLayout（竖）</option>
+              <option value="blank-frame">FrameLayout</option>
+            </optgroup>
+            <optgroup label="示例">
+              <option value="cl">约束布局</option>
+              <option value="chain">链式排布 + Guideline</option>
+              <option value="barrier">Barrier 屏障</option>
+              <option value="list">竖列表</option>
+            </optgroup>
           </select>
           <button
             role="tab"

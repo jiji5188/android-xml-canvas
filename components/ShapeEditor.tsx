@@ -126,7 +126,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="axv-modal axv-shape-modal" role="dialog" aria-label="自定义形状">
+      <div className="axv-modal axv-shape-modal axv-shape-full" role="dialog" aria-label="自定义形状">
         <div className="axv-modal-head">
           <span>自定义形状 · {attrName}</span>
           <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">

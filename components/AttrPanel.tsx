@@ -4,13 +4,14 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ResolvedNode } from "@/lib/xml/types";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import { editorFor, type AttrEditor } from "./attr-catalog";
 import { getWidgetDoc, docAttrs, attrHint } from "@/lib/xml/widget-docs";
 import { IconPickerPanel } from "./IconPickerPanel";
 import { ShapeEditor } from "./ShapeEditor";
+import { DrawablePicker } from "./DrawablePicker";
 
 interface Props {
   node: ResolvedNode;
@@ -102,6 +103,14 @@ export function AttrPanel({
   const [iconPick, setIconPick] = useState<string | null>(null);
   /** M3h：当前正在编辑形状的属性 */
   const [shapeEdit, setShapeEdit] = useState<string | null>(null);
+  /** M4b：drawable 选择对话框（颜色/资源/形状/图标 四入口） */
+  const [dpOpen, setDpOpen] = useState<string | null>(null);
+  /** M4b：从对话框进入形状编辑器时携带的已有 XML（编辑模式回填参数） */
+  const shapeEditRef = useRef<string | undefined>(undefined);
+  // 换节点时清空
+  useEffect(() => {
+    shapeEditRef.current = undefined;
+  }, [node.path]);
   /** M3a：右侧面板双页签：属性 / 文档 */
   const [tab, setTab] = useState<"attrs" | "docs">("attrs");
   /** 属性行展开的说明（点 ? 切换） */
@@ -121,18 +130,49 @@ export function AttrPanel({
   const rows = Object.entries(node.rawAttrs);
   const dNames = drawableNames(resExtras);
 
-  /** 颜色输入区：swatch（可点触发 color picker）+ hex 文本框 */
+  /** M4b：颜色输入区新布局 ——
+   *  drawable 类属性（background/src/foreground）：一行 = 输入框（资源 ID / hex）+ 一个按钮
+   *    按钮弹出「选择资源」对话框（颜色 / 图片xml资源 / 编辑创建形状 / 图标）
+   *  纯颜色属性：保留原 swatch（原生取色器）+ hex 输入框 */
   const renderColor = (name: string, value: string, allowDrawable: boolean) => {
-    const isHex = /^#[0-9a-fA-F]{3,8}$/.test(value);
-    const swatchBg = isHex ? value : "transparent";
-    const pickerVal = isHex
+    if (allowDrawable) {
+      const isHex = /^#[0-9a-fA-F]{3,8}$/.test(value);
+      const isRes = /^@/ .test(value);
+      return (
+        <div className="axv-attr-color axv-dp-row" style={{ display: "flex", gap: 6, alignItems: "center", width: "100%" }}>
+          <input
+            className="axv-attr-input"
+            style={{ flex: 1, minWidth: 0 }}
+            value={drafts[name] ?? value}
+            placeholder="@drawable/bg_card 或 #FFFFFF"
+            spellCheck={false}
+            onChange={(e) => setDrafts((d) => ({ ...d, [name]: e.target.value }))}
+            onBlur={() => {
+              if (drafts[name] !== undefined) commit(name, drafts[name]);
+              setDrafts((d) => { const n = { ...d }; delete n[name]; return n; });
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          />
+          <button
+            className="axv-attr-input axv-dp-btn"
+            style={{ flex: "0 0 auto", cursor: "pointer" }}
+            title={isHex ? "纯色值。点按钮可换选资源/改色" : isRes ? "资源引用。点按钮可换资源/改参数" : "选择颜色或 drawable 资源"}
+            onClick={() => setDpOpen(name)}
+          >
+            {isHex ? "🎨" : isRes ? "🖼" : "＋ 选择"}
+          </button>
+        </div>
+      );
+    }
+    const isHex2 = /^#[0-9a-fA-F]{3,8}$/.test(value);
+    const swatchBg = isHex2 ? value : "transparent";
+    const pickerVal = isHex2
       ? value.length === 4
         ? "#" + value.slice(1).split("").map((c) => c + c).join("") + "00"
         : value.length === 9
           ? "#" + value.slice(7) + value.slice(1, 7)
           : value
       : "#00000000";
-    const datalistId = "axv-drawables";
     return (
       <div className="axv-attr-color" style={{ display: "flex", gap: 6, alignItems: "center", width: "100%" }}>
         <span
@@ -146,9 +186,9 @@ export function AttrPanel({
             borderRadius: 4,
             overflow: "hidden",
           }}
-          title={isHex ? value : "非 hex 颜色值"}
+          title={isHex2 ? value : "非 hex 颜色值"}
         >
-          {isHex ? (
+          {isHex2 ? (
             <input
               type="color"
               value={pickerVal}
@@ -170,47 +210,6 @@ export function AttrPanel({
           }}
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
         />
-        {allowDrawable && dNames.length > 0 ? (
-          <>
-            <input
-              id={datalistId}
-              style={{ display: "none" }}
-              list={datalistId}
-            />
-            <datalist id={datalistId}>
-              {dNames.map((n) => <option key={n} value={n} />)}
-            </datalist>
-            <button
-              className="axv-attr-input"
-              style={{
-                flex: "0 0 80px",
-                padding: "0 8px",
-                cursor: "pointer",
-                fontSize: 11,
-              }}
-              title="从已上传 drawable 里选（值会写成 @drawable/name）"
-              onClick={(e) => {
-                const btn = e.currentTarget;
-                // 简单弹出：让 input 显示为列表选择
-                const inp = document.createElement("input");
-                inp.style.position = "absolute";
-                inp.style.zIndex = "99";
-                inp.setAttribute("list", datalistId);
-                inp.style.left = btn.offsetLeft + "px";
-                inp.style.top = "0px";
-                inp.style.width = "100px";
-                btn.parentElement?.appendChild(inp);
-                inp.focus();
-                inp.addEventListener("change", () => {
-                  if (inp.value) commit(name, "@drawable/" + inp.value);
-                  inp.remove();
-                });
-              }}
-            >
-              🖼 选图
-            </button>
-          </>
-        ) : null}
       </div>
     );
   };
@@ -489,16 +488,42 @@ export function AttrPanel({
         />
       ) : null}
 
+      {dpOpen ? (
+        <DrawablePicker
+          attrName={dpOpen}
+          value={String(node.rawAttrs[dpOpen] ?? "")}
+          bitmapDrawables={resExtras?.drawables}
+          xmlDrawables={{ ...(resExtras?.drawableXml ?? {}), ...(generatedXml ?? {}) }}
+          generatedXml={generatedXml}
+          onEditShape={(existingXml) => {
+            setDpOpen(null);
+            setShapeEdit(dpOpen);
+            /** M4b：从对话框进入形状编辑器时带已有 XML 回填参数 */
+            shapeEditRef.current = existingXml;
+          }}
+          onPickIcon={() => {
+            setDpOpen(null);
+            setIconPick(dpOpen);
+          }}
+          onCommit={(v) => {
+            commit(dpOpen, v);
+            setDpOpen(null);
+          }}
+          onClose={() => setDpOpen(null)}
+        />
+      ) : null}
+
       {shapeEdit ? (
         <ShapeEditor
           attrName={shapeEdit}
           value={String(node.rawAttrs[shapeEdit] ?? "")}
-          existingXml={generatedXml?.[String(node.rawAttrs[shapeEdit] ?? "").replace(/^@(?:drawable|mipmap)\//, "").replace(/\.xml$/, "")]}
+          existingXml={shapeEditRef.current ?? generatedXml?.[String(node.rawAttrs[shapeEdit] ?? "").replace(/^@(?:drawable|mipmap)\//, "").replace(/\.xml$/, "")]}
           existingNames={Object.keys(generatedXml ?? {})}
-          onClose={() => setShapeEdit(null)}
+          onClose={() => { setShapeEdit(null); shapeEditRef.current = undefined; }}
           onSave={(resourceName, xml) => {
             onSaveShape?.(shapeEdit, resourceName, xml);
             setShapeEdit(null);
+            shapeEditRef.current = undefined;
           }}
         />
       ) : null}

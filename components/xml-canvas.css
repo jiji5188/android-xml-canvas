@@ -886,6 +886,156 @@
 
 
 /* ===== 右侧属性面板 ===== */
+
+/* M3a：属性 / 文档 页签 */
+.axv-attr-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #ececf2;
+}
+.axv-attr-tab {
+  padding: 5px 12px;
+  border: none;
+  background: transparent;
+  color: #6b7080;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.axv-attr-tab.is-on {
+  color: #6750A4;
+  border-bottom-color: #6750A4;
+}
+
+/* 文档页 */
+.axv-doc-body {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 4px;
+  font-size: 12.5px;
+}
+.axv-doc-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.axv-doc-cat {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6750A4;
+  background: rgba(103, 80, 164, 0.1);
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+.axv-doc-summary {
+  color: #49454f;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.axv-doc-notes {
+  margin: 0 0 10px 0;
+  padding: 8px 10px 8px 24px;
+  background: #fff8e1;
+  border: 1px solid #f0e6b0;
+  border-radius: 8px;
+  color: #7a5b00;
+  line-height: 1.6;
+}
+.axv-doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.axv-doc-item {
+  border: 1px solid #ececf2;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #fbfbfd;
+}
+.axv-doc-item.is-set {
+  border-color: #cdbcf0;
+  background: #faf7ff;
+}
+.axv-doc-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.axv-doc-name {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: #1d1b20;
+}
+.axv-doc-type {
+  font-size: 10.5px;
+  color: #8a8fa3;
+  border: 1px solid #e6e6ef;
+  border-radius: 5px;
+  padding: 0 5px;
+}
+.axv-doc-badge {
+  font-size: 10.5px;
+  color: #1b7f4b;
+  background: #e8f6ee;
+  border-radius: 5px;
+  padding: 0 5px;
+}
+.axv-doc-desc {
+  color: #49454f;
+  line-height: 1.55;
+  margin-top: 3px;
+}
+.axv-doc-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.axv-doc-values code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  color: #4a3f7a;
+  background: #f0edf8;
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+/* 属性行上的 ? 说明按钮 + 展开的说明气泡 */
+.axv-attr-info {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid #d8d8e2;
+  background: #fff;
+  color: #6b7080;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.axv-attr-info:hover {
+  border-color: #6750A4;
+  color: #6750A4;
+}
+.axv-attr-note {
+  margin: 4px 0 2px 0;
+  padding: 6px 8px;
+  background: #f5f3fb;
+  border-left: 2px solid #b9a8e8;
+  border-radius: 6px;
+  color: #49454f;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .axv-attr-panel {
   padding: 12px;
   font-family: system-ui, sans-serif;
@@ -936,8 +1086,7 @@
   max-height: 46vh;
   overflow-y: auto;
   padding-right: 4px;
-}
-.axv-attr-row {
+}.axv-attr-row {
   display: flex;
   align-items: center;
   gap: 8px;

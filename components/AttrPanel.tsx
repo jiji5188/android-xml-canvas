@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import type { ResolvedNode } from "@/lib/xml/types";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import { editorFor, type AttrEditor } from "./attr-catalog";
+import { getWidgetDoc, docAttrs, attrHint } from "@/lib/xml/widget-docs";
 
 interface Props {
   node: ResolvedNode;
@@ -42,8 +43,15 @@ function drawableNames(extras: ResourceExtras | null | undefined): string[] {
 
 export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras, onDeleteNode }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  /** M3a：右侧面板双页签：属性 / 文档 */
+  const [tab, setTab] = useState<"attrs" | "docs">("attrs");
+  /** 属性行展开的说明（点 ? 切换） */
+  const [hintOpen, setHintOpen] = useState<string | null>(null);
   // 换节点时清空草稿
-  useEffect(() => setDrafts({}), [node.path]);
+  useEffect(() => {
+    setDrafts({});
+    setHintOpen(null);
+  }, [node.path]);
 
   const commit = (name: string, value: string) => {
     const cur = node.rawAttrs[name];
@@ -224,6 +232,10 @@ export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras, onDe
   };
 
   const tag = shortTag(node.tag);
+  const wdoc = getWidgetDoc(node.tag);
+  /** 文档页：当前节点已有值的属性排前面，其余说在后面 */
+  const allDocs = docAttrs(node.tag);
+  const owned = new Set(Object.keys(node.rawAttrs));
 
   return (
     <div className="axv-attr-panel">
@@ -241,26 +253,101 @@ export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras, onDe
           </button>
         ) : null}
       </div>
+
+      {/* M3a：属性 / 文档页签 */}
+      <div className="axv-attr-tabs" role="tablist">
+        <button
+          role="tab"
+          aria-selected={tab === "attrs"}
+          className={"axv-attr-tab" + (tab === "attrs" ? " is-on" : "")}
+          onClick={() => setTab("attrs")}
+        >
+          属性
+        </button>
+        <button
+          role="tab"
+          aria-selected={tab === "docs"}
+          className={"axv-attr-tab" + (tab === "docs" ? " is-on" : "")}
+          onClick={() => setTab("docs")}
+        >
+          文档
+        </button>
+      </div>
+
+      {tab === "docs" ? (
+        <div className="axv-doc-body">
+          <div className="axv-doc-title">
+            {wdoc.title}
+            <span className="axv-doc-cat">{wdoc.category}</span>
+          </div>
+          <div className="axv-doc-summary">{wdoc.summary}</div>
+          {wdoc.notes?.length ? (
+            <ul className="axv-doc-notes">
+              {wdoc.notes.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="axv-doc-list">
+            {allDocs.map((a) => (
+              <div className={"axv-doc-item" + (owned.has(a.name) ? " is-set" : "")} key={a.name}>
+                <div className="axv-doc-row">
+                  <code className="axv-doc-name">{a.name}</code>
+                  <span className="axv-doc-type">{a.type}</span>
+                  {owned.has(a.name) ? <span className="axv-doc-badge">已设</span> : null}
+                </div>
+                <div className="axv-doc-desc">{a.desc}</div>
+                {a.values?.length ? (
+                  <div className="axv-doc-values">
+                    {a.values.slice(0, 4).map((v) => (
+                      <code key={v}>{v}</code>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
       <div className="axv-attr-rows">
         {rows.length === 0 && <div className="axv-attr-empty">该节点还没有属性</div>}
-        {rows.map(([name, value]) => (
-          <div className="axv-attr-row" key={name}>
-            <label className="axv-attr-name" title={name}>{name}</label>
-            <div className="axv-attr-value">{renderEditor(name, String(value))}</div>
-            <button
-              className="axv-attr-del"
-              title={`删除 ${name}`}
-              aria-label={`删除 ${name}`}
-              onClick={() => onRemove(name)}
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+        {rows.map(([name, value]) => {
+          const hint = attrHint(node.tag, name);
+          return (
+            <div key={name}>
+              <div className="axv-attr-row">
+                <label className="axv-attr-name" title={name}>{name}</label>
+                <div className="axv-attr-value">{renderEditor(name, String(value))}</div>
+                {hint ? (
+                  <button
+                    className="axv-attr-info"
+                    title={hint}
+                    aria-label={`${name} 说明`}
+                    onClick={() => setHintOpen((h) => (h === name ? null : name))}
+                  >
+                    ?
+                  </button>
+                ) : null}
+                <button
+                  className="axv-attr-del"
+                  title={`删除 ${name}`}
+                  aria-label={`删除 ${name}`}
+                  onClick={() => onRemove(name)}
+                >
+                  ✕
+                </button>
+              </div>
+              {hintOpen === name && hint ? <div className="axv-attr-note">{hint}</div> : null}
+            </div>
+          );
+        })}
       </div>
       <button className="axv-attr-add" onClick={onAddAttr}>
         ＋ 添加属性
       </button>
+        </>
+      )}
     </div>
   );
 }

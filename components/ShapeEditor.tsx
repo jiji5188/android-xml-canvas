@@ -120,19 +120,17 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
   const grad = spec.gradient;
 
   return (
-    <div
-      className="axv-modal-backdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="axv-modal axv-shape-modal axv-shape-full" role="dialog" aria-label="自定义形状">
-        <div className="axv-modal-head">
-          <span>自定义形状 · {attrName}</span>
-          <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">
-            ✕
-          </button>
-        </div>
+    <div className="axv-shape-page" role="dialog" aria-label="自定义形状">
+      <div className="axv-shape-head">
+        <button className="axv-shape-back" onClick={onClose} aria-label="返回编辑器">
+          <span className="msr" aria-hidden="true">arrow_back</span>
+          返回
+        </button>
+        <span className="axv-shape-title">自定义形状 · {attrName}</span>
+        <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">
+          ✕
+        </button>
+      </div>
 
         <div className="axv-shape-body">
           {/* 左：参数 */}
@@ -513,7 +511,6 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
           </div>
         </div>
       </div>
-    </div>
   );
 }
 

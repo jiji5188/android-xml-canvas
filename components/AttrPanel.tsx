@@ -5,6 +5,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ResolvedNode } from "@/lib/xml/types";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import { editorFor, type AttrEditor } from "./attr-catalog";
@@ -12,6 +13,9 @@ import { getWidgetDoc, docAttrs, attrHint } from "@/lib/xml/widget-docs";
 import { IconPickerPanel } from "./IconPickerPanel";
 import { ShapeEditor } from "./ShapeEditor";
 import { DrawablePicker } from "./DrawablePicker";
+import { vectorToDataUrl } from "@/lib/xml/vector-svg";
+import { specToCss } from "@/lib/xml/shape-gen";
+import { parseShapeSpec } from "@/lib/xml/shape-gen";
 
 interface Props {
   node: ResolvedNode;
@@ -133,11 +137,54 @@ export function AttrPanel({
   /** M4b：颜色输入区新布局 ——
    *  drawable 类属性（background/src/foreground）：一行 = 输入框（资源 ID / hex）+ 一个按钮
    *    按钮弹出「选择资源」对话框（颜色 / 图片xml资源 / 编辑创建形状 / 图标）
+   *    按钮背景显示当前值：纯色=色块，vector/shape=缩略图，其他资源=占位图标
    *  纯颜色属性：保留原 swatch（原生取色器）+ hex 输入框 */
   const renderColor = (name: string, value: string, allowDrawable: boolean) => {
     if (allowDrawable) {
       const isHex = /^#[0-9a-fA-F]{3,8}$/.test(value);
-      const isRes = /^@/ .test(value);
+      const isRes = /^@/.test(value.trim());
+      const resName = value.replace(/^@(?:drawable|mipmap)\//, "").replace(/\.xml$/, "");
+      const genXml = generatedXml?.[resName];
+      const upXml = resExtras?.drawableXml?.[resName];
+      /** 按钮背景：优先 shape 预览，其次 vector 缩略，再次位图，最后纯色 */
+      let btnBg: React.CSSProperties = { background: isHex ? value : "transparent" };
+      let btnLabel = isHex ? "" : isRes ? "🖼" : "＋ 选择";
+      if (isRes && genXml && /^<(ripple|selector|layer-list|inset|shape)/.test(genXml)) {
+        const spec = parseShapeSpec(genXml);
+        if (spec) {
+          const css = specToCss(spec);
+          btnBg = {
+            background: css.background ?? "transparent",
+            borderRadius: css.borderRadius as React.CSSProperties["borderRadius"] ?? undefined,
+            border: css.border ?? undefined,
+          };
+          btnLabel = "";
+        } else {
+          btnLabel = "";
+        }
+      } else if (isRes && upXml && /^<(ripple|selector|layer-list|inset|shape)/.test(upXml)) {
+        const spec = parseShapeSpec(upXml);
+        if (spec) {
+          const css = specToCss(spec);
+          btnBg = {
+            background: css.background ?? "transparent",
+            borderRadius: css.borderRadius as React.CSSProperties["borderRadius"] ?? undefined,
+            border: css.border ?? undefined,
+          };
+          btnLabel = "";
+        }
+      } else if (isRes && genXml && /<vector/.test(genXml)) {
+        try {
+          const url = vectorToDataUrl(genXml);
+          btnBg = { background: "#fff url(" + url + ") center / 20px no-repeat" };
+        } catch {
+          /* 缩略失败保持占位 */
+        }
+        btnLabel = "🖼";
+      } else if (isRes && resExtras?.drawables?.[resName]) {
+        btnBg = { background: "#fff url(" + resExtras.drawables[resName] + ") center / 20px no-repeat" };
+        btnLabel = "🖼";
+      }
       return (
         <div className="axv-attr-color axv-dp-row" style={{ display: "flex", gap: 6, alignItems: "center", width: "100%" }}>
           <input
@@ -154,12 +201,19 @@ export function AttrPanel({
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
           />
           <button
-            className="axv-attr-input axv-dp-btn"
-            style={{ flex: "0 0 auto", cursor: "pointer" }}
-            title={isHex ? "纯色值。点按钮可换选资源/改色" : isRes ? "资源引用。点按钮可换资源/改参数" : "选择颜色或 drawable 资源"}
+            className={"axv-dp-btn" + (isHex || isRes ? "" : " is-empty")}
+            style={btnBg}
+            title={
+              isHex
+                ? `当前是纯色 ${value}。点按钮可换成资源、改色或自定义形状`
+                : isRes
+                  ? `当前是资源 ${value}。点按钮可换资源或编辑参数`
+                  : "点按钮选择颜色 / 图片 xml 资源 / 自定义形状 / 图标"
+            }
+            aria-label={`选择 ${name} 的背景`}
             onClick={() => setDpOpen(name)}
           >
-            {isHex ? "🎨" : isRes ? "🖼" : "＋ 选择"}
+            {btnLabel}
           </button>
         </div>
       );
@@ -425,26 +479,6 @@ export function AttrPanel({
               <div className="axv-attr-row">
                 <label className="axv-attr-name" title={name}>{name}</label>
                 <div className="axv-attr-value">{renderEditor(name, vstr)}</div>
-                {onPickIcon && canPickIcon(name, vstr) ? (
-                  <button
-                    className="axv-attr-info"
-                    title="从 Material Symbols 选图标（会生成 res/drawable 资源）"
-                    aria-label={`为 ${name} 选择图标`}
-                    onClick={() => setIconPick(name)}
-                  >
-                    🖼
-                  </button>
-                ) : null}
-                {onSaveShape && SHAPE_ATTRS.has(name) ? (
-                  <button
-                    className="axv-attr-info"
-                    title="自定义形状（圆角/描边/渐变/水波纹，生成 drawable xml）"
-                    aria-label={`为 ${name} 自定义形状`}
-                    onClick={() => setShapeEdit(name)}
-                  >
-                    ⬛
-                  </button>
-                ) : null}
                 {hint ? (
                   <button
                     className="axv-attr-info"
@@ -489,6 +523,7 @@ export function AttrPanel({
       ) : null}
 
       {dpOpen ? (
+        createPortal(
         <DrawablePicker
           attrName={dpOpen}
           value={String(node.rawAttrs[dpOpen] ?? "")}
@@ -510,10 +545,13 @@ export function AttrPanel({
             setDpOpen(null);
           }}
           onClose={() => setDpOpen(null)}
-        />
+        />,
+          document.body
+        )
       ) : null}
 
       {shapeEdit ? (
+        createPortal(
         <ShapeEditor
           attrName={shapeEdit}
           value={String(node.rawAttrs[shapeEdit] ?? "")}
@@ -525,7 +563,9 @@ export function AttrPanel({
             setShapeEdit(null);
             shapeEditRef.current = undefined;
           }}
-        />
+        />,
+          document.body
+        )
       ) : null}
     </div>
   );

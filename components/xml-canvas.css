@@ -2553,38 +2553,6 @@
 .axv-dp-shape { display: flex; flex-direction: column; gap: 12px; }
 .axv-dp-shape p { margin: 0; line-height: 1.7; }
 
-/* 形状编辑器：全屏子页面（原来是右侧弹窗，参数一多就挤） */
-.axv-shape-full {
-  width: min(1120px, 96vw) !important;
-  height: min(860px, 92vh) !important;
-  max-width: none !important;
-  max-height: none !important;
-  display: flex;
-  flex-direction: column;
-}
-.axv-shape-full .axv-shape-body {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 18px;
-  overflow: auto;
-  padding: 14px 18px;
-}
-.axv-shape-full .axv-shape-form,
-.axv-shape-full .axv-shape-side { min-width: 0; overflow: visible; }
-.axv-shape-full .axv-shape-preview-box {
-  min-height: 200px;
-  display: grid;
-  place-items: center;
-}
-.axv-shape-full .axv-shape-xml { max-height: 320px; overflow: auto; }
-@media (max-width: 900px) {
-  .axv-shape-full { width: 100vw !important; height: 100vh !important; border-radius: 0 !important; }
-  .axv-shape-full .axv-shape-body { grid-template-columns: 1fr; }
-}
-
-
 /* M4c：export-note 挪进状态栏时间后面，水平居中；无提示时画前置摄像头小圆 */
 .axv-statusbar { position: relative; }
 .axv-sb-camera {
@@ -2612,3 +2580,105 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ===== M4d 形状编辑器：axv-editor 层内的整页子页面 ===== */
+.axv-shape-page {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  background: #F5F4F7;
+}
+.axv-shape-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.axv-shape-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 30px;
+  padding: 0 12px 0 6px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 999px;
+  background: #fff;
+  color: #34343d;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.axv-shape-back:hover { background: #f4f3f8; }
+.axv-shape-back .msr { font-size: 18px; }
+.axv-shape-title { font-size: 13.5px; font-weight: 600; color: #1d1b20; }
+.axv-shape-head .axv-icon-btn { margin-left: auto; }
+
+/* 页面内两栏：左参数 / 右预览+XML，各自滚动 */
+.axv-shape-page .axv-shape-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.axv-shape-page .axv-shape-form {
+  flex: none;
+  min-width: 0;
+  padding: 18px 22px 28px;
+  overflow-y: auto;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: none;
+}
+.axv-shape-page .axv-shape-side {
+  flex: none;
+  min-width: 0;
+  padding: 18px 22px 28px;
+  overflow-y: auto;
+  background: #faf9fd;
+}
+.axv-shape-page .axv-shape-preview-box { height: auto; min-height: 220px; }
+.axv-shape-page .axv-shape-xml { min-height: 120px; max-height: none; flex: 0 0 auto; }
+.axv-shape-page .axv-shape-foot {
+  flex: 0 0 auto;
+  background: #fff;
+}
+/* 表单两列，宽屏下少滚动 */
+@media (min-width: 1200px) {
+  .axv-shape-page .axv-shape-form { column-count: 2; column-gap: 24px; }
+  .axv-shape-page .axv-shape-form > * { break-inside: avoid; }
+  .axv-shape-page .axv-shape-adv { column-span: all; }
+}
+@media (max-width: 900px) {
+  .axv-shape-page .axv-shape-body { grid-template-columns: 1fr; }
+  .axv-shape-page .axv-shape-form { border-right: none; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+  .axv-shape-page .axv-shape-preview-box { min-height: 150px; }
+}
+
+/* ===== M4e background 行：输入框 + 一个「预览按钮」（背景 = 当前颜色/形状/图标） ===== */
+.axv-dp-btn {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 7px;
+  background-color: #fff;
+  background-origin: content-box;
+  background-clip: content-box;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+  font-size: 11.5px;
+  line-height: 24px;
+  white-space: nowrap;
+  cursor: pointer;
+  overflow: hidden;
+}
+.axv-dp-btn:hover { border-color: rgba(0, 0, 0, 0.34); }
+.axv-dp-btn:active { transform: scale(0.97); }
+.axv-dp-btn.is-empty { color: #5d5d69; font-size: 11px; }

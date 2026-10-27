@@ -62,18 +62,25 @@ interface GeomDrag {
   mode: GeomMode;
   px: number;
   py: number;
-  /** 起点：布局 px（未受父级 transform 缩放影响） */
+  /** 起点 margin（布局 px，用于写 layout_marginStart/Top）
+   *  · 非 CL：直接读 computedStyle.marginLeft
+   *  · CL 子项：渲染层把 margin 折进了 left/top（patchCL 会 delete margin），
+   *    必须从 rawAttrs 的 layout_marginStart/marginTop 读，否则恒为 0 → 写回去位置飞。 */
   x: number;
   y: number;
+  /** 起点尺寸（布局 px，offsetWidth/offsetHeight） */
   w: number;
   h: number;
-  /** 视觉缩放比（外层 transform: scale(fitRatio)），屏幕位移 ÷ 它 = 布局位移 */
+  /** 视觉缩放比 rect.width / offsetWidth（外层 transform: scale(fitRatio)） */
   vs: number;
-  /** 宽/高是否是百分比型（match_parent / calc(100% - Npx)）。
-   *  这类元素一旦加上 margin，Android 语义会把宽度扣掉 margin → 预览必须同步缩，
-   *  否则松手后模型一算就“闪”一下变窄。 */
+  /** 宽/高是否百分比型（match_parent / calc(100% - Npx)） */
   wPct: boolean;
   hPct: boolean;
+  /** 是否是 CL 子项（预览改 left/top，而不是 margin） */
+  cl: boolean;
+  /** 绝对 left/top（布局 px），仅 CL 预览用 */
+  left: number;
+  top: number;
 }
 
 export function XmlCanvas({
@@ -96,6 +103,10 @@ export function XmlCanvas({
     y: number;
     w: number;
     h: number;
+    /** CL 子项：预览直接给 absolute left/top */
+    cl: boolean;
+    left: number;
+    top: number;
   } | null>(null);
   const selfRef = useRef<HTMLDivElement | null>(null);
   const geomRef = useRef<GeomDrag | null>(null);
@@ -129,15 +140,21 @@ export function XmlCanvas({
   //   位置与拖拽时完全一致 → 不会出现「松手先弹回再跳到新位置」的双跳。
   if (isSel && geomLive) {
     const g = geomLive;
-    if (g.mode === "move" || g.mode === "left") style.marginLeft = `${g.x}px`;
-    if (g.mode === "move" || g.mode === "top") style.marginTop = `${g.y}px`;
+    if (g.cl) {
+      // CL 子项：模型把 margin 折进了 left/top，预览就得改 left/top
+      if (g.mode === "left") style.left = `${g.left}px`;
+      if (g.mode === "top") style.top = `${g.top}px`;
+    } else {
+      if (g.mode === "move" || g.mode === "left") style.marginLeft = `${g.x}px`;
+      if (g.mode === "move" || g.mode === "top") style.marginTop = `${g.y}px`;
+    }
     if (g.mode === "left" || g.mode === "right") style.width = `${g.w}px`;
     if (g.mode === "top" || g.mode === "bottom") style.height = `${g.h}px`;
     // move 时如果原本是百分比宽/高，宽度会因新增 margin 而缩，预览要同步（否则松手闪一下）
-    if (g.mode === "move" && style.width !== undefined && /%/.test(String(style.width))) {
+    if (!g.cl && g.mode === "move" && style.width !== undefined && /%/.test(String(style.width))) {
       style.width = `${g.w}px`;
     }
-    if (g.mode === "move" && style.height !== undefined && /%/.test(String(style.height))) {
+    if (!g.cl && g.mode === "move" && style.height !== undefined && /%/.test(String(style.height))) {
       style.height = `${g.h}px`;
     }
     style.zIndex = 50;
@@ -146,9 +163,30 @@ export function XmlCanvas({
   // 是否显示约束手柄：自己选中 + 父是 ConstraintLayout + 自己不是 Guideline/Barrier
   const inCL = _parentTag !== undefined && shortTag(_parentTag) === "ConstraintLayout";
   const st = shortTag(node.tag);
-  const showHandles = !!onConstraintDraw && isSel && inCL && st !== "Guideline" && st !== "Barrier";
+  const isAux = st === "Guideline" || st === "Barrier";
+  const showHandles = !!onConstraintDraw && isSel && inCL && !isAux;
   // 自由几何手柄：选中 + 非 CL 父 + 不是辅助节点
-  const showGeom = !!onGeometryChange && isSel && !inCL && st !== "Guideline" && st !== "Barrier";
+  const showGeom = !!onGeometryChange && isSel && !inCL && !isAux;
+  // CL 子项：位置由约束决定，不提供移动，但只要尺寸可写就给「改宽高」手柄。
+  // 左侧/上侧需要 marginStart/marginTop 才能把边推出去 → 只有本来就锚了 start/top 才给。
+  const rawA = (node.rawAttrs ?? {}) as Record<string, unknown>;
+  const hasC = (keys: string[]) => keys.some((k) => rawA[k] !== undefined);
+  const hasStartC = hasC([
+    "layout_constraintStart_toStartOf",
+    "layout_constraintStart_toEndOf",
+    "layout_constraintLeft_toLeftOf",
+    "layout_constraintLeft_toRightOf",
+  ]);
+  const hasTopC = hasC(["layout_constraintTop_toTopOf", "layout_constraintTop_toBottomOf"]);
+  const clResizeSides: GeomMode[] =
+    !!onGeometryChange && isSel && inCL && !isAux
+      ? ([
+          ...(hasStartC ? (["left"] as GeomMode[]) : []),
+          "right",
+          ...(hasTopC ? (["top"] as GeomMode[]) : []),
+          "bottom",
+        ] as GeomMode[])
+      : [];
   // 根布局不能「移动」：它在窗口里总是填满内容区，写 layout_marginStart/Top 只会
   // 让根四边出现不对称间隙（预览已忽略根 margin，这里也不再给拖动手柄）
   const isRootNode = node.path === "#0";
@@ -210,7 +248,7 @@ export function XmlCanvas({
   // 【视觉尺寸】，直接 /scale 转 dp 会在松手时按 fitRatio 缩小一次（拖大反而变小）。
   // 所以统一换算成【布局 px】：尺寸用 offsetWidth/offsetHeight，位移用屏幕位移 ÷ vs，
   // 起点坐标直接读 computedStyle 的 margin（就是 layout_marginStart/Top 的实际值）。
-  const beginGeom = (mode: GeomMode) => (e: React.PointerEvent) => {
+  const beginGeom = (mode: GeomMode, cl = false) => (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const el = selfRef.current;
@@ -224,19 +262,41 @@ export function XmlCanvas({
     // 宽/高是百分比型？用 inline style 判定（computed 已被解成 px）
     const inlineW = el.style.width || "";
     const inlineH = el.style.height || "";
+    // 起点 margin：CL 子项的 margin 被 patchCL 折进了 left/top，computed 恒为 0，
+    // 必须回到 rawAttrs 的 layout_marginStart/Top 才能算出正确的目标 margin。
+    const rawMargin = (keys: string[]): number => {
+      for (const k of keys) {
+        const v = rawA[k];
+        if (v === undefined || v === null) continue;
+        const n = parseFloat(String(v));
+        if (!Number.isNaN(n)) return n * scale;
+      }
+      return 0;
+    };
+    const mx = cl
+      ? rawMargin(["layout_marginStart", "layout_marginLeft", "layout_margin"])
+      : parseFloat(cs.marginLeft) || 0;
+    const my = cl
+      ? rawMargin(["layout_marginTop", "layout_margin"])
+      : parseFloat(cs.marginTop) || 0;
+    const baseLeft = parseFloat(cs.left) || 0;
+    const baseTop = parseFloat(cs.top) || 0;
     geomRef.current = {
       mode,
       px: e.clientX,
       py: e.clientY,
-      x: parseFloat(cs.marginLeft) || 0,
-      y: parseFloat(cs.marginTop) || 0,
+      x: mx,
+      y: my,
       w: layoutW,
       h: layoutH,
       vs,
-      wPct: inlineW.includes("%"),
-      hPct: inlineH.includes("%"),
+      wPct: !cl && inlineW.includes("%"),
+      hPct: !cl && inlineH.includes("%"),
+      cl,
+      left: baseLeft,
+      top: baseTop,
     };
-    setGeomLive({ mode, x: parseFloat(cs.marginLeft) || 0, y: parseFloat(cs.marginTop) || 0, w: layoutW, h: layoutH });
+    setGeomLive({ mode, x: mx, y: my, w: layoutW, h: layoutH, cl, left: baseLeft, top: baseTop });
 
     /** 统一的几何推导：屏幕位移 → 绝对布局 px（预览与写回共用，保证两者完全一致） */
     const derive = (g: GeomDrag, ev: PointerEvent) => {
@@ -269,14 +329,14 @@ export function XmlCanvas({
       }
       w = Math.max(8, w);
       h = Math.max(8, h);
-      return { x, y, w, h };
+      return { x, y, w, h, left: g.left + (x - g.x), top: g.top + (y - g.y) };
     };
 
     const move = (ev: PointerEvent) => {
       const g = geomRef.current;
       if (!g) return;
       const n = derive(g, ev);
-      setGeomLive({ mode: g.mode, ...n });
+      setGeomLive({ mode: g.mode, ...n, cl: g.cl });
     };
     const up = (ev: PointerEvent) => {
       window.removeEventListener("pointermove", move);
@@ -290,7 +350,7 @@ export function XmlCanvas({
       }
       const n = derive(g, ev);
       // 锁住最后一帧，等模型落地后再撤（see useEffect [node]）
-      setGeomLive({ mode: g.mode, ...n });
+      setGeomLive({ mode: g.mode, ...n, cl: g.cl });
       // 布局 px → dp（除以 dp 比例，与 css.ts 的 DP() 互逆）
       const r1 = (v: number) => Math.round(v * 10) / 10;
       const px2dp = (v: number) => r1(v / scale);
@@ -472,6 +532,26 @@ export function XmlCanvas({
                       : "拖动改高度（下边）"
               }
               onPointerDown={beginGeom(m)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ))}
+        </>
+      ) : null}
+
+      {/* CL 子项：位置由约束决定，只给「改宽高」手柄（无移动）。
+          手柄画在边内侧，避开外侧的约束圆点（拖约束用）。 */}
+      {clResizeSides.length > 0 ? (
+        <>
+          {clResizeSides.map((m) => (
+            <span
+              key={"cl-" + m}
+              className={"axv-geom-resize axv-geom-cl axv-geom-cl-" + m}
+              title={
+                m === "left" || m === "right"
+                  ? "拖动改 layout_width（位置由约束决定，不会移动）"
+                  : "拖动改 layout_height（位置由约束决定，不会移动）"
+              }
+              onPointerDown={beginGeom(m, true)}
               onClick={(e) => e.stopPropagation()}
             />
           ))}

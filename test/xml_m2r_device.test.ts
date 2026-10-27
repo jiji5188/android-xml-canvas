@@ -53,9 +53,11 @@ describe("M2r 设备尺寸", () => {
     expect(deviceById(undefined).id).toBe("phone");
   });
 
-  it("预设有 5 个且横屏/平板宽度正确", () => {
-    expect(DEVICE_PRESETS).toHaveLength(5);
-    expect(deviceById("tablet").w).toBe(800);
-    expect(deviceById("phone-land").w).toBe(892);
+  it("预设包含横屏/平板且尺寸正确（M2z 已扩充为多机型）", () => {
+    expect(DEVICE_PRESETS.length).toBeGreaterThanOrEqual(5);
+    expect(deviceById("tablet-10").w).toBe(800);
+    expect(deviceById("tablet").w).toBe(600);
+    expect(deviceById("phone-892").w).toBe(412);
+    expect(deviceById("phone-land").w).toBe(915);
   });
 });

@@ -54,19 +54,57 @@ export const SCREEN_DP = { w: 412, h: 892 } as const;
 export interface DevicePreset {
   id: string;
   label: string;
+  /** 屏幕 dp 宽 */
   w: number;
+  /** 屏幕 dp 高 */
   h: number;
   /** 尺寸限定符提示：预览横屏时提醒用户这是 layout-land */
   hint: string;
+  /** M2z：屏幕密度 dpi（仅展示用，用于提醒用户实际像素换算） */
+  dpi?: number;
+  /** M2z：机身圆角半径（dp），影响预览外壳圆角 */
+  radius?: number;
+  /** M2z：分组名（下拉 optgroup），便于按机型挑选 */
+  group?: string;
 }
 
 export const DEVICE_PRESETS: DevicePreset[] = [
-  { id: "phone", label: "手机 412×892", w: 412, h: 892, hint: "layout/" },
-  { id: "phone-land", label: "手机横屏 892×412", w: 892, h: 412, hint: "layout-land/" },
-  { id: "small", label: "小屏 360×640", w: 360, h: 640, hint: "layout/" },
-  { id: "tablet", label: "平板 800×1280", w: 800, h: 1280, hint: "layout-sw600dp/" },
-  { id: "tablet-land", label: "平板横屏 1280×800", w: 1280, h: 800, hint: "layout-sw600dp-land/" },
+  // ---- 手机竖屏 ----
+  { id: "phone", label: "Pixel 7 · 412×915", w: 412, h: 915, hint: "layout/", dpi: 420, radius: 28, group: "手机" },
+  { id: "phone-892", label: "通用手机 · 412×892", w: 412, h: 892, hint: "layout/", dpi: 420, radius: 24, group: "手机" },
+  { id: "small", label: "小屏 · 360×640", w: 360, h: 640, hint: "layout/", dpi: 320, radius: 16, group: "手机" },
+  { id: "compact", label: "小屏细长 · 360×780", w: 360, h: 780, hint: "layout/", dpi: 400, radius: 24, group: "手机" },
+  { id: "tiny", label: "超小屏 · 320×568", w: 320, h: 568, hint: "layout/", dpi: 320, radius: 8, group: "手机" },
+  { id: "pixel-xl", label: "Pixel 7 Pro · 412×1008", w: 412, h: 1008, hint: "layout/", dpi: 480, radius: 30, group: "手机" },
+  { id: "galaxy", label: "Galaxy S23 · 360×851", w: 360, h: 851, hint: "layout/", dpi: 480, radius: 26, group: "手机" },
+  { id: "mate", label: "Mate 60 · 400×872", w: 400, h: 872, hint: "layout/", dpi: 480, radius: 28, group: "手机" },
+  // ---- 横屏 ----
+  { id: "phone-land", label: "手机横屏 · 915×412", w: 915, h: 412, hint: "layout-land/", dpi: 420, radius: 28, group: "横屏" },
+  { id: "small-land", label: "小屏横屏 · 640×360", w: 640, h: 360, hint: "layout-land/", dpi: 320, radius: 16, group: "横屏" },
+  // ---- 平板 ----
+  { id: "tablet", label: "平板 7\" · 600×960", w: 600, h: 960, hint: "layout-sw600dp/", dpi: 320, radius: 12, group: "平板" },
+  { id: "tablet-10", label: "平板 10\" · 800×1280", w: 800, h: 1280, hint: "layout-sw720dp/", dpi: 320, radius: 12, group: "平板" },
+  { id: "tablet-land", label: "平板横屏 · 1280×800", w: 1280, h: 800, hint: "layout-sw720dp-land/", dpi: 320, radius: 12, group: "平板" },
+  // ---- 其他 ----
+  { id: "fold", label: "折叠屏展开 · 673×841", w: 673, h: 841, hint: "layout-sw600dp/", dpi: 420, radius: 20, group: "其他" },
+  { id: "tv", label: "电视 1080p · 960×540", w: 960, h: 540, hint: "layout-television/", dpi: 320, radius: 0, group: "其他" },
+  { id: "watch", label: "手表 · 192×192", w: 192, h: 192, hint: "layout-watch/", dpi: 320, radius: 96, group: "其他" },
 ];
+
+/** 按分组折叠的预设（下拉 optgroup 用） */
+export function deviceGroups(): { group: string; items: DevicePreset[] }[] {
+  const order: string[] = [];
+  const map = new Map<string, DevicePreset[]>();
+  for (const d of DEVICE_PRESETS) {
+    const g = d.group ?? "其他";
+    if (!map.has(g)) {
+      map.set(g, []);
+      order.push(g);
+    }
+    map.get(g)!.push(d);
+  }
+  return order.map((g) => ({ group: g, items: map.get(g)! }));
+}
 
 /** 按 id 取预设，未知 id 回落手机竖屏 */
 export function deviceById(id: string | undefined): DevicePreset {

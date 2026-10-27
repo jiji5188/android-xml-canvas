@@ -32,7 +32,7 @@ import { ResTree } from "./ResTree";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
-import { readableOn, deviceById, DEVICE_PRESETS } from "@/lib/xml/theme";
+import { readableOn, deviceById, deviceGroups } from "@/lib/xml/theme";
 
 const SAMPLES: Record<string, string> = {
   /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
@@ -1314,6 +1314,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                 color: phoneFg,
                 transform: fitRatio < 1 ? `scale(${fitRatio})` : undefined,
                 transformOrigin: "top left",
+                borderRadius: device.radius ? Math.round(device.radius * DPX) : undefined,
               }}
               onDragOver={(e) => {
                 if (e.dataTransfer.types.includes(DRAG_WIDGET_MIME)) {
@@ -1719,10 +1720,14 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               onChange={(e) => changeDevice(e.target.value)}
               title={`预览设备：${device.label}（对应 ${device.hint}）`}
             >
-              {DEVICE_PRESETS.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.label}
-                </option>
+              {deviceGroups().map((g) => (
+                <optgroup key={g.group} label={g.group}>
+                  {g.items.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

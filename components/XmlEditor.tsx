@@ -16,7 +16,7 @@ import { buildResourceExtras, type ResourceExtras } from "@/lib/xml/resdir";
 import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, isSingleChildTag, applyConstraintDefaults, canAcceptChild } from "@/lib/xml/insert";
-import { moveNodeRaw } from "@/lib/xml/reorder";
+import { moveNodeRaw, scanElements } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml } from "@/lib/xml/lint";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
@@ -1005,7 +1005,19 @@ export function XmlEditor() {
   };
 
   // ===== 图层操作 =====
+  /**
+   * 结构自检：标签没闭合 / 有多个根时，按 path 切片会切到錯的区间（历史上因此丢节点、重复节点）。
+   * 这种时候宁可不改，也不要把文档弄得更乱——顺手把提示挂在底部提示条上。
+   */
+  const structureBroken = (): boolean => {
+    const root = scanElements(xml);
+    const broken = !root || !!xml.slice(root.end).trim();
+    if (broken) setExportNote("当前 XML 结构不完整（有标签没闭合），层级调整已暂停；请先在代码里补齐闭合标签");
+    return broken;
+  };
+
   const onMoveSibling = (targetPath: string, toIndex: number) => {
+    if (structureBroken()) return;
     const r = moveSibling(xml, targetPath, toIndex);
     if (r.ok) {
       setXmlAndTrack(r.xml);
@@ -1015,6 +1027,7 @@ export function XmlEditor() {
 
   /** M3d：拖拽调整层级（三种落点：上一兄弟 / 作为子项 / 下一兄弟） */
   const onDragMoveNode = (fromPath: string, target: { path: string; zone: "before" | "inside" | "after" }) => {
+    if (structureBroken()) return;
     const { root } = parseLayoutXml(xml);
     if (!root) return;
     const targetNode = findNode(root, target.path);

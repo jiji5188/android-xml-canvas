@@ -122,7 +122,8 @@ export function setNodeAttrs(
   for (const t of tokens) {
     if (!t.name.startsWith("xmlns")) byBare.set(t.bare, t);
   }
-  const hasNsApp = tokens.some((t) => t.name === "xmlns:app");
+  /** 自己或文档里任何祖先已经声明过 xmlns:app 就不用再写（命名空间是继承的，重复声明纯属噪声） */
+  const hasNsApp = tokens.some((t) => t.name === "xmlns:app") || xml.includes("xmlns:app=");
 
   const edits: { start: number; end: number; text: string }[] = [];
   const touched: string[] = [];
@@ -170,21 +171,22 @@ export function setNodeAttrs(
   if (pending.length) {
     const indent = detectIndent(xml, nameEnd, contentEnd);
     const anchor = tokens.length ? tokens[tokens.length - 1].end : nameEnd;
+    /** 同一次调用只补一次 xmlns:app（以前没这个标记，一次加两个 app: 属性会写出两份声明） */
+    let nsAppDone = hasNsApp;
     let text = "";
     for (const p of pending) {
       // app: 属性首次出现时补 xmlns:app
-      if (p.full.startsWith("app:") && !hasNsApp) {
+      if (p.full.startsWith("app:") && !nsAppDone) {
         text += `${indent}xmlns:app="${APP_NS}"`;
+        nsAppDone = true;
       }
       const { q, v } = quoteFor(p.value);
       text += `${indent}${p.full}=${q}${v}${q}`;
     }
     edits.push({ start: anchor, end: anchor, text });
-    // 自闭合标签末尾要留一个空格前的换行不美观 → 用原缩进
-    if (el.selfClosing) {
-      // 让 "/>" 缩进回主缩进（把行尾空白压掉）
-      edits.push({ start: contentEnd, end: el.openEnd - 1, text: "" });
-    }
+    // ⚠️ 不要再动 "/>"：插入点在斜杠之前，标签结尾本就完整。
+    // 历史 bug：这里曾把自闭合末尾的斜杠删掉 → 控件变成没闭合的 <Xxx ... >，
+    // 整篇 XML 非法；之后层级调整/拖拽在错位的节点区间上切片，才会丢节点、重复节点。
   }
 
   if (!edits.length) return { xml, changed: false, touched: [] };

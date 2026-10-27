@@ -26,6 +26,15 @@ interface Props {
 
 const shortTag = (t: string) => (t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t);
 
+/** M3e：从属性值里读 dp 数（"8dp" → 8；读不出算 0） */
+function dpValue(raw: string | undefined): number {
+  if (!raw) return 0;
+  const m = /^(-?\d+(?:\.\d+)?)\s*(?:dp|dip)?$/.exec(raw.trim());
+  return m ? Number(m[1]) : 0;
+}
+
+const ELEV_PRESETS = [0, 2, 4, 8, 12, 24];
+
 function sizeOptions(value: string): string[] {
   const presets = ["match_parent", "wrap_content", "0dp", "8dp", "16dp", "24dp", "48dp"];
   const extra = !presets.includes(value) && value ? [value] : [];
@@ -233,6 +242,18 @@ export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras, onDe
 
   const tag = shortTag(node.tag);
   const wdoc = getWidgetDoc(node.tag);
+  /** M3e：当前层级（elevation + translationZ 的总和才是真实 Z） */
+  const elevDp = dpValue(node.rawAttrs["elevation"]);
+  const tzDp = dpValue(node.rawAttrs["translationZ"]);
+  /** 拖动滑块/点预设：0 就删掉属性（别在 XML 里留一堆 elevation="0dp"） */
+  const commitElev = (dp: number) => {
+    if (dp <= 0) {
+      if (node.rawAttrs["elevation"] !== undefined) onRemove("elevation");
+      return;
+    }
+    if (String(dp) + "dp" === node.rawAttrs["elevation"]) return;
+    onCommit("elevation", `${dp}dp`);
+  };
   /** 文档页：当前节点已有值的属性排前面，其余说在后面 */
   const allDocs = docAttrs(node.tag);
   const owned = new Set(Object.keys(node.rawAttrs));
@@ -252,6 +273,41 @@ export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras, onDe
             🗑 删除
           </button>
         ) : null}
+      </div>
+
+      {/* M3e：层级（elevation）专用控件——比在属性行里手打数字好找 */}
+      <div className="axv-elev">
+        <div className="axv-elev-head">
+          <span className="axv-elev-title">层级</span>
+          <span className="axv-elev-val">
+            {tzDp > 0 ? `Z ${elevDp + tzDp}dp` : `${elevDp}dp`}
+          </span>
+          <span className="axv-elev-tip" title="抬得越高越靠上层：能盖住兄弟控件，并带阴影（Android: elevation）">
+            elevation
+          </span>
+        </div>
+        <input
+          className="axv-elev-range"
+          type="range"
+          min={0}
+          max={24}
+          step={1}
+          value={elevDp > 24 ? 24 : elevDp}
+          aria-label="层级高度"
+          onChange={(e) => commitElev(Number(e.target.value))}
+        />
+        <div className="axv-elev-presets">
+          {ELEV_PRESETS.map((v) => (
+            <button
+              key={v}
+              className={"axv-elev-chip" + (elevDp === v ? " is-on" : "")}
+              title={v === 0 ? "平放（无阴影，不抬升）" : `抬升 ${v}dp`}
+              onClick={() => commitElev(v)}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* M3a：属性 / 文档页签 */}

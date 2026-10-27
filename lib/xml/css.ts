@@ -333,10 +333,34 @@ export function buildRenderModel(
         style.boxSizing = "border-box";
       }
     }
-    const el = attrs["elevation"] as { kind?: string; value?: number } | null;
-    if (el && el.kind === "dp" && (el.value ?? 0) > 0) {
-      const ev = el.value ?? 0;
-      style.boxShadow = `0 ${ev * scale * 2}px ${ev * scale * 4}px rgba(0,0,0,0.18)`;
+    // ===== M3e：elevation / translationZ =====
+    // Android 里 Z = elevation + translationZ，它不仅决定阴影大小，
+    // **更决定绘制层级**：Z 高的控件会盖住 Z 低的兄弟（即使 XML 里写在前面）。
+    // 所以除了 boxShadow，还必须映射成 z-index，否则重叠场景预览就是错的。
+    const elAttr = attrs["elevation"] as unknown;
+    const tzAttr = attrs["translationZ"] as unknown;
+    /** 属性值可能是 { kind:"dp", value } 也可能是原始字符串，两种都认 */
+    const dpOf = (v: unknown): number => {
+      if (typeof v === "number") return v;
+      if (typeof v === "string") {
+        const m = /^(-?\d+(?:\.\d+)?)\s*(?:dp|dip)?$/.exec(v.trim());
+        return m ? Number(m[1]) : 0;
+      }
+      if (v && typeof v === "object") {
+        const o = v as { kind?: string; value?: number };
+        return o.kind === "dp" ? o.value ?? 0 : 0;
+      }
+      return 0;
+    };
+    const elDp = dpOf(elAttr);
+    const tzDp = dpOf(tzAttr);
+    const zDp = elDp + tzDp;
+    if (zDp > 0) {
+      const d = zDp * scale;
+      // 双层阴影更接近 Material 的真实观感：近处实影 + 远处柔影
+      style.boxShadow = `0 ${Math.max(1, Math.round(d * 0.5))}px ${Math.round(d)}px rgba(0,0,0,0.20), 0 ${Math.round(d * 1.5)}px ${Math.round(d * 2.5)}px rgba(0,0,0,0.10)`;
+      // z-index 阶梯化：2dp 一档，避免浮点差异；选中态的 9999 仍会盖住它
+      style.zIndex = 1 + Math.min(500, Math.round(zDp / 2));
     }
 
     // 可见性
@@ -478,7 +502,8 @@ export function buildRenderModel(
       const cr = (attrs["cardCornerRadius"] as number) || 12;
       style.backgroundColor = bg || "#FFFFFF";
       style.borderRadius = `${DP(cr, scale)}px`;
-      if (!el || (el.value ?? 0) <= 0) style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)";
+      // 卡片没显式 elevation 时给个默认阴影（用了 elevation 就听 elevation 的）
+      if (elDp + tzDp <= 0) style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)";
       style.overflow = "hidden";
     }
 
@@ -559,7 +584,8 @@ export function buildRenderModel(
     const FRAME_PARENTS = new Set(["FrameLayout", "CoordinatorLayout", "DrawerLayout", "FragmentContainerView"]);
     if (FRAME_PARENTS.has(parentTag)) {
       style.position = "absolute";
-      style.zIndex = "1";
+      // 堆叠语义：基础层 1；有 elevation/translationZ 的子项已经算好更高的 z，不能覆盖
+      if (style.zIndex === undefined) style.zIndex = "1";
     }
 
     // M2v：GridLayout 子项落格（layout_column/layout_row 0 基 → CSS 1 基）

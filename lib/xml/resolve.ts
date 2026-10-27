@@ -349,6 +349,9 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
 
   // 圆角 / 阴影（elevation）
   out["elevation"] = a["elevation"] !== undefined ? resolveSize(a["elevation"], res, issues, path, "elevation") : null;
+  // M3e：translationZ 参与 Z 轴堆叠（Android 的 Z = elevation + translationZ）
+  out["translationZ"] =
+    a["translationZ"] !== undefined ? resolveSize(a["translationZ"], res, issues, path, "translationZ") : null;
   out["radius"] = a["radius"] !== undefined ? (resolveSize(a["radius"], res, issues, path, "radius").kind as string === "dp" ? (resolveSize(a["radius"], res, issues, path, "radius") as { kind: "dp"; value: number }).value : 0) : 0;
 
   // id（回写定位用）

@@ -12,7 +12,7 @@ import { buildRenderModel } from "@/lib/xml/css";
 import type { MeasuredMap } from "@/lib/xml/constraints";
 import { commitHistoryState, EMPTY_MARK, type MergeMark } from "@/lib/xml/history";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
-import { buildResourceExtras, type ResourceExtras } from "@/lib/xml/resdir";
+import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
 import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, isSingleChildTag, applyConstraintDefaults, canAcceptChild } from "@/lib/xml/insert";
@@ -570,7 +570,15 @@ export function XmlEditor() {
     if (!raw) return;
     try {
       const { extras, fragment } = JSON.parse(raw);
-      if (extras && typeof extras === "object" && extras.drawables) setResExtras(extras);
+      if (extras && typeof extras === "object" && extras.drawables) {
+        // M4v：老缓存里 vector 只有名字、没全文 → 从 tree 回填，不用重新导入 res
+        try {
+          backfillDrawableXml(extras as ResourceExtras);
+        } catch {
+          /* 结构异常就当没回填 */
+        }
+        setResExtras(extras);
+      }
       if (typeof fragment === "string" && fragment) setResourceFragment(fragment);
     } catch {
       /* 损坏忽略 */

@@ -552,8 +552,9 @@ export function buildRenderModel(
         } else if (/^#[0-9a-fA-F]{3,8}$/.test(src.trim())) {
           // src 写成纯色（旧版选择器错误）——Android 当 ColorDrawable 画，预览也画底色
           style.backgroundColor = src.trim();
-        } else if (/^(data:|https?:|blob:)/.test(src)) {
+        } else if (/^(data:|https?:|blob:|builtin:)/.test(src)) {
           // M4s：真图不用 background 画，交给 <img> 内容层（background 在下、src 在上）
+          // M4v：builtin: = @android:drawable/xxx 平台内置图标，XmlCanvas 画中性占位
           imgSrc = src;
           const st = (attrs["scaleType"] as string) || "fitCenter";
           imgFit =

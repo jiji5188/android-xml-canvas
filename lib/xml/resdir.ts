@@ -146,25 +146,26 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
       continue;
     }
 
-    // ---- drawable 下的矢量 xml ----
+    // ---- drawable / mipmap 下的 xml（vector / shape / selector / ripple / layer-list / adaptive-icon …）----
     if (file.endsWith(".xml") && (looksDrawable || /(^|\/)(drawable|mipmap)/.test(rel))) {
       const text = await item.file.text();
-      if (/<vector[\s>]/.test(text)) {
-        const name = file.replace(/\.xml$/i, "");
+      const name = file.replace(/\.xml$/i, "");
+      // M4v：**所有** drawable/mipmap 里的 xml 都存原文。
+      // 以前 vector 只记名字不存全文 → 资源选择弹窗列表里看不到、画布只能画紫虚线占位。
+      const isVec = /<vector[\s>]/.test(text);
+      const isShape = /<(shape|selector|ripple|layer-list|inset|animated-rotate|animation-list|level-list|clip|scale|transition|crossfade|bitmap)[\s>]/.test(text);
+      if (isVec) {
         if (!extras.vectorNames.includes(name)) {
           extras.vectorNames.push(name);
           extras.counts.vectors++;
         }
-        extras.sourceFiles.push(rel);
-        upsertTree(tree, rel, item.file, text);
-      } else if (/<(shape|selector|ripple)[\s>]/.test(text)) {
-        // M2w：shape / selector / ripple → 存原文，resolve 时还原成渐变/圆角/描边背景
-        const name = file.replace(/\.xml$/i, "");
-        extras.drawableXml[name] = text;
+      } else if (isShape) {
         extras.counts.shapes++;
-        extras.sourceFiles.push(rel);
-        upsertTree(tree, rel, item.file, text);
       }
+      // vector 也进 drawableXml：resolveDrawable 和资源选择弹窗都靠它拿 xml 原文
+      if (!extras.drawableXml[name]) extras.drawableXml[name] = text;
+      extras.sourceFiles.push(rel);
+      upsertTree(tree, rel, item.file, text);
       continue;
     }
   }
@@ -196,6 +197,39 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
 
   extras.tree = tree as ResTreeDir;
   return extras;
+}
+
+/**
+ * M4v：老缓存（M4v 之前导入的 res）里 vector xml 只存了名字、没存全文。
+ * 这里从 tree 里把 drawable/mipmap 下所有 xml 的原文回填到 drawableXml，
+ * 这样用户不用重新导入 res，画布 / 资源选择弹窗马上就能拿到 vector 源。
+ */
+export function backfillDrawableXml(extras: ResourceExtras): number {
+  if (!extras.tree) return 0;
+  let filled = 0;
+  const walk = (dir: ResTreeDir) => {
+    for (const child of Object.values(dir.children)) {
+      if ("children" in child) {
+        walk(child);
+        continue;
+      }
+      const rel = child.rel;
+      if (!/\.xml$/i.test(rel)) continue;
+      const idx = rel.lastIndexOf("/res/");
+      const path = idx >= 0 ? rel.slice(idx + 5) : rel.replace(/^res\//, "");
+      const dirName = path.split("/")[0] || "";
+      if (!/^(drawable|mipmap)(-|$)/.test(dirName)) continue;
+      const text = child.text;
+      if (!text) continue;
+      const name = (path.split("/").pop() || "").replace(/\.xml$/i, "");
+      if (!name || extras.drawableXml[name]) continue;
+      extras.drawableXml[name] = text;
+      filled++;
+    }
+  };
+  if (!extras.drawableXml) extras.drawableXml = {};
+  walk(extras.tree);
+  return filled;
 }
 
 function fileToDataUrl(file: File): Promise<string> {

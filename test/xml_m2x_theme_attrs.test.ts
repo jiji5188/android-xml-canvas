@@ -26,7 +26,9 @@ describe("M2x ?attr 主题解析", () => {
       themeAttrs: { brandColor: "@color/brand" },
       colors: { ...DEFAULT_RESOURCES.colors, brand: "#FF123456" },
     };
-    expect(attrColor(`<TextView ${A} android:textColor="?attr/brandColor" />`, res)).toBe("#FF123456");
+    // M4v 行为变更（有意）：Android 8 位 hex 是 #AARRGGBB，必须转成 CSS（#123456）——
+    // 旧断言保留了项目原值，浏览器会当 #RRGGBBAA 解析成半透明色
+    expect(attrColor(`<TextView ${A} android:textColor="?attr/brandColor" />`, res)).toBe("#123456");
   });
 
   it("主题值直接是 #hex 也能用", () => {

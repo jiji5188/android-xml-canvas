@@ -469,7 +469,28 @@ export function XmlCanvas({
       title={node.tag + (node.rawAttrs.id ? " · " + node.rawAttrs.id : "") + (node.text ? " · " + node.text : "")}
     >
       {node.imgSrc ? (
-        node.imgTint ? (
+        node.imgSrc.startsWith("builtin:") ? (
+          // @android:drawable/xxx 平台内置图标：中性占位（bi�? 提示，不标错）
+          <span
+            className="axv-img-layer"
+            title={node.imgSrc.slice(8)}
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px dashed #B0AEB8",
+              borderRadius: 4,
+              color: "#B0AEB8",
+              fontSize: 11,
+              pointerEvents: "none",
+            }}
+          >
+            android
+          </span>
+        ) : node.imgTint ? (
           // tint：用 mask 把图当成形状填色（对 vector/png 透明图都准）
           <span
             className="axv-img-layer"

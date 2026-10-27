@@ -74,7 +74,9 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
   if (v.startsWith("@color/")) {
     const name = v.slice("@color/".length);
     const c = res.colors[name];
-    if (c !== undefined) return c;
+    // M4v：颜色表里存的是项目原值（很多项目写 #AARRGGBB）——必须转成 CSS，
+    // 否则浏览器把 8 位当 #RRGGBBAA，#FF212121 会变成半透明红
+    if (c !== undefined) return argbToCss(c);
     issues.push({ level: "warn", nodePath: path, message: `${prop} 引用 @color/${name} 未定义，用兜底色` });
     return "#888888";
   }
@@ -89,7 +91,7 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
       return "#888888";
     }
     const c = res.colors[name]; // 主题属性名与 color 名同名时命中颜色表
-    if (c !== undefined) return c;
+    if (c !== undefined) return argbToCss(c);
     // 常见 Material3 主题属性→默认色（未上传 styles 时的预览兜底）
     const themeAttrs: Record<string, string> = {
       colorPrimary: "#6750A4",
@@ -428,6 +430,11 @@ export function resolveDrawable(
 ): string {
   const v = raw.trim();
   if (v === "") return "";
+  // M4v：@android:drawable/xxx 是平台内置图标（不在项目 res 里），
+  // 不当作“找不到”报错；给中性占位，避免登录页之类满屏红框
+  if (/^@android:(drawable|mipmap)\//.test(v)) {
+    return "builtin:" + v.replace(/^@android:(drawable|mipmap)\//, "");
+  }
   const m = v.match(/^@(drawable|mipmap)\/(.+)$/);
   if (m) {
     const [, kind, name] = m;

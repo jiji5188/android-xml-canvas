@@ -33,6 +33,7 @@ import { WidgetPalette } from "./WidgetPalette";
 import { ConstraintPanel, type SibOption } from "./ConstraintPanel";
 import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } from "@/lib/xml/autoconstrain";
 import { ResTree } from "./ResTree";
+import { RunPreview } from "./RunPreview";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
@@ -402,6 +403,7 @@ export function XmlEditor() {
   const [exportReport, setExportReport] = useState<ExportReport | null>(null);
   const [exportAction, setExportAction] = useState<"download" | "copy">("download");
   const [dropHint, setDropHint] = useState<string | null>(null);
+  const [runOpen, setRunOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<"preview" | "xml">("preview");
   const [history, setHistory] = useState<string[]>(() => {
     const raw = lsGet(LS_KEY_HIST);
@@ -1594,6 +1596,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             {resExtras || Object.keys(generatedDrawables).length > 0 ? (
               <button className="axv-mob-tool-btn" onClick={doDownloadResZip} title="导出 res 包（含图标）">res 包</button>
             ) : null}
+            <button className="axv-mob-tool-btn axv-mob-run" onClick={() => setRunOpen(true)} title="运行调试">▶ 运行</button>
           </div>
         </div>
       )}
@@ -1865,6 +1868,14 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             </button>
           ) : null}
           <button
+            className="axv-tb-btn axv-tb-run"
+            title="运行调试：全屏交互预览，可点控件跳布局（Esc 退出）"
+            aria-label="运行"
+            onClick={() => setRunOpen(true)}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>play_arrow</span>
+          </button>
+          <button
             className="axv-tb-btn"
             title="格式化代码（重排缩进，保留注释）"
             aria-label="格式化"
@@ -1921,6 +1932,17 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
         </div>
       </div>
       </div>
-      </div>
+
+      {runOpen ? (
+        <RunPreview
+          entryXml={xml}
+          entryName={"activity_main"}
+          layouts={resExtras?.layouts ?? {}}
+          resources={resources}
+          device={{ label: device.label, w: device.w, h: device.h, radius: device.radius }}
+          onClose={() => setRunOpen(false)}
+        />
+      ) : null}
+    </div>
   );
 }

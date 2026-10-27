@@ -1,0 +1,349 @@
+"use client";
+
+// components/RunPreview.tsx — M4a 运行调试（Think M3E Preview，适配 XML 布局）
+// 全屏手机外壳 + 交互点击 + 布局跳转 + 返回栈 + logcat 风格事件日志。
+//
+// 跳转约定（写进布局 XML 即可）：
+//   android:onClick="openSettings"   → 找 res/layout/settings.xml（也认 activity_settings / settings.xml）
+//   android:onClick="finish" / "back" / "close" → 返回上一页
+//   android:onClick="toast:hello"    → 只打日志，不跳转
+// 找不到目标布局时在日志里报 W 级并列出可用布局。
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { parseLayoutXml, findNode } from "@/lib/xml/parser";
+import { buildRenderModel } from "@/lib/xml/css";
+import { readableOn } from "@/lib/xml/theme";
+import type { ResourceTable } from "@/lib/xml/types";
+import { XmlCanvas } from "./XmlCanvas";
+
+const SCALE = 2; // 1dp = 2px（与编辑器一致）
+
+export interface RunDevice {
+  label: string;
+  w: number;
+  h: number;
+  radius?: number;
+}
+
+interface Props {
+  /** 首页 XML（当前编辑器内容，含未保存改动） */
+  entryXml: string;
+  /** 首页名字，仅用于日志 */
+  entryName: string;
+  /** 其它可跳转的布局：名字（不含 .xml） → XML 全文 */
+  layouts: Record<string, string>;
+  resources: ResourceTable;
+  device: RunDevice;
+  onClose: () => void;
+}
+
+type LogLevel = "I" | "W" | "E" | "D";
+interface LogLine {
+  id: number;
+  t: string;
+  level: LogLevel;
+  msg: string;
+}
+
+interface Screen {
+  name: string;
+  xml: string;
+}
+
+const BACK_WORDS = new Set(["finish", "back", "close", "closeActivity", "onBackPressed"]);
+
+function now(): string {
+  const d = new Date();
+  const p = (n: number, w = 2) => String(n).padStart(w, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
+}
+
+/** 归一化布局名：去目录、去 .xml、小写 */
+function normName(raw: string): string {
+  return raw
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^.*\//, "")
+    .replace(/\.xml$/i, "")
+    .toLowerCase();
+}
+
+export function RunPreview({ entryXml, entryName, layouts, resources, device, onClose }: Props) {
+  const [rotated, setRotated] = useState(false);
+  const [stack, setStack] = useState<Screen[]>([{ name: entryName, xml: entryXml }]);
+  const [dir, setDir] = useState<"fwd" | "back">("fwd");
+  const [logs, setLogs] = useState<LogLine[]>([]);
+  const [showLog, setShowLog] = useState(true);
+  const [fit, setFit] = useState(1);
+  const logRef = useRef<HTMLDivElement | null>(null);
+  const seq = useRef(0);
+
+  const dev = rotated ? { ...device, w: device.h, h: device.w } : device;
+  const cur = stack[stack.length - 1];
+
+  const log = useCallback((level: LogLevel, msg: string) => {
+    const line: LogLine = { id: ++seq.current, t: now(), level, msg };
+    setLogs((ls) => [...ls.slice(-299), line]);
+  }, []);
+
+  // 启动日志
+  useEffect(() => {
+    log("I", `启动 ${entryName}.xml · ${dev.w}×${dev.h}dp · 可跳转布局 ${Object.keys(layouts).length} 个`);
+    if (Object.keys(layouts).length === 0) {
+      log("W", "没有其它布局可跳转：先在左侧「资源」上传 res/ 目录");
+    }
+    // 只在挂载时打一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 自适应：整块手机缩放到窗口内
+  useEffect(() => {
+    const calc = () => {
+      const chromeH = Math.round(24 * SCALE) + Math.round(48 * SCALE);
+      const chromeW = 4;
+      const availH = window.innerHeight - 56;
+      const availW = window.innerWidth - (window.innerWidth > 1000 && showLog ? 380 : 24);
+      const contentH = dev.h * SCALE + chromeH + chromeW;
+      const contentW = dev.w * SCALE + chromeW;
+      setFit(Math.min(availH / contentH, availW / contentW, 1));
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, [dev.w, dev.h, showLog]);
+
+  // 日志自动滚到底
+  useEffect(() => {
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [logs]);
+
+  const parsed = useMemo(() => {
+    const r = parseLayoutXml(cur.xml);
+    return r;
+  }, [cur.xml]);
+
+  const model = useMemo(() => {
+    if (!parsed.root) return null;
+    return buildRenderModel(parsed.root, resources, SCALE, layouts, { w: dev.w, h: dev.h }, undefined);
+  }, [parsed.root, resources, layouts, dev.w, dev.h]);
+
+  const findLayout = useCallback(
+    (raw: string): Screen | null => {
+      const want = normName(raw);
+      const keys = Object.keys(layouts);
+      // 1) 精确 2) 去掉 activity_/fragment_ 前缀 3) 包含匹配
+      const exact = keys.find((k) => normName(k) === want);
+      const stripped = keys.find((k) => normName(k).replace(/^(activity|fragment|layout)_/, "") === want);
+      const fuzzy = keys.find((k) => normName(k).includes(want) || want.includes(normName(k)));
+      const hit = exact ?? stripped ?? fuzzy;
+      if (!hit) return null;
+      return { name: hit, xml: layouts[hit] };
+    },
+    [layouts],
+  );
+
+  const back = useCallback(() => {
+    setStack((s) => {
+      if (s.length <= 1) {
+        log("D", "已在首页，「返回」不再出栈");
+        return s;
+      }
+      const prev = s[s.length - 2];
+      log("I", `← 返回 ${prev.name}.xml（栈深 ${s.length - 1}）`);
+      setDir("back");
+      return s.slice(0, -1);
+    });
+  }, [log]);
+
+  const tap = useCallback(
+    (path: string) => {
+      const node = parsed.root ? findNode(parsed.root, path) : null;
+      if (!node) return;
+      const tag = node.tag.includes(".") ? node.tag.slice(node.tag.lastIndexOf(".") + 1) : node.tag;
+      const id = String(node.attrs["id"] ?? "").replace(/^@\+?id\//, "");
+      const label = id ? `${tag}#${id}` : tag;
+      const action = String(node.attrs["onClick"] ?? "").trim();
+
+      if (!action) {
+        log("D", `点击 ${label}（无 onClick）`);
+        return;
+      }
+      if (BACK_WORDS.has(action)) {
+        log("I", `点击 ${label} · onClick="${action}" → 返回`);
+        back();
+        return;
+      }
+      if (action.startsWith("toast:")) {
+        log("I", `点击 ${label} · toast: ${action.slice(6).trim() || "(空)"}`);
+        return;
+      }
+      const target = findLayout(action);
+      if (!target) {
+        log("W", `点击 ${label} · 找不到布局 "${action}"（可用：${Object.keys(layouts).join(", ") || "无"}）`);
+        return;
+      }
+      log("I", `点击 ${label} · onClick="${action}" → ${target.name}.xml`);
+      setDir("fwd");
+      setStack((s) => [...s, target]);
+    },
+    [parsed.root, findLayout, log, back],
+  );
+
+  // 键盘：Esc = 返回；栈空了再关
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (stack.length > 1) back();
+        else onClose();
+      } else if (e.key === "r" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setRotated((r) => !r);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [stack.length, back, onClose]);
+
+  const DPX = SCALE;
+  const STATUS_BAR_H = Math.round(24 * DPX);
+  const NAV_BAR_H = Math.round(48 * DPX);
+  const theme = readableOn(String(model?.root?.style?.backgroundColor ?? model?.root?.style?.background ?? ""));
+  const phoneBg = theme.bg;
+  const phoneFg = theme.fg;
+  const widthPx = Math.round(dev.w * SCALE);
+  const heightPx = Math.round(dev.h * SCALE);
+  const BORDER = 2;
+  const outerW = widthPx + BORDER * 2;
+  const outerH = heightPx + BORDER * 2;
+
+  return (
+    <div className="axv-run-backdrop">
+      <div className="axv-run-top">
+        <span className="axv-run-title">
+          <span className="msr" aria-hidden="true">
+            play_arrow
+          </span>
+          运行 · {cur.name}.xml
+          <span className="axv-run-dev">{dev.label}</span>
+        </span>
+        <span className="axv-run-stack">
+          {stack.map((s, i) => (
+            <span key={s.name + i} className={"axv-run-crumb" + (i === stack.length - 1 ? " is-on" : "")}>
+              {s.name}
+            </span>
+          ))}
+        </span>
+        <span className="axv-run-actions">
+          <button className="axv-run-btn" onClick={() => setRotated((r) => !r)} title="横竖屏切换（Ctrl+R）">
+            <span className="msr" aria-hidden="true">
+              screen_rotation
+            </span>
+          </button>
+          <button
+            className="axv-run-btn"
+            onClick={() => setShowLog((v) => !v)}
+            title={showLog ? "隐藏日志" : "显示日志"}
+          >
+            <span className="msr" aria-hidden="true">
+              terminal
+            </span>
+          </button>
+          <button className="axv-run-btn" onClick={onClose} title="退出运行（Esc）">
+            <span className="msr" aria-hidden="true">
+              close
+            </span>
+          </button>
+        </span>
+      </div>
+
+      <div className={"axv-run-main" + (showLog ? " with-log" : "")}>
+        <div className="axv-run-stage">
+          <div style={{ width: outerW * fit, height: outerH * fit, flex: "0 0 auto" }}>
+            <div
+              className="axv-phone axv-run-phone"
+              style={{
+                width: outerW,
+                height: outerH,
+                boxSizing: "border-box",
+                background: phoneBg,
+                color: phoneFg,
+                transform: fit < 1 ? `scale(${fit})` : undefined,
+                transformOrigin: "top left",
+                borderRadius: device.radius ? Math.round(device.radius * DPX) : undefined,
+              }}
+            >
+              <div className="axv-statusbar" style={{ height: STATUS_BAR_H }}>
+                <span className="axv-sb-time">9:41</span>
+                <span className="axv-sb-icons">
+                  <span className="msr" aria-hidden="true">
+                    signal_cellular_alt
+                  </span>
+                  <span className="msr" aria-hidden="true">
+                    wifi
+                  </span>
+                  <span className="msr" aria-hidden="true">
+                    battery_full
+                  </span>
+                </span>
+              </div>
+
+              <div className="axv-phone-body axv-run-body">
+                {parsed.root && model ? (
+                  <div key={cur.name + dir} className={"axv-run-screen " + (dir === "fwd" ? "in-fwd" : "in-back")}>
+                    <XmlCanvas node={model.root} selectedPath={null} onSelect={tap} scale={SCALE} />
+                  </div>
+                ) : (
+                  <div className="axv-run-error">XML 解析失败，无法运行</div>
+                )}
+              </div>
+
+              <div className="axv-navbar" style={{ height: NAV_BAR_H }}>
+                <button className="axv-nav-btn" title="返回" onClick={back}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M15 4 7 12l8 8z" fill="currentColor" />
+                  </svg>
+                </button>
+                <button className="axv-nav-btn" title="主页（回首页）" onClick={() => { setDir("back"); setStack((s) => s.slice(0, 1)); log("I", "⌂ 回首页"); }}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                </button>
+                <button className="axv-nav-btn" title="多任务（切换上一屏）" onClick={back}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="5.5" y="5.5" width="13" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {showLog ? (
+          <aside className="axv-run-log">
+            <div className="axv-run-log-head">
+              <span>logcat</span>
+              <button className="axv-run-log-clear" onClick={() => setLogs([])}>
+                清空
+              </button>
+            </div>
+            <div className="axv-run-log-body" ref={logRef}>
+              {logs.length === 0 ? (
+                <div className="axv-run-log-empty">（点击界面上的控件试试）</div>
+              ) : (
+                logs.map((l) => (
+                  <div key={l.id} className={"axv-run-line lv-" + l.level}>
+                    <span className="t">{l.t}</span>
+                    <span className="lv">{l.level}</span>
+                    <span className="m">{l.msg}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </aside>
+        ) : null}
+      </div>
+    </div>
+  );
+}

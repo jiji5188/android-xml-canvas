@@ -242,16 +242,37 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["marginT"] = mar[0]; out["marginR"] = mar[1]; out["marginB"] = mar[2]; out["marginL"] = mar[3];
 
   // 颜色
-  out["background"] = a["background"] !== undefined ? resolveColor(a["background"], res, issues, path, "background") : "";
+  // background 可能是：纯色 / @color / ?attr / **@drawable 引用**（shape xml 、vector、位图）。
+  // M4i：@drawable 引用不能当颜色解析 —— 以前 resolveColor 会报「无法解析」并回成 #888888，
+  //       于是 "background=@drawable/bg_btn" 的画布背景是灰色，而不是那个 shape 的填色。
+  const bgRaw = a["background"] ?? "";
+  const bgIsDrawable = /^@(drawable|mipmap)\//.test(bgRaw);
+  out["background"] = bgRaw === "" ? "" : bgIsDrawable ? "" : resolveColor(bgRaw, res, issues, path, "background");
+  /** 位图 form 的 background（dataURL） */
+  out["bgImage"] = "";
+  /** vector xml 形式的 background（画布用 vectorToDataUrl 转成 dataURL） */
+  out["bgVector"] = "";
 
   // M2w：background="@drawable/bg_xxx" 且上传的 res 里有 <shape> xml → 还原渐变/圆角/描边
   out["bgShape"] = null;
-  const bgRaw = a["background"] ?? "";
-  if (bgRaw.startsWith("@drawable/") && res.drawableXml) {
-    const nm = bgRaw.slice("@drawable/".length);
+  if (bgIsDrawable && res.drawableXml) {
+    const nm = bgRaw.replace(/^@(?:drawable|mipmap)\//, "");
     const src = res.drawableXml[nm] ?? res.drawableXml[nm.replace(/\.xml$/i, "")];
     if (src) {
       out["bgShape"] = parseShapeDrawable(src, (raw) => resolveColor(raw, res, issues, path, "background"));
+    }
+  }
+  // 不是 shape 的 drawable：位图 dataURL / vector xml
+  if (bgIsDrawable && !out["bgShape"]) {
+    const nm = bgRaw.replace(/^@(?:drawable|mipmap)\//, "");
+    const key = nm.replace(/\.\w+$/, "");
+    const url = res.drawables?.[nm] ?? res.drawables?.[key];
+    if (url) {
+      out["bgImage"] = url;
+    } else {
+      const xml = res.drawableXml?.[nm] ?? res.drawableXml?.[key];
+      if (xml && /<vector/.test(xml)) out["bgVector"] = xml;
+      else issues.push({ level: "warn", nodePath: path, message: `background 引用 ${bgRaw} 未找到（可上传 res/ 目录）` });
     }
   }
 

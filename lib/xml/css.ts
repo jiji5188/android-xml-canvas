@@ -8,7 +8,8 @@ import type { ResolvedAttrs } from "./resolve";
 import { solveConstraintChildren, type MeasuredMap } from "./constraints";
 import { solveRelativeChildren } from "./relative";
 import { expandIncludes, repath } from "./include";
-import { SCREEN_DP, phoneBodyDp } from "./theme";
+import { SCREEN_DP, phoneBodyDp, readableOn } from "./theme";
+import { vectorToDataUrl } from "./vector-svg";
 
 const DP = (n: number, scale = 2) => n * scale;
 
@@ -308,8 +309,12 @@ export function buildRenderModel(
     if (pl) style.paddingLeft = `${pl}px`;
 
     // 背景 / 圆角 / 阴影
+    // M4i：只接受合法 CSS 颜色（#hex / rgb() / 命名色 / transparent）
+    // 以前不管三七二十一就写进 backgroundColor，一旦值是 "@drawable/x" 就会被浏览器当非法值丢掉，
+    // 而后面的 Button 默认样式又拿这个原始字符串当颜色用 → 按钮背景直接没了
     const bg = (attrs["background"] as string) || "";
-    if (bg) style.backgroundColor = bg;
+    const bgIsColor = /^(#|rgb\(|rgba\(|hsl\(|hsla\(|[a-zA-Z]+$)/.test(bg);
+    if (bg && bgIsColor) style.backgroundColor = bg;
     const r = (attrs["radius"] as number) || 0;
     if (r) style.borderRadius = `${DP(r, scale)}px`;
     // M2w：<shape> 背景（@drawable/bg_xxx 引用的渐变/圆角/描边），覆盖上面的纯色
@@ -337,6 +342,23 @@ export function buildRenderModel(
         const sh = shape.shadow;
         style.boxShadow = `${DP(sh.dx, scale)}px ${DP(sh.dy, scale)}px ${DP(sh.blur, scale)}px ${sh.color}`;
       }
+    }
+    // M4i：background="@drawable/位图或矢量" —— 不是 shape 时按图片铺上去
+    const bgVector = (attrs["bgVector"] as string) || "";
+    let bgUrl = (attrs["bgImage"] as string) || "";
+    if (!bgUrl && bgVector) {
+      try {
+        bgUrl = vectorToDataUrl(bgVector) || "";
+      } catch {
+        bgUrl = "";
+      }
+    }
+    if (bgUrl && !bgUrl.startsWith("vector:") && !bgUrl.startsWith("missing:")) {
+      style.backgroundImage = style.backgroundImage ?? `url(${bgUrl})`;
+      style.backgroundSize = "100% 100%";
+      style.backgroundPosition = "center";
+      style.backgroundRepeat = "no-repeat";
+      style.backgroundColor = style.backgroundColor ?? "transparent";
     }
     // ===== M3e：elevation / translationZ =====
     // Android 里 Z = elevation + translationZ，它不仅决定阴影大小，
@@ -444,8 +466,20 @@ export function buildRenderModel(
       }
       // Button/EditText 默认样式
       if (tag === "Button" || tag === "MaterialButton" || tag === "AppCompatButton") {
-        style.backgroundColor = bg || "#6750A4";
-        style.color = tc || "#FFFFFF";
+        // M4i：显式 background 优先（颜色 / shape 填色 / 渐变 / 位图），都没有才用默认主色。
+        // 以前是 style.backgroundColor = bg || "#6750A4"，会把 shape 的 solid 抹成灰色/默认色。
+        const tint = (attrs["backgroundTint"] as string) || "";
+        if (tint && !bg) style.backgroundColor = tint;
+        if (!style.backgroundColor && !style.backgroundImage) style.backgroundColor = "#6750A4";
+        // 文字色：显式 textColor > 按背景亮度自动反色（tc 有默认值不能直接拿来做判断）
+        const tcRaw = (attrs["textColor"] as string) || "";
+        const solidBg = typeof style.backgroundColor === "string" ? style.backgroundColor : "";
+        const autoFg = solidBg && /^(#|rgb)/.test(solidBg)
+          ? readableOn(solidBg).fg.includes("255,255,255")
+            ? "#FFFFFF"
+            : "#1D1B20"
+          : "#FFFFFF";
+        style.color = tcRaw || autoFg;
         style.borderRadius = style.borderRadius ?? `${DP(20, scale)}px`;
         style.fontWeight = 500;
         style.cursor = "pointer";
@@ -505,7 +539,8 @@ export function buildRenderModel(
     // ===== M2a：复合 / 常用控件占位渲染 =====
     if (cls === "axv-card") {
       const cr = (attrs["cardCornerRadius"] as number) || 12;
-      style.backgroundColor = bg || "#FFFFFF";
+      // M4i：background 可能是 shape/位图（backgroundColor 已由上面算好），不能无条件覆成白色
+      style.backgroundColor = style.backgroundColor || "#FFFFFF";
       style.borderRadius = `${DP(cr, scale)}px`;
       // 卡片没显式 elevation 时给个默认阴影（用了 elevation 就听 elevation 的）
       if (elDp + tzDp <= 0) style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)";

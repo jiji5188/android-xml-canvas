@@ -47,7 +47,7 @@ describe("M3g res 包组装", () => {
   it("包含 layout/ + 图标 drawable/", () => {
     const entries = buildResBundle({
       layoutXml: '<?xml version="1.0"?>\n<LinearLayout android:src="@drawable/ic_search"/>',
-      iconVectors: { ic_search: VEC },
+      generatedDrawables: { ic_search: VEC },
     });
     const paths = entries.map((e) => e.path);
     expect(paths).toContain("layout/activity_main.xml");
@@ -94,7 +94,7 @@ describe("M3g res 包组装", () => {
   it("同路径不重复打包", () => {
     const entries = buildResBundle({
       layoutXml: "<x/>",
-      iconVectors: { ic_a: VEC, ic_a2: VEC },
+      generatedDrawables: { ic_a: VEC, ic_a2: VEC },
     });
     const paths = entries.map((e) => e.path);
     expect(new Set(paths).size).toBe(paths.length);
@@ -107,14 +107,14 @@ describe("M3g 缺失图标检测", () => {
       <ImageView android:src="@mipmap/ic_launcher"/>`;
     expect(referencedDrawables(layout)).toEqual(["ic_launcher", "ic_search"]);
 
-    const entries = buildResBundle({ layoutXml: layout, iconVectors: { ic_search: VEC } });
+    const entries = buildResBundle({ layoutXml: layout, generatedDrawables: { ic_search: VEC } });
     const missing = missingDrawables(layout, entries);
     expect(missing).toEqual(["ic_launcher"]);
   });
 
   it("全部覆盖时缺失为空", () => {
     const layout = `<ImageView android:src="@drawable/ic_search"/>`;
-    const entries = buildResBundle({ layoutXml: layout, iconVectors: { ic_search: VEC } });
+    const entries = buildResBundle({ layoutXml: layout, generatedDrawables: { ic_search: VEC } });
     expect(missingDrawables(layout, entries)).toEqual([]);
   });
 });

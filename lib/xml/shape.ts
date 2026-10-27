@@ -69,8 +69,9 @@ export function parseShapeDrawable(
   if (!root) return null;
 
   // selector：挑第一个带 drawable/shape 的 item（预览取常态，不区分按压态）
+  // ripple（M3h）：外壳只提供点按色，形状在内层 <item><shape>；取内层渲染
   let target = root;
-  if (root.tag === "selector") {
+  if (root.tag === "selector" || root.tag === "ripple") {
     const item = root.children.find((c) => c.tag === "item");
     if (!item) return null;
     const inline = item.children.find((c) => c.tag === "shape");

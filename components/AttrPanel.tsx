@@ -10,6 +10,7 @@ import type { ResourceExtras } from "@/lib/xml/resdir";
 import { editorFor, type AttrEditor } from "./attr-catalog";
 import { getWidgetDoc, docAttrs, attrHint } from "@/lib/xml/widget-docs";
 import { IconPickerPanel } from "./IconPickerPanel";
+import { ShapeEditor } from "./ShapeEditor";
 
 interface Props {
   node: ResolvedNode;
@@ -27,6 +28,10 @@ interface Props {
   onPickIcon?: (attr: string, resourceName: string, vectorXml: string) => void;
   /** M3g：已生成的图标资源名（用于标记「复用」） */
   iconNames?: string[];
+  /** M3h：保存自定义形状（生成 res/drawable 资源 + 写入属性） */
+  onSaveShape?: (attr: string, resourceName: string, xml: string) => void;
+  /** M3h：已生成资源（名 → xml），用来回填已有形状的参数 */
+  generatedXml?: Record<string, string>;
 }
 
 /** 哪些属性可以接图标（点击弹选择器） */
@@ -50,6 +55,9 @@ function canPickIcon(name: string, value: string): boolean {
   if (ICON_ATTRS.has(name)) return true;
   return /^@(drawable|mipmap)\//.test(value.trim());
 }
+
+/** 哪些属性可以做「形状背景」（形状态/描边/圆角/水波纹最多用在背景上） */
+const SHAPE_ATTRS = new Set(["background", "foreground", "src", "drawableStart", "drawableEnd"]);
 
 const shortTag = (t: string) => (t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t);
 
@@ -86,10 +94,14 @@ export function AttrPanel({
   onDeleteNode,
   onPickIcon,
   iconNames,
+  onSaveShape,
+  generatedXml,
 }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   /** M3g：当前正在选图标的属性 */
   const [iconPick, setIconPick] = useState<string | null>(null);
+  /** M3h：当前正在编辑形状的属性 */
+  const [shapeEdit, setShapeEdit] = useState<string | null>(null);
   /** M3a：右侧面板双页签：属性 / 文档 */
   const [tab, setTab] = useState<"attrs" | "docs">("attrs");
   /** 属性行展开的说明（点 ? 切换） */
@@ -424,6 +436,16 @@ export function AttrPanel({
                     🖼
                   </button>
                 ) : null}
+                {onSaveShape && SHAPE_ATTRS.has(name) ? (
+                  <button
+                    className="axv-attr-info"
+                    title="自定义形状（圆角/描边/渐变/水波纹，生成 drawable xml）"
+                    aria-label={`为 ${name} 自定义形状`}
+                    onClick={() => setShapeEdit(name)}
+                  >
+                    ⬛
+                  </button>
+                ) : null}
                 {hint ? (
                   <button
                     className="axv-attr-info"
@@ -463,6 +485,20 @@ export function AttrPanel({
           onPick={(resourceName, vectorXml, iconName) => {
             onPickIcon?.(iconPick, resourceName, vectorXml);
             setIconPick(null);
+          }}
+        />
+      ) : null}
+
+      {shapeEdit ? (
+        <ShapeEditor
+          attrName={shapeEdit}
+          value={String(node.rawAttrs[shapeEdit] ?? "")}
+          existingXml={generatedXml?.[String(node.rawAttrs[shapeEdit] ?? "").replace(/^@(?:drawable|mipmap)\//, "").replace(/\.xml$/, "")]}
+          existingNames={Object.keys(generatedXml ?? {})}
+          onClose={() => setShapeEdit(null)}
+          onSave={(resourceName, xml) => {
+            onSaveShape?.(shapeEdit, resourceName, xml);
+            setShapeEdit(null);
           }}
         />
       ) : null}

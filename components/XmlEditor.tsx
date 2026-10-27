@@ -346,17 +346,30 @@ export function XmlEditor() {
   const [resourceFragment, setResourceFragment] = useState("");
   /** 上传 res/ 目录解析出的附加资源（drawable/vector/styles/values 原文） */
   const [resExtras, setResExtras] = useState<ResourceExtras | null>(null);
-  /** M3g：图标选择器生成的矢量资源：资源名（ic_search）→ vector xml 原文 */
-  const [iconVectors, setIconVectors] = useState<Record<string, string>>({});
-  /** M3g：图标矢量 → data URL（让画布能真渲染而不是占位框） */
-  const iconDataUrls = useMemo(() => {
+  /** M3g/M3h：本工具生成的 drawable 资源：资源名 → xml 原文（图标 vector + 自定义 shape/ripple 共用） */
+  const [generatedDrawables, setGeneratedDrawables] = useState<Record<string, string>>({});
+  /** 矢量 → data URL（让画布能真渲染而不是占位框） */
+  const generatedDataUrls = useMemo(() => {
     const out: Record<string, string> = {};
-    for (const [name, xml] of Object.entries(iconVectors)) {
+    for (const [name, xml] of Object.entries(generatedDrawables)) {
       const u = vectorToDataUrl(xml);
       if (u) out[name] = u;
     }
     return out;
-  }, [iconVectors]);
+  }, [generatedDrawables]);
+  /** 只包含真矢量的名字（shape 不算，避免误判） */
+  const generatedVectorNames = useMemo(
+    () => Object.entries(generatedDrawables).filter(([, xml]) => /<vector[\s>]/.test(xml)).map(([n]) => n),
+    [generatedDrawables],
+  );
+  /** 只包含 shape/ripple 的 xml（供 resolve 当背景解析） */
+  const generatedShapeXml = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [name, xml] of Object.entries(generatedDrawables)) {
+      if (/<(shape|ripple)[\s>]/.test(xml)) out[name] = xml;
+    }
+    return out;
+  }, [generatedDrawables]);
   const resDirRef = useRef<HTMLInputElement | null>(null);
   /** 双保险：mount 后 setAttribute 强制写入 webkitdirectory/directory，
    *  避免 React 渲染空字符串属性时某些浏览器不识别（导致弹出文件选择器而非目录选择器） */
@@ -559,19 +572,19 @@ export function XmlEditor() {
   useEffect(() => {
     const t = window.setTimeout(() => {
       try {
-        lsSet(LS_KEY_ICONS, JSON.stringify(iconVectors));
+        lsSet(LS_KEY_ICONS, JSON.stringify(generatedDrawables));
       } catch {
         /* 超配额放弃 */
       }
     }, 400);
     return () => window.clearTimeout(t);
-  }, [iconVectors]);
+  }, [generatedDrawables]);
   useEffect(() => {
     const raw = lsGet(LS_KEY_ICONS);
     if (!raw) return;
     try {
       const obj = JSON.parse(raw);
-      if (obj && typeof obj === "object") setIconVectors(obj);
+      if (obj && typeof obj === "object") setGeneratedDrawables(obj as Record<string, string>);
     } catch {
       /* 损坏忽略 */
     }
@@ -580,7 +593,7 @@ export function XmlEditor() {
   /** M3g：选中图标 → 存矢量原文 + 把属性写成 @drawable/资源名 */
   const onPickIcon = useCallback(
     (attrName: string, resourceName: string, vectorXml: string) => {
-      setIconVectors((m) => ({ ...m, [resourceName]: vectorXml }));
+      setGeneratedDrawables((m) => ({ ...m, [resourceName]: vectorXml }));
       if (selectedPath) {
         // 通过 commitAttr 把属性改成 @drawable/<资源名>
         commitAttrRef.current(attrName, `@drawable/${resourceName}`);
@@ -591,40 +604,54 @@ export function XmlEditor() {
     [selectedPath],
   );
 
+  /** M3h：形状 → 存 xml + 把属性写成 @drawable/资源名（与图标同一存储） */
+  const onSaveShape = useCallback(
+    (attrName: string, resourceName: string, shapeXml: string) => {
+      setGeneratedDrawables((m) => ({ ...m, [resourceName]: shapeXml }));
+      if (selectedPath) commitAttrRef.current(attrName, `@drawable/${resourceName}`);
+      setExportNote(`已生成 res/drawable/${resourceName}.xml（含水波纹？${shapeXml.includes("<ripple") ? "是" : "否"}），属性指向它`);
+      window.setTimeout(() => setExportNote(""), 3600);
+    },
+    [selectedPath],
+  );
+
   const resources: ResourceTable = useMemo(() => {
     // 顺序：内置默认 → 上传 res/ 里的 values（真实 color/dimen/string）→ 用户手贴片段（最高优先）
     let base: ResourceTable = DEFAULT_RESOURCES;
     const fragment = [resExtras?.valuesXml ?? "", resourceFragment].filter((x) => x.trim()).join("\n");
     if (fragment.trim()) base = mergeResourceFragment(fragment);
+    base = {
+      ...base,
+      drawables: { ...(resExtras?.drawables || {}), ...(base.drawables || {}), ...generatedDataUrls },
+      vectorNames: [...(resExtras?.vectorNames || []), ...(base.vectorNames || []), ...generatedVectorNames],
+      drawableXml: { ...(resExtras?.drawableXml || {}), ...(base.drawableXml || {}), ...generatedShapeXml },
+    };
     if (resExtras) {
       base = {
         ...base,
-        drawables: resExtras.drawables,
-        vectorNames: resExtras.vectorNames,
-        drawableXml: resExtras.drawableXml,
         themeAttrs: resExtras.themeAttrs,
         styles: resExtras.styles,
       };
     }
     return base;
-  }, [resourceFragment, resExtras]);
+  }, [resourceFragment, resExtras, generatedDataUrls, generatedVectorNames, generatedShapeXml]);
 
-  /** M3g：把图标矢量也并进 resExtras，导出 res 包时能带上 */
+  /** M3g/M3h：把已生成资源（图标矢量 + 自定义形状）也并进 resExtras，导出 res 包时能带上 */
   const resExtrasAll = useMemo(() => {
-    if (!resExtras && Object.keys(iconVectors).length === 0) return null;
+    if (!resExtras && Object.keys(generatedDrawables).length === 0) return null;
     return {
-      drawables: { ...(resExtras?.drawables || {}), ...iconDataUrls },
-      vectorNames: [...(resExtras?.vectorNames || []), ...Object.keys(iconVectors)],
-      drawableXml: { ...(resExtras?.drawableXml || {}), ...iconVectors },
+      drawables: { ...(resExtras?.drawables || {}), ...generatedDataUrls },
+      vectorNames: [...(resExtras?.vectorNames || []), ...generatedVectorNames],
+      drawableXml: { ...(resExtras?.drawableXml || {}), ...generatedShapeXml },
       themeAttrs: resExtras?.themeAttrs ?? {},
       styles: resExtras?.styles ?? {},
       valuesXml: resExtras?.valuesXml ?? "",
       sourceFiles: resExtras?.sourceFiles ?? [],
-      counts: resExtras?.counts ?? { images: 0, vectors: Object.keys(iconVectors).length, values: 0, styles: 0, shapes: 0 },
+      counts: resExtras?.counts ?? { images: 0, vectors: 0, values: 0, styles: 0, shapes: 0 },
       tree: resExtras?.tree,
       layouts: resExtras?.layouts,
     };
-  }, [resExtras, iconVectors, iconDataUrls]);
+  }, [resExtras, generatedDrawables, generatedDataUrls]);
 
   const [measured, setMeasured] = useState<MeasuredMap | null>(null);
   /** M2t：实测收敛计数器（避免 auto ↔ px 互推无限循环） */
@@ -1257,7 +1284,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
    *  避免别处打开工程时「找不到图标文件」。*/
   const doDownloadResZip = () => {
     const layout = exportLayoutXml(xml);
-    const entries = buildResBundle({ layoutXml: layout, iconVectors, extras: resExtrasAll });
+    const entries = buildResBundle({ layoutXml: layout, generatedDrawables, extras: resExtrasAll });
     const missing = missingDrawables(layout, entries);
     const bytes = makeZip(entries);
     downloadBytes(bytes, "res.zip");
@@ -1564,7 +1591,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               </optgroup>
             </select>
             <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
-            {resExtras || Object.keys(iconVectors).length > 0 ? (
+            {resExtras || Object.keys(generatedDrawables).length > 0 ? (
               <button className="axv-mob-tool-btn" onClick={doDownloadResZip} title="导出 res 包（含图标）">res 包</button>
             ) : null}
           </div>
@@ -1744,7 +1771,9 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                 resExtras={resExtras}
                 onDeleteNode={() => onRemoveNode(selectedNode.path)}
                 onPickIcon={onPickIcon}
-                iconNames={Object.keys(iconVectors)}
+                iconNames={Object.keys(generatedDrawables)}
+                onSaveShape={onSaveShape}
+                generatedXml={generatedDrawables}
               />
             </div>
           ) : (
@@ -1825,7 +1854,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           <button className="axv-tb-btn" title="复制生成的 XML" aria-label="复制 XML" onClick={copyExportedXml}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>content_copy</span>
           </button>
-          {resExtras || Object.keys(iconVectors).length > 0 ? (
+          {resExtras || Object.keys(generatedDrawables).length > 0 ? (
             <button className="axv-tb-btn" title="导出 res 目录（zip：布局 + 图标矢量 + shape/values）" aria-label="导出 res 包" onClick={doDownloadResZip}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>folder_zip</span>
             </button>

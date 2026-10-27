@@ -10,7 +10,7 @@ export interface BundleInput {
   /** 布局文件名，默认 activity_main.xml */
   layoutName?: string;
   /** 图标选择器生成的矢量资源：资源名 → vector xml 原文 */
-  iconVectors?: Record<string, string>;
+  generatedDrawables?: Record<string, string>;
   /** 已上传的 res 目录解析结果（要一并带走 shape/vector/values） */
   extras?: ResourceExtras | null;
 }
@@ -29,7 +29,7 @@ export function buildResBundle(input: BundleInput): ZipEntry[] {
   push(`layout/${layoutName}`, input.layoutXml);
 
   // 1) 图标选择器生成的 vector
-  for (const [name, xml] of Object.entries(input.iconVectors ?? {})) {
+  for (const [name, xml] of Object.entries(input.generatedDrawables ?? {})) {
     if (!xml) continue;
     push(`drawable/${name}.xml`, xml);
   }

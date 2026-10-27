@@ -5,7 +5,7 @@
 import type { XmlNode, ResourceTable, RenderModel, ResolvedNode } from "./types";
 import { resolveNodeAttrs, resolveSize } from "./resolve";
 import type { ResolvedAttrs } from "./resolve";
-import { solveConstraintChildren } from "./constraints";
+import { solveConstraintChildren, type MeasuredMap } from "./constraints";
 import { solveRelativeChildren } from "./relative";
 import { expandIncludes, repath } from "./include";
 import { SCREEN_DP, phoneBodyDp } from "./theme";
@@ -159,6 +159,8 @@ export function buildRenderModel(
   layouts?: Record<string, string>,
   /** M2r：预览屏尺寸（dp），不传走默认手机竖屏；影响 match_parent 根/CL 内容区尺寸 */
   screen?: { w: number; h: number },
+  /** M2t：wrap_content 实测尺寸（path → CSS px），浏览器第二遍求解用 */
+  measured?: MeasuredMap,
 ): RenderModel {
   const issues: import("./types").XmlIssue[] = [];
   const screenW = screen?.w ?? SCREEN_DP.w;
@@ -597,7 +599,7 @@ export function buildRenderModel(
     const contentH = Math.max(0, ch - padT - padB);
     const sourceCL = findSourceNode(root, n.path);
     if (!sourceCL) return;
-    const solved = solveConstraintChildren(sourceCL, res, contentW, contentH);
+    const solved = solveConstraintChildren(sourceCL, res, contentW, contentH, measured);
     issues.push(...solved.issues);
     for (const child of n.children) {
       const box = solved.boxes.get(child.path);
@@ -626,8 +628,9 @@ export function buildRenderModel(
       }
       child.style.left = `${padL + box.left}px`;
       child.style.top = `${padT + box.top}px`;
-      child.style.width = `${box.width}px`;
-      child.style.height = `${box.height}px`;
+      // M2t：wrap 轴交给浏览器算真实内容尺寸（shrink-to-fit），实测后回填重解位置
+      child.style.width = box.wrapW ? "auto" : `${box.width}px`;
+      child.style.height = box.wrapH ? "auto" : `${box.height}px`;
       child.style.boxSizing = "border-box";
       delete child.style.marginTop;
       delete child.style.marginRight;
@@ -670,7 +673,7 @@ export function buildRenderModel(
     const contentH = Math.max(0, ch - padT - padB);
     const sourceRL = findSourceNode(root, n.path);
     if (!sourceRL) return;
-    const solved = solveRelativeChildren(sourceRL, res, contentW, contentH);
+    const solved = solveRelativeChildren(sourceRL, res, contentW, contentH, measured);
     issues.push(...solved.issues);
     for (const child of n.children) {
       const box = solved.boxes.get(child.path);
@@ -678,8 +681,9 @@ export function buildRenderModel(
       child.style.position = "absolute";
       child.style.left = `${padL + box.left}px`;
       child.style.top = `${padT + box.top}px`;
-      child.style.width = `${box.width}px`;
-      child.style.height = `${box.height}px`;
+      // M2t：wrap 轴交给浏览器算真实内容尺寸，实测后回填重解位置
+      child.style.width = box.wrapW ? "auto" : `${box.width}px`;
+      child.style.height = box.wrapH ? "auto" : `${box.height}px`;
       child.style.boxSizing = "border-box";
       // margin 已折进 left/top（与 CL 一致），否则会重复位移
       delete child.style.marginTop;

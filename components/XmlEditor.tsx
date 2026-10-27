@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue } from "react";
 import { parseLayoutXml, findNode, serialize } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
+import type { MeasuredMap } from "@/lib/xml/constraints";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, type ResourceExtras } from "@/lib/xml/resdir";
 import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
@@ -547,13 +548,64 @@ export function XmlEditor() {
     return base;
   }, [resourceFragment, resExtras]);
 
+  const [measured, setMeasured] = useState<MeasuredMap | null>(null);
+  /** M2t：实测收敛计数器（避免 auto ↔ px 互推无限循环） */
+  const measurePass = useRef(0);
+
   const { model, issues, parseErr } = useMemo(() => {
     const { root, issues } = parseLayoutXml(parsedXml);
     if (!root) return { model: null, issues, parseErr: true };
     // M2q：把上传 res/layout 里的布局传进去，供 <include> 就地展开
     // M2r：屏幕尺寸传入，影响 match_parent 根 / CL 内容区回落值
-    return { model: buildRenderModel(root, resources, SCALE, resExtras?.layouts, { w: device.w, h: device.h }), issues, parseErr: false };
-  }, [parsedXml, resources, resExtras?.layouts, device]);
+    // M2t：wrap 实测表传入，CL/RL 求解的 wrap 维度不再靠 estSize 估
+    return {
+      model: buildRenderModel(root, resources, SCALE, resExtras?.layouts, { w: device.w, h: device.h }, measured ?? undefined),
+      issues,
+      parseErr: false,
+    };
+  }, [parsedXml, resources, resExtras?.layouts, device, measured]);
+
+  /** M2t：XML / 设备变了 → 旧 path 可能指向别的节点，实测表作废重测 */
+  useEffect(() => {
+    measurePass.current = 0;
+    setMeasured((m) => (m ? null : m));
+  }, [parsedXml, device]);
+
+  /**
+   * M2t：wrap_content 真实尺寸回填。
+   * CL/RL 的子项是 absolute（wrap 轴已写成 width/height:auto），渲染后读 offsetWidth/Height
+   * 就是浏览器按真实文字/图标算出的尺寸 → 回填给下一个渲染循环，兄弟锚点/居中/bias 才准。
+   */
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const host = document.querySelector(".axv-phone-body");
+    if (!host) return;
+    const next: MeasuredMap = new Map();
+    host.querySelectorAll<HTMLElement>("[data-path]").forEach((el) => {
+      if (el.style.position !== "absolute") return; // 只看 CL/RL 直接子项
+      const p = el.dataset.path;
+      if (!p) return;
+      const w = Math.round(el.offsetWidth);
+      const h = Math.round(el.offsetHeight);
+      if (w > 0 && h > 0) next.set(p, { w, h });
+    });
+    if (next.size === 0) return;
+    let changed = false;
+    if (!measured || measured.size !== next.size) changed = true;
+    else {
+      for (const [k, v] of next) {
+        const o = measured.get(k);
+        if (!o || Math.abs(o.w - v.w) > 1 || Math.abs(o.h - v.h) > 1) {
+          changed = true;
+          break;
+        }
+      }
+    }
+    if (!changed) return;
+    if (measurePass.current >= 4) return; // 收敛护栏：最多重排 4 轮
+    measurePass.current += 1;
+    setMeasured(next);
+  }, [model, measured]);
 
   /** 图层树用的原始节点树（不经渲染模型） */
   const treeRoot = useMemo(() => (parseErr ? null : parseLayoutXml(parsedXml).root), [parsedXml, parseErr]);

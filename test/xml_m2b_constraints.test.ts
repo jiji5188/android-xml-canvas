@@ -48,14 +48,15 @@ describe("M2b ConstraintLayout 四向约束", () => {
     expect(s!.height).toBe("80px"); // 40dp
   });
 
-  test("03 end 锚 parent → 右对齐（wrap 估宽 120dp）", () => {
+  test("03 end 锚 parent → 右对齐（wrap 轴交给浏览器算真尺寸）", () => {
     const xml = CL(
       `<TextView android:id="@+id/right" android:layout_width="wrap_content" android:layout_height="wrap_content" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintTop_toTopOf="parent"/>`,
     );
     const s = styleOf(xml, "right");
-    // 824 - 240 = 584
+    // M2t：wrap 轴改写 width:auto（浏览器按真实文字 shrink-to-fit），
+    // left 仍按 estSize 估宽（240px）先算，DOM 实测后由 XmlEditor 第二遍重解
     expect(s!.left).toBe("584px");
-    expect(s!.width).toBe("240px");
+    expect(s!.width).toBe("auto");
   });
 
   test("04 bottom 锚 parent → 下边对齐", () => {

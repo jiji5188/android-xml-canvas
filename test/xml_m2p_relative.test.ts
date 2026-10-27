@@ -139,12 +139,12 @@ describe("M2p RelativeLayout 尺寸与边角", () => {
     expect(k.style.left).toBe("20px");
   });
 
-  it("wrap_content 用 estSize 估（TextView 120x40dp）", () => {
+  it("wrap_content 渲染成 auto（M2t：交给浏览器算真实尺寸）", () => {
     const k = kid(
       wrap(`<TextView android:id="@+id/a" android:layout_width="wrap_content" android:layout_height="wrap_content"/>`),
     );
-    expect(k.style.width).toBe("240px");
-    expect(k.style.height).toBe("80px");
+    expect(k.style.width).toBe("auto");
+    expect(k.style.height).toBe("auto");
   });
 
   it("兄弟 id 不存在 → 回落 parent，不崩", () => {

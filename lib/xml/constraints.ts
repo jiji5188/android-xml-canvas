@@ -19,6 +19,9 @@ export interface ConstraintBox {
   top: number;
   width: number;
   height: number;
+  /** M2t：该轴是 wrap_content（渲染时用 auto，让浏览器算真实内容尺寸） */
+  wrapW?: boolean;
+  wrapH?: boolean;
 }
 
 export interface SolveResult {
@@ -104,6 +107,13 @@ export function estSize(node: XmlNode): { w: number; h: number } {
 type DimKind = "zero" | "wrap" | "match" | "dp";
 
 /**
+ * M2t：wrap_content 真实尺寸表（CSS px，由浏览器 DOM 实测回填）。
+ * 键 = 节点 path。命中时 CL/RL 求解的 wrap 维度优先用它，不再走 estSize 估算。
+ * Node（无 DOM）下传 undefined，行为不变。
+ */
+export type MeasuredMap = Map<string, { w: number; h: number }>;
+
+/**
  * layout_constraintDimensionRatio → 宽/高比值（w/h）。
  * 支持 "16:9"、"W,16:9"、"H,1:1"；返回 w/h，解析失败返回 null。
  */
@@ -124,11 +134,17 @@ function dimDp(
   res: ResourceTable,
   issues: XmlIssue[],
   path: string,
+  measured?: MeasuredMap,
 ): { kind: DimKind; value: number; unit: "dp" | "px" } {
   const raw = node.attrs[which === "width" ? "layout_width" : "layout_height"];
   const est = estSize(node);
+  const meas = measured?.get(path);
+  const wrapPx = meas ? (which === "width" ? meas.w : meas.h) : 0;
   if (raw === undefined) {
-    return { kind: "wrap", value: which === "width" ? est.w : est.h, unit: "dp" };
+    // 缺省当 wrap：实测值优先（px），否则估算（dp）
+    return meas
+      ? { kind: "wrap", value: wrapPx, unit: "px" }
+      : { kind: "wrap", value: which === "width" ? est.w : est.h, unit: "dp" };
   }
   const spec = resolveSize(raw, res, issues, path, which);
   switch (spec.kind) {
@@ -137,7 +153,9 @@ function dimDp(
     case "match":
       return { kind: "match", value: 0, unit: "dp" };
     case "wrap":
-      return { kind: "wrap", value: which === "width" ? est.w : est.h, unit: "dp" };
+      return meas
+        ? { kind: "wrap", value: wrapPx, unit: "px" }
+        : { kind: "wrap", value: which === "width" ? est.w : est.h, unit: "dp" };
     default:
       return { kind: "dp", value: spec.value ?? 0, unit: spec.kind === "px" ? "px" : "dp" };
   }
@@ -153,6 +171,8 @@ export function solveConstraintChildren(
   res: ResourceTable,
   parentContentW: number,
   parentContentH: number,
+  /** M2t：wrap 实测尺寸表（可选，浏览器 DOM 回填） */
+  measured?: MeasuredMap,
 ): SolveResult {
   const out: SolveResult = { boxes: new Map(), issues: [] };
   const children = parent.children;
@@ -249,8 +269,8 @@ export function solveConstraintChildren(
   // 第一遍：估尺寸
   const dims = new Map<string, { w: number; h: number; kindW: DimKind; kindH: DimKind; unitW: "dp" | "px"; unitH: "dp" | "px" }>();
   for (const c of children) {
-    const wSpec = dimDp(c, "width", res, out.issues, c.path);
-    const hSpec = dimDp(c, "height", res, out.issues, c.path);
+    const wSpec = dimDp(c, "width", res, out.issues, c.path, measured);
+    const hSpec = dimDp(c, "height", res, out.issues, c.path, measured);
     dims.set(c.path, {
       w: wSpec.value,
       h: hSpec.value,
@@ -449,6 +469,8 @@ export function solveConstraintChildren(
       top: Math.round(top),
       width: Math.round(w),
       height: Math.round(h),
+      wrapW: d.kindW === "wrap",
+      wrapH: d.kindH === "wrap",
     };
     if (degraded.has(c.path)) boxCache.delete(c.path);
     else boxCache.set(c.path, box);

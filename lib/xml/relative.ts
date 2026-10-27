@@ -17,13 +17,16 @@
 
 import type { XmlNode, ResourceTable, XmlIssue } from "./types";
 import { resolveSize } from "./resolve";
-import { estSize } from "./constraints";
+import { estSize, type MeasuredMap } from "./constraints";
 
 export interface RelBox {
   left: number;
   top: number;
   width: number;
   height: number;
+  /** M2t：该轴是 wrap_content（渲染时用 auto，让浏览器算真实内容尺寸） */
+  wrapW?: boolean;
+  wrapH?: boolean;
 }
 
 export interface RelSolveResult {
@@ -67,24 +70,35 @@ function dim(
   path: string,
   parentContent: number,
   margins: { start: number; end: number },
+  measured?: MeasuredMap,
 ): number {
   const key = which === "width" ? "layout_width" : "layout_height";
   const raw = node.attrs[key];
   const est = estSize(node);
   const estVal = which === "width" ? est.w : est.h;
-  if (raw === undefined) return estVal * SCALE;
+  const meas = measured?.get(path);
+  const wrapVal = meas ? (which === "width" ? meas.w : meas.h) : estVal * SCALE;
+  if (raw === undefined) return wrapVal;
   const spec = resolveSize(raw, res, issues, path, which);
   switch (spec.kind) {
     case "match":
       // match_parent：扣掉左右/上下 margin（Android 语义）
       return Math.max(0, parentContent - margins.start - margins.end);
     case "wrap":
-      return estVal * SCALE;
+      return wrapVal;
     case "zero":
       return 0;
     default:
       return spec.kind === "px" ? (spec.value ?? 0) : (spec.value ?? 0) * SCALE;
   }
+}
+
+/** M2t：节点某方向是否为 wrap_content（未写尺寸属性也当 wrap，与 dim() 口径一致） */
+function isWrapDim(node: XmlNode, which: "width" | "height"): boolean {
+  const raw = node.attrs[which === "width" ? "layout_width" : "layout_height"];
+  if (raw === undefined) return true;
+  const v = String(raw).trim();
+  return v === "wrap_content" || v === "wrap";
 }
 
 /** 读单边 margin（px）：分边优先，layout_margin 兜底 */
@@ -125,6 +139,8 @@ export function solveRelativeChildren(
   res: ResourceTable,
   parentContentW: number,
   parentContentH: number,
+  /** M2t：wrap 实测尺寸表（可选，浏览器 DOM 回填） */
+  measured?: MeasuredMap,
 ): RelSolveResult {
   const issues: XmlIssue[] = [];
   const boxes = new Map<string, RelBox>();
@@ -147,8 +163,8 @@ export function solveRelativeChildren(
       bottom: marginPx(c, "bottom", res),
     };
     sizeOf.set(c.path, {
-      w: dim(c, "width", res, issues, c.path, parentContentW, m),
-      h: dim(c, "height", res, issues, c.path, parentContentH, m),
+      w: dim(c, "width", res, issues, c.path, parentContentW, m, measured),
+      h: dim(c, "height", res, issues, c.path, parentContentH, m, measured),
     });
   }
 
@@ -160,8 +176,7 @@ export function solveRelativeChildren(
     if (cached) return cached;
     const a = node.attrs;
     const { w, h } = sizeOf.get(node.path) ?? { w: 0, h: 0 };
-    const ms = marginPx(node, "start", res);
-    const me = marginPx(node, "end", res);
+    const ms = marginPx(node, "start", res);    const me = marginPx(node, "end", res);
     const mt = marginPx(node, "top", res);
     const mb = marginPx(node, "bottom", res);
 
@@ -249,7 +264,14 @@ export function solveRelativeChildren(
       }
     }
 
-    const box: RelBox = { left: left ?? 0, top: top ?? 0, width: w, height: h };
+    const box: RelBox = {
+      left: left ?? 0,
+      top: top ?? 0,
+      width: w,
+      height: h,
+      wrapW: isWrapDim(node, "width"),
+      wrapH: isWrapDim(node, "height"),
+    };
     boxes.set(node.path, box);
     return box;
   };

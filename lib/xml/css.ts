@@ -157,8 +157,14 @@ export function buildRenderModel(
   scale = 2,
   /** M2q：@layout 名 → XML 文本，供 <include> 就地展开（resdir 上传 / 内粘贴） */
   layouts?: Record<string, string>,
+  /** M2r：预览屏尺寸（dp），不传走默认手机竖屏；影响 match_parent 根/CL 内容区尺寸 */
+  screen?: { w: number; h: number },
 ): RenderModel {
   const issues: import("./types").XmlIssue[] = [];
+  const screenW = screen?.w ?? SCREEN_DP.w;
+  const screenH = screen?.h ?? SCREEN_DP.h;
+  /** 内容区高（扣状态栏/导航栏），CL/Flex 根的高度回落值 */
+  const bodyH = screen ? phoneBodyDp(screen.h) : phoneBodyDp();
 
   // M2q：先展开 include，让 CL/RL/LinearLayout 求解器看到的是一棵完整树
   if (layouts) {
@@ -571,10 +577,10 @@ export function buildRenderModel(
       if (m && !s2.includes("%")) return parseFloat(m[1]);
       return fallback;
     };
-    const cw = toPx(n.style.width, SCREEN_DP.w * scale);
+    const cw = toPx(n.style.width, screenW * scale);
     // 高度回落值 = 内容区高度（屏高 - 状态栏 - 导航栏），否则 CL 根会按整屏高算出
     // 比内容区还高的盒子 → 底部被导航栏遮住 / 溢出预览框
-    const ch = toPx(n.style.height, phoneBodyDp() * scale);
+    const ch = toPx(n.style.height, bodyH * scale);
     // CL 自身尺寸必须落实成 px：父级只有 min-height 时 100% 解析不出来，
     // 子项全 absolute 又撑不起来 → 容器会塔成 0 高（真 bug，会看到控件跑出屏幕）
     const wStr = String(n.style.width ?? "");
@@ -648,8 +654,8 @@ export function buildRenderModel(
       if (m && !s2.includes("%")) return parseFloat(m[1]);
       return fallback;
     };
-    const cw = toPx(n.style.width, SCREEN_DP.w * scale);
-    const ch = toPx(n.style.height, phoneBodyDp() * scale);
+    const cw = toPx(n.style.width, screenW * scale);
+    const ch = toPx(n.style.height, bodyH * scale);
     // 容器自身尺寸要落实成 px：子项全 absolute 撑不起来，否则整个 RelativeLayout 塔成 0 高
     const wStr = String(n.style.width ?? "");
     const hStr = String(n.style.height ?? "");

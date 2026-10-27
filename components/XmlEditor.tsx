@@ -29,7 +29,7 @@ import { ResTree } from "./ResTree";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
-import { readableOn } from "@/lib/xml/theme";
+import { readableOn, deviceById, DEVICE_PRESETS } from "@/lib/xml/theme";
 
 const SAMPLES: Record<string, string> = {
   cl: `<?xml version="1.0" encoding="utf-8"?>
@@ -316,6 +316,15 @@ export function XmlEditor() {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
  const [exportNote, setExportNote] = useState<string>(" ");
   const [scale, setScale] = useState(1);
+  /** M2r：预览设备尺寸（手机竖屏/横屏/平板…），持久化到 localStorage */
+  const [deviceId, setDeviceId] = useState<string>(
+    () => (typeof window !== "undefined" ? window.localStorage.getItem("axv.device") ?? "phone" : "phone"),
+  );
+  const device = deviceById(deviceId);
+  const changeDevice = (id: string) => {
+    setDeviceId(id);
+    try { window.localStorage.setItem("axv.device", id); } catch { /* 静默 */ }
+  };
 
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
@@ -502,8 +511,9 @@ export function XmlEditor() {
     const { root, issues } = parseLayoutXml(parsedXml);
     if (!root) return { model: null, issues, parseErr: true };
     // M2q：把上传 res/layout 里的布局传进去，供 <include> 就地展开
-    return { model: buildRenderModel(root, resources, SCALE, resExtras?.layouts), issues, parseErr: false };
-  }, [parsedXml, resources, resExtras?.layouts]);
+    // M2r：屏幕尺寸传入，影响 match_parent 根 / CL 内容区回落值
+    return { model: buildRenderModel(root, resources, SCALE, resExtras?.layouts, { w: device.w, h: device.h }), issues, parseErr: false };
+  }, [parsedXml, resources, resExtras?.layouts, device]);
 
   /** 图层树用的原始节点树（不经渲染模型） */
   const treeRoot = useMemo(() => (parseErr ? null : parseLayoutXml(parsedXml).root), [parsedXml, parseErr]);
@@ -866,9 +876,8 @@ export function XmlEditor() {
     return findResolvedNode(model.root, selectedPath);
   }, [selectedPath, model]);
 
-  const widthPx = Math.round(412 * SCALE * scale);
-  const heightPx = Math.round(892 * SCALE * scale);
-  /** 屏 dp → px（含用户缩放） */
+  const widthPx = Math.round(device.w * SCALE * scale);
+  const heightPx = Math.round(device.h * SCALE * scale);  /** 屏 dp → px（含用户缩放） */
   const DPX = SCALE * scale;
   /** 手机外壳边框宽（px）；内容区保持 412x892dp 不被边框吃算 */
   const PHONE_BORDER = 2;
@@ -1546,6 +1555,21 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
         </div>
 
         <div className="axv-tb-group axv-tb-zoom">
+          <div className="axv-device">
+            <label htmlFor="axv-device-select">设备</label>
+            <select
+              id="axv-device-select"
+              value={deviceId}
+              onChange={(e) => changeDevice(e.target.value)}
+              title={`预览设备：${device.label}（对应 ${device.hint}）`}
+            >
+              {DEVICE_PRESETS.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="axv-zoom">
             <input
               type="range"

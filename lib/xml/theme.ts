@@ -49,6 +49,29 @@ export function readableOn(bgRaw: string): { bg: string; fg: string } {
 
 /** 屏幕 dp 尺寸（Pixel 7 级别） */
 export const SCREEN_DP = { w: 412, h: 892 } as const;
+
+/** M2r：可选设备尺寸（对应 Android 的 layout / layout-land / layout-sw600dp 目录） */
+export interface DevicePreset {
+  id: string;
+  label: string;
+  w: number;
+  h: number;
+  /** 尺寸限定符提示：预览横屏时提醒用户这是 layout-land */
+  hint: string;
+}
+
+export const DEVICE_PRESETS: DevicePreset[] = [
+  { id: "phone", label: "手机 412×892", w: 412, h: 892, hint: "layout/" },
+  { id: "phone-land", label: "手机横屏 892×412", w: 892, h: 412, hint: "layout-land/" },
+  { id: "small", label: "小屏 360×640", w: 360, h: 640, hint: "layout/" },
+  { id: "tablet", label: "平板 800×1280", w: 800, h: 1280, hint: "layout-sw600dp/" },
+  { id: "tablet-land", label: "平板横屏 1280×800", w: 1280, h: 800, hint: "layout-sw600dp-land/" },
+];
+
+/** 按 id 取预设，未知 id 回落手机竖屏 */
+export function deviceById(id: string | undefined): DevicePreset {
+  return DEVICE_PRESETS.find((d) => d.id === id) ?? DEVICE_PRESETS[0];
+}
 /** 系统状态栏高度（dp，Android 默认 24dp） */
 export const STATUS_BAR_DP = 24;
 /** 三键导航栏高度（dp） */

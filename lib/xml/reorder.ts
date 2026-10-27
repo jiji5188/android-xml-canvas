@@ -432,6 +432,25 @@ export function moveNodeRaw(
     ? lineIndent(removed, dest2.children[0].start)
     : lineIndent(removed, dest2.start) + "    ";
 
+  // 目标容器还是自闭合形式（<CardView ... />）：
+  // 子节点若直接插在 "/>" 后面会变成它的兄弟（看起来就是「拖进去加不了」），
+  // 必须先把标签改成 <CardView ...>\n  子控件\n</CardView> 的成对形式。
+  if (dest2.selfClosing) {
+    const destLineIndent = lineIndent(removed, dest2.start);
+    const block2 = reindent(nodeText, srcIndent, destIndent);
+    const out2 =
+      removed.slice(0, dest2.openEnd - 2) +
+      ">" +
+      "\n" +
+      destIndent +
+      block2 +
+      "\n" +
+      destLineIndent +
+      `</${dest2.tag}>` +
+      removed.slice(dest2.openEnd);
+    return { xml: out2, ok: true, issues, newPath: `${destPath2}/0`, index: 0 };
+  }
+
   const insertIdx = Math.max(0, Math.min(index, dest2.children.length));
   const at = insertIdx === 0 ? dest2.openEnd : dest2.children[insertIdx - 1].end;
 

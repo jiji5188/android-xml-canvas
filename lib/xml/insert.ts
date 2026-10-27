@@ -103,10 +103,15 @@ function shortTag(raw: string): string {
 }
 
 /** 只允许 1 个子控件的容器（ScrollView 家族、CardView 虽允许多个但惯例放 1 个，这里只列硬约束的） */
+/** 只允许 1 个子控件的容器：
+ *  - ScrollView 家族：Android 硬约束（只能放 1 个直接子项）
+ *  - CardView / MaterialCardView：技术上能放多个，但用户 2026-10-28 定为硬约束，UI 只给放 1 个 */
 const SINGLE_CHILD_TAGS = new Set([
   "ScrollView",
   "HorizontalScrollView",
   "NestedScrollView",
+  "CardView",
+  "MaterialCardView",
 ]);
 
 /** 是否是「只能放 1 个子控件」的容器（拖拽排序时用它拦第二个子项） */

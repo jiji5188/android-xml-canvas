@@ -112,3 +112,72 @@ describe("M3f 新增控件文档", () => {
     }
   });
 });
+
+describe("M3f2 分类拆分（Material 组与平台组分开）", () => {
+  it("Material 组件归入 Material 组（不再散在 选择/容器/其他）", () => {
+    for (const tag of [
+      "MaterialButton",
+      "MaterialCardView",
+      "SwitchMaterial",
+      "TextInputLayout",
+      "Slider",
+      "FloatingActionButton",
+      "ExtendedFloatingActionButton",
+      "Toolbar",
+      "MaterialToolbar",
+      "AppBarLayout",
+      "CollapsingToolbarLayout",
+      "BottomNavigationView",
+      "NavigationView",
+      "TabLayout",
+      "Chip",
+      "ChipGroup",
+      "SwipeRefreshLayout",
+      "ViewPager2",
+      "MaterialButtonToggleGroup",
+      "CircularProgressIndicator",
+      "LinearProgressIndicator",
+    ]) {
+      expect(getWidgetDoc(tag).category).toBe("Material");
+    }
+  });
+
+  it("平台常用控件保留原有分组（选择/输入/列表/其他/容器/布局）", () => {
+    expect(getWidgetDoc("RatingBar").category).toBe("选择");
+    expect(getWidgetDoc("AutoCompleteTextView").category).toBe("输入");
+    expect(getWidgetDoc("GridView").category).toBe("列表");
+    expect(getWidgetDoc("Chronometer").category).toBe("其他");
+    expect(getWidgetDoc("ViewPager").category).toBe("容器");
+    expect(getWidgetDoc("MotionLayout").category).toBe("布局");
+  });
+
+  it("新增 M3f2 平台控件都有专属文档（非兑底）", () => {
+    for (const tag of [
+      "Chronometer",
+      "TextClock",
+      "AnalogClock",
+      "DigitalClock",
+      "MultiAutoCompleteTextView",
+      "TextureView",
+      "GridView",
+      "ViewPager",
+      "PagerTabStrip",
+      "PagerTitleStrip",
+      "Group",
+      "ViewAnimator",
+      "TabHost",
+      "TabWidget",
+    ]) {
+      expect(getWidgetDoc(tag).title).not.toBe(tag);
+    }
+  });
+
+  it("新增 M3f2 平台控件的 name/desc 不空", () => {
+    for (const t of ["Chronometer", "GridView", "ViewPager", "Group", "ViewAnimator", "TabHost"]) {
+      for (const a of docAttrs(t)) {
+        expect(a.name.trim().length).toBeGreaterThan(0);
+        expect(a.desc.length).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+});

@@ -13,17 +13,31 @@ export interface AttrDoc {
   values?: string[];
 }
 
+/** 控件分类（文档面板里按这个分组；M3f 拆成 Material / 平台两组） */
+export type WidgetCategory =
+  | "布局"
+  | "文本"
+  | "输入"
+  | "图片"
+  | "选择"
+  | "列表"
+  | "容器"
+  | "Material"
+  | "其他";
+
 export interface WidgetDoc {
   /** 控件中文名 */
   title: string;
   /** 一句话定位 */
   summary: string;
   /** 归属分类 */
-  category: "布局" | "文本" | "输入" | "图片" | "选择" | "列表" | "容器" | "其他";
+  category: WidgetCategory;
   /** 专属属性 */
   attrs: AttrDoc[];
   /** 使用要点（渲染/约束相关的坑） */
   notes?: string[];
+  /** 官方文档链接（developer.android.com 或 androidx/m3 文档） */
+  officialDoc?: string;
 }
 
 /** 所有 View 通用属性 */
@@ -422,7 +436,7 @@ const PARSED: Record<string, WidgetDoc> = {
   MaterialButton: {
     title: "Material 按钮",
     summary: "Material 组件按钮，支持描边款、图标、圆角自定义。",
-    category: "文本",
+    category: "Material",
     attrs: [
       ...TEXT_ATTRS,
       { name: "cornerRadius", type: "尺寸", desc: "圆角半径", values: ["4dp", "20dp"] },
@@ -455,7 +469,7 @@ const PARSED: Record<string, WidgetDoc> = {
   TextInputLayout: {
     title: "输入框容器",
     summary: "Material 输入框外壳：带浮动标签、错误提示、字数统计。",
-    category: "输入",
+    category: "Material",
     attrs: [
       { name: "hint", type: "文本", desc: "浮动标签文字（获得焦点时上浮）" },
       { name: "boxBackgroundMode", type: "枚举", desc: "外观：none / filled / outline", values: ["filled", "outline"] },
@@ -501,7 +515,7 @@ const PARSED: Record<string, WidgetDoc> = {
   SwitchMaterial: {
     title: "Material 开关",
     summary: "Material 风格开关（MaterialSwitch 同义）。",
-    category: "选择",
+    category: "Material",
     attrs: [...SELECTION_ATTRS],
   },
   SeekBar: {
@@ -562,7 +576,7 @@ const PARSED: Record<string, WidgetDoc> = {
   MaterialCardView: {
     title: "Material 卡片",
     summary: "支持描边、选中态的 Material 卡片。",
-    category: "容器",
+    category: "Material",
     attrs: [
       { name: "cardCornerRadius", type: "尺寸", desc: "卡片圆角" },
       { name: "cardElevation", type: "尺寸", desc: "阴影高度" },
@@ -622,7 +636,7 @@ const PARSED: Record<string, WidgetDoc> = {
   Slider: {
     title: "滑块",
     summary: "Material 3 的滑动选值控件（取代 SeekBar），常用于音量、价格区间。",
-    category: "选择",
+    category: "Material",
     attrs: [
       { name: "android:value", type: "数值", desc: "当前值", values: ["50"] },
       { name: "android:valueFrom", type: "数值", desc: "最小值", values: ["0"] },
@@ -638,7 +652,7 @@ const PARSED: Record<string, WidgetDoc> = {
   FloatingActionButton: {
     title: "浮动按钮",
     summary: "屏幕右下角的圆形主操作按钮（新建/添加），一个界面最多一个。",
-    category: "其他",
+    category: "Material",
     attrs: MATERIAL_FAB_ATTRS,
     notes: [
       "默认尺寸 56dp，图标 24dp；用 FrameLayout/CoordinatorLayout 包起来并加 layout_gravity=\"bottom|end\"",
@@ -648,7 +662,7 @@ const PARSED: Record<string, WidgetDoc> = {
   ExtendedFloatingActionButton: {
     title: "带文字的浮动按钮",
     summary: "胶囊形浮动按钮，图标 + 文字，适合文字较长的主操作。",
-    category: "其他",
+    category: "Material",
     attrs: [
       ...MATERIAL_FAB_ATTRS,
       { name: "android:text", type: "文本", desc: "按钮文字", values: ["新建订单"] },
@@ -659,7 +673,7 @@ const PARSED: Record<string, WidgetDoc> = {
   MaterialButtonToggleGroup: {
     title: "按钮切换组",
     summary: "多个 MaterialButton 互斥或可多选的分段控件（相当于一组 RadioButton）。",
-    category: "选择",
+    category: "Material",
     attrs: [
       { name: "app:singleSelection", type: "布尔", desc: "是否只能选一个", values: ["true"] },
       { name: "app:selectionRequired", type: "布尔", desc: "是否必须保留一个选中" },
@@ -670,27 +684,27 @@ const PARSED: Record<string, WidgetDoc> = {
   Toolbar: {
     title: "工具栏",
     summary: "应用顶部的标题栏（替代旧 ActionBar），可放返回、标题、菜单。",
-    category: "容器",
+    category: "Material",
     attrs: TOOLBAR_ATTRS,
     notes: ["高度一般用 ?attr/actionBarSize（56dp）；放 AppBarLayout 里才能随滚动收起"],
   },
   MaterialToolbar: {
     title: "Material 工具栏",
     summary: "Material 风格的 Toolbar，额外支持标题居中、副标题样式。",
-    category: "容器",
+    category: "Material",
     attrs: TOOLBAR_ATTRS,
   },
   AppBarLayout: {
     title: "应用栏容器",
     summary: "装 Toolbar / TabLayout 的竖向容器，负责随列表滚动收起展开。",
-    category: "容器",
+    category: "Material",
     attrs: APP_BAR_ATTRS,
     notes: ["子控件要写 app:layout_scrollFlags 才会跟着滚动；父级必须是 CoordinatorLayout 才生效"],
   },
   CollapsingToolbarLayout: {
     title: "可折叠标题栏",
     summary: "顶部大图随滚动收成小标题栏（详情页经典效果）。",
-    category: "容器",
+    category: "Material",
     attrs: COLLAPSING_ATTRS,
     notes: [
       "外层必须是 AppBarLayout，且自己是 AppBarLayout 的子项",
@@ -700,21 +714,21 @@ const PARSED: Record<string, WidgetDoc> = {
   BottomNavigationView: {
     title: "底部导航",
     summary: "底部 3~5 个页签的主导航（首页/订单/我的）。",
-    category: "选择",
+    category: "Material",
     attrs: BOTTOM_NAV_ATTRS,
     notes: ["菜单项上限 5 个，超过会挤压变形；高度固定 80dp"],
   },
   NavigationView: {
     title: "侧边抽屉菜单",
     summary: "左侧滑出的菜单（配合 DrawerLayout 用）。",
-    category: "容器",
+    category: "Material",
     attrs: NAV_VIEW_ATTRS,
     notes: ["必须放在 DrawerLayout 里并写 layout_gravity=\"start\"，否则会铺满整屏"],
   },
   TabLayout: {
     title: "标签页",
     summary: "顶部横排标签（页签切换），常配合 ViewPager2 左右滑动。",
-    category: "选择",
+    category: "Material",
     attrs: TAB_ATTRS,
   },
   TabItem: {
@@ -729,14 +743,14 @@ const PARSED: Record<string, WidgetDoc> = {
   Chip: {
     title: "芯片",
     summary: "圆角小标签，用于状态标识、筛选条件、多选标签。",
-    category: "选择",
+    category: "Material",
     attrs: CHIP_ATTRS,
     notes: ["多个 Chip 要放 ChipGroup 里才会自动换行排列"],
   },
   ChipGroup: {
     title: "芯片组",
     summary: "多个 Chip 的容器，自动换行/横排排列。",
-    category: "容器",
+    category: "Material",
     attrs: [
       { name: "app:singleSelection", type: "布尔", desc: "是否只能选一个（筛选场景常用）", values: ["true"] },
       { name: "app:chipSpacingHorizontal", type: "尺寸", desc: "横向间距", values: ["8dp"] },
@@ -747,14 +761,14 @@ const PARSED: Record<string, WidgetDoc> = {
   SwipeRefreshLayout: {
     title: "下拉刷新",
     summary: "包住列表，下拉时出现转圈刷新（只允许一个直接子控件）。",
-    category: "容器",
+    category: "Material",
     attrs: SWIPE_REFRESH_ATTRS,
     notes: ["只能包一个子控件（通常是 RecyclerView/ScrollView）"],
   },
   ViewPager2: {
     title: "滑动翻页容器",
     summary: "左右滑动的页面容器（引导页、轮播图、配合 TabLayout）。",
-    category: "容器",
+    category: "Material",
     attrs: VIEWPAGER_ATTRS,
     notes: ["每个子项通常用 FragmentContainerView，适配器用 FragmentStateAdapter"],
   },
@@ -893,7 +907,7 @@ const PARSED: Record<string, WidgetDoc> = {
   CircularProgressIndicator: {
     title: "圆形进度（Material 3）",
     summary: "Material 3 的转圈进度，可确定百分比也可不确定。",
-    category: "其他",
+    category: "Material",
     attrs: [
       { name: "android:indeterminate", type: "布尔", desc: "是否无限转圈" },
       { name: "app:indicatorSize", type: "尺寸", desc: "圆环直径", values: ["48dp"] },
@@ -904,12 +918,154 @@ const PARSED: Record<string, WidgetDoc> = {
   LinearProgressIndicator: {
     title: "条形进度（Material 3）",
     summary: "Material 3 的水平进度条。",
-    category: "其他",
+    category: "Material",
     attrs: [
       { name: "android:progress", type: "数值", desc: "当前进度 0~100", values: ["60"] },
       { name: "android:indeterminate", type: "布尔", desc: "是否不确定进度" },
       { name: "app:trackThickness", type: "尺寸", desc: "条的高度", values: ["4dp"] },
       { name: "app:trackCornerRadius", type: "尺寸", desc: "条的圆角" },
+    ],
+  },
+
+  /* ===== 平台常用控件补全（M3f2） ===== */
+  Chronometer: {
+    title: "计时器",
+    summary: "实时走时的文本（倒计时、运动计时），可设为从过去某时刻开始累计。",
+    category: "其他",
+    attrs: [
+      { name: "android:countDown", type: "布尔", desc: "是否倒着走", values: ["true"] },
+      { name: "android:format", type: "文本", desc: "时间格式（如 %s 占位）", values: ["已用 %s"] },
+      { name: "android:minWidth", type: "尺寸", desc: "最小宽度（防止时间变化时抖动）" },
+      { name: "android:tag", type: "文本", desc: "业务标识（代码里找哪个计时器）" },
+    ],
+    notes: ["预览里画成静态文本，实际走时要代码调用 setBase()"],
+  },
+  TextClock: {
+    title: "数字时钟",
+    summary: "自动显示当前时间（无需代码），可配 12h/24h、时区。",
+    category: "其他",
+    attrs: [
+      { name: "android:format12Hour", type: "文本", desc: "12 小时制格式", values: ["HH:mm:ss a"] },
+      { name: "android:format24Hour", type: "文本", desc: "24 小时制格式", values: ["HH:mm:ss"] },
+      { name: "android:timeZone", type: "文本", desc: "时区", values: ["Asia/Shanghai", "UTC"] },
+      { name: "android:showSoftKeyboardOnFocus", type: "布尔", desc: "是否可点击编辑" },
+    ],
+  },
+  AnalogClock: {
+    title: "模拟时钟",
+    summary: "表盘式时钟（已不推荐，新场景用 Material 时钟或 Chronometer）。",
+    category: "其他",
+    attrs: [
+      { name: "android:dial", type: "drawable", desc: "表盘背景" },
+      { name: "android:hourHandColor", type: "颜色", desc: "时针颜色" },
+      { name: "android:minuteHandColor", type: "颜色", desc: "分针颜色" },
+      { name: "android:seconds", type: "数值", desc: "初始秒数" },
+    ],
+  },
+  DigitalClock: {
+    title: "数字时钟（旧）",
+    summary: "纯文本时钟（已不推荐，新场景用 Chronometer/TextClock）。",
+    category: "其他",
+    attrs: [
+      { name: "android:startOnBoot", type: "布尔", desc: "开机后是否立即启动" },
+    ],
+  },
+  MultiAutoCompleteTextView: {
+    title: "多行自动补全",
+    summary: "支持多候选并存的自动补全输入框（搜索历史、多人选择）。",
+    category: "输入",
+    attrs: [
+      { name: "android:completionThreshold", type: "数值", desc: "输几个字符开始提示", values: ["1"] },
+      { name: "android:dropDownHorizontalOffset", type: "尺寸", desc: "下拉框水平偏移" },
+      { name: "android:dropDownVerticalOffset", type: "尺寸", desc: "下拉框垂直偏移" },
+      { name: "android:dropDownWidth", type: "尺寸", desc: "下拉框宽度" },
+    ],
+  },
+  TextureView: {
+    title: "纹理视图",
+    summary: "可缩放/旋转的独立绘制层（相机预览、视频，比 SurfaceView 更灵活）。",
+    category: "其他",
+    attrs: [
+      { name: "android:zOrderMediaOverlay", type: "布尔", desc: "是否画在普通 UI 之上" },
+      { name: "android:zOrderOnTop", type: "布尔", desc: "是否画在最上层" },
+    ],
+  },
+  GridView: {
+    title: "网格列表",
+    summary: "网格布局的列表（老控件，新项目建议用 RecyclerView + 网格 LayoutManager）。",
+    category: "列表",
+    attrs: [
+      { name: "android:numColumns", type: "枚举", desc: "列数：具体数字 或 auto_fit / auto_size", values: ["2", "auto_fit"] },
+      { name: "android:stretchMode", type: "枚举", desc: "列的拉伸方式：columnWidth 按列宽 / spacingWidth 按间距", values: ["columnWidth"] },
+      { name: "android:columnWidth", type: "尺寸", desc: "列宽", values: ["100dp"] },
+      { name: "android:horizontalSpacing", type: "尺寸", desc: "横向间距", values: ["8dp"] },
+      { name: "android:verticalSpacing", type: "尺寸", desc: "纵向间距", values: ["8dp"] },
+      { name: "android:gravity", type: "枚举", desc: "整列的对齐", values: ["center"] },
+    ],
+  },
+  ViewPager: {
+    title: "滑动翻页容器（v1）",
+    summary: "左右滑动的页面容器（老版，新项目用 ViewPager2）。",
+    category: "容器",
+    attrs: [
+      { name: "android:offscreenPageLimit", type: "数值", desc: "左右各保留几页", values: ["1"] },
+      { name: "android:scrollFormat", type: "文本", desc: "页码显示格式" },
+      { name: "android:scrollGranularity", type: "尺寸", desc: "每次滚动的距离", values: ["?attr/scrollMinVelocity"] },
+    ],
+    notes: ["新项目用 ViewPager2，v1 只为了兼容老代码"],
+  },
+  PagerTabStrip: {
+    title: "页签条（v1）",
+    summary: "ViewPager 顶部的页签指示（老版，可点击跳页）。",
+    category: "其他",
+    attrs: [
+      { name: "android:layout_gravity", type: "枚举", desc: "对齐位置", values: ["top", "bottom"] },
+      { name: "android:textColor", type: "颜色", desc: "页签文字颜色" },
+      { name: "android:tabStripLocation", type: "枚举", desc: "显示在顶还是底", values: ["top", "bottom"] },
+    ],
+  },
+  PagerTitleStrip: {
+    title: "页标题条（v1）",
+    summary: "ViewPager 顶部只显示当前/相邻页标题（老版，不可点）。",
+    category: "其他",
+    attrs: [
+      { name: "android:layout_gravity", type: "枚举", desc: "对齐位置", values: ["top", "bottom"] },
+      { name: "android:textColor", type: "颜色", desc: "标题文字颜色" },
+    ],
+  },
+  Group: {
+    title: "约束组（ConstraintLayout）",
+    summary: "把多个 ConstraintLayout 子控件绑成一个组，批量启用/停用它们的可见性。",
+    category: "其他",
+    attrs: [
+      { name: "android:constraint_referenced_ids", type: "文本", desc: "组里包含的控件 id（逗号分隔）", values: ["btn1,btn2,btn3"] },
+      { name: "android:visibility", type: "枚举", desc: "控制整组显隐", values: ["visible", "invisible", "gone"] },
+    ],
+    notes: ["本身不画东西，靠 referenced_ids 控制子控件；父级必须是 ConstraintLayout"],
+  },
+  ViewAnimator: {
+    title: "视图动画器",
+    summary: "同一位置多个子控件轮番显示（ViewFlipper 的扩展，支持动画监听）。",
+    category: "容器",
+    attrs: FLIPPER_ATTRS,
+    notes: ["每个子控件占满整屏，代码里 showNext() 切换"],
+  },
+  TabHost: {
+    title: "旧版页签宿主",
+    summary: "老版 Tab 页签容器（新项目用 TabLayout + ViewPager2）。",
+    category: "容器",
+    attrs: [
+      { name: "android:foreground", type: "drawable", desc: "页签上层的遮罩" },
+      { name: "android:measureWithLargestChild", type: "布尔", desc: "是否按最大子项测量" },
+    ],
+  },
+  TabWidget: {
+    title: "旧版页签条",
+    summary: "TabHost 里的标签条（新项目用 TabLayout）。",
+    category: "选择",
+    attrs: [
+      { name: "android:tabStripLeft", type: "尺寸", desc: "标签条左侧间距" },
+      { name: "android:tabStripRight", type: "尺寸", desc: "标签条右侧间距" },
     ],
   },
 };

@@ -64,7 +64,10 @@ export function IconPickerPanel({ value, attrName, existing, onClose, onPick }: 
     let alive = true;
     loadIconFont(`${basePath}/material-symbols-rounded.ttf`)
       .then(() => alive && setFontReady(true))
-      .catch(() => alive && setErr("图标字体解析失败（material-symbols-rounded.ttf）"));
+      .catch((e) => {
+        console.error("[axv] icon font load failed", e);
+        alive && setErr("图标字体解析失败（material-symbols-rounded.ttf）");
+      });
     return () => {
       alive = false;
     };

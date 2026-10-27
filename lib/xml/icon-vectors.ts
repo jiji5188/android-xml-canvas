@@ -13,7 +13,9 @@ export function isIconFontLoaded(): boolean {
 
 /** 解析 TTF 并建立「图标名 → glyphIndex」索引（浏览器里只调一次） */
 export async function loadIconFont(src: string | ArrayBuffer): Promise<void> {
-  const buf = typeof src === "string" ? (await fetch(src)).arrayBuffer() : src;
+  // 注意：Response.arrayBuffer() 返回 Promise，必须 await（否则把 Promise 喂给 opentype，
+  // 内部 new DataView(Promise) 得到 0 长度 → RangeError: Offset is outside the bounds of the DataView）
+  const buf = typeof src === "string" ? await (await fetch(src)).arrayBuffer() : src;
   font = opentype.parse(buf as unknown as ArrayBuffer);
   nameIdx = new Map();
   const names: string[] | undefined =

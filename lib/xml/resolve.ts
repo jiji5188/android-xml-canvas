@@ -3,8 +3,9 @@
 
 import type { XmlNode, XmlIssue, ResourceTable } from "./types";
 import { parseDimenToDp, FRAMEWORK_COLORS, FRAMEWORK_STYLES } from "./resources";
+import { parseShapeDrawable } from "./shape";
 
-export type ResolvedAttrs = Record<string, string | number | boolean | SizeSpec | null>;
+export type ResolvedAttrs = Record<string, string | number | boolean | SizeSpec | null | import("./shape").ShapeStyle>;
 
 /** 尺寸类属性解析：match_parent/wrap_content/0dp/具体值/引用 */
 export type SizeSpec =
@@ -234,6 +235,17 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
 
   // 颜色
   out["background"] = a["background"] !== undefined ? resolveColor(a["background"], res, issues, path, "background") : "";
+
+  // M2w：background="@drawable/bg_xxx" 且上传的 res 里有 <shape> xml → 还原渐变/圆角/描边
+  out["bgShape"] = null;
+  const bgRaw = a["background"] ?? "";
+  if (bgRaw.startsWith("@drawable/") && res.drawableXml) {
+    const nm = bgRaw.slice("@drawable/".length);
+    const src = res.drawableXml[nm] ?? res.drawableXml[nm.replace(/\.xml$/i, "")];
+    if (src) {
+      out["bgShape"] = parseShapeDrawable(src, (raw) => resolveColor(raw, res, issues, path, "background"));
+    }
+  }
 
   // 文本
   out["text"] = a["text"] !== undefined ? resolveText(a["text"], res, issues, path) : "";

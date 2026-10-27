@@ -98,7 +98,7 @@ describe("M2v 容器补全", () => {
   });
 
   it("gridColumnCount：非法/超大值兜底", () => {
-    const fake = (cols: string[]) => ({ children: cols.map((c) => ({ attrs: c ? { layout_column: c } : {} })) });
+    const fake = (cols: string[]) => ({ children: cols.map((c) => ({ attrs: (c ? { layout_column: c } : {}) as Record<string, string> })) });
     expect(gridColumnCount(3, fake([]))).toBe(3);
     expect(gridColumnCount(0, fake([]))).toBe(1);
     expect(gridColumnCount("abc", fake([]))).toBe(1);

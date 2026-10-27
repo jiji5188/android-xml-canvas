@@ -29,6 +29,8 @@ export interface ResourceExtras {
   drawables: Record<string, string>;
   /** 矢量图（vector xml）资源名，渲染为占位框 */
   vectorNames: string[];
+  /** M2w：<shape> 等非矢量 drawable xml 原文（名 → xml），供渐变/圆角/描边背景还原 */
+  drawableXml: Record<string, string>;
   /** values/*.xml 中 string/dimen/color 标签集合，喂 mergeResourceFragment */
   valuesXml: string;
   /** styles.xml 展开记录 */
@@ -36,7 +38,7 @@ export interface ResourceExtras {
   /** 已读入的相对路径（提示用户读了什么） */
   sourceFiles: string[];
   /** 各类计数，给 UI 打提示 */
-  counts: { images: number; vectors: number; values: number; styles: number };
+  counts: { images: number; vectors: number; values: number; styles: number; shapes: number };
   /** res/ 目录树（仅含读到的文件） */
   tree?: ResTreeDir;
   /** res/layout/*.xml 全文缓存（点击树里布局文件 → 画到预览） */
@@ -75,10 +77,11 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
   const extras: ResourceExtras = {
     drawables: {},
     vectorNames: [],
+    drawableXml: {},
     valuesXml: "",
     styles: {},
     sourceFiles: [],
-    counts: { images: 0, vectors: 0, values: 0, styles: 0 },
+    counts: { images: 0, vectors: 0, values: 0, styles: 0, shapes: 0 },
   };
   const tree = { name: 'res' as const, children: {} as Record<string, ResTreeDir | ResTreeFile> };
 
@@ -150,6 +153,13 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
           extras.vectorNames.push(name);
           extras.counts.vectors++;
         }
+        extras.sourceFiles.push(rel);
+        upsertTree(tree, rel, item.file, text);
+      } else if (/<(shape|selector|ripple)[\s>]/.test(text)) {
+        // M2w：shape / selector / ripple → 存原文，resolve 时还原成渐变/圆角/描边背景
+        const name = file.replace(/\.xml$/i, "");
+        extras.drawableXml[name] = text;
+        extras.counts.shapes++;
         extras.sourceFiles.push(rel);
         upsertTree(tree, rel, item.file, text);
       }

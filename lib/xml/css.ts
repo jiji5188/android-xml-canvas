@@ -312,6 +312,27 @@ export function buildRenderModel(
     if (bg) style.backgroundColor = bg;
     const r = (attrs["radius"] as number) || 0;
     if (r) style.borderRadius = `${DP(r, scale)}px`;
+    // M2w：<shape> 背景（@drawable/bg_xxx 引用的渐变/圆角/描边），覆盖上面的纯色
+    const shape = attrs["bgShape"] as { gradient?: string; solid?: string; radiusDp?: number; cornersDp?: { tl: number; tr: number; br: number; bl: number }; strokeDp?: number; strokeColor?: string; oval?: boolean } | null;
+    if (shape) {
+      if (shape.gradient) {
+        style.backgroundImage = shape.gradient;
+      } else if (shape.solid) {
+        style.backgroundColor = shape.solid;
+      }
+      if (shape.oval) {
+        style.borderRadius = "50%";
+      } else if (shape.cornersDp) {
+        const c = shape.cornersDp;
+        style.borderRadius = `${DP(c.tl, scale)}px ${DP(c.tr, scale)}px ${DP(c.br, scale)}px ${DP(c.bl, scale)}px`;
+      } else if (shape.radiusDp !== undefined) {
+        style.borderRadius = `${DP(shape.radiusDp, scale)}px`;
+      }
+      if (shape.strokeDp && shape.strokeColor) {
+        style.border = `${DP(shape.strokeDp, scale)}px solid ${shape.strokeColor}`;
+        style.boxSizing = "border-box";
+      }
+    }
     const el = attrs["elevation"] as { kind?: string; value?: number } | null;
     if (el && el.kind === "dp" && (el.value ?? 0) > 0) {
       const ev = el.value ?? 0;

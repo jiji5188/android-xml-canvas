@@ -9,6 +9,7 @@ import type { ResolvedNode } from "@/lib/xml/types";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import { editorFor, type AttrEditor } from "./attr-catalog";
 import { getWidgetDoc, docAttrs, attrHint } from "@/lib/xml/widget-docs";
+import { IconPickerPanel } from "./IconPickerPanel";
 
 interface Props {
   node: ResolvedNode;
@@ -22,6 +23,32 @@ interface Props {
   onAddAttr: () => void;
   /** 已上传 res 资源（可选；提供后 background/src 可弹 drawable 列表） */
   resExtras?: ResourceExtras | null;
+  /** M3g：选中图标 → 生成 res/drawable 资源并写入该属性 */
+  onPickIcon?: (attr: string, resourceName: string, vectorXml: string) => void;
+  /** M3g：已生成的图标资源名（用于标记「复用」） */
+  iconNames?: string[];
+}
+
+/** 哪些属性可以接图标（点击弹选择器） */
+const ICON_ATTRS = new Set([
+  "src",
+  "srcCompat",
+  "background",
+  "foreground",
+  "drawableStart",
+  "drawableLeft",
+  "drawableEnd",
+  "drawableRight",
+  "drawableTop",
+  "drawableBottom",
+  "icon",
+  "navigationIcon",
+  "checkedIcon",
+]);
+
+function canPickIcon(name: string, value: string): boolean {
+  if (ICON_ATTRS.has(name)) return true;
+  return /^@(drawable|mipmap)\//.test(value.trim());
 }
 
 const shortTag = (t: string) => (t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t);
@@ -50,8 +77,19 @@ function drawableNames(extras: ResourceExtras | null | undefined): string[] {
   return Array.from(names).sort();
 }
 
-export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras, onDeleteNode }: Props) {
+export function AttrPanel({
+  node,
+  onCommit,
+  onRemove,
+  onAddAttr,
+  resExtras,
+  onDeleteNode,
+  onPickIcon,
+  iconNames,
+}: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  /** M3g：当前正在选图标的属性 */
+  const [iconPick, setIconPick] = useState<string | null>(null);
   /** M3a：右侧面板双页签：属性 / 文档 */
   const [tab, setTab] = useState<"attrs" | "docs">("attrs");
   /** 属性行展开的说明（点 ? 切换） */
@@ -370,11 +408,22 @@ export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras, onDe
         {rows.length === 0 && <div className="axv-attr-empty">该节点还没有属性</div>}
         {rows.map(([name, value]) => {
           const hint = attrHint(node.tag, name);
+          const vstr = String(value);
           return (
             <div key={name}>
               <div className="axv-attr-row">
                 <label className="axv-attr-name" title={name}>{name}</label>
-                <div className="axv-attr-value">{renderEditor(name, String(value))}</div>
+                <div className="axv-attr-value">{renderEditor(name, vstr)}</div>
+                {onPickIcon && canPickIcon(name, vstr) ? (
+                  <button
+                    className="axv-attr-info"
+                    title="从 Material Symbols 选图标（会生成 res/drawable 资源）"
+                    aria-label={`为 ${name} 选择图标`}
+                    onClick={() => setIconPick(name)}
+                  >
+                    🖼
+                  </button>
+                ) : null}
                 {hint ? (
                   <button
                     className="axv-attr-info"
@@ -404,6 +453,19 @@ export function AttrPanel({ node, onCommit, onRemove, onAddAttr, resExtras, onDe
       </button>
         </>
       )}
+
+      {iconPick ? (
+        <IconPickerPanel
+          value={String(node.rawAttrs[iconPick] ?? "")}
+          attrName={iconPick}
+          existing={iconNames ?? []}
+          onClose={() => setIconPick(null)}
+          onPick={(resourceName, vectorXml, iconName) => {
+            onPickIcon?.(iconPick, resourceName, vectorXml);
+            setIconPick(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

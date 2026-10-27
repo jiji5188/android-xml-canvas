@@ -2161,3 +2161,115 @@
 
 /* M3b 上传 res 资源按钮激活态 */
 .axv-tb-btn.axv-tb-active { background: #4f46e5; color: #fff; }
+
+/* ===== M3g 图标选择器 ===== */
+.axv-icon-modal {
+  width: min(720px, 92vw);
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+}
+.axv-icon-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+}
+.axv-icon-search input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: #fff;
+  color: #1d1b20;
+}
+.axv-icon-search input:focus { border-color: #4f46e5; }
+.axv-icon-err {
+  margin: 8px 14px 0;
+  padding: 8px 10px;
+  background: #fdecea;
+  color: #8a1c12;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.axv-icon-grid {
+  flex: 1;
+  min-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 6px;
+  padding: 12px 14px;
+  align-content: start;
+}
+.axv-icon-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 68px;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 10px;
+  background: #fff;
+  color: #1d1b20;
+  cursor: pointer;
+  padding: 4px;
+  overflow: hidden;
+}
+.axv-icon-cell:hover { background: #f4f2ff; border-color: #4f46e5; }
+.axv-icon-cell .msr { font-size: 24px; line-height: 1; }
+.axv-icon-name {
+  font-size: 9.5px;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #6b6b78;
+}
+.axv-icon-cell.is-current { border-color: #4f46e5; background: #ede9fe; }
+.axv-icon-cell.is-dup .axv-icon-name { color: #8a6d1f; }
+.axv-icon-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 8px;
+  padding: 1px 3px;
+  border-radius: 4px;
+  background: #4f46e5;
+  color: #fff;
+}
+.axv-icon-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding: 26px 10px;
+  color: #6b6b78;
+  font-size: 13px;
+}
+.axv-icon-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid rgba(0,0,0,.08);
+  font-size: 11.5px;
+  color: #6b6b78;
+}
+.axv-icon-foot code {
+  background: #f1f0f6;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 11px;
+}

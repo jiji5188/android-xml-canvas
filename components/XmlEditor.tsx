@@ -19,6 +19,9 @@ import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag,
 import { moveNodeRaw } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml } from "@/lib/xml/lint";
+import { vectorToDataUrl } from "@/lib/xml/vector-svg";
+import { buildResBundle, missingDrawables } from "@/lib/xml/bundle";
+import { makeZip, downloadBytes } from "@/lib/xml/zip";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { ExportCheckModal, type ExportReport } from "./ExportCheckModal";
 import { XmlCanvas } from "./XmlCanvas";
@@ -318,6 +321,7 @@ const stripNs = (frag: string) => frag.replace(/\s+xmlns:android="[^"]*"/g, "");
 const LS_KEY_XML = "axv.autosave.xml";
 const LS_KEY_HIST = "axv.autosave.history";
 const LS_KEY_RES = "axv.autosave.resources";
+const LS_KEY_ICONS = "axv.autosave.icons"; // M3g：图标选择器生成的矢量资源
 
 /** 安全读 localStorage（无 SSR、禁用存储模式都要不炸） */
 function lsGet(key: string): string | null {
@@ -342,6 +346,17 @@ export function XmlEditor() {
   const [resourceFragment, setResourceFragment] = useState("");
   /** 上传 res/ 目录解析出的附加资源（drawable/vector/styles/values 原文） */
   const [resExtras, setResExtras] = useState<ResourceExtras | null>(null);
+  /** M3g：图标选择器生成的矢量资源：资源名（ic_search）→ vector xml 原文 */
+  const [iconVectors, setIconVectors] = useState<Record<string, string>>({});
+  /** M3g：图标矢量 → data URL（让画布能真渲染而不是占位框） */
+  const iconDataUrls = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [name, xml] of Object.entries(iconVectors)) {
+      const u = vectorToDataUrl(xml);
+      if (u) out[name] = u;
+    }
+    return out;
+  }, [iconVectors]);
   const resDirRef = useRef<HTMLInputElement | null>(null);
   /** 双保险：mount 后 setAttribute 强制写入 webkitdirectory/directory，
    *  避免 React 渲染空字符串属性时某些浏览器不识别（导致弹出文件选择器而非目录选择器） */
@@ -540,6 +555,42 @@ export function XmlEditor() {
     }
   }, []);
 
+  // M3g：图标矢量 自动保存 + 恢复
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      try {
+        lsSet(LS_KEY_ICONS, JSON.stringify(iconVectors));
+      } catch {
+        /* 超配额放弃 */
+      }
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [iconVectors]);
+  useEffect(() => {
+    const raw = lsGet(LS_KEY_ICONS);
+    if (!raw) return;
+    try {
+      const obj = JSON.parse(raw);
+      if (obj && typeof obj === "object") setIconVectors(obj);
+    } catch {
+      /* 损坏忽略 */
+    }
+  }, []);
+
+  /** M3g：选中图标 → 存矢量原文 + 把属性写成 @drawable/资源名 */
+  const onPickIcon = useCallback(
+    (attrName: string, resourceName: string, vectorXml: string) => {
+      setIconVectors((m) => ({ ...m, [resourceName]: vectorXml }));
+      if (selectedPath) {
+        // 通过 commitAttr 把属性改成 @drawable/<资源名>
+        commitAttrRef.current(attrName, `@drawable/${resourceName}`);
+      }
+      setExportNote(`已生成 res/drawable/${resourceName}.xml，属性指向它（导出 res 包时会自动包含）`);
+      window.setTimeout(() => setExportNote(""), 3600);
+    },
+    [selectedPath],
+  );
+
   const resources: ResourceTable = useMemo(() => {
     // 顺序：内置默认 → 上传 res/ 里的 values（真实 color/dimen/string）→ 用户手贴片段（最高优先）
     let base: ResourceTable = DEFAULT_RESOURCES;
@@ -557,6 +608,23 @@ export function XmlEditor() {
     }
     return base;
   }, [resourceFragment, resExtras]);
+
+  /** M3g：把图标矢量也并进 resExtras，导出 res 包时能带上 */
+  const resExtrasAll = useMemo(() => {
+    if (!resExtras && Object.keys(iconVectors).length === 0) return null;
+    return {
+      drawables: { ...(resExtras?.drawables || {}), ...iconDataUrls },
+      vectorNames: [...(resExtras?.vectorNames || []), ...Object.keys(iconVectors)],
+      drawableXml: { ...(resExtras?.drawableXml || {}), ...iconVectors },
+      themeAttrs: resExtras?.themeAttrs ?? {},
+      styles: resExtras?.styles ?? {},
+      valuesXml: resExtras?.valuesXml ?? "",
+      sourceFiles: resExtras?.sourceFiles ?? [],
+      counts: resExtras?.counts ?? { images: 0, vectors: Object.keys(iconVectors).length, values: 0, styles: 0, shapes: 0 },
+      tree: resExtras?.tree,
+      layouts: resExtras?.layouts,
+    };
+  }, [resExtras, iconVectors, iconDataUrls]);
 
   const [measured, setMeasured] = useState<MeasuredMap | null>(null);
   /** M2t：实测收敛计数器（避免 auto ↔ px 互推无限循环） */
@@ -969,6 +1037,7 @@ export function XmlEditor() {
   };
 
   // ===== 属性回写（M1b 双向）=====
+  const commitAttrRef = useRef<(name: string, value: string) => void>(() => {});
   const commitAttr = (name: string, value: string) => {
     if (!selectedPath) return;
     // 设四周边距简写 layout_margin 时，顺手清掉可能残留的单边 margin（Start/End/Left/Right/Top/Bottom）。
@@ -989,6 +1058,7 @@ export function XmlEditor() {
     // M2u：属性面板连续改同一属性（拖动滑杆/输入）合并成一步撤销
     if (r.changed) setXmlAndTrack(r.xml, `attr:${selectedPath}:${name}`);
   };
+  commitAttrRef.current = commitAttr;
 
   /** M2d：画布自由拖动 / 四角拉伸 → 写回 layout_marginStart/Top（XY）或 layout_width/height（宽高，dp）
    *  move 手柄只改 x/y（不碰 w/h）；四角 resize 只改 w/h（不碰 x/y） */
@@ -1183,6 +1253,23 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
   };
 
   /** 清掉已上传的资源，回到内置默认 */
+  /** M3g：导出 res 包（zip）：布局 + 图标矢量 + 上传的 shape/values 一起带走，
+   *  避免别处打开工程时「找不到图标文件」。*/
+  const doDownloadResZip = () => {
+    const layout = exportLayoutXml(xml);
+    const entries = buildResBundle({ layoutXml: layout, iconVectors, extras: resExtrasAll });
+    const missing = missingDrawables(layout, entries);
+    const bytes = makeZip(entries);
+    downloadBytes(bytes, "res.zip");
+    setExportNote(
+      `已导出 res.zip（${entries.length} 个文件）` +
+        (missing.length
+          ? `；还有 ${missing.length} 个 @drawable 引用未覆盖：${missing.slice(0, 5).join(", ")}${missing.length > 5 ? " …" : ""}（需上传 res 目录补齐）`
+          : "；布局里引用的图标资源已全部包含"),
+    );
+    window.setTimeout(() => setExportNote(""), 4200);
+  };
+
   const clearRes = () => {
     setResExtras(null);
     setResourceFragment("");
@@ -1477,6 +1564,9 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               </optgroup>
             </select>
             <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
+            {resExtras || Object.keys(iconVectors).length > 0 ? (
+              <button className="axv-mob-tool-btn" onClick={doDownloadResZip} title="导出 res 包（含图标）">res 包</button>
+            ) : null}
           </div>
         </div>
       )}
@@ -1653,6 +1743,8 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                 onAddAttr={() => setAddModalOpen(true)}
                 resExtras={resExtras}
                 onDeleteNode={() => onRemoveNode(selectedNode.path)}
+                onPickIcon={onPickIcon}
+                iconNames={Object.keys(iconVectors)}
               />
             </div>
           ) : (
@@ -1733,6 +1825,11 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           <button className="axv-tb-btn" title="复制生成的 XML" aria-label="复制 XML" onClick={copyExportedXml}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>content_copy</span>
           </button>
+          {resExtras || Object.keys(iconVectors).length > 0 ? (
+            <button className="axv-tb-btn" title="导出 res 目录（zip：布局 + 图标矢量 + shape/values）" aria-label="导出 res 包" onClick={doDownloadResZip}>
+              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>folder_zip</span>
+            </button>
+          ) : null}
           {resExtras ? (
             <button className="axv-tb-btn" title="清除已上传的 res 资源" aria-label="清除 res" onClick={clearRes}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>hide_image</span>

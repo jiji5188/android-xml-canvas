@@ -2769,3 +2769,13 @@
   font-size: 11px;
   line-height: 1;
 }
+
+/* ===== M4s：图片控件的内容图层（android:src）=====
+   放在节点内部 absolute 铺满，保证「background 在下、src 在上」，
+   点击事件仍归节点本身（pointer-events: none）。 */
+.axv-node.axv-image {
+  position: relative;
+}
+.axv-img-layer {
+  z-index: 1;
+}

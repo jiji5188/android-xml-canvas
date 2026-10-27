@@ -293,11 +293,23 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["tint"] = a["tint"] !== undefined ? resolveColor(a["tint"], res, issues, path, "tint") : "";
   out["textStyle"] = a["textStyle"] ?? "";
   out["textAllCaps"] = a["textAllCaps"] === "true";
+  // M4r：文字阴影（android:shadowColor/Dx/Dy/Radius，与 elevation 阴影是两回事）
+  out["shadowColor"] =
+    a["shadowColor"] !== undefined ? resolveColor(a["shadowColor"], res, issues, path, "shadowColor") : "";
+  for (const k of ["shadowDx", "shadowDy", "shadowRadius"] as const) {
+    if (a[k] === undefined) {
+      out[k] = 0;
+      continue;
+    }
+    const s = resolveSize(a[k], res, issues, path, k);
+    out[k] = s.kind === "dp" ? s.value : 0;
+  }
   out["textAlignment"] = a["textAlignment"] ?? "";
   out["hint"] = a["hint"] !== undefined ? resolveText(a["hint"], res, issues, path) : "";
 
   // 图片：@drawable/xxx / @mipmap/xxx 优先查上传的 res 目录，查不到再原样
   out["src"] = resolveDrawable(a["src"] ?? a["srcCompat"] ?? "", res, issues, path, "src");
+  out["scaleType"] = a["scaleType"] ?? "";
 
   // 可见性 / 可用性
   out["visibility"] = a["visibility"] ?? "visible";

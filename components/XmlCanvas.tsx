@@ -468,6 +468,45 @@ export function XmlCanvas({
       }
       title={node.tag + (node.rawAttrs.id ? " · " + node.rawAttrs.id : "") + (node.text ? " · " + node.text : "")}
     >
+      {node.imgSrc ? (
+        node.imgTint ? (
+          // tint：用 mask 把图当成形状填色（对 vector/png 透明图都准）
+          <span
+            className="axv-img-layer"
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundColor: node.imgTint,
+              WebkitMaskImage: `url(${node.imgSrc})`,
+              maskImage: `url(${node.imgSrc})`,
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+              WebkitMaskPosition: "center",
+              maskPosition: "center",
+              WebkitMaskSize: node.imgFit === "fill" ? "100% 100%" : node.imgFit === "cover" ? "cover" : "contain",
+              maskSize: node.imgFit === "fill" ? "100% 100%" : node.imgFit === "cover" ? "cover" : "contain",
+              pointerEvents: "none",
+            }}
+          />
+        ) : (
+          <img
+            className="axv-img-layer"
+            src={node.imgSrc}
+            alt=""
+            draggable={false}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: (node.imgFit as React.CSSProperties["objectFit"]) ?? "contain",
+              objectPosition: "center",
+              pointerEvents: "none",
+            }}
+          />
+        )
+      ) : null}
       {(() => {
         const c = node.compound;
         if (!c) return node.text ? <span>{node.text}</span> : null;

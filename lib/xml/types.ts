@@ -54,6 +54,12 @@ export interface ResolvedNode {
   rawAttrs: Record<string, string>;
   /** M2q：子树来自 include 展开的源文件（如 "header.xml"）；存在时 UI 应标记只读 */
   sourceFile?: string;
+  /** M4s：图片控件的内容图（android:src）——单独用 <img> 画，保证在 background 之上 */
+  imgSrc?: string;
+  /** M4s：scaleType 对应的 CSS object-fit */
+  imgFit?: string;
+  /** M4s：tint 颜色（图片着色，优先用 mask） */
+  imgTint?: string;
 }
 
 /** 根结果 */

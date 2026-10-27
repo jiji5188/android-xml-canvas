@@ -210,6 +210,10 @@ export function buildRenderModel(
     issues.push(...nIssues);
     const style: Record<string, string | number> = {};
     const tag = shortTag(node.tag); // 全限定类名归一化
+    /** M4s：图片控件内容图（src）单独画在 background 之上 */
+    let imgSrc = "";
+    let imgFit = "";
+    let imgTint = "";
 
     // 容器
     const isCL = tag === "ConstraintLayout" || tag === "ConstraintSet";
@@ -467,6 +471,14 @@ export function buildRenderModel(
       }
       if ((attrs["textAllCaps"] as boolean)) style.textTransform = "uppercase";
       if ((attrs["textStyle"] as string) === "bold") style.fontWeight = 600;
+      // M4r：TextView 文字阴影（shadowColor 不写就无阴影；Dx/Dy/Radius 默认 1/1/3dp）
+      const shColor = (attrs["shadowColor"] as string) || "";
+      if (shColor) {
+        const sdx = (attrs["shadowDx"] as number) || 0;
+        const sdy = (attrs["shadowDy"] as number) || 0;
+        const sr = (attrs["shadowRadius"] as number) || 0;
+        style.textShadow = `${(sdx * scale).toFixed(1)}px ${(sdy * scale).toFixed(1)}px ${(sr * scale).toFixed(1)}px ${shColor}`;
+      }
       // M4q：Button 家族预览对齐 Android 默认样式（minWidth 88dp / minHeight 48dp / 左右 16dp 内边距 /
       // 文字居中 / Button 默认全大写），仅在 XML 没显式写时才补
       if (tag === "Button" || tag === "AppCompatButton" || tag === "MaterialButton" || tag === "ImageButton") {
@@ -540,15 +552,30 @@ export function buildRenderModel(
         } else if (/^#[0-9a-fA-F]{3,8}$/.test(src.trim())) {
           // src 写成纯色（旧版选择器错误）——Android 当 ColorDrawable 画，预览也画底色
           style.backgroundColor = src.trim();
+        } else if (/^(data:|https?:|blob:)/.test(src)) {
+          // M4s：真图不用 background 画，交给 <img> 内容层（background 在下、src 在上）
+          imgSrc = src;
+          const st = (attrs["scaleType"] as string) || "fitCenter";
+          imgFit =
+            st === "fitXY" ? "fill"
+            : st === "centerCrop" ? "cover"
+            : st === "centerInside" || st === "fitCenter" ? "contain"
+            : st === "center" ? "none"
+            : "contain";
+          const tint = (attrs["tint"] as string) || "";
+          if (tint && /^(#|rgb|hsl)/.test(tint)) imgTint = tint;
         } else {
-          // dataURL 直接做 background
-          style.backgroundImage = `url(${src})`;
-          style.backgroundSize = "100% 100%";
-          style.backgroundColor = style.backgroundColor || "transparent";
+          // 其余非常见值（相对路径 / 未解析符号）不当图片画，给占位提示
+          style.backgroundColor = style.backgroundColor || "#EDE7F6";
+          style.border = "1.5px dashed #B0AEB8";
         }
       } else if (!src) {
         style.backgroundColor = style.backgroundColor || "#E0D9E3";
         style.minHeight = style.minHeight || `${DP(48, scale)}px`;
+      } else {
+        // missing:xxx —— 引用不存在的资源：红色虚线占位（不静默变空白）
+        style.backgroundColor = style.backgroundColor || "#FFEBEE";
+        style.border = "1.5px dashed #E57373";
       }
       if (attrs["adjustViewBounds"]) style.aspectRatio = "1 / 1";
       // CL 里的宽高比（0dp + layout_constraintDimensionRatio 在非 CL 容器时也吃）
@@ -728,6 +755,9 @@ export function buildRenderModel(
       rawAttrs: node.attrs,
     };
     if (sourceFile) resolved.sourceFile = sourceFile;
+    if (imgSrc) resolved.imgSrc = imgSrc;
+    if (imgFit) resolved.imgFit = imgFit;
+    if (imgTint) resolved.imgTint = imgTint;
     return resolved;
   };
 

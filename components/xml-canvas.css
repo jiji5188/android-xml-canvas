@@ -1128,6 +1128,123 @@
   text-align: center;
 }
 
+/* ===== M2s：导出前检查面板 ===== */
+.axv-export-modal {
+  width: min(560px, 92vw);
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+}
+.axv-export-body {
+  padding: 12px 16px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+.axv-export-summary {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.axv-export-summary.is-ok {
+  color: #067647;
+  background: #ecfdf3;
+  border: 1px solid #abefc6;
+}
+.axv-export-summary.is-warn {
+  color: #b54708;
+  background: #fffaeb;
+  border: 1px solid #fedf89;
+}
+.axv-export-summary.is-error {
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+}
+.axv-export-section {
+  margin-bottom: 14px;
+}
+.axv-export-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475467;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.axv-export-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.axv-export-list li {
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: #344054;
+}
+.axv-export-list li.is-error {
+  color: #b42318;
+}
+.axv-export-line {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid #fecdca;
+  background: #fff;
+  color: #b42318;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-export-line:hover {
+  background: #fef3f2;
+}
+.axv-export-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid #eaecf0;
+}
+.axv-btn {
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  color: #344054;
+  cursor: pointer;
+}
+.axv-btn:hover {
+  background: #f9fafb;
+}
+.axv-btn-primary {
+  background: #04409f;
+  border-color: #04409f;
+  color: #fff;
+  font-weight: 600;
+}
+.axv-btn-primary:hover {
+  background: #03337c;
+}
+.axv-btn-danger {
+  background: #b42318;
+  border-color: #b42318;
+}
+.axv-btn-danger:hover {
+  background: #912018;
+}
+
 /* 移动端：两侧滑面板背后蒙版（点蒙版关闭面板） */
 .axv-backdrop {
   position: absolute;

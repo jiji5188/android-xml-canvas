@@ -17,6 +17,7 @@ import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag,
 import { formatXml } from "@/lib/xml/format";
 import { lintXml } from "@/lib/xml/lint";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
+import { ExportCheckModal, type ExportReport } from "./ExportCheckModal";
 import { XmlCanvas } from "./XmlCanvas";
 import { XmlCodeEditor } from "./XmlCodeEditor";
 import { AttrPanel } from "./AttrPanel";
@@ -32,6 +33,41 @@ import "./xml-canvas.css";
 import { readableOn, deviceById, DEVICE_PRESETS } from "@/lib/xml/theme";
 
 const SAMPLES: Record<string, string> = {
+  /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
+  "blank-cl": `<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+  <!-- 从左侧「组件」把控件拖进来，或选中后在右侧加约束 -->
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+`,
+  /** M2s：新建空白 LinearLayout（竖） */
+  "blank-ll": `<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+  <!-- 从左侧「组件」把控件拖进来 -->
+
+</LinearLayout>
+`,
+  /** M2s：新建空白 FrameLayout */
+  "blank-frame": `<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+  <!-- 从左侧「组件」把控件拖进来 -->
+
+</FrameLayout>
+`,
   cl: `<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -330,6 +366,10 @@ export function XmlEditor() {
   const [rightOpen, setRightOpen] = useState(true);
   const [leftView, setLeftView] = useState<"parts" | "layers" | "code" | "res">("parts");
   const [addModalOpen, setAddModalOpen] = useState(false);
+  /** M2s：导出前检查面板 */
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportReport, setExportReport] = useState<ExportReport | null>(null);
+  const [exportAction, setExportAction] = useState<"download" | "copy">("download");
   const [dropHint, setDropHint] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<"preview" | "xml">("preview");
   const [history, setHistory] = useState<string[]>(() => {
@@ -1047,51 +1087,64 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
     window.setTimeout(() => setExportNote(""), 2400);
   };
 
-  /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续 */
-  const saveProject = () => {
-    const check = exportChecks(xml);
-    if (check.errors > 0) {
-      alert(`有 ${check.errors} 个结构错误，先修复再导出（切到「XML 代码」tab 看行号提示）`);
-      return;
-    }
-    let body = exportLayoutXml(xml);
-    if (check.notes.length > 0) {
-      const ok = confirm(
-        "导出前检查发现 " +
-          check.notes.length +
-          " 条提示：\n" +
-          check.notes.slice(0, 8).join("\n") +
-          "\n\n继续导出？",
-      );
-      if (!ok) return;
-    }
-    void body;
+  /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续
+   *  M2s：改成可视化检查面板（不再用 alert/confirm） */
+  const doDownload = () => {
+    const body = exportLayoutXml(xml);
     const blob = new Blob([body], { type: "application/xml" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "activity_main.xml";
     a.click();
     URL.revokeObjectURL(a.href);
+    setExportNote(`已导出 activity_main.xml`);
+    window.setTimeout(() => setExportNote(""), 2400);
+  };
+
+  const buildReport = (): ExportReport => {
+    const check = exportChecks(xml);
+    const lint = lintXml(xml);
+    return {
+      errors: lint.filter((i) => i.level === "error"),
+      notes: check.notes,
+    };
+  };
+
+  const saveProject = () => {
+    setExportAction("download");
+    setExportReport(buildReport());
+    setExportOpen(true);
   };
 
   /** M3：复制生成的 XML 到剪贴板（与下载同一份内容） */
-  const copyExportedXml = async () => {
-    const check = exportChecks(xml);
-    if (check.errors > 0) {
-      alert(`有 ${check.errors} 个结构错误，先修复再复制`);
-      return;
-    }
+  const doCopy = async () => {
     const body = exportLayoutXml(xml);
     try {
       await navigator.clipboard.writeText(body);
       setExportNote("已复制到剪贴板");
     } catch {
       // 剪贴板 API 不可用（非 https / 旧浏览器）时退化成下载
-      saveProject();
+      doDownload();
       setExportNote("剪贴板不可用，已改为下载");
     }
     window.setTimeout(() => setExportNote(""), 2600);
   };
+
+  const copyExportedXml = () => {
+    setExportAction("copy");
+    setExportReport(buildReport());
+    setExportOpen(true);
+  };
+
+  /** M2s：跳转到代码 tab 并让代码编辑器滚动/选中到指定行 */
+  const [focusLine, setFocusLine] = useState(0);
+  const [focusTick, setFocusTick] = useState(0);
+  const gotoLine = useCallback((line: number) => {
+    setLeftView("code");
+    setLeftOpen(true);
+    setFocusLine(line);
+    setFocusTick((t) => t + 1);
+  }, []);
 
   return (
     <div className="axv-editor">
@@ -1276,6 +1329,8 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             value={xml}
             onChange={onChangeXmlText}
             errors={lints}
+            focusLine={focusLine}
+            focusTick={focusTick}
           />
           <div className="axv-mob-xml-tools">
             <button className="axv-mob-tool-btn axv-ghost" onClick={doFormat} title="重排缩进（保留注释）">
@@ -1291,10 +1346,17 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               }}
             >
               <option value="">示例…</option>
-              <option value="cl">约束布局</option>
+              <optgroup label="新建（空白）">
+                <option value="blank-cl">ConstraintLayout</option>
+                <option value="blank-ll">LinearLayout（竖）</option>
+                <option value="blank-frame">FrameLayout</option>
+              </optgroup>
+              <optgroup label="示例">
+                <option value="cl">约束布局</option>
                 <option value="chain">链式排布 + Guideline</option>
                 <option value="barrier">Barrier 屏障</option>
-              <option value="list">竖列表</option>
+                <option value="list">竖列表</option>
+              </optgroup>
             </select>
             <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
           </div>
@@ -1487,6 +1549,19 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
         tag={selectedNode ? shortTag(selectedNode.tag) : undefined}
         onClose={() => setAddModalOpen(false)}
         onPick={(name) => addAttr(name)}
+      />
+
+      {/* M2s：导出前检查面板 */}
+      <ExportCheckModal
+        open={exportOpen}
+        report={exportReport}
+        action={exportAction}
+        onClose={() => setExportOpen(false)}
+        onConfirm={exportAction === "copy" ? doCopy : doDownload}
+        onJumpLine={(line) => {
+          setExportOpen(false);
+          gotoLine(line);
+        }}
       />
 
       {/* 顶部工具栏（桌面端只占两侧面板之间的画布区，不重叠侧栏） */}

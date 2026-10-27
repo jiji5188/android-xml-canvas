@@ -4,7 +4,7 @@
 
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { LintIssue } from "@/lib/xml/lint";
 
 /** 行高（必须与 xml-canvas.css 里 .axv-code-hl/.axv-ln 的 line-height 一致） */
@@ -79,9 +79,13 @@ interface Props {
   errors?: LintIssue[];
   /** 外层容器的额外类名 */
   className?: string;
+  /** M2s：跳转到指定行（改变时滚动并选中该行） */
+  focusLine?: number;
+  /** 与 focusLine 配合的自增序号（同一行二次跳转也能生效） */
+  focusTick?: number;
 }
 
-export function XmlCodeEditor({ value, onChange, errors, className }: Props) {
+export function XmlCodeEditor({ value, onChange, errors, className, focusLine, focusTick }: Props) {
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const preRef = useRef<HTMLPreElement | null>(null);
   const gutRef = useRef<HTMLDivElement | null>(null);
@@ -105,6 +109,20 @@ export function XmlCodeEditor({ value, onChange, errors, className }: Props) {
     return set;
   }, [errors]);
   const firstErr = errors && errors.length > 0 ? errors[0] : null;
+
+  // M2s：跳转到指定行（滚动 + 选中该行）
+  useEffect(() => {
+    if (!focusLine || focusLine < 1) return;
+    const ta = taRef.current;
+    if (!ta) return;
+    const lines = value.split("\n");
+    let start = 0;
+    for (let i = 0; i < focusLine - 1; i++) start += (lines[i]?.length ?? 0) + 1;
+    const end = start + (lines[focusLine - 1]?.length ?? 0);
+    ta.scrollTop = Math.max(0, (focusLine - 1) * CODE_LINE_HEIGHT - CODE_LINE_HEIGHT * 4);
+    ta.focus();
+    ta.setSelectionRange(start, end);
+  }, [focusLine, focusTick, value]);
 
   return (
     <div className={"axv-code" + (className ? " " + className : "")}>

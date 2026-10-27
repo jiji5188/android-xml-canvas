@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ResolvedNode } from "@/lib/xml/types";
 import { DRAG_WIDGET_MIME } from "./widget-catalog";
 import { isContainerTag } from "@/lib/xml/insert";
@@ -69,6 +69,11 @@ interface GeomDrag {
   h: number;
   /** 视觉缩放比（外层 transform: scale(fitRatio)），屏幕位移 ÷ 它 = 布局位移 */
   vs: number;
+  /** 宽/高是否是百分比型（match_parent / calc(100% - Npx)）。
+   *  这类元素一旦加上 margin，Android 语义会把宽度扣掉 margin → 预览必须同步缩，
+   *  否则松手后模型一算就“闪”一下变窄。 */
+  wPct: boolean;
+  hPct: boolean;
 }
 
 export function XmlCanvas({
@@ -94,6 +99,19 @@ export function XmlCanvas({
   } | null>(null);
   const selfRef = useRef<HTMLDivElement | null>(null);
   const geomRef = useRef<GeomDrag | null>(null);
+  /** 松手后等模型落地的兜底定时器（正常会提前被模型变更清掉） */
+  const settleTimer = useRef<number | null>(null);
+
+  // 模型换新（node 引用变化）→ 说明写回的几何已经落到 DOM，可以撤掉拖拽预览。
+  // 模型走 useDeferredValue，比 setXml 晚一帧；若松手时立即撤预览，会先闪回旧位置
+  // 再跳到新位置（用户看到的就是“闪一下”）。
+  useEffect(() => {
+    setGeomLive(null);
+    if (settleTimer.current !== null) {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+  }, [node]);
 
   const isSel = selectedPath === node.path;
   const isContainer = node.children.length > 0 || isContainerTag(node.tag);
@@ -115,6 +133,13 @@ export function XmlCanvas({
     if (g.mode === "move" || g.mode === "top") style.marginTop = `${g.y}px`;
     if (g.mode === "left" || g.mode === "right") style.width = `${g.w}px`;
     if (g.mode === "top" || g.mode === "bottom") style.height = `${g.h}px`;
+    // move 时如果原本是百分比宽/高，宽度会因新增 margin 而缩，预览要同步（否则松手闪一下）
+    if (g.mode === "move" && style.width !== undefined && /%/.test(String(style.width))) {
+      style.width = `${g.w}px`;
+    }
+    if (g.mode === "move" && style.height !== undefined && /%/.test(String(style.height))) {
+      style.height = `${g.h}px`;
+    }
     style.zIndex = 50;
   }
 
@@ -196,6 +221,9 @@ export function XmlCanvas({
     const layoutH = el.offsetHeight || rect.height;
     // 视觉缩放比：视觉宽 ÷ 布局宽（无 transform 时为 1）
     const vs = layoutW > 0 && rect.width > 0 ? rect.width / layoutW : 1;
+    // 宽/高是百分比型？用 inline style 判定（computed 已被解成 px）
+    const inlineW = el.style.width || "";
+    const inlineH = el.style.height || "";
     geomRef.current = {
       mode,
       px: e.clientX,
@@ -205,6 +233,8 @@ export function XmlCanvas({
       w: layoutW,
       h: layoutH,
       vs,
+      wPct: inlineW.includes("%"),
+      hPct: inlineH.includes("%"),
     };
     setGeomLive({ mode, x: parseFloat(cs.marginLeft) || 0, y: parseFloat(cs.marginTop) || 0, w: layoutW, h: layoutH });
 
@@ -220,6 +250,10 @@ export function XmlCanvas({
       if (g.mode === "move") {
         x += dx;
         y += dy;
+        // match_parent / calc 宽高：加 margin 后 Android 会把尺寸扣掉 margin，
+        // 预览同步缩，否则松手后模型一算就闪一下变窄
+        if (g.wPct) w -= dx;
+        if (g.hPct) h -= dy;
       } else if (g.mode === "left") {
         // 左边手柄：右缘固定 → x 跟着走，宽反向变
         x += dx;
@@ -255,10 +289,12 @@ export function XmlCanvas({
         return;
       }
       const n = derive(g, ev);
+      // 锁住最后一帧，等模型落地后再撤（see useEffect [node]）
+      setGeomLive({ mode: g.mode, ...n });
       // 布局 px → dp（除以 dp 比例，与 css.ts 的 DP() 互逆）
       const r1 = (v: number) => Math.round(v * 10) / 10;
       const px2dp = (v: number) => r1(v / scale);
-      // 关键：先写出新 XML（新节点样式）再清预览，避免「先弹回原位再跳到新位置」的双跳
+      // 先写出新 XML（新节点样式）再等模型，避免「先弹回原位再跳到新位置」的闪烁
       if (g.mode === "move") {
         onGeometryChange?.(node.path, { x: px2dp(n.x), y: px2dp(n.y) });
       } else if (g.mode === "left") {
@@ -270,7 +306,12 @@ export function XmlCanvas({
       } else if (g.mode === "bottom") {
         onGeometryChange?.(node.path, { h: px2dp(n.h) });
       }
-      setGeomLive(null);
+      // 兜底：若写回没造成模型变更（如拖了 0px、或写回被拦），最多 400ms 后自己撑掉
+      if (settleTimer.current !== null) clearTimeout(settleTimer.current);
+      settleTimer.current = window.setTimeout(() => {
+        settleTimer.current = null;
+        setGeomLive(null);
+      }, 400);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);

@@ -15,6 +15,9 @@ interface Geom {
   h: number;
   /** 视觉缩放比 rect.width / offsetWidth（外层 transform: scale(fitRatio)） */
   vs: number;
+  /** 宽/高是否百分比型（match_parent / calc(100% - Npx)） */
+  wPct?: boolean;
+  hPct?: boolean;
 }
 
 const SCALE = 2;
@@ -30,6 +33,9 @@ function solve(g: Geom, mode: Mode, screenDx: number, screenDy: number) {
   if (mode === "move") {
     x += dx;
     y += dy;
+    // 百分比型宽高：加 margin 后 Android 会从尺寸里扣掉 margin
+    if (g.wPct) w -= dx;
+    if (g.hPct) h -= dy;
   } else if (mode === "left") {
     x += dx;
     w -= dx;
@@ -134,5 +140,32 @@ describe("M2l 画布缩放（fitRatio）下不能把尺寸缩小", () => {
   it("vs = 1 时位移不放大（回归保护）", () => {
     const { patch } = solve(base, "move", 20, 10);
     expect(patch).toEqual({ x: 14, y: 13 });
+  });
+});
+
+describe("M2n match_parent（百分比）元素移动时预览同步缩宽", () => {
+  const pct: Geom = { ...base, w: 764, h: 800, wPct: true, hPct: true };
+
+  it("百分比宽：往右拖 40px（布局）→ 预览宽减 40，写回 marginStart 增加 40", () => {
+    const { patch, layout } = solve(pct, "move", 40, 0);
+    expect(layout.w).toBe(724); // 764 - 40
+    expect(patch.x).toBe(24); // (8+40)/2
+  });
+
+  it("固定宽（非百分比）：移动不改宽度，所以不缩", () => {
+    const fixed: Geom = { ...base, w: 300, h: 150 };
+    const { layout } = solve(fixed, "move", 40, 0);
+    expect(layout.w).toBe(300);
+  });
+
+  it("百分比高：往下拖 20px → 预览高减 20", () => {
+    const { layout } = solve(pct, "move", 0, 20);
+    expect(layout.h).toBe(780);
+  });
+
+  it("缩放画布时按布局位移缩（屏幕 20px / vs 0.5 = 40px）", () => {
+    const halfPct: Geom = { ...pct, vs: 0.5 };
+    const { layout } = solve(halfPct, "move", 20, 0);
+    expect(layout.w).toBe(724);
   });
 });

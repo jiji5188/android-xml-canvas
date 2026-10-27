@@ -196,6 +196,14 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["gravity"] = a["gravity"] ?? "";
   out["layoutGravity"] = a["layout_gravity"] ?? "";
 
+  // M2v：GridLayout 定位（layout_column/layout_row 是 0 基；-1 = 未指定，由 CSS 自动流式排）
+  out["gridColumn"] = a["layout_column"] !== undefined ? parseInt(a["layout_column"], 10) : -1;
+  out["gridRow"] = a["layout_row"] !== undefined ? parseInt(a["layout_row"], 10) : -1;
+  out["gridColumnSpan"] = parseInt(a["layout_columnSpan"] ?? "", 10) || 1;
+  out["gridRowSpan"] = parseInt(a["layout_rowSpan"] ?? "", 10) || 1;
+  out["gridColumnWeight"] = parseFloat(a["layout_columnWeight"] ?? "") || 0;
+  out["columnCount"] = parseInt(a["columnCount"] ?? "", 10) || 0;
+
   // 四角 margin/padding（支持简写 padding="16dp" 展开四边；Start/End 是 RTL 语义，映射到 Left/Right）
   // Android 语义：简写值先铺四边，单独属性只覆盖自己那一边。
   // （旧实现：只要存在任何一个单独边就直接返回四边值，其余边变 0 → 会出现左右不对称）

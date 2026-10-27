@@ -145,6 +145,18 @@ function layoutGravityToSelf(g: string): Record<string, string> {
   return v;
 }
 
+/** M2v：GridLayout 列数——显式 columnCount 优先，否则按子项最大的 layout_column+1 推，兜底 1 */
+export function gridColumnCount(raw: unknown, node: { children: { attrs: Record<string, string> }[] }): number {
+  const n = typeof raw === "number" ? raw : parseInt(String(raw ?? ""), 10);
+  if (Number.isFinite(n) && n > 0) return Math.min(n, 24);
+  let max = 0;
+  for (const c of node.children) {
+    const v = parseInt(c.attrs["layout_column"] ?? "", 10);
+    if (Number.isFinite(v) && v + 1 > max) max = v + 1;
+  }
+  return Math.min(Math.max(max, 1), 24);
+}
+
 function orientationAlign(dir: string): { flexDirection: string; alignItems?: string } {
   return dir === "horizontal"
     ? { flexDirection: "row" }
@@ -186,17 +198,36 @@ export function buildRenderModel(
     // 容器
     const isCL = tag === "ConstraintLayout" || tag === "ConstraintSet";
     const isRL = tag === "RelativeLayout";
+    // M2v：容器分类集合（新增 CoordinatorLayout / DrawerLayout / GridLayout / NestedScrollView / TableLayout…）
+    const isGrid = tag === "GridLayout";
+    const FRAME_LIKE = new Set([
+      "FrameLayout",
+      "CoordinatorLayout",
+      "DrawerLayout",
+      "FragmentContainerView",
+      "merge",
+    ]);
+    const SCROLL_V = new Set(["ScrollView", "NestedScrollView", "androidx.core.widget.NestedScrollView"]);
+    const SCROLL_H = new Set(["HorizontalScrollView"]);
+    const isFrameLike = FRAME_LIKE.has(tag);
     // RelativeLayout：子项位置由规则求解（见 relative.ts），容器自身仍需 position:relative
     // 作为 absolute 子项的定位基准
     if (isRL) {
       style.display = "block";
       style.position = "relative";
-    } else if (tag === "LinearLayout" || tag === "FrameLayout" || tag === "ScrollView" || tag === "HorizontalScrollView" || tag === "CardView" || tag === "MaterialCardView" || isCL) {
+    } else if (isGrid) {
+      // GridLayout → CSS Grid：columnCount 决定列数（缺省按子项 layout_column 推）
+      style.display = "grid";
+      const cols = gridColumnCount(attrs["columnCount"], node);
+      style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+      style.alignItems = "start";
+      style.justifyItems = "stretch";
+    } else if (tag === "LinearLayout" || isFrameLike || SCROLL_V.has(tag) || SCROLL_H.has(tag) || tag === "CardView" || tag === "MaterialCardView" || tag === "TableLayout" || tag === "TableRow" || isCL) {
       style.display = "flex";
-      if (tag === "ScrollView") {
+      if (SCROLL_V.has(tag)) {
         style.flexDirection = "column";
         style.overflowY = "auto";
-      } else if (tag === "HorizontalScrollView") {
+      } else if (SCROLL_H.has(tag)) {
         style.flexDirection = "row";
         style.overflowX = "auto";
       } else if (tag === "LinearLayout") {
@@ -208,8 +239,11 @@ export function buildRenderModel(
         style.alignItems = g.alignItems ?? "stretch";
       } else if (tag === "CardView" || tag === "MaterialCardView") {
         style.flexDirection = "column";
+      } else if (tag === "TableLayout" || tag === "TableRow") {
+        // TableLayout = 竖排若干行；TableRow = 横排若干列
+        style.flexDirection = tag === "TableLayout" ? "column" : "row";
       } else {
-        // FrameLayout / ConstraintLayout
+        // FrameLayout / CoordinatorLayout / DrawerLayout / ConstraintLayout
         style.position = "relative";
       }
     }
@@ -499,11 +533,25 @@ export function buildRenderModel(
     // layout_gravity（FrameLayout / LinearLayout 子项）
     const lg = layoutGravityToSelf((attrs["layoutGravity"] as string) || "");
     Object.assign(style, lg);
-    // FrameLayout 子项绝对定位
+    // FrameLayout / CoordinatorLayout / DrawerLayout 子项绝对定位（Android 这三者都是堆叠语义）
     const parentTag = shortTag(findParentTag(root, node) ?? "");
-    if (parentTag === "FrameLayout") {
+    const FRAME_PARENTS = new Set(["FrameLayout", "CoordinatorLayout", "DrawerLayout", "FragmentContainerView"]);
+    if (FRAME_PARENTS.has(parentTag)) {
       style.position = "absolute";
       style.zIndex = "1";
+    }
+
+    // M2v：GridLayout 子项落格（layout_column/layout_row 0 基 → CSS 1 基）
+    if (parentTag === "GridLayout") {
+      const col = attrs["gridColumn"] as number;
+      const row = attrs["gridRow"] as number;
+      const cs = (attrs["gridColumnSpan"] as number) || 1;
+      const rs = (attrs["gridRowSpan"] as number) || 1;
+      if (col >= 0) style.gridColumn = `${col + 1} / span ${cs}`;
+      else if (cs > 1) style.gridColumn = `span ${cs}`;
+      if (row >= 0) style.gridRow = `${row + 1} / span ${rs}`;
+      else if (rs > 1) style.gridRow = `span ${rs}`;
+      style.minWidth = 0; // 防止长文本把列撑破
     }
 
     // 开关/勾选类不渲染文字到框里（会在 title 提示里显示）

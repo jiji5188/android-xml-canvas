@@ -64,10 +64,11 @@ export const WIDGETS: WidgetDef[] = [
   {
     key: "card", label: "卡片", tag: "CardView", icon: "screenshot", group: "布局",
     xml: `<androidx.cardview.widget.CardView ${A}
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="8dp"
-    android:radius="8dp">
+    app:cardCornerRadius="8dp">
 </androidx.cardview.widget.CardView>`,
   },
   {

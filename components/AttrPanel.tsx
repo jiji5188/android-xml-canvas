@@ -62,6 +62,20 @@ function canPickIcon(name: string, value: string): boolean {
 }
 
 /** 哪些属性可以做「形状背景」（形状态/描边/圆角/水波纹最多用在背景上） */
+const DRAWABLE_PICK_ATTRS = new Set([
+  "src",
+  "srcCompat",
+  "icon",
+  "navigationIcon",
+  "checkedIcon",
+  "drawableStart",
+  "drawableLeft",
+  "drawableEnd",
+  "drawableRight",
+  "drawableTop",
+  "drawableBottom",
+]);
+
 const SHAPE_ATTRS = new Set(["background", "foreground", "src", "drawableStart", "drawableEnd"]);
 
 const shortTag = (t: string) => (t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t);
@@ -268,6 +282,7 @@ export function AttrPanel({
   };
 
   const renderEditor = (name: string, value: string) => {
+    if (DRAWABLE_PICK_ATTRS.has(name)) return renderColor(name, value, true);
     const { editor, options } = editorFor(name, value);
     const draft = drafts[name];
     switch (editor) {
@@ -322,7 +337,7 @@ export function AttrPanel({
           </select>
         );
       case "color":
-        return renderColor(name, value, name === "background" || name === "src" || name === "foreground");
+        return renderColor(name, value, name === "background" || name === "src" || name === "foreground" || name === "tint");
       default: {
         const ph: Record<string, string> = { dimen: "8dp / 14sp", number: "0.5", ref: "@+id/xxx 或 parent", string: "…" };
         return (

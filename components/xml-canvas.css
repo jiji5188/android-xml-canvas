@@ -95,9 +95,10 @@
   z-index: 5;
 }
 
-/* M3e：选中态必须永远看得见（elevation 高的兄弟会盖住低的话，高亮就没了） */
+/* M3e：选中态要高过所有 elevation，但不能高过弹窗/整页子页面（M4n：从 9999 降到 900，
+   否则选中框会盖住 DrawablePicker / ShapeEditor 这类弹层） */
 .axv-node.axv-selected {
-  z-index: 9999 !important;
+  z-index: 900 !important;
 }
 
 /* M3b：选中高亮强化 —— 虚线框 + 左上角 tag 标签头 */
@@ -1355,7 +1356,7 @@
   position: fixed;
   inset: 0;
   background: var(--axv-scrim);
-  z-index: 100;
+  z-index: 20000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2627,7 +2628,7 @@
 .axv-shape-page {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  z-index: 20100;
   display: flex;
   flex-direction: column;
   background: var(--axv-surface-sunken);

@@ -76,11 +76,14 @@ interface GeomDrag {
   /** 宽/高是否百分比型（match_parent / calc(100% - Npx)） */
   wPct: boolean;
   hPct: boolean;
-  /** 是否是 CL 子项（预览改 left/top，而不是 margin） */
+  /** 是否是「绝对定位父级」子项（CL 或 RelativeLayout）——预览改 left/top，不是 margin */
   cl: boolean;
-  /** 绝对 left/top（布局 px），仅 CL 预览用 */
+  /** 绝对 left/top（布局 px），仅绝对定位父级预览用 */
   left: number;
   top: number;
+  /** 该方向能不能用 margin 推动（CL/RL 里 end 对齐的子项，marginStart 不会让它动） */
+  mxOk: boolean;
+  myOk: boolean;
 }
 
 export function XmlCanvas({
@@ -103,7 +106,7 @@ export function XmlCanvas({
     y: number;
     w: number;
     h: number;
-    /** CL 子项：预览直接给 absolute left/top */
+    /** 绝对定位父级：预览直接给 absolute left/top */
     cl: boolean;
     left: number;
     top: number;
@@ -162,13 +165,16 @@ export function XmlCanvas({
 
   // 是否显示约束手柄：自己选中 + 父是 ConstraintLayout + 自己不是 Guideline/Barrier
   const inCL = _parentTag !== undefined && shortTag(_parentTag) === "ConstraintLayout";
+  const inRL = _parentTag !== undefined && shortTag(_parentTag) === "RelativeLayout";
+  const absParent = inCL || inRL;
   const st = shortTag(node.tag);
   const isAux = st === "Guideline" || st === "Barrier";
   const showHandles = !!onConstraintDraw && isSel && inCL && !isAux;
-  // 自由几何手柄：选中 + 非 CL 父 + 不是辅助节点
-  const showGeom = !!onGeometryChange && isSel && !inCL && !isAux;
-  // CL 子项：位置由约束决定，不提供移动，但只要尺寸可写就给「改宽高」手柄。
-  // 左侧/上侧需要 marginStart/marginTop 才能把边推出去 → 只有本来就锚了 start/top 才给。
+  // 自由几何手柄：选中 + 非绝对定位父级 + 不是辅助节点
+  const showGeom = !!onGeometryChange && isSel && !absParent && !isAux;
+  // CL / RL 子项：位置由约束/规则决定，但仍然要给「改宽高」手柄。
+  // 左侧/上侧能不能用：CL 看有没有锚点（marginStart 才有作用）；
+  // RL 看这个方向是不是 end 驱动（end 驱动时 marginStart 推不动，但 width 仍然能改）。
   const rawA = (node.rawAttrs ?? {}) as Record<string, unknown>;
   const hasC = (keys: string[]) => keys.some((k) => rawA[k] !== undefined);
   const hasStartC = hasC([
@@ -178,14 +184,35 @@ export function XmlCanvas({
     "layout_constraintLeft_toRightOf",
   ]);
   const hasTopC = hasC(["layout_constraintTop_toTopOf", "layout_constraintTop_toBottomOf"]);
-  const clResizeSides: GeomMode[] =
-    !!onGeometryChange && isSel && inCL && !isAux
-      ? ([
-          ...(hasStartC ? (["left"] as GeomMode[]) : []),
-          "right",
-          ...(hasTopC ? (["top"] as GeomMode[]) : []),
-          "bottom",
-        ] as GeomMode[])
+  // RL：这个方向的位置是不是「贴着 end/bottom 算」的（那 marginStart/Top 就推不动它）
+  const rlEndH = hasC([
+    "layout_alignParentEnd",
+    "layout_alignParentRight",
+    "layout_centerHorizontal",
+    "layout_centerInParent",
+    "layout_toStartOf",
+    "layout_toLeftOf",
+    "layout_alignEnd",
+    "layout_alignRight",
+  ]);
+  const rlEndV = hasC([
+    "layout_alignParentBottom",
+    "layout_centerVertical",
+    "layout_centerInParent",
+    "layout_above",
+    "layout_alignBottom",
+  ]);
+  const absMoveOk = isSel && inRL && !!onGeometryChange && !isAux && (!rlEndH || !rlEndV);
+  const absResizeSides: GeomMode[] =
+    !!onGeometryChange && isSel && absParent && !isAux
+      ? inRL
+        ? (["left", "right", "top", "bottom"] as GeomMode[])
+        : ([
+            ...(hasStartC ? (["left"] as GeomMode[]) : []),
+            "right",
+            ...(hasTopC ? (["top"] as GeomMode[]) : []),
+            "bottom",
+          ] as GeomMode[])
       : [];
   // 根布局不能「移动」：它在窗口里总是填满内容区，写 layout_marginStart/Top 只会
   // 让根四边出现不对称间隙（预览已忽略根 margin，这里也不再给拖动手柄）
@@ -281,6 +308,9 @@ export function XmlCanvas({
       : parseFloat(cs.marginTop) || 0;
     const baseLeft = parseFloat(cs.left) || 0;
     const baseTop = parseFloat(cs.top) || 0;
+    // 这个方向上 margin 能不能推动控件：RL 里 end 驱动的子项推不动
+    const mxOk = cl ? !inRL || !rlEndH : true;
+    const myOk = cl ? !inRL || !rlEndV : true;
     geomRef.current = {
       mode,
       px: e.clientX,
@@ -295,6 +325,8 @@ export function XmlCanvas({
       cl,
       left: baseLeft,
       top: baseTop,
+      mxOk,
+      myOk,
     };
     setGeomLive({ mode, x: mx, y: my, w: layoutW, h: layoutH, cl, left: baseLeft, top: baseTop });
 
@@ -356,7 +388,10 @@ export function XmlCanvas({
       const px2dp = (v: number) => r1(v / scale);
       // 先写出新 XML（新节点样式）再等模型，避免「先弹回原位再跳到新位置」的闪烁
       if (g.mode === "move") {
-        onGeometryChange?.(node.path, { x: px2dp(n.x), y: px2dp(n.y) });
+        const patch: { x?: number; y?: number } = {};
+        if (g.mxOk) patch.x = px2dp(n.x);
+        if (g.myOk) patch.y = px2dp(n.y);
+        onGeometryChange?.(node.path, patch);
       } else if (g.mode === "left") {
         onGeometryChange?.(node.path, { x: px2dp(n.x), w: px2dp(n.w) });
       } else if (g.mode === "right") {
@@ -538,18 +573,31 @@ export function XmlCanvas({
         </>
       ) : null}
 
+      {/* CL / RelativeLayout 子项：位置由约束/规则决定，移动只改 margin（能推得动才有），
+          宽高直接写 layout_width/height。手柄画在边内侧，避开外侧的约束圆点。 */}
+      {absMoveOk && inRL ? (
+        <span
+          className="axv-geom-move axv-geom-cl"
+          title="拖动我移动控件（写回 layout_marginStart / layout_marginTop；位置由相对规则决定）"
+          onPointerDown={beginGeom("move", true)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          ✥
+        </span>
+      ) : null}
+
       {/* CL 子项：位置由约束决定，只给「改宽高」手柄（无移动）。
           手柄画在边内侧，避开外侧的约束圆点（拖约束用）。 */}
-      {clResizeSides.length > 0 ? (
+      {absResizeSides.length > 0 ? (
         <>
-          {clResizeSides.map((m) => (
+          {absResizeSides.map((m) => (
             <span
-              key={"cl-" + m}
+              key={"abs-" + m}
               className={"axv-geom-resize axv-geom-cl axv-geom-cl-" + m}
               title={
                 m === "left" || m === "right"
-                  ? "拖动改 layout_width（位置由约束决定，不会移动）"
-                  : "拖动改 layout_height（位置由约束决定，不会移动）"
+                  ? "拖动改 layout_width（位置由约束/规则决定，不会跑飞）"
+                  : "拖动改 layout_height（位置由约束/规则决定，不会跑飞）"
               }
               onPointerDown={beginGeom(m, true)}
               onClick={(e) => e.stopPropagation()}

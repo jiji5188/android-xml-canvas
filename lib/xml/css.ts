@@ -6,6 +6,7 @@ import type { XmlNode, ResourceTable, RenderModel, ResolvedNode } from "./types"
 import { resolveNodeAttrs, resolveSize } from "./resolve";
 import type { ResolvedAttrs } from "./resolve";
 import { solveConstraintChildren } from "./constraints";
+import { solveRelativeChildren } from "./relative";
 import { SCREEN_DP, phoneBodyDp } from "./theme";
 
 const DP = (n: number, scale = 2) => n * scale;
@@ -167,7 +168,13 @@ export function buildRenderModel(
 
     // 容器
     const isCL = tag === "ConstraintLayout" || tag === "ConstraintSet";
-    if (tag === "LinearLayout" || tag === "FrameLayout" || tag === "ScrollView" || tag === "HorizontalScrollView" || tag === "CardView" || tag === "MaterialCardView" || isCL) {
+    const isRL = tag === "RelativeLayout";
+    // RelativeLayout：子项位置由规则求解（见 relative.ts），容器自身仍需 position:relative
+    // 作为 absolute 子项的定位基准
+    if (isRL) {
+      style.display = "block";
+      style.position = "relative";
+    } else if (tag === "LinearLayout" || tag === "FrameLayout" || tag === "ScrollView" || tag === "HorizontalScrollView" || tag === "CardView" || tag === "MaterialCardView" || isCL) {
       style.display = "flex";
       if (tag === "ScrollView") {
         style.flexDirection = "column";
@@ -560,9 +567,17 @@ export function buildRenderModel(
     const hStr = String(n.style.height ?? "");
     if (wStr === "100%" || wStr === "auto" || wStr === "") n.style.width = `${cw}px`;
     if (hStr === "100%" || hStr === "auto" || hStr === "") n.style.height = `${ch}px`;
+    // 子项定位基准是 padding box，而 Android 是在 padding 里面排
+    // → 内容区扣掉 padding，坐标加上 padding 偏移
+    const padL = parseFloat(String(n.style.paddingLeft ?? "0")) || 0;
+    const padT = parseFloat(String(n.style.paddingTop ?? "0")) || 0;
+    const padR = parseFloat(String(n.style.paddingRight ?? "0")) || 0;
+    const padB = parseFloat(String(n.style.paddingBottom ?? "0")) || 0;
+    const contentW = Math.max(0, cw - padL - padR);
+    const contentH = Math.max(0, ch - padT - padB);
     const sourceCL = findSourceNode(root, n.path);
     if (!sourceCL) return;
-    const solved = solveConstraintChildren(sourceCL, res, cw, ch);
+    const solved = solveConstraintChildren(sourceCL, res, contentW, contentH);
     issues.push(...solved.issues);
     for (const child of n.children) {
       const box = solved.boxes.get(child.path);
@@ -575,22 +590,22 @@ export function buildRenderModel(
         const dir = (child.rawAttrs["barrierDirection"] ?? "top").toLowerCase();
         const isHorizLine = cTag === "Guideline" ? o === "horizontal" : dir === "top" || dir === "bottom";
         if (isHorizLine) {
-          child.style.left = "0px";
-          child.style.top = `${box.top}px`;
-          child.style.width = `${cw}px`;
+          child.style.left = `${padL}px`;
+          child.style.top = `${padT + box.top}px`;
+          child.style.width = `${contentW}px`;
           child.style.height = "2px";
         } else {
-          child.style.left = `${box.left}px`;
-          child.style.top = "0px";
+          child.style.left = `${padL + box.left}px`;
+          child.style.top = `${padT}px`;
           child.style.width = "2px";
-          child.style.height = `${ch}px`;
+          child.style.height = `${contentH}px`;
         }
         child.style.boxSizing = "border-box";
         for (const gc of child.children) patchCL(gc);
         continue;
       }
-      child.style.left = `${box.left}px`;
-      child.style.top = `${box.top}px`;
+      child.style.left = `${padL + box.left}px`;
+      child.style.top = `${padT + box.top}px`;
       child.style.width = `${box.width}px`;
       child.style.height = `${box.height}px`;
       child.style.boxSizing = "border-box";
@@ -602,6 +617,59 @@ export function buildRenderModel(
     }
   };
   patchCL(rootNode);
+
+  // M2p：RelativeLayout 子项规则定位（alignParent / center / toRightOf / below / alignTop …）
+  const patchRL = (n: ResolvedNode): void => {
+    if (shortTag(n.tag) !== "RelativeLayout") {
+      for (const c of n.children) patchRL(c);
+      return;
+    }
+    const toPx = (v: unknown, fallback: number): number => {
+      const s2 = String(v ?? "");
+      if (s2.endsWith("px")) return parseFloat(s2);
+      const mCalc = s2.match(/^calc\(100%\s*-\s*([0-9.]+)px\)$/);
+      if (mCalc) return Math.max(0, fallback - parseFloat(mCalc[1]));
+      if (s2 === "100%" || s2 === "" || s2 === "auto") return fallback;
+      const m = s2.match(/^(-?[0-9.]+)/);
+      if (m && !s2.includes("%")) return parseFloat(m[1]);
+      return fallback;
+    };
+    const cw = toPx(n.style.width, SCREEN_DP.w * scale);
+    const ch = toPx(n.style.height, phoneBodyDp() * scale);
+    // 容器自身尺寸要落实成 px：子项全 absolute 撑不起来，否则整个 RelativeLayout 塔成 0 高
+    const wStr = String(n.style.width ?? "");
+    const hStr = String(n.style.height ?? "");
+    if (wStr === "100%" || wStr === "auto" || wStr === "") n.style.width = `${cw}px`;
+    if (hStr === "100%" || hStr === "auto" || hStr === "") n.style.height = `${ch}px`;
+    // 同 CL：Android 在 padding 内排子项，CSS absolute 不认 padding → 手动扣/偏移
+    const padL = parseFloat(String(n.style.paddingLeft ?? "0")) || 0;
+    const padT = parseFloat(String(n.style.paddingTop ?? "0")) || 0;
+    const padR = parseFloat(String(n.style.paddingRight ?? "0")) || 0;
+    const padB = parseFloat(String(n.style.paddingBottom ?? "0")) || 0;
+    const contentW = Math.max(0, cw - padL - padR);
+    const contentH = Math.max(0, ch - padT - padB);
+    const sourceRL = findSourceNode(root, n.path);
+    if (!sourceRL) return;
+    const solved = solveRelativeChildren(sourceRL, res, contentW, contentH);
+    issues.push(...solved.issues);
+    for (const child of n.children) {
+      const box = solved.boxes.get(child.path);
+      if (!box) continue;
+      child.style.position = "absolute";
+      child.style.left = `${padL + box.left}px`;
+      child.style.top = `${padT + box.top}px`;
+      child.style.width = `${box.width}px`;
+      child.style.height = `${box.height}px`;
+      child.style.boxSizing = "border-box";
+      // margin 已折进 left/top（与 CL 一致），否则会重复位移
+      delete child.style.marginTop;
+      delete child.style.marginRight;
+      delete child.style.marginBottom;
+      delete child.style.marginLeft;
+      for (const gc of child.children) patchRL(gc);
+    }
+  };
+  patchRL(rootNode);
 
   // M2d：FrameLayout 子项定位修正——absolute 子项补默认 left/top，父容器补明确宽高
   const patchFrame = (n: ResolvedNode): void => {

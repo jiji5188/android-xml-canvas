@@ -3,6 +3,7 @@
 // 规避 M3E 运行环境里 Node 冒烟脚本拿不到 DOM 的问题）。
 
 import type { XmlNode, XmlIssue } from "./types";
+import { setNodeAttrs, APP_ATTR_RE, APP_NS } from "./attrs";
 
 /** M1 支持的标签（其余走 unknown 占位，不阻断） */
 export const KNOWN_TAGS = new Set([
@@ -229,37 +230,14 @@ export function rewriteNodeAttrs(
   newAttrs: Record<string, string>,
   removedAttrs?: string[],
 ): string {
-  // 简化策略：重新 parse → 改属性 → serialize。
-  // 保留注释：先扫出原注释文本，序列化后再按出现顺序插回。
-  const { root } = parseLayoutXml(xml);
-  if (!root) return xml;
-  const target = findNode(root, path);
-  if (!target) return xml;
-  const attrs = { ...target.attrs };
-  for (const [k, v] of Object.entries(newAttrs)) attrs[k] = v;
-  for (const k of removedAttrs ?? []) delete attrs[k];
-  target.attrs = attrs;
-
-  const comments: { text: string }[] = [];
-  const re = /<!--[\s\S]*?-->/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(xml)) !== null) comments.push({ text: m[0] });
-
-  const serialized = serialize(root);
-  // 注释简单追加到文档尾（M1b 够用；M2 再做原位保留）
-  const withComments = comments.length
-    ? serialized + "\n" + comments.map((c) => c.text).join("\n") + "\n"
-    : serialized;
-
-  // 把 XML 声明拼回
-  const decl = xml.match(/^<\?xml[\s\S]*?\?>/i);
-  return (decl ? decl[0] + "\n" : "") + withComments;
+  // M3c：改为文本级手术（只改目标节点开标签里的那几个属性 token）。
+  // 旧实现是 parse → 改属性 → serialize 全文重写：注释会被搬到文件末尾、
+  // 属性顺序与缩进全被重排，改一次字号就把用户排版洗一遍。
+  return setNodeAttrs(xml, path, newAttrs, removedAttrs).xml;
 }
 
 /** 序列化：把归一化树写回 XML 文本 */
-/** ConstraintLayout / MotionLayout 专用属性：序列化时必须用 app: 前缀 */
-const APP_ATTR_RE = /^(layout_constraint|layout_guideline|layout_barrier|layout_wrapBehavior|layout_optimizationLevel|flow_|motion_|constraint_referenced_ids|barrierDirection|barrierMargin|barrierAllowsGoneWidgets)/;
-const APP_NS = "http://schemas.android.com/apk/res-auto";
+export { APP_ATTR_RE, APP_NS };
 
 /** 子树里是否用了 app: 命名空间的属性 */
 function usesAppNs(n: XmlNode): boolean {

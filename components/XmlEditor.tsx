@@ -15,7 +15,8 @@ import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, type ResourceExtras } from "@/lib/xml/resdir";
 import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
-import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild } from "@/lib/xml/insert";
+import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, isSingleChildTag, applyConstraintDefaults, canAcceptChild } from "@/lib/xml/insert";
+import { moveNodeRaw } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml } from "@/lib/xml/lint";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
@@ -911,6 +912,41 @@ export function XmlEditor() {
     }
   };
 
+  /** M3d：拖拽调整层级（三种落点：上一兄弟 / 作为子项 / 下一兄弟） */
+  const onDragMoveNode = (fromPath: string, target: { path: string; zone: "before" | "inside" | "after" }) => {
+    const { root } = parseLayoutXml(xml);
+    if (!root) return;
+    const targetNode = findNode(root, target.path);
+    if (!targetNode) return;
+
+    const segs = target.path.replace(/^#/, "").split("/");
+    const targetIndex = Number(segs[segs.length - 1]);
+    const targetParent = "#" + segs.slice(0, -1).join("/");
+
+    let parentPath: string;
+    let index: number;
+    let maxChildren: number | undefined;
+
+    if (target.zone === "inside") {
+      parentPath = target.path;
+      index = targetNode.children.length;
+      maxChildren = isSingleChildTag(targetNode.tag) ? 1 : undefined;
+    } else {
+      parentPath = targetParent;
+      index = target.zone === "before" ? targetIndex : targetIndex + 1;
+      const parentNode = findNode(root, targetParent);
+      maxChildren = parentNode && isSingleChildTag(parentNode.tag) ? 1 : undefined;
+    }
+
+    const r = moveNodeRaw(xml, fromPath, { parentPath, index, maxChildren });
+    if (r.ok) {
+      setXmlAndTrack(r.xml);
+      if (r.newPath) setSelectedPath(r.newPath);
+    } else if (r.issues.length) {
+      setExportNote(r.issues[0].message);
+    }
+  };
+
   const onRemoveNode = (path: string) => {
     if (path === "#0") return;
     const { parentPath, index } = splitPath(path);
@@ -1521,6 +1557,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                 onSelect={setSelectedPath}
                 onMove={onMoveSibling}
                 onRemove={onRemoveNode}
+                onDragMove={onDragMoveNode}
               />
             </div>
           )}

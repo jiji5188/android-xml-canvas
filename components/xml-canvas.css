@@ -897,6 +897,36 @@
   background: transparent;
 }
 
+/* ===== M3d：拖拽排序的落点提示 ===== */
+.axv-lt-hint {
+  font-size: 11px;
+  color: #8a8fa3;
+  line-height: 1.5;
+  padding: 6px 10px 8px;
+  border-bottom: 1px dashed #ececf2;
+  margin-bottom: 4px;
+}
+.axv-lt-row[draggable="true"] {
+  cursor: grab;
+}
+.axv-lt-row.dragging {
+  opacity: 0.4;
+}
+/* 拖到行上方：蓝线在上边 */
+.axv-lt-row.drop-before {
+  box-shadow: inset 0 2px 0 0 #04409F;
+}
+/* 拖到行下方：蓝线在下边 */
+.axv-lt-row.drop-after {
+  box-shadow: inset 0 -2px 0 0 #04409F;
+}
+/* 拖到行中间：整个行变蓝框，表示「放进这个容器」 */
+.axv-lt-row.drop-inside {
+  background: rgba(4, 64, 159, 0.1);
+  box-shadow: inset 0 0 0 2px #04409F;
+  border-radius: 6px;
+}
+
 /* 拖放目标高亮 */
 .axv-phone.axv-drop-target {
   outline: 2px dashed #04409F;

@@ -261,3 +261,188 @@ export function bringToFront(xml: string, targetPath: string): ReorderResult {
 export function sendToBack(xml: string, targetPath: string): ReorderResult {
   return moveSiblingRaw(xml, targetPath, 0);
 }
+
+// ===== M3d：跨父级移动（拖拽排序：移到上层 / 下层 / 兄弟层）=====
+
+/** 路径段数组：#0/1/2 → [0,1,2] */
+function segsOf(path: string): number[] {
+  return path.replace(/^#/, "").split("/").map((x) => Number(x));
+}
+
+function pathOf(segs: number[]): string {
+  return "#" + segs.join("/");
+}
+
+/** a 是否等于 b 或者是 b 的祖先 */
+function isAncestorOrSelf(a: string, b: string): boolean {
+  const sa = segsOf(a);
+  const sb = segsOf(b);
+  if (sa.length > sb.length) return false;
+  return sa.every((v, i) => v === sb[i]);
+}
+
+/** 从一个位置删除节点后，其他路径需要重映射（同一父级下 index 变动的兄弟） */
+export function remapPathAfterRemoval(path: string, removedPath: string): string | null {
+  const segs = segsOf(path);
+  const rm = segsOf(removedPath);
+  const depth = rm.length - 1; // 被删节点的父级深度
+  if (segs.length <= depth) return path;
+  for (let i = 0; i < depth; i++) {
+    if (segs[i] !== rm[i]) return path;
+  }
+  const removedIdx = rm[depth];
+  if (segs[depth] === removedIdx) return null; // 自己就是被删的那个（或它下方）
+  if (segs[depth] > removedIdx) {
+    const out = segs.slice();
+    out[depth] -= 1;
+    return pathOf(out);
+  }
+  return path;
+}
+
+/** 取元素所在行的缩进（行首空白） */
+function lineIndent(xml: string, pos: number): string {
+  const ls = xml.lastIndexOf("\n", Math.max(0, pos - 1)) + 1;
+  const head = xml.slice(ls, pos);
+  return /^[ \t]*$/.test(head) ? head : "";
+}
+
+/** 把节点文本整体平移到新缩进（保持内部相对层级） */
+function reindent(nodeText: string, from: string, to: string): string {
+  if (from === to) return nodeText;
+  const delta = to.length - from.length;
+  return nodeText
+    .split("\n")
+    .map((line, i) => {
+      if (i === 0) return line;
+      if (!line.trim()) return line;
+      if (delta > 0) return " ".repeat(delta) + line;
+      const lead = line.match(/^[ \t]*/)![0];
+      const cut = Math.min(lead.length, -delta);
+      return line.slice(cut);
+    })
+    .join("\n");
+}
+
+export interface MoveNodeOptions {
+  /** 目标父级 path */
+  parentPath: string;
+  /** 插到目标父级的第几个子项之前（0..children.length） */
+  index: number;
+  /** 目标父级最多允许多少子项（用于单 child 容器校验，不传则不校验） */
+  maxChildren?: number;
+}
+
+/**
+ * 把节点移到另一个父级（或同父级的新位置）。
+ *
+ * 这是拖拽排序的核心：
+ *  - 拖到某个控件「上方/下方」→ parentPath = 该控件的父级，index = 该控件下标 / 下标+1
+ *  - 拖到某个容器「中间」   → parentPath = 该容器，index = 末尾（或指定位置）
+ *
+ * 移动后原文保留（注释、缩进、属性顺序都不动），只是把节点块剪走再插入，
+ * 并按目标层级重新缩进。
+ */
+export function moveNodeRaw(
+  xml: string,
+  targetPath: string,
+  opts: MoveNodeOptions,
+): ReorderResult {
+  const issues: ReorderIssue[] = [];
+  const { parentPath, index, maxChildren } = opts;
+  const root = scanElements(xml);
+  if (!root) {
+    issues.push({ level: "error", message: "XML 无法解析" });
+    return { xml, ok: false, issues, newPath: null, index: null };
+  }
+  const targetSegs = segsOf(targetPath);
+  if (targetSegs.length < 2) {
+    issues.push({ level: "error", message: "根节点不能移动" });
+    return { xml, ok: false, issues, newPath: null, index: null };
+  }
+  if (isAncestorOrSelf(targetPath, parentPath)) {
+    issues.push({ level: "error", message: "不能把控件移动到它自己内部" });
+    return { xml, ok: false, issues, newPath: null, index: null };
+  }
+  const src = elementAt(root, targetPath);
+  const dest = elementAt(root, parentPath);
+  if (!src || !dest) {
+    issues.push({ level: "error", message: "找不到源节点或目标父级" });
+    return { xml, ok: false, issues, newPath: null, index: null };
+  }
+
+  const fromParent = pathOf(targetSegs.slice(0, -1));
+  const fromIndex = targetSegs[targetSegs.length - 1];
+  const sameParent = fromParent === parentPath;
+
+  // 同父级 → 退化成纯重排（走已验证的 moveSiblingRaw）
+  if (sameParent) {
+    const after = index > fromIndex ? index - 1 : index;
+    return moveSiblingRaw(xml, targetPath, after);
+  }
+
+  // 容器容量校验
+  if (maxChildren !== undefined && dest.children.length >= maxChildren) {
+    issues.push({ level: "error", message: "目标容器已满，不能再放子控件" });
+    return { xml, ok: false, issues, newPath: null, index: null };
+  }
+
+  // ---- 1) 把节点块从原位置剪出来 ----
+  const srcParent = elementAt(root, fromParent)!;
+  const srcInner = innerRange(srcParent);
+  const srcKids = srcParent.children;
+  let cutStart = src.start;
+  // 连带前面紧跟的注释行（注释是在描述这个控件的）
+  for (;;) {
+    const prevLineEnd = xml.lastIndexOf("\n", cutStart - 1);
+    if (prevLineEnd < srcInner.from) break;
+    const prevLineStart = xml.lastIndexOf("\n", prevLineEnd - 1) + 1;
+    const prevLine = xml.slice(prevLineStart, prevLineEnd).trim();
+    const leadOfCut = xml.slice(prevLineStart, cutStart);
+    if (!/^<!--[\s\S]*-->$/.test(prevLine)) break;
+    if (!/^[ \t]*$/.test(leadOfCut)) break;
+    cutStart = prevLineStart;
+  }
+  // 行首缩进也一起剪（避免留空白行）
+  const cutLineStart = xml.lastIndexOf("\n", cutStart - 1) + 1;
+  if (cutLineStart >= srcInner.from && /^[ \t]*$/.test(xml.slice(cutLineStart, cutStart))) {
+    cutStart = cutLineStart;
+  }
+  // 剪到行尾换行（含）、不留空行
+  let cutEnd = src.end;
+  while (cutEnd < xml.length && /[ \t]/.test(xml[cutEnd])) cutEnd++;
+  if (xml[cutEnd] === "\n") cutEnd += 1;
+
+  const srcIndent = lineIndent(xml, src.start);
+  const nodeText = xml.slice(src.start, src.end);
+  const removed = xml.slice(0, cutStart) + xml.slice(cutEnd);
+
+  // ---- 2) 在删除后的文本里重新定位目标父级并插入 ----
+  const destPath2 = remapPathAfterRemoval(parentPath, targetPath);
+  if (destPath2 === null) {
+    issues.push({ level: "error", message: "目标位置在被移动的子树内" });
+    return { xml, ok: false, issues, newPath: null, index: null };
+  }
+  const dest2 = elementAt(scanElements(removed), destPath2);
+  if (!dest2) {
+    issues.push({ level: "error", message: "移动后找不到目标父级" });
+    return { xml, ok: false, issues, newPath: null, index: null };
+  }
+  const destIndent = dest2.children.length
+    ? lineIndent(removed, dest2.children[0].start)
+    : lineIndent(removed, dest2.start) + "    ";
+
+  const insertIdx = Math.max(0, Math.min(index, dest2.children.length));
+  const at = insertIdx === 0 ? dest2.openEnd : dest2.children[insertIdx - 1].end;
+
+  const block = "\n" + destIndent + reindent(nodeText, srcIndent, destIndent);
+  const out = removed.slice(0, at) + block + removed.slice(at);
+
+  return {
+    xml: out,
+    ok: true,
+    issues,
+    newPath: `${destPath2}/${insertIdx}`,
+    index: insertIdx,
+  };
+}

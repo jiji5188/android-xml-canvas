@@ -57,6 +57,11 @@ const SINGLE_CHILD_TAGS = new Set([
   "NestedScrollView",
 ]);
 
+/** 是否是「只能放 1 个子控件」的容器（拖拽排序时用它拦第二个子项） */
+export function isSingleChildTag(rawTag: string): boolean {
+  return SINGLE_CHILD_TAGS.has(shortTag(rawTag));
+}
+
 /** 容器还能不能再塞子控件？
  *  - 不是容器 → 不能（reason: “不支持子控件”）
  *  - 是单 child 容器且已有 1 个 → 不能（reason: “只支持 1 个子控件”）

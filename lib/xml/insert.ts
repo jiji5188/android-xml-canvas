@@ -16,9 +16,10 @@ export interface InsertResult {
 }
 
 /** 可用作父容器的控件（拖放落位判定用）
- *  注：按用户口径，「View」在这里当作可放子控件的容器用（做占位容器）。 */
+ *  铁律（用户 2026-10-28 明确）：只有 ViewGroup 才能 addView。所有 View 子类（含 View 本身、
+ *  TextView/Button/ImageView/ProgressBar…）都是叶子，既不能放子控件，也不能拖子控件进去。
+ *  → 这里只允许真正的 ViewGroup 及其子类。 */
 const CONTAINER_TAGS = new Set([
-  "View",
   "LinearLayout",
   "LinearLayoutCompat",
   "FrameLayout",
@@ -39,6 +40,15 @@ const CONTAINER_TAGS = new Set([
   "ViewFlipper",
   "ViewAnimator",
   "RadioGroup",
+  // 真 ViewGroup 但上面漏了的常见容器（View 子类里属于 ViewGroup 的才能进这张表）
+  "TextInputLayout",
+  "MotionLayout",
+  "ChipGroup",
+  "TabLayout",
+  "Toolbar",
+  "MaterialToolbar",
+  // 有意不收：RecyclerView / ListView / ViewPager2 / BottomNavigationView / NavigationView
+  //  它们是 ViewGroup，但子项由 adapter/menu 生成，XML 里写子控件不生效
 ]);
 
 /** 标签是否容器（全限定名取尾段，如 androidx.constraintlayout.widget.ConstraintLayout）
@@ -51,6 +61,7 @@ export function isContainerTag(rawTag: string): boolean {
 
 /** 已知的叶子控件（继承自 View 但不是 ViewGroup）——只用于 lint 提示，不参与插入判定 */
 const KNOWN_LEAF_TAGS = new Set([
+  "View",
   "TextView",
   "Button",
   "ImageButton",
@@ -76,7 +87,6 @@ const KNOWN_LEAF_TAGS = new Set([
   "ExtendedFloatingActionButton",
   "TextClock",
   "Chronometer",
-  "WebView",
   "SurfaceView",
   "TextureView",
   "VideoView",

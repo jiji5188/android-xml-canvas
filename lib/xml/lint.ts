@@ -106,8 +106,8 @@ export function lintXml(src: string): LintIssue[] {
       issues.push({ line: startLine, level: "error", message: "非法标签名" });
       continue;
     }
-    if (/\/>$/.test(raw.trimEnd())) continue; // 自闭合
     // M4g：父节点是叶子控件（继承自 View，非 ViewGroup）却写了子节点 → aapt 会报错
+    // 注意：判断必须在「自闭合 continue」之前，否则 <View><TextView/></View> 这类最典型的写法拦不到
     const parent = stack[stack.length - 1];
     if (parent && !isContainerTag(parent.tag) && isKnownLeafTag(parent.tag) && !warned.has(parent.line)) {
       warned.add(parent.line);
@@ -117,6 +117,7 @@ export function lintXml(src: string): LintIssue[] {
         message: `<${parent.tag}> 不是 ViewGroup，不能包含子控件（<${name}>）`,
       });
     }
+    if (/\/>$/.test(raw.trimEnd())) continue; // 自闭合
     stack.push({ tag: name, line: startLine });
   }
 

@@ -28,13 +28,14 @@ describe("isContainerTag — 拖放落位判定", () => {
   });
 
   it("叶子控件返回 false", () => {
-    for (const t of ["TextView", "Button", "ImageView", "Switch"]) {
+    for (const t of ["TextView", "Button", "ImageView", "Switch", "View"]) {
       expect(isContainerTag(t), t).toBe(false);
     }
   });
 
-  it("裸 View 按占位容器处理（M4f 用户口径）", () => {
-    expect(isContainerTag("View")).toBe(true);
+  it("View 本身不是 ViewGroup，不能当容器（用户铁律）", () => {
+    expect(isContainerTag("View")).toBe(false);
+    expect(isContainerTag("android.view.View")).toBe(false);
   });
 });
 

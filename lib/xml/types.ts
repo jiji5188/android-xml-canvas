@@ -29,10 +29,12 @@ export interface ResourceTable {
   /** 可选：上传 res/ 目录后填充（@drawable/@mipmap 名 → dataURL，矢量名列表） */
   drawables?: Record<string, string>;
   vectorNames?: string[];
-  /** M2w：res/drawable/*.xml 里的 <shape> 原文（名 → xml），用来还原渐变/圆角/描边背景 */
-  drawableXml?: Record<string, string>;
   /** 可选：styles.xml 解析后的展开样式（@style/xxx → attrs） */
   styles?: Record<string, { name: string; parent?: string; attrs: Record<string, string> }>;
+  /** M2x：?attr/xxx 主题属性（主题样式里收集到的 名 → 原始值），颜色引用在 resolve 时再展开 */
+  themeAttrs?: Record<string, string>;
+  /** M2w：res/drawable/*.xml 里的 <shape> 原文（名 → xml），用来还原渐变/圆角/描边背景 */
+  drawableXml?: Record<string, string>;
 }
 
 /** 解析完成、引用已展开的节点（供 css.ts 用） */

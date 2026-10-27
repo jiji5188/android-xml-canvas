@@ -35,6 +35,8 @@ export interface ResourceExtras {
   valuesXml: string;
   /** styles.xml 展开记录 */
   styles: Record<string, StyleRecord>;
+  /** M2x：?attr/xxx 主题属性（从 Theme* 样式收集，名 → 原始值） */
+  themeAttrs?: Record<string, string>;
   /** 已读入的相对路径（提示用户读了什么） */
   sourceFiles: string[];
   /** 各类计数，给 UI 打提示 */
@@ -175,6 +177,22 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
   for (const [name, st] of rawStyles) {
     extras.styles[name] = expandStyle(name, st, rawStyles, new Set());
   }
+
+  // M2x：?attr/xxx 主题属性表——从 Theme* 样式（含 parent 链）里收集 item
+  // 后声明的覆盖先声明的（等同于后加载的 styles 覆盖），只留原始值（颜色引用在 resolve 时再解）
+  const themeAttrs: Record<string, string> = {};
+  for (const [name, st] of rawStyles) {
+    const isTheme = /^Theme/i.test(name) || /theme/i.test(name);
+    if (!isTheme) continue;
+    const expanded = extras.styles[name]?.attrs ?? st.attrs;
+    for (const [k, v] of Object.entries(expanded)) {
+      // 只收能当颜色/尺寸用的（跳过后天属性如 windowActionBar=true）
+      if (/^(color|.*Color|textColor|.*Tint)/.test(k) || /^#[0-9a-f]/i.test(v) || /^@color\//.test(v) || /^\?attr\//.test(v)) {
+        themeAttrs[k] = v;
+      }
+    }
+  }
+  if (Object.keys(themeAttrs).length > 0) extras.themeAttrs = themeAttrs;
 
   extras.tree = tree as ResTreeDir;
   return extras;

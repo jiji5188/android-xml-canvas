@@ -549,6 +549,8 @@ export function XmlEditor() {
         ...base,
         drawables: resExtras.drawables,
         vectorNames: resExtras.vectorNames,
+        drawableXml: resExtras.drawableXml,
+        themeAttrs: resExtras.themeAttrs,
         styles: resExtras.styles,
       };
     }

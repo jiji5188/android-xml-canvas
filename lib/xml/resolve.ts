@@ -79,7 +79,15 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
   }
   if (v.startsWith("?attr/")) {
     const name = v.slice("?attr/".length);
-    const c = res.colors[name]; // 主题属性名与 color 名同名时命中默认主题表
+    // M2x：上传的主题（styles.xml 里 Theme* 的 item）最优先——相当于运行时主题注入
+    const themeV = res.themeAttrs?.[name];
+    if (themeV !== undefined) {
+      if (themeV.startsWith("@color/") || themeV.startsWith("#")) return resolveColor(themeV, res, issues, path, prop);
+      if (themeV.startsWith("?attr/")) return themeV; // 嵌套引用不再深入，保持原样交给 CSS
+      issues.push({ level: "warn", nodePath: path, message: `?attr/${name} 主题值 "${themeV}" 无法解析，用兜底色` });
+      return "#888888";
+    }
+    const c = res.colors[name]; // 主题属性名与 color 名同名时命中颜色表
     if (c !== undefined) return c;
     // 常见 Material3 主题属性→默认色（未上传 styles 时的预览兜底）
     const themeAttrs: Record<string, string> = {

@@ -54,7 +54,9 @@ describe("M1a 渲染引擎（XML → CSS 树）", () => {
     const btn = root.children[1];
     expect(btn.style.width).toBe("auto");
     expect(btn.style.marginRight).toBe("32px");
-    expect(btn.style.paddingLeft).toBeUndefined();
+    // M4q：Button 现在补 Android 默认内边距（16dp @2x = 32px），与真机观感一致
+    expect(btn.style.paddingLeft).toBe("32px");
+    expect(btn.style.minHeight).toBe("96px");
   });
 
   it("样例3 FrameLayout：子项绝对定位 + layout_gravity=bottom|end", () => {

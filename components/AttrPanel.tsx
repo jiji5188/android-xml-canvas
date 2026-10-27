@@ -540,6 +540,7 @@ export function AttrPanel({
         createPortal(
         <DrawablePicker
           attrName={dpOpen}
+          imageOnly={DRAWABLE_PICK_ATTRS.has(dpOpen)}
           value={String(node.rawAttrs[dpOpen] ?? "")}
           bitmapDrawables={resExtras?.drawables}
           xmlDrawables={{ ...(resExtras?.drawableXml ?? {}), ...(generatedXml ?? {}) }}

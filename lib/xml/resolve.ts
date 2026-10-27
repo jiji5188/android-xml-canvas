@@ -4,6 +4,7 @@
 import type { XmlNode, XmlIssue, ResourceTable } from "./types";
 import { parseDimenToDp, FRAMEWORK_COLORS, FRAMEWORK_STYLES } from "./resources";
 import { parseShapeDrawable } from "./shape";
+import { vectorToDataUrl } from "./vector-svg";
 
 export type ResolvedAttrs = Record<string, string | number | boolean | SizeSpec | null | import("./shape").ShapeStyle>;
 
@@ -280,6 +281,16 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["text"] = a["text"] !== undefined ? resolveText(a["text"], res, issues, path) : "";
   out["textSize"] = a["textSize"] !== undefined ? (resolveSize(a["textSize"], res, issues, path, "textSize").kind as string === "dp" ? (resolveSize(a["textSize"], res, issues, path, "textSize") as { kind: "dp"; value: number }).value : 14) : 0;
   out["textColor"] = a["textColor"] !== undefined ? resolveColor(a["textColor"], res, issues, path, "textColor") : "";
+  // M4q：API 28+ 阴影颜色（elevation 的露色控制；不写则用系统默认黑）
+  out["outlineSpotShadowColor"] =
+    a["outlineSpotShadowColor"] !== undefined
+      ? resolveColor(a["outlineSpotShadowColor"], res, issues, path, "outlineSpotShadowColor")
+      : "";
+  out["outlineAmbientShadowColor"] =
+    a["outlineAmbientShadowColor"] !== undefined
+      ? resolveColor(a["outlineAmbientShadowColor"], res, issues, path, "outlineAmbientShadowColor")
+      : "";
+  out["tint"] = a["tint"] !== undefined ? resolveColor(a["tint"], res, issues, path, "tint") : "";
   out["textStyle"] = a["textStyle"] ?? "";
   out["textAllCaps"] = a["textAllCaps"] === "true";
   out["textAlignment"] = a["textAlignment"] ?? "";
@@ -410,6 +421,12 @@ export function resolveDrawable(
     const [, kind, name] = m;
     const url = res.drawables?.[name] ?? res.drawables?.[name.replace(/\.\w+$/, "")];
     if (url) return url;
+    // M4p：上传的 vector xml（@drawable/ic_xxx）直接转成 data URL，画布能真画出来
+    const vxml = res.drawableXml?.[name] ?? res.drawableXml?.[name.replace(/\.xml$/i, "")];
+    if (vxml && /<vector[\s>]/.test(vxml)) {
+      const du = vectorToDataUrl(vxml);
+      if (du) return du;
+    }
     // 矢量名单里（vector xml）标记为占位
     if (res.vectorNames?.includes(name)) {
       issues.push({ level: "warn", nodePath: path, message: `${prop} 引用矢量 @${kind}/${name}，按占位渲染` });

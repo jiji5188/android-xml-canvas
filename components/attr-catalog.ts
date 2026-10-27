@@ -72,6 +72,9 @@ export const ATTR_CATALOG: AttrSpec[] = [
   // ===== 外观 =====
   { name: "background", editor: "color", default: "#FFFFFF", group: "外观", desc: "背景色" },
   { name: "elevation", editor: "dimen", default: "2dp", group: "外观" },
+  { name: "translationZ", editor: "dimen", default: "2dp", group: "外观", desc: "瞬时抬升（与 elevation 相加）" },
+  { name: "outlineSpotShadowColor", editor: "color", default: "#000000", group: "外观", desc: "点光源阴影颜色（API 28+）" },
+  { name: "outlineAmbientShadowColor", editor: "color", default: "#000000", group: "外观", desc: "环境光阴影颜色（API 28+）" },
   { name: "src", editor: "string", default: "@drawable/", group: "外观", desc: "图片资源", tags: ["ImageView"] },
   { name: "tint", editor: "color", default: "#000000", group: "外观", desc: "着色（图片框/图片按钮特有，颜色值或 @color/xxx）", tags: ["ImageView", "ImageButton", "FloatingActionButton", "CheckBox", "RadioButton"] },
   { name: "tintMode", editor: "enum", options: ["src_in", "src_over", "src_atop", "multiply", "screen", "add"], default: "src_in", group: "外观", desc: "着色混合模式", tags: ["ImageView", "ImageButton"] },

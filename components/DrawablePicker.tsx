@@ -36,6 +36,9 @@ interface Props {
   onPickIcon?: () => void;
   /** 选中的值写回属性 */
   onCommit: (value: string) => void;
+  /** true = 图片类属性（src / icon / drawableStart …）：drawable 不认纯色，
+   *  所以不提供「颜色」tab（纯色写进 src 在画布上是空白） */
+  imageOnly?: boolean;
   onClose: () => void;
 }
 
@@ -54,9 +57,10 @@ export function DrawablePicker({
   onEditShape,
   onPickIcon,
   onCommit,
+  imageOnly,
   onClose,
 }: Props) {
-  const [tab, setTab] = useState<"color" | "res" | "shape" | "icon">("color");
+  const [tab, setTab] = useState<"color" | "res" | "shape" | "icon">(imageOnly ? "res" : "color");
   const [filter, setFilter] = useState("");
   /** 资源 ID 输入框草稿（不与属性实时同步，回车/失焦才写回，避免污染 XML） */
   const [idDraft, setIdDraft] = useState(value);
@@ -150,7 +154,7 @@ export function DrawablePicker({
         <div className="axv-dp-tabs">
           {(
             [
-              ["color", "🎨 颜色"],
+              ...(imageOnly ? [] : ([ ["color", "🎨 颜色"] ] as const)),
               ["res", `🖼 图片/XML 资源（${Object.keys(bitmapDrawables ?? {}).length + Object.keys(xmlDrawables ?? {}).length + Object.keys(generatedXml ?? {}).length}）`],
               ["shape", "⬛ 编辑/创建 XML 形状"],
               ["icon", "📦 图标生成"],

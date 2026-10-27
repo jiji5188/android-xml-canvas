@@ -268,6 +268,20 @@ export const WIDGETS: WidgetDef[] = [
     android:layout_height="48dp"
     android:background="#E0E0E0"/>`,
   },
+  {
+    key: "imgbtn", label: "图片按钮", tag: "ImageButton", icon: "apps", group: "图片",
+    xml: `<ImageButton ${A}
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:background="#E0E0E0"/>`,
+  },
+  {
+    key: "iconbtn", label: "图标按钮", tag: "ImageButton", icon: "touch_app", group: "图片",
+    xml: `<ImageButton ${A}
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:background="?attr/selectableItemBackgroundBorderless"/>`,
+  },
 
   // ===== Material Components（Material 库，与平台控件分开） =====
   {

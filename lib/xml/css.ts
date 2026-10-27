@@ -33,6 +33,9 @@ function viewClass(rawTag: string, a: ResolvedAttrs): string {
       return "axv-text";
     case "ImageView":
     case "AppCompatImageView":
+    case "ImageButton":
+    case "AppCompatImageButton":
+    case "androidx.appcompat.widget.AppCompatImageButton":
       return "axv-image";
     case "ProgressBar":
       return "axv-progress";
@@ -135,6 +138,18 @@ function gravityToFlexAlign(g: string): Record<string, string> {
   else if (has("top")) v.alignItems = "flex-start";
   else if (has("bottom")) v.alignItems = "flex-end";
   return v;
+}
+
+/** M4q：#RRGGBB / #AARRGGBB → "r,g,b"；用来算阴影颜色 */
+function rgbOf(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const h = raw.trim().replace(/^#/, "");
+  const hex = (s: string) => parseInt(s, 16);
+  if (!/^[0-9a-fA-F]+$/.test(h)) return null;
+  if (h.length === 8) return `${hex(h.slice(2, 4))},${hex(h.slice(4, 6))},${hex(h.slice(6, 8))}`;
+  if (h.length === 6) return `${hex(h.slice(0, 2))},${hex(h.slice(2, 4))},${hex(h.slice(4, 6))}`;
+  if (h.length === 3) return `${hex(h[0] + h[0])},${hex(h[1] + h[1])},${hex(h[2] + h[2])}`;
+  return null;
 }
 
 function layoutGravityToSelf(g: string): Record<string, string> {
@@ -385,7 +400,12 @@ export function buildRenderModel(
     if (zDp > 0) {
       const d = zDp * scale;
       // 双层阴影更接近 Material 的真实观感：近处实影 + 远处柔影
-      style.boxShadow = `0 ${Math.max(1, Math.round(d * 0.5))}px ${Math.round(d)}px rgba(0,0,0,0.20), 0 ${Math.round(d * 1.5)}px ${Math.round(d * 2.5)}px rgba(0,0,0,0.10)`;
+      // M4q：outlineSpotShadowColor / outlineAmbientShadowColor（API 28+）能改阴影颜色
+      const spot = rgbOf(attrs["outlineSpotShadowColor"] as string);
+      const amb = rgbOf(attrs["outlineAmbientShadowColor"] as string);
+      const near = spot ? `rgba(${spot},0.20)` : "rgba(0,0,0,0.20)";
+      const far = amb ? `rgba(${amb},0.10)` : "rgba(0,0,0,0.10)";
+      style.boxShadow = `0 ${Math.max(1, Math.round(d * 0.5))}px ${Math.round(d)}px ${near}, 0 ${Math.round(d * 1.5)}px ${Math.round(d * 2.5)}px ${far}`;
       // z-index 阶梯化：2dp 一档，避免浮点差异；选中态的 9999 仍会盖住它
       style.zIndex = 1 + Math.min(500, Math.round(zDp / 2));
     }
@@ -447,6 +467,20 @@ export function buildRenderModel(
       }
       if ((attrs["textAllCaps"] as boolean)) style.textTransform = "uppercase";
       if ((attrs["textStyle"] as string) === "bold") style.fontWeight = 600;
+      // M4q：Button 家族预览对齐 Android 默认样式（minWidth 88dp / minHeight 48dp / 左右 16dp 内边距 /
+      // 文字居中 / Button 默认全大写），仅在 XML 没显式写时才补
+      if (tag === "Button" || tag === "AppCompatButton" || tag === "MaterialButton" || tag === "ImageButton") {
+        style.minWidth = style.minWidth ?? `${DP(88, scale)}px`;
+        style.minHeight = style.minHeight ?? `${DP(48, scale)}px`;
+        style.paddingLeft = style.paddingLeft ?? `${DP(16, scale)}px`;
+        style.paddingRight = style.paddingRight ?? `${DP(16, scale)}px`;
+        style.paddingTop = style.paddingTop ?? `${DP(8, scale)}px`;
+        style.paddingBottom = style.paddingBottom ?? `${DP(8, scale)}px`;
+        style.textAlign = style.textAlign ?? "center";
+        style.justifyContent = style.justifyContent ?? "center";
+        style.alignItems = style.alignItems ?? "center";
+        if (tag !== "MaterialButton" && attrs["textAllCaps"] === undefined) style.textTransform = "uppercase";
+      }
       // 排版细节：letterSpacing / lineSpacingExtra / maxLines / ellipsize
       const fsPx = parseFloat(String(style.fontSize ?? "28")) || 28;
       const ls = attrs["letterSpacing"] as number;
@@ -503,6 +537,9 @@ export function buildRenderModel(
           // 矢量图：虚线紫框占位（真实 vector 路径不渲染，避免误导）
           style.backgroundColor = style.backgroundColor || "#EDE7F6";
           style.border = "1.5px dashed #9575CD";
+        } else if (/^#[0-9a-fA-F]{3,8}$/.test(src.trim())) {
+          // src 写成纯色（旧版选择器错误）——Android 当 ColorDrawable 画，预览也画底色
+          style.backgroundColor = src.trim();
         } else {
           // dataURL 直接做 background
           style.backgroundImage = `url(${src})`;

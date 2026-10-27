@@ -26,6 +26,8 @@ export interface ShapeStyle {
   oval?: boolean;
   /** line → 只画一条线（stroke 生效，背景透明） */
   line?: boolean;
+  /** layer-list 阴影层（M3h-2）：底层偏移实心块 */
+  shadow?: { dx: number; dy: number; blur: number; color: string };
 }
 
 /** Android 渐变角度 → CSS 角度：Android 0°=左→右，90°=下→上；CSS 0deg=下→上，90deg=左→右 */
@@ -68,15 +70,50 @@ export function parseShapeDrawable(
   const root = parsed?.root;
   if (!root) return null;
 
-  // selector：挑第一个带 drawable/shape 的 item（预览取常态，不区分按压态）
-  // ripple（M3h）：外壳只提供点按色，形状在内层 <item><shape>；取内层渲染
+  // selector（M3h-2）：取「常态」item（没有 state_* 的那个），拿不到才退第一个
+  // ripple / inset：外壳只提供点按色 / 内缩，形状在内层
+  // layer-list：Android 自下而上绘制，取最后一个（顶层）当可见形状
   let target = root;
-  if (root.tag === "selector" || root.tag === "ripple") {
-    const item = root.children.find((c) => c.tag === "item");
-    if (!item) return null;
-    const inline = item.children.find((c) => c.tag === "shape");
-    if (inline) target = inline;
-    else return null; // android:drawable="@drawable/other" 需要递归读文件，这里不支持
+  let shadow: ShapeStyle["shadow"];
+  for (let guard = 0; guard < 6; guard++) {
+    if (target.tag === "selector") {
+      const items = target.children.filter((c) => c.tag === "item");
+      if (items.length === 0) return null;
+      const normal = items.find((it) => !Object.keys(it.attrs).some((k) => /^state_/.test(k))) ?? items[0];
+      const inline = normal.children.find((c) => c.tag === "shape" || c.tag === "ripple" || c.tag === "layer-list" || c.tag === "inset");
+      if (!inline) return null; // android:drawable="@drawable/other" 需要递归读文件，这里不支持
+      target = inline;
+      continue;
+    }
+    if (target.tag === "ripple" || target.tag === "inset") {
+      const item = target.children.find((c) => c.tag === "item");
+      const inner = item
+        ? item.children.find((c) => c.tag !== "#text" && c.tag !== "#comment")
+        : target.children.find((c) => c.tag !== "#text" && c.tag !== "#comment");
+      if (!inner) return null;
+      target = inner;
+      continue;
+    }
+    if (target.tag === "layer-list") {
+      const items = target.children.filter((c) => c.tag === "item");
+      // 第一个 = 阴影层（约定：实心块 + 偏移），记录为 box-shadow 近似
+      if (items.length >= 2) {
+        const first = items[0];
+        const fshape = first.children.find((c) => c.tag === "shape");
+        const solid = fshape?.children.find((c) => c.tag === "solid")?.attrs["color"];
+        if (solid) {
+          const left = dp(first.attrs["left"]) ?? 0;
+          const top = dp(first.attrs["top"]) ?? 0;
+          shadow = { dx: left !== 0 ? -left : 0, dy: top, blur: 0, color: resolveColor(solid) };
+        }
+      }
+      const last = items[items.length - 1];
+      const inner = last?.children.find((c) => c.tag !== "#text" && c.tag !== "#comment");
+      if (!inner) return null;
+      target = inner;
+      continue;
+    }
+    break;
   }
   if (target.tag !== "shape") return null;
 
@@ -126,5 +163,5 @@ export function parseShapeDrawable(
       }
     }
   }
-  return out;
+  return shadow ? { ...out, shadow } : out;
 }

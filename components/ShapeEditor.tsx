@@ -302,6 +302,96 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
               ) : null}
             </div>
 
+            {/* M3h-2：selector 按下/禁用态 */}
+            <div className="axv-shape-field">
+              <label className="axv-shape-check axv-shape-check-line">
+                <input
+                  type="checkbox"
+                  checked={!!spec.states}
+                  onChange={(e) =>
+                    setSpec((s) =>
+                      e.target.checked
+                        ? { ...s, states: { pressed: shade(s.solid ?? "#FFFFFF", 0.12) } }
+                        : { ...s, states: undefined },
+                    )
+                  }
+                />
+                按下/禁用用不同颜色（&lt;selector&gt;）
+              </label>
+              {spec.states ? (
+                <div className="axv-shape-row" style={{ marginTop: 6 }}>
+                  <span className="axv-shape-hint">按下</span>
+                  <input
+                    type="color"
+                    value={toHex6(spec.states.pressed ?? spec.solid ?? "#FFFFFF")}
+                    onChange={(e) => setSpec((s) => ({ ...s, states: { ...s.states, pressed: e.target.value.toUpperCase() } }))}
+                  />
+                  <span className="axv-shape-hint">禁用</span>
+                  <input
+                    type="color"
+                    value={toHex6(spec.states.disabled ?? "#EEEEEE")}
+                    onChange={(e) => setSpec((s) => ({ ...s, states: { ...s.states, disabled: e.target.value.toUpperCase() } }))}
+                  />
+                  <button
+                    className="axv-shape-link"
+                    onClick={() => setSpec((s) => ({ ...s, states: { ...s.states, disabled: undefined } }))}
+                  >
+                    不要禁用态
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            {/* M3h-2：layer-list 阴影层 */}
+            <div className="axv-shape-field">
+              <label className="axv-shape-check axv-shape-check-line">
+                <input
+                  type="checkbox"
+                  checked={!!spec.shadow}
+                  onChange={(e) =>
+                    setSpec((s) =>
+                      e.target.checked
+                        ? { ...s, shadow: { dx: 0, dy: 4, blur: 6, color: "#1F000000" } }
+                        : { ...s, shadow: undefined },
+                    )
+                  }
+                />
+                阴影层（&lt;layer-list&gt;）
+              </label>
+              {spec.shadow ? (
+                <div className="axv-shape-row" style={{ marginTop: 6 }}>
+                  <input
+                    className="axv-attr-input"
+                    type="number"
+                    title="水平偏移 dp"
+                    value={spec.shadow.dx}
+                    onChange={(e) => setSpec((s) => ({ ...s, shadow: { ...s.shadow!, dx: Number(e.target.value) } }))}
+                  />
+                  <input
+                    className="axv-attr-input"
+                    type="number"
+                    title="垂直偏移 dp"
+                    value={spec.shadow.dy}
+                    onChange={(e) => setSpec((s) => ({ ...s, shadow: { ...s.shadow!, dy: Number(e.target.value) } }))}
+                  />
+                  <input
+                    className="axv-attr-input"
+                    type="number"
+                    title="扩散 dp（没有真模糊，靠外扩近似）"
+                    value={spec.shadow.blur}
+                    onChange={(e) => setSpec((s) => ({ ...s, shadow: { ...s.shadow!, blur: Number(e.target.value) } }))}
+                  />
+                  <input
+                    type="color"
+                    value={toHex6(spec.shadow.color)}
+                    onChange={(e) =>
+                      setSpec((s) => ({ ...s, shadow: { ...s.shadow!, color: withAlphaHex(e.target.value, s.shadow?.color) } }))
+                    }
+                  />
+                </div>
+              ) : null}
+            </div>
+
             <details
               className="axv-shape-adv"
               open={advanced}
@@ -443,4 +533,18 @@ function withAlphaHex(picked: string, prev?: string): string {
   const m = /^#([0-9a-f]{8})$/i.exec((prev ?? "").trim());
   const alpha = m ? m[1].slice(0, 2) : "33";
   return `#${alpha}${picked.replace("#", "").toUpperCase()}`;
+}
+
+/** 按下色默认值：把常态色往黑/白撑一点（暗色变亮、亮色变暗） */
+function shade(hex: string, amount: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return "#E0E0E0";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const t = lum > 0.5 ? 0 : 255;
+  const mix = (c: number) => Math.round(c + (t - c) * amount);
+  return `#${[mix(r), mix(g), mix(b)].map((c) => c.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
 }

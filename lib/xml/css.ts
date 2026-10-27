@@ -313,7 +313,7 @@ export function buildRenderModel(
     const r = (attrs["radius"] as number) || 0;
     if (r) style.borderRadius = `${DP(r, scale)}px`;
     // M2w：<shape> 背景（@drawable/bg_xxx 引用的渐变/圆角/描边），覆盖上面的纯色
-    const shape = attrs["bgShape"] as { gradient?: string; solid?: string; radiusDp?: number; cornersDp?: { tl: number; tr: number; br: number; bl: number }; strokeDp?: number; strokeColor?: string; oval?: boolean } | null;
+    const shape = attrs["bgShape"] as { gradient?: string; solid?: string; radiusDp?: number; cornersDp?: { tl: number; tr: number; br: number; bl: number }; strokeDp?: number; strokeColor?: string; oval?: boolean; shadow?: { dx: number; dy: number; blur: number; color: string } } | null;
     if (shape) {
       if (shape.gradient) {
         style.backgroundImage = shape.gradient;
@@ -331,6 +331,11 @@ export function buildRenderModel(
       if (shape.strokeDp && shape.strokeColor) {
         style.border = `${DP(shape.strokeDp, scale)}px solid ${shape.strokeColor}`;
         style.boxSizing = "border-box";
+      }
+      // M3h-2：layer-list 阴影层（elevation 没设时才用，否则下面会覆盖）
+      if (shape.shadow) {
+        const sh = shape.shadow;
+        style.boxShadow = `${DP(sh.dx, scale)}px ${DP(sh.dy, scale)}px ${DP(sh.blur, scale)}px ${sh.color}`;
       }
     }
     // ===== M3e：elevation / translationZ =====

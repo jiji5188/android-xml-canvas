@@ -34,6 +34,8 @@ import { WidgetPalette } from "./WidgetPalette";
 import { ConstraintPanel, type SibOption } from "./ConstraintPanel";
 import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } from "@/lib/xml/autoconstrain";
 import { ResTree } from "./ResTree";
+import { ResImagePreview } from "./ResImagePreview";
+import { ShapeEditor } from "./ShapeEditor";
 import { RunPreview } from "./RunPreview";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
@@ -384,6 +386,10 @@ export function XmlEditor() {
   }, []);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
  const [exportNote, setExportNote] = useState<string>(" ");
+  /** M4u：从资源树里直接打开的「绘制编辑器」（drawable/*.xml） */
+  const [resShape, setResShape] = useState<{ name: string; xml: string } | null>(null);
+  /** M4u：从资源树里点开的图片预览 */
+  const [resImage, setResImage] = useState<{ rel: string; name: string; url: string } | null>(null);
   const [scale, setScale] = useState(1);
   /** M2r：预览设备尺寸（手机竖屏/横屏/平板…），持久化到 localStorage */
   const [deviceId, setDeviceId] = useState<string>(
@@ -1736,7 +1742,10 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                 <ResTree
                   tree={resExtras.tree}
                   layouts={resExtras.layouts}
+                  extras={resExtras}
                   onOpenLayout={(fileName, content) => setXmlAndTrack(content)}
+                  onOpenDrawable={(_rel, name, xml) => setResShape({ name, xml })}
+                  onPreviewImage={(rel, name, url) => setResImage({ rel, name, url })}
                 />
               ) : (
                 <>
@@ -1963,6 +1972,34 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           resources={resources}
           device={{ label: device.label, w: device.w, h: device.h, radius: device.radius }}
           onClose={() => setRunOpen(false)}
+        />
+      ) : null}
+
+      {/* M4u：资源树里的 drawable xml → 绘制编辑器（保存回写 generatedDrawables） */}
+      {resShape ? (
+        <ShapeEditor
+          attrName="background"
+          value={`@drawable/${resShape.name}`}
+          existingXml={resShape.xml}
+          existingNames={Object.keys(generatedDrawables)}
+          onClose={() => setResShape(null)}
+          onSave={(resourceName, shapeXml) => {
+            const safe = sanitizeResName(resourceName, "bg");
+            setGeneratedDrawables((m) => ({ ...m, [safe]: shapeXml }));
+            setResShape(null);
+            setExportNote(`已保存 res/drawable/${safe}.xml`);
+            window.setTimeout(() => setExportNote(" "), 3200);
+          }}
+        />
+      ) : null}
+
+      {/* M4u：资源树里的图片 / vector xml → 图片预览框 */}
+      {resImage ? (
+        <ResImagePreview
+          rel={resImage.rel}
+          name={resImage.name}
+          url={resImage.url}
+          onClose={() => setResImage(null)}
         />
       ) : null}
     </div>

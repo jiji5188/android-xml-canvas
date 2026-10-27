@@ -4,7 +4,8 @@
 "use client";
 
 import { useState } from "react";
-import type { ResTreeDir, ResTreeFile } from "@/lib/xml/resdir";
+import type { ResTreeDir, ResTreeFile, ResourceExtras } from "@/lib/xml/resdir";
+import { resOpenAction, type ResOpenAction } from "@/lib/xml/resource-open";
 
 interface Props {
   tree: ResTreeDir;
@@ -12,6 +13,12 @@ interface Props {
   onOpenLayout: (fileName: string, content: string) => void;
   /** 可选：已上传的布局全文（res/layout 子树里文件可点开预览） */
   layouts?: Record<string, string> | null;
+  /** 可选：上传的 res 解析结果（drawable 名 → dataURL 等） */
+  extras?: ResourceExtras | null;
+  /** drawable/*.xml（shape/ripple/selector…）→ 用形状编辑器打开 */
+  onOpenDrawable?: (rel: string, name: string, xml: string) => void;
+  /** 图片 / vector xml → 弹图片预览 */
+  onPreviewImage?: (rel: string, name: string, url: string) => void;
 }
 
 function isDir(v: ResTreeDir | ResTreeFile): v is ResTreeDir {
@@ -46,7 +53,10 @@ function TreeNode({
   node,
   depth,
   layouts,
+  extras,
   onOpenLayout,
+  onOpenDrawable,
+  onPreviewImage,
   expanded,
   onToggle,
 }: {
@@ -54,7 +64,10 @@ function TreeNode({
   node: ResTreeDir | ResTreeFile;
   depth: number;
   layouts?: Record<string, string> | null;
+  extras?: ResourceExtras | null;
   onOpenLayout: (fileName: string, content: string) => void;
+  onOpenDrawable?: (rel: string, name: string, xml: string) => void;
+  onPreviewImage?: (rel: string, name: string, url: string) => void;
   expanded: Set<string>;
   onToggle: (key: string) => void;
 }) {
@@ -83,7 +96,10 @@ function TreeNode({
             node={cv}
             depth={depth + 1}
             layouts={layouts}
+            extras={extras}
             onOpenLayout={onOpenLayout}
+            onOpenDrawable={onOpenDrawable}
+            onPreviewImage={onPreviewImage}
             expanded={expanded}
             onToggle={onToggle}
           />
@@ -94,17 +110,41 @@ function TreeNode({
 
   // 文件
   const file = node as ResTreeFile;
-  const canPreview = file.kind === "layout" && layouts && layouts[file.rel.split("/").pop() || ""] !== undefined;
+  const baseName = file.rel.split("/").pop() || "";
+  const canOpenLayout = file.kind === "layout" && layouts && layouts[baseName] !== undefined;
+  /** M4u：drawable/mipmap 里的文件按类型分流：xml → 绘制编辑器，图片 → 预览框 */
+  const action: ResOpenAction = file.kind === "drawable" || file.kind === "mipmap"
+    ? resOpenAction(file.rel, file.text, extras ?? null)
+    : { kind: "none" };
+  const drawableHit = action.kind === "drawable" && !!onOpenDrawable;
+  const imageHit = (action.kind === "image" || action.kind === "vector") && !!onPreviewImage;
+  const canClick = canOpenLayout || drawableHit || imageHit;
+  const title = canOpenLayout
+    ? "点击在预览中打开此布局"
+    : drawableHit
+      ? "点击用绘制编辑器打开" + file.rel
+      : imageHit
+        ? "点击预览图片" + file.rel
+        : file.rel;
   return (
     <button
-      className={"axv-treenode" + (canPreview ? " axv-tree-clickable" : "")}
-      style={{ ...indent, cursor: canPreview ? "pointer" : "default" }}
+      className={"axv-treenode" + (canClick ? " axv-tree-clickable" : "")}
+      style={{ ...indent, cursor: canClick ? "pointer" : "default" }}
       onClick={() => {
-        if (!canPreview) return;
-        const content = layouts![file.rel.split("/").pop() || ""];
-        if (content) onOpenLayout(file.rel, content);
+        if (canOpenLayout) {
+          const content = layouts![baseName];
+          if (content) onOpenLayout(file.rel, content);
+          return;
+        }
+        if (drawableHit && action.kind === "drawable") {
+          onOpenDrawable!(file.rel, action.name, action.xml);
+          return;
+        }
+        if (imageHit && (action.kind === "image" || action.kind === "vector")) {
+          onPreviewImage!(file.rel, action.name, action.url);
+        }
       }}
-      title={canPreview ? "点击在预览中打开此布局" : file.rel}
+      title={title}
     >
       <span className="axv-tree-caret" style={{ visibility: "hidden" }}>▸</span>
       <span className="axv-tree-ico">{KIND_ICON[file.kind] || "•"}</span>
@@ -113,7 +153,7 @@ function TreeNode({
   );
 }
 
-export function ResTree({ tree, onOpenLayout, layouts }: Props) {
+export function ResTree({ tree, onOpenLayout, layouts, extras, onOpenDrawable, onPreviewImage }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // 默认展开顶层目录
@@ -158,7 +198,10 @@ export function ResTree({ tree, onOpenLayout, layouts }: Props) {
             node={node}
             depth={0}
             layouts={layouts}
+            extras={extras}
             onOpenLayout={onOpenLayout}
+            onOpenDrawable={onOpenDrawable}
+            onPreviewImage={onPreviewImage}
             expanded={expanded}
             onToggle={toggle}
           />

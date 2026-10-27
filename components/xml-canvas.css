@@ -2779,3 +2779,59 @@
 .axv-img-layer {
   z-index: 1;
 }
+
+/* ===== M4u：资源树里的图片预览框 ===== */
+.axv-imgprev {
+  width: min(760px, 92vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+}
+.axv-imgprev-meta {
+  margin-left: 8px;
+  font-size: 11px;
+  color: #8a8794;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+.axv-imgprev-body {
+  flex: 1;
+  min-height: 180px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background-color: #f4f3f7;
+  background-image:
+    linear-gradient(45deg, #e7e5ee 25%, transparent 25%, transparent 75%, #e7e5ee 75%),
+    linear-gradient(45deg, #e7e5ee 25%, transparent 25%, transparent 75%, #e7e5ee 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+.axv-imgprev-body img {
+  max-width: 100%;
+  max-height: 62vh;
+  image-rendering: auto;
+  background-color: transparent;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+.axv-imgprev-empty {
+  padding: 24px;
+  color: #6b6675;
+  font-size: 13px;
+  text-align: center;
+  background: #fff;
+  border-radius: 10px;
+}
+.axv-imgprev-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid #eae7f0;
+}
+.axv-imgprev-foot code {
+  font-size: 12px;
+  color: #4a4653;
+}

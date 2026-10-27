@@ -1273,6 +1273,16 @@
   flex-direction: column;
   gap: 12px;
 }
+/* M2q：include 展开节点的只读提示条 */
+.axv-include-readonly {
+  font-size: 12px;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+  line-height: 1.5;
+}
 .axv-constraint {
   border: 1px solid rgba(4, 64, 159, 0.18);
   background: #F7F9FE;

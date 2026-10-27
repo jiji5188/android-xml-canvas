@@ -7,6 +7,7 @@ import { resolveNodeAttrs, resolveSize } from "./resolve";
 import type { ResolvedAttrs } from "./resolve";
 import { solveConstraintChildren } from "./constraints";
 import { solveRelativeChildren } from "./relative";
+import { expandIncludes, repath } from "./include";
 import { SCREEN_DP, phoneBodyDp } from "./theme";
 
 const DP = (n: number, scale = 2) => n * scale;
@@ -154,8 +155,16 @@ export function buildRenderModel(
   root: XmlNode,
   res: ResourceTable,
   scale = 2,
+  /** M2q：@layout 名 → XML 文本，供 <include> 就地展开（resdir 上传 / 内粘贴） */
+  layouts?: Record<string, string>,
 ): RenderModel {
   const issues: import("./types").XmlIssue[] = [];
+
+  // M2q：先展开 include，让 CL/RL/LinearLayout 求解器看到的是一棵完整树
+  if (layouts) {
+    expandIncludes(root, layouts, issues);
+    repath(root);
+  }
 
   /** isRoot：根布局在窗口里总是填满内容区，它的 layout_margin 在 Android 里也不会
    *  产生「缩进」，但会让人误以为填充不满（拖动根节点留下的残值就属于这种）。
@@ -523,6 +532,10 @@ export function buildRenderModel(
       style.alignItems = "center";
     }
 
+    // M2q：include 展开的节点在渲染模型里是「只读投影」，标记来源文件（UI 据此禁用编辑）。
+    // 嵌套 include 时子树自带更近的 includeFile，逐层传递。
+    const sourceFile = node.includeFile;
+
     const resolved: ResolvedNode = {
       tag: node.tag,
       path: node.path,
@@ -534,6 +547,7 @@ export function buildRenderModel(
       children: node.children.map((c) => resolveAll(c)),
       rawAttrs: node.attrs,
     };
+    if (sourceFile) resolved.sourceFile = sourceFile;
     return resolved;
   };
 

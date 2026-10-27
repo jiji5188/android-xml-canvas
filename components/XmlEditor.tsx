@@ -501,8 +501,9 @@ export function XmlEditor() {
   const { model, issues, parseErr } = useMemo(() => {
     const { root, issues } = parseLayoutXml(parsedXml);
     if (!root) return { model: null, issues, parseErr: true };
-    return { model: buildRenderModel(root, resources, SCALE), issues, parseErr: false };
-  }, [parsedXml, resources]);
+    // M2q：把上传 res/layout 里的布局传进去，供 <include> 就地展开
+    return { model: buildRenderModel(root, resources, SCALE, resExtras?.layouts), issues, parseErr: false };
+  }, [parsedXml, resources, resExtras?.layouts]);
 
   /** 图层树用的原始节点树（不经渲染模型） */
   const treeRoot = useMemo(() => (parseErr ? null : parseLayoutXml(parsedXml).root), [parsedXml, parseErr]);
@@ -1440,6 +1441,11 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
         <div className="axv-slide-body">
           {selectedNode ? (
             <div className="axv-panel-stack">
+              {selectedNode.sourceFile ? (
+                <div className="axv-include-readonly" title="include 展开进来的节点：主 XML 里没有它的实体，改不了（要改去那个文件）">
+                  ⚠ 来自 <b>{selectedNode.sourceFile}</b>（include 展开，只读）
+                </div>
+              ) : null}
               {isChildOfCL && (
                 <ConstraintPanel
                   node={selectedNode}

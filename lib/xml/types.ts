@@ -9,6 +9,9 @@ export interface XmlNode {
   nsDecls?: Record<string, string>;
   children: XmlNode[];
   path: string;                // 节点路径（#0/1/0 风格，writeback 定位用）
+  /** M2q：该子树是从哪个 include 展开来的（文件名，如 "header.xml"）。
+   *  渲染模型里存在，但回写主 XML 时这些节点不可编辑。 */
+  includeFile?: string;
 }
 
 /** 解析错误/警告（不阻断渲染） */
@@ -43,6 +46,8 @@ export interface ResolvedNode {
   children: ResolvedNode[];
   /** 回写定位用的原始属性 */
   rawAttrs: Record<string, string>;
+  /** M2q：子树来自 include 展开的源文件（如 "header.xml"）；存在时 UI 应标记只读 */
+  sourceFile?: string;
 }
 
 /** 根结果 */

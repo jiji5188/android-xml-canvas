@@ -586,8 +586,15 @@ export function XmlEditor() {
     const raw = lsGet(LS_KEY_ICONS);
     if (!raw) return;
     try {
-      const obj = JSON.parse(raw);
-      if (obj && typeof obj === "object") setGeneratedDrawables(obj as Record<string, string>);
+      const obj = JSON.parse(raw) as Record<string, unknown>;
+      if (obj && typeof obj === "object") {
+        // M4t：丢掉非法资源名（旧版本可能存了 "#E8EEFA" 这种；aapt 只认小写字母数字下划线）
+        const clean: Record<string, string> = {};
+        for (const [k, v] of Object.entries(obj)) {
+          if (typeof v === "string" && /^[a-z][a-z0-9_]*$/.test(k)) clean[k] = v;
+        }
+        setGeneratedDrawables(clean);
+      }
     } catch {
       /* 损坏忽略 */
     }

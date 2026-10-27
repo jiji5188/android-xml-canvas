@@ -31,6 +31,8 @@ export function buildResBundle(input: BundleInput): ZipEntry[] {
   // 1) 图标选择器生成的 vector
   for (const [name, xml] of Object.entries(input.generatedDrawables ?? {})) {
     if (!xml) continue;
+    // M4t：非法资源名（如 "#E8EEFA"）不能写成文件，否则 res 包 aapt 编译失败
+    if (!/^[a-z][a-z0-9_]*$/.test(name)) continue;
     push(`drawable/${name}.xml`, xml);
   }
 

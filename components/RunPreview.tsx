@@ -276,6 +276,7 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
             >
               <div className="axv-statusbar" style={{ height: STATUS_BAR_H }}>
                 <span className="axv-sb-time">9:41</span>
+                <div className="axv-sb-camera" aria-hidden="true" />
                 <span className="axv-sb-icons">
                   <span className="msr" aria-hidden="true">
                     signal_cellular_alt

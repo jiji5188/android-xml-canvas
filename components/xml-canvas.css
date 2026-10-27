@@ -2146,10 +2146,6 @@
 
 /* M3 导出提示浮层 */
 .axv-export-note {
-  position: absolute;
-  left: 50%;
-  top: 8px;
-  transform: translateX(-50%);
   background: #323232;
   color: #fff;
   font-size: 12px;
@@ -2586,4 +2582,33 @@
 @media (max-width: 900px) {
   .axv-shape-full { width: 100vw !important; height: 100vh !important; border-radius: 0 !important; }
   .axv-shape-full .axv-shape-body { grid-template-columns: 1fr; }
+}
+
+
+/* M4c：export-note 挪进状态栏时间后面，水平居中；无提示时画前置摄像头小圆 */
+.axv-statusbar { position: relative; }
+.axv-sb-camera {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #3a3a44 0%, #101016 65%);
+  box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.25);
+}
+.axv-sb-camera-note {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 1px 8px;
+  font-size: 9px;
+  line-height: 1.5;
+  border-radius: 4px;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

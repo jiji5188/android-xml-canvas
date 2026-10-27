@@ -1478,9 +1478,10 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               onDragLeave={() => setDropHint(null)}
               onDrop={onDrop}
             >
-              {/* 状态栏（系统窗口，不属于布局 XML）：时间 + 信号/WiFi/电池 */}
+              {/* 状态栏（系统窗口，不属于布局 XML）：时间 + 前置摄像头（居中）+ 信号/WiFi/电池 */}
               <div className="axv-statusbar" style={{ height: STATUS_BAR_H }}>
                 <span className="axv-sb-time">9:41</span>
+                {exportNote ? <div className="axv-export-note axv-sb-camera-note">{exportNote}</div> : <div className="axv-sb-camera" aria-hidden="true" />}
                 <span className="axv-sb-icons">
                   <span className="msr" aria-hidden="true">
                     signal_cellular_alt
@@ -1528,10 +1529,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             </div>
             </div>
           ) : null}
-          {exportNote ? (
-              <div className="axv-export-note">{exportNote}</div>
-            ) : null}
-            {issues.length > 0 && (
+          {issues.length > 0 && (
             <div className="axv-issues">
               <strong>{issues.length} 条提示：</strong>
               {issues.slice(0, 8).map((i, idx) => (

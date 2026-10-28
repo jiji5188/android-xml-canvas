@@ -486,6 +486,10 @@
   scrollbar-width: none;
   /* M11g：中区底色（半透明，透出工具栏主题背景） */
   background-color: #e3e3e369;
+  /* M11h：中区圆角胶囊 */
+  border-radius: 20px;
+  /* 圆角会裁掉首尾按钮的两端，左右给 4px 缓冲 */
+  padding: 0 4px;
   pointer-events: auto;
 }
 .axv-tb-scroll::-webkit-scrollbar {

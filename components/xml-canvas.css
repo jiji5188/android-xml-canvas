@@ -654,6 +654,65 @@
   background: #eef3ff;
 }
 
+/* M6e：编辑器内查找条（Ctrl/Cmd+F） */
+.axv-find {
+  position: absolute;
+  top: 8px;
+  right: 18px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.axv-find-input {
+  width: 170px;
+  border: none;
+  outline: none;
+  font-size: 12.5px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: #f4f5f8;
+  color: #23232b;
+  font-family: inherit;
+}
+.axv-find-input:focus {
+  background: #eef3ff;
+}
+.axv-find-count {
+  min-width: 44px;
+  text-align: right;
+  font-size: 11.5px;
+  color: #8b8b96;
+  font-variant-numeric: tabular-nums;
+}
+.axv-find-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #5b5b66;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.axv-find-btn .msr {
+  font-size: 18px;
+}
+.axv-find-btn:hover:not(:disabled) {
+  background: #eef3ff;
+  color: #04409F;
+}
+.axv-find-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* 分段控件：胶囊内 3px 缝，首尾圆角（M3E 同款） */
 .axv-seg {
   display: flex;

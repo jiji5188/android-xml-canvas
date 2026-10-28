@@ -1310,51 +1310,59 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
   for (const c of n.children as { attrs: Record<string, string>; children: unknown[] }[]) collectIds(c, out);
   return out;
 }
-  /** 打开 .xml 文件：校验类型/大小，try/catch 读取，载入后检查可解析性，解析不了就提示而不留坏文件 */
+  /** M6d：载入一个 .xml 文件（工具栏按钮 / 资源面板按钮 / 拖拽入口共用）
+   *  校验类型与大小，try/catch 读取，载入前预检可解析性，解析不了就提示而不留坏文件 */
+  const loadXmlFile = (f: File) => {
+    // 1) 类型校验：后缀必须 .xml
+    if (!/\.xml$/i.test(f.name)) {
+      setExportNote(`「${f.name}」不是 .xml 文件，已忽略`);
+      window.setTimeout(() => setExportNote(""), 3600);
+      return;
+    }
+    // 2) 大小上限（5MB），防止巨型文件卡死浏览器
+    if (f.size > 5 * 1024 * 1024) {
+      setExportNote(`「${f.name}」超过 5MB，不加载`);
+      window.setTimeout(() => setExportNote(""), 4000);
+      return;
+    }
+    // 3) 读取（try/catch，File.text() 会 reject）
+    f.text()
+      .then((txt) => {
+        // 4) 载入前预检：能解析出根元素吗？解析不了 → 报错不写入，画布保持原内容
+        const { root, issues } = parseLayoutXml(txt);
+        if (!root) {
+          const errIssues = issues.filter((i) => i.level === "error");
+          const detail = errIssues.length > 0 ? `：${errIssues[0].message}` : "";
+          setExportNote(`「${f.name}」无法解析为布局 XML${detail}，未载入（画布保持不变）`);
+          window.setTimeout(() => setExportNote(""), 5000);
+          return;
+        }
+        setXmlAndTrack(txt);
+        // 5) 载入后语义检查：有 error 级问题给出提示（不阻断，用户可继续编辑）
+        const errs = issues.filter((i) => i.level === "error");
+        if (errs.length > 0) {
+          setExportNote(`已载入「${f.name}」，但检测到 ${errs.length} 条结构错误，切「XML 代码」tab 查看行号提示`);
+          window.setTimeout(() => setExportNote(""), 6000);
+        } else {
+          setExportNote(`已载入「${f.name}」`);
+          window.setTimeout(() => setExportNote(""), 2400);
+        }
+      })
+      .catch((err) => {
+        console.error("[axv] 读取 xml 文件失败", err);
+        setExportNote(`读取「${f.name}」失败，请重试`);
+        window.setTimeout(() => setExportNote(""), 4000);
+      });
+  };
+
+  /** 打开 .xml 文件（弹系统文件选择器） */
   const openProject = () => {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".xml";
     input.onchange = () => {
       const f = input.files?.[0];
-      if (!f) return;
-      // 1) 类型校验：后缀必须 .xml
-      if (!/\.xml$/i.test(f.name)) {
-        setExportNote(`「${f.name}」不是 .xml 文件，已忽略`);
-        window.setTimeout(() => setExportNote(""), 3600);
-        return;
-      }
-      // 2) 大小上限（5MB），防止巨型文件卡死浏览器
-      if (f.size > 5 * 1024 * 1024) {
-        setExportNote(`「${f.name}」超过 5MB，不加载`);
-        window.setTimeout(() => setExportNote(""), 4000);
-        return;
-      }
-      // 3) 读取（try/catch，File.text() 会 reject）
-      f.text()
-        .then((txt) => {
-          // 4) 载入前预检：能解析出根元素吗？解析不了 → 报错不写入，画布保持原内容
-          const { root, issues } = parseLayoutXml(txt);
-          if (!root) {
-            const errIssues = issues.filter((i) => i.level === "error");
-            const detail = errIssues.length > 0 ? `：${errIssues[0].message}` : "";
-            setExportNote(`「${f.name}」无法解析为布局 XML${detail}，未载入（画布保持不变）`);
-            window.setTimeout(() => setExportNote(""), 5000);
-            return;
-          }
-          setXmlAndTrack(txt);
-          // 5) 载入后语义检查：有 error 级问题给出提示（不阻断，用户可继续编辑）
-          const errs = issues.filter((i) => i.level === "error");
-          if (errs.length > 0) {
-            setExportNote(`已载入「${f.name}」，但检测到 ${errs.length} 条结构错误，切「XML 代码」tab 查看行号提示`);
-            window.setTimeout(() => setExportNote(""), 6000);
-          }
-        })
-        .catch((err) => {
-          console.error("[axv] 读取 xml 文件失败", err);
-          setExportNote(`读取「${f.name}」失败，请重试`);
-          window.setTimeout(() => setExportNote(""), 4000);
-        });
+      if (f) loadXmlFile(f);
     };
     input.click();
   };
@@ -1483,7 +1491,22 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
   }, []);
 
   return (
-    <div className="axv-editor">
+    <div
+      className="axv-editor"
+      onDragOver={(e) => {
+        // M6d：拖 .xml 文件进来直接打开（控件拖拽由内层画布处理）
+        if (e.dataTransfer.types.includes("Files")) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+        }
+      }}
+      onDrop={(e) => {
+        const f = e.dataTransfer.files?.[0];
+        if (!f) return;
+        e.preventDefault();
+        loadXmlFile(f);
+      }}
+    >
       {/* 上传资源：整目录入口 */}
       <input
         ref={resDirRef}
@@ -1702,6 +1725,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                 <option value="list">竖列表</option>
               </optgroup>
             </select>
+            <button className="axv-mob-tool-btn" onClick={openProject} title="打开本地 XML 文件">打开</button>
             <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
             {resExtras || Object.keys(generatedDrawables).length > 0 ? (
               <button className="axv-mob-tool-btn" onClick={() => setAssetsOpen(true)} title="已生成资源管理">
@@ -1978,6 +2002,9 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           </button>
           <button className="axv-tb-btn" title="保存为 XML 文件" aria-label="保存" onClick={saveProject}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save</span>
+          </button>
+          <button className="axv-tb-btn" title="打开本地 XML 文件（也可直接把文件拖进来）" aria-label="打开 XML 文件" onClick={openProject}>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>file_open</span>
           </button>
           <button className="axv-tb-btn" title="复制生成的 XML" aria-label="复制 XML" onClick={copyExportedXml}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>content_copy</span>

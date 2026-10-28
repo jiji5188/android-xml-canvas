@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
     private WebView web;
     private FrameLayout root;
     private TextView diag;
+    private ScrollView diagScroll;
     private ValueCallback<Uri[]> fileCallback;
     private final StringBuilder logs = new StringBuilder();
 
@@ -166,10 +167,16 @@ public class MainActivity extends Activity {
         diag.setPadding(24, 24, 24, 24);
         diag.setGravity(Gravity.TOP | Gravity.START);
         diag.setTextIsSelectable(true);
-        diag.setVisibility(android.view.View.GONE);
+
+        // 只在 onCreate 里包一次 ScrollView，showDiag 只改文字/显隐。
+        // （之前每次 showDiag 都新建 ScrollView 加 diag，diag 还挂在旧父级上 → 直接崩）
+        diagScroll = new ScrollView(this);
+        diagScroll.addView(diag, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        diagScroll.setVisibility(android.view.View.GONE);
 
         root.addView(web);
-        root.addView(diag, new FrameLayout.LayoutParams(
+        root.addView(diagScroll, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
 
@@ -206,7 +213,6 @@ public class MainActivity extends Activity {
 
     private void showDiag(String reason) {
         runOnUiThread(() -> {
-            diag.setVisibility(android.view.View.VISIBLE);
             StringBuilder sb = new StringBuilder();
             sb.append(reason).append("\n\n");
             sb.append("Android ").append(Build.VERSION.RELEASE)
@@ -216,13 +222,8 @@ public class MainActivity extends Activity {
             sb.append("--- 日志 ---\n");
             sb.append(logs.length() == 0 ? "(无)" : logs.toString());
             diag.setText(sb.toString());
-
-            // 让诊断信息自身可滚动
-            ScrollView sv = new ScrollView(MainActivity.this);
-            root.removeView(diag);
-            sv.addView(diag);
-            root.addView(sv, new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            diagScroll.setVisibility(android.view.View.VISIBLE);
+            diagScroll.bringToFront();
         });
     }
 

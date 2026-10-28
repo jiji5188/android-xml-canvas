@@ -1754,6 +1754,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
                   onOpenLayout={(fileName, content) => setXmlAndTrack(content)}
                   onOpenDrawable={(_rel, name, xml) => setResShape({ name, xml })}
                   onPreviewImage={(rel, name, url) => setResImage({ rel, name, url })}
+                  generated={generatedDrawables}
                 />
               ) : (
                 <>

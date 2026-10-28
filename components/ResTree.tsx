@@ -4,8 +4,9 @@
 "use client";
 
 import { useState } from "react";
-import type { ResTreeDir, ResTreeFile, ResourceExtras } from "@/lib/xml/resdir";
-import { resOpenAction, type ResOpenAction } from "@/lib/xml/resource-open";
+import type { ResTreeDir, ResTreeFile, ResourceExtras } from "../lib/xml/resdir";
+import { resOpenAction, type ResOpenAction } from "../lib/xml/resource-open";
+import { vectorToDataUrl } from "../lib/xml/vector-svg";
 
 interface Props {
   tree: ResTreeDir;
@@ -19,6 +20,8 @@ interface Props {
   onOpenDrawable?: (rel: string, name: string, xml: string) => void;
   /** 图片 / vector xml → 弹图片预览 */
   onPreviewImage?: (rel: string, name: string, url: string) => void;
+  /** 可选：本工具生成的资源（图标 vector / 自定义 shape）——显示为树底部的虚拟目录 */
+  generated?: Record<string, string>;
 }
 
 function isDir(v: ResTreeDir | ResTreeFile): v is ResTreeDir {
@@ -153,7 +156,7 @@ function TreeNode({
   );
 }
 
-export function ResTree({ tree, onOpenLayout, layouts, extras, onOpenDrawable, onPreviewImage }: Props) {
+export function ResTree({ tree, onOpenLayout, layouts, extras, onOpenDrawable, onPreviewImage, generated }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // 默认展开顶层目录
@@ -207,6 +210,51 @@ export function ResTree({ tree, onOpenLayout, layouts, extras, onOpenDrawable, o
           />
         ))
       )}
+      {/* M4v+：本工具生成的资源（图标 vector / 自定义 shape）——单独分组显示，
+          让「生成器生成的图标没写进文件」这个疑问可视：它们确实存在（localStorage），
+          导出 res.zip 时会进 drawable/；这里只是把它们画进树里方便点开 */}
+      {generated && Object.keys(generated).length > 0 ? (
+        <div>
+          <button
+            className="axv-treenode axv-treenode-open"
+            style={{ paddingLeft: 12 }}
+            title="本工具生成的资源（随 res.zip 导出到 drawable/）"
+          >
+            <span className="axv-tree-caret">▾</span>
+            <span className="axv-tree-name">（生成资源）/</span>
+            <span className="axv-tree-count">{Object.keys(generated).length}</span>
+          </button>
+          {Object.entries(generated)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([name, xml]) => {
+              const rel = `drawable/${name}.xml`;
+              const isShape = /^(ripple|shape|selector|layer-list|inset|animated-rotate|animation-list|level-list|clip|scale|transition|crossfade|bitmap)/.test(xml.trim());
+              const canClick = isShape ? !!onOpenDrawable : !!onPreviewImage;
+              return (
+                <button
+                  key={name}
+                  className={"axv-treenode" + (canClick ? " axv-tree-clickable" : "")}
+                  style={{ paddingLeft: 28, cursor: canClick ? "pointer" : "default" }}
+                  title={isShape ? "点击用绘制编辑器打开（生成的形状）" + rel : "点击预览图标" + rel}
+                  onClick={() => {
+                    if (isShape && onOpenDrawable) onOpenDrawable(rel, name, xml);
+                    else if (!isShape && onPreviewImage) {
+                      try {
+                        onPreviewImage(rel, name, vectorToDataUrl(xml) || "");
+                      } catch {
+                        /* 非 vector 就跳过预览 */
+                      }
+                    }
+                  }}
+                >
+                  <span className="axv-tree-caret" style={{ visibility: "hidden" }}>▸</span>
+                  <span className="axv-tree-ico">{isShape ? "⬛" : "🖼"}</span>
+                  <span className="axv-tree-name">{name}.xml</span>
+                </button>
+              );
+            })}
+        </div>
+      ) : null}
     </div>
   );
 }

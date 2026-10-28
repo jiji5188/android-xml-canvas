@@ -1,0 +1,65 @@
+﻿1551:       {mobileTab === "preview" && (
+1552:         <div className={"axv-stage" + (leftOpen ? " pad-l" : "") + (rightOpen ? " pad-r" : "")}>
+1553:           {parseErr ? (
+1554:             <div className="axv-canvas-empty">XML 瑙ｆ瀽澶辫触锛岃妫€鏌ョ粨鏋?/div>
+1555:           ) : model ? (
+1556:             <div
+1557:               style={{
+1558:                 width: outerW * fitRatio,
+1559:                 height: outerH * fitRatio,
+1560:                 flex: "0 0 auto",
+1561:               }}
+1562:             >
+1563:             <div
+1564:               className={"axv-phone" + (dropHint ? " axv-drop-target" : "")}
+1565:               style={{
+1566:                 width: outerW,
+1567:                 height: outerH,
+1568:                 boxSizing: "border-box",
+1569:                 background: phoneBg,
+1570:                 color: phoneFg,
+1571:                 transform: fitRatio < 1 ? `scale(${fitRatio})` : undefined,
+1572:                 transformOrigin: "top left",
+1573:                 borderRadius: device.radius ? Math.round(device.radius * DPX) : undefined,
+1574:               }}
+1575:               onDragOver={(e) => {
+1576:                 if (e.dataTransfer.types.includes(DRAG_WIDGET_MIME)) {
+1577:                   e.preventDefault();
+1578:                   e.dataTransfer.dropEffect = "copy";
+1579:                   setDropHint("drop");
+1580:                 }
+1581:               }}
+1582:               onDragLeave={() => setDropHint(null)}
+1583:               onDrop={onDrop}
+1584:             >
+1585:               {/* 鐘舵€佹爮锛堢郴缁熺獥鍙ｏ紝涓嶅睘浜庡竷灞€ XML锛夛細鏃堕棿 + 鍓嶇疆鎽勫儚澶达紙灞呬腑锛? 淇″彿/WiFi/鐢垫睜 */}
+1586:               <div className="axv-statusbar" style={{ height: STATUS_BAR_H }}>
+1587:                 <span className="axv-sb-time">9:41</span>
+1588:                 {exportNote ? <div className="axv-export-note axv-sb-camera-note">{exportNote}</div> : <div className="axv-sb-camera" aria-hidden="true" />}
+1589:                 <span className="axv-sb-icons">
+1590:                   <span className="msr" aria-hidden="true">
+1591:                     signal_cellular_alt
+1592:                   </span>
+1593:                   <span className="msr" aria-hidden="true">
+1594:                     wifi
+1595:                   </span>
+1596:                   <span className="msr" aria-hidden="true">
+1597:                     battery_full
+1598:                   </span>
+1599:                 </span>
+1600:               </div>
+1601: 
+1602:               {/* 搴旂敤鍐呭鍖猴細鏍瑰竷灞€濉弧杩欓噷 */}
+1603:               <div className="axv-phone-body">
+1604:                 <XmlCanvas
+1605:                   node={model.root}
+1606:                   selectedPath={selectedPath}
+1607:                   onSelect={setSelectedPath}
+1608:                   onDropWidget={onDropWidget}
+1609:                   onConstraintDraw={onConstraintDraw}
+1610:                   onGeometryChange={onGeometryChange}
+1611:                   scale={SCALE}
+1612:                 />
+1613:               </div>
+1614: 
+1615:               {/* 瀵艰埅鏍忥紙涓夐敭瀵艰埅锛氳繑鍥?/ 涓婚〉 / 澶氫换鍔★級 */}

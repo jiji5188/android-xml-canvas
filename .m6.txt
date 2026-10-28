@@ -1,0 +1,67 @@
+﻿6: 
+7: "use client";
+8: 
+9: import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue } from "react";
+10: import { parseLayoutXml, findNode, serialize, nodeAtLine } from "@/lib/xml/parser";
+11: import { buildRenderModel } from "@/lib/xml/css";
+12: import type { MeasuredMap } from "@/lib/xml/constraints";
+13: import { commitHistoryState, EMPTY_MARK, type MergeMark } from "@/lib/xml/history";
+14: import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
+15: import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
+16: import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
+17: import { writebackAttrs } from "@/lib/xml/writeback";
+18: import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, isSingleChildTag, applyConstraintDefaults, canAcceptChild } from "@/lib/xml/insert";
+19: import { moveNodeRaw, scanElements } from "@/lib/xml/reorder";
+20: import { formatXml } from "@/lib/xml/format";
+21: import { lintXml } from "@/lib/xml/lint";
+22: import { vectorToDataUrl } from "@/lib/xml/vector-svg";
+23: import { buildResBundle, missingDrawables } from "@/lib/xml/bundle";
+24: import { sanitizeResName } from "@/lib/xml/resname";
+25: import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
+26: import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
+27: import { hasIcon } from "@/lib/xml/icon-vectors";
+28: import { makeZip, downloadBytes } from "@/lib/xml/zip";
+29: import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
+30: import { ExportCheckModal, type ExportReport } from "./ExportCheckModal";
+31: import { XmlCanvas } from "./XmlCanvas";
+32: import { XmlCodeEditor } from "./XmlCodeEditor";
+33: import { AttrPanel } from "./AttrPanel";
+34: import { AddAttrModal } from "./AddAttrModal";
+35: import { defaultFor } from "./attr-catalog";
+36: import { WidgetPalette } from "./WidgetPalette";
+37: import { ConstraintPanel, type SibOption } from "./ConstraintPanel";
+38: import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } from "@/lib/xml/autoconstrain";
+39: import { ResTree } from "./ResTree";
+40: import { ResImagePreview } from "./ResImagePreview";
+--- 385-415
+385:   useEffect(() => {
+386:     const el = resDirRef.current;
+387:     if (el) {
+388:       el.setAttribute("webkitdirectory", "");
+389:       el.setAttribute("directory", "");
+390:     }
+391:   }, []);
+392:   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+393:  const [exportNote, setExportNote] = useState<string>(" ");
+394:   /** M4u锛氫粠璧勬簮鏍戦噷鐩存帴鎵撳紑鐨勩€岀粯鍒剁紪杈戝櫒銆嶏紙drawable/*.xml锛?*/
+395:   const [resShape, setResShape] = useState<{ name: string; xml: string } | null>(null);
+396:   /** M4u锛氫粠璧勬簮鏍戦噷鐐瑰紑鐨勫浘鐗囬瑙?*/
+397:   const [resImage, setResImage] = useState<{ rel: string; name: string; url: string } | null>(null);
+398:   const [scale, setScale] = useState(1);
+399:   /** M2r锛氶瑙堣澶囧昂瀵革紙鎵嬫満绔栧睆/妯睆/骞虫澘鈥︼級锛屾寔涔呭寲鍒?localStorage */
+400:   const [deviceId, setDeviceId] = useState<string>(
+401:     () => (typeof window !== "undefined" ? window.localStorage.getItem("axv.device") ?? "phone" : "phone"),
+402:   );
+403:   const device = deviceById(deviceId);
+404:   const changeDevice = (id: string) => {
+405:     setDeviceId(id);
+406:     try { window.localStorage.setItem("axv.device", id); } catch { /* 闈欓粯 */ }
+407:   };
+408: 
+409:   const [leftOpen, setLeftOpen] = useState(true);
+410:   const [rightOpen, setRightOpen] = useState(true);
+411:   const [leftView, setLeftView] = useState<"parts" | "layers" | "code" | "res">("parts");
+412:   const [addModalOpen, setAddModalOpen] = useState(false);
+413:   /** M2s锛氬鍑哄墠妫€鏌ラ潰鏉?*/
+414:   const [exportOpen, setExportOpen] = useState(false);
+415:   const [exportReport, setExportReport] = useState<ExportReport | null>(null);

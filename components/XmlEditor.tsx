@@ -28,6 +28,8 @@ import { hasIcon } from "@/lib/xml/icon-vectors";
 import { makeZip, downloadBytes } from "@/lib/xml/zip";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { ExportCheckModal, type ExportReport } from "./ExportCheckModal";
+import { ExportImageModal } from "./ExportImageModal";
+import type { ExportTarget } from "@/lib/xml/export-image";
 import { XmlCanvas } from "./XmlCanvas";
 import { XmlCodeEditor } from "./XmlCodeEditor";
 import { AttrPanel } from "./AttrPanel";
@@ -413,6 +415,10 @@ export function XmlEditor() {
   /** M2s：导出前检查面板 */
   const [exportOpen, setExportOpen] = useState(false);
   const [exportReport, setExportReport] = useState<ExportReport | null>(null);
+  /** M6a：导出预览图（PNG / SVG）弹窗 */
+  const [imgExportOpen, setImgExportOpen] = useState(false);
+  /** 手机壳 DOM（导出图片要拿它做 DOM → SVG/PNG） */
+  const phoneRef = useRef<HTMLDivElement | null>(null);
   const [exportAction, setExportAction] = useState<"download" | "copy">("download");
   const [dropHint, setDropHint] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
@@ -1561,6 +1567,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               }}
             >
             <div
+              ref={phoneRef}
               className={"axv-phone" + (dropHint ? " axv-drop-target" : "")}
               style={{
                 width: outerW,
@@ -1985,6 +1992,14 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>folder_zip</span>
             </button>
           ) : null}
+          <button
+            className="axv-tb-btn"
+            title="导出预览图（PNG / SVG）"
+            aria-label="导出预览图"
+            onClick={() => setImgExportOpen(true)}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>image</span>
+          </button>
           {resExtras ? (
             <button className="axv-tb-btn" title="清除已上传的 res 资源" aria-label="清除 res" onClick={clearRes}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>hide_image</span>
@@ -2064,6 +2079,27 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           resources={resources}
           device={{ label: device.label, w: device.w, h: device.h, radius: device.radius }}
           onClose={() => setRunOpen(false)}
+        />
+      ) : null}
+
+      {/* M6a：导出预览图（PNG / SVG） */}
+      {imgExportOpen ? (
+        <ExportImageModal
+          getTarget={(): ExportTarget | null =>
+            phoneRef.current
+              ? {
+                  el: phoneRef.current,
+                  width: outerW,
+                  height: outerH,
+                  background: phoneBg,
+                }
+              : null
+          }
+          deviceLabel={device.label}
+          width={outerW}
+          height={outerH}
+          onClose={() => setImgExportOpen(false)}
+          onToast={assetsNote}
         />
       ) : null}
 

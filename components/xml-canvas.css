@@ -95,6 +95,22 @@
   z-index: 5;
 }
 
+/* M6a：导出图片时去掉一切编辑态装饰（选中虚线框 / tag 标签头 / 拖拽高亮 / 尺寸手柄） */
+.axv-exporting .axv-node.axv-selected {
+  outline: none !important;
+}
+.axv-exporting .axv-node.axv-selected::before {
+  display: none !important;
+}
+.axv-exporting .axv-drop-hit {
+  outline: none !important;
+}
+.axv-exporting .axv-handle,
+.axv-exporting .axv-geom-hint,
+.axv-exporting .axv-drop-zone {
+  display: none !important;
+}
+
 /* M3e：选中态要高过所有 elevation，但不能高过弹窗/整页子页面（M4n：从 9999 降到 900，
    否则选中框会盖住 DrawablePicker / ShapeEditor 这类弹层） */
 .axv-node.axv-selected {
@@ -3049,3 +3065,49 @@
     align-items: stretch;
   }
 }
+
+/* ===== M6a 导出预览图弹窗 ===== */
+.axv-export-modal {
+  width: min(460px, 92vw);
+}
+.axv-export-body {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+.axv-export-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--axv-on-surface-variant);
+}
+.axv-export-meta .msr {
+  font-size: 20px;
+  color: var(--axv-primary);
+}
+.axv-export-note {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--axv-on-surface-variant);
+  background: var(--axv-surface-sunken);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.axv-export-err {
+  font-size: 12px;
+  color: var(--axv-danger);
+  background: #fdf2f4;
+  border: 1px solid #f5c2cb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  word-break: break-word;
+}
+.axv-export-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+

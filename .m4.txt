@@ -1,0 +1,73 @@
+﻿1355: .axv-modal-backdrop {
+1356:   position: fixed;
+1357:   inset: 0;
+1358:   background: var(--axv-scrim);
+1359:   z-index: 20000;
+1360:   display: flex;
+1361:   align-items: center;
+1362:   justify-content: center;
+1363: }
+1364: .axv-modal {
+1365:   width: min(520px, 92vw);
+1366:   max-height: 78vh;
+1367:   background: var(--axv-surface);
+1368:   color: var(--axv-on-surface);
+1369:   border: 1px solid var(--axv-outline);
+1370:   border-radius: 14px;
+1371:   display: flex;
+1372:   flex-direction: column;
+1373:   overflow: hidden;
+1374:   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+1375: }
+1376: .axv-modal-head {
+1377:   display: flex;
+1378:   align-items: center;
+1379:   justify-content: space-between;
+1380:   padding: 12px 16px;
+1381:   font-size: 14px;
+1382:   font-weight: 700;
+1383:   color: var(--axv-on-surface);
+1384:   background: var(--axv-surface-head);
+1385:   border-bottom: 1px solid var(--axv-outline);
+1386: }
+1387: .axv-modal-head .axv-icon-btn {
+1388:   border-color: var(--axv-outline);
+1389: }
+1390: .axv-modal-search {
+1391:   margin: 12px 16px 4px;
+1392:   padding: 8px 12px;
+1393:   border-radius: 10px;
+1394:   border: 1px solid var(--axv-outline-strong);
+1395:   background: var(--axv-surface);
+1544: .axv-btn {
+1545:   font-size: 13px;
+1546:   padding: 7px 14px;
+1547:   border-radius: 8px;
+1548:   border: 1px solid #d0d5dd;
+1549:   background: #fff;
+1550:   color: #344054;
+1551:   cursor: pointer;
+1552: }
+1553: .axv-btn:hover {
+1554:   background: #f9fafb;
+1555: }
+1556: .axv-btn-primary {
+1557:   background: #04409f;
+1558:   border-color: #04409f;
+1559:   color: #fff;
+1560:   font-weight: 600;
+1561: }
+1562: .axv-btn-primary:hover {
+1563:   background: #03337c;
+1564: }
+1565: .axv-btn-danger {
+1566:   background: #b42318;
+1567:   border-color: #b42318;
+1568: }
+1569: .axv-btn-danger:hover {
+1570:   background: #912018;}
+1571: 
+1572: /* 绉诲姩绔細涓や晶婊戦潰鏉胯儗鍚庤挋鐗堬紙鐐硅挋鐗堝叧闂潰鏉匡級 */
+1573: .axv-backdrop {
+1574:   position: absolute;
+1575:   inset: 0;

@@ -1,0 +1,77 @@
+﻿// lib/xml/types.ts 鈥?Android 甯冨眬 XML 褰掍竴鍖栨爲锛圡1 鍩虹甯冨眬瀛愰泦锛?// 绾暟鎹紝涓嶇 React/DOM锛屼究浜庡崟娴嬨€?
+/** 褰掍竴鍖栧悗鐨勮妭鐐?*/
+export interface XmlNode {
+  tag: string;                 // LinearLayout / TextView / ...
+  attrs: Record<string, string>; // 鍘熷灞炴€э紙鏈В鏋愬紩鐢級
+  /** 鍛藉悕绌洪棿澹版槑锛坸mlns:android="..."锛夛紝writeback 搴忓垪鍖栨椂琛ュ洖锛屼笉杩?attrs */
+  nsDecls?: Record<string, string>;
+  /** M2y锛氭簮鏂囦欢琛屽彿锛? 鍩猴紝鏍囩 < 鎵€鍦ㄨ锛夛紝鐢ㄤ簬浠ｇ爜 鈫?鐢诲竷鍙嶈烦 */
+  line?: number;
+  children: XmlNode[];
+  path: string;                // 鑺傜偣璺緞锛?0/1/0 椋庢牸锛寃riteback 瀹氫綅鐢級
+  /** M2q锛氳瀛愭爲鏄粠鍝釜 include 灞曞紑鏉ョ殑锛堟枃浠跺悕锛屽 "header.xml"锛夈€?   *  娓叉煋妯″瀷閲屽瓨鍦紝浣嗗洖鍐欎富 XML 鏃惰繖浜涜妭鐐逛笉鍙紪杈戙€?*/
+  includeFile?: string;
+}
+
+/** 瑙ｆ瀽閿欒/璀﹀憡锛堜笉闃绘柇娓叉煋锛?*/
+export interface XmlIssue {
+  level: 'error' | 'warn';
+  nodePath: string;
+  message: string;
+}
+
+/** 璧勬簮琛細string/dimen/color 涓夌被 + 涓婁紶鐨?res/ 鐩綍闄勫姞璧勬簮 */
+export interface ResourceTable {
+  strings: Record<string, string>;
+  dimens: Record<string, number>;   // 缁熶竴瀛?dp 鏁板€?  colors: Record<string, string>;   // css 棰滆壊鍊?  /** 鍙€夛細涓婁紶 res/ 鐩綍鍚庡～鍏咃紙@drawable/@mipmap 鍚?鈫?dataURL锛岀煝閲忓悕鍒楄〃锛?*/
+  drawables?: Record<string, string>;
+  vectorNames?: string[];
+  /** 鍙€夛細styles.xml 瑙ｆ瀽鍚庣殑灞曞紑鏍峰紡锛園style/xxx 鈫?attrs锛?*/
+  styles?: Record<string, { name: string; parent?: string; attrs: Record<string, string> }>;
+  /** M2x锛?attr/xxx 涓婚灞炴€э紙涓婚鏍峰紡閲屾敹闆嗗埌鐨?鍚?鈫?鍘熷鍊硷級锛岄鑹插紩鐢ㄥ湪 resolve 鏃跺啀灞曞紑 */
+  themeAttrs?: Record<string, string>;
+  /** M2w锛歳es/drawable/*.xml 閲岀殑 <shape> 鍘熸枃锛堝悕 鈫?xml锛夛紝鐢ㄦ潵杩樺師娓愬彉/鍦嗚/鎻忚竟鑳屾櫙 */
+  drawableXml?: Record<string, string>;
+}
+
+/** 瑙ｆ瀽瀹屾垚銆佸紩鐢ㄥ凡灞曞紑鐨勮妭鐐癸紙渚?css.ts 鐢級 */
+export interface ResolvedNode {
+  tag: string;
+  path: string;
+  style: Record<string, string | number>; // css.ts 鐢熸垚鐨勬牱寮?  /** 缁勫悎鍥炬爣锛坉rawableLeft/Top/Right/Bottom 瑙ｆ瀽缁撴灉锛屾覆鏌撳眰鐢?img锛?*/
+  compound?: { start?: string; end?: string; top?: string; bottom?: string; gap: number };
+  className: string;                      // 鎺т欢绫诲悕锛堟覆鏌撳崰浣嶇敤锛?  text: string;                           // TextView/Button/EditText 鏂囨湰
+  issues: XmlIssue[];
+  children: ResolvedNode[];
+  /** 鍥炲啓瀹氫綅鐢ㄧ殑鍘熷灞炴€?*/
+  rawAttrs: Record<string, string>;
+  /** M2q锛氬瓙鏍戞潵鑷?include 灞曞紑鐨勬簮鏂囦欢锛堝 "header.xml"锛夛紱瀛樺湪鏃?UI 搴旀爣璁板彧璇?*/
+  sourceFile?: string;
+  /** M4s锛氬浘鐗囨帶浠剁殑鍐呭鍥撅紙android:src锛夆€斺€斿崟鐙敤 <img> 鐢伙紝淇濊瘉鍦?background 涔嬩笂 */
+  imgSrc?: string;
+  /** M4s锛歴caleType 瀵瑰簲鐨?CSS object-fit */
+  imgFit?: string;
+  /** M4z锛歴caleType=fitStart/fitEnd 鐨勫榻愶紙left/right锛涚己鐪佸眳涓級 */
+  imgPos?: string;
+  /** M4s锛歵int 棰滆壊锛堝浘鐗囩潃鑹诧紝浼樺厛鐢?mask锛?*/
+  imgTint?: string;
+  /** M5a锛歵intMode 鐨勬贩鑹叉柟寮忥紙multiply/screen/plus-lighter/overlay锛涚┖ = 鐢?mask 濉壊锛?*/
+  imgBlend?: string;
+  /** M5c锛?inset> 鑳屾櫙鈥斺€旇儗鏅浘鍐呯缉缁樺埗锛堜笉瑁佸瓙鎺т欢锛屽崟鐙敾涓€灞傦級 */
+  bgInset?: {
+    t: number;
+    r: number;
+    b: number;
+    l: number;
+    fill?: string;
+    radius?: string;
+    border?: string;
+  };
+}
+
+/** 鏍圭粨鏋?*/
+export interface RenderModel {
+  root: ResolvedNode;
+  issues: XmlIssue[];
+}
+

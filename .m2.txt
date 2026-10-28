@@ -1,0 +1,178 @@
+﻿715
+381:       geomRef.current = null;
+382:       if (!g) {
+383:         setGeomLive(null);
+384:         return;
+385:       }
+386:       const n = derive(g, ev);
+387:       // 閿佷綇鏈€鍚庝竴甯э紝绛夋ā鍨嬭惤鍦板悗鍐嶆挙锛坰ee useEffect [node]锛?388:       setGeomLive({ mode: g.mode, ...n, cl: g.cl });
+389:       // 甯冨眬 px 鈫?dp锛堥櫎浠?dp 姣斾緥锛屼笌 css.ts 鐨?DP() 浜掗€嗭級
+390:       const r1 = (v: number) => Math.round(v * 10) / 10;
+391:       const px2dp = (v: number) => r1(v / scale);
+392:       // 鍏堝啓鍑烘柊 XML锛堟柊鑺傜偣鏍峰紡锛夊啀绛夋ā鍨嬶紝閬垮厤銆屽厛寮瑰洖鍘熶綅鍐嶈烦鍒版柊浣嶇疆銆嶇殑闂儊
+393:       if (g.mode === "move") {
+394:         const patch: { x?: number; y?: number } = {};
+395:         if (g.mxOk) patch.x = px2dp(n.x);
+396:         if (g.myOk) patch.y = px2dp(n.y);
+397:         onGeometryChange?.(node.path, patch);
+398:       } else if (g.mode === "left") {
+399:         onGeometryChange?.(node.path, { x: px2dp(n.x), w: px2dp(n.w) });
+400:       } else if (g.mode === "right") {
+401:         onGeometryChange?.(node.path, { w: px2dp(n.w) });
+402:       } else if (g.mode === "top") {
+403:         onGeometryChange?.(node.path, { y: px2dp(n.y), h: px2dp(n.h) });
+404:       } else if (g.mode === "bottom") {
+405:         onGeometryChange?.(node.path, { h: px2dp(n.h) });
+406:       }
+407:       // 鍏滃簳锛氳嫢鍐欏洖娌￠€犳垚妯″瀷鍙樻洿锛堝鎷栦簡 0px銆佹垨鍐欏洖琚嫤锛夛紝鏈€澶?400ms 鍚庤嚜宸辨拺鎺?408:       if (settleTimer.current !== null) clearTimeout(settleTimer.current);
+409:       settleTimer.current = window.setTimeout(() => {
+410:         settleTimer.current = null;
+411:         setGeomLive(null);
+412:       }, 400);
+413:     };
+414:     window.addEventListener("pointermove", move);
+415:     window.addEventListener("pointerup", up);
+416:     window.addEventListener("pointercancel", up);
+417:   };
+418: 
+419:   return (
+420:     <div
+421:       ref={selfRef}
+422:       data-path={node.path}
+423:       data-tag={node.tag}
+424:       className={
+425:         "axv-node " +
+426:         node.className +
+427:         (isSel ? " axv-selected" : "") +
+428:         (dropHit === node.path ? " axv-drop-hit" : "") +
+429:         (isContainer ? " axv-container" : "") +
+430:         (leafWithChildren ? " axv-leaf-invalid" : "")
+431:       }
+432:       style={style}
+433:       onClick={(e) => {
+434:         e.stopPropagation();
+435:         onSelect(node.path);
+436:       }}
+437:       onDragOver={
+438:         onDropWidget
+439:           ? (e) => {
+440:               if (!e.dataTransfer.types.includes(DRAG_WIDGET_MIME)) return;
+441:               e.preventDefault();
+442:               e.stopPropagation();
+443:               e.dataTransfer.dropEffect = "copy";
+444:               setDropHit(node.path);
+445:             }
+446:           : undefined
+447:       }
+448:       onDragLeave={
+449:         onDropWidget
+450:           ? (e) => {
+451:               // 鍙湪鐪熸绂诲紑璇ヨ妭鐐癸紙鑰屼笉鏄繘鍏ュ瓙鑺傜偣锛夋椂娓呮帀楂樹寒
+452:               if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+453:               setDropHit((p) => (p === node.path ? null : p));
+454:             }
+455:           : undefined
+456:       }
+457:       onDrop={
+458:         onDropWidget
+459:           ? (e) => {
+460:               const key = e.dataTransfer.getData(DRAG_WIDGET_MIME);
+461:               if (!key) return;
+462:               e.preventDefault();
+463:               e.stopPropagation();
+464:               setDropHit(null);
+465:               onDropWidget(node.path, key, isContainer);
+466:             }
+467:           : undefined
+468:       }
+469:       title={node.tag + (node.rawAttrs.id ? " 路 " + node.rawAttrs.id : "") + (node.text ? " 路 " + node.text : "")}
+470:     >
+471:       {/* M5c锛?inset> 鑳屾櫙灞傦細鐢诲湪鍐呭涔嬩笅锛坺-index:0锛夛紝浣嗗唴缂?t/r/b/l锛屼笉瑁佸瓙鎺т欢 */}
+472:       {node.bgInset ? (
+473:         <span
+474:           className="axv-bg-inset"
+475:           aria-hidden="true"
+476:           style={{
+477:             position: "absolute",
+478:             top: `calc(${node.bgInset.t} * 2px)`,
+479:             right: `calc(${node.bgInset.r} * 2px)`,
+480:             bottom: `calc(${node.bgInset.b} * 2px)`,
+481:             left: `calc(${node.bgInset.l} * 2px)`,
+482:             background: node.bgInset.fill,
+483:             borderRadius: node.bgInset.radius,
+484:             border: node.bgInset.border,
+485:             boxSizing: "border-box",
+486:             zIndex: 0,
+487:             pointerEvents: "none",
+488:           }}
+489:         />
+490:       ) : null}
+491: 
+492:       {node.imgSrc ? (
+493:         node.imgSrc.startsWith("builtin:") ? (
+494:           // @android:drawable/xxx 骞冲彴鍐呯疆鍥炬爣锛氫腑鎬у崰浣嶏紙bi锟? 鎻愮ず锛屼笉鏍囬敊锛?495:           <span
+496:             className="axv-img-layer"
+497:             title={node.imgSrc.slice(8)}
+498:             aria-hidden="true"
+499:             style={{
+500:               position: "absolute",
+501:               inset: 0,
+502:               display: "flex",
+503:               alignItems: "center",
+504:               justifyContent: "center",
+505:               border: "1px dashed #B0AEB8",
+506:               borderRadius: 4,
+507:               color: "#B0AEB8",
+508:               fontSize: 11,
+509:               pointerEvents: "none",
+510:             }}
+511:           >
+512:             android
+513:           </span>
+514:         ) : node.imgTint && !node.imgBlend ? (
+515:           // tint锛氱敤 mask 鎶婂浘褰撴垚褰㈢姸濉壊锛堝 vector/png 閫忔槑鍥鹃兘鍑嗭級
+516:           <span
+517:             className="axv-img-layer"
+518:             aria-hidden="true"
+519:             style={{
+520:               position: "absolute",
+521:               inset: 0,
+522:               backgroundColor: node.imgTint,
+523:               WebkitMaskImage: `url(${node.imgSrc})`,
+524:               maskImage: `url(${node.imgSrc})`,
+525:               WebkitMaskRepeat: "no-repeat",
+526:               maskRepeat: "no-repeat",
+527:               WebkitMaskPosition: node.imgPos ?? "center",
+528:               maskPosition: node.imgPos ?? "center",
+529:               WebkitMaskSize: node.imgFit === "fill" ? "100% 100%" : node.imgFit === "cover" ? "cover" : "contain",
+530:               maskSize: node.imgFit === "fill" ? "100% 100%" : node.imgFit === "cover" ? "cover" : "contain",
+531:               pointerEvents: "none",
+532:             }}
+533:           />
+534:         ) : (
+535:           <>
+536:             <img
+537:               className="axv-img-layer"
+538:               src={node.imgSrc}
+539:               alt=""
+540:               draggable={false}
+541:               style={{
+542:                 position: "absolute",
+543:                 inset: 0,
+544:                 width: "100%",
+545:                 height: "100%",
+546:                 objectFit: (node.imgFit as React.CSSProperties["objectFit"]) ?? "contain",
+547:                 objectPosition: node.imgPos ?? "center",
+548:                 pointerEvents: "none",
+549:               }}
+550:             />
+551:             {node.imgTint && node.imgBlend ? (
+552:               // M5a锛歵intMode=multiply/screen/add/src_over 鈥斺€?鍘熷浘涔嬩笂鍙犱竴灞傛贩鑹插眰
+553:               <span
+554:                 className="axv-img-layer"
+555:                 aria-hidden="true"
+556:                 style={{
+557:                   position: "absolute",
+558:                   inset: 0,
+559:                   backgroundColor: node.imgTint,
+560:                   mixBlendMode:

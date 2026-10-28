@@ -1,0 +1,20 @@
+﻿986:   const onDeleteAsset = (name: string) => {
+987:     setGeneratedDrawables((m) => {
+988:       if (!(name in m)) return m;
+989:       const next = { ...m };
+990:       delete next[name];
+991:       return next;
+992:     });
+993:   };
+994: 
+995:   /** 璧勬簮闈㈡澘 / 鍥炬爣閫夊畬鍚庣殑鎻愮ず鏉?*/
+996:   const assetsNote = (text: string) => {
+997:     setExportNote(text);
+998:     window.setTimeout(() => setExportNote(" "), 3600);
+999:   };
+1000: 
+1001:   const insertWidget = (w: WidgetDef) => {
+1002:     const frag = stripNs(w.xml);
+1003:     const { root } = parseLayoutXml(xml);
+1004:     const targetNode = selectedPath && selectedPath !== "#0" && root ? findNode(root, selectedPath) : null;
+1005:     // 浼樺厛锛氶€変腑鐨勬槸瀹瑰櫒涓旇繕鑳芥帴鏀跺瓙鎺т欢 鈫?鎻掑叆涓哄畠鐨勫瓙鑺傜偣

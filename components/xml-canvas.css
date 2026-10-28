@@ -1706,14 +1706,14 @@
   text-align: center;
 }
 
-/* ===== M2s：导出前检查面板 ===== */
-.axv-export-modal {
+/* ===== M2s：导出前检查面板（M7c 改独立类名，避免和导出预览图弹窗抢 width） ===== */
+.axv-check-modal {
   width: min(560px, 92vw);
   max-height: 78vh;
   display: flex;
   flex-direction: column;
 }
-.axv-export-body {
+.axv-check-body {
   padding: 12px 16px;
   overflow: auto;
   flex: 1;
@@ -2474,8 +2474,8 @@
   color: #1d1b20;
 }
 
-/* M3 导出提示浮层 */
-.axv-export-note {
+/* M3 导出提示浮层（M7c 从 .axv-export-note 拆出来：那个类名被导出弹窗的说明块占用，两者风格冲突） */
+.axv-toast {
   background: #323232;
   color: #fff;
   font-size: 12px;

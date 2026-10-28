@@ -43,6 +43,8 @@ import { ResImagePreview } from "./ResImagePreview";
 import { ShapeEditor } from "./ShapeEditor";
 import { GenAssetsPanel } from "./GenAssetsPanel";
 import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
+import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/paths";
+import { LS_KEY_XML, LS_KEY_HIST, LS_KEY_RES, LS_KEY_ICONS, lsGet, lsSet } from "@/lib/xml/storage";
 import { RunPreview } from "./RunPreview";
 import { ViewSettingsMenu } from "./ViewSettingsMenu";
 import { LayerTree } from "./LayerTree";
@@ -308,48 +310,6 @@ const SAMPLES: Record<string, string> = {
 };
 
 const SCALE = 2; // 1dp = 2px
-
-function findResolvedNode(root: ResolvedNode, path: string): ResolvedNode | null {
-  if (root.path === path) return root;
-  for (const c of root.children ?? []) {
-    const r = findResolvedNode(c, path);
-    if (r) return r;
-  }
-  return null;
-}
-
-/** 把 path 拆成父级 + 索引 */
-function splitPath(path: string): { parentPath: string; index: number } {
-  const segs = path.split("/").filter(Boolean);
-  const index = Number(segs[segs.length - 1]);
-  const parentPath = "#" + segs.slice(0, -1).join("/");
-  return { parentPath, index };
-}
-
-/** 去掉片段里的 xmlns 声明（根节点已有；否则序列化会重复写） */
-const stripNs = (frag: string) => frag.replace(/\s+xmlns:android="[^"]*"/g, "");
-
-/** localStorage 自动保存：刷新/关页面不丢工作 */
-const LS_KEY_XML = "axv.autosave.xml";
-const LS_KEY_HIST = "axv.autosave.history";
-const LS_KEY_RES = "axv.autosave.resources";
-const LS_KEY_ICONS = "axv.autosave.icons"; // M3g：图标选择器生成的矢量资源
-
-/** 安全读 localStorage（无 SSR、禁用存储模式都要不炸） */
-function lsGet(key: string): string | null {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function lsSet(key: string, val: string) {
-  try {
-    window.localStorage.setItem(key, val);
-  } catch {
-    // 超配额/隐私模式：静默放弃，不影响主流程
-  }
-}
 
 export function XmlEditor() {
   const [xml, setXml] = useState<string>(() => lsGet(LS_KEY_XML) ?? SAMPLES.list);
@@ -1418,23 +1378,8 @@ function boxOf(n: ResolvedNode | null | undefined): CBox | null {
   return { left, top, width, height };
 }
 
-/** 在渲染模型里按 path 找节点 */
-function findResolved(n: ResolvedNode, path: string): ResolvedNode | null {
-  if (n.path === path) return n;
-  for (const c of n.children) {
-    const f = findResolved(c, path);
-    if (f) return f;
-  }
-  return null;
-}
-
-/** 收集全文档的 id 引用（生成不重复 id 用） */
-function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | null, out: string[]): string[] {
-  if (!n) return out;
-  if (n.attrs.id) out.push(n.attrs.id);
-  for (const c of n.children as { attrs: Record<string, string>; children: unknown[] }[]) collectIds(c, out);
-  return out;
-}
+/** 在渲染模型里按 path 找节点（findResolvedNode 的别名，历史命名保留） */
+const findResolved = findResolvedNode;
   /** M6d：载入一个 .xml 文件（工具栏按钮 / 资源面板按钮 / 拖拽入口共用）
    *  校验类型与大小，try/catch 读取，载入前预检可解析性，解析不了就提示而不留坏文件 */
   const loadXmlFile = (f: File) => {
@@ -1749,7 +1694,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               {/* 状态栏（系统窗口，不属于布局 XML）：时间 + 前置摄像头（居中）+ 信号/WiFi/电池 */}
               <div className="axv-statusbar" style={{ height: STATUS_BAR_H }}>
                 <span className="axv-sb-time">9:41</span>
-                {exportNote ? <div className="axv-export-note axv-sb-camera-note">{exportNote}</div> : <div className="axv-sb-camera" aria-hidden="true" />}
+                {exportNote ? <div className="axv-toast axv-sb-camera-note">{exportNote}</div> : <div className="axv-sb-camera" aria-hidden="true" />}
                 <span className="axv-sb-icons">
                   <span className="msr" aria-hidden="true">
                     signal_cellular_alt

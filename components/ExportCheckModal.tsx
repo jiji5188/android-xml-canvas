@@ -36,7 +36,7 @@ export function ExportCheckModal({ open, report, action = "download", onClose, o
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="axv-modal axv-export-modal" role="dialog" aria-label="导出前检查">
+      <div className="axv-modal axv-check-modal" role="dialog" aria-label="导出前检查">
         <div className="axv-modal-head">
           <span>{verb}前检查</span>
           <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">
@@ -44,7 +44,7 @@ export function ExportCheckModal({ open, report, action = "download", onClose, o
           </button>
         </div>
 
-        <div className="axv-export-body">
+        <div className="axv-check-body">
           <div className={"axv-export-summary" + (hasError ? " is-error" : report.notes.length ? " is-warn" : " is-ok")}>
             {hasError
               ? `✖ ${report.errors.length} 个结构错误，必须先修复才能${verb}`

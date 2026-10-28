@@ -22,6 +22,7 @@ import { lintXml } from "@/lib/xml/lint";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { buildResBundle, missingDrawables } from "@/lib/xml/bundle";
 import { sanitizeResName } from "@/lib/xml/resname";
+import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { makeZip, downloadBytes } from "@/lib/xml/zip";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { ExportCheckModal, type ExportReport } from "./ExportCheckModal";
@@ -607,7 +608,13 @@ export function XmlEditor() {
         for (const [k, v] of Object.entries(obj)) {
           if (typeof v === "string" && /^[a-z][a-z0-9_]*$/.test(k)) clean[k] = v;
         }
-        setGeneratedDrawables(clean);
+        // M4w：旧版生成的图标 y 全落在视口外（画出来是空白）→ 载入时自动归位到 0–24
+        const fixed = repairGeneratedVectors(clean);
+        setGeneratedDrawables(fixed.map);
+        if (fixed.repaired.length > 0) {
+          setExportNote(`已修正 ${fixed.repaired.length} 个旧图标的坐标（之前预览是空白）`);
+          window.setTimeout(() => setExportNote(""), 4200);
+        }
       }
     } catch {
       /* 损坏忽略 */

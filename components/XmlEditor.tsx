@@ -1814,7 +1814,8 @@ const findResolved = findResolvedNode;
 
       {/* 画布区顶部 tab 切换「预览 / XML 代码」（桌面 + 移动端均可用） */}
       {(!isMobile || (!leftOpen && !rightOpen)) && (
-        <div className="axv-mob-tabs" role="tablist" aria-label="视图">
+        <div className="axv-mob-tabs">
+          <div className="axv-mob-tabs-inner" role="tablist" aria-label="视图">
           <button
             role="tab"
             aria-selected={mobileTab === "preview"}
@@ -1862,6 +1863,7 @@ const findResolved = findResolvedNode;
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
             XML 代码
           </button>
+          </div>
         </div>
       )}
 
@@ -2279,9 +2281,9 @@ const findResolved = findResolvedNode;
               }
         }
       >
-        <div className="axv-tb-group axv-tb-side" style={leftOpen ? { display: "none" } : undefined}>
+        {leftOpen ? null : (
           <button
-            className="axv-tb-btn"
+            className="axv-tb-btn axv-tb-side-btn"
             title="展开左侧面板"
             aria-label="展开左侧面板"
             aria-pressed={false}
@@ -2289,15 +2291,13 @@ const findResolved = findResolvedNode;
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>left_panel_open</span>
           </button>
-        </div>
+        )}
 
         {/* M6b：中间可横向滚动的工具栏区（左/右侧滑按钮各占一边，不悬浮不吸边） */}
         <div className="axv-tb-scroll">
-          {/* M6c：设备 + 缩放收进这个按钮（原来占 370px，窄窗会把工具栏挤成两行） */}
-          <div className="axv-tb-group axv-tb-view">
-            <ViewSettingsMenu deviceId={deviceId} onDevice={changeDevice} scale={scale} onScale={setScale} />
-          </div>
           <div className="axv-tb-group">
+            {/* M6c/M10：设备 + 缩放收进这个按钮，并与其它工具同处一个工具组 */}
+            <ViewSettingsMenu deviceId={deviceId} onDevice={changeDevice} scale={scale} onScale={setScale} />
             <button
               className="axv-tb-btn"
               title="撤销"
@@ -2389,9 +2389,9 @@ const findResolved = findResolvedNode;
         </div>
         </div>
 
-        <div className="axv-tb-group axv-tb-side" style={rightOpen ? { display: "none" } : undefined}>
+        {rightOpen ? null : (
           <button
-            className="axv-tb-btn"
+            className="axv-tb-btn axv-tb-side-btn"
             title="展开右侧属性面板"
             aria-label="右侧属性面板"
             aria-pressed={false}
@@ -2399,7 +2399,7 @@ const findResolved = findResolvedNode;
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>right_panel_open</span>
           </button>
-        </div>
+        )}
       </div>
       </div>
 

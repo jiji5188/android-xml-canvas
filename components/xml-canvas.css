@@ -438,7 +438,7 @@
   display: block;
 }
 
-/* ===== 顶部悬浮工具栏（胶囊组，M3E 同款）===== */
+/* ===== 顶部悬浮工具栏（M6b 三栏布局） ===== */
 .axv-toolbar-v2 {
   position: absolute;
   left: 0;
@@ -446,23 +446,28 @@
   top: 14px;
   display: flex;
   align-items: center;
-  /* M6b：左按钮 | 中间可滚工具栏（吃满剩余宽度）| 右按钮 */
-  gap: 10px;
-  padding: 0 20px;
+  /* M6b：左按钮 | 中间可滚工具栏（吃满剩余宽度）| 右按钮；
+     M10：gap 3px + 主题背景填充（整条工具栏） */
+  gap: 3px;
+  padding: 3px 6px;
+  background: #F3F3F9;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   z-index: 40;
   pointer-events: none;
   flex-wrap: nowrap;
 }
-/* 侧滑按钮组：固定宽度，不参与压缩 */
-.axv-tb-side {
+/* 侧滑展开按钮（M10：直接放在工具栏层，不再套 axv-tb-group） */
+.axv-tb-side-btn {
   flex: 0 0 auto;
+  pointer-events: auto;
 }
 /* 中间的工具栏容器：桌面放不下就换行；手机改为横向滚动（见下方媒体查询） */
 .axv-tb-scroll {
   display: flex;
   align-items: center;
-  gap: 6px;
-  row-gap: 6px;
+  /* M10：gap 3px，与工具栏一致 */
+  gap: 3px;
+  row-gap: 3px;
   flex: 1 1 auto;
   min-width: 0;
   flex-wrap: wrap;
@@ -472,15 +477,16 @@
 .axv-tb-scroll > .axv-tb-group {
   flex: 0 0 auto;
 }
+/* M10：组背景透明 + 圆角 0（整条工具栏统一由 .axv-toolbar-v2 填充） */
 .axv-tb-group {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px;
-  border-radius: 28px;
+  gap: 3px;
+  padding: 2px;
+  border-radius: 0;
   user-select: none;
-  background: #F3F3F9;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  background: transparent;
+  box-shadow: none;
   pointer-events: auto;
 }
 .axv-tb-btn {
@@ -1831,19 +1837,38 @@
   transition: opacity 0.18s ease;
 }
 
-/* 移动端：画布区顶部 XML 代码 / 预览 tab */
+/* 移动端：画布区顶部 XML 代码 / 预览 tab
+   M10：宽度按视口填满一行（不再居中浮动），圆角 0，背景同主题工具栏 */
 .axv-mob-tabs {
   position: absolute;
-  top: 72px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 64px;
+  left: 0;
+  right: 0;
   display: flex;
-  gap: 4px;
+  gap: 3px;
   z-index: 45;
-  padding: 4px;
-  border-radius: 20px;
+  padding: 3px 6px;
+  border-radius: 0;
   background: #F3F3F9;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  overflow-x: visible;
+}
+/* M10：内部容器横向滚动（外层填满视口、背景铺满；滚动发生在内层，边缘可加 mask） */
+.axv-mob-tabs-inner {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 6px, #000 calc(100% - 6px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 6px, #000 calc(100% - 6px), transparent 100%);
+}
+.axv-mob-tabs-inner::-webkit-scrollbar {
+  display: none;
+}
+.axv-mob-tabs-inner > * {
+  flex: 0 0 auto;
 }
 .axv-mob-tabs button {
   display: inline-flex;
@@ -2222,11 +2247,17 @@
     width: min(280px, calc(100vw - 16px));
   }
   .axv-toolbar-v2 {
-    top: 10px;
-    padding: 0 6px;
-    gap: 6px;
+    top: 8px;
+    padding: 3px 6px;
+    gap: 3px;
     /* 层级低于蒙版（25）：面板打开时工具栏一起被遮罩盖住 */
     z-index: 20;
+  }
+  /* 侧滑展开按钮（M10）：手机上同样直接放工具栏层 */
+  .axv-tb-side-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 19px;
   }
   /* 中间区：手机上改成横向滚动（桌面是换行） */
   .axv-tb-scroll {
@@ -2256,30 +2287,36 @@
     flex: 0 0 auto;
   }
   .axv-tb-group {
-    padding: 5px;
+    padding: 2px;
+    gap: 3px;
   }
   .axv-tb-btn {
     width: 38px;
     height: 38px;
   }
   .axv-mob-tabs {
-    top: 72px;
-    /* 窄屏下 tab + 示例下拉可能超出屏宽，允许横向滚动并藏滚动条 */
-    max-width: calc(100vw - 20px);
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
+    top: 56px;
+    left: 0;
+    right: 0;
+    padding: 3px 6px;
+    gap: 3px;
+    border-radius: 0;
+    /* 窄屏下 tab + 示例下拉可能超出屏宽，横向滚动在内层 .axv-mob-tabs-inner */
+    overflow-x: visible;
+  }
+  .axv-mob-tabs-inner {
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .axv-mob-tabs::-webkit-scrollbar {
     display: none;
   }
-  .axv-mob-tabs > * {
-    flex: 0 0 auto;
+  .axv-mob-tabs-inner::-webkit-scrollbar {
+    display: none;
   }
   .axv-stage {
-    /* 工具栏（top:10 + ≈48）+ 移动端 tab 行（top:72 + 最多两行≈62）≈ 134，再留余量；
-       窄屏 tab 文字可能换行，留 150 保证手机框顶部（含新建的状态栏）不被浮层遮住 */
-    padding: 150px 8px 16px;
+    /* M10：工具栏（top:8 + ≈46）+ 移动端 tab 行（top:56 + 最多两行≈62）≈ 124，留余量 130 */
+    padding: 130px 8px 16px;
   }
   .axv-stage.pad-l,
   .axv-stage.pad-r {
@@ -2287,7 +2324,7 @@
     padding-right: 8px;
   }
   .axv-mob-xml {
-    inset: 150px 12px 12px;
+    inset: 130px 12px 12px;
   }
   .axv-slide-left .axv-rail {
     width: 48px;

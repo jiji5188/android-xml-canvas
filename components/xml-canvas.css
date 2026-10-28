@@ -484,6 +484,8 @@
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
+  /* M11g：中区底色（半透明，透出工具栏主题背景） */
+  background-color: #e3e3e369;
   pointer-events: auto;
 }
 .axv-tb-scroll::-webkit-scrollbar {

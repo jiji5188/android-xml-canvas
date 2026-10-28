@@ -61,3 +61,8 @@ build.log
 test-results/
 playwright-report/
 .e2e-artifacts/
+
+# APK shell build
+apk/build/
+apk/assets/
+apk/debug.keystore

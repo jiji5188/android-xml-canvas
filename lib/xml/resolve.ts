@@ -312,6 +312,8 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   // 图片：@drawable/xxx / @mipmap/xxx 优先查上传的 res 目录，查不到再原样
   out["src"] = resolveDrawable(a["src"] ?? a["srcCompat"] ?? "", res, issues, path, "src");
   out["scaleType"] = a["scaleType"] ?? "";
+  // M5a：tintMode（缺省 src_in）——不在白名单里 css 层永远拿不到
+  out["tintMode"] = a["tintMode"] ?? "";
 
   // 可见性 / 可用性
   out["visibility"] = a["visibility"] ?? "visible";

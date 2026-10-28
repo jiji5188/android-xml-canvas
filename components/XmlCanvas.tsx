@@ -490,7 +490,7 @@ export function XmlCanvas({
           >
             android
           </span>
-        ) : node.imgTint ? (
+        ) : node.imgTint && !node.imgBlend ? (
           // tint：用 mask 把图当成形状填色（对 vector/png 透明图都准）
           <span
             className="axv-img-layer"
@@ -511,21 +511,40 @@ export function XmlCanvas({
             }}
           />
         ) : (
-          <img
-            className="axv-img-layer"
-            src={node.imgSrc}
-            alt=""
-            draggable={false}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: (node.imgFit as React.CSSProperties["objectFit"]) ?? "contain",
-              objectPosition: node.imgPos ?? "center",
-              pointerEvents: "none",
-            }}
-          />
+          <>
+            <img
+              className="axv-img-layer"
+              src={node.imgSrc}
+              alt=""
+              draggable={false}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: (node.imgFit as React.CSSProperties["objectFit"]) ?? "contain",
+                objectPosition: node.imgPos ?? "center",
+                pointerEvents: "none",
+              }}
+            />
+            {node.imgTint && node.imgBlend ? (
+              // M5a：tintMode=multiply/screen/add/src_over —— 原图之上叠一层混色层
+              <span
+                className="axv-img-layer"
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  backgroundColor: node.imgTint,
+                  mixBlendMode:
+                    node.imgBlend === "overlay"
+                      ? undefined
+                      : (node.imgBlend as React.CSSProperties["mixBlendMode"]),
+                  pointerEvents: "none",
+                }}
+              />
+            ) : null}
+          </>
         )
       ) : null}
       {(() => {

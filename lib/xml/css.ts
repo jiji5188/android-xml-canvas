@@ -215,6 +215,7 @@ export function buildRenderModel(
     let imgFit = "";
     /** M4z：scaleType=fitStart/fitEnd 的对齐（center 之外的两端） */
     let imgPos = "";
+    let imgBlend = "";
     let imgTint = "";
 
     // 容器
@@ -590,7 +591,19 @@ export function buildRenderModel(
               break;
           }
           const tint = (attrs["tint"] as string) || "";
-          if (tint && /^(#|rgb|hsl)/.test(tint)) imgTint = tint;
+          if (tint && /^(#|rgb|hsl)/.test(tint)) {
+            imgTint = tint;
+            // M5a：android:tintMode → 叠加方式
+            //   src_in / src_atop（默认、最常见）→ 用 mask 填色（对透明 png / vector 最准）
+            //   multiply / screen / add → 保留原图，叠一层混色层（CSS mix-blend-mode）
+            //   src_over → 保留原图，直接盖一层半透明色
+            const tm = ((attrs["tintMode"] as string) || "src_in").trim();
+            if (tm === "multiply") imgBlend = "multiply";
+            else if (tm === "screen") imgBlend = "screen";
+            else if (tm === "add") imgBlend = "plus-lighter";
+            else if (tm === "src_over") imgBlend = "overlay";
+            else imgBlend = "";
+          }
         } else {
           // 其余非常见值（相对路径 / 未解析符号）不当图片画，给占位提示
           style.backgroundColor = style.backgroundColor || "#EDE7F6";
@@ -786,6 +799,8 @@ export function buildRenderModel(
     if (imgFit) resolved.imgFit = imgFit;
     if (imgPos) resolved.imgPos = imgPos;
     if (imgTint) resolved.imgTint = imgTint;
+    if (imgTint) resolved.imgTint = imgTint;
+    if (imgBlend) resolved.imgBlend = imgBlend;
     return resolved;
   };
 

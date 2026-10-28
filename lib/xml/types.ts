@@ -62,6 +62,8 @@ export interface ResolvedNode {
   imgPos?: string;
   /** M4s：tint 颜色（图片着色，优先用 mask） */
   imgTint?: string;
+  /** M5a：tintMode 的混色方式（multiply/screen/plus-lighter/overlay；空 = 用 mask 填色） */
+  imgBlend?: string;
 }
 
 /** 根结果 */

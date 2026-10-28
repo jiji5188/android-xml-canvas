@@ -503,8 +503,8 @@ export function XmlCanvas({
               maskImage: `url(${node.imgSrc})`,
               WebkitMaskRepeat: "no-repeat",
               maskRepeat: "no-repeat",
-              WebkitMaskPosition: "center",
-              maskPosition: "center",
+              WebkitMaskPosition: node.imgPos ?? "center",
+              maskPosition: node.imgPos ?? "center",
               WebkitMaskSize: node.imgFit === "fill" ? "100% 100%" : node.imgFit === "cover" ? "cover" : "contain",
               maskSize: node.imgFit === "fill" ? "100% 100%" : node.imgFit === "cover" ? "cover" : "contain",
               pointerEvents: "none",
@@ -522,7 +522,7 @@ export function XmlCanvas({
               width: "100%",
               height: "100%",
               objectFit: (node.imgFit as React.CSSProperties["objectFit"]) ?? "contain",
-              objectPosition: "center",
+              objectPosition: node.imgPos ?? "center",
               pointerEvents: "none",
             }}
           />

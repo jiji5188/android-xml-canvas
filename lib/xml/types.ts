@@ -58,6 +58,8 @@ export interface ResolvedNode {
   imgSrc?: string;
   /** M4s：scaleType 对应的 CSS object-fit */
   imgFit?: string;
+  /** M4z：scaleType=fitStart/fitEnd 的对齐（left/right；缺省居中） */
+  imgPos?: string;
   /** M4s：tint 颜色（图片着色，优先用 mask） */
   imgTint?: string;
 }

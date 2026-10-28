@@ -1,0 +1,64 @@
+// M4z：scaleType 完整映射（fitStart/fitEnd 对齐、matrix 近似）
+import { describe, it, expect } from "vitest";
+import { buildRenderModel } from "../lib/xml/css";
+import { parseLayoutXml } from "../lib/xml/parser";
+import { DEFAULT_RESOURCES } from "../lib/xml/resources";
+
+const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+function first(xml: string) {
+  const m = buildRenderModel(
+    parseLayoutXml(
+      `<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent" android:layout_height="match_parent">${xml}</LinearLayout>`
+    ).root!,
+    { ...DEFAULT_RESOURCES, drawables: { pic: PNG } }
+  );
+  return m.root.children[0];
+}
+
+const pic =
+  '<ImageView android:src="@drawable/pic" android:layout_width="48dp" android:layout_height="48dp" />';
+
+describe("M4z scaleType 完整映射", () => {
+  it("fitXY → fill", () => {
+    expect(first(pic.replace(/\/>/, ' android:scaleType="fitXY" />')).imgFit).toBe("fill");
+  });
+
+  it("centerCrop → cover", () => {
+    expect(first(pic.replace(/\/>/, ' android:scaleType="centerCrop" />')).imgFit).toBe("cover");
+  });
+
+  it("fitCenter（缺省）/ centerInside → contain，居中（无 imgPos）", () => {
+    const a = first(pic);
+    const b = first(pic.replace(/\/>/, ' android:scaleType="centerInside" />'));
+    expect(a.imgFit).toBe("contain");
+    expect(b.imgFit).toBe("contain");
+    expect(a.imgPos).toBeUndefined();
+    expect(b.imgPos).toBeUndefined();
+  });
+
+  it("fitStart → contain + 左对齐", () => {
+    const n = first(pic.replace(/\/>/, ' android:scaleType="fitStart" />'));
+    expect(n.imgFit).toBe("contain");
+    expect(n.imgPos).toBe("left");
+  });
+
+  it("fitEnd → contain + 右对齐", () => {
+    const n = first(pic.replace(/\/>/, ' android:scaleType="fitEnd" />'));
+    expect(n.imgFit).toBe("contain");
+    expect(n.imgPos).toBe("right");
+  });
+
+  it("center → none（原始尺寸）", () => {
+    expect(first(pic.replace(/\/>/, ' android:scaleType="center" />')).imgFit).toBe("none");
+  });
+
+  it("matrix → none（浏览器无矩阵变换，近似原尺寸居中）", () => {
+    expect(first(pic.replace(/\/>/, ' android:scaleType="matrix" />')).imgFit).toBe("none");
+  });
+
+  it("非法值兜底 → contain", () => {
+    expect(first(pic.replace(/\/>/, ' android:scaleType="bogus" />')).imgFit).toBe("contain");
+  });
+});

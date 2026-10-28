@@ -213,6 +213,8 @@ export function buildRenderModel(
     /** M4s：图片控件内容图（src）单独画在 background 之上 */
     let imgSrc = "";
     let imgFit = "";
+    /** M4z：scaleType=fitStart/fitEnd 的对齐（center 之外的两端） */
+    let imgPos = "";
     let imgTint = "";
 
     // 容器
@@ -556,13 +558,37 @@ export function buildRenderModel(
           // M4s：真图不用 background 画，交给 <img> 内容层（background 在下、src 在上）
           // M4v：builtin: = @android:drawable/xxx 平台内置图标，XmlCanvas 画中性占位
           imgSrc = src;
+          // M4z：Android scaleType → CSS object-fit / object-position 完整映射
+          //   fitXY=fill（拉伸）  centerCrop=cover（裁切）
+          //   fitCenter/centerInside=contain（等比缩放到完整可见，居中）
+          //   fitStart=contain+左对齐  fitEnd=contain+右对齐
+          //   center=none（原始尺寸居中，超出裁掉）  matrix=none（不做矩阵变换，近似 center）
           const st = (attrs["scaleType"] as string) || "fitCenter";
-          imgFit =
-            st === "fitXY" ? "fill"
-            : st === "centerCrop" ? "cover"
-            : st === "centerInside" || st === "fitCenter" ? "contain"
-            : st === "center" ? "none"
-            : "contain";
+          switch (st) {
+            case "fitXY":
+              imgFit = "fill";
+              break;
+            case "centerCrop":
+              imgFit = "cover";
+              break;
+            case "center":
+            case "matrix":
+              imgFit = "none";
+              break;
+            case "fitStart":
+              imgFit = "contain";
+              imgPos = "left";
+              break;
+            case "fitEnd":
+              imgFit = "contain";
+              imgPos = "right";
+              break;
+            case "fitCenter":
+            case "centerInside":
+            default:
+              imgFit = "contain";
+              break;
+          }
           const tint = (attrs["tint"] as string) || "";
           if (tint && /^(#|rgb|hsl)/.test(tint)) imgTint = tint;
         } else {
@@ -758,6 +784,7 @@ export function buildRenderModel(
     if (sourceFile) resolved.sourceFile = sourceFile;
     if (imgSrc) resolved.imgSrc = imgSrc;
     if (imgFit) resolved.imgFit = imgFit;
+    if (imgPos) resolved.imgPos = imgPos;
     if (imgTint) resolved.imgTint = imgTint;
     return resolved;
   };

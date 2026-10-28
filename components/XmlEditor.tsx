@@ -28,6 +28,20 @@ import { hasIcon } from "@/lib/xml/icon-vectors";
 import { makeZip, downloadBytes } from "@/lib/xml/zip";
 import { saveTextNative, workspaceLabel } from "@/lib/xml/native-save";
 import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
+import {
+  activeFile,
+  addFile,
+  createProject,
+  guessFileName,
+  parseProject,
+  removeFile,
+  renameFile,
+  serializeProject,
+  switchFile,
+  updateFileXml,
+  MAX_FILES,
+  type Project,
+} from "@/lib/xml/multi-file";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { ExportCheckModal, type ExportReport } from "./ExportCheckModal";
 import { ExportImageModal } from "./ExportImageModal";
@@ -46,7 +60,7 @@ import { ShapeEditor } from "./ShapeEditor";
 import { GenAssetsPanel } from "./GenAssetsPanel";
 import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/paths";
-import { LS_KEY_XML, LS_KEY_HIST, LS_KEY_RES, LS_KEY_ICONS, lsGet, lsSet } from "@/lib/xml/storage";
+import { LS_KEY_XML, LS_KEY_HIST, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, lsGet, lsSet } from "@/lib/xml/storage";
 import { RunPreview } from "./RunPreview";
 import { ViewSettingsMenu } from "./ViewSettingsMenu";
 import { LayerTree } from "./LayerTree";
@@ -314,7 +328,66 @@ const SAMPLES: Record<string, string> = {
 const SCALE = 2; // 1dp = 2px
 
 export function XmlEditor() {
-  const [xml, setXml] = useState<string>(() => lsGet(LS_KEY_XML) ?? SAMPLES.list);
+  /** 启动引导：项目（多文件）优先，没有存档时从上次的 xml 建一个单文件项目 */
+  const bootRef = useRef<{ project: Project; xml: string } | null>(null);
+  if (bootRef.current === null) {
+    const saved = parseProject(lsGet(LS_KEY_PROJECT));
+    const raw = lsGet(LS_KEY_XML) ?? SAMPLES.list;
+    if (saved) {
+      const f = activeFile(saved);
+      bootRef.current = { project: saved, xml: f?.xml ?? raw };
+    } else {
+      bootRef.current = {
+        project: createProject("我的项目", { name: guessFileName(raw), xml: raw }),
+        xml: raw,
+      };
+    }
+  }
+  const [xml, setXml] = useState<string>(() => bootRef.current!.xml);
+  /** 多文件项目：文件列表 + 当前激活文件（内容以 xml 为准，切换时回写） */
+  const [project, setProject] = useState<Project>(() => bootRef.current!.project);
+
+  /** M9：文件切换器下拉框（桌面/移动共用的一个 select）：
+   *  选项 = 项目里的文件 + 4 个操作项；选中操作项立即执行并弹回当前文件 */
+  const fileSelectValue = "";
+  const onFileSelect = (v: string) => {
+    if (v === "") return;
+    if (v === "action:new") { newFile(); return; }
+    if (v === "action:rename") { renameActiveFile(); return; }
+    if (v === "action:delete") { deleteActiveFile(); return; }
+    selectFile(v);
+  };
+  const currentFile = activeFile(project);
+  /** M9：文件切换下拉框（桌面/移动共用）：项目里的文件 + 3 个操作项 */
+  const fileSelect = (
+    <select
+      className="axv-tb-select"
+      title="项目文件（多文件切换）"
+      value=""
+      onChange={(e) => {
+        const v = e.target.value;
+        if (!v) return;
+        if (v === "action:new") newFile();
+        else if (v === "action:rename") renameActiveFile();
+        else if (v === "action:delete") deleteActiveFile();
+        else selectFile(v);
+      }}
+    >
+      <option value="">{`${currentFile?.name ?? "文件"} ▾`}</option>
+      <optgroup label="项目文件">
+        {project.files.map((f) => (
+          <option key={f.id} value={f.id}>
+            {f.id === project.activeId ? "● " : "○ "} {f.name}
+          </option>
+        ))}
+      </optgroup>
+      <optgroup label="文件操作">
+        <option value="action:new">＋ 新建文件…</option>
+        <option value="action:rename">✎ 重命名当前文件…</option>
+        <option value="action:delete">🗑 删除当前文件</option>
+      </optgroup>
+    </select>
+  );
   /** 解析用（低优先级）：敲代码时让输入不卡，解析滞后几帧 */
   const parsedXml = useDeferredValue(xml);
   const [resourceFragment, setResourceFragment] = useState("");
@@ -638,13 +711,22 @@ export function XmlEditor() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  // ===== 自动保存：xml / 历史 / 资源 变更即写 localStorage（防抖 400ms） =====
+  // ===== 自动保存：xml / 历史 / 资源 / 项目 变更即写 localStorage（防抖 400ms） =====
   useEffect(() => {
     const t = window.setTimeout(() => {
       lsSet(LS_KEY_XML, xml);
+      // M9：当前编辑内容回写进项目（对象引用不变时不产生新对象，下面的持久化 effect 不会空转）
+      setProject((p) => updateFileXml(p, p.activeId, xml));
     }, 400);
     return () => window.clearTimeout(t);
   }, [xml]);
+  // M9：项目持久化（含全部文件的 xml；超配额就放弃，不影响编辑）
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      lsSet(LS_KEY_PROJECT, serializeProject(project));
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [project]);
   useEffect(() => {
     const t = window.setTimeout(() => {
       lsSet(LS_KEY_HIST, JSON.stringify(history));
@@ -1079,6 +1161,83 @@ export function XmlEditor() {
     [setXmlAndTrack],
   );
 
+  /** M9：多文件切换 —— 先把当前编辑内容回写到项目，再切到目标文件，撤销栈跟着文件走 */
+  const selectFile = useCallback(
+    (id: string) => {
+      flushTextTimer();
+      setProject((p) => {
+        const withSaved = updateFileXml(p, p.activeId, xml);
+        const next = switchFile(withSaved, id);
+        const target = activeFile(next);
+        if (target && target.id !== p.activeId) {
+          setXml(target.xml);
+          histRef.current = { stack: [target.xml], idx: 0 };
+          syncHist();
+          setSelectedPath(null);
+        }
+        return next;
+      });
+    },
+    [flushTextTimer, xml],
+  );
+
+  const newFile = useCallback(() => {
+    flushTextTimer();
+    setProject((p) => {
+      const withSaved = updateFileXml(p, p.activeId, xml);
+      const n = withSaved.files.length;
+      const { project: next, id } = addFile(
+        withSaved,
+        `untitled_${n + 1}.xml`,
+        `<?xml version="1.0" encoding="utf-8"?>\n<LinearLayout\n    xmlns:android="http://schemas.android.com/apk/res/android"\n    android:layout_width="match_parent"\n    android:layout_height="match_parent"\n    android:orientation="vertical">\n\n</LinearLayout>\n`,
+      );
+      if (!id) {
+        setExportNote(`最多 ${n} 个文件，新建失败`);
+        window.setTimeout(() => setExportNote(""), 3600);
+        return withSaved;
+      }
+      const target = activeFile(next)!;
+      setXml(target.xml);
+      histRef.current = { stack: [target.xml], idx: 0 };
+      syncHist();
+      setSelectedPath(null);
+      setExportNote(`已新建「${target.name}」`);
+      window.setTimeout(() => setExportNote(""), 2400);
+      return next;
+    });
+  }, [flushTextTimer, xml]);
+
+  const renameActiveFile = useCallback(() => {
+    const cur = activeFile(project);
+    if (!cur) return;
+    const input = window.prompt(`重命名「${cur.name}」`, cur.name);
+    if (!input || input === cur.name) return;
+    setProject((p) => renameFile(p, cur.id, input));
+  }, [project]);
+
+  const deleteActiveFile = useCallback(() => {
+    const cur = activeFile(project);
+    if (!cur || project.files.length <= 1) {
+      setExportNote("项目里只剩最后一个文件，删不了（先新建一个）");
+      window.setTimeout(() => setExportNote(""), 3600);
+      return;
+    }
+    if (!window.confirm(`删除「${cur.name}」？该文件内容会丢失。`)) return;
+    flushTextTimer();
+    setProject((p) => {
+      const withSaved = updateFileXml(p, p.activeId, xml);
+      const next = removeFile(withSaved, cur.id);
+      const target = activeFile(next)!;
+      setXml(target.xml);
+      histRef.current = { stack: [target.xml], idx: 0 };
+      syncHist();
+      setSelectedPath(null);
+      return next;
+    });
+    setExportNote(`已删除「${cur.name}」`);
+    window.setTimeout(() => setExportNote(""), 2400);
+  }, [flushTextTimer, project, xml]);
+
   /** 手敲代码：立即上屏，历史防抖 500ms 合并 */
   const onChangeXmlText = useCallback(
     (next: string) => {
@@ -1440,6 +1599,15 @@ const findResolved = findResolvedNode;
           window.setTimeout(() => setExportNote(""), 5000);
           return;
         }
+        // M9：打开的文件作为项目里的一个新文件（同名自动加序号），不再冲掉当前内容
+        const res2 = addFile(project, f.name, txt);
+        if (!res2.id) {
+          setExportNote(`项目文件已达上限（${MAX_FILES} 个），仍已载入「${f.name}」但未入项目`);
+          window.setTimeout(() => setExportNote(""), 4600);
+          setXmlAndTrack(txt);
+          return;
+        }
+        setProject(res2.project);
         setXmlAndTrack(txt);
         // 5) 载入后语义检查：有 error 级问题给出提示（不阻断，用户可继续编辑）
         const errs = issues.filter((i) => i.level === "error");
@@ -1678,6 +1846,7 @@ const findResolved = findResolvedNode;
               ))}
             </optgroup>
           </select>
+          {fileSelect}
           <button
             role="tab"
             aria-selected={mobileTab === "xml"}
@@ -1851,6 +2020,7 @@ const findResolved = findResolvedNode;
                 ))}
               </optgroup>
             </select>
+            {fileSelect}
             <button className="axv-mob-tool-btn" onClick={openProject} title="打开本地 XML 文件">打开</button>
             <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
             {resExtras || Object.keys(generatedDrawables).length > 0 ? (

@@ -7,6 +7,8 @@ export const LS_KEY_RES = "axv.autosave.resources";
 export const LS_KEY_ICONS = "axv.autosave.icons"; // M3g：图标选择器生成的矢量资源
 export const LS_KEY_DEVICE = "axv.device";
 export const LS_KEY_ZOOM = "axv.zoom";
+/** 多文件项目（文件列表 + 各自的 xml） */
+export const LS_KEY_PROJECT = "axv.project.v1";
 
 /** 安全读 localStorage 字符串 */
 export function lsGet(key: string): string | null {

@@ -68,9 +68,16 @@ export function buildShapeXml(spec: ShapeSpec): string {
   // 3. inset
   if (spec.inset && hasInset(spec.inset)) {
     const i = spec.inset;
+    // M5c 修正：Android 的 inset 属性是 insetLeft/Top/Right/Bottom（以前写成 insetL/T/R/B，aapt 不认）
+    const INSET_ATTR: Record<"l" | "t" | "r" | "b", string> = {
+      l: "Left",
+      t: "Top",
+      r: "Right",
+      b: "Bottom",
+    };
     const parts = (["l", "t", "r", "b"] as const)
       .filter((k) => i[k] !== undefined && i[k] !== 0)
-      .map((k) => `android:inset${k.toUpperCase()}="${dp(i[k] as number)}"`);
+      .map((k) => `android:inset${INSET_ATTR[k]}="${dp(i[k] as number)}"`);
     block = [`<inset${parts.length ? " " + parts.join(" ") : ""}>`, ...indentAll(block, 1), `</inset>`];
     wrapped = true;
   }
@@ -247,8 +254,16 @@ function parseWrap(node: XmlNode): ShapeSpec | null {
     const prev = parseWrap(firstElementChild(node) ?? node);
     if (!prev) return null;
     const inset: NonNullable<ShapeSpec["inset"]> = {};
+    // M5c：标准名是 insetLeft/Top/Right/Bottom；旧版本生成过 insetL/T/R/B，两种都读
+    const LEGACY: Record<"l" | "t" | "r" | "b", [string, string]> = {
+      l: ["insetLeft", "insetL"],
+      t: ["insetTop", "insetT"],
+      r: ["insetRight", "insetR"],
+      b: ["insetBottom", "insetB"],
+    };
     for (const k of ["l", "t", "r", "b"] as const) {
-      const v = num(node.attrs[`inset${k.toUpperCase()}`]);
+      const [std, old] = LEGACY[k];
+      const v = num(node.attrs[std]) ?? num(node.attrs[old]);
       if (v !== undefined && v !== 0) inset[k] = v;
     }
     if (!hasInset(inset)) return prev;
@@ -378,8 +393,17 @@ export function specToCss(
   border?: string;
   boxShadow?: string;
   aspectRatio?: string;
+  /** M5c：<inset> 内缩——预览用 clip-path 把背景裁到内缩区（不参与画布节点样式） */
+  clipPath?: string;
 } {
-  const css: { background?: string; borderRadius?: string; border?: string; boxShadow?: string; aspectRatio?: string } = {};
+  const css: {
+    background?: string;
+    borderRadius?: string;
+    border?: string;
+    boxShadow?: string;
+    aspectRatio?: string;
+    clipPath?: string;
+  } = {};
 
   if (spec.gradient) {
     const g = spec.gradient;
@@ -414,6 +438,19 @@ export function specToCss(
     const s = spec.shadow;
     const inset = s.blur > 0 ? `${s.blur}px` : "0";
     css.boxShadow = `${s.dx}px ${s.dy}px ${inset} 0 ${resolveColor(s.color)}`;
+  }
+
+  // M5c：inset 内缩（预览）：把整个绘制区域向内裁掉 l/t/r/b，圆角跟着走
+  if (spec.inset) {
+    const i = spec.inset;
+    const l = i.l ?? 0;
+    const t = i.t ?? 0;
+    const r = i.r ?? 0;
+    const b = i.b ?? 0;
+    if (l || t || r || b) {
+      const round = css.borderRadius ? ` round ${css.borderRadius}` : "";
+      css.clipPath = `inset(${t}px ${r}px ${b}px ${l}px${round})`;
+    }
   }
 
   if (spec.kind === "line") {

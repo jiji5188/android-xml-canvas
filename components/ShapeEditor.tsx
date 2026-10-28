@@ -394,6 +394,61 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
               ) : null}
             </div>
 
+            {/* M5c：<inset> 内缩（背景整体内缩绘制） */}
+            <div className="axv-shape-field">
+              <label className="axv-shape-check axv-shape-check-line">
+                <input
+                  type="checkbox"
+                  checked={!!spec.inset}
+                  onChange={(e) =>
+                    setSpec((s) =>
+                      e.target.checked
+                        ? { ...s, inset: { l: 4, t: 4, r: 4, b: 4 } }
+                        : { ...s, inset: undefined },
+                    )
+                  }
+                />
+                内缩（&lt;inset&gt;）
+              </label>
+              {spec.inset ? (
+                <>
+                  <div className="axv-shape-corners" style={{ marginTop: 6 }}>
+                    {(
+                      [
+                        ["l", "左"],
+                        ["t", "上"],
+                        ["r", "右"],
+                        ["b", "下"],
+                      ] as const
+                    ).map(([k, label]) => (
+                      <input
+                        key={k}
+                        className="axv-attr-input"
+                        type="number"
+                        min={0}
+                        title={`内缩${label}（dp）`}
+                        placeholder={label}
+                        value={spec.inset?.[k] ?? 0}
+                        onChange={(e) =>
+                          setSpec((s) => ({
+                            ...s,
+                            inset: { ...(s.inset ?? {}), [k]: Math.max(0, Number(e.target.value) || 0) },
+                          }))
+                        }
+                      />
+                    ))}
+                  </div>
+                  <button
+                    className="axv-shape-link"
+                    style={{ marginTop: 6 }}
+                    onClick={() => setSpec((s) => ({ ...s, inset: { l: 4, t: 4, r: 4, b: 4 } }))}
+                  >
+                    四边统一 4dp
+                  </button>
+                </>
+              ) : null}
+            </div>
+
             <details
               className="axv-shape-adv"
               open={advanced}
@@ -478,6 +533,8 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                   background: css.background,
                   borderRadius: css.borderRadius,
                   border: css.border,
+                  // M5c：inset 预览——背景向内裁掉 l/t/r/b（画布里由独立背景层实现）
+                  clipPath: css.clipPath,
                   width: spec.kind === "line" ? "100%" : 180,
                   height: spec.kind === "line" ? 2 : 100,
                 }}

@@ -340,24 +340,49 @@ export function buildRenderModel(
     const r = (attrs["radius"] as number) || 0;
     if (r) style.borderRadius = `${DP(r, scale)}px`;
     // M2w：<shape> 背景（@drawable/bg_xxx 引用的渐变/圆角/描边），覆盖上面的纯色
-    const shape = attrs["bgShape"] as { gradient?: string; solid?: string; radiusDp?: number; cornersDp?: { tl: number; tr: number; br: number; bl: number }; strokeDp?: number; strokeColor?: string; oval?: boolean; shadow?: { dx: number; dy: number; blur: number; color: string } } | null;
+    const shape = attrs["bgShape"] as { gradient?: string; solid?: string; radiusDp?: number; cornersDp?: { tl: number; tr: number; br: number; bl: number }; strokeDp?: number; strokeColor?: string; oval?: boolean; shadow?: { dx: number; dy: number; blur: number; color: string }; insetDp?: { t: number; r: number; b: number; l: number } } | null;
+    /** M5c：<inset> 背景：单独画一层（内缩 t/r/b/l），不裁子控件 */
+    let bgInset: ResolvedNode["bgInset"];
     if (shape) {
-      if (shape.gradient) {
-        style.backgroundImage = shape.gradient;
-      } else if (shape.solid) {
-        style.backgroundColor = shape.solid;
-      }
-      if (shape.oval) {
-        style.borderRadius = "50%";
-      } else if (shape.cornersDp) {
-        const c = shape.cornersDp;
-        style.borderRadius = `${DP(c.tl, scale)}px ${DP(c.tr, scale)}px ${DP(c.br, scale)}px ${DP(c.bl, scale)}px`;
-      } else if (shape.radiusDp !== undefined) {
-        style.borderRadius = `${DP(shape.radiusDp, scale)}px`;
-      }
-      if (shape.strokeDp && shape.strokeColor) {
-        style.border = `${DP(shape.strokeDp, scale)}px solid ${shape.strokeColor}`;
-        style.boxSizing = "border-box";
+      /** M5c：<inset> 背景画到单独的 bgInset 层（不裁子控件），不直接写节点 background */
+      if (shape.insetDp && (shape.insetDp.t || shape.insetDp.r || shape.insetDp.b || shape.insetDp.l)) {
+        const i = shape.insetDp;
+        let radius = "0px";
+        if (shape.oval) radius = "50%";
+        else if (shape.cornersDp) {
+          const c = shape.cornersDp;
+          radius = `${DP(c.tl, scale)}px ${DP(c.tr, scale)}px ${DP(c.br, scale)}px ${DP(c.bl, scale)}px`;
+        } else if (shape.radiusDp !== undefined) radius = `${DP(shape.radiusDp, scale)}px`;
+        bgInset = {
+          t: i.t,
+          r: i.r,
+          b: i.b,
+          l: i.l,
+          fill: shape.gradient ?? shape.solid ?? "#E0E0E0",
+          radius,
+          border:
+            shape.strokeDp && shape.strokeColor
+              ? `${DP(shape.strokeDp, scale)}px solid ${shape.strokeColor}`
+              : undefined,
+        };
+      } else {
+        if (shape.gradient) {
+          style.backgroundImage = shape.gradient;
+        } else if (shape.solid) {
+          style.backgroundColor = shape.solid;
+        }
+        if (shape.oval) {
+          style.borderRadius = "50%";
+        } else if (shape.cornersDp) {
+          const c = shape.cornersDp;
+          style.borderRadius = `${DP(c.tl, scale)}px ${DP(c.tr, scale)}px ${DP(c.br, scale)}px ${DP(c.bl, scale)}px`;
+        } else if (shape.radiusDp !== undefined) {
+          style.borderRadius = `${DP(shape.radiusDp, scale)}px`;
+        }
+        if (shape.strokeDp && shape.strokeColor) {
+          style.border = `${DP(shape.strokeDp, scale)}px solid ${shape.strokeColor}`;
+          style.boxSizing = "border-box";
+        }
       }
       // M3h-2：layer-list 阴影层（elevation 没设时才用，否则下面会覆盖）
       if (shape.shadow) {
@@ -795,6 +820,7 @@ export function buildRenderModel(
       rawAttrs: node.attrs,
     };
     if (sourceFile) resolved.sourceFile = sourceFile;
+    if (bgInset) resolved.bgInset = bgInset;
     if (imgSrc) resolved.imgSrc = imgSrc;
     if (imgFit) resolved.imgFit = imgFit;
     if (imgPos) resolved.imgPos = imgPos;

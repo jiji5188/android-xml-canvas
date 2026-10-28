@@ -26,6 +26,8 @@ export interface ShapeStyle {
   oval?: boolean;
   /** line → 只画一条线（stroke 生效，背景透明） */
   line?: boolean;
+  /** M5c：<inset> 外壳的内缩值（dp）—— 背景实际画在内缩后的区域里 */
+  insetDp?: { t: number; r: number; b: number; l: number };
   /** layer-list 阴影层（M3h-2）：底层偏移实心块 */
   shadow?: { dx: number; dy: number; blur: number; color: string };
 }
@@ -75,6 +77,8 @@ export function parseShapeDrawable(
   // layer-list：Android 自下而上绘制，取最后一个（顶层）当可见形状
   let target = root;
   let shadow: ShapeStyle["shadow"];
+  /** M5c：<inset> 外壳的内缩（空 = 没套 inset） */
+  let insetDp: ShapeStyle["insetDp"];
   for (let guard = 0; guard < 6; guard++) {
     if (target.tag === "selector") {
       const items = target.children.filter((c) => c.tag === "item");
@@ -86,6 +90,14 @@ export function parseShapeDrawable(
       continue;
     }
     if (target.tag === "ripple" || target.tag === "inset") {
+      // M5c：inset 外壳带内缩值（Android: insetLeft/Top/Right/Bottom）；ripple 没有
+      if (target.tag === "inset") {
+        const t = dp(target.attrs["insetTop"]) ?? 0;
+        const r = dp(target.attrs["insetRight"]) ?? dp(target.attrs["insetEnd"]) ?? 0;
+        const b = dp(target.attrs["insetBottom"]) ?? 0;
+        const l = dp(target.attrs["insetLeft"]) ?? dp(target.attrs["insetStart"]) ?? 0;
+        if (t || r || b || l) insetDp = { t, r, b, l };
+      }
       const item = target.children.find((c) => c.tag === "item");
       const inner = item
         ? item.children.find((c) => c.tag !== "#text" && c.tag !== "#comment")
@@ -163,5 +175,7 @@ export function parseShapeDrawable(
       }
     }
   }
-  return shadow ? { ...out, shadow } : out;
+  const fin: ShapeStyle = shadow ? { ...out, shadow } : out;
+  if (insetDp) fin.insetDp = insetDp;
+  return fin;
 }

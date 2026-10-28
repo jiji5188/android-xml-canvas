@@ -468,6 +468,27 @@ export function XmlCanvas({
       }
       title={node.tag + (node.rawAttrs.id ? " · " + node.rawAttrs.id : "") + (node.text ? " · " + node.text : "")}
     >
+      {/* M5c：<inset> 背景层：画在内容之下（z-index:0），但内缩 t/r/b/l，不裁子控件 */}
+      {node.bgInset ? (
+        <span
+          className="axv-bg-inset"
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: `calc(${node.bgInset.t} * 2px)`,
+            right: `calc(${node.bgInset.r} * 2px)`,
+            bottom: `calc(${node.bgInset.b} * 2px)`,
+            left: `calc(${node.bgInset.l} * 2px)`,
+            background: node.bgInset.fill,
+            borderRadius: node.bgInset.radius,
+            border: node.bgInset.border,
+            boxSizing: "border-box",
+            zIndex: 0,
+            pointerEvents: "none",
+          }}
+        />
+      ) : null}
+
       {node.imgSrc ? (
         node.imgSrc.startsWith("builtin:") ? (
           // @android:drawable/xxx 平台内置图标：中性占位（bi�? 提示，不标错）

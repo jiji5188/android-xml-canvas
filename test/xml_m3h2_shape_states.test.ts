@@ -95,8 +95,9 @@ describe("M3h-2 inset", () => {
   it("生成 <inset> 包裹", () => {
     const xml = buildShapeXml(spec);
     expect(xml.startsWith('<inset xmlns:android=')).toBe(true);
-    expect(xml).toContain('android:insetL="2dp"');
-    expect(xml).toContain('android:insetT="2dp"');
+    // M5c 修正：标准属性名是 insetLeft / insetTop（旧版本误写成 insetL / insetT）
+    expect(xml).toContain('android:insetLeft="2dp"');
+    expect(xml).toContain('android:insetTop="2dp"');
   });
 
   it("画布预览等于内层形状", () => {

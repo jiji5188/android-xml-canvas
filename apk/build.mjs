@@ -67,7 +67,6 @@ run(jbrExe("javac"), [
   "--release", "11", "-classpath", path.join(SDK, "platforms", PLATFORM, "android.jar"),
   "-d", "build/classes",
   "src/com/jiji/axv/MainActivity.java",
-  "src/com/jiji/axv/AssetServer.java",
   "build/gen/com/jiji/axv/R.java",
 ], apk);
 

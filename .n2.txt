@@ -1,0 +1,16 @@
+﻿1951:         </div>
+1952: 
+1953:         <div className="axv-tb-group">
+1954:           <button
+1955:             className="axv-tb-btn"
+1956:             title="鎾ら攢"
+1957:             aria-label="鎾ら攢"
+1958:             disabled={!canUndo}
+1959:             onClick={undo}
+1960:           >
+1961:             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>undo</span>
+1962:           </button>
+1963:           <button
+1964:             className="axv-tb-btn"
+1965:             title="閲嶅仛"
+1966:             aria-label="閲嶅仛"

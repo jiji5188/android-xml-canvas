@@ -421,12 +421,31 @@
   top: 14px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  /* M6b：左按钮 | 中间可滚工具栏（吃满剩余宽度）| 右按钮 */
   gap: 10px;
   padding: 0 20px;
   z-index: 40;
   pointer-events: none;
+  flex-wrap: nowrap;
+}
+/* 侧滑按钮组：固定宽度，不参与压缩 */
+.axv-tb-side {
+  flex: 0 0 auto;
+}
+/* 中间的工具栏容器：桌面放不下就换行；手机改为横向滚动（见下方媒体查询） */
+.axv-tb-scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  row-gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
   flex-wrap: wrap;
+  justify-content: center;
+  pointer-events: auto;
+}
+.axv-tb-scroll > .axv-tb-group {
+  flex: 0 0 auto;
 }
 .axv-tb-group {
   display: flex;
@@ -1986,48 +2005,29 @@
   }
   .axv-toolbar-v2 {
     top: 10px;
-    /* 不能留左右 padding：sticky 吸边时那块 padding 会漏出下面滚过去的图标（右侧碎图标） */
-    padding: 0;
+    padding: 0 6px;
     gap: 6px;
-    flex-wrap: nowrap;
-    /* 移动端按钮太多：容器横向滚动（藏滚动条），右侧「展开属性面板」吸边常驻 */
-    justify-content: flex-start;
-    overflow-x: auto;
-    overflow-y: hidden;
-    /* 容器默认 pointer-events:none 会让触摸滑动失效，这里必须放开 */
-    pointer-events: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
     /* 层级低于蒙版（25）：面板打开时工具栏一起被遮罩盖住 */
     z-index: 20;
   }
-  .axv-toolbar-v2::-webkit-scrollbar {
+  /* 中间区：手机上改成横向滚动（桌面是换行） */
+  .axv-tb-scroll {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    /* 溢出时左右边缘淡出，提示还能滑 */
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 5px, #000 calc(100% - 5px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 5px, #000 calc(100% - 5px), transparent 100%);
+  }
+  .axv-tb-scroll::-webkit-scrollbar {
     display: none;
   }
-  .axv-toolbar-v2 > .axv-tb-group {
-    /* 不允许被挤扁，否则图标会被裁 */
-    flex: 0 0 auto;
-  }
-  .axv-toolbar-v2 > .axv-tb-group:last-child {
-    /* 最后一个 group = 展开右侧属性面板：吸在右边缘，滚多远都点得到 */
-    position: sticky;
-    right: 0;
-    margin-left: auto;
-    z-index: 1;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.05);
-  }
-  .axv-toolbar-v2 > .axv-tb-group:first-child {
-    /* 第一个 group = 展开左侧面板：同样吸左边缘（z-index 要比滚动内容高，否则会被盖住） */
-    position: sticky;
-    left: 0;
-    margin-right: auto;
-    z-index: 1;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.05);
-  }
   /* 代码 tab 底部工具条同样可能溢出 */
-  .axv-mob-xml-tools {
-    overflow-x: auto;
+  .axv-mob-xml-tools {    overflow-x: auto;
     overscroll-behavior-x: contain;
     scrollbar-width: none;
   }

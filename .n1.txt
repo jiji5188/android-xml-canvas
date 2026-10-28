@@ -1,0 +1,61 @@
+﻿1926:       />
+1927: 
+1928:       {/* 椤堕儴宸ュ叿鏍忥紙妗岄潰绔彧鍗犱袱渚ч潰鏉夸箣闂寸殑鐢诲竷鍖猴紝涓嶉噸鍙犱晶鏍忥級 */}
+1929:       <div
+1930:         className="axv-toolbar-v2"
+1931:         style={
+1932:           isMobile
+1933:             ? undefined
+1934:             : {
+1935:                 left: leftOpen ? 320 : 0,
+1936:                 right: rightOpen ? 320 : 0,
+1937:                 transition: "left 0.22s, right 0.22s",
+1938:               }
+1939:         }
+1940:       >
+1941:         <div className="axv-tb-group" style={{ visibility: leftOpen ? "hidden" : "visible" }}>
+1942:           <button
+1943:             className="axv-tb-btn"
+1944:             title="灞曞紑宸︿晶闈㈡澘"
+1945:             aria-label="灞曞紑宸︿晶闈㈡澘"
+1946:             aria-pressed={false}
+1947:             onClick={() => setLeftOpen(true)}
+1948:           >
+1949:             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>left_panel_open</span>
+1950:           </button>
+...
+2041:                   ))}
+2042:                 </optgroup>
+2043:               ))}
+2044:             </select>
+2045:           </div>
+2046:           <div className="axv-zoom">
+2047:             <input
+2048:               type="range"
+2049:               min={0.4}
+2050:               max={1.5}
+2051:               step={0.1}
+2052:               value={scale}
+2053:               onChange={(e) => setScale(parseFloat(e.target.value))}
+2054:               aria-label="缂╂斁"
+2055:             />
+2056:             <span>{scale.toFixed(2)}脳</span>
+2057:           </div>
+2058:         </div>
+2059: 
+2060:         <div className="axv-tb-group" style={{ visibility: rightOpen ? "hidden" : "visible" }}>
+2061:           <button
+2062:             className="axv-tb-btn"
+2063:             title="灞曞紑鍙充晶灞炴€ч潰鏉?
+2064:             aria-label="鍙充晶灞炴€ч潰鏉?
+2065:             aria-pressed={false}
+2066:             onClick={() => setRightOpen(true)}
+2067:           >
+2068:             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>right_panel_open</span>
+2069:           </button>
+2070:         </div>
+2071:       </div>
+2072:       </div>
+2073: 
+2074:       {runOpen ? (
+2075:         <RunPreview

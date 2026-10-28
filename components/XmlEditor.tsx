@@ -1938,7 +1938,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               }
         }
       >
-        <div className="axv-tb-group" style={{ visibility: leftOpen ? "hidden" : "visible" }}>
+        <div className="axv-tb-group axv-tb-side" style={{ visibility: leftOpen ? "hidden" : "visible" }}>
           <button
             className="axv-tb-btn"
             title="展开左侧面板"
@@ -1950,10 +1950,12 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           </button>
         </div>
 
-        <div className="axv-tb-group">
-          <button
-            className="axv-tb-btn"
-            title="撤销"
+        {/* M6b：中间可横向滚动的工具栏区（左/右侧滑按钮各占一边，不悬浮不吸边） */}
+        <div className="axv-tb-scroll">
+          <div className="axv-tb-group">
+            <button
+              className="axv-tb-btn"
+              title="撤销"
             aria-label="撤销"
             disabled={!canUndo}
             onClick={undo}
@@ -2056,8 +2058,9 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             <span>{scale.toFixed(2)}×</span>
           </div>
         </div>
+        </div>
 
-        <div className="axv-tb-group" style={{ visibility: rightOpen ? "hidden" : "visible" }}>
+        <div className="axv-tb-group axv-tb-side" style={{ visibility: rightOpen ? "hidden" : "visible" }}>
           <button
             className="axv-tb-btn"
             title="展开右侧属性面板"

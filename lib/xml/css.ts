@@ -593,7 +593,10 @@ export function buildRenderModel(
           //   fitCenter/centerInside=contain（等比缩放到完整可见，居中）
           //   fitStart=contain+左对齐  fitEnd=contain+右对齐
           //   center=none（原始尺寸居中，超出裁掉）  matrix=none（不做矩阵变换，近似 center）
-          const st = (attrs["scaleType"] as string) || "fitCenter";
+          // M11：默认值按控件区分 —— ImageView 默认 fitCenter，ImageButton 默认 center
+          const tagName = String(node.tag || "");
+          const isImageButton = /ImageButton$/.test(tagName) || tagName === "ImageButton";
+          const st = ((attrs["scaleType"] as string) || (isImageButton ? "center" : "fitCenter")).trim();
           switch (st) {
             case "fitXY":
               imgFit = "fill";
@@ -602,16 +605,20 @@ export function buildRenderModel(
               imgFit = "cover";
               break;
             case "center":
-            case "matrix":
               imgFit = "none";
+              break;
+            case "matrix":
+              // matrix 不做任何缩放，从左上角开始绘制（近似 object-position: left top）
+              imgFit = "none";
+              imgPos = "left top";
               break;
             case "fitStart":
               imgFit = "contain";
-              imgPos = "left";
+              imgPos = "left center";
               break;
             case "fitEnd":
               imgFit = "contain";
-              imgPos = "right";
+              imgPos = "right center";
               break;
             case "fitCenter":
             case "centerInside":

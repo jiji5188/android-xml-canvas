@@ -13,6 +13,29 @@ import { isContainerTag } from "@/lib/xml/insert";
 export type ConstraintSide = "start" | "end" | "top" | "bottom";
 export type GeomMode = "move" | "left" | "right" | "top" | "bottom";
 
+/** M11：src 内容区要避开 padding（Android 里 src 只能画在 content box 内）。
+ *  从 ResolvedNode.style 的 padding* 取出 px 值拼成 inset 字符串。 */
+function padInset(style: ResolvedNode["style"]): string {
+  const n = (v: unknown) => {
+    const f = parseFloat(String(v ?? 0));
+    return Number.isFinite(f) ? f : 0;
+  };
+  const t = n(style?.paddingTop);
+  const r = n(style?.paddingRight);
+  const b = n(style?.paddingBottom);
+  const l = n(style?.paddingLeft);
+  if (!t && !r && !b && !l) return "0px";
+  return `${t}px ${r}px ${b}px ${l}px`;
+}
+
+/** M11：scaleType → CSS mask-size（mask 不吃 object-fit，要自己映射） */
+function maskSizeOf(fit: string | undefined): string {
+  if (fit === "fill") return "100% 100%";
+  if (fit === "cover") return "cover";
+  if (fit === "none") return "auto";
+  return "contain";
+}
+
 /** 画布几何变化（单位 dp，相对父容器左上角） */
 export interface GeomPatch {
   x?: number;
@@ -498,7 +521,7 @@ export function XmlCanvas({
             aria-hidden="true"
             style={{
               position: "absolute",
-              inset: 0,
+              inset: padInset(node.style),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -518,7 +541,7 @@ export function XmlCanvas({
             aria-hidden="true"
             style={{
               position: "absolute",
-              inset: 0,
+              inset: padInset(node.style),
               backgroundColor: node.imgTint,
               WebkitMaskImage: `url(${node.imgSrc})`,
               maskImage: `url(${node.imgSrc})`,
@@ -526,8 +549,8 @@ export function XmlCanvas({
               maskRepeat: "no-repeat",
               WebkitMaskPosition: node.imgPos ?? "center",
               maskPosition: node.imgPos ?? "center",
-              WebkitMaskSize: node.imgFit === "fill" ? "100% 100%" : node.imgFit === "cover" ? "cover" : "contain",
-              maskSize: node.imgFit === "fill" ? "100% 100%" : node.imgFit === "cover" ? "cover" : "contain",
+              WebkitMaskSize: maskSizeOf(node.imgFit),
+              maskSize: maskSizeOf(node.imgFit),
               pointerEvents: "none",
             }}
           />
@@ -540,9 +563,9 @@ export function XmlCanvas({
               draggable={false}
               style={{
                 position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
+                inset: padInset(node.style),
+                width: "auto",
+                height: "auto",
                 objectFit: (node.imgFit as React.CSSProperties["objectFit"]) ?? "contain",
                 objectPosition: node.imgPos ?? "center",
                 pointerEvents: "none",
@@ -555,7 +578,7 @@ export function XmlCanvas({
                 aria-hidden="true"
                 style={{
                   position: "absolute",
-                  inset: 0,
+                  inset: padInset(node.style),
                   backgroundColor: node.imgTint,
                   mixBlendMode:
                     node.imgBlend === "overlay"

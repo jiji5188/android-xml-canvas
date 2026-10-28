@@ -325,6 +325,7 @@ const SAMPLES: Record<string, string> = {
 </LinearLayout>`,
 };
 
+const APP_VERSION = "1.10";
 const SCALE = 2; // 1dp = 2px
 
 export function XmlEditor() {
@@ -455,7 +456,7 @@ export function XmlEditor() {
 
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
-  const [leftView, setLeftView] = useState<"parts" | "layers" | "code" | "res">("parts");
+  const [leftView, setLeftView] = useState<"parts" | "layers" | "code" | "res" | "settings" | "about">("parts");
   const [addModalOpen, setAddModalOpen] = useState(false);
   /** M2s：导出前检查面板 */
   const [exportOpen, setExportOpen] = useState(false);
@@ -469,6 +470,31 @@ export function XmlEditor() {
   const [runOpen, setRunOpen] = useState(false);
   /** M5b：已生成资源管理面板 */
   const [assetsOpen, setAssetsOpen] = useState(false);
+  // M11：设置 / 关于面板
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [showSystemBars, setShowSystemBars] = useState(true);
+  const [showIssues, setShowIssues] = useState(true);
+
+  // M11：主题切换（只影响编辑器界面，不影响导出）
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") root.setAttribute("data-axv-theme", "dark");
+    else root.removeAttribute("data-axv-theme");
+    try {
+      window.localStorage.setItem("axv.theme", theme);
+    } catch {
+      /* ignore */
+    }
+  }, [theme]);
+
+  // M11：启动时恢复主题
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem("axv.theme") === "dark") setTheme("dark");
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const [mobileTab, setMobileTab] = useState<"preview" | "xml">("preview");
 
 
@@ -1912,6 +1938,7 @@ const findResolved = findResolvedNode;
               onDrop={onDrop}
             >
               {/* 状态栏（系统窗口，不属于布局 XML）：时间 + 前置摄像头（居中）+ 信号/WiFi/电池 */}
+              {showSystemBars && (
               <div className="axv-statusbar" style={{ height: STATUS_BAR_H }}>
                 <span className="axv-sb-time">9:41</span>
                 {exportNote ? <div className="axv-toast axv-sb-camera-note">{exportNote}</div> : <div className="axv-sb-camera" aria-hidden="true" />}
@@ -1927,6 +1954,7 @@ const findResolved = findResolvedNode;
                   </span>
                 </span>
               </div>
+              )}
 
               {/* 应用内容区：根布局填满这里 */}
               <div className="axv-phone-body">
@@ -1942,6 +1970,7 @@ const findResolved = findResolvedNode;
               </div>
 
               {/* 导航栏（三键导航：返回 / 主页 / 多任务） */}
+              {showSystemBars && (
               <div className="axv-navbar" style={{ height: NAV_BAR_H }}>
                 <span className="axv-nav-btn" title="返回">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1959,10 +1988,11 @@ const findResolved = findResolvedNode;
                   </svg>
                 </span>
               </div>
+              )}
             </div>
             </div>
           ) : null}
-          {issues.length > 0 && (
+          {showIssues && issues.length > 0 && (
             <div className="axv-issues">
               <strong>{issues.length} 条提示：</strong>
               {issues.slice(0, 8).map((i, idx) => (
@@ -2104,12 +2134,49 @@ const findResolved = findResolvedNode;
               folder_open
             </span>
           </button>
+          <div className="axv-rail-gap" />
+          <button
+            className={"axv-rail-btn" + (leftView === "settings" ? " on" : "")}
+            title="设置"
+            aria-label="设置"
+            aria-pressed={leftView === "settings"}
+            onClick={() => {
+              setLeftView("settings");
+              setLeftOpen(true);
+            }}
+          >
+            <span className="msr" aria-hidden="true" data-fill={leftView === "settings" ? "1" : "0"} style={{ fontSize: 24 }}>
+              settings
+            </span>
+          </button>
+          <button
+            className={"axv-rail-btn" + (leftView === "about" ? " on" : "")}
+            title="关于"
+            aria-label="关于"
+            aria-pressed={leftView === "about"}
+            onClick={() => {
+              setLeftView("about");
+              setLeftOpen(true);
+            }}
+          >
+            <span className="msr" aria-hidden="true" data-fill={leftView === "about" ? "1" : "0"} style={{ fontSize: 24 }}>
+              info
+            </span>
+          </button>
         </div>
 
         <div className="axv-rail-body">
           <div className="axv-rail-head">
             <span className="axv-rail-title">
-              {leftView === "parts" ? "组件" : leftView === "layers" ? "图层" : "资源"}
+              {leftView === "parts"
+                ? "组件"
+                : leftView === "layers"
+                  ? "图层"
+                  : leftView === "res"
+                    ? "资源"
+                    : leftView === "settings"
+                      ? "设置"
+                      : "关于"}
             </span>
             <button
               className="axv-icon-btn"
@@ -2191,6 +2258,109 @@ const findResolved = findResolvedNode;
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {leftView === "settings" && (
+            <div className="axv-rail-scroll">
+              <div className="axv-set-group">
+                <div className="axv-set-label">界面主题</div>
+                <div className="axv-set-seg">
+                  <button
+                    className={"axv-set-seg-btn" + (theme === "light" ? " on" : "")}
+                    onClick={() => setTheme("light")}
+                  >
+                    浅色
+                  </button>
+                  <button
+                    className={"axv-set-seg-btn" + (theme === "dark" ? " on" : "")}
+                    onClick={() => setTheme("dark")}
+                  >
+                    深色
+                  </button>
+                </div>
+                <div className="axv-set-hint">深色仅作用于编辑器界面，不影响导出的布局配色。</div>
+              </div>
+
+              <div className="axv-set-group">
+                <div className="axv-set-label">预览</div>
+                <label className="axv-set-row">
+                  <span>显示系统状态栏 / 导航栏</span>
+                  <input
+                    type="checkbox"
+                    checked={showSystemBars}
+                    onChange={(e) => setShowSystemBars(e.target.checked)}
+                  />
+                </label>
+                <label className="axv-set-row">
+                  <span>控件提示（缺资源红框等）</span>
+                  <input
+                    type="checkbox"
+                    checked={showIssues}
+                    onChange={(e) => setShowIssues(e.target.checked)}
+                  />
+                </label>
+              </div>
+
+              <div className="axv-set-group">
+                <div className="axv-set-label">数据</div>
+                <div className="axv-set-hint">
+                  布局、资源与生成的图标都自动存在本机浏览器（localStorage），关页面不丢。
+                </div>
+                <button className="axv-set-btn" onClick={saveProject}>
+                  <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>save</span>
+                  立即导出当前 XML
+                </button>
+                <button
+                  className="axv-set-btn axv-set-btn-danger"
+                  onClick={() => {
+                    if (!window.confirm("清空本机所有缓存（布局 / 资源 / 生成的图标 / 文件列表）？此操作不可撤销。")) return;
+                    try {
+                      Object.keys(window.localStorage)
+                        .filter((k) => k.startsWith("axv."))
+                        .forEach((k) => window.localStorage.removeItem(k));
+                    } catch {
+                      /* ignore */
+                    }
+                    window.location.reload();
+                  }}
+                >
+                  <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>delete</span>
+                  清空本机缓存并重启
+                </button>
+              </div>
+            </div>
+          )}
+
+          {leftView === "about" && (
+            <div className="axv-rail-scroll">
+              <div className="axv-about-hero">
+                <span className="msr" aria-hidden="true" style={{ fontSize: 36 }}>android</span>
+                <div>
+                  <div className="axv-about-name">Android XML 布局预览</div>
+                  <div className="axv-about-ver">版本 {APP_VERSION}</div>
+                </div>
+              </div>
+              <div className="axv-about-desc">
+                纯前端 Android 布局编辑器：写 XML 或拖控件都能实时看到近似真机的渲染效果，
+                支持 ConstraintLayout 约束求解、shape / selector / vector 资源、图标生成与 res 打包导出。
+              </div>
+              <div className="axv-set-group">
+                <div className="axv-set-label">快捷键</div>
+                <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>Z</kbd><span>撤销</span></div>
+                <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd><span>重做</span></div>
+                <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>F</kbd><span>代码内查找</span></div>
+                <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>滚轮</kbd><span>缩放画布</span></div>
+                <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>0</kbd><span>缩放复位</span></div>
+                <div className="axv-about-kv"><kbd>Delete</kbd><span>删除选中控件</span></div>
+              </div>
+              <div className="axv-set-group">
+                <div className="axv-set-label">说明</div>
+                <div className="axv-set-hint">
+                  渲染为近似实现，不是 aapt / Android 运行时；个别属性（自定义 View、动画、第三方库）
+                  只做占位。最终效果以真机为准。
+                </div>
+              </div>
             </div>
           )}
         </div>

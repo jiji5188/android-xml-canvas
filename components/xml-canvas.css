@@ -364,10 +364,11 @@
   padding-right: 340px;
 }
 .axv-phone {
-  border: 2px solid #45455e;
+  /* M11：加厚边框 + 更夸张的落地阴影，更像真机 */
+  border: 8px solid #52525d;
   border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  box-shadow: 10px 20px 60px #0000007d;
   flex: 0 0 auto;
   /* 竖向三段：状态栏 / 应用内容区 / 导航栏。显式 flex 列布局 +
      明确高度，根布局的 height:100% 才有参照物（之前父级只有 min-height，
@@ -382,8 +383,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  font-size: 12px;
+  /* M11：横向留白 20（纵向留 0：高度由内联 height 定死，给纵向 padding 会把字压没） */
+  padding: 0 20px;
+  font-size: 30px;
   font-weight: 600;
   letter-spacing: 0.2px;
   user-select: none;
@@ -397,7 +399,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 15px;
+  /* M11：状态栏图标放大到 30 */
+  font-size: 30px;
   line-height: 1;
 }
 
@@ -433,8 +436,9 @@
   opacity: 0.75;
 }
 .axv-nav-btn svg {
-  width: 18px;
-  height: 18px;
+  /* M11：导航栏图标放大 2 倍 */
+  width: 36px;
+  height: 36px;
   display: block;
 }
 
@@ -2940,10 +2944,11 @@
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  padding: 1px 8px;
+  /* M11：状态栏提示条放大 */
+  padding: 8px 36px;
   font-size: 9px;
   line-height: 1.5;
-  border-radius: 4px;
+  border-radius: 8px;
   max-width: 70%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3376,3 +3381,131 @@
   justify-content: flex-end;
 }
 
+
+/* ===== M11：设置 / 关于面板 ===== */
+.axv-set-group {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--axv-outline);
+}
+.axv-set-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--axv-on-surface-variant);
+  margin-bottom: 8px;
+}
+.axv-set-seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--axv-surface-sunken);
+}
+.axv-set-seg-btn {
+  flex: 1 1 0;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--axv-on-surface);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.axv-set-seg-btn.on {
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+  font-weight: 600;
+}
+.axv-set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 13px;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+}
+.axv-set-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--axv-primary);
+  cursor: pointer;
+}
+.axv-set-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--axv-on-surface-variant);
+  margin: 6px 0 8px;
+}
+.axv-set-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  margin-top: 8px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.axv-set-btn:hover {
+  background: var(--axv-hover);
+}
+.axv-set-btn-danger {
+  border-color: var(--axv-danger);
+  color: var(--axv-danger);
+}
+.axv-about-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 14px 12px;
+  color: var(--axv-primary);
+}
+.axv-about-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--axv-on-surface);
+}
+.axv-about-ver {
+  font-size: 12px;
+  color: var(--axv-on-surface-variant);
+  margin-top: 2px;
+}
+.axv-about-desc {
+  padding: 0 14px 14px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--axv-on-surface-variant);
+}
+.axv-about-kv {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  font-size: 12.5px;
+  color: var(--axv-on-surface-variant);
+}
+.axv-about-kv kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--axv-outline-strong);
+  border-radius: 5px;
+  background: var(--axv-surface-sunken);
+  color: var(--axv-on-surface);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.axv-about-kv span {
+  margin-left: auto;
+}

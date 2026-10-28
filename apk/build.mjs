@@ -59,7 +59,6 @@ run(btExe("aapt2.exe"), [
   "--java", "build/gen",
   "--min-sdk-version", "24",
   "--target-sdk-version", "35",
-  "-A", "assets",
 ], apk);
 
 // 4) javac
@@ -95,6 +94,10 @@ run(jbrExe("javac"), [
 //    用 zip（build-tools 不带，系统一般也没有）→ 退化成 PowerShell Compress-Archive 不可靠，
 //    改用 Java 的 jar 命令（jbr 里有 jar.exe）：jar uf base.apk classes.dex
 run(jbrExe("jar"), ["uf", "build/base.apk", "-C", "build/dex", "classes.dex"], apk);
+
+// 6.5) assets 必须用正斜杠：aapt2 在 Windows 上会写成反斜杠（AssetManager 读不到，白屏），
+//      .NET ZipArchive 追加又会写 data descriptor（启动闪退）——用 append-assets.mjs 纯手写 STORE
+run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "build", "base.apk"), path.join(apk, "assets", "www")], apk);
 
 // 7) zipalign + 签名
 const keystore = path.join(apk, "debug.keystore");

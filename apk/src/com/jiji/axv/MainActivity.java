@@ -2,9 +2,13 @@ package com.jiji.axv;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.ViewGroup;
 import android.webkit.ConsoleMessage;
 import android.webkit.ValueCallback;
@@ -14,6 +18,9 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -23,11 +30,11 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * M9 真机壳 v2：WebView + shouldInterceptRequest 直接读 APK 里的 assets。
+ * M9 真机壳 v3：WebView + shouldInterceptRequest 直接读 assets/www。
  *
- * v1 用的是「在 App 内起 127.0.0.1 静态服务」，在部分机器上白屏（socket/端口不可靠），
- * 改成拦截请求：不建 socket、不占端口、不走网络，所有 /_next/... 绝对路径照样能解析，
- * https 假域名也给 localStorage 一个稳定的 origin（不然 file:// 下存不住东西）。
+ * v1（127.0.0.1 静态服务）在手机上白屏，v2 已改拦截方案；v3 在这基础上加
+ * 自诊断：如果页面渲染完 body 还是空的，就把 WebView 版本 / UA / console 报错
+ * 直接贴在屏幕上，不用连 USB 也能看到原因。
  */
 public class MainActivity extends Activity {
     private static final String TAG = "AXV";
@@ -36,7 +43,10 @@ public class MainActivity extends Activity {
     private static final int REQ_FILE = 1001;
 
     private WebView web;
+    private FrameLayout root;
+    private TextView diag;
     private ValueCallback<Uri[]> fileCallback;
+    private final StringBuilder logs = new StringBuilder();
 
     private static final Map<String, String> MIME = new HashMap<>();
 
@@ -66,9 +76,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
+        installCrashHandler();
 
+        root = new FrameLayout(this);
         web = new WebView(this);
-        web.setLayoutParams(new ViewGroup.LayoutParams(
+        web.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         WebSettings s = web.getSettings();
@@ -82,8 +94,10 @@ public class MainActivity extends Activity {
         s.setSupportZoom(false);
         s.setBuiltInZoomControls(false);
         s.setMediaPlaybackRequiresUserGesture(false);
-        // 让页面按手机真实宽度排版，否则设备下拉的「桌面三栏」判断会错
-        s.setJavaScriptCanOpenWindowsAutomatically(false);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            WebView.setWebContentsDebuggingEnabled(true);
+        }
 
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -92,20 +106,41 @@ public class MainActivity extends Activity {
             }
 
             @Override
-            public void onReceivedError(WebView view, android.webkit.WebResourceRequest req,
+            public void onReceivedError(WebView view, WebResourceRequest req,
                                         android.webkit.WebResourceError err) {
-                Log.e(TAG, "load error: " + req.getUrl() + " -> " + err.getDescription());
+                note("LOAD ERROR " + req.getUrl() + " -> " + err.getDescription());
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                // 页面渲染完还是一片空白时，把诊断信息直接显示出来
+                view.evaluateJavascript(
+                        "(function(){try{"
+                                + "var b=document.body;"
+                                + "var t=b?b.innerText.trim():'';"
+                                + "var ok=!!document.querySelector('.axv-phone, .axv-stage, .axv-editor');"
+                                + "return (ok?1:0)+'|'+t.length+'|'+(document.title||'');"
+                                + "}catch(e){return '-2|-2|'+e.message;}})()",
+                        value -> {
+                            String v = value == null ? "" : value.replace("\"", "").replace("\"", "");
+                            String[] parts = v.split("\\|");
+                            boolean rendered = parts.length > 0 && "1".equals(parts[0].trim());
+                            if (!rendered) {
+                                showDiag("编辑器没有渲染出来（" + v + "）");
+                            }
+                        });
             }
         });
 
         web.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onConsoleMessage(ConsoleMessage m) {
-                Log.d(TAG, "console: " + m.message() + " @" + m.sourceId() + ":" + m.lineNumber());
+                String line = m.message() + " @" + m.sourceId() + ":" + m.lineNumber();
+                Log.d(TAG, "console: " + line);
+                note(line);
                 return true;
             }
 
-            // 让「打开 XML 文件」能弹出系统文件选择器
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> cb,
                                              FileChooserParams params) {
@@ -124,15 +159,82 @@ public class MainActivity extends Activity {
             }
         });
 
-        setContentView(web);
+        diag = new TextView(this);
+        diag.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        diag.setTextColor(Color.parseColor("#B3261E"));
+        diag.setBackgroundColor(Color.parseColor("#FFF8F7"));
+        diag.setPadding(24, 24, 24, 24);
+        diag.setGravity(Gravity.TOP | Gravity.START);
+        diag.setTextIsSelectable(true);
+        diag.setVisibility(android.view.View.GONE);
 
-        // 包一层容错：万一 assets 里没有 xml/index.html，至少能看到提示而不是白屏
+        root.addView(web);
+        root.addView(diag, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(root);
+
+        String crash = readLastCrash();
+        if (crash != null) {
+            note("=== 上次崩溃 ===\n" + crash);
+            showDiag("上次启动崩溃了，下面是堆栈");
+            return;
+        }
+
         if (!assetExists("xml/index.html")) {
-            web.loadData("<h3 style='font-family:sans-serif'>APK 内缺少 www/xml/index.html</h3>",
-                    "text/html", "utf-8");
+            showDiag("APK 内缺少 www/xml/index.html");
             return;
         }
         web.loadUrl(HOST + "/xml/");
+    }
+
+    /** getAssets() 读 zip 失败会直接崩进程；包一层，把异常显示在屏幕上 */
+    private boolean assetExists(String path) {
+        try {
+            InputStream is = getAssets().open(ASSET_ROOT + "/" + path);
+            if (is != null) is.close();
+            return true;
+        } catch (Throwable t) {
+            note("getAssets().open 异常: " + t);
+            return false;
+        }
+    }
+
+    private void note(String line) {
+        if (logs.length() > 12000) logs.delete(0, logs.length() - 8000);
+        logs.append(line).append('\n');
+    }
+
+    private void showDiag(String reason) {
+        runOnUiThread(() -> {
+            diag.setVisibility(android.view.View.VISIBLE);
+            StringBuilder sb = new StringBuilder();
+            sb.append(reason).append("\n\n");
+            sb.append("Android ").append(Build.VERSION.RELEASE)
+                    .append(" (API ").append(Build.VERSION.SDK_INT).append(")\n");
+            sb.append("WebView: ").append(webViewVersion()).append("\n");
+            sb.append("网页: ").append(web.getUrl()).append("\n\n");
+            sb.append("--- 日志 ---\n");
+            sb.append(logs.length() == 0 ? "(无)" : logs.toString());
+            diag.setText(sb.toString());
+
+            // 让诊断信息自身可滚动
+            ScrollView sv = new ScrollView(MainActivity.this);
+            root.removeView(diag);
+            sv.addView(diag);
+            root.addView(sv, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        });
+    }
+
+    private String webViewVersion() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                android.content.pm.PackageInfo pi = android.webkit.WebView.getCurrentWebViewPackage();
+                return pi == null ? "未知" : pi.packageName + " " + pi.versionName;
+            }
+        } catch (Throwable ignored) {
+        }
+        return WebSettings.getDefaultUserAgent(this);
     }
 
     @Override
@@ -151,6 +253,39 @@ public class MainActivity extends Activity {
         super.onActivityResult(req, res, data);
     }
 
+    /** 把未捕获异常的堆栈写到私有目录，下次启动直接显示（没 adb 也能定位闪退） */
+    private void installCrashHandler() {
+        final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            try {
+                java.io.StringWriter sw = new java.io.StringWriter();
+                e.printStackTrace(new java.io.PrintWriter(sw));
+                try (java.io.FileWriter w = new java.io.FileWriter(
+                        new java.io.File(getFilesDir(), "last_crash.txt"))) {
+                    w.write("thread: " + t.getName() + "\n" + sw);
+                }
+            } catch (Throwable ignored) {
+            }
+            if (prev != null) prev.uncaughtException(t, e);
+        });
+    }
+
+    private String readLastCrash() {
+        try {
+            java.io.File f = new java.io.File(getFilesDir(), "last_crash.txt");
+            if (!f.exists()) return null;
+            byte[] b = new byte[(int) f.length()];
+            try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+                int off = 0, n;
+                while (off < b.length && (n = in.read(b, off, b.length - off)) > 0) off += n;
+            }
+            f.delete();
+            return new String(b, "UTF-8");
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     /** 把请求 URL 映射到 assets/www 下的文件 */
     private WebResourceResponse serve(Uri url) {
         String path = url.getPath();
@@ -159,27 +294,26 @@ public class MainActivity extends Activity {
         String asset = resolveAsset(path);
         if (asset == null) {
             Log.w(TAG, "404 " + path);
+            note("404 " + path);
             return new WebResourceResponse("text/plain", "utf-8",
                     new ByteArrayInputStream("404".getBytes()));
         }
         try {
             InputStream is = getAssets().open(ASSET_ROOT + "/" + asset);
             String mime = mimeOf(asset);
-            // 只有文本类才声明 charset；图片/字体传 charset 会让 WebView 解析异常
             String charset = isText(mime) ? "utf-8" : null;
             WebResourceResponse resp = new WebResourceResponse(mime, charset, is);
             Map<String, String> h = new HashMap<>();
             h.put("Cache-Control", "no-store");
             resp.setResponseHeaders(h);
             return resp;
-        } catch (IOException e) {
-            Log.e(TAG, "read fail: " + asset + " " + e.getMessage());
+        } catch (Throwable e) {
+            note("read fail: " + asset + " " + e);
             return new WebResourceResponse("text/plain", "utf-8",
                     new ByteArrayInputStream(("500 " + asset).getBytes()));
         }
     }
 
-    /** /xml/ → xml/index.html；/x.js → x.js；找不到返回 null */
     private String resolveAsset(String path) {
         String p = path.startsWith("/") ? path.substring(1) : path;
         if (p.contains("..")) return null;
@@ -195,14 +329,6 @@ public class MainActivity extends Activity {
             if (assetExists(c)) return c;
         }
         return null;
-    }
-
-    private boolean assetExists(String path) {
-        try (InputStream is = getAssets().open(ASSET_ROOT + "/" + path)) {
-            return is != null;
-        } catch (IOException e) {
-            return false;
-        }
     }
 
     private static boolean isText(String mime) {

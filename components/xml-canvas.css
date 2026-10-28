@@ -337,6 +337,25 @@
      → 手机上屏比可见区宽、拖到面板底下时，选中的控件会盖在侧边栏上面。 */
   isolation: isolate;
   z-index: 1;
+  /* M6g：允许双指捻合自己接管（拦 page 缩放），滚动仍然原生 */
+  touch-action: pan-x pan-y;
+}
+
+/* M6g：缩放百分比浮层（Ctrl+滚轮 / 双指捻合时短暂出现） */
+.axv-zoom-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(27, 27, 31, 0.82);
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
 }
 .axv-stage.pad-l {
   padding-left: 340px;
@@ -1304,6 +1323,28 @@
   padding-right: 4px;
   font-size: 12.5px;
 }
+/* M6h：文档面板里的官方文档入口 */
+.axv-doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 2px 0 6px;
+  padding: 3px 9px 3px 8px;
+  border-radius: 999px;
+  background: var(--axv-primary-soft, #E8F0FE);
+  color: var(--axv-primary, #04409F);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.axv-doc-link:hover {
+  background: var(--axv-primary, #04409F);
+  color: #fff;
+}
+.axv-doc-link .msr {
+  font-size: 14px;
+}
+
 .axv-doc-title {
   display: flex;
   align-items: center;

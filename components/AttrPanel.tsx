@@ -10,6 +10,7 @@ import type { ResolvedNode } from "@/lib/xml/types";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import { editorFor, type AttrEditor } from "./attr-catalog";
 import { getWidgetDoc, docAttrs, attrHint } from "@/lib/xml/widget-docs";
+import { officialDocUrl } from "@/lib/xml/widget-links";
 import { IconPickerPanel } from "./IconPickerPanel";
 import { ShapeEditor } from "./ShapeEditor";
 import { DrawablePicker } from "./DrawablePicker";
@@ -453,6 +454,21 @@ export function AttrPanel({
             {wdoc.title}
             <span className="axv-doc-cat">{wdoc.category}</span>
           </div>
+          {(() => {
+            const url = wdoc.officialDoc ?? officialDocUrl(node.tag);
+            return url ? (
+              <a
+                className="axv-doc-link"
+                href={url}
+                target="_blank"
+                rel="noreferrer noopener"
+                title={url}
+              >
+                官方文档
+                <span className="msr" aria-hidden="true">open_in_new</span>
+              </a>
+            ) : null;
+          })()}
           <div className="axv-doc-summary">{wdoc.summary}</div>
           {wdoc.notes?.length ? (
             <ul className="axv-doc-notes">

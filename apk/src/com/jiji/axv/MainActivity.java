@@ -114,19 +114,28 @@ public class MainActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                // 页面渲染完还是一片空白时，把诊断信息直接显示出来
-                view.evaluateJavascript(
+                // 页面渲染完还是一片空白时，把诊断信息直接显示出来。
+                // 查两次：load 事件可能早于 React hydration，只查一次会误报。
+                probe(0);
+                view.postDelayed(() -> probe(1500), 1500);
+            }
+
+            private void probe(int delayOrFlag) {
+                if (web == null) return;
+                web.evaluateJavascript(
                         "(function(){try{"
                                 + "var b=document.body;"
                                 + "var t=b?b.innerText.trim():'';"
                                 + "var ok=!!document.querySelector('.axv-phone, .axv-stage, .axv-editor');"
-                                + "return (ok?1:0)+'|'+t.length+'|'+(document.title||'');"
-                                + "}catch(e){return '-2|-2|'+e.message;}})()",
+                                + "var js=document.querySelectorAll('script').length;"
+                                + "return (ok?1:0)+'|'+t.length+'|'+(document.title||'')+'|'+js;"
+                                + "}catch(e){return '-2|-2|'+e.message+'|0';}})()",
                         value -> {
-                            String v = value == null ? "" : value.replace("\"", "").replace("\"", "");
+                            String v = value == null ? "" : value.replace("\"", "");
                             String[] parts = v.split("\\|");
                             boolean rendered = parts.length > 0 && "1".equals(parts[0].trim());
-                            if (!rendered) {
+                            note("probe(" + delayOrFlag + "): " + v);
+                            if (!rendered && delayOrFlag != 0) {
                                 showDiag("编辑器没有渲染出来（" + v + "）");
                             }
                         });
@@ -289,8 +298,18 @@ public class MainActivity extends Activity {
 
     /** 把请求 URL 映射到 assets/www 下的文件 */
     private WebResourceResponse serve(Uri url) {
+        String host = url.getHost() == null ? "" : url.getHost();
         String path = url.getPath();
         if (path == null || path.isEmpty()) path = "/";
+
+        // 外部域名（Google Fonts 之类）：返回空响应，别让它 404/悬挂
+        if (!host.isEmpty() && !"axv.local".equals(host) && !HOST.endsWith(host)) {
+            note("EXT " + host + path);
+            String mime = path.endsWith(".css") || path.contains("css2") ? "text/css" : "text/plain";
+            WebResourceResponse empty = new WebResourceResponse(mime, "utf-8",
+                    new ByteArrayInputStream(new byte[0]));
+            return empty;
+        }
 
         String asset = resolveAsset(path);
         if (asset == null) {
@@ -299,6 +318,7 @@ public class MainActivity extends Activity {
             return new WebResourceResponse("text/plain", "utf-8",
                     new ByteArrayInputStream("404".getBytes()));
         }
+        note("200 " + path);
         try {
             InputStream is = getAssets().open(ASSET_ROOT + "/" + asset);
             String mime = mimeOf(asset);

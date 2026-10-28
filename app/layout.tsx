@@ -32,18 +32,10 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap"
-        />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400..700,0..1,0&display=block"
-        />
+        {/* 图标字体改用本地 material-symbols-rounded.ttf（见 globals.css 的 @font-face）。
+            Roboto 不再从 Google Fonts 拉：离线/APK 壳里外网被拦，直接落系统字体。 */}
       </head>
-      <body style={{ fontFamily: "Roboto, system-ui, sans-serif" }}>{children}</body>
+      <body style={{ fontFamily: "Roboto, system-ui, -apple-system, sans-serif" }}>{children}</body>
     </html>
   );
 }

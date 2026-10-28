@@ -17,7 +17,16 @@ body {
   overscroll-behavior: none;
 }
 
-/* Material Symbols Rounded (variable font) */
+/* Material Symbols Rounded (variable font) — 本地自带，不依赖 Google Fonts。
+   离线 / APK 壳里 external 请求会被拦掉，走本地文件才不会退化成连字文本。 */
+@font-face {
+  font-family: "Material Symbols Rounded";
+  font-style: normal;
+  font-weight: 100 700;
+  src: url("/material-symbols-rounded.ttf") format("truetype");
+  font-display: block;
+}
+
 .msr {
   font-family: "Material Symbols Rounded";
   font-weight: normal;

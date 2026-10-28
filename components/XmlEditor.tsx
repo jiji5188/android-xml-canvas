@@ -456,7 +456,9 @@ export function XmlEditor() {
 
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
-  const [leftView, setLeftView] = useState<"parts" | "layers" | "code" | "res" | "settings" | "about">("parts");
+  const [leftView, setLeftView] = useState<
+    "parts" | "layers" | "code" | "res" | "assets" | "settings" | "about"
+  >("parts");
   const [addModalOpen, setAddModalOpen] = useState(false);
   /** M2s：导出前检查面板 */
   const [exportOpen, setExportOpen] = useState(false);
@@ -469,7 +471,6 @@ export function XmlEditor() {
   const [dropHint, setDropHint] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
   /** M5b：已生成资源管理面板 */
-  const [assetsOpen, setAssetsOpen] = useState(false);
   // M11：设置 / 关于面板
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [showSystemBars, setShowSystemBars] = useState(true);
@@ -1840,7 +1841,19 @@ const findResolved = findResolvedNode;
 
       {/* 画布区顶部 tab 切换「预览 / XML 代码」（桌面 + 移动端均可用） */}
       {(!isMobile || (!leftOpen && !rightOpen)) && (
-        <div className="axv-mob-tabs">
+        <div
+          className="axv-mob-tabs"
+          style={
+            isMobile
+              ? undefined
+              : {
+                  // M11：桌面端跟着两侧面板收放（与工具栏同一套偏移）
+                  left: leftOpen ? 320 : 0,
+                  right: rightOpen ? 320 : 0,
+                  transition: "left 0.22s, right 0.22s",
+                }
+          }
+        >
           <div className="axv-mob-tabs-inner" role="tablist" aria-label="视图">
           <button
             role="tab"
@@ -2062,11 +2075,6 @@ const findResolved = findResolvedNode;
             <button className="axv-mob-tool-btn" onClick={openProject} title="打开本地 XML 文件">打开</button>
             <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
             {resExtras || Object.keys(generatedDrawables).length > 0 ? (
-              <button className="axv-mob-tool-btn" onClick={() => setAssetsOpen(true)} title="已生成资源管理">
-                资源
-              </button>
-            ) : null}
-            {resExtras || Object.keys(generatedDrawables).length > 0 ? (
               <button className="axv-mob-tool-btn" onClick={doDownloadResZip} title="导出 res 包（含图标）">res 包</button>
             ) : null}
             <button className="axv-mob-tool-btn axv-mob-run" onClick={() => setRunOpen(true)} title="运行调试">▶ 运行</button>
@@ -2119,11 +2127,24 @@ const findResolved = findResolvedNode;
               account_tree
             </span>
           </button>
-          <div className="axv-rail-gap" />
+          <button
+            className={"axv-rail-btn" + (leftView === "assets" ? " on" : "")}
+            title="已生成资源"
+            aria-label="已生成资源"
+            aria-pressed={leftView === "assets"}
+            onClick={() => {
+              setLeftView("assets");
+              setLeftOpen(true);
+            }}
+          >
+            <span className="msr" aria-hidden="true" data-fill={leftView === "assets" ? "1" : "0"} style={{ fontSize: 24 }}>
+              category
+            </span>
+          </button>
           <button
             className={"axv-rail-btn" + (leftView === "res" ? " on" : "")}
-            title="资源"
-            aria-label="资源"
+            title="项目管理"
+            aria-label="项目管理"
             aria-pressed={leftView === "res"}
             onClick={() => {
               setLeftView("res");
@@ -2173,10 +2194,12 @@ const findResolved = findResolvedNode;
                 : leftView === "layers"
                   ? "图层"
                   : leftView === "res"
-                    ? "资源"
-                    : leftView === "settings"
-                      ? "设置"
-                      : "关于"}
+                    ? "项目管理"
+                    : leftView === "assets"
+                      ? "已生成资源"
+                      : leftView === "settings"
+                        ? "设置"
+                        : "关于"}
             </span>
             <button
               className="axv-icon-btn"
@@ -2202,6 +2225,22 @@ const findResolved = findResolvedNode;
                 onMove={onMoveSibling}
                 onRemove={onRemoveNode}
                 onDragMove={onDragMoveNode}
+              />
+            </div>
+          )}
+          {leftView === "assets" && (
+            <div className="axv-rail-scroll axv-assets-inline-wrap">
+              <GenAssetsPanel
+                inline
+                assets={generatedDrawables}
+                layoutXml={xml}
+                onRename={(oldName, newName) => onRenameAsset(oldName, newName)}
+                onDelete={onDeleteAsset}
+                onClose={() => setLeftView("parts")}
+                onNote={(text) => {
+                  setExportNote(text);
+                  window.setTimeout(() => setExportNote(" "), 3200);
+                }}
               />
             </div>
           )}
@@ -2496,18 +2535,6 @@ const findResolved = findResolvedNode;
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>content_copy</span>
           </button>
           {resExtras || Object.keys(generatedDrawables).length > 0 ? (
-            <button
-              className="axv-tb-btn"
-              title="管理已生成资源（改名 / 删除 / 引用计数）"
-              aria-label="已生成资源"
-              onClick={() => setAssetsOpen(true)}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>
-                category
-              </span>
-            </button>
-          ) : null}
-          {resExtras || Object.keys(generatedDrawables).length > 0 ? (
             <button className="axv-tb-btn" title="导出 res 目录（zip：布局 + 图标矢量 + shape/values）" aria-label="导出 res 包" onClick={doDownloadResZip}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>folder_zip</span>
             </button>
@@ -2602,18 +2629,6 @@ const findResolved = findResolvedNode;
           height={outerH}
           onClose={() => setImgExportOpen(false)}
           onToast={assetsNote}
-        />
-      ) : null}
-
-      {/* M5b：已生成资源管理面板（图标矢量 / shape / selector…） */}
-      {assetsOpen ? (
-        <GenAssetsPanel
-          assets={generatedDrawables}
-          layoutXml={xml}
-          onRename={onRenameAsset}
-          onDelete={onDeleteAsset}
-          onClose={() => setAssetsOpen(false)}
-          onNote={assetsNote}
         />
       ) : null}
 

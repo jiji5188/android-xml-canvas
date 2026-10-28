@@ -456,7 +456,8 @@
   padding: 3px 6px;
   background: #F3F3F9;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  z-index: 40;
+  /* M11：工具栏 9，标签栏 10（标签栏压在工具栏之上） */
+  z-index: 9;
   pointer-events: none;
   flex-wrap: nowrap;
 }
@@ -465,7 +466,7 @@
   flex: 0 0 auto;
   pointer-events: auto;
 }
-/* 中间的工具栏容器：桌面放不下就换行；手机改为横向滚动（见下方媒体查询） */
+/* 中间的工具栏容器：M11 桌面也改成横向滚动（内容超出就滚，不再换行压到 tab 行） */
 .axv-tb-scroll {
   display: flex;
   align-items: center;
@@ -474,9 +475,16 @@
   row-gap: 3px;
   flex: 1 1 auto;
   min-width: 0;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
   pointer-events: auto;
+}
+.axv-tb-scroll::-webkit-scrollbar {
+  display: none;
 }
 .axv-tb-scroll > .axv-tb-group {
   flex: 0 0 auto;
@@ -1850,11 +1858,11 @@
   right: 0;
   display: flex;
   gap: 3px;
-  z-index: 45;
+  z-index: 10;
   padding: 3px 6px;
   border-radius: 0;
   background: #F3F3F9;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0px 8px 8px #00000014;
   overflow-x: visible;
 }
 /* M10：内部容器横向滚动（外层填满视口、背景铺满；滚动发生在内层，边缘可加 mask） */
@@ -2255,7 +2263,7 @@
     padding: 3px 6px;
     gap: 3px;
     /* 层级低于蒙版（25）：面板打开时工具栏一起被遮罩盖住 */
-    z-index: 20;
+    z-index: 9;
   }
   /* 侧滑展开按钮（M10）：手机上同样直接放工具栏层 */
   .axv-tb-side-btn {
@@ -3508,4 +3516,64 @@
 }
 .axv-about-kv span {
   margin-left: auto;
+}
+
+/* ===== M11：已生成资源内嵌版（左侧 tab 面板内，不用弹窗） ===== */
+.axv-assets-inline {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  font-size: 13px;
+}
+.axv-assets-inline .axv-assets-search {
+  margin: 8px 12px;
+}
+.axv-assets-inline .axv-assets-list {
+  padding: 0 8px 8px;
+}
+.axv-assets-inline .axv-assets-row {
+  gap: 8px;
+  padding: 6px;
+  border-radius: 8px;
+}
+.axv-assets-inline .axv-assets-thumb {
+  width: 34px;
+  height: 34px;
+}
+.axv-assets-inline .axv-assets-name {
+  font-size: 12.5px;
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.axv-assets-inline .axv-assets-sub {
+  font-size: 10.5px;
+}
+/* 窄栏里 4 个操作按钮放一行会挤爆 → 允许换行，按钮缩到 26 */
+.axv-assets-inline .axv-assets-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 60px;
+  gap: 2px;
+}
+.axv-assets-inline .axv-assets-actions .axv-icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+}
+.axv-assets-inline .axv-assets-actions .axv-icon-btn .msr {
+  font-size: 17px !important;
+}
+.axv-assets-inline .axv-assets-empty {
+  padding: 16px 12px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.axv-assets-inline .axv-assets-foot {
+  margin-top: auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 10px 12px;
+  font-size: 10.5px;
+  line-height: 1.6;
 }

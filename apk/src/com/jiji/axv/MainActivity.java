@@ -362,6 +362,36 @@ public class MainActivity extends Activity {
             return workspaceLabel();
         }
 
+        /** JS 侧复制文本（WebView 的 navigator.clipboard 不可靠，走原生 ClipboardManager） */
+        @JavascriptInterface
+        public String copyText(String text) {
+            try {
+                runOnUiThread(() -> {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+                            android.content.ClipData d = android.content.ClipData
+                                    .newPlainText("axv", text == null ? "" : text);
+                            android.content.ClipboardManager cm =
+                                    (android.content.ClipboardManager) getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                            if (cm == null) throw new IOException("ClipboardManager 为空");
+                            cm.setPrimaryClip(d);
+                        } else {
+                            android.text.ClipboardManager cm =
+                                    (android.text.ClipboardManager) getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                            if (cm == null) throw new IOException("ClipboardManager 为空");
+                            cm.setText(text == null ? "" : text);
+                        }
+                    } catch (Throwable t) {
+                        Log.w(TAG, "copy fail", t);
+                    }
+                });
+                return "ok";
+            } catch (Throwable t) {
+                Log.e(TAG, "copyText", t);
+                return "err:" + t;
+            }
+        }
+
         @JavascriptInterface
         public void pickWorkspace() {
             runOnUiThread(MainActivity.this::chooseTree);

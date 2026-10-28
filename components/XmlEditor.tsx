@@ -26,7 +26,7 @@ import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
 import { hasIcon } from "@/lib/xml/icon-vectors";
 import { makeZip, downloadBytes } from "@/lib/xml/zip";
-import { saveTextNative, workspaceLabel } from "@/lib/xml/native-save";
+import { saveTextNative, workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative } from "@/lib/xml/native-save";
 import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
 import {
   activeFile,
@@ -1739,13 +1739,19 @@ const findResolved = findResolvedNode;
   /** M3：复制生成的 XML 到剪贴板（与下载同一份内容） */
   const doCopy = async () => {
     const body = exportLayoutXml(xml);
+    // 原生壳里先走 ClipboardManager（WebView 的 navigator.clipboard 不可靠）
+    if (copyTextNative(body)) {
+      setExportNote("已复制到剪贴板");
+      window.setTimeout(() => setExportNote(""), 2600);
+      return;
+    }
     try {
       await navigator.clipboard.writeText(body);
       setExportNote("已复制到剪贴板");
     } catch {
-      // 剪贴板 API 不可用（非 https / 旧浏览器）时退化成下载
+      // 剪贴板 API 不可用（非 https / 旧浏览器）时退化成保存
       doDownload();
-      setExportNote("剪贴板不可用，已改为下载");
+      setExportNote("剪贴板不可用，已改为保存文件");
     }
     window.setTimeout(() => setExportNote(""), 2600);
   };
@@ -2032,6 +2038,20 @@ const findResolved = findResolvedNode;
               <button className="axv-mob-tool-btn" onClick={doDownloadResZip} title="导出 res 包（含图标）">res 包</button>
             ) : null}
             <button className="axv-mob-tool-btn axv-mob-run" onClick={() => setRunOpen(true)} title="运行调试">▶ 运行</button>
+            {nativeAvailable() ? (
+              <button
+                className="axv-mob-tool-btn"
+                title={`保存位置：${workspaceLabel() || "默认目录"}`}
+                onClick={() => {
+                  if (chooseWorkspace()) {
+                    setExportNote(`保存位置：${workspaceLabel()}`);
+                    window.setTimeout(() => setExportNote(""), 2400);
+                  }
+                }}
+              >
+                存至
+              </button>
+            ) : null}
           </div>
         </div>
       )}
@@ -2333,6 +2353,21 @@ const findResolved = findResolvedNode;
           {resExtras ? (
             <button className="axv-tb-btn" title="清除已上传的 res 资源" aria-label="清除 res" onClick={clearRes}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>hide_image</span>
+            </button>
+          ) : null}
+          {nativeAvailable() ? (
+            <button
+              className="axv-tb-btn"
+              title={`保存位置：${workspaceLabel() || "默认目录"}（点击更换）`}
+              aria-label="更换保存位置"
+              onClick={() => {
+                if (chooseWorkspace()) {
+                  setExportNote("已更换保存位置（下次保存生效）");
+                  window.setTimeout(() => setExportNote(""), 2400);
+                }
+              }}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save_location</span>
             </button>
           ) : null}
           <button

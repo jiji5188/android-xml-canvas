@@ -6,6 +6,8 @@
 export interface AxvNativeBridge {
   /** 保存文件，base64 传输；返回 "ok:<路径>" 或 "err:<原因>" */
   saveFile(name: string, mime: string, base64: string): string;
+  /** 复制到系统剪贴板（ClipboardManager）；返回 "ok" 或 "err:<原因>" */
+  copyText?(text: string): string;
   /** 当前工作目录的人类可读名称，如「下载/XML画板」 */
   getWorkspace(): string;
   /** 弹出系统文件夹选择器，选完即成为新的默认工作目录 */
@@ -103,6 +105,18 @@ export function saveBytesNative(name: string, bytes: Uint8Array, mime?: string):
 export function saveTextNative(name: string, text: string, mime?: string): boolean {
   try {
     return saveBytesNative(name, new TextEncoder().encode(text), mime || mimeOfName(name));
+  } catch {
+    return false;
+  }
+}
+
+/** 原生复制文本（ClipboardManager）；不是原生壳或壳没有 copyText 时返回 false，调用方自己走 clipboard API */
+export function copyTextNative(text: string): boolean {
+  const b = nativeBridge();
+  if (!b || typeof b.copyText !== "function") return false;
+  try {
+    const r = b.copyText(text);
+    return typeof r === "string" && r.startsWith("ok");
   } catch {
     return false;
   }

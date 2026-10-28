@@ -33,6 +33,8 @@ interface Props {
   onNote?: (text: string) => void;
   /** M11：内嵌到左侧 tab 面板里（不用弹窗/遮罩层） */
   inline?: boolean;
+  /** M11：双击形状资源 → 打开形状编辑器改内容 */
+  onEditShape?: (name: string, xml: string) => void;
 }
 
 /** 缩略图：vector → data URL；shape/selector/layer-list → 按 CSS 近似画个色块 */
@@ -57,6 +59,7 @@ export function GenAssetsPanel({
   onClose,
   onNote,
   inline,
+  onEditShape,
 }: Props) {
   const [q, setQ] = useState("");
   /** 正在改名的资源名 */
@@ -176,7 +179,17 @@ export function GenAssetsPanel({
             const t = thumb(r.name, r.xml);
             const isEditing = editing === r.name;
             return (
-              <div className="axv-assets-row" key={r.name}>
+              <div
+                className={
+                  "axv-assets-row" + (onEditShape && r.kind === "shape" ? " axv-assets-row-editable" : "")
+                }
+                key={r.name}
+                onDoubleClick={() => {
+                  if (!onEditShape || r.kind !== "shape") return;
+                  onEditShape(r.name, r.xml);
+                }}
+                title={onEditShape && r.kind === "shape" ? "双击编辑形状内容" : undefined}
+              >
                 <div className="axv-assets-thumb">
                   {t.url ? (
                     <img src={t.url} alt="" />
@@ -296,11 +309,9 @@ export function GenAssetsPanel({
 
       <div className="axv-assets-foot">
         <span>
-          改名 / 删除只影响编辑器里生成的资源；已上传 res 目录里的同名文件不会被改动
+          改名 / 删除只影响编辑器里生成的资源；已上传 res 目录里的同名文件不会被改动。
+          形状资源双击可直接改内容。
         </span>
-        <button className="axv-btn" onClick={onClose}>
-          关闭
-        </button>
       </div>
 
       </div>

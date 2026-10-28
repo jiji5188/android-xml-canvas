@@ -2236,6 +2236,7 @@ const findResolved = findResolvedNode;
                 layoutXml={xml}
                 onRename={(oldName, newName) => onRenameAsset(oldName, newName)}
                 onDelete={onDeleteAsset}
+                onEditShape={(name, shapeXml) => setResShape({ name, xml: shapeXml })}
                 onClose={() => setLeftView("parts")}
                 onNote={(text) => {
                   setExportNote(text);

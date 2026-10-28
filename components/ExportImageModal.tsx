@@ -14,6 +14,7 @@ import {
   type ExportRatio,
   type ExportTarget,
 } from "@/lib/xml/export-image";
+import { renderVectorSvg } from "@/lib/xml/export-svg";
 
 interface Props {
   /** 取导出目标（点击时再取，避免 DOM 还没挂上） */
@@ -36,7 +37,7 @@ const RATIOS: { v: ExportRatio; label: string; hint: string }[] = [
 
 export function ExportImageModal({ getTarget, deviceLabel, width, height, onClose, onToast }: Props) {
   const [ratio, setRatio] = useState<ExportRatio>(2);
-  const [busy, setBusy] = useState<ExportKind | null>(null);
+  const [busy, setBusy] = useState<"png" | "svg" | "svgv" | null>(null);
   const [err, setErr] = useState<string>("");
 
   useEffect(() => {
@@ -49,7 +50,7 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
     return () => document.removeEventListener("keydown", onKey, true);
   }, [onClose, busy]);
 
-  const doExport = async (kind: ExportKind) => {
+  const doExport = async (kind: "png" | "svg" | "svgv") => {
     if (busy) return;
     const target = getTarget();
     if (!target || !target.el) {
@@ -59,6 +60,18 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
     setErr("");
     setBusy(kind);
     try {
+      if (kind === "svgv") {
+        const url = await renderVectorSvg({
+          el: target.el,
+          width: target.width,
+          height: target.height,
+          background: target.background,
+        });
+        downloadUrl(exportFileName("svg", deviceLabel, ratio).replace(/\.svg$/, "-vector.svg"), url);
+        onToast?.(`已导出矢量 SVG（${Math.round(width)}×${Math.round(height)} px）`);
+        onClose();
+        return;
+      }
       const url = kind === "png" ? await renderPng(target, ratio) : await renderSvg(target);
       downloadUrl(exportFileName(kind, deviceLabel, ratio), url);
       const px = kind === "png" ? `${Math.round(width * ratio)}×${Math.round(height * ratio)} px` : `${Math.round(width)}×${Math.round(height)} px`;
@@ -114,7 +127,8 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
 
           <div className="axv-export-note">
             导出的是当前画布（含状态栏 / 导航栏，不含选中虚线框等编辑装饰）。
-            SVG 内含 foreignObject 外壳，浏览器与 Figma 可正常打开。
+            SVG 内含 foreignObject 外壳，浏览器与 Figma 可正常打开；矢量 SVG 是原生图元（rect/text/path），
+            可在 Illustrator / Inkscape 里编辑，但图标字体会依赖本机字体。
           </div>
 
           {err ? <div className="axv-export-err">{err}</div> : null}
@@ -125,6 +139,9 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
             </button>
             <button className="axv-btn" disabled={!!busy} onClick={() => doExport("svg")}>
               {busy === "svg" ? "导出中…" : "下载 SVG"}
+            </button>
+            <button className="axv-btn" disabled={!!busy} onClick={() => doExport("svgv")} title="原生矢量图元，可在设计工具里逐层编辑">
+              {busy === "svgv" ? "导出中…" : "矢量 SVG"}
             </button>
           </div>
         </div>

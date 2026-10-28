@@ -39,6 +39,8 @@ import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } fr
 import { ResTree } from "./ResTree";
 import { ResImagePreview } from "./ResImagePreview";
 import { ShapeEditor } from "./ShapeEditor";
+import { GenAssetsPanel } from "./GenAssetsPanel";
+import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { RunPreview } from "./RunPreview";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
@@ -414,6 +416,8 @@ export function XmlEditor() {
   const [exportAction, setExportAction] = useState<"download" | "copy">("download");
   const [dropHint, setDropHint] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
+  /** M5b：已生成资源管理面板 */
+  const [assetsOpen, setAssetsOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<"preview" | "xml">("preview");
   const [history, setHistory] = useState<string[]>(() => {
     const raw = lsGet(LS_KEY_HIST);
@@ -967,6 +971,32 @@ export function XmlEditor() {
     },
     [flushTextTimer, commitHistory],
   );
+
+  /** M5b：资源改名 —— 同步改布局里的 @drawable/x 引用（依赖 setXmlAndTrack，故定义在此） */
+  const onRenameAsset = (oldName: string, newName: string) => {
+    const next = renameAsset(generatedDrawables, oldName, newName);
+    if (!next) return;
+    setGeneratedDrawables(next);
+    if (xml.includes(`@drawable/${oldName}`) || xml.includes(`@mipmap/${oldName}`)) {
+      setXmlAndTrack(renameReferences(xml, oldName, newName));
+    }
+  };
+
+  /** M5b：删除生成资源（布局里的引用变成缺失资源占位） */
+  const onDeleteAsset = (name: string) => {
+    setGeneratedDrawables((m) => {
+      if (!(name in m)) return m;
+      const next = { ...m };
+      delete next[name];
+      return next;
+    });
+  };
+
+  /** 资源面板 / 图标选完后的提示条 */
+  const assetsNote = (text: string) => {
+    setExportNote(text);
+    window.setTimeout(() => setExportNote(" "), 3600);
+  };
 
   const insertWidget = (w: WidgetDef) => {
     const frag = stripNs(w.xml);
@@ -1666,6 +1696,11 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             </select>
             <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
             {resExtras || Object.keys(generatedDrawables).length > 0 ? (
+              <button className="axv-mob-tool-btn" onClick={() => setAssetsOpen(true)} title="已生成资源管理">
+                资源
+              </button>
+            ) : null}
+            {resExtras || Object.keys(generatedDrawables).length > 0 ? (
               <button className="axv-mob-tool-btn" onClick={doDownloadResZip} title="导出 res 包（含图标）">res 包</button>
             ) : null}
             <button className="axv-mob-tool-btn axv-mob-run" onClick={() => setRunOpen(true)} title="运行调试">▶ 运行</button>
@@ -1934,6 +1969,18 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>content_copy</span>
           </button>
           {resExtras || Object.keys(generatedDrawables).length > 0 ? (
+            <button
+              className="axv-tb-btn"
+              title="管理已生成资源（改名 / 删除 / 引用计数）"
+              aria-label="已生成资源"
+              onClick={() => setAssetsOpen(true)}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>
+                category
+              </span>
+            </button>
+          ) : null}
+          {resExtras || Object.keys(generatedDrawables).length > 0 ? (
             <button className="axv-tb-btn" title="导出 res 目录（zip：布局 + 图标矢量 + shape/values）" aria-label="导出 res 包" onClick={doDownloadResZip}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>folder_zip</span>
             </button>
@@ -2017,6 +2064,18 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
           resources={resources}
           device={{ label: device.label, w: device.w, h: device.h, radius: device.radius }}
           onClose={() => setRunOpen(false)}
+        />
+      ) : null}
+
+      {/* M5b：已生成资源管理面板（图标矢量 / shape / selector…） */}
+      {assetsOpen ? (
+        <GenAssetsPanel
+          assets={generatedDrawables}
+          layoutXml={xml}
+          onRename={onRenameAsset}
+          onDelete={onDeleteAsset}
+          onClose={() => setAssetsOpen(false)}
+          onNote={assetsNote}
         />
       ) : null}
 

@@ -15,6 +15,7 @@ import {
   type ExportTarget,
 } from "@/lib/xml/export-image";
 import { renderVectorSvg } from "@/lib/xml/export-svg";
+import { chooseWorkspace, nativeAvailable, workspaceLabel } from "@/lib/xml/native-save";
 
 interface Props {
   /** 取导出目标（点击时再取，避免 DOM 还没挂上） */
@@ -39,6 +40,11 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
   const [ratio, setRatio] = useState<ExportRatio>(2);
   const [busy, setBusy] = useState<"png" | "svg" | "svgv" | null>(null);
   const [err, setErr] = useState<string>("");
+  // 原生壳里刷新取一次工作目录显示（用户可能刚换过）
+  const [wsLabel, setWsLabel] = useState("");
+  useEffect(() => {
+    if (nativeAvailable()) setWsLabel(workspaceLabel());
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -130,6 +136,24 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
             SVG 内含 foreignObject 外壳，浏览器与 Figma 可正常打开；矢量 SVG 是原生图元（rect/text/path），
             可在 Illustrator / Inkscape 里编辑，但图标字体会依赖本机字体。
           </div>
+
+          {nativeAvailable() ? (
+            <div className="axv-shape-field">
+              <label>保存位置</label>
+              <button
+                className="axv-btn"
+                onClick={() => {
+                  if (chooseWorkspace()) {
+                    // 选择器是异步返回的，等它关回来再刷新标签
+                    window.setTimeout(() => setWsLabel(workspaceLabel()), 800);
+                  }
+                }}
+              >
+                {wsLabel || "下载/XML画板"}
+                <span style={{ opacity: 0.55, marginLeft: 6 }}>（更改）</span>
+              </button>
+            </div>
+          ) : null}
 
           {err ? <div className="axv-export-err">{err}</div> : null}
 

@@ -1,16 +1,25 @@
 package com.jiji.axv;
 
 import android.app.Activity;
+import android.content.ContentValues;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.provider.DocumentsContract;
+import android.provider.MediaStore;
+import android.util.Base64;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.webkit.ConsoleMessage;
+import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -21,10 +30,14 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -41,6 +54,12 @@ public class MainActivity extends Activity {
     private static final String HOST = "https://axv.local";
     private static final String ASSET_ROOT = "www";
     private static final int REQ_FILE = 1001;
+    private static final int REQ_TREE = 1002;
+    /** 默认工作目录：手机「下载」下的这个子目录（文件管理器里能直接看到） */
+    private static final String DEFAULT_DIR = "XML画板";
+    private static final String PREF = "axv";
+
+    private Uri treeUri;
 
     private WebView web;
     private FrameLayout root;
@@ -179,8 +198,7 @@ public class MainActivity extends Activity {
 
         // 只在 onCreate 里包一次 ScrollView，showDiag 只改文字/显隐。
         // （之前每次 showDiag 都新建 ScrollView 加 diag，diag 还挂在旧父级上 → 直接崩）
-        diagScroll = new ScrollView(this);
-        diagScroll.addView(diag, new FrameLayout.LayoutParams(
+        diagScroll = new ScrollView(this);        diagScroll.addView(diag, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         diagScroll.setVisibility(android.view.View.GONE);
 
@@ -188,6 +206,17 @@ public class MainActivity extends Activity {
         root.addView(diagScroll, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
+
+        // 原生保存桥：网页里的导出走这里，不再靠 blob 下载（WebView 不支持）
+        SharedPreferences sp = getSharedPreferences(PREF, MODE_PRIVATE);
+        String savedTree = sp.getString("tree", null);
+        if (savedTree != null) {
+            try {
+                treeUri = Uri.parse(savedTree);
+            } catch (Throwable ignored) {
+            }
+        }
+        web.addJavascriptInterface(new Bridge(), "AxvNative");
 
         String crash = readLastCrash();
         if (crash != null) {
@@ -249,6 +278,22 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
+        if (req == REQ_TREE) {
+            if (res == RESULT_OK && data != null && data.getData() != null) {
+                treeUri = data.getData();
+                int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                try {
+                    getContentResolver().takePersistableUriPermission(treeUri, flags);
+                } catch (Throwable t) {
+                    Log.w(TAG, "takePersistableUriPermission 失败: " + t);
+                }
+                getSharedPreferences(PREF, MODE_PRIVATE).edit()
+                        .putString("tree", treeUri.toString()).apply();
+                toast("工作目录：" + workspaceLabel());
+            }
+            return;
+        }
         if (req == REQ_FILE) {
             Uri[] out = null;
             if (res == RESULT_OK && data != null && data.getData() != null) {
@@ -294,6 +339,123 @@ public class MainActivity extends Activity {
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /** JS 桥：网页通过 window.AxvNative 调用 */
+    public class Bridge {
+        @JavascriptInterface
+        public String saveFile(String name, String mime, String base64) {
+            try {
+                byte[] data = Base64.decode(base64, Base64.DEFAULT);
+                String where = writeToWorkspace(name, mime == null || mime.isEmpty() ? "application/octet-stream" : mime, data);
+                toast("已保存：" + where);
+                return "ok:" + where;
+            } catch (Throwable t) {
+                Log.e(TAG, "save fail", t);
+                toast("保存失败：" + t.getMessage());
+                return "err:" + t;
+            }
+        }
+
+        @JavascriptInterface
+        public String getWorkspace() {
+            return workspaceLabel();
+        }
+
+        @JavascriptInterface
+        public void pickWorkspace() {
+            runOnUiThread(MainActivity.this::chooseTree);
+        }
+    }
+
+    private void toast(String msg) {
+        new Handler(Looper.getMainLooper()).post(() -> {
+            try {
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+            } catch (Throwable ignored) {
+            }
+        });
+    }
+
+    /** 打开系统文件夹选择器（ACTION_OPEN_DOCUMENT_TREE） */
+    private void chooseTree() {
+        try {
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            startActivityForResult(i, REQ_TREE);
+        } catch (Throwable t) {
+            toast("打开文件夹选择器失败：" + t.getMessage());
+        }
+    }
+
+    private String workspaceLabel() {
+        if (treeUri != null) {
+            try {
+                String id = DocumentsContract.getTreeDocumentId(treeUri);
+                int slash = id.lastIndexOf(':');
+                String tail = slash >= 0 ? id.substring(slash + 1) : id;
+                return tail.isEmpty() ? "已选择的文件夹" : tail;
+            } catch (Throwable ignored) {
+                return "已选择的文件夹";
+            }
+        }
+        return "下载/" + DEFAULT_DIR;
+    }
+
+    /** 写文件：优先用户选的文件夹，否则存到「下载/XML画板」 */
+    private String writeToWorkspace(String name, String mime, byte[] data) throws IOException {
+        String safe = sanitize(name);
+
+        if (treeUri != null) {
+            try {
+                Uri docDir = DocumentsContract.buildDocumentUriUsingTree(
+                        treeUri, DocumentsContract.getTreeDocumentId(treeUri));
+                Uri created = DocumentsContract.createDocument(
+                        getContentResolver(), docDir, mime, safe);
+                if (created == null) throw new IOException("createDocument 返回空");
+                try (OutputStream os = getContentResolver().openOutputStream(created)) {
+                    if (os == null) throw new IOException("无法打开输出流");
+                    os.write(data);
+                }
+                return workspaceLabel() + "/" + safe;
+            } catch (Throwable t) {
+                Log.w(TAG, "写自选文件夹失败，回退默认目录: " + t);
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentValues v = new ContentValues();
+            v.put(MediaStore.MediaColumns.DISPLAY_NAME, safe);
+            v.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+            v.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/" + DEFAULT_DIR);
+            Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+            if (uri == null) throw new IOException("MediaStore 插入失败");
+            try (OutputStream os = getContentResolver().openOutputStream(uri)) {
+                if (os == null) throw new IOException("无法打开输出流");
+                os.write(data);
+            }
+            return "下载/" + DEFAULT_DIR + "/" + safe;
+        }
+
+        // Android 9 及以下：直接写公共下载目录
+        File dir = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS), DEFAULT_DIR);
+        if (!dir.exists() && !dir.mkdirs()) throw new IOException("无法创建目录 " + dir);
+        File out = new File(dir, safe);
+        try (FileOutputStream fos = new FileOutputStream(out)) {
+            fos.write(data);
+        }
+        return "下载/" + DEFAULT_DIR + "/" + safe;
+    }
+
+    /** 去掉路径分隔符等危险字符 */
+    private static String sanitize(String name) {
+        String s = name == null ? "export" : name;
+        s = s.replaceAll("[\\\\/:*?\"<>|]", "_");
+        if (s.length() > 120) s = s.substring(0, 120);
+        return s.isEmpty() ? "export" : s;
     }
 
     /** 把请求 URL 映射到 assets/www 下的文件 */

@@ -310,6 +310,8 @@ export function solveConstraintChildren(
     const hEnd = readAnchor(a, "End");
     const vTop = readAnchor(a, "Top");
     const vBottom = readAnchor(a, "Bottom");
+    /** M8：基线对齐（只在上下都没约束时生效） */
+    const baselineId = cleanId(a["layout_constraintBaseline_toBaselineOf"] ?? "");
 
     const biasOf = (raw: string | undefined): number => {
       const n = parseFloat(raw ?? "");
@@ -460,6 +462,30 @@ export function solveConstraintChildren(
       top = topY + mT;
     } else if (vBottom) {
       top = bottomY - mB - h;
+    } else if (baselineId) {
+      // M8：layout_constraintBaseline_toBaselineOf——上下都没约束时才拿它当垂直锚。
+      // 没有字体度量，用「行高 80% 处≈基线」估算两条基线的偏差（单行文本够用）
+      if (baselineId === "parent") {
+        top = 0;
+      } else {
+        const target = byId.get(baselineId);
+        if (!target) {
+          out.issues.push({
+            level: "warn",
+            nodePath: c.path,
+            message: `基线约束目标 @+id/${baselineId} 未找到，按顶部对齐兜底`,
+          });
+          top = 0;
+        } else if (visiting.has(target.path)) {
+          top = 0;
+        } else {
+          visiting.add(c.path);
+          const tb = positionOf(target);
+          visiting.delete(c.path);
+          const BASELINE = 0.8;
+          top = tb.top + tb.height * BASELINE - h * BASELINE;
+        }
+      }
     } else {
       top = 0;
     }

@@ -26,6 +26,8 @@ import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
 import { hasIcon } from "@/lib/xml/icon-vectors";
 import { makeZip, downloadBytes } from "@/lib/xml/zip";
+import { saveTextNative, workspaceLabel } from "@/lib/xml/native-save";
+import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { ExportCheckModal, type ExportReport } from "./ExportCheckModal";
 import { ExportImageModal } from "./ExportImageModal";
@@ -316,6 +318,8 @@ export function XmlEditor() {
   /** 解析用（低优先级）：敲代码时让输入不卡，解析滞后几帧 */
   const parsedXml = useDeferredValue(xml);
   const [resourceFragment, setResourceFragment] = useState("");
+  /** 示例项目自带的 values（@color/@string）——单独存，不抢用户自己贴的片段；用户片段优先 */
+  const [sampleValues, setSampleValues] = useState("");
   /** 上传 res/ 目录解析出的附加资源（drawable/vector/styles/values 原文） */
   const [resExtras, setResExtras] = useState<ResourceExtras | null>(null);
   /** M3g/M3h：本工具生成的 drawable 资源：资源名 → xml 原文（图标 vector + 自定义 shape/ripple 共用） */
@@ -772,7 +776,9 @@ export function XmlEditor() {
   const resources: ResourceTable = useMemo(() => {
     // 顺序：内置默认 → 上传 res/ 里的 values（真实 color/dimen/string）→ 用户手贴片段（最高优先）
     let base: ResourceTable = DEFAULT_RESOURCES;
-    const fragment = [resExtras?.valuesXml ?? "", resourceFragment].filter((x) => x.trim()).join("\n");
+    const fragment = [resExtras?.valuesXml ?? "", sampleValues, resourceFragment]
+      .filter((x) => x.trim())
+      .join("\n");
     if (fragment.trim()) base = mergeResourceFragment(fragment);
     base = {
       ...base,
@@ -788,7 +794,7 @@ export function XmlEditor() {
       };
     }
     return base;
-  }, [resourceFragment, resExtras, generatedDataUrls, generatedVectorNames, generatedShapeXml]);
+  }, [resourceFragment, sampleValues, resExtras, generatedDataUrls, generatedVectorNames, generatedShapeXml]);
 
   /** M3g/M3h：把已生成资源（图标矢量 + 自定义形状）也并进 resExtras，导出 res 包时能带上 */
   const resExtrasAll = useMemo(() => {
@@ -1044,6 +1050,33 @@ export function XmlEditor() {
       commitHistory(next, mergeKey ?? "");
     },
     [flushTextTimer, commitHistory],
+  );
+
+  /** 载入完整示例项目：布局 + 自带 drawable + values 一起换（合并语义：用户已有资源不会被覆盖） */
+  const applySampleProject = useCallback(
+    (key: string) => {
+      const p = sampleProjectByKey(key);
+      if (!p) return;
+      setXmlAndTrack(p.layout);
+      setGeneratedDrawables((m) => ({ ...p.drawables, ...m }));
+      setSampleValues(p.values ?? "");
+      setSelectedPath(null);
+      setExportNote(
+        `已载入示例项目「${p.name}」· ${p.library}，自带 ${Object.keys(p.drawables).length} 个 drawable`,
+      );
+      window.setTimeout(() => setExportNote(""), 4600);
+    },
+    [setXmlAndTrack],
+  );
+
+  const applyBlankTemplate = useCallback(
+    (key: string) => {
+      const b = SAMPLE_BLANKS.find((t) => t.key === key);
+      if (!b) return;
+      setXmlAndTrack(b.layout);
+      setSelectedPath(null);
+    },
+    [setXmlAndTrack],
   );
 
   /** 手敲代码：立即上屏，历史防抖 500ms 合并 */
@@ -1505,6 +1538,11 @@ const findResolved = findResolvedNode;
    *  M2s：改成可视化检查面板（不再用 alert/confirm） */
   const doDownload = () => {
     const body = exportLayoutXml(xml);
+    if (saveTextNative("activity_main.xml", body, "text/xml")) {
+      setExportNote(`已保存 activity_main.xml（${workspaceLabel() || "工作目录"}）`);
+      window.setTimeout(() => setExportNote(""), 2400);
+      return;
+    }
     const blob = new Blob([body], { type: "application/xml" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1614,25 +1652,30 @@ const findResolved = findResolvedNode;
           </button>
           <select
             className="axv-tb-select axv-tab-sample"
-            title="载入示例"
+            title="载入完整示例项目（布局 + 自带图标/背景资源）"
             value=""
             onChange={(e) => {
               const v = e.target.value;
-              if (v && SAMPLES[v]) setXmlAndTrack(SAMPLES[v]);
+              if (!v) return;
+              if (v.startsWith("blank:")) applyBlankTemplate(v.slice(6));
+              else applySampleProject(v);
             }}
             style={{ margin: "0 8px" }}
           >
-            <option value="">示例…</option>
-            <optgroup label="新建（空白）">
-              <option value="blank-cl">ConstraintLayout</option>
-              <option value="blank-ll">LinearLayout（竖）</option>
-              <option value="blank-frame">FrameLayout</option>
+            <option value="">示例项目…</option>
+            <optgroup label="完整示例（带资源）">
+              {SAMPLE_PROJECTS.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.name} · {p.library.split(" + ")[0]}
+                </option>
+              ))}
             </optgroup>
-            <optgroup label="示例">
-              <option value="cl">约束布局</option>
-              <option value="chain">链式排布 + Guideline</option>
-              <option value="barrier">Barrier 屏障</option>
-              <option value="list">竖列表</option>
+            <optgroup label="新建（空白）">
+              {SAMPLE_BLANKS.map((b) => (
+                <option key={b.key} value={`blank:${b.key}`}>
+                  {b.name}
+                </option>
+              ))}
             </optgroup>
           </select>
           <button
@@ -1783,24 +1826,29 @@ const findResolved = findResolvedNode;
             </button>
             <select
               className="axv-tb-select"
-              title="载入示例"
+              title="载入完整示例项目（布局 + 自带图标/背景资源）"
               value=""
               onChange={(e) => {
                 const v = e.target.value;
-                if (v && SAMPLES[v]) setXmlAndTrack(SAMPLES[v]);
+                if (!v) return;
+                if (v.startsWith("blank:")) applyBlankTemplate(v.slice(6));
+                else applySampleProject(v);
               }}
             >
-              <option value="">示例…</option>
-              <optgroup label="新建（空白）">
-                <option value="blank-cl">ConstraintLayout</option>
-                <option value="blank-ll">LinearLayout（竖）</option>
-                <option value="blank-frame">FrameLayout</option>
+              <option value="">示例项目…</option>
+              <optgroup label="完整示例（带资源）">
+                {SAMPLE_PROJECTS.map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.name}
+                  </option>
+                ))}
               </optgroup>
-              <optgroup label="示例">
-                <option value="cl">约束布局</option>
-                <option value="chain">链式排布 + Guideline</option>
-                <option value="barrier">Barrier 屏障</option>
-                <option value="list">竖列表</option>
+              <optgroup label="新建（空白）">
+                {SAMPLE_BLANKS.map((b) => (
+                  <option key={b.key} value={`blank:${b.key}`}>
+                    {b.name}
+                  </option>
+                ))}
               </optgroup>
             </select>
             <button className="axv-mob-tool-btn" onClick={openProject} title="打开本地 XML 文件">打开</button>

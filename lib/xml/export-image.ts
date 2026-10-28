@@ -7,6 +7,7 @@
 // 注意：导出期间给根节点挂 .axv-exporting，用 CSS 去掉选中虚线框 / 拖拽高亮（见 xml-canvas.css）。
 
 import { toPng, toSvg } from "html-to-image";
+import { saveDataUrlNative } from "./native-save";
 
 /** 导出目标：手机壳元素 + 它的逻辑尺寸（CSS px，未缩放） */
 export interface ExportTarget {
@@ -179,6 +180,8 @@ export async function renderSvg(target: ExportTarget): Promise<string> {
 
 /** 触发下载（dataURL 或 blobURL 都行） */
 export function downloadUrl(filename: string, url: string): void {
+  // 原生壳里优先走原生保存（WebView 不支持 blob:/data: 下载）
+  if (saveDataUrlNative(filename, url)) return;
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;

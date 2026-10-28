@@ -133,4 +133,37 @@ describe("M2b ConstraintLayout 四向约束", () => {
     expect(box.width).toBe(200);
     expect(box.height).toBe(1640);
   });
+
+  test("11 baseline_toBaselineOf 把两个控件的基线对齐（上下都无约束时生效）", () => {
+    const cl = parseLayoutXml(CL(
+      `<TextView android:id="@+id/cb" android:layout_width="wrap_content" android:layout_height="wrap_content" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent"/>
+       <TextView android:id="@+id/forgot" android:layout_width="wrap_content" android:layout_height="wrap_content" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintBaseline_toBaselineOf="@+id/cb"/>`,
+    )).root!;
+    const res = solveConstraintChildren(cl, DEFAULT_RESOURCES, 824, 1640);
+    const cb = res.boxes.get(cl.children[0].path)!;
+    const fg = res.boxes.get(cl.children[1].path)!;
+    expect(cb.top).toBe(0);
+    // 基线 = top + 0.8*height，两者基线应相等
+    expect(cb.top + cb.height * 0.8).toBeCloseTo(fg.top + fg.height * 0.8, 5);
+    // 两边都 wrap 时高度估算相同 → 顶部对齐
+    expect(fg.top).toBe(0);
+  });
+
+  test("12 baseline 目标不存在时兜底到顶部 + 告警，不抛异常", () => {
+    const cl = parseLayoutXml(CL(
+      `<TextView android:id="@+id/x" android:layout_width="wrap_content" android:layout_height="wrap_content" app:layout_constraintBaseline_toBaselineOf="@+id/nope"/>`,
+    )).root!;
+    const res = solveConstraintChildren(cl, DEFAULT_RESOURCES, 824, 1640);
+    expect(res.boxes.get(cl.children[0].path)!.top).toBe(0);
+    expect(res.issues.some((i) => i.message.includes("基线约束目标"))).toBe(true);
+  });
+
+  test("13 有 top 约束时不走 baseline（top 优先）", () => {
+    const cl = parseLayoutXml(CL(
+      `<TextView android:id="@+id/a" android:layout_width="wrap_content" android:layout_height="wrap_content" app:layout_constraintTop_toTopOf="parent"/>
+       <TextView android:id="@+id/b" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="40dp" app:layout_constraintTop_toTopOf="parent" app:layout_constraintBaseline_toBaselineOf="@+id/a"/>`,
+    )).root!;
+    const res = solveConstraintChildren(cl, DEFAULT_RESOURCES, 824, 1640);
+    expect(res.boxes.get(cl.children[1].path)!.top).toBe(80); // 40dp
+  });
 });

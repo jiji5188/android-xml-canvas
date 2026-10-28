@@ -52,8 +52,11 @@ describe("M2a 复合控件占位渲染", () => {
     </LinearLayout>`).root;
     const sw = findByTag(root, "Switch");
     expect(sw.className).toBe("axv-switch axv-checked");
-    expect(sw.style.backgroundColor).toBe("#6750A4");
-    expect(sw.text).toBe(""); // 文字不画进开关里
+    // M8：轨道改由 ::before 画，颜色走 CSS 变量（节点本身不再铺满背景色）
+    const vars = sw.style as unknown as Record<string, string>;
+    expect(vars["--axv-ctl-bg"]).toBe("#6750A4");
+    expect(vars["--axv-ctl-thumb"]).toBe("#FFFFFF");
+    expect(sw.text).toBe(""); // 没写 android:text 时不显示文字
   });
 
   it("未勾选 CheckBox 用白底灰边，勾选后主色", () => {
@@ -63,15 +66,32 @@ describe("M2a 复合控件占位渲染", () => {
     const off = findByTag(model(xml("false")).root, "CheckBox");
     const on = findByTag(model(xml("true")).root, "CheckBox");
     expect(off.className).toBe("axv-check");
-    expect(off.style.backgroundColor).toBe("#FFFFFF");
+    const offVars = off.style as unknown as Record<string, string>;
+    const onVars = on.style as unknown as Record<string, string>;
+    expect(offVars["--axv-ctl-bg"]).toBe("#FFFFFF");
+    expect(offVars["--axv-ctl-ring"]).toBe("#79747E");
     expect(on.className).toBe("axv-check axv-checked");
-    expect(on.style.backgroundColor).toBe("#6750A4");
+    expect(onVars["--axv-ctl-bg"]).toBe("#6750A4");
+    expect(onVars["--axv-ctl-img"]).toContain("data:image/svg+xml");
+  });
+
+  it("CheckBox 的 android:text 会显示在方框右侧", () => {
+    const cb = findByTag(
+      model(`<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+        <CheckBox android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="记住我" />
+      </LinearLayout>`).root,
+      "CheckBox",
+    );
+    expect(cb.text).toBe("记住我");
+    expect(cb.style.display).toBe("inline-flex");
   });
 
   it("RadioButton 是圆形", () => {
     const root = model(`<RadioButton android:layout_width="wrap_content" android:layout_height="wrap_content" />`).root;
     expect(root.className).toBe("axv-radio");
-    expect(root.style.borderRadius).toBe("50%");
+    const vars = root.style as unknown as Record<string, string>;
+    expect(vars["--axv-ctl-r"]).toBe("50%");
+    expect(vars["--axv-ctl-ring"]).toBe("#79747E");
   });
 
   it("SeekBar 按 progress/max 换算百分比", () => {

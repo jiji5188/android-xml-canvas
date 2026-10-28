@@ -13,6 +13,10 @@ import { vectorToDataUrl } from "./vector-svg";
 
 const DP = (n: number, scale = 2) => n * scale;
 
+/** 勾选框里的白色对勾（画在 ::before 的 background-image 上） */
+const CTL_CHECK_IMG =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E\")";
+
 /** 全限定类名 → 短名：androidx.recyclerview.widget.RecyclerView → RecyclerView */
 function shortTag(tag: string): string {
   return tag.includes(".") ? tag.slice(tag.lastIndexOf(".") + 1) : tag;
@@ -681,21 +685,42 @@ export function buildRenderModel(
       style.minHeight = style.minHeight || `${DP(160, scale)}px`;
     }
 
-    if (cls === "axv-switch") {
-      style.minWidth = `${DP(56, scale)}px`;
-      style.minHeight = `${DP(32, scale)}px`;
-      style.borderRadius = `${DP(16, scale)}px`;
-      style.backgroundColor = style.backgroundColor || (attrs["checked"] ? "#6750A4" : "#E0D9E3");
+    if (cls === "axv-switch" || cls === "axv-check" || cls === "axv-radio") {
+      // 轨道/方框交给 ::before 画（见 globals.css），节点自身当 flex 行，
+      // 这样 android:text 能显示在控件右侧（之前直接把文字丢了，「记住我」整行不见）
+      const on = !!attrs["checked"];
+      const cs = style as React.CSSProperties & Record<string, string>;
+      style.display = "inline-flex";
+      style.alignItems = "center";
+      style.gap = `${DP(8, scale)}px`;
+      if (!style.position || style.position === "static") style.position = "relative";
       style.boxSizing = "border-box";
-    }
-
-    if (cls === "axv-check" || cls === "axv-radio") {
-      style.minWidth = `${DP(24, scale)}px`;
-      style.minHeight = `${DP(24, scale)}px`;
-      style.boxSizing = "border-box";
-      style.backgroundColor = style.backgroundColor || (attrs["checked"] ? "#6750A4" : "#FFFFFF");
-      style.border = "2px solid " + (attrs["checked"] ? "#6750A4" : "#79747E");
-      style.borderRadius = cls === "axv-radio" ? "50%" : `${DP(4, scale)}px`;
+      style.minWidth = "0";
+      style.minHeight = "0";
+      style.color = style.color || ((attrs["textColor"] as string) || "#1D1B20");
+      style.fontSize = style.fontSize || `${DP((attrs["textSize"] as number) || 14, scale)}px`;
+      if (cls === "axv-switch") {
+        cs["--axv-ctl-w"] = `${DP(40, scale)}px`;
+        cs["--axv-ctl-h"] = `${DP(22, scale)}px`;
+        cs["--axv-ctl-r"] = `calc(${DP(22, scale)}px / 2)`;
+        cs["--axv-ctl-bg"] = on ? "#6750A4" : "#E0D9E3";
+        cs["--axv-ctl-ring"] = "transparent";
+        cs["--axv-ctl-img"] = "none";
+        cs["--axv-ctl-thumb"] = "#FFFFFF";
+        cs["--axv-ctl-thumb-x"] = on ? `${DP(20, scale)}px` : `${DP(2, scale)}px`;
+      } else {
+        cs["--axv-ctl-w"] = `${DP(20, scale)}px`;
+        cs["--axv-ctl-h"] = `${DP(20, scale)}px`;
+        cs["--axv-ctl-r"] = cls === "axv-radio" ? "50%" : `${DP(3, scale)}px`;
+        cs["--axv-ctl-bg"] = cls === "axv-radio" ? "#FFFFFF" : on ? "#6750A4" : "#FFFFFF";
+        cs["--axv-ctl-ring"] = on ? "#6750A4" : "#79747E";
+        cs["--axv-ctl-img"] = on
+          ? cls === "axv-radio"
+            ? "radial-gradient(circle, #6750A4 0 42%, transparent 45%)"
+            : CTL_CHECK_IMG
+          : "none";
+        cs["--axv-ctl-thumb-x"] = "0px";
+      }
     }
 
     if (cls === "axv-seek") {
@@ -772,7 +797,7 @@ export function buildRenderModel(
 
     // 开关/勾选类不渲染文字到框里（会在 title 提示里显示）
     let text = (attrs["text"] as string) || "";
-    if (cls === "axv-switch" || cls === "axv-check" || cls === "axv-radio" || cls === "axv-seek") {
+    if (cls === "axv-seek") {
       text = "";
     } else if (cls === "axv-include") {
       text = "⟳ include " + ((node.attrs["layout"] as string) || "");

@@ -17,6 +17,7 @@ import {
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { parseShapeSpec, specToCss } from "@/lib/xml/shape-gen";
 import { sanitizeResName } from "@/lib/xml/resname";
+import { saveTextNative } from "@/lib/xml/native-save";
 
 interface Props {
   /** 已生成资源：资源名 → xml 原文 */
@@ -127,6 +128,7 @@ export function GenAssetsPanel({ assets, layoutXml, onRename, onDelete, onClose,
   };
 
   const downloadXml = (name: string, xml: string) => {
+    if (saveTextNative(`${name}.xml`, xml, "text/xml")) return;
     const blob = new Blob([xml], { type: "text/xml" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);

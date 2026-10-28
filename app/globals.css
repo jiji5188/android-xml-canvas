@@ -433,3 +433,40 @@ input.m3-number {
   }
 }
 
+/* ---- 开关 / 勾选 / 单选的预览图形 ----
+   css.ts 只往节点上写 --axv-ctl-* 变量（它算 scale 与颜色），图形统一在这里画：
+   节点本身当成 flex 行，::before 是轨道/方框，所以 android:text 能正常出现在右侧。 */
+.axv-switch::before,
+.axv-check::before,
+.axv-radio::before {
+  content: "";
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: var(--axv-ctl-w, 40px);
+  height: var(--axv-ctl-h, 22px);
+  border-radius: var(--axv-ctl-r, 4px);
+  background-color: var(--axv-ctl-bg, #e0d9e3);
+  background-image: var(--axv-ctl-img, none);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 72%;
+  border: 2px solid var(--axv-ctl-ring, transparent);
+}
+.axv-switch::after {
+  content: "";
+  position: absolute;
+  left: var(--axv-ctl-thumb-x, 2px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(var(--axv-ctl-h, 22px) - 4px);
+  height: calc(var(--axv-ctl-h, 22px) - 4px);
+  border-radius: 50%;
+  background-color: var(--axv-ctl-thumb, #ffffff);
+  pointer-events: none;
+}
+.axv-check,
+.axv-radio,
+.axv-switch {
+  white-space: nowrap;
+}
+

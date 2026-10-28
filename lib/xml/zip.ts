@@ -2,6 +2,8 @@
 // 用途：把 res/drawable/*.xml + res/layout/*.xml 打成一个 zip 下载，
 // 让用户解压后直接放进 Android 工程，不会出现「找不到图标文件」。
 
+import { saveBytesNative } from "./native-save";
+
 export interface ZipEntry {
   /** zip 内路径，如 drawable/ic_search.xml */
   path: string;
@@ -112,8 +114,9 @@ export function makeZip(entries: ZipEntry[], now = new Date()): Uint8Array {
   return out;
 }
 
-/** 触发浏览器下载（Node 环境不调用） */
+/** 触发浏览器下载（Node 环境不调用）；原生壳里改走原生保存 */
 export function downloadBytes(bytes: Uint8Array, filename: string, mime = "application/zip"): void {
+  if (saveBytesNative(filename, bytes, mime)) return;
   const blob = new Blob([bytes as unknown as BlobPart], { type: mime });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);

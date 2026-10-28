@@ -542,6 +542,118 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* M6c：「显示与设备」弹出面板（工具栏一个按钮 → 设备 + 缩放）
+   走 createPortal 到 body，position: fixed 由组件按按钮位置算 */
+.axv-tb-btn.is-on {
+  background: #e3ecff;
+  color: #04409F;
+}
+.axv-vs-panel {
+  position: fixed;
+  z-index: 80;
+  width: 260px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  color: #23232b;
+  font-size: 12px;
+}
+.axv-vs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.axv-vs-row + .axv-vs-row {
+  margin-top: 12px;
+}
+.axv-vs-row > label {
+  flex: 0 0 auto;
+  color: #5b5b66;
+  font-weight: 600;
+}
+.axv-vs-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  color: #23232b;
+  cursor: pointer;
+  font-family: inherit;
+}
+.axv-vs-hint {
+  margin: 5px 0 0;
+  color: #8b8b96;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.axv-vs-hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  color: #4a4a55;
+  background: #f4f5f8;
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.axv-vs-zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.axv-vs-zoom > button {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  border: none;
+  background: #F0F1F6;
+  color: #3A3A45;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.axv-vs-zoom > button:hover {
+  background: #e3ecff;
+  color: #04409F;
+}
+.axv-vs-zoom input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: #04409F;
+}
+.axv-vs-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid #eef0f4;
+  color: #6b6b76;
+}
+.axv-vs-foot > span {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #23232b;
+}
+.axv-vs-reset {
+  border: none;
+  background: transparent;
+  color: #04409F;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.axv-vs-reset:hover {
+  background: #eef3ff;
+}
+
 /* 分段控件：胶囊内 3px 缝，首尾圆角（M3E 同款） */
 .axv-seg {
   display: flex;
@@ -1999,9 +2111,9 @@
   .axv-rail {
     padding-top: 10px;
   }
-  /* 手机上不需要缩放滑条，隐掉腾出位置 */
-  .axv-tb-zoom {
-    display: none;
+  /* 手机上不需要缩放滑条，隐掉腾出位置（M6c：已收进「显示与设备」按钮，此规则作废） */
+  .axv-vs-panel {
+    width: min(280px, calc(100vw - 16px));
   }
   .axv-toolbar-v2 {
     top: 10px;

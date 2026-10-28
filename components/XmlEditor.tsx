@@ -44,10 +44,11 @@ import { ShapeEditor } from "./ShapeEditor";
 import { GenAssetsPanel } from "./GenAssetsPanel";
 import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { RunPreview } from "./RunPreview";
+import { ViewSettingsMenu } from "./ViewSettingsMenu";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
-import { readableOn, deviceById, deviceGroups } from "@/lib/xml/theme";
+import { readableOn, deviceById } from "@/lib/xml/theme";
 
 const SAMPLES: Record<string, string> = {
   /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
@@ -1938,7 +1939,7 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
               }
         }
       >
-        <div className="axv-tb-group axv-tb-side" style={{ visibility: leftOpen ? "hidden" : "visible" }}>
+        <div className="axv-tb-group axv-tb-side" style={leftOpen ? { display: "none" } : undefined}>
           <button
             className="axv-tb-btn"
             title="展开左侧面板"
@@ -1952,6 +1953,10 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
 
         {/* M6b：中间可横向滚动的工具栏区（左/右侧滑按钮各占一边，不悬浮不吸边） */}
         <div className="axv-tb-scroll">
+          {/* M6c：设备 + 缩放收进这个按钮（原来占 370px，窄窗会把工具栏挤成两行） */}
+          <div className="axv-tb-group axv-tb-view">
+            <ViewSettingsMenu deviceId={deviceId} onDevice={changeDevice} scale={scale} onScale={setScale} />
+          </div>
           <div className="axv-tb-group">
             <button
               className="axv-tb-btn"
@@ -2024,43 +2029,9 @@ function collectIds(n: { attrs: Record<string, string>; children: unknown[] } | 
             <span className="msr" aria-hidden="true" style={{ fontSize: 22 }}>format_shapes</span>
           </button>
         </div>
-
-        <div className="axv-tb-group axv-tb-zoom">
-          <div className="axv-device">
-            <label htmlFor="axv-device-select">设备</label>
-            <select
-              id="axv-device-select"
-              value={deviceId}
-              onChange={(e) => changeDevice(e.target.value)}
-              title={`预览设备：${device.label}（对应 ${device.hint}）`}
-            >
-              {deviceGroups().map((g) => (
-                <optgroup key={g.group} label={g.group}>
-                  {g.items.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-          <div className="axv-zoom">
-            <input
-              type="range"
-              min={0.4}
-              max={1.5}
-              step={0.1}
-              value={scale}
-              onChange={(e) => setScale(parseFloat(e.target.value))}
-              aria-label="缩放"
-            />
-            <span>{scale.toFixed(2)}×</span>
-          </div>
-        </div>
         </div>
 
-        <div className="axv-tb-group axv-tb-side" style={{ visibility: rightOpen ? "hidden" : "visible" }}>
+        <div className="axv-tb-group axv-tb-side" style={rightOpen ? { display: "none" } : undefined}>
           <button
             className="axv-tb-btn"
             title="展开右侧属性面板"

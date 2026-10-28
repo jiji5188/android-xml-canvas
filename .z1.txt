@@ -1,0 +1,55 @@
+﻿2021:             aria-label="鏍煎紡鍖?
+2022:             onClick={doFormat}
+2023:           >
+2024:             <span className="msr" aria-hidden="true" style={{ fontSize: 22 }}>format_shapes</span>
+2025:           </button>
+2026:         </div>
+2027: 
+2028:         <div className="axv-tb-group axv-tb-zoom">
+2029:           <div className="axv-device">
+2030:             <label htmlFor="axv-device-select">璁惧</label>
+2031:             <select
+2032:               id="axv-device-select"
+2033:               value={deviceId}
+2034:               onChange={(e) => changeDevice(e.target.value)}
+2035:               title={`棰勮璁惧锛?{device.label}锛堝搴?${device.hint}锛塦}
+2036:             >
+2037:               {deviceGroups().map((g) => (
+2038:                 <optgroup key={g.group} label={g.group}>
+2039:                   {g.items.map((d) => (
+2040:                     <option key={d.id} value={d.id}>
+2041:                       {d.label}
+2042:                     </option>
+2043:                   ))}
+2044:                 </optgroup>
+2045:               ))}
+2046:             </select>
+2047:           </div>
+2048:           <div className="axv-zoom">
+2049:             <input
+2050:               type="range"
+2051:               min={0.4}
+2052:               max={1.5}
+2053:               step={0.1}
+2054:               value={scale}
+2055:               onChange={(e) => setScale(parseFloat(e.target.value))}
+2056:               aria-label="缂╂斁"
+2057:             />
+2058:             <span>{scale.toFixed(2)}脳</span>
+2059:           </div>
+2060:         </div>
+2061:         </div>
+2062: 
+2063:         <div className="axv-tb-group axv-tb-side" style={{ visibility: rightOpen ? "hidden" : "visible" }}>
+2064:           <button
+2065:             className="axv-tb-btn"
+2066:             title="灞曞紑鍙充晶灞炴€ч潰鏉?
+2067:             aria-label="鍙充晶灞炴€ч潰鏉?
+2068:             aria-pressed={false}
+2069:             onClick={() => setRightOpen(true)}
+2070:           >
+2071:             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>right_panel_open</span>
+2072:           </button>
+2073:         </div>
+2074:       </div>
+2075:       </div>

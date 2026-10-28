@@ -187,7 +187,7 @@ export function IconPickerPanel({ value, attrName, existing, onClose, onPick }: 
 
         <div className="axv-icon-foot">
           <span>
-            选中后生成 <code>res/drawable/ic_xxx.xml</code>，属性写成 <code>@drawable/ic_xxx</code>
+            选中后生成 <code>res/drawable/ic_xxx.xml</code>，属性写成 <code>@drawable/ic_xxx</code>。生成的是「填充」样式图标（与列表一致），Android 里就是实心 vector
           </span>
           <button className="axv-btn" onClick={onClose}>
             取消

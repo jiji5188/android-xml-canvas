@@ -1986,7 +1986,8 @@
   }
   .axv-toolbar-v2 {
     top: 10px;
-    padding: 0 10px;
+    /* 不能留左右 padding：sticky 吸边时那块 padding 会漏出下面滚过去的图标（右侧碎图标） */
+    padding: 0;
     gap: 6px;
     flex-wrap: nowrap;
     /* 移动端按钮太多：容器横向滚动（藏滚动条），右侧「展开属性面板」吸边常驻 */
@@ -2013,6 +2014,15 @@
     position: sticky;
     right: 0;
     margin-left: auto;
+    z-index: 1;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  }
+  .axv-toolbar-v2 > .axv-tb-group:first-child {
+    /* 第一个 group = 展开左侧面板：同样吸左边缘（z-index 要比滚动内容高，否则会被盖住） */
+    position: sticky;
+    left: 0;
+    margin-right: auto;
+    z-index: 1;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.05);
   }
   /* 代码 tab 底部工具条同样可能溢出 */

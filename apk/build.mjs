@@ -58,7 +58,7 @@ run(btExe("aapt2.exe"), [
   "--auto-add-overlay",
   "--java", "build/gen",
   "--min-sdk-version", "24",
-  "--target-sdk-version", "35",
+  "--target-sdk-version", "34",
 ], apk);
 
 // 4) javac

@@ -331,6 +331,12 @@
   padding: 124px 20px 24px;
   box-sizing: border-box;
   transition: padding 0.22s cubic-bezier(0.2, 0, 0, 1);
+  /* M6f：画布自成层叠上下文。
+     选中态是 z-index:900（要高过所有 elevation），但画布节点都是 stage 的后代，
+     不隔离的话 900 会参与根层叠上下文，比 .axv-slide-left/.axv-slide-right（30）还高
+     → 手机上屏比可见区宽、拖到面板底下时，选中的控件会盖在侧边栏上面。 */
+  isolation: isolate;
+  z-index: 1;
 }
 .axv-stage.pad-l {
   padding-left: 340px;

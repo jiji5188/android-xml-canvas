@@ -1973,8 +1973,43 @@
     padding: 0 10px;
     gap: 6px;
     flex-wrap: nowrap;
+    /* 移动端按钮太多：容器横向滚动（藏滚动条），右侧「展开属性面板」吸边常驻 */
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* 容器默认 pointer-events:none 会让触摸滑动失效，这里必须放开 */
+    pointer-events: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
     /* 层级低于蒙版（25）：面板打开时工具栏一起被遮罩盖住 */
     z-index: 20;
+  }
+  .axv-toolbar-v2::-webkit-scrollbar {
+    display: none;
+  }
+  .axv-toolbar-v2 > .axv-tb-group {
+    /* 不允许被挤扁，否则图标会被裁 */
+    flex: 0 0 auto;
+  }
+  .axv-toolbar-v2 > .axv-tb-group:last-child {
+    /* 最后一个 group = 展开右侧属性面板：吸在右边缘，滚多远都点得到 */
+    position: sticky;
+    right: 0;
+    margin-left: auto;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  }
+  /* 代码 tab 底部工具条同样可能溢出 */
+  .axv-mob-xml-tools {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .axv-mob-xml-tools::-webkit-scrollbar {
+    display: none;
+  }
+  .axv-mob-xml-tools > * {
+    flex: 0 0 auto;
   }
   .axv-tb-group {
     padding: 5px;
@@ -1985,6 +2020,17 @@
   }
   .axv-mob-tabs {
     top: 72px;
+    /* 窄屏下 tab + 示例下拉可能超出屏宽，允许横向滚动并藏滚动条 */
+    max-width: calc(100vw - 20px);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .axv-mob-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .axv-mob-tabs > * {
+    flex: 0 0 auto;
   }
   .axv-stage {
     /* 工具栏（top:10 + ≈48）+ 移动端 tab 行（top:72 + 最多两行≈62）≈ 134，再留余量；

@@ -23,6 +23,8 @@ import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { buildResBundle, missingDrawables } from "@/lib/xml/bundle";
 import { sanitizeResName } from "@/lib/xml/resname";
 import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
+import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
+import { hasIcon } from "@/lib/xml/icon-vectors";
 import { makeZip, downloadBytes } from "@/lib/xml/zip";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { ExportCheckModal, type ExportReport } from "./ExportCheckModal";
@@ -611,6 +613,33 @@ export function XmlEditor() {
         // M4w：旧版生成的图标 y 全落在视口外（画出来是空白）→ 载入时自动归位到 0–24
         const fixed = repairGeneratedVectors(clean);
         setGeneratedDrawables(fixed.map);
+        // M4y：旧版图标是 opentype glyf 直出（实心样式），与选择器列表的样式不一致。
+        // 这里按「列表同款渲染」重描一遍，只动 ic_* 且确实是图标名的条目。
+        void (async () => {
+          const stale = Object.entries(fixed.map).filter(([k, v]) => {
+            const iconName = k.replace(/^ic_/, "");
+            return hasIcon(iconName) && looksLikeGlyfVector(v);
+          });
+          if (stale.length === 0) return;
+          const next = { ...fixed.map };
+          let n = 0;
+          for (const [res, xml] of stale) {
+            try {
+              const vec = await getIconVectorWysiwyg(res.replace(/^ic_/, ""));
+              if (vec) {
+                next[res] = vec;
+                n++;
+              }
+            } catch {
+              /* 单个失败不影响其它 */
+            }
+          }
+          if (n > 0) {
+            setGeneratedDrawables(next);
+            setExportNote(`已按选择器同款样式重建 ${n} 个图标`);
+            window.setTimeout(() => setExportNote(""), 4200);
+          }
+        })();
         if (fixed.repaired.length > 0) {
           setExportNote(`已修正 ${fixed.repaired.length} 个旧图标的坐标（之前预览是空白）`);
           window.setTimeout(() => setExportNote(""), 4200);

@@ -11,6 +11,7 @@ import {
   iconResourceName,
   isIconFontLoaded,
 } from "@/lib/xml/icon-vectors";
+import { getIconVectorWysiwyg } from "@/lib/xml/font-glyph";
 
 interface IconMeta {
   /** 图标名（也是 Material Symbols 的 ligature 文本） */
@@ -41,6 +42,8 @@ export function IconPickerPanel({ value, attrName, existing, onClose, onPick }: 
   const [fontReady, setFontReady] = useState(isIconFontLoaded());
   const [q, setQ] = useState("");
   const [err, setErr] = useState<string>("");
+  /** 正在生成的图标名（防重复点击） */
+  const [busy, setBusy] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // 加载图标索引（本地静态 json，离线可用）
@@ -101,13 +104,21 @@ export function IconPickerPanel({ value, attrName, existing, onClose, onPick }: 
     return [...starts, ...rest].slice(0, SHOWN);
   }, [icons, q]);
 
-  const pick = (iconName: string) => {
-    const xml = getIconVector(iconName);
-    if (!xml) {
-      setErr(`「${iconName}」没有可用字形，无法生成 vector`);
-      return;
+  const pick = async (iconName: string) => {
+    // M4y：用与列表同款渲染的字形轮廓生成 vector（含 FILL 轴），保证「选的 = 生成的」；
+    // 画布不可用（如 SSR）时自动退回 opentype glyf 轮廓
+    setBusy(iconName);
+    try {
+      const xml =
+        (await getIconVectorWysiwyg(iconName)) ?? getIconVector(iconName) ?? "";
+      if (!xml) {
+        setErr(`「${iconName}」没有可用字形，无法生成 vector`);
+        return;
+      }
+      onPick(iconResourceName(iconName), xml, iconName);
+    } finally {
+      setBusy(null);
     }
-    onPick(iconResourceName(iconName), xml, iconName);
   };
 
   const currentName = value.replace(/^@(?:drawable|mipmap)\//, "").replace(/\.xml$/, "");
@@ -172,7 +183,7 @@ export function IconPickerPanel({ value, attrName, existing, onClose, onPick }: 
                   key={i.n}
                   className={"axv-icon-cell" + (isCur ? " is-current" : "") + (isDup ? " is-dup" : "")}
                   title={`${i.n}${isDup ? "（已生成，复用同一个文件）" : ""}`}
-                  onClick={() => pick(i.n)}
+                  onClick={() => void pick(i.n)}
                 >
                   <span className="msr" aria-hidden>
                     {i.n}

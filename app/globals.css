@@ -43,11 +43,12 @@ body {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
-/* M4x：图标选择器的格子必须用「填充」样式渲染——
-   opentype.js 只能读 TTF 的 glyf 默认轮廓，Material Symbols 那份默认就是 FILL 1，
-   所以生成出来的 vector 是实心图标。列表若按 FILL 0 画描边，就会「选的跟生成的不一样」。 */
+/* M4x：图标选择器的格子要按「实心」样式渲染——
+   注意 Material Symbols 的 FILL 轴：FILL 0 = 实心（filled），FILL 1 = 描边（outlined）。
+   opentype.js 生成 vector 用的是 TTF 默认 glyf 轮廓 = 实心，
+   所以列表必须也按实心画，否则「选的时候是描边、生成的却是实心」对不上。 */
 .axv-icon-modal .msr {
-  font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
 .m3-hidden-scrollbar {

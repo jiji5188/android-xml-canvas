@@ -100,7 +100,6 @@ export function iconNames(): string[] {
   return [...nameIdx.keys()];
 }
 
-/** opentype Path → SVG pathData（绝对坐标，Q/C 贝塞尔转成近似折线+二次曲线） */
 export function pathToSvgD(path: opentype.Path): string | null {
   const cmds = path.commands;
   if (cmds.length === 0) return null;

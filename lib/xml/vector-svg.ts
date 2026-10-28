@@ -7,6 +7,8 @@ export interface VectorSpec {
   vw: number;
   vh: number;
   paths: { d: string; fill: string; alpha?: number; stroke?: string; strokeWidth?: number }[];
+  /** M11j：<group> 的旋转 / 缩放（镜像）；没有 group 时为 undefined */
+  group?: { rotation: number; scaleX: number; scaleY: number; pivotX: number; pivotY: number };
 }
 
 /** 从 vector xml 文本里抽 viewport + path 列表；不是 vector 返回 null */
@@ -34,7 +36,27 @@ export function parseVectorXml(xml: string): VectorSpec | null {
     });
   }
   if (paths.length === 0) return null;
-  return { vw, vh, paths };
+  return { vw, vh, paths, group: parseGroup(xml, vw, vh) };
+}
+
+/** M11j：抽 <group> 的变换（只处理编辑器生成的一层 group） */
+function parseGroup(
+  xml: string,
+  vw: number,
+  vh: number
+): { rotation: number; scaleX: number; scaleY: number; pivotX: number; pivotY: number } | undefined {
+  const m = /<group\b([^>]*)>/.exec(xml);
+  if (!m) return undefined;
+  const head = m[1];
+  const g = {
+    rotation: num(attrFrom(head, "rotation")) ?? 0,
+    scaleX: num(attrFrom(head, "scaleX")) ?? 1,
+    scaleY: num(attrFrom(head, "scaleY")) ?? 1,
+    pivotX: num(attrFrom(head, "pivotX")) ?? vw / 2,
+    pivotY: num(attrFrom(head, "pivotY")) ?? vh / 2,
+  };
+  if (g.rotation === 0 && g.scaleX === 1 && g.scaleY === 1) return undefined;
+  return g;
 }
 
 /** vector xml → SVG 字符串（viewBox 用 viewport，尺寸 100% 自适应） */
@@ -50,7 +72,12 @@ export function vectorToSvg(xml: string): string | null {
       return `<path ${parts.join(" ")}/>`;
     })
     .join("");
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${spec.vw} ${spec.vh}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">${body}</svg>`;
+  // M11j：group 的旋转 / 镜像（Android 是 缩放→旋转→绕 pivot 平移，SVG 等价写法如下）
+  const g = spec.group;
+  const wrapped = g
+    ? `<g transform="translate(${g.pivotX} ${g.pivotY}) rotate(${g.rotation}) scale(${g.scaleX} ${g.scaleY}) translate(${-g.pivotX} ${-g.pivotY})">${body}</g>`
+    : body;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${spec.vw} ${spec.vh}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">${wrapped}</svg>`;
 }
 
 /** vector xml → data URL（直接给 CSS background-image 用） */

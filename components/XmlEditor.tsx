@@ -58,6 +58,7 @@ import { ResTree } from "./ResTree";
 import { ResImagePreview } from "./ResImagePreview";
 import { ShapeEditor } from "./ShapeEditor";
 import { GenAssetsPanel } from "./GenAssetsPanel";
+import IconEditor from "./IconEditor";
 import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/paths";
 import { LS_KEY_XML, LS_KEY_HIST, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, lsGet, lsSet } from "@/lib/xml/storage";
@@ -432,6 +433,8 @@ export function XmlEditor() {
   }, []);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
  const [exportNote, setExportNote] = useState<string>(" ");
+  /** M11j：正在编辑的生成图标（vector） */
+  const [resIcon, setResIcon] = useState<{ name: string; xml: string } | null>(null);
   /** M4u：从资源树里直接打开的「绘制编辑器」（drawable/*.xml） */
   const [resShape, setResShape] = useState<{ name: string; xml: string } | null>(null);
   /** M4u：从资源树里点开的图片预览 */
@@ -2237,6 +2240,7 @@ const findResolved = findResolvedNode;
                 onRename={(oldName, newName) => onRenameAsset(oldName, newName)}
                 onDelete={onDeleteAsset}
                 onEditShape={(name, shapeXml) => setResShape({ name, xml: shapeXml })}
+                onEditIcon={(name, iconXml) => setResIcon({ name, xml: iconXml })}
                 onClose={() => setLeftView("parts")}
                 onNote={(text) => {
                   setExportNote(text);
@@ -2646,6 +2650,29 @@ const findResolved = findResolvedNode;
             setGeneratedDrawables((m) => ({ ...m, [safe]: shapeXml }));
             setResShape(null);
             setExportNote(`已保存 res/drawable/${safe}.xml`);
+            window.setTimeout(() => setExportNote(" "), 3200);
+          }}
+        />
+      ) : null}
+
+      {/* M11j：生成的图标 → 图标编辑器（颜色 / 尺寸 / 路径 / 旋转） */}
+      {resIcon ? (
+        <IconEditor
+          name={resIcon.name}
+          xml={resIcon.xml}
+          existingNames={Object.keys(generatedDrawables)}
+          onClose={() => setResIcon(null)}
+          onSave={(safeName, iconXml) => {
+            const oldName = resIcon.name;
+            setGeneratedDrawables((m) => {
+              const next = { ...m };
+              if (safeName !== oldName) delete next[oldName];
+              next[safeName] = iconXml;
+              return next;
+            });
+            if (safeName !== oldName) onRenameAsset(oldName, safeName);
+            setResIcon(null);
+            setExportNote("已保存 res/drawable/" + safeName + ".xml");
             window.setTimeout(() => setExportNote(" "), 3200);
           }}
         />

@@ -1,0 +1,219 @@
+
+/* ===== M11j：图标编辑器（生成的 vector drawable）===== */
+.axv-icon-editor {
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+.axv-icon-ed-body {
+  display: flex;
+  gap: 16px;
+  padding: 14px 16px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+.axv-icon-ed-preview {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+.axv-icon-ed-canvas {
+  width: 200px;
+  height: 200px;
+  border-radius: 14px;
+  border: 1px solid var(--axv-line, #dcdce4);
+  /* 棋盘格底：透明区域看得清 */
+  background-image: linear-gradient(45deg, #e8e8ee 25%, transparent 25%),
+    linear-gradient(-45deg, #e8e8ee 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e8e8ee 75%),
+    linear-gradient(-45deg, transparent 75%, #e8e8ee 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.axv-icon-ed-canvas img {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+  image-rendering: auto;
+}
+.axv-icon-ed-meta {
+  font-size: 11px;
+  color: var(--axv-muted, #71717a);
+}
+.axv-icon-ed-form {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.axv-icon-ed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--axv-fg, #3a3a45);
+  margin: 4px 0;
+}
+.axv-icon-ed-row > span:first-child {
+  flex: 0 0 74px;
+}
+.axv-icon-ed-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-line, #dcdce4);
+  background: var(--axv-input-bg, #fff);
+  color: inherit;
+  font-size: 12px;
+}
+.axv-icon-ed-two {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 8px;
+}
+.axv-icon-ed-swatches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+.axv-icon-ed-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid #00000024;
+  cursor: pointer;
+  flex: 0 0 auto;
+  padding: 0;
+}
+.axv-icon-ed-color {
+  width: 30px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--axv-line, #dcdce4);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.axv-icon-ed-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+.axv-icon-ed-mini {
+  margin-left: 8px;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--axv-line, #dcdce4);
+  background: var(--axv-input-bg, #fff);
+  color: inherit;
+  cursor: pointer;
+}
+.axv-icon-ed-paths {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 132px;
+  overflow: auto;
+}
+.axv-icon-ed-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--axv-soft, #f4f4f8);
+  cursor: pointer;
+  font-size: 11px;
+}
+.axv-icon-ed-path.on {
+  border-color: var(--axv-primary, #04409f);
+  background: var(--axv-primary-soft, #e8f0fe);
+}
+.axv-icon-ed-d {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: var(--axv-muted, #71717a);
+}
+.axv-icon-ed-del {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--axv-muted, #71717a);
+  cursor: pointer;
+  line-height: 1;
+}
+.axv-icon-ed-del:hover {
+  background: #d9363e22;
+  color: #d9363e;
+}
+.axv-icon-ed-pathdata,
+.axv-icon-ed-raw {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-line, #dcdce4);
+  background: var(--axv-input-bg, #fff);
+  color: inherit;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.axv-icon-ed-pathdata {
+  min-height: 72px;
+}
+.axv-icon-ed-raw {
+  min-height: 160px;
+  white-space: pre;
+  overflow: auto;
+}
+.axv-icon-ed-err {
+  font-size: 11px;
+  color: #d9363e;
+  margin: 2px 0;
+}
+.axv-icon-ed-val {
+  flex: 0 0 36px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+}
+@media (max-width: 720px) {
+  .axv-icon-ed-body {
+    flex-direction: column;
+  }
+  .axv-icon-ed-preview {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: center;
+  }
+  .axv-icon-ed-canvas {
+    width: 120px;
+    height: 120px;
+  }
+}

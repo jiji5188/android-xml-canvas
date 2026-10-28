@@ -35,6 +35,8 @@ interface Props {
   inline?: boolean;
   /** M11：双击形状资源 → 打开形状编辑器改内容 */
   onEditShape?: (name: string, xml: string) => void;
+  /** M11j：双击图标（vector）→ 打开图标编辑器 */
+  onEditIcon?: (name: string, xml: string) => void;
 }
 
 /** 缩略图：vector → data URL；shape/selector/layer-list → 按 CSS 近似画个色块 */
@@ -60,6 +62,7 @@ export function GenAssetsPanel({
   onNote,
   inline,
   onEditShape,
+  onEditIcon,
 }: Props) {
   const [q, setQ] = useState("");
   /** 正在改名的资源名 */
@@ -181,14 +184,23 @@ export function GenAssetsPanel({
             return (
               <div
                 className={
-                  "axv-assets-row" + (onEditShape && r.kind === "shape" ? " axv-assets-row-editable" : "")
+                  "axv-assets-row" +
+                  ((onEditShape && r.kind === "shape") || (onEditIcon && r.kind === "vector")
+                    ? " axv-assets-row-editable"
+                    : "")
                 }
                 key={r.name}
                 onDoubleClick={() => {
-                  if (!onEditShape || r.kind !== "shape") return;
-                  onEditShape(r.name, r.xml);
+                  if (r.kind === "shape" && onEditShape) onEditShape(r.name, r.xml);
+                  else if (r.kind === "vector" && onEditIcon) onEditIcon(r.name, r.xml);
                 }}
-                title={onEditShape && r.kind === "shape" ? "双击编辑形状内容" : undefined}
+                title={
+                  r.kind === "shape" && onEditShape
+                    ? "双击编辑形状内容"
+                    : r.kind === "vector" && onEditIcon
+                      ? "双击编辑图标（颜色 / 尺寸 / 路径 / 旋转）"
+                      : undefined
+                }
               >
                 <div className="axv-assets-thumb">
                   {t.url ? (

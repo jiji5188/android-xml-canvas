@@ -8,7 +8,6 @@
 // 支持：改已有属性值、新增属性（自动补 android:/app: 前缀与 xmlns:app）、删除属性。
 
 import { scanElements, elementAt } from "./reorder";
-import { scanElements, elementAt } from "./reorder";
 import { ANDROIDX_ATTRS } from "./namespace";
 
 /** ConstraintLayout / MotionLayout 专用属性：必须用 app: 前缀 */

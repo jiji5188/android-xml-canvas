@@ -20,6 +20,13 @@
   --axv-scrim: rgba(20, 18, 32, 0.55);
   --axv-danger: #b3261e;
   --axv-ok: #1f7a3d;
+  /* M16h：外壳配色 token（主题预设会覆盖这些值，见 lib/xml/theme-presets.ts） */
+  --axv-app-bg: #F5F4F7;
+  --axv-toolbar-bg: #F3F3F9;
+  --axv-toolbar-soft: #E9E9F0;
+  --axv-rail-bg: #F3F3F9;
+  --axv-title: #1d1b20;
+  --axv-desc: #6b7280;
 }
 
 :root[data-axv-theme="dark"] {
@@ -259,12 +266,14 @@
 .axv-rail-mini-btn {
   flex: 1;
   min-width: 0;
-  padding: 5px 8px;
-  border: 1px solid #D1D5DB;
-  border-radius: 6px;
-  background: #fff;
-  color: #374151;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
   font-size: 12px;
+  font-weight: 600;
   line-height: 1.3;
   cursor: pointer;
   text-align: center;
@@ -272,9 +281,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.axv-rail-mini-btn:hover { background: #F3F4F6; border-color: #9CA3AF; }
-.axv-rail-mini-btn-danger { color: #B42318; border-color: #F3B4B4; }
-.axv-rail-mini-btn-danger:hover { background: #FEF2F2; border-color: #FCA5A5; }
+.axv-rail-mini-btn:hover { background: var(--axv-hover); border-color: var(--axv-outline-strong); }
+.axv-rail-mini-btn-danger { color: var(--axv-danger); border-color: var(--axv-outline); }
+.axv-rail-mini-btn-danger:hover { background: var(--axv-hover); border-color: var(--axv-danger); }
 
 /* 颜色 swatch 触发 color picker */
 .axv-attr-sw { position: relative; display: inline-block; width: 28px; height: 28px; border-radius: 4px; flex: 0 0 28px; }
@@ -321,7 +330,7 @@
   position: relative;
   height: 100vh;
   overflow: hidden;
-  background: #F5F4F7;
+  background: var(--axv-app-bg);
 }
 .axv-main {
   position: absolute;
@@ -332,7 +341,7 @@
 .axv-stage {
   position: absolute;
   inset: 0;
-  background: #F5F4F7;
+  background: var(--axv-app-bg);
   overflow: auto;
   display: flex;
   align-items: flex-start;
@@ -467,7 +476,7 @@
      M10：gap 3px + 主题背景填充（整条工具栏） */
   gap: 3px;
   padding: 3px 6px;
-  background: #F3F3F9;
+  background: var(--axv-toolbar-bg);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   /* M11：工具栏 9，标签栏 10（标签栏压在工具栏之上） */
   z-index: 9;
@@ -495,7 +504,7 @@
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   /* M11g：中区底色（半透明，透出工具栏主题背景） */
-  background-color: #e3e3e369;
+  background-color: var(--axv-toolbar-soft);
   /* M11h：中区圆角胶囊 */
   border-radius: 20px;
   /* 圆角会裁掉首尾按钮的两端，左右给 4px 缓冲 */
@@ -841,7 +850,7 @@
   align-items: center;
   gap: 6px;
   padding: 10px 0;
-  background: #F3F3F9;
+  background: var(--axv-rail-bg);
 }
 .axv-slide-left .axv-rail-btn {
   /* M11c：占满 rail 宽度，朝画布那侧（右）做成直角，像标签页探出来 */
@@ -2013,7 +2022,7 @@
   z-index: 10;
   padding: 3px 6px;
   border-radius: 0;
-  background: #F3F3F9;
+  background: var(--axv-toolbar-bg);
   box-shadow: 0px 8px 8px #00000014;
   overflow-x: visible;
 }
@@ -4361,4 +4370,268 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 
 .axv-node.axv-clock::before {
   content: "00:00";
+}
+
+/* ================= M16i：项目管理 tab / 工作目录 / 配色方案 ================= */
+
+/* 项目管理：横向 tab 标签（工作目录 | 当前项目） */
+.axv-proj-tabs {
+  display: flex;
+  gap: 3px;
+  margin: 8px 10px 6px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--axv-surface-sunken);
+}
+.axv-proj-tab {
+  flex: 1 1 auto;
+  height: 30px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.axv-proj-tab:hover {
+  background: var(--axv-hover);
+}
+.axv-proj-tab.on {
+  background: var(--axv-surface);
+  color: var(--axv-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* 工作目录面板 */
+.axv-ws-panel {
+  padding: 2px 10px 14px;
+}
+.axv-ws-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: var(--axv-surface-sunken);
+  color: var(--axv-on-surface-variant);
+  font-size: 12px;
+}
+.axv-ws-path-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--axv-on-surface);
+  font-weight: 600;
+}
+.axv-ws-mini {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+}
+.axv-ws-mini:hover {
+  background: var(--axv-hover);
+}
+.axv-ws-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.axv-ws-hint {
+  margin-top: 8px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--axv-desc);
+}
+.axv-ws-warn {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: var(--axv-primary-soft);
+  border: 1px solid var(--axv-primary-soft-border);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--axv-on-surface);
+}
+.axv-ws-link {
+  margin-left: 4px;
+  border: none;
+  background: transparent;
+  color: var(--axv-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.axv-ws-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.axv-ws-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.axv-ws-item:hover {
+  background: var(--axv-hover);
+  border-color: var(--axv-outline);
+}
+.axv-ws-item-icon {
+  font-size: 20px;
+  color: var(--axv-primary);
+}
+.axv-ws-item-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.axv-ws-item-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--axv-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-ws-item-sub {
+  font-size: 11px;
+  color: var(--axv-desc);
+}
+
+/* 配色方案卡片 */
+.axv-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.axv-theme-card {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 7px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  background: var(--axv-surface);
+  cursor: pointer;
+}
+.axv-theme-card:hover {
+  border-color: var(--axv-outline-strong);
+}
+.axv-theme-card.on {
+  border-color: var(--axv-primary);
+  box-shadow: 0 0 0 2px var(--axv-primary-soft);
+}
+.axv-theme-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.axv-theme-swatch > span {
+  display: block;
+  width: 100%;
+  height: 9px;
+}
+.axv-theme-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--axv-title);
+  text-align: left;
+}
+.axv-theme-check {
+  font-size: 16px;
+  color: var(--axv-primary);
+}
+
+/* 配色明细 token 列表 */
+.axv-token-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.axv-token-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 2px;
+  font-size: 11.5px;
+}
+.axv-token-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  flex: 0 0 auto;
+}
+.axv-token-name {
+  flex: 1 1 auto;
+  color: var(--axv-desc);
+}
+.axv-token-hex {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--axv-on-surface-variant);
+}
+
+/* 设置：键值行 / 按钮组 */
+.axv-set-kv {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--axv-desc);
+}
+.axv-set-kv > b {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  color: var(--axv-title);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-set-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px !important;
+}
+.axv-set-btns {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.axv-set-btns > .axv-set-btn {
+  flex: 1 1 0;
+  margin-top: 0;
 }

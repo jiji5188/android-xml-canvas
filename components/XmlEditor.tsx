@@ -28,6 +28,25 @@ import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph"
 import { hasIcon } from "@/lib/xml/icon-vectors";
 import { makeZip, downloadBytes } from "@/lib/xml/zip";
 import { saveTextNative, workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative } from "@/lib/xml/native-save";
+import {
+  THEME_PRESETS,
+  DEFAULT_PRESET_ID,
+  THEME_TOKEN_ORDER,
+  THEME_TOKEN_LABEL,
+  themeTokens,
+  applyThemeToDom,
+  type ThemeMode,
+} from "@/lib/xml/theme-presets";
+import {
+  wsInfo,
+  wsListProjects,
+  wsOpenProject,
+  wsPickCustom,
+  wsUseDefault,
+  wsRequestAllFiles,
+  type WsInfo,
+  type WsProject,
+} from "@/lib/xml/workspace";
 import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
 import {
   activeFile,
@@ -331,7 +350,7 @@ const SAMPLES: Record<string, string> = {
 </LinearLayout>`,
 };
 
-const APP_VERSION = "1.11";
+const APP_VERSION = "1.12";
 const SCALE = 2; // 1dp = 2px
 
 export function XmlEditor() {
@@ -469,6 +488,12 @@ export function XmlEditor() {
   const [leftView, setLeftView] = useState<
     "parts" | "layers" | "code" | "res" | "assets" | "settings" | "about"
   >("parts");
+  /* ===== M16i：工作目录 ===== */
+  const [projectTab, setProjectTab] = useState<"workspace" | "current">("current");
+  const [wsState, setWsState] = useState<WsInfo | null>(null);
+  const [wsProjects, setWsProjects] = useState<WsProject[]>([]);
+  const [wsBusy, setWsBusy] = useState(false);
+  const [wsMsg, setWsMsg] = useState<string>("");
   const [addModalOpen, setAddModalOpen] = useState(false);
   /** M2s：导出前检查面板 */
   const [exportOpen, setExportOpen] = useState(false);
@@ -492,28 +517,31 @@ export function XmlEditor() {
   const [runOpen, setRunOpen] = useState(false);
   /** M5b：已生成资源管理面板 */
   // M11：设置 / 关于面板
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  // M16h：界面主题改成「预设配色方案 + 亮/暗」，token 见 lib/xml/theme-presets.ts
+  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [themePreset, setThemePreset] = useState<string>(DEFAULT_PRESET_ID);
   /** M16d：预览渲染主题（默认 AppCompat，跟 AIDE 真机一致） */
   const [renderTheme, setRenderTheme] = useState<RenderTheme>(DEFAULT_RENDER_THEME);
   const [showSystemBars, setShowSystemBars] = useState(true);
   const [showIssues, setShowIssues] = useState(true);
 
-  // M11：主题切换（只影响编辑器界面，不影响导出）
+  // M16h：应用配色方案（只影响编辑器外壳，不影响导出/预览）
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") root.setAttribute("data-axv-theme", "dark");
-    else root.removeAttribute("data-axv-theme");
+    applyThemeToDom(themePreset, theme);
     try {
       window.localStorage.setItem("axv.theme", theme);
+      window.localStorage.setItem("axv.themePreset", themePreset);
     } catch {
       /* ignore */
     }
-  }, [theme]);
+  }, [theme, themePreset]);
 
-  // M11：启动时恢复主题
+  // M11：启动时恢复主题（兼容旧 key：axv.theme=dark）
   useEffect(() => {
     try {
       if (window.localStorage.getItem("axv.theme") === "dark") setTheme("dark");
+      const preset = window.localStorage.getItem("axv.themePreset");
+      if (preset && THEME_PRESETS.some((p) => p.id === preset)) setThemePreset(preset);
       const rt = window.localStorage.getItem("axv.renderTheme");
       if (rt === "material3" || rt === "appcompat") setRenderTheme(rt);
     } catch {
@@ -529,6 +557,48 @@ export function XmlEditor() {
       /* ignore */
     }
   }, [renderTheme]);
+
+  /* ===== M16i：工作目录（默认 /AndroidUIIDE/Project）===== */
+  const refreshWorkspace = useCallback(async () => {
+    setWsBusy(true);
+    try {
+      const info = await wsInfo();
+      setWsState(info);
+      if (info.mode === "unsupported") {
+        setWsProjects([]);
+      } else if (info.mode === "native" || info.custom) {
+        setWsProjects(await wsListProjects());
+      } else {
+        setWsProjects([]);
+      }
+    } catch (e) {
+      setWsMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWsBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (leftView === "res" || leftView === "settings") void refreshWorkspace();
+  }, [leftView, refreshWorkspace]);
+
+  const pickCustomDir = useCallback(async () => {
+    const ok = await wsPickCustom();
+    if (!ok) {
+      setWsMsg(wsState?.mode === "unsupported" ? "当前浏览器不支持，请用 Chrome / Edge 或 APK" : "已取消选择");
+      return;
+    }
+    setWsMsg("");
+    // 原生选择器是异步回调，给系统一点时间落盘
+    window.setTimeout(() => void refreshWorkspace(), 600);
+  }, [refreshWorkspace, wsState?.mode]);
+
+  const useDefaultDir = useCallback(async () => {
+    await wsUseDefault();
+    setWsMsg("已恢复默认工作目录");
+    window.setTimeout(() => void refreshWorkspace(), 400);
+  }, [refreshWorkspace]);
+
   const [mobileTab, setMobileTab] = useState<"preview" | "xml">("preview");
 
 
@@ -1195,6 +1265,24 @@ export function XmlEditor() {
       commitHistory(next, mergeKey ?? "");
     },
     [flushTextTimer, commitHistory],
+  );
+
+  /** M16i：从工作目录打开项目（依赖 setXmlAndTrack，必须放在它后面） */
+  const openWsProject = useCallback(
+    async (p: WsProject) => {
+      try {
+        const r = await wsOpenProject(p);
+        if (!r) {
+          setWsMsg(`打不开《${p.name}》：没有可读的 layout xml，或目录权限已被收回`);
+          return;
+        }
+        setXmlAndTrack(r.text);
+        setWsMsg(`已打开 ${r.name}`);
+      } catch (e) {
+        setWsMsg(`打开失败：${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+    [setXmlAndTrack],
   );
 
   /** 载入完整示例项目：布局 + 自带 drawable + values 一起换（合并语义：用户已有资源不会被覆盖） */
@@ -2305,8 +2393,113 @@ const findResolved = findResolvedNode;
           )}
           {leftView === "res" && (
             <div className="axv-rail-scroll">
-              {/* 资源操作按钮（横向排列，树形框上方） */}
-              <div style={{ display: "flex", gap: 8, padding: "8px 12px 6px" }}>
+              {/* M16i：项目管理两个 tab（工作目录在前，当前项目在后；默认停在当前项目） */}
+              <div className="axv-proj-tabs">
+                <button
+                  className={"axv-proj-tab" + (projectTab === "workspace" ? " on" : "")}
+                  onClick={() => {
+                    setProjectTab("workspace");
+                    void refreshWorkspace();
+                  }}
+                >
+                  工作目录
+                </button>
+                <button
+                  className={"axv-proj-tab" + (projectTab === "current" ? " on" : "")}
+                  onClick={() => setProjectTab("current")}
+                >
+                  当前项目
+                </button>
+              </div>
+
+              {projectTab === "workspace" ? (
+                <div className="axv-ws-panel">
+                  <div className="axv-ws-path">
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
+                    <span className="axv-ws-path-text" title={wsState?.label || ""}>
+                      {wsState?.mode === "native"
+                        ? wsState.label || "AndroidUIIDE/Project"
+                        : wsState?.mode === "unsupported"
+                          ? "当前浏览器不支持读本地目录"
+                          : wsState?.custom
+                            ? wsState.label
+                            : "未授权目录"}
+                    </span>
+                    <button
+                      className="axv-ws-mini"
+                      title="刷新列表"
+                      onClick={() => void refreshWorkspace()}
+                    >
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
+                    </button>
+                  </div>
+
+                  <div className="axv-ws-actions">
+                    <button className="axv-rail-mini-btn" onClick={() => void pickCustomDir()}>
+                      选择目录
+                    </button>
+                    <button className="axv-rail-mini-btn" onClick={() => void useDefaultDir()} title="回到内置默认目录">
+                      恢复默认
+                    </button>
+                  </div>
+
+                  {wsState?.mode === "native" && wsState.allFiles === false ? (
+                    <div className="axv-ws-warn">
+                      默认目录在存储根下，需要「所有文件访问」权限才能读取。
+                      <button className="axv-ws-link" onClick={() => wsRequestAllFiles()}>
+                        去开启
+                      </button>
+                    </div>
+                  ) : null}
+                  {wsState?.mode === "unsupported" ? (
+                    <div className="axv-ws-warn">
+                      请用 Chrome / Edge 打开网页版，或安装 APK（APK 默认目录：/AndroidUIIDE/Project）。
+                    </div>
+                  ) : null}
+                  {wsState?.mode === "web" && !wsState.custom ? (
+                    <div className="axv-ws-hint">点「选择目录」授权一个文件夹，授权会被记住，下次打开不用再选。</div>
+                  ) : null}
+                  {wsState?.permission === "prompt" ? (
+                    <div className="axv-ws-warn">
+                      目录权限需要重新确认（浏览器安全策略）。
+                      <button className="axv-ws-link" onClick={() => void refreshWorkspace()}>
+                        重新授权
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {wsBusy ? <div className="axv-ws-hint">正在读取…</div> : null}
+
+                  {wsProjects.length > 0 ? (
+                    <ul className="axv-ws-list">
+                      {wsProjects.map((p) => (
+                        <li key={p.rel + p.kind}>
+                          <button className="axv-ws-item" onClick={() => void openWsProject(p)} title={p.rel}>
+                            <span className="msr axv-ws-item-icon" aria-hidden="true">
+                              {p.kind === "dir" ? "folder" : "description"}
+                            </span>
+                            <span className="axv-ws-item-main">
+                              <span className="axv-ws-item-name">{p.name}</span>
+                              <span className="axv-ws-item-sub">
+                                {p.kind === "dir" ? `项目 · ${p.layoutCount} 个布局` : "单个 xml"}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : !wsBusy && (wsState?.mode === "native" || wsState?.custom) ? (
+                    <div className="axv-ws-hint">
+                      目录里还没有项目。把项目文件夹（内含 layout/*.xml）放到这个目录下，点刷新即可。
+                    </div>
+                  ) : null}
+
+                  {wsMsg ? <div className="axv-ws-hint">{wsMsg}</div> : null}
+                </div>
+              ) : (
+                <>
+                  {/* 资源操作按钮（横向排列，树形框上方） */}
+                  <div style={{ display: "flex", gap: 8, padding: "8px 12px 6px" }}>
                 <button
                   className="axv-rail-mini-btn"
                   title="选择整个 res 目录（推荐：一次导入 drawable / values / mipmap）"
@@ -2356,14 +2549,43 @@ const findResolved = findResolvedNode;
                   </div>
                 </>
               )}
+                </>
+              )}
             </div>
           )}
 
           {leftView === "settings" && (
             <div className="axv-rail-scroll">
+              {/* ===== 外观：预设配色方案 ===== */}
               <div className="axv-set-group">
-                <div className="axv-set-label">界面主题</div>
-                <div className="axv-set-seg">
+                <div className="axv-set-label">配色方案</div>
+                <div className="axv-theme-grid">
+                  {THEME_PRESETS.map((p) => {
+                    const t = themeTokens(p.id, theme);
+                    const on = p.id === themePreset;
+                    return (
+                      <button
+                        key={p.id}
+                        className={"axv-theme-card" + (on ? " on" : "")}
+                        onClick={() => setThemePreset(p.id)}
+                        title={p.note}
+                      >
+                        <span
+                          className="axv-theme-swatch"
+                          style={{
+                            background: `linear-gradient(135deg, ${t.primary}, ${t.toolbarBg})`,
+                            borderColor: t.primary,
+                          }}
+                        >
+                          <span style={{ background: t.panelBg }} />
+                        </span>
+                        <span className="axv-theme-name">{p.name}</span>
+                        {on ? <span className="msr axv-theme-check" aria-hidden="true">check</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="axv-set-seg" style={{ marginTop: 8 }}>
                   <button
                     className={"axv-set-seg-btn" + (theme === "light" ? " on" : "")}
                     onClick={() => setTheme("light")}
@@ -2377,7 +2599,70 @@ const findResolved = findResolvedNode;
                     深色
                   </button>
                 </div>
-                <div className="axv-set-hint">深色仅作用于编辑器界面，不影响导出的布局配色。</div>
+                <div className="axv-set-hint">
+                  {THEME_PRESETS.find((p) => p.id === themePreset)?.note}。配色只作用于编辑器界面，不影响导出的布局。
+                </div>
+              </div>
+
+              {/* 配色明细：把工具栏/背景/面板/标题/描述这些真用到的色值列出来 */}
+              <div className="axv-set-group">
+                <div className="axv-set-label">配色明细</div>
+                <div className="axv-token-list">
+                  {THEME_TOKEN_ORDER.map((k) => {
+                    const tokens = themeTokens(themePreset, theme);
+                    const val = tokens[k] ?? "";
+                    return (
+                      <div className="axv-token-row" key={k}>
+                        <span className="axv-token-dot" style={{ background: val }} />
+                        <span className="axv-token-name">{THEME_TOKEN_LABEL[k]}</span>
+                        <code className="axv-token-hex">{val.toUpperCase()}</code>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ===== 工作目录 ===== */}
+              <div className="axv-set-group">
+                <div className="axv-set-label">工作目录</div>
+                <div className="axv-set-kv">
+                  <span>当前</span>
+                  <b title={wsState?.label || ""}>
+                    {wsState?.mode === "native"
+                      ? wsState.label || "AndroidUIIDE/Project"
+                      : wsState?.mode === "unsupported"
+                        ? "不支持（请用 Chrome/Edge 或 APK）"
+                        : wsState?.custom
+                          ? wsState.label
+                          : "未授权目录"}
+                  </b>
+                </div>
+                {wsState?.defaultPath ? (
+                  <div className="axv-set-kv">
+                    <span>默认</span>
+                    <b className="axv-set-mono">{wsState.defaultPath}</b>
+                  </div>
+                ) : null}
+                <div className="axv-set-btns">
+                  <button className="axv-set-btn" onClick={() => void pickCustomDir()}>
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>folder_open</span>
+                    选择目录
+                  </button>
+                  <button className="axv-set-btn" onClick={() => void useDefaultDir()}>
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>settings_backup_restore</span>
+                    恢复默认
+                  </button>
+                </div>
+                {wsState?.mode === "native" && wsState.allFiles === false ? (
+                  <button className="axv-set-btn" onClick={() => wsRequestAllFiles()}>
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>shield</span>
+                    开启「所有文件访问」（默认目录在存储根下，必须开）
+                  </button>
+                ) : null}
+                <div className="axv-set-hint">
+                  默认目录：APK 是 <code>/AndroidUIIDE/Project</code>；网页版由你授权一个文件夹（授权会记住）。
+                  自定义目录失效时会自动回落到默认目录，两者都不会留空。
+                </div>
               </div>
 
               <div className="axv-set-group">

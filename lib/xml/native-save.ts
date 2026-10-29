@@ -12,6 +12,20 @@ export interface AxvNativeBridge {
   getWorkspace(): string;
   /** 弹出系统文件夹选择器，选完即成为新的默认工作目录 */
   pickWorkspace(): void;
+
+  /* ===== M16i：工作目录 ===== */
+  /** 内置默认工作目录绝对路径（如 /storage/emulated/0/AndroidUIIDE/Project） */
+  getDefaultWorkspace?(): string;
+  /** 当前生效目录 + 权限状态（JSON 字符串） */
+  getWorkspaceInfo?(): string;
+  /** 是否已拿到「所有文件访问」 */
+  hasAllFilesAccess?(): boolean;
+  /** 跳系统设置申请「所有文件访问」 */
+  requestAllFilesAccess?(): void;
+  /** 列工作目录下的项目（JSON 字符串） */
+  listProjects?(): string;
+  /** 读文本：绝对路径（限默认目录）或 content:// URI */
+  readText?(target: string): string | null;
 }
 
 declare global {

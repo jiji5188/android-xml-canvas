@@ -64,6 +64,8 @@ export interface ResolvedNode {
   imgTint?: string;
   /** M5a：tintMode 的混色方式（multiply/screen/plus-lighter/overlay；空 = 用 mask 填色） */
   imgBlend?: string;
+  /** M11y：TextInputLayout 的浮动 hint 标签（行外绝对定位，压在框线上） */
+  label?: string;
   /** M5c：<inset> 背景——背景图内缩绘制（不裁子控件，单独画一层） */
   bgInset?: {
     t: number;

@@ -1826,10 +1826,18 @@ const ALL_WIDGETS_LAYOUT = `<?xml version="1.0" encoding="utf-8"?>
           android:gravity="center" />
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="ViewPager2（子项由 adapter 生成，预览里是空占位）"
+        android:textSize="12sp"
+        android:textColor="#8C8794"
+        android:paddingTop="12dp" />
+
     <androidx.viewpager2.widget.ViewPager2
         android:layout_width="match_parent"
         android:layout_height="120dp"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="4dp"
         android:background="@drawable/bg_stat" />
 
     <com.google.android.material.bottomnavigation.BottomNavigationView

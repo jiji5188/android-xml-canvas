@@ -3151,6 +3151,52 @@
   white-space: nowrap;
 }
 
+/* M11y：Chip 带 closeIcon 时右侧画个小叉（Android 是图标，这里用文字叉占位） */
+.axv-node.axv-chip-close::after {
+  content: "✕";
+  font-size: 0.78em;
+  line-height: 1;
+  margin-left: 0.5em;
+  opacity: 0.75;
+}
+
+/* M11y：SearchView 左侧放大镜（Material Symbols 图标字体） */
+.axv-node.axv-search::before {
+  content: "search";
+  font-family: "Material Symbols Rounded", "Material Icons", sans-serif;
+  font-size: 1.15em;
+  line-height: 1;
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.8;
+  pointer-events: none;
+}
+.axv-node.axv-search {
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* M11y：TextInputLayout 浮动 hint —— 压在描边框上，底色遮住边线 */
+.axv-til-label {
+  position: absolute;
+  top: -0.62em;
+  left: 12px;
+  padding: 0 4px;
+  font-size: 0.72em;
+  line-height: 1.2;
+  color: #6750a4;
+  background: var(--axv-til-label-bg, #ffffff);
+  border-radius: 2px;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Toolbar 副标题（用 attr 占位不划算，这里只保主标题居中左对齐已由内联样式给） */
 .axv-node.axv-toolbar {
   overflow: hidden;

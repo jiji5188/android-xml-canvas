@@ -946,6 +946,24 @@ export function buildRenderModel(
       if (stroke) style.border = `${DP(1, scale)}px solid ${stroke}`;
       else if (mode === "outline") style.border = `${DP(1, scale)}px solid #79747E`;
       if (mode) style.borderRadius = `${DP(4, scale)}px`;
+      // M11y：outline / filled 有内边距（左 16dp 上 8dp），否则文字贴着描边
+      if (mode) {
+        style.paddingLeft = style.paddingLeft === "0px" || !style.paddingLeft ? `${DP(16, scale)}px` : style.paddingLeft;
+        style.paddingRight = style.paddingRight === "0px" || !style.paddingRight ? `${DP(16, scale)}px` : style.paddingRight;
+        style.paddingTop = style.paddingTop === "0px" || !style.paddingTop ? `${DP(8, scale)}px` : style.paddingTop;
+        style.paddingBottom = style.paddingBottom === "0px" || !style.paddingBottom ? `${DP(8, scale)}px` : style.paddingBottom;
+      }
+    }
+
+    // M11y：SearchView —— 搜索框外观（圆角浅底 + 放大镜 + 左侧留位）
+    if (tag === "SearchView" || tag === "AppCompatSearchView") {
+      style.display = style.display ?? "flex";
+      style.alignItems = "center";
+      style.backgroundColor = style.backgroundColor ?? "#F3EDF7";
+      style.borderRadius = style.borderRadius ?? `${DP(24, scale)}px`;
+      style.paddingLeft = style.paddingLeft ?? `${DP(40, scale)}px`;
+      style.paddingRight = style.paddingRight ?? `${DP(16, scale)}px`;
+      style.color = style.color ?? "#49454F";
     }
 
     if (cls === "axv-list") {
@@ -1278,6 +1296,9 @@ export function buildRenderModel(
       className:
         cls +
         (attrs["checked"] ? " axv-checked" : "") +
+        // M11y：SearchView 搜索框外观 / Chip 带 closeIcon 时多画个叉
+        (cls === "axv-text" && (tag === "SearchView" || tag === "AppCompatSearchView") ? " axv-search" : "") +
+        (cls === "axv-chip" && (attrs["closeIcon"] as string) ? " axv-chip-close" : "") +
         // M11t：不确定进度条要多一个类来挂动画
         (cls === "axv-progress" && attrs["indeterminate"] ? " axv-indet" : "") +
         (cls === "axv-progress" && progressRing ? " axv-progress-ring" : ""),
@@ -1335,6 +1356,8 @@ export function buildRenderModel(
     // 子项全 absolute 又撑不起来 → 容器会塔成 0 高（真 bug，会看到控件跑出屏幕）
     const wStr = String(n.style.width ?? "");
     const hStr = String(n.style.height ?? "");
+    /** M11y：wrap_content 的 CL 应该由子项擑开，而不是回落到整屏高 */
+    const wrapH = hStr === "auto" || hStr === "";
     if (wStr === "100%" || wStr === "auto" || wStr === "") n.style.width = `${cw}px`;
     if (hStr === "100%" || hStr === "auto" || hStr === "") n.style.height = `${ch}px`;
     // 子项定位基准是 padding box，而 Android 是在 padding 里面排
@@ -1386,8 +1409,37 @@ export function buildRenderModel(
       delete child.style.marginLeft;
       for (const gc of child.children) patchCL(gc);
     }
+
+    // M11y：CL 高度收尾
+    //  - wrap_content：按子项最大下沿定高（以前回落到整屏高，底部多出一大片空白）
+    //  - 固定高：子项超出就裁掉（Android ViewGroup 默认 clipChildren=true），
+    //    否则超出部分会盖住下一节的标题
+    let maxBottom = 0;
+    for (const child of n.children) {
+      const t2 = parseFloat(String(child.style.top ?? 0)) || 0;
+      const h2 = parseFloat(String(child.style.height ?? 0)) || 0;
+      maxBottom = Math.max(maxBottom, t2 + h2);
+    }
+    const fixedH = parseFloat(String(n.style.height ?? 0)) || 0;
+    if (wrapH && maxBottom > 0) {
+      n.style.height = `${Math.round(maxBottom + padB)}px`;
+    } else if (fixedH > 0 && maxBottom > fixedH + 1) {
+      n.style.overflow = "hidden";
+    }
   };
   patchCL(rootNode);
+
+  // M11y：TextInputLayout 浮动 hint 标签（Android 里 hint 会浮到框线上，占位行里不能少）
+  const patchTIL = (n: ResolvedNode): void => {
+    if (shortTag(n.tag) === "TextInputLayout") {
+      const own = (n.rawAttrs["hint"] ?? "") as string;
+      const childHint = n.children.find((c) => /EditText$/.test(String(c.tag)) && (c.text || "").trim())?.text;
+      const lbl = (own || childHint || "").trim();
+      if (lbl) n.label = lbl;
+    }
+    for (const c of n.children) patchTIL(c);
+  };
+  patchTIL(rootNode);
 
   // M2p：RelativeLayout 子项规则定位（alignParent / center / toRightOf / below / alignTop …）
   const patchRL = (n: ResolvedNode): void => {

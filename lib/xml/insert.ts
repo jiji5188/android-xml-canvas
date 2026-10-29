@@ -50,6 +50,9 @@ const CONTAINER_TAGS = new Set([
   "TabLayout",
   "Toolbar",
   "MaterialToolbar",
+  // M11y：CollapsingToolbarLayout 是 AppBarLayout 的子级容器，里面放 Toolbar 是标准写法
+  "CollapsingToolbarLayout",
+  "BottomAppBar",
   // 有意不收：RecyclerView / ListView / ViewPager2 / BottomNavigationView / NavigationView
   //  它们是 ViewGroup，但子项由 adapter/menu 生成，XML 里写子控件不生效
 ]);

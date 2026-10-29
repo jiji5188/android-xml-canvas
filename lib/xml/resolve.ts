@@ -475,6 +475,7 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["valueFrom"] = a["valueFrom"] !== undefined ? parseFloat(a["valueFrom"]) || 0 : 0;
   out["valueTo"] = a["valueTo"] !== undefined ? parseFloat(a["valueTo"]) || 100 : 100;
   out["indicatorColor"] = a["indicatorColor"] !== undefined ? resolveColor(a["indicatorColor"], res, issues, path, "indicatorColor") : "";
+  out["closeIcon"] = a["closeIcon"] !== undefined ? resolveDrawable(a["closeIcon"], res, issues, path, "closeIcon") : "";
 
   return { attrs: out, issues };
 }

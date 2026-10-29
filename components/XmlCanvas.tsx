@@ -644,6 +644,12 @@ export function XmlCanvas({
           {node.tag}
         </span>
       ) : null}
+      {/* M11y：TextInputLayout 浮动 hint 标签（压在描边框上） */}
+      {node.label ? (
+        <span className="axv-til-label" aria-hidden="true" title={node.label}>
+          {node.label}
+        </span>
+      ) : null}
       {node.children.map((c) => (
         <XmlCanvas
           key={c.path}

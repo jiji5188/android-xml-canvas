@@ -81,6 +81,10 @@ function wrapValues(fragment: string): string {
   const body = fragment
     .replace(/<\?xml[^>]*\?>/gi, "")
     .replace(/<\/?resources[^>]*>/gi, "")
+    // M12c：<macro> 是 AAPT2 新特性，AIDE 内嵌的老 aapt 遇到会直接
+    // “Found tag macro where item is expected”→ 导出时丢掉（宏只影响 gradle 层，预览/编译不需要）
+    .replace(/<macro\b[^>]*\/>/gi, "")
+    .replace(/<macro\b[^>]*>[\s\S]*?<\/macro>/gi, "")
     .trim();
   return `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${body}\n</resources>\n`;
 }

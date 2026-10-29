@@ -9,6 +9,7 @@ import { solveConstraintChildren, type MeasuredMap } from "./constraints";
 import { solveRelativeChildren } from "./relative";
 import { expandIncludes, repath } from "./include";
 import { SCREEN_DP, phoneBodyDp, readableOn } from "./theme";
+import { DEFAULT_RENDER_THEME, type RenderTheme } from "./theme";
 import { vectorToDataUrl } from "./vector-svg";
 
 const DP = (n: number, scale = 2) => n * scale;
@@ -358,7 +359,10 @@ export function buildRenderModel(
   screen?: { w: number; h: number },
   /** M2t：wrap_content 实测尺寸（path → CSS px），浏览器第二遍求解用 */
   measured?: MeasuredMap,
+  /** M16d：渲染主题（appcompat 默认，跟真机 AIDE 一致；material3 可选） */
+  theme: RenderTheme = DEFAULT_RENDER_THEME,
 ): RenderModel {
+  const appcompat = theme !== "material3";
   const issues: import("./types").XmlIssue[] = [];
   const screenW = screen?.w ?? SCREEN_DP.w;
   const screenH = screen?.h ?? SCREEN_DP.h;
@@ -766,7 +770,8 @@ export function buildRenderModel(
             : "#1D1B20"
           : "#FFFFFF";
         style.color = tcRaw || autoFg;
-        style.borderRadius = style.borderRadius ?? `${DP(20, scale)}px`;
+        // M16d：AppCompat 下 M3 的胶囊按钮不存在（默认 4dp 圆角），Material3 才是胶囊
+        style.borderRadius = style.borderRadius ?? `${DP(appcompat ? 4 : 20, scale)}px`;
         style.fontWeight = 500;
         style.cursor = "pointer";
         // M11x：app:strokeColor + strokeWidth 的 MaterialButton 是「描边按钮」（OutlinedButton），
@@ -774,9 +779,15 @@ export function buildRenderModel(
         const sCol = (attrs["strokeColor"] as string) || "";
         const sW = (attrs["strokeWidth"] as number) || 0;
         if (tag === "MaterialButton" && sCol && !tint && !bg) {
-          style.backgroundColor = "transparent";
-          style.border = `${DP(sW || 1, scale)}px solid ${sCol}`;
-          style.color = tcRaw || sCol;
+          if (appcompat) {
+            // AppCompat：M3 描边按钮样式无效 → 退化成普通灰色实心按钮（真机就是这样）
+            style.backgroundColor = "#E8E8EC";
+            style.color = tcRaw || "#1D1B20";
+          } else {
+            style.backgroundColor = "transparent";
+            style.border = `${DP(sW || 1, scale)}px solid ${sCol}`;
+            style.color = tcRaw || sCol;
+          }
         } else if (tag === "MaterialButton" && sCol && sW) {
           style.border = `${DP(sW, scale)}px solid ${sCol}`;
         }
@@ -1281,13 +1292,14 @@ export function buildRenderModel(
       style.display = "inline-flex";
       style.alignItems = "center";
       style.justifyContent = "center";
-      style.height = style.height === "auto" ? `${DP(32, scale)}px` : style.height;
-      style.minHeight = `${DP(32, scale)}px`;
-      style.paddingLeft = style.paddingLeft === "0px" || !style.paddingLeft ? `${DP(12, scale)}px` : style.paddingLeft;
-      style.paddingRight = style.paddingRight === "0px" || !style.paddingRight ? `${DP(12, scale)}px` : style.paddingRight;
-      style.borderRadius = style.borderRadius ?? `${DP(8, scale)}px`;
-      style.backgroundColor = style.backgroundColor ?? (attrs["checked"] ? "#D0BCFF" : "#E8DEF8");
-      style.color = style.color ?? "#1D192B";
+      style.height = style.height === "auto" ? `${DP(appcompat ? 24 : 32, scale)}px` : style.height;
+      style.minHeight = `${DP(appcompat ? 24 : 32, scale)}px`;
+      style.paddingLeft = style.paddingLeft === "0px" || !style.paddingLeft ? `${DP(appcompat ? 2 : 12, scale)}px` : style.paddingLeft;
+      style.paddingRight = style.paddingRight === "0px" || !style.paddingRight ? `${DP(appcompat ? 2 : 12, scale)}px` : style.paddingRight;
+      // M16d：AppCompat 里 Chip 没有 Material 主题支撑 → 退化成纯文字（真机就是「Chip可关闭」一行字）
+      style.borderRadius = style.borderRadius ?? `${DP(appcompat ? 0 : 8, scale)}px`;
+      style.backgroundColor = style.backgroundColor ?? (appcompat ? "transparent" : attrs["checked"] ? "#D0BCFF" : "#E8DEF8");
+      style.color = style.color ?? (appcompat ? "#1D1B20" : "#1D192B");
       style.fontSize = style.fontSize === "28px" || !style.fontSize ? `${DP(14, scale)}px` : style.fontSize;
       style.flex = "0 0 auto";
     } else if (cls === "axv-chipgroup") {
@@ -1313,25 +1325,26 @@ export function buildRenderModel(
       style.color = style.color ?? (attrs["checkedTab"] ? "#6750A4" : "#49454F");
       if (attrs["checkedTab"]) style.boxShadow = `inset 0 -${DP(3, scale)}px 0 #6750A4`;
     } else if (cls === "axv-fab" || cls === "axv-fab-ext") {
-      const fabBg = (attrs["backgroundTint"] as string) || "#6750A4";
+      // M16d：AppCompat 下 FAB 没有 Material 主题的色/阴影 → 灰底方角块（真机截图就是这样）
+      const fabBg = (attrs["backgroundTint"] as string) || (appcompat ? "#E8E8EC" : "#6750A4");
       style.backgroundColor = style.backgroundColor ?? fabBg;
-      style.color = style.color ?? "#FFFFFF";
+      style.color = style.color ?? (appcompat ? "#1D1B20" : "#FFFFFF");
       style.flex = "0 0 auto";
       style.display = "inline-flex";
       style.alignItems = "center";
       style.justifyContent = "center";
-      style.boxShadow = style.boxShadow ?? "0 4px 10px rgba(0,0,0,0.22)";
+      style.boxShadow = appcompat ? "none" : style.boxShadow ?? "0 4px 10px rgba(0,0,0,0.22)";
       if (cls === "axv-fab") {
         const d = DP(56, scale);
         style.width = style.width === "auto" || !style.width ? `${d}px` : style.width;
         style.height = style.height === "auto" || !style.height ? `${d}px` : style.height;
-        style.borderRadius = style.borderRadius ?? "50%";
+        style.borderRadius = style.borderRadius ?? (appcompat ? `${DP(4, scale)}px` : "50%");
         // 图标用 padding 收成 24dp（img 层铺满内容区，padding 就是它的内缩）
         style.paddingLeft = style.paddingRight = style.paddingTop = style.paddingBottom = `${DP(16, scale)}px`;
         const fabSrc = (attrs["src"] as string) || "";
         if (fabSrc && /^(data:|builtin:)/.test(fabSrc)) imgSrc = fabSrc;
       } else {
-        style.borderRadius = style.borderRadius ?? `${DP(16, scale)}px`;
+        style.borderRadius = style.borderRadius ?? (appcompat ? `${DP(4, scale)}px` : `${DP(16, scale)}px`);
         style.paddingLeft = style.paddingLeft ?? `${DP(20, scale)}px`;
         style.paddingRight = style.paddingRight ?? `${DP(20, scale)}px`;
         style.height = style.height === "auto" || !style.height ? `${DP(56, scale)}px` : style.height;

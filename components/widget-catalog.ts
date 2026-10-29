@@ -4,7 +4,7 @@
 
 export type LibKind = "android" | "androidx" | "material";
 
-export type WidgetCat = "布局" | "文本" | "输入" | "控件" | "进度" | "图片";
+export type WidgetCat = "布局" | "适配器" | "文本" | "输入" | "控件" | "进度" | "图片";
 
 export interface WidgetDef {
   key: string;
@@ -268,7 +268,7 @@ export const WIDGETS: WidgetDef[] = [
   },
   {
     // 注：ListView / GridView 是 AdapterView，内容由 Adapter 给，所以模板不能带子控件（带了运行时会崩）
-    key: "list_view", label: "列表（ListView）", tag: "ListView", icon: "list", lib: "android", group: "布局",
+    key: "list_view", label: "列表（ListView）", tag: "ListView", icon: "list", lib: "android", group: "适配器",
     xml: `<ListView ${A}
     android:layout_width="match_parent"
     android:layout_height="240dp"
@@ -276,7 +276,7 @@ export const WIDGETS: WidgetDef[] = [
     android:dividerHeight="1dp"/>`,
   },
   {
-    key: "grid_view", label: "网格（GridView）", tag: "GridView", icon: "grid_on", lib: "android", group: "布局",
+    key: "grid_view", label: "网格（GridView）", tag: "GridView", icon: "grid_on", lib: "android", group: "适配器",
     xml: `<GridView ${A}
     android:layout_width="match_parent"
     android:layout_height="240dp"
@@ -285,7 +285,7 @@ export const WIDGETS: WidgetDef[] = [
     android:verticalSpacing="4dp"/>`,
   },
   {
-    key: "expandable_list", label: "可展开列表", tag: "ExpandableListView", icon: "account_tree", lib: "android", group: "布局",
+    key: "expandable_list", label: "可展开列表", tag: "ExpandableListView", icon: "account_tree", lib: "android", group: "适配器",
     xml: `<ExpandableListView ${A}
     android:layout_width="match_parent"
     android:layout_height="240dp"
@@ -999,7 +999,7 @@ export const WIDGETS: WidgetDef[] = [
 export const WIDGET_MAP: Record<string, WidgetDef> = Object.fromEntries(WIDGETS.map((w) => [w.key, w]));
 
 /** 分组顺序（面板展示用） */
-export const WIDGET_GROUPS: WidgetCat[] = ["布局", "文本", "输入", "控件", "进度", "图片"];
+export const WIDGET_GROUPS: WidgetCat[] = ["布局", "适配器", "文本", "输入", "控件", "进度", "图片"];
 
 /** 库大类顺序 + 显示名 + 图标（面板第一层） */
 export const WIDGET_LIBS: { lib: LibKind; label: string; hint: string; icon: string }[] = [
@@ -1011,6 +1011,7 @@ export const WIDGET_LIBS: { lib: LibKind; label: string; hint: string; icon: str
 /** 分组图标 */
 export const GROUP_ICON: Record<WidgetCat, string> = {
   布局: "widgets",
+  适配器: "view_list",
   文本: "text_fields",
   输入: "edit",
   控件: "touch_app",

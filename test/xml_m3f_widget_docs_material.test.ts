@@ -189,7 +189,7 @@ const AND = WIDGETS.filter((w) => w.lib === "android");
 describe("M3f3 / M14 组件面板：按库分大类（平台 / AndroidX / Material）", () => {
   it("三个库大类都存在，且分类顺序固定", () => {
     expect(WIDGET_LIBS.map((l) => l.lib)).toEqual(["android", "androidx", "material"]);
-    expect(WIDGET_GROUPS).toEqual(["布局", "文本", "输入", "控件", "进度", "图片"]);
+    expect(WIDGET_GROUPS).toEqual(["布局", "适配器", "文本", "输入", "控件", "进度", "图片"]);
     for (const g of WIDGET_GROUPS) expect(GROUP_ICON[g]).toBeTruthy();
   });
 

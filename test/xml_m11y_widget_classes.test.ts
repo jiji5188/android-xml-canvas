@@ -6,14 +6,14 @@ import { DEFAULT_RESOURCES } from "../lib/xml/resources";
 const ICON =
   "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M0 0h24v24H0z'/%3E%3C/svg%3E";
 
-function build(xml: string): any {
+function build(xml: string, theme?: "appcompat" | "material3"): any {
   const parsed = parseLayoutXml(xml);
   const res = {
     ...(DEFAULT_RESOURCES as any),
     drawables: { ic_x: ICON },
     drawableXml: { ic_x: "<vector/>" },
   };
-  return buildRenderModel(parsed.root!, res).root;
+  return buildRenderModel(parsed.root!, res, 2, undefined, undefined, undefined, theme).root;
 }
 
 function find(node: any, tag: string): any {
@@ -55,8 +55,8 @@ describe("M11x 全组件总览修正", () => {
     expect(group.style.flexWrap).toBe("wrap");
   });
 
-  it("FAB 是 56dp 圆形并带图标；Extended FAB 是胶囊", () => {
-    const root = build(`<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  it("FAB 是 56dp 圆形并带图标；Extended FAB 是胶囊（Material3）；AppCompat 下方块灰底", () => {
+    const xml = `<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto"
       android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
       <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -64,7 +64,8 @@ describe("M11x 全组件总览修正", () => {
         android:src="@drawable/ic_x" app:backgroundTint="#6750A4" />
       <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="扩展" />
-    </LinearLayout>`);
+    </LinearLayout>`;
+    const root = build(xml, "material3");
     const fab = find(root, "FloatingActionButton");
     expect(fab.className).toContain("axv-fab");
     expect(fab.style.borderRadius).toBe("50%");
@@ -73,6 +74,12 @@ describe("M11x 全组件总览修正", () => {
     const ext = find(root, "ExtendedFloatingActionButton");
     expect(ext.className).toContain("axv-fab-ext");
     expect(ext.text).toBe("扩展");
+
+    // M16d：默认 AppCompat —— FAB 没有 Material 主题支撑，是灰底方角块、无阴影
+    const ac = build(xml);
+    const acFab = find(ac, "FloatingActionButton");
+    expect(acFab.style.borderRadius).toBe("8px");
+    expect(acFab.style.boxShadow).toBe("none");
   });
 
   it("ToggleButton 用 textOn/textOff（默认 ON/OFF）", () => {
@@ -135,14 +142,20 @@ describe("M11x 全组件总览修正", () => {
     expect(root.children[1].text).toBe("");
   });
 
-  it("MaterialButton 有 strokeColor 时按描边按钮画（透明底 + 同色文字）", () => {
-    const root = build(`<com.google.android.material.button.MaterialButton
+  it("MaterialButton 有 strokeColor：Material3 画描边，AppCompat 退化为灰底按钮", () => {
+    const xml = `<com.google.android.material.button.MaterialButton
       xmlns:android="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto"
       android:layout_width="wrap_content" android:layout_height="wrap_content"
-      android:text="描边" app:strokeColor="#6750A4" app:strokeWidth="1dp" />`);
-    expect(root.style.backgroundColor).toBe("transparent");
-    expect(root.style.border).toContain("solid");
-    expect(root.style.color).toBe("#6750A4");
+      android:text="描边" app:strokeColor="#6750A4" app:strokeWidth="1dp" />`;
+    const m3 = build(xml, "material3");
+    expect(m3.style.backgroundColor).toBe("transparent");
+    expect(m3.style.border).toContain("solid");
+    expect(m3.style.color).toBe("#6750A4");
+
+    // M16d：默认 AppCompat —— Widget.Material3.Button.OutlinedButton 样式不存在，真机就是灰底实心
+    const ac = build(xml);
+    expect(ac.style.backgroundColor).toBe("#E8E8EC");
+    expect(ac.style.color).toBe("#1D1B20");
   });
 });

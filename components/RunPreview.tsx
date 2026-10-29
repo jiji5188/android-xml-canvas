@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseLayoutXml, findNode } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
 import { readableOn } from "@/lib/xml/theme";
+import { DEFAULT_RENDER_THEME, type RenderTheme } from "@/lib/xml/theme";
 import type { ResourceTable } from "@/lib/xml/types";
 import { XmlCanvas } from "./XmlCanvas";
 
@@ -125,7 +126,15 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
 
   const model = useMemo(() => {
     if (!parsed.root) return null;
-    return buildRenderModel(parsed.root, resources, SCALE, layouts, { w: dev.w, h: dev.h }, undefined);
+    // M16d：运行预览跟编辑器用同一个渲染主题（默认 AppCompat）
+    let rt: RenderTheme = DEFAULT_RENDER_THEME;
+    try {
+      const v = window.localStorage.getItem("axv.renderTheme");
+      if (v === "material3" || v === "appcompat") rt = v;
+    } catch {
+      /* ignore */
+    }
+    return buildRenderModel(parsed.root, resources, SCALE, layouts, { w: dev.w, h: dev.h }, undefined, rt);
   }, [parsed.root, resources, layouts, dev.w, dev.h]);
 
   const findLayout = useCallback(

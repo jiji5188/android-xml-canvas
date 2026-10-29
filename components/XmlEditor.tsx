@@ -70,6 +70,7 @@ import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
 import { readableOn, deviceById } from "@/lib/xml/theme";
+import { DEFAULT_RENDER_THEME, RENDER_THEMES, type RenderTheme } from "@/lib/xml/theme";
 
 const SAMPLES: Record<string, string> = {
   /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
@@ -490,6 +491,8 @@ export function XmlEditor() {
   /** M5b：已生成资源管理面板 */
   // M11：设置 / 关于面板
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  /** M16d：预览渲染主题（默认 AppCompat，跟 AIDE 真机一致） */
+  const [renderTheme, setRenderTheme] = useState<RenderTheme>(DEFAULT_RENDER_THEME);
   const [showSystemBars, setShowSystemBars] = useState(true);
   const [showIssues, setShowIssues] = useState(true);
 
@@ -509,10 +512,21 @@ export function XmlEditor() {
   useEffect(() => {
     try {
       if (window.localStorage.getItem("axv.theme") === "dark") setTheme("dark");
+      const rt = window.localStorage.getItem("axv.renderTheme");
+      if (rt === "material3" || rt === "appcompat") setRenderTheme(rt);
     } catch {
       /* ignore */
     }
   }, []);
+
+  // M16d：渲染主题持久化
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("axv.renderTheme", renderTheme);
+    } catch {
+      /* ignore */
+    }
+  }, [renderTheme]);
   const [mobileTab, setMobileTab] = useState<"preview" | "xml">("preview");
 
 
@@ -950,11 +964,11 @@ export function XmlEditor() {
     // M2r：屏幕尺寸传入，影响 match_parent 根 / CL 内容区回落值
     // M2t：wrap 实测表传入，CL/RL 求解的 wrap 维度不再靠 estSize 估
     return {
-      model: buildRenderModel(root, resources, SCALE, resExtras?.layouts, { w: device.w, h: device.h }, measured ?? undefined),
+      model: buildRenderModel(root, resources, SCALE, resExtras?.layouts, { w: device.w, h: device.h }, measured ?? undefined, renderTheme),
       issues,
       parseErr: false,
     };
-  }, [parsedXml, resources, resExtras?.layouts, device, measured]);
+  }, [parsedXml, resources, resExtras?.layouts, device, measured, renderTheme]);
 
   /** M2t：XML / 设备变了 → 旧 path 可能指向别的节点，实测表作废重测 */
   useEffect(() => {
@@ -2359,6 +2373,24 @@ const findResolved = findResolvedNode;
                   </button>
                 </div>
                 <div className="axv-set-hint">深色仅作用于编辑器界面，不影响导出的布局配色。</div>
+              </div>
+
+              <div className="axv-set-group">
+                <div className="axv-set-label">渲染主题</div>
+                <div className="axv-set-seg">
+                  {RENDER_THEMES.map((t) => (
+                    <button
+                      key={t.id}
+                      className={"axv-set-seg-btn" + (renderTheme === t.id ? " on" : "")}
+                      onClick={() => setRenderTheme(t.id)}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="axv-set-hint">
+                  {RENDER_THEMES.find((t) => t.id === renderTheme)?.hint}
+                </div>
               </div>
 
               <div className="axv-set-group">

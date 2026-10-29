@@ -50,6 +50,19 @@ export function readableOn(bgRaw: string): { bg: string; fg: string } {
 /** 屏幕 dp 尺寸（Pixel 7 级别） */
 export const SCREEN_DP = { w: 412, h: 892 } as const;
 
+/**
+ * 预览渲染主题（M16d）
+ * - appcompat：按 Theme.AppCompat 渲染（没有 Material 主题时的真实观感）—— **默认**
+ * - material3：按 Material3 渲染（圆角胶囊按钮、Chip 胶囊、FAB 圆形…）
+ * 真机用 AIDE 跑出来是 AppCompat，所以默认跟真机一致。
+ */
+export type RenderTheme = "appcompat" | "material3";
+export const DEFAULT_RENDER_THEME: RenderTheme = "appcompat";
+export const RENDER_THEMES: { id: RenderTheme; label: string; hint: string }[] = [
+  { id: "appcompat", label: "AppCompat", hint: "跟 AIDE/旧工程一致：按钮方角、Chip 退化成文字" },
+  { id: "material3", label: "Material 3", hint: "胶囊按钮、胶囊 Chip、圆形 FAB" },
+];
+
 /** M2r：可选设备尺寸（对应 Android 的 layout / layout-land / layout-sw600dp 目录） */
 export interface DevicePreset {
   id: string;

@@ -1677,7 +1677,8 @@ export function XmlEditor() {
   }, [selectedPath, model]);
 
   const widthPx = Math.round(device.w * SCALE * scale);
-  const heightPx = Math.round(device.h * SCALE * scale);  /** 屏 dp → px（含用户缩放） */
+  const heightPx = Math.round(device.h * SCALE * scale);
+  /** 屏 dp → px（含用户缩放） */
   /** 手机外壳边框宽（px）；内容区保持 412x892dp 不被边框吃掉
    *  M12：必须和 xml-canvas.css 里 `.axv-phone` 的 `border: 8px` 一致。
    *  之前这里是 2，CSS 是 8 → border-box 下内容区比模型假设窄 12px，
@@ -1721,7 +1722,9 @@ export function XmlEditor() {
     const layoutW = Math.round(device.w * SCALE * scale) + PHONE_BORDER * 2;
     if (layoutW <= avail) return 1;
     if (scale >= 1) return 1; // 放大档：超宽就滚动看细节，不压回窗口
-    return Math.min(1, avail / Math.max(1, baseW)); // 缩小档且装不下：轻微压缩
+    // 缩小档且装不下：压到装进可视区，下限 0.15（避免压到看不见）
+    const fit = Math.max(0.15, avail / Math.max(1, layoutW));
+    return Math.min(1, fit);
   })();
 
   function shortTag(t: string): string {
@@ -2108,6 +2111,8 @@ const findResolved = findResolvedNode;
                 color: phoneFg,
                 transform: fitRatio < 1 ? `scale(${fitRatio})` : undefined,
                 transformOrigin: "top left",
+                /* M20g：边框视觉厚度恒定（CSS 边框不随 transform 变，除回系数） */
+                borderWidth: Math.max(2, Math.round(8 / fitRatio)) + "px",
                 borderRadius: device.radius ? Math.round(device.radius * DPX) : undefined,
               }}
               onDragOver={(e) => {

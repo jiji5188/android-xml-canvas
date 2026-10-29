@@ -187,6 +187,61 @@ export const WIDGETS: WidgetDef[] = [
 </LinearLayout>`,
   },
   {
+    // 平台 Toolbar（API 21+）；android:title / subtitle / navigationIcon 都是框架属性，不需要库
+    key: "toolbar", label: "工具栏", tag: "Toolbar", icon: "web_asset", lib: "android", group: "布局",
+    xml: `<Toolbar ${A}
+    android:layout_width="match_parent"
+    android:layout_height="?android:attr/actionBarSize"
+    android:background="#3F51B5"
+    android:elevation="4dp"
+    android:navigationIcon="@android:drawable/ic_menu_sort_by_size"
+    android:title="标题"
+    android:titleTextColor="#FFFFFF"/>`,
+  },
+  {
+    // 完全用平台控件搭的工具栏（老工程 / AIDE 里最常用，不依赖 Toolbar 的 API 级别）
+    key: "toolbar_layout", label: "工具栏（布局）", tag: "LinearLayout", icon: "view_agenda", lib: "android", group: "布局",
+    xml: `<LinearLayout ${A}
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="#3F51B5"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp">
+
+    <ImageButton
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="返回"
+        android:src="@android:drawable/ic_menu_revert"/>
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:paddingStart="8dp"
+        android:text="标题"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"/>
+
+    <ImageButton
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="搜索"
+        android:src="@android:drawable/ic_menu_search"/>
+
+    <ImageButton
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="更多"
+        android:src="@android:drawable/ic_menu_more"/>
+</LinearLayout>`,
+  },
+  {
     key: "card", label: "卡片", tag: "CardView", icon: "screenshot", lib: "androidx", group: "布局",
     xml: `<androidx.cardview.widget.CardView ${A}
     xmlns:app="http://schemas.android.com/apk/res-auto"

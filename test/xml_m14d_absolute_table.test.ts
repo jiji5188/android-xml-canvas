@@ -63,7 +63,7 @@ describe("M14d 表格 / 绝对布局 / 选择器渲染", () => {
   });
 
   it("组件面板里新加的 9 个磁贴都能解析（无 error 级问题）", () => {
-    const keys = ["absolute", "table", "table_row", "button_bar", "expandable_list", "number_picker", "date_picker", "time_picker", "frame"];
+    const keys = ["absolute", "table", "table_row", "button_bar", "expandable_list", "number_picker", "date_picker", "time_picker", "frame", "toolbar", "toolbar_layout"];
     for (const k of keys) {
       const w = WIDGETS.find((x) => x.key === k)!;
       const { root, issues } = parseLayoutXml(w.xml);

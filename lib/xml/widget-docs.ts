@@ -722,10 +722,14 @@ const PARSED: Record<string, WidgetDoc> = {
   },
   Toolbar: {
     title: "工具栏",
-    summary: "应用顶部的标题栏（替代旧 ActionBar），可放返回、标题、菜单。",
-    category: "Material",
+    summary:
+      "应用顶部的标题栏（android.widget.Toolbar，API 21+，替代旧 ActionBar），可放返回、标题、菜单。不需要任何库依赖。",
+    category: "布局",
     attrs: TOOLBAR_ATTRS,
-    notes: ["高度一般用 ?attr/actionBarSize（56dp）；放 AppBarLayout 里才能随滚动收起"],
+    notes: [
+      "高度一般用 ?android:attr/actionBarSize（56dp）；放在 AppBarLayout（Material）里才能随滚动收起",
+      "android:title / android:subtitle / android:navigationIcon 都是平台属性",
+    ],
   },
   MaterialToolbar: {
     title: "Material 工具栏",

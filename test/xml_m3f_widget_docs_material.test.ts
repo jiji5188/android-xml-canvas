@@ -124,7 +124,6 @@ describe("M3f2 分类拆分（Material 组与平台组分开）", () => {
       "Slider",
       "FloatingActionButton",
       "ExtendedFloatingActionButton",
-      "Toolbar",
       "MaterialToolbar",
       "AppBarLayout",
       "CollapsingToolbarLayout",

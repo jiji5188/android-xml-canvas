@@ -114,6 +114,75 @@ function gravityToJustify(g: string): Record<string, string> {
   return v;
 }
 
+/**
+ * M11s：LinearLayout 的 gravity 按「主轴 / 交叉轴」正确映射。
+ * Android 里 gravity 的横向分量（start/left/end/right/center_horizontal）和
+ * 纵向分量（top/bottom/center_vertical）跟主轴无关，而 CSS flex 的
+ * justifyContent 永远是主轴、alignItems 永远是交叉轴 —— 所以必须知道 orientation：
+ *   vertical（column）：主轴=纵向，交叉轴=横向
+ *   horizontal（row） ：主轴=横向，交叉轴=纵向
+ * 老实现不看 orientation，导致 `center_vertical` 在横向布局里被错当成主轴居中。
+ */
+function gravityToFlexByOrientation(
+  gRaw: string,
+  vertical: boolean
+): { justifyContent?: string; alignItems?: string } {
+  const parts = (gRaw || "")
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const out: { justifyContent?: string; alignItems?: string } = {};
+  if (!parts.length) return out;
+  const has = (...vals: string[]) => parts.some((p) => vals.includes(p));
+
+  // 横向分量 → start | center | end | fill | ""
+  const h = has("center", "center_horizontal")
+    ? "center"
+    : has("start", "left")
+      ? "start"
+      : has("end", "right")
+        ? "end"
+        : has("fill_horizontal")
+          ? "fill"
+          : "";
+  // 纵向分量
+  const v = has("center", "center_vertical")
+    ? "center"
+    : has("top")
+      ? "start"
+      : has("bottom")
+        ? "end"
+        : has("fill_vertical")
+          ? "fill"
+          : "";
+
+  const just = (x: string) =>
+    x === "center" ? "center" : x === "start" ? "flex-start" : x === "end" ? "flex-end" : undefined;
+  const align = (x: string) =>
+    x === "center"
+      ? "center"
+      : x === "start"
+        ? "flex-start"
+        : x === "end"
+          ? "flex-end"
+          : x === "fill"
+            ? "stretch"
+            : undefined;
+
+  if (vertical) {
+    const j = just(v);
+    if (j) out.justifyContent = j;
+    const a = align(h);
+    if (a) out.alignItems = a;
+  } else {
+    const j = just(h);
+    if (j) out.justifyContent = j;
+    const a = align(v);
+    if (a) out.alignItems = a;
+  }
+  return out;
+}
+
 /** 文本类控件的 gravity → text-align（Button/TextView/EditText 语义） */
 function gravityToTextAlign(g: string): "left" | "center" | "right" | undefined {
   if (!g) return undefined;
@@ -260,15 +329,25 @@ export function buildRenderModel(
       } else if (tag === "LinearLayout") {
         const o = orientationAlign((attrs["orientation"] as string) || "vertical");
         style.flexDirection = o.flexDirection;
-        const g = gravityToJustify((attrs["gravity"] as string) || "");
-        Object.assign(style, g);
+        const g = gravityToFlexByOrientation(
+          (attrs["gravity"] as string) || "",
+          o.flexDirection === "column"
+        );
+        style.justifyContent = g.justifyContent ?? "flex-start";
+        style.alignItems = g.alignItems ?? "stretch";
+      } else if (tag === "TableRow") {
+        // M11s：TableRow 是横向布局，gravity 的纵向分量 → 交叉轴
+        style.flexDirection = "row";
+        const g = gravityToFlexByOrientation((attrs["gravity"] as string) || "", false);
+        style.justifyContent = g.justifyContent ?? "flex-start";
+        style.alignItems = g.alignItems ?? "stretch";
+      } else if (tag === "TableLayout") {
+        style.flexDirection = "column";
+        const g = gravityToFlexByOrientation((attrs["gravity"] as string) || "", true);
         style.justifyContent = g.justifyContent ?? "flex-start";
         style.alignItems = g.alignItems ?? "stretch";
       } else if (tag === "CardView" || tag === "MaterialCardView") {
         style.flexDirection = "column";
-      } else if (tag === "TableLayout" || tag === "TableRow") {
-        // TableLayout = 竖排若干行；TableRow = 横排若干列
-        style.flexDirection = tag === "TableLayout" ? "column" : "row";
       } else {
         // FrameLayout / CoordinatorLayout / DrawerLayout / ConstraintLayout
         style.position = "relative";

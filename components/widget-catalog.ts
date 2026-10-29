@@ -62,11 +62,20 @@ export const WIDGETS: WidgetDef[] = [
 </androidx.constraintlayout.widget.ConstraintLayout>`,
   },
   {
-    key: "scroll", label: "滚动视图", tag: "ScrollView", icon: "unfold_more", lib: "android", group: "布局",
+    key: "scroll", label: "纵向滚动", tag: "ScrollView", icon: "swap_vert", lib: "android", group: "布局",
     xml: `<ScrollView ${A}
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:fillViewport="true">
 </ScrollView>`,
+  },
+  {
+    key: "scroll_h", label: "横向滚动", tag: "HorizontalScrollView", icon: "swap_horiz", lib: "android", group: "布局",
+    xml: `<HorizontalScrollView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:scrollbars="horizontal">
+</HorizontalScrollView>`,
   },
   {
     key: "card", label: "卡片", tag: "CardView", icon: "screenshot", lib: "androidx", group: "布局",
@@ -79,8 +88,7 @@ export const WIDGETS: WidgetDef[] = [
 </androidx.cardview.widget.CardView>`,
   },
   {
-    key: "listview", label: "列表", tag: "RecyclerView", icon: "view_list", lib: "androidx", group: "布局",
-    xml: `<androidx.recyclerview.widget.RecyclerView ${A}
+    key: "listview", label: "列表", tag: "RecyclerView", icon: "view_list", lib: "androidx", group: "布局",    xml: `<androidx.recyclerview.widget.RecyclerView ${A}
     android:id="@+id/recycler"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"/>`,
@@ -429,8 +437,15 @@ export const WIDGETS: WidgetDef[] = [
     android:progress="60"/>`,
   },
   {
-    key: "mat_swipe", label: "下拉刷新", tag: "SwipeRefreshLayout", icon: "refresh", lib: "androidx", group: "布局",
-    xml: `<androidx.swiperefreshlayout.widget.SwipeRefreshLayout ${A}
+    key: "nested_scroll", label: "嵌套滚动（AX）", tag: "NestedScrollView", icon: "unfold_more", lib: "androidx", group: "布局",
+    xml: `<androidx.core.widget.NestedScrollView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true">
+</androidx.core.widget.NestedScrollView>`,
+  },
+  {
+    key: "mat_swipe", label: "下拉刷新", tag: "SwipeRefreshLayout", icon: "refresh", lib: "androidx", group: "布局",    xml: `<androidx.swiperefreshlayout.widget.SwipeRefreshLayout ${A}
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 

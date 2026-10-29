@@ -17,7 +17,7 @@ import { DEFAULT_RENDER_THEME, type RenderTheme } from "@/lib/xml/theme";
 import type { ResourceTable } from "@/lib/xml/types";
 import { XmlCanvas } from "./XmlCanvas";
 import { decorateRunScreen } from "./run-decorate";
-import { eventText, shortName, targetLabel } from "@/lib/xml/run-sim";
+import { eventText, targetLabel } from "@/lib/xml/run-sim";
 
 const SCALE = 2; // 1dp = 2px（与编辑器一致）
 
@@ -136,6 +136,14 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
     window.addEventListener("resize", calc);
     return () => window.removeEventListener("resize", calc);
   }, [dev.w, dev.h, showLog]);
+
+  // 卸载时清掉 Toast 定时器，避免 setState on unmounted
+  useEffect(
+    () => () => {
+      if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
+    },
+    [],
+  );
 
   // 日志自动滚到底
   useEffect(() => {

@@ -21,7 +21,6 @@ import {
   sampleRows,
   seekRatio,
   seekValue,
-  shortName,
   spinnerOptions,
   targetLabel,
   type RunRole,
@@ -132,6 +131,35 @@ function attachRipple(ctx: Ctx, el: HTMLElement, label?: string) {
 
 /* ===================== 输入框 ===================== */
 
+/** 浏览器是否支持 contenteditable="plaintext-only"（Firefox 不支持） */
+function supportsPlainTextOnly(): boolean {
+  try {
+    const d = document.createElement("div");
+    d.setAttribute("contenteditable", "plaintext-only");
+    return d.contentEditable === "plaintext-only";
+  } catch {
+    return false;
+  }
+}
+
+/** 在光标处插入纯文本（execCommand 仍是最省事的跨浏览器做法） */
+function insertPlainText(text: string) {
+  if (!text) return;
+  try {
+    if (document.execCommand("insertText", false, text)) return;
+  } catch {
+    /* 有的浏览器在非编辑态会抛错，走下面的兜底 */
+  }
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  range.insertNode(document.createTextNode(text));
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 function decorateInput(ctx: Ctx, el: HTMLElement, path: string, label: string) {
   const a = attrsOf(ctx, path);
   const hint = String(a["hint"] ?? "");
@@ -144,10 +172,12 @@ function decorateInput(ctx: Ctx, el: HTMLElement, path: string, label: string) {
   }
 
   el.classList.add("axv-run-input");
-  el.contentEditable = "plaintext-only";
+  // plaintext-only 只有 Chromium/Safari 认；Firefox 拿到会完全不让人输入 → 探测后回退 true
+  el.setAttribute("contenteditable", supportsPlainTextOnly() ? "plaintext-only" : "true");
   el.spellcheck = false;
   el.setAttribute("role", "textbox");
-  if (a["singleLine"]) {
+  const single = Boolean(a["singleLine"]);
+  if (single) {
     el.dataset.single = "1";
   }
 
@@ -177,10 +207,26 @@ function decorateInput(ctx: Ctx, el: HTMLElement, path: string, label: string) {
     ctx.hooks.log("D", eventText("blur", label, `"${previewInput((el.textContent ?? "").trim())}"`));
     el.classList.remove("axv-run-focused");
   });
+  // 单行输入框回车不换行（Android 里就是 actionNext/Done）
+  const offKey = on(el, "keydown", (e) => {
+    if (!single) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      flushLog();
+    }
+  });
+  // 粘贴一律去格式：富文本粘进来会把画布结构写坏
+  const offPaste = on(el, "paste", (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData?.getData("text/plain") ?? "").replace(/\r/g, "");
+    const value = single ? text.replace(/\n+/g, " ") : text;
+    insertPlainText(value);
+  });
+
   // 输入框的点击不要冒泡去触发 onClick / 选中逻辑
   const offClick = on(el, "click", (e) => e.stopPropagation());
 
-  ctx.cleanups.push(offInput, offFocus, offBlur, offClick, () => {
+  ctx.cleanups.push(offInput, offFocus, offBlur, offClick, offKey, offPaste, () => {
     if (typing !== null) window.clearTimeout(typing);
   });
 }
@@ -474,11 +520,3 @@ export function decorateRunScreen(root: HTMLElement, parsedRoot: XmlNode | null,
   };
 }
 
-/** 供 RunPreview 复用：把毫秒时间戳打成 logcat 时间 */
-export function stamp(d = new Date()): string {
-  const p = (n: number, w = 2) => String(n).padStart(w, "0");
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
-}
-
-/** 短名导出，RunPreview 记录 tag 时要用 */
-export { shortName };

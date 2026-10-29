@@ -1,9 +1,13 @@
+import path from "node:path";
 import { defineConfig } from "vitest/config";
 
-// 单测走 test/*.test.ts；e2e/ 是 Playwright 的（npm run e2e），不进 vitest。
-// 环境保持 vitest 默认（node）：历史上没有配置文件，64 个测试文件都是在默认环境跑绿的，
-// 个别文件自己带 @vitest-environment 注释，这里不强行覆盖。
+// 单测只跑 test/*.test.ts；e2e/ 是 Playwright 的（npm run e2e），不进 vitest。
+// 环境保持 vitest 默认（node）：个别文件用 @vitest-environment 注释自己切 jsdom。
 export default defineConfig({
+  resolve: {
+    // 跟 tsconfig 的 paths 对齐，组件里用 "@/lib/..." 才能被 vitest 解析
+    alias: { "@": path.resolve(__dirname) },
+  },
   test: {
     include: ["test/**/*.test.ts"],
     exclude: ["node_modules", "out", "e2e"],

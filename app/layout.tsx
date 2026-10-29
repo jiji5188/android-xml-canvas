@@ -4,15 +4,15 @@ import "./globals.css";
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_ORIGIN ?? "https://lnkiai.github.io"),
-  title: "Android XML 布局预览",
-  applicationName: "Android XML Canvas",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_ORIGIN ?? "https://jiji5188.github.io"),
+  title: "Android 可视化 UI 编辑器",
+  applicationName: "Android 可视化 UI 编辑器",
   alternates: { canonical: `${BASE}/` },
   description:
-    "浏览器里编辑 Android 布局 XML：实时预览、按资源目录解析主题、导出 res 包与预览图。",
+    "在浏览器里可视化编辑 Android 布局 XML：拖控件、改属性、实时近似真机预览，一键导出 res 资源。",
   openGraph: {
-    title: "Android XML 布局预览",
-    description: "浏览器里编辑 Android 布局 XML：实时预览、导出 res 包与预览图。",
+    title: "Android 可视化 UI 编辑器",
+    description: "在浏览器里可视化编辑 Android 布局 XML：拖控件、改属性、实时近似真机预览，导出 res 资源与预览图。",
     images: [`${BASE}/og.png`],
     type: "website",
   },

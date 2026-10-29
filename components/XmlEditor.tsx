@@ -72,6 +72,7 @@ import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
 import { readableOn, deviceById } from "@/lib/xml/theme";
 import { DEFAULT_RENDER_THEME, RENDER_THEMES, type RenderTheme } from "@/lib/xml/theme";
+import { CREDITS, UPSTREAM, PROJECT_NAME, PROJECT_TAGLINE } from "@/lib/xml/credits";
 
 const SAMPLES: Record<string, string> = {
   /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
@@ -2452,13 +2453,44 @@ const findResolved = findResolvedNode;
               <div className="axv-about-hero">
                 <span className="msr" aria-hidden="true" style={{ fontSize: 36 }}>android</span>
                 <div>
-                  <div className="axv-about-name">Android XML 布局预览</div>
+                  <div className="axv-about-name">{PROJECT_NAME}</div>
                   <div className="axv-about-ver">版本 {APP_VERSION}</div>
                 </div>
               </div>
               <div className="axv-about-desc">
-                纯前端 Android 布局编辑器：写 XML 或拖控件都能实时看到近似真机的渲染效果，
+                {PROJECT_TAGLINE}
                 支持 ConstraintLayout 约束求解、shape / selector / vector 资源、图标生成与 res 打包导出。
+              </div>
+
+              {/* M16f：项目来源 + 开源致谢（列表数据在 lib/xml/credits.ts，跟 README 同一口径） */}
+              <div className="axv-set-group">
+                <div className="axv-set-label">项目来源</div>
+                <div className="axv-credit-upstream">
+                  本项目由 <b>{UPSTREAM.name}</b>（{UPSTREAM.license}，作者 {UPSTREAM.by}）拓展而来。
+                  {UPSTREAM.role}
+                  <a href={UPSTREAM.url} target="_blank" rel="noreferrer noopener">
+                    查看上游仓库
+                  </a>
+                </div>
+              </div>
+
+              <div className="axv-set-group">
+                <div className="axv-set-label">致谢 · 开源共享</div>
+                <div className="axv-set-hint" style={{ marginBottom: 8 }}>
+                  这个编辑器能跑到今天，靠的是下面这些开源项目与作者的分享。在此致谢。
+                </div>
+                <ul className="axv-credit-list">
+                  {CREDITS.map((c) => (
+                    <li key={c.name}>
+                      <a href={c.url} target="_blank" rel="noreferrer noopener">
+                        {c.name}
+                      </a>
+                      <span className="axv-credit-by">{c.by}</span>
+                      <span className="axv-credit-lic">{c.license}</span>
+                      <div className="axv-credit-role">{c.role}</div>
+                    </li>
+                  ))}
+                </ul>
               </div>
               <div className="axv-set-group">
                 <div className="axv-set-label">快捷键</div>

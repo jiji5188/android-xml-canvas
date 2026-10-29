@@ -6,12 +6,16 @@
 </p>
 
 <p align="center">
-  <strong>Sketch Material 3 Expressive screens in the browser, link them, tap through them, and copy a prompt for your AI coding tool.</strong>
+  <strong>Android 可视化 UI 编辑器 —— 在浏览器里拖控件、改属性，实时近似真机预览，导出 res 资源。</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/lnkiai/m3e-canvas/stargazers"><picture><source media="(max-width: 767px)" srcset="https://img.shields.io/github/stars/lnkiai/m3e-canvas?style=flat-square&logo=github&logoColor=white&color=6750A4&labelColor=1D1B20" /><img alt="GitHub stars" src="https://img.shields.io/github/stars/lnkiai/m3e-canvas?style=for-the-badge&logo=github&logoColor=white&color=6750A4&labelColor=1D1B20" /></picture></a>
-  <a href="https://github.com/sponsors/lnkiai"><picture><source media="(max-width: 767px)" srcset="https://img.shields.io/github/sponsors/lnkiai?style=flat-square&logo=githubsponsors&logoColor=white&color=7D5260&labelColor=1D1B20" /><img alt="Sponsors" src="https://img.shields.io/github/sponsors/lnkiai?style=for-the-badge&logo=githubsponsors&logoColor=white&color=7D5260&labelColor=1D1B20" /></picture></a>
+  本项目是 <a href="https://github.com/lnkiai/m3e-canvas"><b>M3E Canvas</b></a>（MIT，lnkiai）的衍生拓展：
+  保留其画布交互与组件模型，把目标从 Material 3 网页原型改为 <b>Android 布局 XML</b> 的可视化编辑。
+</p>
+
+<p align="center">
+  <a href="https://github.com/jiji5188/android-xml-canvas/stargazers"><picture><source media="(max-width: 767px)" srcset="https://img.shields.io/github/stars/jiji5188/android-xml-canvas?style=flat-square&logo=github&logoColor=white&color=6750A4&labelColor=1D1B20" /><img alt="GitHub stars" src="https://img.shields.io/github/stars/jiji5188/android-xml-canvas?style=for-the-badge&logo=github&logoColor=white&color=6750A4&labelColor=1D1B20" /></picture></a>
   <a href="LICENSE"><picture><source media="(max-width: 767px)" srcset="https://img.shields.io/badge/license-MIT-625B71?style=flat-square&labelColor=1D1B20" /><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-625B71?style=for-the-badge&labelColor=1D1B20" /></picture></a>
   <br />
   <a href="https://m3.material.io/"><picture><source media="(max-width: 767px)" srcset="https://img.shields.io/badge/Material_3-Expressive-6750A4?style=flat-square&logo=materialdesign&logoColor=white&labelColor=1D1B20" /><img alt="Material 3 Expressive" src="https://img.shields.io/badge/Material_3-Expressive-6750A4?style=for-the-badge&logo=materialdesign&logoColor=white&labelColor=1D1B20" /></picture></a>
@@ -31,7 +35,7 @@
 
 M3E Canvas is a free, open-source sketchpad for app screens made of real Material 3 Expressive parts. It runs entirely in your browser: no account, no server, nothing to install. What you sketch becomes a precise prompt that any AI coding tool that takes one, such as Claude Code, Codex, Gemini CLI or Cursor, can turn into a working app.
 
-<p align="center"><a href="https://lnkiai.github.io/m3e-canvas/"><img src="docs/readme/ui/open-en.png" height="56" alt="Open the app" /></a></p>
+<p align="center"><a href="https://jiji5188.github.io/android-xml-canvas/"><img src="docs/readme/ui/open-en.png" height="56" alt="Open the editor" /></a></p>
 
 ## <img src="docs/readme/ui/icon-how.png" width="32" height="32" align="absmiddle" alt="" /> How it works
 
@@ -145,6 +149,24 @@ For anything that does not fit an issue, such as collaboration or press, get in 
 
 <p><a href="mailto:info@lnkiai.com"><img src="docs/readme/ui/contact-mail.png" height="48" alt="info@lnkiai.com" /></a><a href="https://x.com/lnkiai"><img src="docs/readme/ui/contact-x.png" height="48" alt="@lnkiai on X" /></a></p>
 
+## 致谢 / Acknowledgements
+
+本项目的开发与运行依赖以下开源项目与作者的分享，在此致谢（与「关于」页面同一份口径）：
+
+- **M3E Canvas** — [lnkiai](https://github.com/lnkiai)（MIT）— 项目上游：画布交互、组件模型、图层/资源面板与导出思路。
+- **Material Components for Android** — Google（Apache-2.0）— 加载指示器的图形形状与动画模型。
+- **Material Symbols** — Google（Apache-2.0）— 界面图标字体。
+- **Android Open Source Project** — Google / Open Handset Alliance（Apache-2.0）— 布局规则与控件行为的实现依据。
+- **Next.js** — Vercel（MIT）— 应用框架与静态导出。
+- **React** — Meta（MIT）— 界面渲染与状态管理。
+- **TypeScript** — Microsoft（Apache-2.0）— 类型系统。
+- **Vitest** — Vitest team（MIT）— 单元测试。
+- **Playwright** — Microsoft（Apache-2.0）— 端到端测试。
+- **opentype.js** — Frederik De Bleser 等（MIT）— 字体轮廓读取。
+- **html-to-image** — bubkoo（MIT）— 预览画布导出 PNG。
+- **Motion** — Framer（MIT）— 面板与画布过渡动画。
+- **Tailwind CSS** — Tailwind Labs（MIT）— 样式工具链。
+
 ## <img src="docs/readme/ui/icon-license.png" width="32" height="32" align="absmiddle" alt="" /> License
 
-MIT © lnkiai
+MIT © jiji5188（衍生自 MIT 许可的 M3E Canvas © lnkiai）

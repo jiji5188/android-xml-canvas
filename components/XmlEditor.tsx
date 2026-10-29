@@ -2684,6 +2684,16 @@ const findResolved = findResolvedNode;
           rel={resImage.rel}
           name={resImage.name}
           url={resImage.url}
+          xml={
+            generatedDrawables[resImage.name] ??
+            resExtras?.drawableXml?.[resImage.name] ??
+            resExtras?.drawableXml?.[resImage.name.replace(/\.xml$/i, "")]
+          }
+          onEdit={(iconXml) => {
+            const n = resImage.name.replace(/\.xml$/i, "");
+            setResImage(null);
+            setResIcon({ name: n, xml: iconXml });
+          }}
           onClose={() => setResImage(null)}
         />
       ) : null}

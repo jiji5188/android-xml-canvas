@@ -3929,3 +3929,10 @@
     width: 100%;
   }
 }
+
+/* M11o：图片预览框里的「编辑」（矢量图专用） */
+.axv-imgprev-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

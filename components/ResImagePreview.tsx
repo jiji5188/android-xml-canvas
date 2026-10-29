@@ -2,6 +2,7 @@
 
 // components/ResImagePreview.tsx — M4u：资源树里点图片 → 弹预览框
 // 只做「看一眼」：图片居中、棋盘格底（看透明度）、显示资源名/路径/尺寸，Esc 或点遮罩关闭。
+// M11o：如果是矢量图（vector drawable），底部「复制引用」后面多一个「编辑」→ 打开图标编辑器。
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -13,10 +14,14 @@ interface Props {
   name: string;
   /** dataURL 或 http(s) URL；空 = 没解析到 */
   url: string;
+  /** 矢量资源（vector xml）原文；有值才显示「编辑」按钮 */
+  xml?: string;
+  /** 点「编辑」→ 打开图标编辑器 */
+  onEdit?: (xml: string) => void;
   onClose: () => void;
 }
 
-export function ResImagePreview({ rel, name, url, onClose }: Props) {
+export function ResImagePreview({ rel, name, url, xml, onEdit, onClose }: Props) {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -28,6 +33,9 @@ export function ResImagePreview({ rel, name, url, onClose }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  /** M11o：矢量图（vector drawable）才给「编辑」入口 */
+  const isVector = !!xml && /<vector[\s>]/.test(xml) && !!onEdit;
 
   if (!mounted) return null;
 
@@ -78,6 +86,18 @@ export function ResImagePreview({ rel, name, url, onClose }: Props) {
           >
             复制引用
           </button>
+          {isVector ? (
+            <button
+              className="axv-btn axv-imgprev-edit"
+              onClick={() => xml && onEdit?.(xml)}
+              title="打开图标编辑器（颜色 / 尺寸 / 路径 / 旋转）"
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
+                edit
+              </span>
+              编辑
+            </button>
+          ) : null}
         </div>
       </div>
     </div>,

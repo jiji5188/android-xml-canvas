@@ -1041,6 +1041,12 @@ export function XmlEditor() {
   /** M2t：实测收敛计数器（避免 auto ↔ px 互推无限循环） */
   const measurePass = useRef(0);
 
+  /** M20：画布缩放要进布局本身（不能只改外壳）。
+   *  否则字号/padding/dp 全是 1x 尺寸、只有百分比宽度跟着长 → 缩放后「格子宽了、字没变大」；
+   *  match_parent 被算成固定 px 的节点（CL/RL/表格里的）更是完全不动。
+   *  DPX = 1dp 对应的 px = SCALE(2) × 用户缩放。 */
+  const DPX = SCALE * scale;
+
   const { model, issues, parseErr } = useMemo(() => {
     const { root, issues } = parseLayoutXml(parsedXml);
     if (!root) return { model: null, issues, parseErr: true };
@@ -1048,17 +1054,17 @@ export function XmlEditor() {
     // M2r：屏幕尺寸传入，影响 match_parent 根 / CL 内容区回落值
     // M2t：wrap 实测表传入，CL/RL 求解的 wrap 维度不再靠 estSize 估
     return {
-      model: buildRenderModel(root, resources, SCALE, resExtras?.layouts, { w: device.w, h: device.h }, measured ?? undefined, renderTheme),
+      model: buildRenderModel(root, resources, DPX, resExtras?.layouts, { w: device.w, h: device.h }, measured ?? undefined, renderTheme),
       issues,
       parseErr: false,
     };
-  }, [parsedXml, resources, resExtras?.layouts, device, measured, renderTheme]);
+  }, [parsedXml, resources, resExtras?.layouts, device, measured, renderTheme, DPX]);
 
   /** M2t：XML / 设备变了 → 旧 path 可能指向别的节点，实测表作废重测 */
   useEffect(() => {
     measurePass.current = 0;
     setMeasured((m) => (m ? null : m));
-  }, [parsedXml, device]);
+  }, [parsedXml, device, DPX]);
 
   /**
    * M2t：wrap_content 真实尺寸回填。
@@ -1254,7 +1260,7 @@ export function XmlEditor() {
     const prevNode = idx > 0 ? selectedParent.children[idx - 1] : null;
     const prev = prevNode && prevNode.attrs.id ? sibs.find((s) => s.ref === prevNode.attrs.id) ?? null : null;
 
-    const res = autoConstrain({ attrs, box, parent: pbox, siblings: sibs, prev, scale: SCALE });
+    const res = autoConstrain({ attrs, box, parent: pbox, siblings: sibs, prev, scale: DPX });
     commitMany([...changes, ...res.changes]);
     setAutoNotes(res.notes);
   };
@@ -1672,7 +1678,6 @@ export function XmlEditor() {
 
   const widthPx = Math.round(device.w * SCALE * scale);
   const heightPx = Math.round(device.h * SCALE * scale);  /** 屏 dp → px（含用户缩放） */
-  const DPX = SCALE * scale;
   /** 手机外壳边框宽（px）；内容区保持 412x892dp 不被边框吃掉
    *  M12：必须和 xml-canvas.css 里 `.axv-phone` 的 `border: 8px` 一致。
    *  之前这里是 2，CSS 是 8 → border-box 下内容区比模型假设窄 12px，
@@ -1706,9 +1711,13 @@ export function XmlEditor() {
     // M6g：fitRatio 改成「基准装入比 × 用户缩放」。
     // 以前直接把 scale 算进分母，导致手机上永远被压回窗口宽度，放大没任何效果、也没有滚动条；
     // 现在缩放是乘数：放大到超宽就出横向滚动条，看细节；缩小则整体变小。
+    // M20：widthPx 里已经乘过 scale，这里只负责「装进视口」，不能再乘一次
+    // （以前 ×scale 导致缩小 0.6 → 布局 0.6 再 transform 0.6 = 视觉 0.36）
     const baseW = device.w * SCALE + PHONE_BORDER * 2;
     const fitBase = Math.min(1, avail / Math.max(1, baseW));
-    return Math.min(1, fitBase * scale);
+    // 缩放后本来就装得下 → 不要再套贴合缩放（否则缩到 0.6 却只剩 0.48）
+    const layoutW = Math.round(device.w * SCALE * scale) + PHONE_BORDER * 2;
+    return layoutW <= avail ? 1 : fitBase;
   })();
 
   function shortTag(t: string): string {
@@ -2135,7 +2144,7 @@ const findResolved = findResolvedNode;
                   onDropWidget={onDropWidget}
                   onConstraintDraw={onConstraintDraw}
                   onGeometryChange={onGeometryChange}
-                  scale={SCALE}
+                  scale={DPX}
                 />
               </div>
 

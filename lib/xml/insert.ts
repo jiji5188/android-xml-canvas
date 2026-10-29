@@ -6,6 +6,14 @@ import { parseLayoutXml, findNode, rewriteNodeAttrs, serialize } from "./parser"
 import type { XmlNode, XmlIssue } from "./types";
 import { nextViewId } from "./autoconstrain";
 import { moveSiblingRaw } from "./reorder";
+import {
+  acceptsChildren,
+  canAddChild,
+  childRuleOf,
+  isLeafTag,
+  maxChildCount,
+  shortTag,
+} from "./child-rules";
 
 export interface InsertResult {
   xml: string;
@@ -15,130 +23,35 @@ export interface InsertResult {
   ok: boolean;
 }
 
-/** 可用作父容器的控件（拖放落位判定用）
+/** 可用作父容器的控件（拖放落位判定用）——规则全部来自 lib/xml/child-rules.ts（M15）
  *  铁律（用户 2026-10-28 明确）：只有 ViewGroup 才能 addView。所有 View 子类（含 View 本身、
  *  TextView/Button/ImageView/ProgressBar…）都是叶子，既不能放子控件，也不能拖子控件进去。
- *  → 这里只允许真正的 ViewGroup 及其子类。 */
-const CONTAINER_TAGS = new Set([
-  "LinearLayout",
-  "LinearLayoutCompat",
-  "FrameLayout",
-  "RelativeLayout",
-  "ConstraintLayout",
-  "GridLayout",
-  "TableLayout",
-  "TableRow",
-  "AbsoluteLayout",
-  "ScrollView",
-  "HorizontalScrollView",
-  "NestedScrollView",
-  "CoordinatorLayout",
-  "DrawerLayout",
-  "AppBarLayout",
-  "CardView",
-  "MaterialCardView",
-  "SwipeRefreshLayout",
-  "ViewFlipper",
-  "ViewAnimator",
-  "RadioGroup",
-  // 真 ViewGroup 但上面漏了的常见容器（View 子类里属于 ViewGroup 的才能进这张表）
-  "TextInputLayout",
-  "MotionLayout",
-  "ChipGroup",
-  // MaterialButtonToggleGroup 本质是 LinearLayout，XML 里直接放 MaterialButton 是合法的
-  "MaterialButtonToggleGroup",
-  "SquareButtonToggleGroup",
-  "TabLayout",
-  "Toolbar",
-  "MaterialToolbar",
-  // M11y：CollapsingToolbarLayout 是 AppBarLayout 的子级容器，里面放 Toolbar 是标准写法
-  "CollapsingToolbarLayout",
-  "BottomAppBar",
-  // 有意不收：RecyclerView / ListView / ViewPager2 / BottomNavigationView / NavigationView
-  //  它们是 ViewGroup，但子项由 adapter/menu 生成，XML 里写子控件不生效
-]);
+ *  二分（用户 2026-10-29 规则表）：Adapter 容器（ListView/RecyclerView/ViewPager2…）虽然也是
+ *  ViewGroup，但静态子控件真机会抛 UnsupportedOperationException，同样不接受拖放。 */
 
-/** 标签是否容器（全限定名取尾段，如 androidx.constraintlayout.widget.ConstraintLayout）
- *  铁律：不在这个集合里的控件（包括 View 自己、TextView、Button、ImageView 等所有 View 子类）
- *  都不能包含子控件 —— Android 里只有 ViewGroup 才能 addView。 */
+/** 标签是否容器（能接静态子控件：single / multi） */
 export function isContainerTag(rawTag: string): boolean {
-  const tag = rawTag.includes(".") ? rawTag.slice(rawTag.lastIndexOf(".") + 1) : rawTag;
-  return CONTAINER_TAGS.has(tag);
+  return acceptsChildren(rawTag);
 }
-
-/** 已知的叶子控件（继承自 View 但不是 ViewGroup）——只用于 lint 提示，不参与插入判定 */
-const KNOWN_LEAF_TAGS = new Set([
-  "View",
-  "TextView",
-  "Button",
-  "ImageButton",
-  "MaterialButton",
-  "EditText",
-  "TextInputEditText",
-  "AutoCompleteTextView",
-  "ImageView",
-  "ImageButton",
-  "CheckBox",
-  "RadioButton",
-  "Switch",
-  "SwitchCompat",
-  "ToggleButton",
-  "SeekBar",
-  "ProgressBar",
-  "RatingBar",
-  "Spinner",
-  "Space",
-  "ViewStub",
-  "Chip",
-  "FloatingActionButton",
-  "ExtendedFloatingActionButton",
-  "TextClock",
-  "Chronometer",
-  "SurfaceView",
-  "TextureView",
-  "VideoView",
-]);
 
 /** 已知叶子控件（供 lint 判断「这个不符」而不是「不认识的标签」） */
 export function isKnownLeafTag(rawTag: string): boolean {
-  return KNOWN_LEAF_TAGS.has(shortTag(rawTag));
+  return isLeafTag(rawTag);
 }
-
-/** 短标签名（全限定名取尾段） */
-function shortTag(raw: string): string {
-  return raw.includes(".") ? raw.slice(raw.lastIndexOf(".") + 1) : raw;
-}
-
-/** 只允许 1 个子控件的容器（ScrollView 家族、CardView 虽允许多个但惯例放 1 个，这里只列硬约束的） */
-/** 只允许 1 个子控件的容器：
- *  - ScrollView 家族：Android 硬约束（只能放 1 个直接子项）
- *  - CardView / MaterialCardView：技术上能放多个，但用户 2026-10-28 定为硬约束，UI 只给放 1 个 */
-const SINGLE_CHILD_TAGS = new Set([
-  "ScrollView",
-  "HorizontalScrollView",
-  "NestedScrollView",
-  "CardView",
-  "MaterialCardView",
-]);
 
 /** 是否是「只能放 1 个子控件」的容器（拖拽排序时用它拦第二个子项） */
 export function isSingleChildTag(rawTag: string): boolean {
-  return SINGLE_CHILD_TAGS.has(shortTag(rawTag));
+  return childRuleOf(rawTag)?.max === 1;
 }
 
-/** 容器还能不能再塞子控件？
- *  - 不是容器 → 不能（reason: “不支持子控件”）
- *  - 是单 child 容器且已有 1 个 → 不能（reason: “只支持 1 个子控件”）
- *  - 其它 → 能 */
+/** 容器还能不能再塞子控件？（规则见 child-rules.ts） */
 export function canAcceptChild(rawTag: string, childCount: number): { ok: boolean; reason?: string } {
-  const tag = shortTag(rawTag);
-  if (!CONTAINER_TAGS.has(tag)) {
-    return { ok: false, reason: `${tag} 不是 ViewGroup，不支持子控件` };
-  }
-  if (SINGLE_CHILD_TAGS.has(tag) && childCount >= 1) {
-    return { ok: false, reason: `${tag} 只支持 1 个子控件，已存在 1 个` };
-  }
-  return { ok: true };
+  return canAddChild(rawTag, childCount);
+}
+
+/** 容器最多能放几个直接子控件（undefined = 不限；mover 用） */
+export function childLimitOf(rawTag: string): number | undefined {
+  return maxChildCount(rawTag);
 }
 
 /** 在 parentPath 下（末尾）插入一个节点，返回新 XML。

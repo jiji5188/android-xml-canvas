@@ -15,7 +15,7 @@ import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
 import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
-import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, isSingleChildTag, applyConstraintDefaults, canAcceptChild } from "@/lib/xml/insert";
+import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild, childLimitOf } from "@/lib/xml/insert";
 import { moveNodeRaw, scanElements } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml } from "@/lib/xml/lint";
@@ -1454,12 +1454,12 @@ export function XmlEditor() {
     if (target.zone === "inside") {
       parentPath = target.path;
       index = targetNode.children.length;
-      maxChildren = isSingleChildTag(targetNode.tag) ? 1 : undefined;
+      maxChildren = childLimitOf(targetNode.tag);
     } else {
       parentPath = targetParent;
       index = target.zone === "before" ? targetIndex : targetIndex + 1;
       const parentNode = findNode(root, targetParent);
-      maxChildren = parentNode && isSingleChildTag(parentNode.tag) ? 1 : undefined;
+      maxChildren = parentNode ? childLimitOf(parentNode.tag) : undefined;
     }
 
     const r = moveNodeRaw(xml, fromPath, { parentPath, index, maxChildren });

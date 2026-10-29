@@ -2,7 +2,7 @@
 // 只做「能不能被 Android 吃下」级别的检查：标签配对、注释/CDATA/声明闭合、非法标签名。
 // 不做属性语义校验（那是渲染层 issues 的事）。
 
-import { isContainerTag, isKnownLeafTag } from "./insert";
+import { childRuleOf, isRootOnlyTag, shortTag } from "./child-rules";
 import { namespaceIssues } from "./namespace";
 
 export interface LintIssue {
@@ -30,9 +30,7 @@ export function lintXml(src: string): LintIssue[] {
           : `${ns.from} 是 androidx/Material 属性，必须写成 ${ns.to}（否则 aapt 报 No resource identifier found）`,
     });
   }
-  const stack: { tag: string; line: number }[] = [];
-  /** 已提示过的父标签行号（同一个非容器不重复报） */
-  const warned = new Set<number>();
+  const stack: { tag: string; line: number; kids: number; reported: Set<string> }[] = [];
   /** 出现过配对错误时，栈里剩下的「未闭合」不可信（错一个就会连锁），不再报 */
   let hadPairError = false;
   let i = 0;
@@ -118,19 +116,50 @@ export function lintXml(src: string): LintIssue[] {
       issues.push({ line: startLine, level: "error", message: "非法标签名" });
       continue;
     }
-    // M4g：父节点是叶子控件（继承自 View，非 ViewGroup）却写了子节点 → aapt 会报错
-    // 注意：判断必须在「自闭合 continue」之前，否则 <View><TextView/></View> 这类最典型的写法拦不到
-    const parent = stack[stack.length - 1];
-    if (parent && !isContainerTag(parent.tag) && isKnownLeafTag(parent.tag) && !warned.has(parent.line)) {
-      warned.add(parent.line);
+    // merge 只能当根：出现在任何控件内部都是错的
+    if (isRootOnlyTag(name) && stack.length > 0) {
       issues.push({
-        line: parent.line,
-        level: "warn",
-        message: `<${parent.tag}> 不是 ViewGroup，不能包含子控件（<${name}>）`,
+        line: startLine,
+        level: "error",
+        message: `<${shortTag(name)}> 只能作为 XML 根节点，不能放在其他控件内部`,
       });
     }
+    // M15：按 child-rules.ts 的规则表校验「父标签 × 子控件」——5 类规则全在这里落地
+    // （叶子 View / Adapter 容器 / 单 child 容器 / 有上限的多 child 容器 / merge 非根）
+    const parent = stack[stack.length - 1];
+    if (parent) {
+      parent.kids++;
+      const rule = childRuleOf(parent.tag);
+      const pTag = shortTag(parent.tag);
+      const once = (key: string, level: "error" | "warn", message: string) => {
+        if (parent.reported.has(key)) return;
+        parent.reported.add(key);
+        issues.push({ line: parent.line, level, message });
+      };
+      if (rule?.cat === 5 && rule.max === 0) {
+        // fragment / include：内部不能写子控件（只能引用外部文件）
+        once("special", "warn", `<${pTag}> ${rule.desc}（发现子控件 <${name}>）`);
+      } else if (rule?.kind === "none") {
+        // 叶子控件里写子节点 → 真机崩溃 / aapt 报错。文案保持原样（既有测试断言）
+        once("leaf", "warn", `<${pTag}> 不是 ViewGroup，不能包含子控件（<${name}>）`);
+      } else if (rule?.kind === "adapter") {
+        once(
+          "adapter",
+          "warn",
+          `<${pTag}> 的子项由 Adapter 动态加载，XML 里写静态子控件真机会抛 UnsupportedOperationException`,
+        );
+      } else if (rule?.kind === "single" && parent.kids > 1) {
+        once(
+          "single",
+          "warn",
+          `<${pTag}> 只允许 1 个直接子控件，当前已有 ${parent.kids} 个（多余的不会显示）`,
+        );
+      } else if (rule?.max !== undefined && parent.kids > rule.max) {
+        once("max", "warn", `<${pTag}> 最多只允许 ${rule.max} 个直接子控件，当前已有 ${parent.kids} 个`);
+      }
+    }
     if (/\/>$/.test(raw.trimEnd())) continue; // 自闭合
-    stack.push({ tag: name, line: startLine });
+    stack.push({ tag: name, line: startLine, kids: 0, reported: new Set() });
   }
 
   if (!hadPairError) {

@@ -100,7 +100,7 @@
 .axv-exporting .axv-node.axv-selected {
   outline: none !important;
 }
-.axv-exporting .axv-node.axv-selected:not(.axv-switch):not(.axv-check):not(.axv-radio):not(.axv-progress):not(.axv-seek):not(.axv-spinner):not(.axv-rating)::before {
+.axv-exporting .axv-tag-head {
   display: none !important;
 }
 .axv-exporting .axv-drop-hit {
@@ -118,18 +118,17 @@
   z-index: 900 !important;
 }
 
-/* M3b：选中高亮强化 —— 虚线框 + 左上角 tag 标签头 */
+/* M3b / M11u：选中高亮强化 —— 虚线框 + 左上角 tag 标签头（真实 DOM，见 XmlCanvas） */
 .axv-node.axv-selected {
   outline: 2px dashed #04409F;
   outline-offset: -2px;
 }
-.axv-node.axv-selected:not(.axv-switch):not(.axv-check):not(.axv-radio):not(.axv-progress):not(.axv-seek):not(.axv-spinner):not(.axv-rating)::before {
-  content: attr(data-tag);
+.axv-tag-head {
   position: absolute;
   top: -18px;
   left: -2px;
   z-index: 6;
-  background: #04409F;
+  background: #04409f;
   color: #fff;
   font-size: 10px;
   font-weight: 600;
@@ -139,12 +138,11 @@
   white-space: nowrap;
   pointer-events: none;
   line-height: 1.4;
+  /* 标签头不该被父级的 flex 居中/拉伸影响 */
+  flex: 0 0 auto;
+  margin: 0;
+  transform: none;
 }
-/* 标签头被父容器裁切时（overflow:hidden）不显示，只留虚线框 */
-.axv-node.axv-selected:not(.axv-switch):not(.axv-check):not(.axv-radio):not(.axv-progress):not(.axv-seek):not(.axv-spinner):not(.axv-rating)::after {
-  content: none;
-}
-
 /* ===== M2c：约束拖拽手柄 ===== */
 .axv-handle {
   position: absolute;

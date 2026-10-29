@@ -630,6 +630,13 @@ export function XmlCanvas({
           </span>
         );
       })()}
+      {/* M11u：选中标签头改成真实 DOM（控制类控件要用 ::before/::after 画开关/勾选/星星图形，
+          无法再借用伪元素写标签，否则一选中就把控件图形顶掉） */}
+      {isSel ? (
+        <span className="axv-tag-head" aria-hidden="true">
+          {node.tag}
+        </span>
+      ) : null}
       {node.children.map((c) => (
         <XmlCanvas
           key={c.path}

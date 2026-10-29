@@ -3,7 +3,7 @@
 // 单位：画布 scale 默认 1dp=2px（可通过 scale 参数调）。
 
 import type { XmlNode, ResourceTable, RenderModel, ResolvedNode } from "./types";
-import { resolveNodeAttrs, resolveSize } from "./resolve";
+import { resolveNodeAttrs, resolveSize, resolveColor } from "./resolve";
 import type { ResolvedAttrs } from "./resolve";
 import { solveConstraintChildren, type MeasuredMap } from "./constraints";
 import { solveRelativeChildren } from "./relative";
@@ -600,9 +600,15 @@ export function buildRenderModel(
     // 前景（foreground 覆盖层，CardView / FrameLayout 常见）
     const fg = (attrs["foreground"] as string) || "";
     if (fg && fg.startsWith("data:")) {
+      // M11v：foregroundGravity 决定前景层的铺法（默认 center，fill 才拉伸）
+      const fgg = (attrs["foregroundGravity"] as string) || "";
+      const fill = fgg.includes("fill");
+      const hpos = fgg.includes("end") || fgg.includes("right") ? "right" : fgg.includes("start") || fgg.includes("left") ? "left" : "center";
+      const vpos = fgg.includes("bottom") ? "bottom" : fgg.includes("top") ? "top" : "center";
       style.backgroundImage = `url(${fg})`;
-      style.backgroundSize = "cover";
-      style.backgroundPosition = "center";
+      style.backgroundSize = fill ? "100% 100%" : "auto";
+      style.backgroundRepeat = "no-repeat";
+      style.backgroundPosition = `${hpos} ${vpos}`;
     }
 
     // 文本类
@@ -623,6 +629,11 @@ export function buildRenderModel(
         style.justifyContent = style.justifyContent ?? "center";
       } else if (ga) {
         style.textAlign = ga;
+      }
+      // M11v：android:fontFamily（@font/xxx 需要资源文件，这里只认系统字体名）
+      const ff = (attrs["fontFamily"] as string) || "";
+      if (ff && !ff.startsWith("@") && !ff.startsWith("?")) {
+        style.fontFamily = `${ff}, Roboto, "Noto Sans SC", sans-serif`;
       }
       if ((attrs["textAllCaps"] as boolean)) style.textTransform = "uppercase";
       if ((attrs["textStyle"] as string) === "bold") style.fontWeight = 600;
@@ -841,6 +852,28 @@ export function buildRenderModel(
       style.overflow = "hidden";
     }
 
+    // M11v：contentPadding（CardView / TextInputLayout 的内容内边距）
+    if (((attrs["contentPadding"] as number) || 0) > 0) {
+      const cp = `${DP(attrs["contentPadding"] as number, scale)}px`;
+      style.padding = cp;
+      style.paddingTop = cp;
+      style.paddingRight = cp;
+      style.paddingBottom = cp;
+      style.paddingLeft = cp;
+    }
+
+    // M11v：TextInputLayout（outline 盒子 / 描边色 / 填充色）
+    if (tag === "TextInputLayout") {
+      const mode = (attrs["boxBackgroundMode"] as string) || "";
+      const stroke = (attrs["boxStrokeColor"] as string) || "";
+      const bgBox = (attrs["boxBackgroundColor"] as string) || "";
+      if (bgBox) style.backgroundColor = bgBox;
+      else if (mode === "filled") style.backgroundColor = style.backgroundColor || "#F3EDF7";
+      if (stroke) style.border = `${DP(1, scale)}px solid ${stroke}`;
+      else if (mode === "outline") style.border = `${DP(1, scale)}px solid #79747E`;
+      if (mode) style.borderRadius = `${DP(4, scale)}px`;
+    }
+
     if (cls === "axv-list") {
       style.backgroundColor = style.backgroundColor || "#FFFFFF";
       style.minHeight = style.minHeight || `${DP(160, scale)}px`;
@@ -1002,6 +1035,14 @@ export function buildRenderModel(
         const lh = ((attrs["textSize"] as number) || 14) * 1.3;
         style.minHeight = `${DP(lh * ((attrs["minLines"] as number) || 1), scale)}px`;
       }
+    }
+
+    // M11v：Switch / ToggleButton 写了 textOn / textOff 时展示（Android 里 Switch 默认不显示这两个），
+    // 没写就不凭空造文字（否则「记住我」这类空文本开关会多出「开」）
+    if (cls === "axv-switch") {
+      const onNow = !!attrs["checked"];
+      const onOff = (onNow ? (attrs["textOn"] as string) : (attrs["textOff"] as string)) || "";
+      text = text || onOff;
     }
 
     if (cls === "axv-seek") {
@@ -1247,6 +1288,32 @@ export function buildRenderModel(
     for (const c of n.children) patchWrapCross(c);
   };
   patchWrapCross(rootNode);
+
+  // M11v：android:divider + android:showDividers —— 给中间子项补边框当作分割线
+  const patchDividers = (n: ResolvedNode): void => {
+    const raw = n.rawAttrs || {};
+    const show = String(raw["showDividers"] || "");
+    const dRaw = String(raw["divider"] || "");
+    if (show && show !== "none" && dRaw) {
+      const color = resolveColor(dRaw, res, [], "", "divider") || dRaw;
+      const hDp = parseFloat(String(raw["dividerHeight"] || "")) || 1;
+      const px = Math.max(1, DP(hDp, scale));
+      const vertical = String(n.style.flexDirection ?? "column") !== "row";
+      n.children.forEach((c, i) => {
+        if (c.style.position === "absolute") return;
+        const first = i === 0;
+        const last = i === n.children.length - 1;
+        const want =
+          show.includes("middle") && !first ? true : show.includes("beginning") && first ? true : false;
+        if (!want) return;
+        if (vertical) c.style.borderTop = `${px}px solid ${color}`;
+        else c.style.borderLeft = `${px}px solid ${color}`;
+        void last;
+      });
+    }
+    n.children.forEach(patchDividers);
+  };
+  patchDividers(rootNode);
 
   return { root: rootNode, issues };
 }

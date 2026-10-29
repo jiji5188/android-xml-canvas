@@ -447,6 +447,18 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   // CardView
   out["cardBackgroundColor"] = a["cardBackgroundColor"] !== undefined ? resolveColor(a["cardBackgroundColor"], res, issues, path, "cardBackgroundColor") : "";
   out["cardElevation"] = dpNum("cardElevation");
+  // M11v：容器分割线 / 前景对齐 / 字体 / TextInputLayout 盒子 / Switch 开关文字
+  out["divider"] = a["divider"] !== undefined ? resolveColor(a["divider"], res, issues, path, "divider") : "";
+  out["dividerHeight"] = dpNum("dividerHeight");
+  out["showDividers"] = a["showDividers"] ?? "";
+  out["foregroundGravity"] = a["foregroundGravity"] ?? "";
+  out["fontFamily"] = a["fontFamily"] ?? "";
+  out["textOn"] = a["textOn"] ?? "";
+  out["textOff"] = a["textOff"] ?? "";
+  out["contentPadding"] = dpNum("contentPadding");
+  out["boxStrokeColor"] = a["boxStrokeColor"] !== undefined ? resolveColor(a["boxStrokeColor"], res, issues, path, "boxStrokeColor") : "";
+  out["boxBackgroundColor"] = a["boxBackgroundColor"] !== undefined ? resolveColor(a["boxBackgroundColor"], res, issues, path, "boxBackgroundColor") : "";
+  out["boxBackgroundMode"] = a["boxBackgroundMode"] ?? "";
 
   return { attrs: out, issues };
 }

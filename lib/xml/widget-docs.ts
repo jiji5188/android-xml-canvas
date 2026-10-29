@@ -67,6 +67,34 @@ export const COMMON_ATTRS: AttrDoc[] = [
   { name: "minHeight", type: "尺寸", desc: "最小高度" },
   { name: "contentDescription", type: "文本", desc: "无障碍朗读文本（图标类控件必填）" },
   { name: "tag", type: "文本", desc: "任意标记文本，代码里可取（常用于列表复用标识）" },
+  // ===== M11v：补齐此前缺失的通用属性 =====
+  { name: "paddingTop", type: "尺寸", desc: "上内边距" },
+  { name: "paddingBottom", type: "尺寸", desc: "下内边距" },
+  { name: "paddingLeft", type: "尺寸", desc: "左内边距（不随语言方向翻转，一般用 paddingStart）" },
+  { name: "paddingRight", type: "尺寸", desc: "右内边距（不随语言方向翻转，一般用 paddingEnd）" },
+  { name: "paddingHorizontal", type: "尺寸", desc: "左右内边距一次设置（等于同时设 Start + End）" },
+  { name: "paddingVertical", type: "尺寸", desc: "上下内边距一次设置（等于同时设 Top + Bottom）" },
+  { name: "layout_marginLeft", type: "尺寸", desc: "左外边距（不随语言方向翻转）" },
+  { name: "layout_marginRight", type: "尺寸", desc: "右外边距（不随语言方向翻转）" },
+  { name: "layout_marginHorizontal", type: "尺寸", desc: "左右外边距一次设置" },
+  { name: "layout_marginVertical", type: "尺寸", desc: "上下外边距一次设置" },
+  { name: "maxWidth", type: "尺寸", desc: "最大宽度（wrap_content 时限制上限）", values: ["320dp"] },
+  { name: "maxHeight", type: "尺寸", desc: "最大高度" },
+  { name: "foregroundGravity", type: "枚举", desc: "前景层的对齐方式（fill 才拉伸）", values: ["center", "fill", "bottom|end"] },
+  { name: "rotation", type: "数值", desc: "旋转角度（度，顺时针）" },
+  { name: "rotationX", type: "数值", desc: "沿 X 轴翻转角度（3D 变换）" },
+  { name: "rotationY", type: "数值", desc: "沿 Y 轴翻转角度（3D 变换）" },
+  { name: "scaleX", type: "数值", desc: "横向缩放倍数（1 = 原始大小）", values: ["0.5", "1.2"] },
+  { name: "scaleY", type: "数值", desc: "纵向缩放倍数" },
+  { name: "translationX", type: "尺寸", desc: "横向平移（不影响布局占位）" },
+  { name: "translationY", type: "尺寸", desc: "纵向平移（不影响布局占位）" },
+  { name: "translationZ", type: "尺寸", desc: "Z 轴抬升（跟 elevation 相加，决定压谁上面）" },
+  { name: "pivotX", type: "数值", desc: "变换中心点 X（默认 50%）" },
+  { name: "pivotY", type: "数值", desc: "变换中心点 Y（默认 50%）" },
+  { name: "backgroundTintMode", type: "枚举", desc: "背景着色的混色方式", values: ["src_over", "multiply", "screen", "add"] },
+  { name: "outlineSpotShadowColor", type: "颜色", desc: "聚光阴影颜色（API 28+）" },
+  { name: "outlineAmbientShadowColor", type: "颜色", desc: "环境阴影颜色（API 28+）" },
+  { name: "fontFamily", type: "文本", desc: "字体（系统字体名，如 sans-serif-medium）" },
 ];
 
 const TEXT_ATTRS: AttrDoc[] = [
@@ -1070,6 +1098,208 @@ const PARSED: Record<string, WidgetDoc> = {
   },
 };
 
+/**
+ * M11v：补充属性表。
+ * 单独放一张表、查询时合并（按属性名去重），这样既不动 88 个控件已有的条目，
+ * 又能把「常用但文档没写 / 预览已经开始渲染」的属性补齐。
+ */
+const EXTRA_ATTRS: Record<string, AttrDoc[]> = {
+  LinearLayout: [
+    { name: "divider", type: "drawable", desc: "子项之间的分割线（颜色或 @drawable/xxx）", values: ["#E0E0E0", "@drawable/divider"] },
+    { name: "dividerHeight", type: "尺寸", desc: "分割线粗细", values: ["1dp"] },
+    { name: "showDividers", type: "枚举", desc: "在哪里画分割线", values: ["none", "beginning", "middle", "end"] },
+    { name: "baselineAligned", type: "布尔", desc: "横排时是否按文字基线对齐（false 更好控高度）" },
+    { name: "measureWithLargestChild", type: "布尔", desc: "按最大子项测量宽度" },
+  ],
+  FrameLayout: [
+    { name: "foregroundGravity", type: "枚举", desc: "前景遮罩的对齐方式", values: ["fill", "center", "bottom"] },
+    { name: "clipChildren", type: "布尔", desc: "是否裁掉超出边界的子控件" },
+    { name: "clipToPadding", type: "布尔", desc: "子控件是否被 padding 区域裁切" },
+  ],
+  ConstraintLayout: [
+    { name: "layout_constraintWidth_percent", type: "数值", desc: "宽度占父级百分比（需配合 layout_width=0dp）", values: ["0.5"] },
+    { name: "layout_constraintHeight_percent", type: "数值", desc: "高度占父级百分比（需配合 layout_height=0dp）", values: ["0.3"] },
+    { name: "layout_constraintHorizontal_bias", type: "数值", desc: "左右约束之间的偏移比例 0~1（0.5 居中）", values: ["0", "0.5", "1"] },
+    { name: "layout_constraintVertical_bias", type: "数值", desc: "上下约束之间的偏移比例 0~1" },
+    { name: "layout_constraintDimensionRatio", type: "文本", desc: "宽高比，如 16:9 或 W,16:9", values: ["16:9", "1:1"] },
+    { name: "layout_constraintHorizontal_chainStyle", type: "枚举", desc: "链式排列样式", values: ["spread", "spread_inside", "packed"] },
+    { name: "layout_optimizationLevel", type: "枚举", desc: "编译期优化级别", values: ["none", "standard", "all"] },
+  ],
+  GridLayout: [
+    { name: "columnCount", type: "数值", desc: "列数（预览用它均分宽度）", values: ["2", "3"] },
+    { name: "rowCount", type: "数值", desc: "行数" },
+    { name: "orientation", type: "枚举", desc: "排布方向（影响先填行还是先填列）", values: ["horizontal", "vertical"] },
+    { name: "useDefaultMargins", type: "布尔", desc: "自动加默认间距" },
+    { name: "layout_column", type: "数值", desc: "放在第几列（从 0 开始）" },
+    { name: "layout_row", type: "数值", desc: "放在第几行（从 0 开始）" },
+    { name: "layout_columnSpan", type: "数值", desc: "横跨几列" },
+    { name: "layout_rowSpan", type: "数值", desc: "纵跨几行" },
+    { name: "layout_columnWeight", type: "数值", desc: "列宽权重（等分卡片常用）", values: ["1"] },
+    { name: "layout_rowWeight", type: "数值", desc: "行高权重" },
+  ],
+  TableLayout: [
+    { name: "stretchColumns", type: "文本", desc: "要拉伸填满的列（0 基，逗号分隔）", values: ["0", "0,1"] },
+    { name: "shrinkColumns", type: "文本", desc: "内容超宽时压缩的列" },
+    { name: "collapseColumns", type: "文本", desc: "要隐藏的列" },
+  ],
+  TableRow: [
+    { name: "layout_column", type: "数值", desc: "强制放到第几列（默认按顺序）" },
+    { name: "layout_span", type: "数值", desc: "横跨几列" },
+    { name: "gravity", type: "枚举", desc: "单元格内容的对齐方式", values: ["center_vertical", "center"] },
+  ],
+  ScrollView: [
+    { name: "fillViewport", type: "布尔", desc: "内容不足一屏时也撑满（配合 weight 用）" },
+    { name: "scrollbars", type: "枚举", desc: "滚动条方向（预览不显示滚动条）", values: ["vertical", "none"] },
+    { name: "fadeScrollbars", type: "布尔", desc: "滚动条自动淡出" },
+  ],
+  TextView: [
+    { name: "maxLines", type: "数值", desc: "最多显示几行（超出按 ellipsize 处理）" },
+    { name: "minLines", type: "数值", desc: "最少占几行高度" },
+    { name: "ellipsize", type: "枚举", desc: "超长文本的省略方式", values: ["end", "middle", "marquee"] },
+    { name: "lineSpacingExtra", type: "尺寸", desc: "行间距（额外增加值）", values: ["4dp"] },
+    { name: "lineSpacingMultiplier", type: "数值", desc: "行间距倍数", values: ["1.2"] },
+    { name: "letterSpacing", type: "数值", desc: "字间距（em 为单位）", values: ["0.02"] },
+    { name: "textStyle", type: "枚举", desc: "字体样式", values: ["normal", "bold", "italic", "bold|italic"] },
+    { name: "textAllCaps", type: "布尔", desc: "全部显示为大写" },
+    { name: "shadowColor", type: "颜色", desc: "文字阴影颜色", values: ["#40000000"] },
+    { name: "shadowDx", type: "尺寸", desc: "文字阴影横向偏移" },
+    { name: "shadowDy", type: "尺寸", desc: "文字阴影纵向偏移" },
+    { name: "shadowRadius", type: "尺寸", desc: "文字阴影模糊半径" },
+    { name: "textAlignment", type: "枚举", desc: "文本对齐（view 级，跟 gravity 类似但只管文字）", values: ["viewStart", "center", "viewEnd"] },
+    { name: "autoSizeTextType", type: "枚举", desc: "自动缩放字号", values: ["none", "uniform"] },
+  ],
+  Button: [
+    { name: "textAllCaps", type: "布尔", desc: "文字全大写（Material 主题默认 true）" },
+    { name: "gravity", type: "枚举", desc: "文字在按钮内的对齐", values: ["center", "start|center_vertical"] },
+  ],
+  MaterialButton: [
+    { name: "app:cornerRadius", type: "尺寸", desc: "按钮圆角", values: ["8dp"] },
+    { name: "app:strokeColor", type: "颜色", desc: "描边颜色（无填充按钮用）" },
+    { name: "app:strokeWidth", type: "尺寸", desc: "描边宽度", values: ["1dp"] },
+    { name: "app:icon", type: "drawable", desc: "按钮左侧图标" },
+    { name: "app:iconGravity", type: "枚举", desc: "图标位置", values: ["textStart", "textEnd", "start"] },
+    { name: "app:iconPadding", type: "尺寸", desc: "图标与文字间距", values: ["8dp"] },
+  ],
+  EditText: [
+    { name: "inputType", type: "枚举", desc: "键盘类型 / 内容类型", values: ["text", "number", "textPassword", "phone"] },
+    { name: "singleLine", type: "布尔", desc: "单行显示（回车不换行）" },
+    { name: "minLines", type: "数值", desc: "最少行数" },
+    { name: "maxLines", type: "数值", desc: "最多行数（配合 inputType=textMultiLine）" },
+    { name: "textColorHint", type: "颜色", desc: "提示文字颜色" },
+    { name: "imeOptions", type: "枚举", desc: "软键盘右下角按钮", values: ["actionSearch", "actionDone", "actionNext"] },
+    { name: "hint", type: "文本", desc: "输入为空时的提示文字" },
+  ],
+  ImageView: [
+    { name: "srcCompat", type: "drawable", desc: "图片资源（矢量图推荐用这个，兼容低版本）" },
+    { name: "scaleType", type: "枚举", desc: "图片缩放方式", values: ["fitCenter", "centerCrop", "fitXY", "center"] },
+    { name: "tint", type: "颜色", desc: "给图片着色（保留透明度）" },
+    { name: "tintMode", type: "枚举", desc: "着色混色方式", values: ["src_in", "src_atop", "multiply", "screen", "add"] },
+    { name: "adjustViewBounds", type: "布尔", desc: "按图片比例调整自身尺寸" },
+  ],
+  Switch: [
+    { name: "checked", type: "布尔", desc: "初始是否打开" },
+    { name: "thumbTint", type: "颜色", desc: "滑块颜色" },
+    { name: "trackTint", type: "颜色", desc: "轨道颜色" },
+    { name: "textOn", type: "文本", desc: "打开时的文字（Switch 一般不显示，用 text 更常见）" },
+    { name: "textOff", type: "文本", desc: "关闭时的文字" },
+    { name: "showText", type: "布尔", desc: "是否显示开/关文字" },
+    { name: "switchMinWidth", type: "尺寸", desc: "轨道最小宽度" },
+    { name: "splitTrack", type: "布尔", desc: "滑块下方是否留出轨道缝隙" },
+  ],
+  CheckBox: [
+    { name: "checked", type: "布尔", desc: "初始是否勾选" },
+    { name: "buttonTint", type: "颜色", desc: "勾选框颜色" },
+  ],
+  RadioButton: [
+    { name: "checked", type: "布尔", desc: "初始是否选中（同一 RadioGroup 内互斥）" },
+    { name: "buttonTint", type: "颜色", desc: "圆形选中色" },
+  ],
+  RadioGroup: [
+    { name: "orientation", type: "枚举", desc: "排列方向", values: ["vertical", "horizontal"] },
+    { name: "checkedButton", type: "引用", desc: "默认选中的那个 RadioButton 的 id" },
+  ],
+  SeekBar: [
+    { name: "max", type: "数值", desc: "最大值（进度条范围）", values: ["100"] },
+    { name: "progress", type: "数值", desc: "当前进度", values: ["30"] },
+    { name: "thumbTint", type: "颜色", desc: "滑块颜色" },
+    { name: "progressTint", type: "颜色", desc: "已走过部分的颜色" },
+    { name: "splitTrack", type: "布尔", desc: "滑块下方留缝" },
+  ],
+  ProgressBar: [
+    { name: "progress", type: "数值", desc: "当前进度（配合 max）", values: ["50"] },
+    { name: "max", type: "数值", desc: "最大值", values: ["100"] },
+    { name: "secondaryProgress", type: "数值", desc: "第二层进度（缓冲进度）" },
+    { name: "indeterminate", type: "布尔", desc: "不确定进度（转圈/来回跑）" },
+    { name: "progressTint", type: "颜色", desc: "进度颜色" },
+    { name: "indeterminateTint", type: "颜色", desc: "不确定态颜色" },
+  ],
+  RatingBar: [
+    { name: "numStars", type: "数值", desc: "星星数量", values: ["5"] },
+    { name: "rating", type: "数值", desc: "当前评分", values: ["3.5"] },
+    { name: "stepSize", type: "数值", desc: "每颗星的步进", values: ["0.5"] },
+    { name: "isIndicator", type: "布尔", desc: "只显示不给点（true 常用于展示评分）" },
+    { name: "buttonTint", type: "颜色", desc: "星星颜色" },
+  ],
+  CardView: [
+    { name: "cardCornerRadius", type: "尺寸", desc: "卡片圆角", values: ["12dp"] },
+    { name: "cardElevation", type: "尺寸", desc: "卡片阴影高度", values: ["2dp"] },
+    { name: "cardBackgroundColor", type: "颜色", desc: "卡片底色（CardView 的底色写这里，不是 background）" },
+    { name: "cardUseCompatPadding", type: "布尔", desc: "低版本也加阴影留白（各版本视觉一致）" },
+    { name: "contentPadding", type: "尺寸", desc: "卡片内容内边距" },
+  ],
+  MaterialCardView: [
+    { name: "app:cardCornerRadius", type: "尺寸", desc: "卡片圆角", values: ["12dp"] },
+    { name: "app:strokeColor", type: "颜色", desc: "卡片描边颜色" },
+    { name: "app:strokeWidth", type: "尺寸", desc: "卡片描边宽度" },
+    { name: "app:cardElevation", type: "尺寸", desc: "卡片阴影" },
+    { name: "app:checkable", type: "布尔", desc: "卡片是否可选中（带勾选态）" },
+  ],
+  TextInputLayout: [
+    { name: "boxBackgroundMode", type: "枚举", desc: "输入框盒子样式", values: ["outline", "filled", "none"] },
+    { name: "boxStrokeColor", type: "颜色", desc: "outline 模式的边框色（聚焦时用它）" },
+    { name: "boxBackgroundColor", type: "颜色", desc: "filled 模式的底色" },
+    { name: "hint", type: "文本", desc: "浮动标签文字" },
+    { name: "counterEnabled", type: "布尔", desc: "显示字数计数" },
+    { name: "errorEnabled", type: "布尔", desc: "显示错误提示位" },
+    { name: "contentPadding", type: "尺寸", desc: "内容内边距" },
+  ],
+  Toolbar: [
+    { name: "title", type: "文本", desc: "标题文字" },
+    { name: "subtitle", type: "文本", desc: "副标题" },
+    { name: "navigationIcon", type: "drawable", desc: "左侧导航图标（返回/菜单）" },
+    { name: "logo", type: "drawable", desc: "左侧 logo" },
+    { name: "titleTextColor", type: "颜色", desc: "标题颜色" },
+    { name: "subtitleTextColor", type: "颜色", desc: "副标题颜色" },
+  ],
+  RecyclerView: [
+    { name: "layoutManager", type: "文本", desc: "布局管理器类名（linear / grid）" },
+    { name: "spanCount", type: "数值", desc: "网格列数（GridLayoutManager）" },
+    { name: "itemAnimator", type: "文本", desc: "增删动画" },
+  ],
+  Spinner: [
+    { name: "entries", type: "引用", desc: "下拉选项数组（@array/xxx）" },
+    { name: "spinnerMode", type: "枚举", desc: "弹出方式", values: ["dropdown", "dialog"] },
+    { name: "prompt", type: "文本", desc: "dialog 模式的标题" },
+  ],
+  View: [
+    { name: "background", type: "颜色", desc: "分隔线/色块最常用：直接给颜色 + 1dp 高度" },
+  ],
+  Space: [
+    { name: "layout_weight", type: "数值", desc: "当弹簧用：占满剩余空间", values: ["1"] },
+  ],
+  Chip: [
+    { name: "app:chipIcon", type: "drawable", desc: "标签左侧图标" },
+    { name: "app:closeIcon", type: "drawable", desc: "右侧关闭图标" },
+    { name: "app:checkable", type: "布尔", desc: "是否可选（filter chip）" },
+    { name: "app:chipBackgroundColor", type: "颜色", desc: "标签底色" },
+  ],
+  ToggleButton: [
+    { name: "textOn", type: "文本", desc: "选中时显示的文字", values: ["开"] },
+    { name: "textOff", type: "文本", desc: "未选中时显示的文字", values: ["关"] },
+    { name: "disabledAlpha", type: "数值", desc: "禁用态透明度" },
+  ],
+};
+
 /** 全限定类名 → 短名（androidx.cardview.widget.CardView → CardView） */
 export function shortDocTag(tag: string): string {
   const t = (tag || "").trim();
@@ -1101,7 +1331,13 @@ export function getWidgetDoc(tag: string): WidgetDoc {
   const short = shortDocTag(tag);
   const key = ALIAS[short] ?? short;
   const found = PARSED[key];
-  if (found) return found;
+  if (found) {
+    // M11v：合并补充属性（按名字去重，已有的优先）
+    const extra = EXTRA_ATTRS[key];
+    if (!extra || extra.length === 0) return found;
+    const seen = new Set(found.attrs.map((a) => a.name));
+    return { ...found, attrs: [...found.attrs, ...extra.filter((a) => !seen.has(a.name))] };
+  }
   return {
     title: short || "未知控件",
     summary: "这个控件还没有收录说明；下面列出所有 View 通用的属性。",
@@ -1132,3 +1368,10 @@ export function attrHint(tag: string, attrName: string): string | null {
   if (!d) return null;
   return d.values?.length ? `${d.desc}（${d.values.slice(0, 3).join(" / ")}）` : d.desc;
 }
+
+// 变体名共用同一份补充属性（ALIAS 归一后可能落到这些 key 上）
+EXTRA_ATTRS.SwitchMaterial = EXTRA_ATTRS.Switch;
+EXTRA_ATTRS.Slider = EXTRA_ATTRS.SeekBar;
+EXTRA_ATTRS.MaterialToolbar = EXTRA_ATTRS.Toolbar;
+EXTRA_ATTRS.MaterialTextView = EXTRA_ATTRS.TextView;
+EXTRA_ATTRS.AppCompatButton = EXTRA_ATTRS.Button;

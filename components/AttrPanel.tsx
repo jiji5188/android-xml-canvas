@@ -32,6 +32,8 @@ interface Props {
   resExtras?: ResourceExtras | null;
   /** M3g：选中图标 → 生成 res/drawable 资源并写入该属性 */
   onPickIcon?: (attr: string, resourceName: string, vectorXml: string) => void;
+  /** M11p：从资源对话框直接打开图标编辑器（xml 为空 = 当前值不是 vector，让编辑器新建） */
+  onEditIconResource?: (name: string, xml: string | undefined, attr: string) => void;
   /** M3g：已生成的图标资源名（用于标记「复用」） */
   iconNames?: string[];
   /** M3h：保存自定义形状（生成 res/drawable 资源 + 写入属性） */
@@ -113,6 +115,7 @@ export function AttrPanel({
   resExtras,
   onDeleteNode,
   onPickIcon,
+  onEditIconResource,
   iconNames,
   onSaveShape,
   generatedXml,
@@ -570,6 +573,16 @@ export function AttrPanel({
           onPickIcon={() => {
             setDpOpen(null);
             setIconPick(dpOpen);
+          }}
+          onEditIcon={() => {
+            const attr = dpOpen;
+            const nm = String(node.rawAttrs[attr] ?? "")
+              .replace(/^@(?:drawable|mipmap)\//, "")
+              .replace(/\.xml$/i, "");
+            const xml = nm ? (generatedXml?.[nm] ?? resExtras?.drawableXml?.[nm]) : undefined;
+            const isVec = !!xml && /<vector[\s>]/.test(xml);
+            setDpOpen(null);
+            onEditIconResource?.(isVec ? nm : "", isVec ? xml : undefined, attr);
           }}
           onCommit={(v) => {
             commit(dpOpen, v);

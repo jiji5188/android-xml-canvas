@@ -34,6 +34,8 @@ interface Props {
   onEditShape: (existingXml?: string) => void;
   /** 直接弹图标选择器（M3g 已有面板） */
   onPickIcon?: () => void;
+  /** M11p：直接打开图标编辑器（编辑当前值的 vector，或新建一个） */
+  onEditIcon?: () => void;
   /** 选中的值写回属性 */
   onCommit: (value: string) => void;
   /** true = 图片类属性（src / icon / drawableStart …）：drawable 不认纯色，
@@ -56,16 +58,28 @@ export function DrawablePicker({
   generatedXml,
   onEditShape,
   onPickIcon,
+  onEditIcon,
   onCommit,
   imageOnly,
   onClose,
 }: Props) {
-  const [tab, setTab] = useState<"color" | "res" | "shape" | "icon">(imageOnly ? "res" : "color");
+  // M11p：默认落在「颜色」（imageOnly 没有颜色页签，退回资源列表）
+  const [tab, setTab] = useState<"color" | "res">("color");
+  const effTab: "color" | "res" = imageOnly && tab === "color" ? "res" : tab;
   const [filter, setFilter] = useState("");
   /** 资源 ID 输入框草稿（不与属性实时同步，回车/失焦才写回，避免污染 XML） */
   const [idDraft, setIdDraft] = useState(value);
   useEffect(() => setIdDraft(value), [value]);
   const idError = validateAttrValue(idDraft);
+
+  /** M11p：资源总数（位图 + xml + 生成，同名只算一个），用于页签上的「资源列表（N）」 */
+  const resCount = useMemo(() => {
+    const uniq = new Set<string>();
+    for (const n of Object.keys(bitmapDrawables ?? {})) uniq.add(n);
+    for (const n of Object.keys(xmlDrawables ?? {})) uniq.add(n);
+    for (const n of Object.keys(generatedXml ?? {})) uniq.add(n);
+    return uniq.size;
+  }, [bitmapDrawables, xmlDrawables, generatedXml]);
 
   const items = useMemo<DrawableItem[]>(() => {
     const out: DrawableItem[] = [];
@@ -99,8 +113,7 @@ export function DrawablePicker({
     return undefined;
   };
 
-  const isHex = /^#[0-9a-fA-F]{3,8}$/.test(value);
-  const colorVal = toHex6(value);
+  const isHex = /^#[0-9a-fA-F]{3,8}$/.test(value);  const colorVal = toHex6(value);
   /** 只有「形状类」xml 才能进形状编辑器（vector 是画出来的一次性资源） */
   const isShapeXml = (xml?: string) => !!xml && /<\s*(shape|ripple|selector|layer-list|inset)\b/.test(xml);
 
@@ -152,22 +165,31 @@ export function DrawablePicker({
         {idError ? <div className="axv-dp-iderr">⛔ {idError}</div> : null}
 
         <div className="axv-dp-tabs">
-          {(
-            [
-              ...(imageOnly ? [] : ([ ["color", "🎨 颜色"] ] as const)),
-              ["res", `🖼 图片/XML 资源（${Object.keys(bitmapDrawables ?? {}).length + Object.keys(xmlDrawables ?? {}).length + Object.keys(generatedXml ?? {}).length}）`],
-              ["shape", "⬛ 编辑/创建 XML 形状"],
-              ["icon", "📦 图标生成"],
-            ] as const
-          ).map(([k, label]) => (
-            <button key={k} className={"axv-dp-tab" + (tab === k ? " is-on" : "")} onClick={() => setTab(k)}>
-              {label}
+          {!imageOnly ? (
+            <button
+              className={"axv-dp-tab" + (effTab === "color" ? " is-on" : "")}
+              onClick={() => setTab("color")}
+            >
+              🎨 颜色
             </button>
-          ))}
+          ) : null}
+          <button
+            className={"axv-dp-tab" + (effTab === "res" ? " is-on" : "")}
+            onClick={() => setTab("res")}
+          >
+            资源列表（{resCount}）
+          </button>
+          {/* M11p：这两个是「动作页签」，点了直接打开对应编辑器，不再出中间面板 */}
+          <button className="axv-dp-tab" onClick={() => onEditShape(currentShapeXml())}>
+            ⬛ 编辑/创建 XML 形状
+          </button>
+          <button className="axv-dp-tab" onClick={() => onEditIcon?.()}>
+            📦 图标编辑
+          </button>
         </div>
 
         <div className="axv-dp-body">
-          {tab === "color" ? (
+          {effTab === "color" ? (
             <div className="axv-dp-color">
               <div className="axv-dp-pickrow">
                 <input
@@ -191,7 +213,7 @@ export function DrawablePicker({
             </div>
           ) : null}
 
-          {tab === "res" ? (
+          {effTab === "res" ? (
             <div className="axv-dp-res">
               {items.length === 0 ? (
                 <div className="axv-dp-empty">
@@ -201,7 +223,7 @@ export function DrawablePicker({
                 <>
                   <input
                     className="axv-attr-input axv-dp-search"
-                    placeholder={`搜索 ${Object.keys(bitmapDrawables ?? {}).length + Object.keys(xmlDrawables ?? {}).length + Object.keys(generatedXml ?? {}).length} 个 drawable…`}
+                    placeholder={`搜索 ${resCount} 个 drawable…`}
                     value={filter}
                     spellCheck={false}
                     onChange={(e) => setFilter(e.target.value)}
@@ -239,33 +261,6 @@ export function DrawablePicker({
                     })}
                   </div>
                 </>
-              )}
-            </div>
-          ) : null}
-
-          {tab === "shape" ? (
-            <div className="axv-dp-shape">
-              <p className="axv-dp-hint">
-                新建一个 <code>&lt;shape&gt;</code> / <code>&lt;ripple&gt;</code> 资源（圆角、描边、渐变、水波纹、按下态、阴影），保存后自动写回本属性。
-                若当前值已是本工具生成的资源，可直接在上面「图片/XML 资源」里点「编辑」修改。
-              </p>
-              <button className="axv-btn axv-btn-primary" onClick={() => onEditShape(currentShapeXml())}>
-                ⬛ 打开形状编辑器
-              </button>
-            </div>
-          ) : null}
-
-          {tab === "icon" ? (
-            <div className="axv-dp-shape">
-              <p className="axv-dp-hint">从 Material Symbols 生成一个 24dp 图标 vector（离线 TTF，导出 res 包时一并带走）。</p>
-              {onPickIcon ? (
-                <button className="axv-btn axv-btn-primary" onClick={onPickIcon}>
-                  📦 打开图标选择器
-                </button>
-              ) : (
-                <button className="axv-btn" disabled>
-                  图标选择器需要工具栏入口（未接入）
-                </button>
               )}
             </div>
           ) : null}

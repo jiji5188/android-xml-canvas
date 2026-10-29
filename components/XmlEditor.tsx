@@ -434,7 +434,9 @@ export function XmlEditor() {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
  const [exportNote, setExportNote] = useState<string>(" ");
   /** M11j：正在编辑的生成图标（vector） */
-  const [resIcon, setResIcon] = useState<{ name: string; xml: string } | null>(null);
+  const [resIcon, setResIcon] = useState<{ name: string; xml: string; attr?: string } | null>(
+    null
+  );
   /** M4u：从资源树里直接打开的「绘制编辑器」（drawable/*.xml） */
   const [resShape, setResShape] = useState<{ name: string; xml: string } | null>(null);
   /** M4u：从资源树里点开的图片预览 */
@@ -2449,6 +2451,9 @@ const findResolved = findResolvedNode;
                 resExtras={resExtras}
                 onDeleteNode={() => onRemoveNode(selectedNode.path)}
                 onPickIcon={onPickIcon}
+                onEditIconResource={(name, iconXml, attr) =>
+                  setResIcon({ name: name || "ic_icon", xml: iconXml ?? "", attr })
+                }
                 iconNames={Object.keys(generatedDrawables)}
                 onSaveShape={onSaveShape}
                 generatedXml={generatedDrawables}
@@ -2671,6 +2676,8 @@ const findResolved = findResolvedNode;
               return next;
             });
             if (safeName !== oldName) onRenameAsset(oldName, safeName);
+            // M11p：从属性面板「图标编辑」进来的话，保存后把属性指向这个资源
+            if (resIcon.attr) commitAttr(resIcon.attr, "@drawable/" + safeName);
             setResIcon(null);
             setExportNote("已保存 res/drawable/" + safeName + ".xml");
             window.setTimeout(() => setExportNote(" "), 3200);

@@ -14,7 +14,8 @@ import { IconPickerPanel } from "./IconPickerPanel";
 
 interface Props {
   name: string;
-  xml: string;
+  /** vector xml 原文；空字符串 / undefined = 新建一个空图标（从图标库选字形） */
+  xml?: string;
   onClose: () => void;
   onSave: (name: string, xml: string) => void;
   /** 已占用的资源名（防止改名撞车 / 给图标选择器打「已生成」标记） */
@@ -23,17 +24,42 @@ interface Props {
 
 const PRESET_COLORS = ["#1D1B20", "#04409F", "#B3261E", "#1F7A3D", "#F5A524", "#6B7280"];
 
+/** 新建 / 空内容时的占位图形：24dp 圆角方块 */
+const BLANK_MODEL: VectorModel = {
+  w: 24,
+  h: 24,
+  vw: 24,
+  vh: 24,
+  group: { rotation: 0, scaleX: 1, scaleY: 1, pivotX: 12, pivotY: 12 },
+  paths: [{ d: "M5 5h14v14H5z", fill: "#1D1B20" }],
+};
+
+/** M11p：判断传进来的内容到底是什么，防止把普通图片当图标改 */
+function inspect(xml?: string): "vector" | "bitmap" | "other-xml" | "empty" {
+  const s = (xml ?? "").trim();
+  if (!s) return "empty";
+  if (/^data:image\//i.test(s) || /^\/9j\//.test(s) || /^iVBOR/.test(s)) return "bitmap";
+  if (/<vector[\s>]/.test(s)) return "vector";
+  if (!s.startsWith("<")) return "bitmap";
+  return "other-xml";
+}
+
 export default function IconEditor({ name, xml, onClose, onSave, existingNames = [] }: Props) {
-  const initial = useMemo(() => parseVectorModel(xml), [xml]);
-  const [model, setModel] = useState<VectorModel | null>(initial);
+  const kind = useMemo(() => inspect(xml), [xml]);
+  const initial = useMemo(() => parseVectorModel(xml ?? ""), [xml]);
+  const [model, setModel] = useState<VectorModel | null>(initial ?? (kind === "empty" ? BLANK_MODEL : null));
   const [resName, setResName] = useState(name);
   const [activePath, setActivePath] = useState(0);
   const [showRaw, setShowRaw] = useState(false);
   const [picking, setPicking] = useState(false);
   const [err, setErr] = useState("");
 
-  // 解析失败（不是标准 vector）：只给原文查看，避免误存坏文件
+  // 解析失败（不是标准 vector）：说清楚原因，并给「改为从图标库选」的退路
   if (!model) {
+    const msg =
+      kind === "bitmap"
+        ? "这是普通图片（png / jpg 等位图），不是矢量图标 —— 图标编辑器只能改 <vector> 资源。位图请直接用图片资源，或点下面的按钮从图标库重新选一个。"
+        : "这个文件不是标准 <vector>，暂时只能原样查看。可以点下面的按钮改用图标库里的字形。";
     const body = (
       <div className="axv-icon-page" role="dialog" aria-label="图标编辑器">
         <div className="axv-shape-head">
@@ -48,8 +74,25 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
         </div>
         <div className="axv-icon-page-body">
           <div className="axv-icon-ed-form">
-            <div className="axv-icon-ed-err">这个文件不是标准 &lt;vector&gt;，暂时只能原样查看。</div>
-            <textarea className="axv-icon-ed-raw" readOnly value={xml} />
+            <div className="axv-icon-ed-warn">
+              <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>warning</span>
+              <span>{msg}</span>
+            </div>
+            <div className="axv-icon-ed-btns">
+              <button
+                className="axv-btn axv-btn-primary"
+                onClick={() => {
+                  setModel(BLANK_MODEL);
+                  setActivePath(0);
+                }}
+              >
+                从图标库选一个
+              </button>
+              <button className="axv-btn axv-ghost" onClick={onClose}>
+                关闭
+              </button>
+            </div>
+            {xml ? <textarea className="axv-icon-ed-raw" readOnly value={xml} /> : null}
           </div>
         </div>
       </div>
@@ -136,6 +179,12 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
 
         {/* 右：参数 */}
         <div className="axv-icon-ed-form">
+          {kind === "empty" ? (
+            <div className="axv-icon-ed-warn">
+              <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>info</span>
+              <span>当前还没有图标内容，点「选择图标」从图标库挑一个字形，或直接在下面改路径。</span>
+            </div>
+          ) : null}
           <div className="axv-set-group">
             <div className="axv-set-label">资源</div>
             <div className="axv-icon-ed-row">

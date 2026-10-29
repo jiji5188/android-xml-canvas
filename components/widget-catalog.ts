@@ -101,6 +101,24 @@ export const WIDGETS: WidgetDef[] = [
     android:background="#E0E0E0"/>`,
   },
   {
+    // 注：ListView / GridView 是 AdapterView，内容由 Adapter 给，所以模板不能带子控件（带了运行时会崩）
+    key: "list_view", label: "列表（ListView）", tag: "ListView", icon: "list", lib: "android", group: "布局",
+    xml: `<ListView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="240dp"
+    android:divider="#E0E0E0"
+    android:dividerHeight="1dp"/>`,
+  },
+  {
+    key: "grid_view", label: "网格（GridView）", tag: "GridView", icon: "grid_on", lib: "android", group: "布局",
+    xml: `<GridView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="240dp"
+    android:numColumns="3"
+    android:horizontalSpacing="4dp"
+    android:verticalSpacing="4dp"/>`,
+  },
+  {
     key: "include", label: "引入布局", tag: "include", icon: "insert_drive_file", lib: "android", group: "布局",
     xml: `<include ${A}
     android:layout="@layout/"/>`,

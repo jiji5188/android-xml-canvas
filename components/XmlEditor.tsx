@@ -331,7 +331,7 @@ const SAMPLES: Record<string, string> = {
 </LinearLayout>`,
 };
 
-const APP_VERSION = "1.10";
+const APP_VERSION = "1.11";
 const SCALE = 2; // 1dp = 2px
 
 export function XmlEditor() {
@@ -2451,7 +2451,14 @@ const findResolved = findResolvedNode;
           {leftView === "about" && (
             <div className="axv-rail-scroll">
               <div className="axv-about-hero">
-                <span className="msr" aria-hidden="true" style={{ fontSize: 36 }}>android</span>
+                {/* M16g：项目 logo（public/logo.svg，也是应用图标） */}
+                <img
+                  className="axv-about-logo"
+                  src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/logo.svg`}
+                  alt=""
+                  width={44}
+                  height={44}
+                />
                 <div>
                   <div className="axv-about-name">{PROJECT_NAME}</div>
                   <div className="axv-about-ver">版本 {APP_VERSION}</div>

@@ -1,9 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 应用图标：紫色圆角底 + 画布外框 + 强调色标题条 + 选中控件（四角控制点）
+     设计稿见 public/logo.svg（渐变版）；vector 不支持 CSS 渐变，这里用等效纯色 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp" android:height="48dp"
     android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#1D1B20" android:pathData="M4,4 L44,4 L44,44 L4,44 Z M8,8 L40,8 L40,40 L8,40 Z" android:fillType="evenOdd"/>
-    <path android:fillColor="#1A73E8" android:pathData="M14,18 L30,18 L28,22 L18,22 Z"/>
-    <path android:fillColor="#6750A4" android:pathData="M14,26 L34,26 L34,28 L14,28 Z M14,31 L26,31 L26,33 L14,33 Z"/>
-    <path android:fillColor="#000000" android:pathData="M30,18 L34,24 L30,30 Z"/>
+
+    <!-- 底板 -->
+    <path android:fillColor="#6750A4" android:pathData="M11,0 H37 A11,11 0 0 1 48,11 V37 A11,11 0 0 1 37,48 H11 A11,11 0 0 1 0,37 V11 A11,11 0 0 1 11,0 Z" />
+
+    <!-- 手机外框（描边） -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="2.2" android:strokeAlpha="0.96"
+        android:fillColor="#00000000" android:pathData="M17,7.4 H31 A4.4,4.4 0 0 1 35.4,11.8 V36.2 A4.4,4.4 0 0 1 31,40.6 H17 A4.4,4.4 0 0 1 12.6,36.2 V11.8 A4.4,4.4 0 0 1 17,7.4 Z" />
+
+    <!-- 状态条 -->
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.45" android:pathData="M21.35,10.4 H26.650000000000002 A0.75,0.75 0 0 1 27.400000000000002,11.15 V11.15 A0.75,0.75 0 0 1 26.650000000000002,11.9 H21.35 A0.75,0.75 0 0 1 20.6,11.15 V11.15 A0.75,0.75 0 0 1 21.35,10.4 Z" />
+
+    <!-- 标题条（强调色） -->
+    <path android:fillColor="#FFD8E4" android:pathData="M18.400000000000002,14.6 H29.6 A1.8,1.8 0 0 1 31.400000000000002,16.4 V16.4 A1.8,1.8 0 0 1 29.6,18.2 H18.400000000000002 A1.8,1.8 0 0 1 16.6,16.4 V16.4 A1.8,1.8 0 0 1 18.400000000000002,14.6 Z" />
+
+    <!-- 文本行 -->
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.92" android:pathData="M17.700000000000003,20.3 H24.5 A1.1,1.1 0 0 1 25.6,21.400000000000002 V21.4 A1.1,1.1 0 0 1 24.5,22.5 H17.700000000000003 A1.1,1.1 0 0 1 16.6,21.4 V21.400000000000002 A1.1,1.1 0 0 1 17.700000000000003,20.3 Z" />
+
+    <!-- 选中控件：半透明底 + 白框 -->
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.24" android:pathData="M18.400000000000002,24.6 H29.6 A1.8,1.8 0 0 1 31.400000000000002,26.400000000000002 V30.400000000000002 A1.8,1.8 0 0 1 29.6,32.2 H18.400000000000002 A1.8,1.8 0 0 1 16.6,30.400000000000002 V26.400000000000002 A1.8,1.8 0 0 1 18.400000000000002,24.6 Z" />
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="1.2" android:fillColor="#00000000"
+        android:pathData="M18.400000000000002,24.6 H29.6 A1.8,1.8 0 0 1 31.400000000000002,26.400000000000002 V30.400000000000002 A1.8,1.8 0 0 1 29.6,32.2 H18.400000000000002 A1.8,1.8 0 0 1 16.6,30.400000000000002 V26.400000000000002 A1.8,1.8 0 0 1 18.400000000000002,24.6 Z" />
+
+    <!-- 四角控制点 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M15.9,23.4 H17.3 A0.5,0.5 0 0 1 17.8,23.9 V25.299999999999997 A0.5,0.5 0 0 1 17.3,25.799999999999997 H15.9 A0.5,0.5 0 0 1 15.4,25.299999999999997 V23.9 A0.5,0.5 0 0 1 15.9,23.4 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M30.7,23.4 H32.1 A0.5,0.5 0 0 1 32.6,23.9 V25.299999999999997 A0.5,0.5 0 0 1 32.1,25.799999999999997 H30.7 A0.5,0.5 0 0 1 30.2,25.299999999999997 V23.9 A0.5,0.5 0 0 1 30.7,23.4 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M15.9,31 H17.3 A0.5,0.5 0 0 1 17.8,31.5 V32.9 A0.5,0.5 0 0 1 17.3,33.4 H15.9 A0.5,0.5 0 0 1 15.4,32.9 V31.5 A0.5,0.5 0 0 1 15.9,31 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M30.7,31 H32.1 A0.5,0.5 0 0 1 32.6,31.5 V32.9 A0.5,0.5 0 0 1 32.1,33.4 H30.7 A0.5,0.5 0 0 1 30.2,32.9 V31.5 A0.5,0.5 0 0 1 30.7,31 Z" />
+
+    <!-- 底部导航条 -->
+    <path android:fillColor="#FFFFFF" android:fillAlpha="0.55" android:pathData="M20.4,35.4 H27.599999999999998 A1,1 0 0 1 28.599999999999998,36.4 V36.4 A1,1 0 0 1 27.599999999999998,37.4 H20.4 A1,1 0 0 1 19.4,36.4 V36.4 A1,1 0 0 1 20.4,35.4 Z" />
 </vector>

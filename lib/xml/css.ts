@@ -830,6 +830,14 @@ export function buildRenderModel(
         if (attrs["indeterminate"]) {
           (style as React.CSSProperties & Record<string, string>)["--axv-progress"] = "0.4";
         }
+        // M11v：android:progressDrawable 是图片时，轨道直接用该图（含自定义底色/纹理）
+        const pImg = (attrs["progressDrawable"] as string) || "";
+        if (pImg.startsWith("data:")) {
+          style.backgroundImage = `url(${pImg})`;
+          style.backgroundSize = "100% 100%";
+          style.backgroundRepeat = "no-repeat";
+          style.backgroundColor = style.backgroundColor || "transparent";
+        }
       } else {
         style.width = style.width || `${DP(32, scale)}px`;
         style.height = style.height || `${DP(32, scale)}px`;
@@ -956,6 +964,12 @@ export function buildRenderModel(
       style["--axv-progress"] = String(Math.min(1, maxV > 0 ? p / maxV : 0));
       // M11t：SeekBar 的滑块色（thumbTint，否则用主题色）
       style["--axv-seek-thumb"] = (attrs["thumbTint"] as string) || "#6750A4";
+      // M11v：android:thumb 是图片（上传 res 后能解析成 data URL）就直接画图，颜色只做兜底
+      const thumbImg = (attrs["thumb"] as string) || "";
+      if (thumbImg.startsWith("data:")) {
+        style["--axv-seek-thumb-img"] = `url(${thumbImg})`;
+        style["--axv-seek-thumb"] = "transparent";
+      }
     }
 
     if (cls === "axv-spinner") {

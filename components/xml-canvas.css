@@ -3972,3 +3972,11 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 .axv-node.axv-seek::after {
   background-color: var(--axv-seek-thumb, #6750A4);
 }
+
+/* M11v：android:thumb 给了图片时画图片（保留轨道和位置） */
+.axv-node.axv-seek::after {
+  background-image: var(--axv-seek-thumb-img, none);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}

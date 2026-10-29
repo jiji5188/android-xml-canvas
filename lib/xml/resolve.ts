@@ -437,6 +437,9 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   // 染色（Button/CheckBox/RadioButton 的 buttonTint、SeekBar/Switch 的 thumbTint/trackTint）
   out["buttonTint"] = a["buttonTint"] !== undefined ? resolveColor(a["buttonTint"], res, issues, path, "buttonTint") : "";
   out["thumbTint"] = a["thumbTint"] !== undefined ? resolveColor(a["thumbTint"], res, issues, path, "thumbTint") : "";
+  // M11v：自定义滑块 / 进度条图（SeekBar.thumb、ProgressBar.progressDrawable / indeterminateDrawable）
+  out["thumb"] = a["thumb"] !== undefined ? resolveDrawable(a["thumb"], res, issues, path, "thumb") : "";
+  out["progressDrawable"] = a["progressDrawable"] !== undefined ? resolveDrawable(a["progressDrawable"], res, issues, path, "progressDrawable") : "";
   out["trackTint"] = a["trackTint"] !== undefined ? resolveColor(a["trackTint"], res, issues, path, "trackTint") : "";
   out["progressTint"] = a["progressTint"] !== undefined ? resolveColor(a["progressTint"], res, issues, path, "progressTint") : "";
   out["indeterminateTint"] = a["indeterminateTint"] !== undefined ? resolveColor(a["indeterminateTint"], res, issues, path, "indeterminateTint") : "";

@@ -85,4 +85,19 @@ describe("M11v 新增渲染", () => {
     const noText = one(`<Switch ${A} android:layout_width="wrap_content" android:layout_height="wrap_content" />`);
     expect(noText.text).toBe("");
   });
+
+  it("SeekBar thumb 图片 → CSS 变量；颜色边界透明", () => {
+    const res = { ...(DEFAULT_RESOURCES as object), drawables: { thumb_png: "data:image/png;base64,AAA" } } as never;
+    const xml = `<LinearLayout ${A} android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"><SeekBar ${A} android:layout_width="match_parent" android:layout_height="wrap_content" android:thumb="@drawable/thumb_png" /></LinearLayout>`;
+    const n = buildRenderModel(parseLayoutXml(xml).root!, res).root.children[0];
+    expect(String(n.style["--axv-seek-thumb-img"])).toContain("data:image/png");
+    expect(n.style["--axv-seek-thumb"]).toBe("transparent");
+  });
+
+  it("ProgressBar progressDrawable 图片 → 轨道背景图", () => {
+    const res = { ...(DEFAULT_RESOURCES as object), drawables: { track_png: "data:image/png;base64,AAA" } } as never;
+    const xml = `<LinearLayout ${A} android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"><ProgressBar ${A} style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:progressDrawable="@drawable/track_png" /></LinearLayout>`;
+    const n = buildRenderModel(parseLayoutXml(xml).root!, res).root.children[0];
+    expect(String(n.style.backgroundImage)).toContain("data:image/png");
+  });
 });

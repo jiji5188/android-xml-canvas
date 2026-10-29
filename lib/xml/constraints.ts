@@ -244,11 +244,14 @@ export function solveConstraintChildren(
         })
         .filter(Boolean) as ConstraintBox[];
       // 若引用的子项还没解出来（循环），退回 0
+      // M11z：水平屏障（top/bottom）只是一条线 —— 高度必须为 0，
+      //   否则 toBottomOf=barrier 的子项会多跳一个 parentContentH（「屏障下方」跑到容器外就是这个）
+      const isHorizBarrier = dir === "top" || dir === "bottom";
       const bb: ConstraintBox = {
         left: 0,
         top: 0,
-        width: parentContentW,
-        height: parentContentH,
+        width: isHorizBarrier ? parentContentW : 0,
+        height: isHorizBarrier ? 0 : parentContentH,
       };
       if (members.length === 0) {
         if (dir === "top") bb.top = margin;
@@ -258,9 +261,9 @@ export function solveConstraintChildren(
         return bb;
       }
       if (dir === "top") bb.top = Math.min(...members.map((m) => m.top)) + margin;
-      else if (dir === "bottom") bb.top = Math.max(...members.map((m) => m.top + m.height)) - margin;
+      else if (dir === "bottom") bb.top = Math.max(...members.map((m) => m.top + m.height)) + margin;
       else if (dir === "start") bb.left = Math.min(...members.map((m) => m.left)) + margin;
-      else if (dir === "end") bb.left = Math.max(...members.map((m) => m.left + m.width)) - margin;
+      else if (dir === "end") bb.left = Math.max(...members.map((m) => m.left + m.width)) + margin;
       return bb;
     }
     return null;

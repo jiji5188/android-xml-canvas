@@ -872,8 +872,9 @@ export function buildRenderModel(
     if (cls === "axv-progress") {
       const styleAttr = (attrs["progressStyle"] as string) || "";
       const linearTag = tag === "LinearProgressIndicator";
+      const curH = String(style.height ?? "");
       if (/horizontal/i.test(styleAttr) || linearTag) {
-        style.height = style.height || `${DP(4, scale)}px`;
+        style.height = !curH || curH === "auto" || curH === "0px" ? `${DP(4, scale)}px` : style.height;
         style.backgroundColor = style.backgroundColor || "#E0D9E3";
         style.borderRadius = `${DP(2, scale)}px`;
         style.overflow = "hidden";
@@ -901,8 +902,11 @@ export function buildRenderModel(
         }
       } else {
         // M11w：没有 horizontal 样式就是转圈进度条 —— 画环 + 旋转，不能画成一根细条
-        style.width = style.width || `${DP(32, scale)}px`;
-        style.height = style.height || `${DP(32, scale)}px`;
+        // M11z：wrap_content 也会给 "auto"，必须当成未设（否则环宽高 auto → 只剩 0 尺寸）
+        const w0 = String(style.width ?? "");
+        const h0 = String(style.height ?? "");
+        if (!w0 || w0 === "auto") style.width = `${DP(32, scale)}px`;
+        if (!h0 || h0 === "auto") style.height = `${DP(32, scale)}px`;
         (style as React.CSSProperties & Record<string, string>)["--axv-progress-color"] =
           (attrs["indicatorColor"] as string) || (attrs["progressTint"] as string) || (attrs["indeterminateTint"] as string) || "#6750A4";
         (style as React.CSSProperties & Record<string, string>)["--axv-ring-w"] = `${DP(3, scale)}px`;
@@ -1111,6 +1115,46 @@ export function buildRenderModel(
       style.position = "absolute";
       // 堆叠语义：基础层 1；有 elevation/translationZ 的子项已经算好更高的 z，不能覆盖
       if (style.zIndex === undefined) style.zIndex = "1";
+      // M11z：FrameLayout 子项的 layout_gravity 要真的定位。
+      //   绝对定位下 alignSelf 完全无效（之前 bottom|end / center 的子项全堆在左上角）
+      const g = String(attrs["layoutGravity"] || "").toLowerCase().replace(/\s+/g, "|");
+      if (g) {
+        const hCenter = /center_horizontal/.test(g) || (/center/.test(g) && !/center_vertical/.test(g));
+        const vCenter = /center_vertical/.test(g) || (/center/.test(g) && !/center_horizontal/.test(g));
+        const hEnd = /end|right/.test(g) && !hCenter;
+        const hStart = /start|left/.test(g) && !hCenter;
+        const vBottom = /bottom/.test(g) && !vCenter;
+        const vTop = /top/.test(g) && !vCenter;
+        const tf: string[] = [];
+        if (hCenter) {
+          style.left = "50%";
+          style.right = "auto";
+          tf.push("translateX(-50%)");
+        } else if (hEnd) {
+          style.left = "auto";
+          style.right = "0px";
+        } else if (hStart) {
+          style.left = "0px";
+          style.right = "auto";
+        }
+        if (vCenter) {
+          style.top = "50%";
+          style.bottom = "auto";
+          tf.push("translateY(-50%)");
+        } else if (vBottom) {
+          style.top = "auto";
+          style.bottom = "0px";
+        } else if (vTop) {
+          style.top = "0px";
+          style.bottom = "auto";
+        }
+        if (tf.length) {
+          const prev = String(style.transform ?? "").trim();
+          style.transform = prev ? `${prev} ${tf.join(" ")}` : tf.join(" ");
+        }
+        // 这两个轴已经定了，别让旧的 alignSelf 干扰
+        delete (style as Record<string, unknown>).alignSelf;
+      }
     }
 
     // M2v：GridLayout 子项落格（layout_column/layout_row 0 基 → CSS 1 基）
@@ -1331,9 +1375,38 @@ export function buildRenderModel(
   const rootNode = resolveAll(root, true);
 
   // M2b：ConstraintLayout 子项约束定位（后处理：对每个 CL 节点求解直接子项）
-  const patchCL = (n: ResolvedNode): void => {
+  // M11z：算子节点可用宽高 = 本节点盒子尺寸 - 内边距。
+  //   病因：CL/RL 把 100% 落实成 px 时用的是「屏幕宽」，但外面可能还有带 padding 的 LinearLayout
+  //   → 子 CL 比父内容盒宽 24px，整块向右下方溢出屏幕（RelativeLayout match_parent 超宽就是它）
+  const innerAvail = (n: ResolvedNode, aw: number, ah: number): { w: number; h: number } => {
+    const num = (v: unknown): number => {
+      const s2 = String(v ?? "");
+      if (s2.endsWith("px")) return parseFloat(s2);
+      return NaN;
+    };
+    const w = String(n.style.width ?? "");
+    const h = String(n.style.height ?? "");
+    let boxW = num(w);
+    if (!Number.isFinite(boxW)) boxW = aw;
+    let boxH = num(h);
+    if (!Number.isFinite(boxH)) boxH = ah;
+    const sh = (n.style.padding ?? "") as string;
+    const shv = sh.endsWith("px") ? parseFloat(sh) : 0;
+    const pl = num(n.style.paddingLeft);
+    const pr = num(n.style.paddingRight);
+    const pt = num(n.style.paddingTop);
+    const pb = num(n.style.paddingBottom);
+    const l = Number.isFinite(pl) ? pl : shv;
+    const r = Number.isFinite(pr) ? pr : shv;
+    const t = Number.isFinite(pt) ? pt : shv;
+    const b = Number.isFinite(pb) ? pb : shv;
+    return { w: Math.max(0, boxW - l - r), h: Math.max(0, boxH - t - b) };
+  };
+
+  const patchCL = (n: ResolvedNode, availW: number = screenW * scale, availH: number = bodyH * scale): void => {
     if (shortTag(n.tag) !== "ConstraintLayout") {
-      for (const c of n.children) patchCL(c);
+      const ia = innerAvail(n, availW, availH);
+      for (const c of n.children) patchCL(c, ia.w, ia.h);
       return;
     }
     // CL 自身内容区尺寸（px）：取自身 style 的 width/height，"100%"/auto/undefined 时回落到手机屏默认
@@ -1348,10 +1421,10 @@ export function buildRenderModel(
       if (m && !s2.includes("%")) return parseFloat(m[1]);
       return fallback;
     };
-    const cw = toPx(n.style.width, screenW * scale);
+    const cw = toPx(n.style.width, availW);
     // 高度回落值 = 内容区高度（屏高 - 状态栏 - 导航栏），否则 CL 根会按整屏高算出
     // 比内容区还高的盒子 → 底部被导航栏遮住 / 溢出预览框
-    const ch = toPx(n.style.height, bodyH * scale);
+    const ch = toPx(n.style.height, availH);
     // CL 自身尺寸必须落实成 px：父级只有 min-height 时 100% 解析不出来，
     // 子项全 absolute 又撑不起来 → 容器会塔成 0 高（真 bug，会看到控件跑出屏幕）
     const wStr = String(n.style.width ?? "");
@@ -1394,7 +1467,7 @@ export function buildRenderModel(
           child.style.height = `${contentH}px`;
         }
         child.style.boxSizing = "border-box";
-        for (const gc of child.children) patchCL(gc);
+        for (const gc of child.children) patchCL(gc, availW, availH);
         continue;
       }
       child.style.left = `${padL + box.left}px`;
@@ -1407,7 +1480,8 @@ export function buildRenderModel(
       delete child.style.marginRight;
       delete child.style.marginBottom;
       delete child.style.marginLeft;
-      for (const gc of child.children) patchCL(gc);
+      // M11z：子 CL 的「可用宽高」是父 CL 的内容盒（不是屏幕宽）
+      patchCL(child, contentW, contentH);
     }
 
     // M11y：CL 高度收尾
@@ -1442,9 +1516,10 @@ export function buildRenderModel(
   patchTIL(rootNode);
 
   // M2p：RelativeLayout 子项规则定位（alignParent / center / toRightOf / below / alignTop …）
-  const patchRL = (n: ResolvedNode): void => {
+  const patchRL = (n: ResolvedNode, availW: number = screenW * scale, availH: number = bodyH * scale): void => {
     if (shortTag(n.tag) !== "RelativeLayout") {
-      for (const c of n.children) patchRL(c);
+      const ia = innerAvail(n, availW, availH);
+      for (const c of n.children) patchRL(c, ia.w, ia.h);
       return;
     }
     const toPx = (v: unknown, fallback: number): number => {
@@ -1457,8 +1532,8 @@ export function buildRenderModel(
       if (m && !s2.includes("%")) return parseFloat(m[1]);
       return fallback;
     };
-    const cw = toPx(n.style.width, screenW * scale);
-    const ch = toPx(n.style.height, bodyH * scale);
+    const cw = toPx(n.style.width, availW);
+    const ch = toPx(n.style.height, availH);
     // 容器自身尺寸要落实成 px：子项全 absolute 撑不起来，否则整个 RelativeLayout 塔成 0 高
     const wStr = String(n.style.width ?? "");
     const hStr = String(n.style.height ?? "");
@@ -1490,7 +1565,7 @@ export function buildRenderModel(
       delete child.style.marginRight;
       delete child.style.marginBottom;
       delete child.style.marginLeft;
-      for (const gc of child.children) patchRL(gc);
+      patchRL(child, contentW, contentH);
     }
   };
   patchRL(rootNode);

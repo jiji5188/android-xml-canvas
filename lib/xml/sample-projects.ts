@@ -1905,6 +1905,7 @@ const ALL_WIDGETS_LAYOUT = `<?xml version="1.0" encoding="utf-8"?>
           app:layout_constraintWidth_percent="0.6" />
 
       <androidx.constraintlayout.widget.Barrier
+          android:id="@+id/barrier"
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
           app:barrierDirection="bottom"

@@ -67,7 +67,9 @@ describe("M1a 渲染引擎（XML → CSS 树）", () => {
 
     const fab = root.children[1];
     expect(fab.style.position).toBe("absolute");
-    expect(fab.style.alignSelf).toBe("flex-end");
+    // M11z：absolute 下 alignSelf 无效，改成真的靠右下
+    expect(fab.style.right).toBe("0px");
+    expect(fab.style.bottom).toBe("0px");
     expect(fab.style.width).toBe("96px");
     expect(fab.style.marginTop).toBe("48px");
 

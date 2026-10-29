@@ -3862,7 +3862,7 @@
   display: flex;
   /* M11l：竖排（说明在上、按钮在下），高度自适应 */
   flex-direction: column;
-  align-items: stretch;
+  align-items: center;
   justify-content: flex-start;
   gap: 6px;
   height: auto;

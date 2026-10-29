@@ -23,6 +23,7 @@ import android.util.Base64;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
@@ -401,6 +402,38 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void pickWorkspace() {
             runOnUiThread(MainActivity.this::chooseTree);
+        }
+
+        /** M19：触觉反馈。type 取值：long(30ms 长按) / toggle(15ms 开关·勾选·单选) / none。
+         *  没有震动马达的设备静默忽略。在 JS 桥线程调用，需要自己切 UI 线程。 */
+        @JavascriptInterface
+        public void haptic(String type) {
+            try {
+                long ms = "long".equals(type) ? 30L : "toggle".equals(type) ? 15L : 0L;
+                if (ms <= 0 || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+                android.view.View v = root;
+                if (v == null || !v.isAttachedToWindow()) return;
+                // performHapticFeedback 必须在 UI 线程
+                runOnUiThread(() -> vibrateMs(ms));
+            } catch (Throwable t) {
+                Log.w(TAG, "haptic", t);
+            }
+        }
+
+        /** 精确时长震动。API26+ 用 VibrationEffect 造一个「延迟0、震ms」的波形（最干净，
+         *  不触发 deprecation 警告）；24–25 退化成系统标准时长；更低版本静默不震。 */
+        private void vibrateMs(long ms) {
+            if (Build.VERSION.SDK_INT < 24) return; // minSdk 是 24，这里防御一下
+            try {
+                android.os.Vibrator v = (android.os.Vibrator) getSystemService(android.content.Context.VIBRATOR_SERVICE);
+                if (v == null || !v.hasVibrator()) return;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(android.os.VibrationEffect.createOneShot(ms, 200));
+                } else {
+                    // API24/25：createOneShot 也是 26 才有，用 vibrate(long)（deprecated 但可用）
+                    v.vibrate(ms);
+                }
+            } catch (Throwable ignored) {}
         }
 
         /** 恢复内置默认目录（清掉自选文件夹） */

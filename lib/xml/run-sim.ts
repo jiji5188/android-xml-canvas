@@ -5,6 +5,8 @@
 //   2. 没有真实数据时，列表和下拉该拿什么假数据演示？
 // 真正的 DOM 操作留在 RunPreview.tsx 里，避免测试环境没有 DOM。
 
+import { hapticNative } from "./native-save";
+
 /** 运行时角色 */
 export type RunRole =
   | "input"
@@ -197,10 +199,11 @@ export function vibeMs(role: RunRole, kind: "press" | "toggle" | "long" | "selec
   return 0; // 普通按下/选择：安卓也不震
 }
 
-/** 安全震动：旧浏览器/没有硬件时不报错 */
-export function vibrate(ms: number): void {
+/** 安全震动：原生壳（Vibrator 精确时长）优先，桌面浏览器回退 navigator.vibrate */
+export function vibrate(ms: number, type?: "long" | "toggle" | "none"): void {
   if (ms <= 0) return;
   try {
+    if (type && hapticNative(type)) return; // 原生壳：精确时长
     navigator.vibrate?.(ms);
   } catch {
     /* Safari 等会直接抛，忽略 */

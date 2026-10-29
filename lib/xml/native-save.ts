@@ -26,6 +26,9 @@ export interface AxvNativeBridge {
   listProjects?(): string;
   /** 读文本：绝对路径（限默认目录）或 content:// URI */
   readText?(target: string): string | null;
+  /** M19：触觉反馈。type: "long"(长按) / "toggle"(开关·勾选·单选)。
+   *  原生用 Vibrator 精确时长；无马达设备静默。返回 true 表示原生已处理。 */
+  haptic?(type: string): void;
 }
 
 declare global {
@@ -133,6 +136,30 @@ export function copyTextNative(text: string): boolean {
     return typeof r === "string" && r.startsWith("ok");
   } catch {
     return false;
+  }
+}
+
+/** 原生触觉反馈（Vibrator 精确时长）；壳里没有 haptic 桥时返回 false，调用方回退 navigator.vibrate */
+export function hapticNative(type: "long" | "toggle" | "none"): boolean {
+  const b = nativeBridge();
+  if (!b || typeof b.haptic !== "function") return false;
+  try {
+    b.haptic(type);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 触觉反馈统一入口：原生壳优先（精确时长），桌面浏览器回退 navigator.vibrate（能震就震）。
+ *  ms=0 直接不震。 */
+export function vibrateSmart(ms: number, type?: "long" | "toggle" | "none"): void {
+  if (ms <= 0) return;
+  if (type && hapticNative(type)) return;
+  try {
+    navigator.vibrate?.(ms);
+  } catch {
+    /* Safari 直接抛，忽略 */
   }
 }
 

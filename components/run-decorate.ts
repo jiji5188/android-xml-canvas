@@ -96,7 +96,7 @@ function attachRipple(ctx: Ctx, el: HTMLElement, label?: string) {
     clearTimer();
     timer = window.setTimeout(() => {
       longFired = true;
-      vibrate(vibeMs("button", "long"));
+      vibrate(vibeMs("button", "long"), "long");
       ctx.hooks.log("I", eventText("long", label, "onLongClick"));
     }, 550);
   });
@@ -281,7 +281,7 @@ function decorateCtl(ctx: Ctx, el: HTMLElement, path: string, role: RunRole, lab
       checked = !checked;
     }
     applyCtl(el, role, checked, tint);
-    vibrate(vibeMs(role, "toggle"));
+    vibrate(vibeMs(role, "toggle"), "toggle");
     const verb = role === "switch" ? (checked ? "打开" : "关闭") : checked ? "选中" : "取消选中";
     ctx.hooks.log("I", eventText("check", label, verb));
   });
@@ -460,7 +460,7 @@ function decorateList(ctx: Ctx, el: HTMLElement, role: RunRole, label: string) {
     e.stopPropagation();
     el.querySelectorAll(".axv-run-row.on, .axv-run-row-static.on").forEach((r) => r.classList.remove("on"));
     target.classList.add("on");
-    vibrate(vibeMs(role, "select"));
+    vibrate(vibeMs(role, "select"), "toggle");
     const idx = Number(target.dataset.runIndex ?? 0);
     const text = rows[idx]?.title ?? (target.textContent ?? "").trim().slice(0, 20);
     ctx.hooks.log("I", eventText("click", label, `onItemClick position=${idx} item="${text}"`));

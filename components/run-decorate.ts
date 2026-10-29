@@ -331,23 +331,28 @@ function decorateSpinner(ctx: Ctx, el: HTMLElement, path: string, label: string)
     e.stopPropagation();
     ctx.root.querySelector(".axv-run-popup")?.remove();
 
-    // ⚠ 手机外壳带 transform: scale(fit)，getBoundingClientRect 拿到的是【视觉坐标】，
-    //   直接相减会把弹窗放到错误位置（缩放越小偏得越多）→ 先换算回布局坐标。
+    // ⚠ 两个坑：① 手机外壳有 transform: scale(fit)，getBoundingClientRect 是【视觉坐标】；
+    //   ② 内容可能在外层 .axv-run-body 里滚过。位置一律「相对 root 换算」，翻不翻转看【可视区剩余空间】。
     const rect = el.getBoundingClientRect();
-    const bodyRect = ctx.root.getBoundingClientRect();
-    const k = ctx.root.offsetWidth > 0 ? bodyRect.width / ctx.root.offsetWidth : 1;
-    const layoutW = (n: number) => (k > 0 ? n / k : n);
-    const left = layoutW(rect.left - bodyRect.left);
-    const topLayout = layoutW(rect.bottom - bodyRect.top) + 2;
-    const w = layoutW(rect.width);
-    const screenH = ctx.root.offsetHeight;
+    const rootRect = ctx.root.getBoundingClientRect();
+    const k = ctx.root.offsetWidth > 0 ? rootRect.width / ctx.root.offsetWidth : 1;
+    const toLayout = (n: number) => (k > 0 ? n / k : n);
+    const vp = (ctx.root.parentElement ?? ctx.root).getBoundingClientRect();
+    const menuH = Math.min(264, options.length * 54 + 16);
+
+    const left = toLayout(rect.left - rootRect.left);
+    const below = toLayout(rect.bottom - rootRect.top) + 2;
+    const above = toLayout(rect.top - rootRect.top) - menuH - 2;
+    // 下方剩余视觉空间放不下、且上方放得下 → 往上翻
+    const flipUp = vp.bottom - rect.bottom - 4 < menuH * k && rect.top - vp.top > menuH * k;
 
     const menu = document.createElement("div");
     menu.className = "axv-run-popup";
     menu.setAttribute("role", "listbox");
-    menu.style.left = `${Math.max(0, left)}px`;
-    menu.style.top = `${topLayout}px`;
-    menu.style.minWidth = `${Math.max(w, DP(120))}px`;
+    menu.style.left = `${Math.max(0, Math.min(left, ctx.root.offsetWidth - 40))}px`;
+    menu.style.top = `${Math.max(4, flipUp ? above : below)}px`;
+    menu.style.minWidth = `${Math.max(toLayout(rect.width), DP(120))}px`;
+    menu.style.maxHeight = `${menuH}px`;
 
     options.forEach((opt) => {
       const item = document.createElement("div");
@@ -369,13 +374,6 @@ function decorateSpinner(ctx: Ctx, el: HTMLElement, path: string, label: string)
       });
       menu.appendChild(item);
     });
-
-    const menuH = Math.min(220, options.length * 38 + 8);
-    if (topLayout + menuH > screenH - 8) {
-      const upTop = layoutW(rect.top - bodyRect.top) - menuH - 2;
-      menu.style.top = `${Math.max(4, upTop)}px`;
-      menu.style.maxHeight = `${Math.max(80, Math.min(menuH, screenH - 16))}px`;
-    }
 
     ctx.root.appendChild(menu);
 

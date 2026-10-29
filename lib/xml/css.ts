@@ -809,6 +809,7 @@ export function buildRenderModel(
       style.opacity = String(Math.min(cur, 0.38));
     }
 
+    let progressRing = false;
     if (cls === "axv-progress") {
       const styleAttr = (attrs["progressStyle"] as string) || "";
       if (/horizontal/i.test(styleAttr)) {
@@ -839,8 +840,13 @@ export function buildRenderModel(
           style.backgroundColor = style.backgroundColor || "transparent";
         }
       } else {
+        // M11w：没有 horizontal 样式就是转圈进度条 —— 画环 + 旋转，不能画成一根细条
         style.width = style.width || `${DP(32, scale)}px`;
         style.height = style.height || `${DP(32, scale)}px`;
+        (style as React.CSSProperties & Record<string, string>)["--axv-progress-color"] =
+          (attrs["progressTint"] as string) || (attrs["indeterminateTint"] as string) || "#6750A4";
+        (style as React.CSSProperties & Record<string, string>)["--axv-ring-w"] = `${DP(3, scale)}px`;
+        progressRing = true;
       }
     }
 
@@ -957,11 +963,19 @@ export function buildRenderModel(
     if (cls === "axv-seek") {
       style.minWidth = `${DP(120, scale)}px`;
       style.minHeight = `${DP(24, scale)}px`;
-      style.backgroundColor = style.backgroundColor || "#E0D9E3";
-      style.borderRadius = `${DP(2, scale)}px`;
+      // M11w：SeekBar 的灰块是整个节点的背景（旧做法），Android 实际只有一条细轨道 →
+      // 节点背景清空，轨道交给 ::before 画，滑块交给 ::after 画
+      style.backgroundColor = (attrs["background"] as string) || "transparent";
+      style.overflow = "visible";
       const p = (attrs["progress"] as number) || 0;
       const maxV = (attrs["max"] as number) || 100;
-      style["--axv-progress"] = String(Math.min(1, maxV > 0 ? p / maxV : 0));
+      const ratio = Math.min(1, Math.max(0, maxV > 0 ? p / maxV : 0));
+      style["--axv-progress"] = String(ratio);
+      style["--axv-seek-pct"] = `${(ratio * 100).toFixed(2)}%`;
+      style["--axv-seek-track-h"] = `${DP(4, scale)}px`;
+      style["--axv-seek-thumb-d"] = `${DP(20, scale)}px`;
+      style["--axv-seek-color"] = (attrs["progressTint"] as string) || "#6750A4";
+      style["--axv-seek-track-bg"] = (attrs["trackTint"] as string) || "#E0D9E3";
       // M11t：SeekBar 的滑块色（thumbTint，否则用主题色）
       style["--axv-seek-thumb"] = (attrs["thumbTint"] as string) || "#6750A4";
       // M11v：android:thumb 是图片（上传 res 后能解析成 data URL）就直接画图，颜色只做兜底
@@ -1104,7 +1118,8 @@ export function buildRenderModel(
         cls +
         (attrs["checked"] ? " axv-checked" : "") +
         // M11t：不确定进度条要多一个类来挂动画
-        (cls === "axv-progress" && attrs["indeterminate"] ? " axv-indet" : ""),
+        (cls === "axv-progress" && attrs["indeterminate"] ? " axv-indet" : "") +
+        (cls === "axv-progress" && progressRing ? " axv-progress-ring" : ""),
       text,
       issues: nIssues,
       children: node.children.map((c) => resolveAll(c)),

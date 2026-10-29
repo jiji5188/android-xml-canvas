@@ -74,7 +74,7 @@
   transform: translateY(-50%);
   /* M11t：宽度跟 android:progress / max 走（原来写死 40%） */
   width: calc(var(--axv-progress, 0.4) * 100%);
-  height: 60%;
+  height: 100%;
   background: var(--axv-progress-color, #6750A4);
   border-radius: inherit;
 }
@@ -2392,20 +2392,46 @@
 /* CheckBox：勾选显示对勾 */
 /* M11t：旧图形已移除，改由 globals.css 的 --axv-ctl-* 变量统一绘制 */
 
-/* SeekBar：轨道 + 按 --axv-progress 定位的滑块 */
+/* SeekBar：细轨道（::before，含已选段）+ 圆形滑块（::after） */
 .axv-node.axv-seek {
   position: relative;
+}
+.axv-node.axv-seek::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--axv-seek-track-h, 8px);
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background-color: var(--axv-seek-track-bg, #e0d9e3);
+  background-image: linear-gradient(
+    to right,
+    var(--axv-seek-color, #6750a4) 0 var(--axv-seek-pct, 40%),
+    transparent var(--axv-seek-pct, 40%)
+  );
+  pointer-events: none;
 }
 .axv-node.axv-seek::after {
   content: "";
   position: absolute;
   top: 50%;
-  left: calc(var(--axv-progress, 0.4) * 100%);
+  /* 滑块中心在轨道两端内缩半个滑块，0%/100% 时不会跑到轨道外 */
+  left: calc(
+    var(--axv-seek-thumb-d, 40px) / 2 + var(--axv-progress, 0.4) * (100% - var(--axv-seek-thumb-d, 40px))
+  );
   transform: translate(-50%, -50%);
-  width: 16px;
-  height: 16px;
+  width: var(--axv-seek-thumb-d, 40px);
+  height: var(--axv-seek-thumb-d, 40px);
   border-radius: 50%;
-  background: #6750A4;
+  background-color: var(--axv-seek-thumb, #6750a4);
+  background-image: var(--axv-seek-thumb-img, none);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
 }
 
 /* Spinner：右侧下拉箭头 */
@@ -3973,10 +3999,23 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   background-color: var(--axv-seek-thumb, #6750A4);
 }
 
-/* M11v：android:thumb 给了图片时画图片（保留轨道和位置） */
-.axv-node.axv-seek::after {
-  background-image: var(--axv-seek-thumb-img, none);
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
+
+
+/* M11w：圆形 ProgressBar（没有 horizontal 样式）= 转圈环，不是细条 */
+.axv-node.axv-progress-ring {
+  border-radius: 50%;
+  border: var(--axv-ring-w, 6px) solid #e0d9e3;
+  border-top-color: var(--axv-progress-color, #6750a4);
+  background: transparent;
+  box-sizing: border-box;
+  animation: axv-ring-spin 1s linear infinite;
+}
+.axv-node.axv-progress-ring::after {
+  content: none;
+  display: none;
+}
+@keyframes axv-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

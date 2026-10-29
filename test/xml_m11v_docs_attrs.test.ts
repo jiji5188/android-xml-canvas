@@ -101,3 +101,26 @@ describe("M11v 新增渲染", () => {
     expect(String(n.style.backgroundImage)).toContain("data:image/png");
   });
 });
+
+describe("M11w SeekBar / ProgressBar 绘制修正", () => {
+  const one3 = (widget: string) => {
+    const xml = `<LinearLayout ${A} android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">${widget}</LinearLayout>`;
+    return buildRenderModel(parseLayoutXml(xml).root!, DEFAULT_RESOURCES as never).root.children[0];
+  };
+
+  it("SeekBar 不再整块灰底，轨道/滑块尺寸走变量", () => {
+    const n = one3(`<SeekBar ${A} android:layout_width="match_parent" android:layout_height="wrap_content" android:progress="40" android:max="100" />`);
+    expect(n.style.backgroundColor).toBe("transparent");
+    expect(n.style["--axv-seek-pct"]).toBe("40.00%");
+    expect(n.style["--axv-seek-track-h"]).toBe("8px");
+    expect(n.style["--axv-seek-thumb-d"]).toBe("40px");
+    expect(n.style.overflow).toBe("visible");
+  });
+
+  it("圆形 ProgressBar 带 axv-progress-ring 类，水平的不带", () => {
+    const ring = one3(`<ProgressBar ${A} android:layout_width="wrap_content" android:layout_height="wrap_content" android:indeterminate="true" />`);
+    expect(ring.className).toContain("axv-progress-ring");
+    const bar = one3(`<ProgressBar ${A} style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:progress="30" />`);
+    expect(bar.className).not.toContain("axv-progress-ring");
+  });
+});

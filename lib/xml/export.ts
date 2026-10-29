@@ -4,7 +4,15 @@
 import { parseLayoutXml, serialize } from "./parser";
 import { lintXml } from "./lint";
 import { fixNamespacePrefixes } from "./namespace";
+import { toCompatXml } from "./compat";
 import type { XmlNode } from "./types";
+
+export type ExportMode = "modern" | "compat";
+
+export interface ExportOptions {
+  /** modern = 原样（androidx + Material）；compat = 降级成纯平台控件，老 aapt / AIDE 可编译 */
+  mode?: ExportMode;
+}
 
 export interface ExportCheck {
   /** 阻断下载/复制的结构性错误（lint 的 error 级） */
@@ -16,11 +24,17 @@ export interface ExportCheck {
 }
 
 /** 把当前 XML 文本规范成可直接下载的 Android 布局文件 */
-export function exportLayoutXml(src: string): string {
+export function exportLayoutXml(src: string, opts: ExportOptions = {}): string {
   // M12：先把 android:cornerRadius 这类库属性改成 app:，否则 aapt 编译直接报错
   const fixed = fixNamespacePrefixes(src);
   const declMatch = fixed.match(/^<\?xml[^>]*>/i);
   const declLine = declMatch ? declMatch[0] : '<?xml version="1.0" encoding="utf-8"?>';
+
+  // M13：兼容模式——先降级成纯平台控件，再走正常序列化
+  if (opts.mode === "compat") {
+    const compat = toCompatXml(fixed);
+    return `${declLine}\n${compat.xml}\n`;
+  }
 
   const { root } = parseLayoutXml(fixed);
   if (!root) {

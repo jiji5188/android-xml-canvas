@@ -43,7 +43,9 @@ import {
   type Project,
 } from "@/lib/xml/multi-file";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
-import { ExportCheckModal, type ExportReport } from "./ExportCheckModal";
+import { toCompatXml } from "@/lib/xml/compat";
+import { fixNamespacePrefixes } from "@/lib/xml/namespace";
+import { ExportCheckModal, type ExportReport, type ExportMode } from "./ExportCheckModal";
 import { ExportImageModal } from "./ExportImageModal";
 import type { ExportTarget } from "@/lib/xml/export-image";
 import { XmlCanvas } from "./XmlCanvas";
@@ -468,6 +470,16 @@ export function XmlEditor() {
   /** M2s：导出前检查面板 */
   const [exportOpen, setExportOpen] = useState(false);
   const [exportReport, setExportReport] = useState<ExportReport | null>(null);
+  /** M13：导出模式（localStorage 记住），compat = 纯平台控件、AIDE 可编译 */
+  const [exportMode, setExportMode] = useState<ExportMode>(() => {
+    try {
+      return window.localStorage.getItem("axv.exportMode") === "compat" ? "compat" : "modern";
+    } catch {
+      return "modern";
+    }
+  });
+  /** 兼容模式的转换摘要（选 compat 时重算） */
+  const [compatNotes, setCompatNotes] = useState<string[]>([]);
   /** M6a：导出预览图（PNG / SVG）弹窗 */
   const [imgExportOpen, setImgExportOpen] = useState(false);
   /** 手机壳 DOM（导出图片要拿它做 DOM → SVG/PNG） */
@@ -1710,7 +1722,7 @@ const findResolved = findResolvedNode;
   /** M3g：导出 res 包（zip）：布局 + 图标矢量 + 上传的 shape/values 一起带走，
    *  避免别处打开工程时「找不到图标文件」。*/
   const doDownloadResZip = () => {
-    const layout = exportLayoutXml(xml);
+    const layout = exportLayoutXml(xml, { mode: exportMode });
     const entries = buildResBundle({ layoutXml: layout, generatedDrawables, extras: resExtrasAll });
     const missing = missingDrawables(layout, entries);
     const bytes = makeZip(entries);
@@ -1740,7 +1752,7 @@ const findResolved = findResolvedNode;
   /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续
    *  M2s：改成可视化检查面板（不再用 alert/confirm） */
   const doDownload = () => {
-    const body = exportLayoutXml(xml);
+    const body = exportLayoutXml(xml, { mode: exportMode });
     if (saveTextNative("activity_main.xml", body, "text/xml")) {
       setExportNote(`已保存 activity_main.xml（${workspaceLabel() || "工作目录"}）`);
       window.setTimeout(() => setExportNote(""), 2400);
@@ -1756,13 +1768,31 @@ const findResolved = findResolvedNode;
     window.setTimeout(() => setExportNote(""), 2400);
   };
 
-  const buildReport = (): ExportReport => {
-    const check = exportChecks(xml);
-    const lint = lintXml(xml);
+  const buildReport = (mode: ExportMode = exportMode): ExportReport => {
+    // M13：报告基于「真正要导出的内容」算——兼容模式下 CL 约束/库属性都已消失，
+    // 拿原始 xml 算会把已不存在的项报成错误
+    const body = exportLayoutXml(xml, { mode });
+    const check = exportChecks(body);
+    const lint = lintXml(body);
+    if (mode === "compat") {
+      const compat = toCompatXml(fixNamespacePrefixes(xml));
+      setCompatNotes(compat.notes);
+    }
     return {
       errors: lint.filter((i) => i.level === "error"),
       notes: check.notes,
     };
+  };
+
+  /** M13：切换导出模式（面板里点选）——立即重算报告，用户能看到模式带来的差异 */
+  const applyExportMode = (m: ExportMode) => {
+    setExportMode(m);
+    try {
+      window.localStorage.setItem("axv.exportMode", m);
+    } catch {
+      /* ignore */
+    }
+    setExportReport(buildReport(m));
   };
 
   const saveProject = () => {
@@ -1773,7 +1803,7 @@ const findResolved = findResolvedNode;
 
   /** M3：复制生成的 XML 到剪贴板（与下载同一份内容） */
   const doCopy = async () => {
-    const body = exportLayoutXml(xml);
+    const body = exportLayoutXml(xml, { mode: exportMode });
     // 原生壳里先走 ClipboardManager（WebView 的 navigator.clipboard 不可靠）
     if (copyTextNative(body)) {
       setExportNote("已复制到剪贴板");
@@ -2482,6 +2512,9 @@ const findResolved = findResolvedNode;
         open={exportOpen}
         report={exportReport}
         action={exportAction}
+        mode={exportMode}
+        onMode={applyExportMode}
+        compatNotes={compatNotes}
         onClose={() => setExportOpen(false)}
         onConfirm={exportAction === "copy" ? doCopy : doDownload}
         onJumpLine={(line) => {

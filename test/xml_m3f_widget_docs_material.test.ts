@@ -1,7 +1,7 @@
 // M3f：控件文档扩充（Material 组件 + 平台常用控件）
 import { describe, expect, it } from "vitest";
 import { getWidgetDoc, docAttrs, docForAttr, shortDocTag } from "../lib/xml/widget-docs";
-import { WIDGETS, WIDGET_GROUPS, GROUP_ICON } from "../components/widget-catalog";
+import { WIDGETS, WIDGET_GROUPS, WIDGET_LIBS, GROUP_ICON } from "../components/widget-catalog";
 import { parseLayoutXml } from "../lib/xml/parser";
 
 describe("M3f 新增控件文档", () => {
@@ -183,34 +183,51 @@ describe("M3f2 分类拆分（Material 组与平台组分开）", () => {
   });
 });
 
-describe("M3f3 组件面板：Material 组与平台组分开", () => {
-  it("面板里存在独立的 Material 分组，且在最后", () => {
-    expect(WIDGET_GROUPS).toContain("Material");
-    expect(WIDGET_GROUPS[WIDGET_GROUPS.length - 1]).toBe("Material");
-    expect(GROUP_ICON.Material).toBeTruthy();
+const MAT = WIDGETS.filter((w) => w.lib === "material");
+const AX = WIDGETS.filter((w) => w.lib === "androidx");
+const AND = WIDGETS.filter((w) => w.lib === "android");
+
+describe("M3f3 / M14 组件面板：按库分大类（平台 / AndroidX / Material）", () => {
+  it("三个库大类都存在，且分类顺序固定", () => {
+    expect(WIDGET_LIBS.map((l) => l.lib)).toEqual(["android", "androidx", "material"]);
+    expect(WIDGET_GROUPS).toEqual(["布局", "文本", "输入", "控件", "进度", "图片"]);
+    for (const g of WIDGET_GROUPS) expect(GROUP_ICON[g]).toBeTruthy();
   });
 
-  it("Material 组的组件数量合理（≥12）", () => {
-    expect(WIDGETS.filter((w) => w.group === "Material").length).toBeGreaterThanOrEqual(12);
+  it("每个组件都归到某个库 + 某个用途分类，且两者不越界", () => {
+    for (const w of WIDGETS) {
+      expect({ k: w.key, lib: ["android", "androidx", "material"].includes(w.lib) }).toEqual({ k: w.key, lib: true });
+      expect({ k: w.key, cat: WIDGET_GROUPS.includes(w.group) }).toEqual({ k: w.key, cat: true });
+    }
+    expect(MAT.length).toBeGreaterThanOrEqual(12);
+    expect(AND.length).toBeGreaterThanOrEqual(20);
   });
 
-  it("Material 组的每个组件都有 Material 分类的文档", () => {
-    for (const w of WIDGETS.filter((x) => x.group === "Material")) {
+  it("Material 库的每个组件都有 Material 分类的文档", () => {
+    for (const w of MAT) {
       const d = getWidgetDoc(w.tag);
       expect({ tag: w.tag, cat: d.category }).toEqual({ tag: w.tag, cat: "Material" });
     }
   });
 
-  it("平台组里不再混 Material 控件（滑块已归入 Material）", () => {
-    const platform = WIDGETS.filter((w) => w.group !== "Material");
-    for (const w of platform) {
-      expect(getWidgetDoc(w.tag).category).not.toBe("Material");
+  it("平台库里不再混 Material / AndroidX 控件（滑块归 Material、卡片归 AndroidX）", () => {
+    for (const w of AND) {
+      expect({ tag: w.tag, cat: getWidgetDoc(w.tag).category }).not.toEqual({ tag: w.tag, cat: "Material" });
+      expect({ key: w.key, cls: /\.(widget|app|view|material)\./.test(w.tag) }).toEqual({ key: w.key, cls: false });
     }
-    expect(WIDGETS.find((w) => w.key === "slider")?.group).toBe("Material");
+    expect(WIDGETS.find((w) => w.key === "slider")?.lib).toBe("material");
+    expect(WIDGETS.find((w) => w.key === "card")?.lib).toBe("androidx");
+    expect(WIDGETS.find((w) => w.key === "listview")?.lib).toBe("androidx");
+  });
+
+  it("AndroidX 库的模板都带 androidx. 全限定名", () => {
+    for (const w of AX) {
+      expect({ k: w.key, ax: /androidx\./.test(w.xml) }).toEqual({ k: w.key, ax: true });
+    }
   });
 
   it("新增 Material 模板都能被解析（无 error 级问题）", () => {
-    for (const w of WIDGETS.filter((x) => x.group === "Material")) {
+    for (const w of MAT) {
       const { root, issues } = parseLayoutXml(w.xml);
       expect({ key: w.key, ok: !!root }).toEqual({ key: w.key, ok: true });
       const errs = issues.filter((i) => i.level === "error");
@@ -219,7 +236,7 @@ describe("M3f3 组件面板：Material 组与平台组分开", () => {
   });
 
   it("Material 模板带 app: 属性时都声明了 xmlns:app", () => {
-    for (const w of WIDGETS.filter((x) => x.group === "Material")) {
+    for (const w of MAT) {
       const usesApp = /\sapp:[\w_]+=/.test(w.xml);
       if (usesApp) expect({ key: w.key, ns: w.xml.includes("xmlns:app") }).toEqual({ key: w.key, ns: true });
     }

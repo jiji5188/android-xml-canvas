@@ -105,6 +105,29 @@ export function spinnerOptions(entries: unknown): string[] {
   return ["选项一", "选项二", "选项三"];
 }
 
+/** 带资源表的版本：@array/xxx 能解析出来就当真数据，解析不出再落到提示词。
+ *  返回 null 表示「没有任何可用候选」，调用方决定怎么展示。 */
+export function resolveSpinner(
+  entries: unknown,
+  table?: { stringArrays?: Record<string, string[]> } | null,
+): string[] | null {
+  const raw = typeof entries === "string" ? entries.trim() : "";
+  if (raw && !raw.startsWith("@")) {
+    const list = raw
+      .split(/[,，|]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (list.length) return list;
+  }
+  if (raw.startsWith("@array/")) {
+    const m = raw.match(/^@(?:\w+:)?array\/([\w.]+)$/);
+    const name = m?.[1];
+    if (name && table?.stringArrays?.[name]?.length) return table.stringArrays[name];
+    return null; // 资源表里没有 → 让调用方提示
+  }
+  return null;
+}
+
 /* ===================== 数值类控件 ===================== */
 
 /** 指针位置 → SeekBar 比例（0..1） */
@@ -159,4 +182,27 @@ export function targetLabel(tag: string, id?: unknown): string {
 export function previewInput(value: string, limit = 40): string {
   const v = value.replace(/\r/g, "").replace(/\n+/g, "⏎");
   return v.length > limit ? v.slice(0, limit) + "…" : v;
+}
+
+/** 该角色在状态变化时该不该震、震多久（ms）。
+ *  对齐 Android：按钮单击不震、长按一次 30ms；开关/勾选切换 15ms。
+ *  没有震动硬件的浏览器里 vibrate 直接返回 false，调用方静默降级即可。 */
+export function vibeMs(role: RunRole, kind: "press" | "toggle" | "long" | "select"): number {
+  if (kind === "long") return 30;
+  if (kind === "toggle") {
+    if (role === "switch" || role === "check" || role === "radio") return 15;
+    return 0;
+  }
+  if (kind === "select") return role === "list" || role === "grid" ? 15 : 0;
+  return 0; // 普通按下/选择：安卓也不震
+}
+
+/** 安全震动：旧浏览器/没有硬件时不报错 */
+export function vibrate(ms: number): void {
+  if (ms <= 0) return;
+  try {
+    navigator.vibrate?.(ms);
+  } catch {
+    /* Safari 等会直接抛，忽略 */
+  }
 }

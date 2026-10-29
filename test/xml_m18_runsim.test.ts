@@ -10,6 +10,8 @@ import {
   spinnerOptions,
   targetLabel,
   wantsRipple,
+  vibeMs,
+  vibrate,
 } from "../lib/xml/run-sim";
 
 describe("M18 run-sim：角色判定", () => {
@@ -63,6 +65,25 @@ describe("M18 run-sim：假数据与数值", () => {
     expect(seekValue(0.333, 3)).toBe(1);
     expect(seekValue(1, 100)).toBe(100);
     expect(seekValue(2, 50)).toBe(50);
+  });
+});
+
+describe("M18 run-sim：触觉反馈策略", () => {
+  it("普通按下/选择不震，长按 30ms，开关/勾选/单选 15ms", () => {
+    expect(vibeMs("button", "press")).toBe(0);
+    expect(vibeMs("button", "select")).toBe(0);
+    expect(vibeMs("button", "long")).toBe(30);
+    expect(vibeMs("switch", "toggle")).toBe(15);
+    expect(vibeMs("check", "toggle")).toBe(15);
+    expect(vibeMs("radio", "toggle")).toBe(15);
+    expect(vibeMs("list", "select")).toBe(15);
+    expect(vibeMs("grid", "select")).toBe(15);
+    expect(vibeMs("spinner", "select")).toBe(0);
+    expect(vibeMs("input", "press")).toBe(0);
+  });
+  it("vibrate 0 毫秒不碰 navigator", () => {
+    vibrate(0);
+    vibrate(-5); // 不报错就行
   });
 });
 

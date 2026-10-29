@@ -3,7 +3,17 @@
 
 import type { ResourceTable } from "./types";
 
+/** @array/xxx 默认值：values 里没有定义时给演示数据（跟字符串表一个套路） */
+export const DEFAULT_STRING_ARRAYS: Record<string, string[]> = {
+  cities: ["北京", "上海", "广州", "深圳", "成都"],
+  sort_order: ["最新优先", "价格升序", "价格降序", "销量优先"],
+  time_range: ["今天", "最近一周", "最近一月", "全部"],
+  categories: ["推荐", "数码", "图书", "生活"],
+  units: ["分钟", "小时", "天"],
+};
+
 export const DEFAULT_RESOURCES: ResourceTable = {
+  stringArrays: { ...DEFAULT_STRING_ARRAYS },
   strings: {
     app_name: "My App",
     title: "标题",
@@ -182,6 +192,17 @@ export function mergeResourceFragment(xmlFragment: string): ResourceTable {
     else if (kind === "dimen") merged.dimens[name] = parseDimenToDp(val);
     else if (kind === "color") merged.colors[name] = val;
   }
+  // M19：string-array → 下拉候选
+  merged.stringArrays = { ...DEFAULT_STRING_ARRAYS, ...(merged.stringArrays ?? {}) };
+  const arrRe = /<string-array\s+name="([^"]+)"[^>]*>([\s\S]*?)<\/string-array>/g;
+  let am: RegExpExecArray | null;
+  while ((am = arrRe.exec(inner)) !== null) {
+    const name = am[1];
+    const items = Array.from(am[2].matchAll(/<item[^>]*>([\s\S]*?)<\/item>/g)).map((it) =>
+      it[1].trim().replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">"),
+    );
+    if (items.length) merged.stringArrays[name] = items;
+  }
   // 框架样式兜底：项目 styles 没有时补 @android:style/* 常见项（键去 android: 前缀存）
   if (!merged.styles) {
     merged.styles = {};
@@ -206,4 +227,13 @@ export function parseDimenToDp(raw: string): number {
     case "mm": return n * 6.338;
     default: return n; // dp/sp
   }
+}
+
+/** 从资源表取 @array/xxx 的项（Spinner 下拉用）。
+ *  没定义时返回 null —— 调用方决定给默认候选还是提示。 */
+export function stringArrayOf(table: ResourceTable, ref: string): string[] | null {
+  const m = (ref ?? "").match(/^@\w*:?array\/([\w.]+)$/);
+  if (!m) return null;
+  const items = table.stringArrays?.[m[1]];
+  return items && items.length ? items : null;
 }

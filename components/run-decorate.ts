@@ -12,7 +12,7 @@
 // 配合 RunPreview 里 memo 过的画布，重渲染不会把用户输入冲掉。
 
 import { CTL_CHECK_IMG } from "@/lib/xml/css";
-import type { XmlNode } from "@/lib/xml/types";
+import type { XmlNode, ResourceTable } from "@/lib/xml/types";
 import { findNode } from "@/lib/xml/parser";
 import {
   eventText,
@@ -21,8 +21,11 @@ import {
   sampleRows,
   seekRatio,
   seekValue,
+  resolveSpinner,
   spinnerOptions,
   targetLabel,
+  vibeMs,
+  vibrate,
   type RunRole,
 } from "@/lib/xml/run-sim";
 
@@ -40,6 +43,8 @@ export interface DecorateHooks {
 interface Ctx {
   root: HTMLElement;
   parsedRoot: XmlNode | null;
+  /** M19：资源表（@array/xxx 下拉候选） */
+  table: ResourceTable | null;
   hooks: DecorateHooks;
   /** 收集清理函数，切屏时统一撤掉 */
   cleanups: (() => void)[];
@@ -91,6 +96,7 @@ function attachRipple(ctx: Ctx, el: HTMLElement, label?: string) {
     clearTimer();
     timer = window.setTimeout(() => {
       longFired = true;
+      vibrate(vibeMs("button", "long"));
       ctx.hooks.log("I", eventText("long", label, "onLongClick"));
     }, 550);
   });
@@ -275,6 +281,7 @@ function decorateCtl(ctx: Ctx, el: HTMLElement, path: string, role: RunRole, lab
       checked = !checked;
     }
     applyCtl(el, role, checked, tint);
+    vibrate(vibeMs(role, "toggle"));
     const verb = role === "switch" ? (checked ? "打开" : "关闭") : checked ? "选中" : "取消选中";
     ctx.hooks.log("I", eventText("check", label, verb));
   });
@@ -324,7 +331,9 @@ function decorateSeek(ctx: Ctx, el: HTMLElement, path: string, label: string) {
 
 function decorateSpinner(ctx: Ctx, el: HTMLElement, path: string, label: string) {
   const a = attrsOf(ctx, path);
-  const options = spinnerOptions(a["entries"]);
+  // M19：@array/xxx 走资源表，解析不出再用占位候选（而不是假装解析成功）
+  const real = resolveSpinner(a["entries"], ctx.table);
+  const options = real ?? spinnerOptions(a["entries"]);
   let current = String(a["text"] ?? options[0] ?? "");
 
   const off = on(el, "click", (e) => {
@@ -451,6 +460,7 @@ function decorateList(ctx: Ctx, el: HTMLElement, role: RunRole, label: string) {
     e.stopPropagation();
     el.querySelectorAll(".axv-run-row.on, .axv-run-row-static.on").forEach((r) => r.classList.remove("on"));
     target.classList.add("on");
+    vibrate(vibeMs(role, "select"));
     const idx = Number(target.dataset.runIndex ?? 0);
     const text = rows[idx]?.title ?? (target.textContent ?? "").trim().slice(0, 20);
     ctx.hooks.log("I", eventText("click", label, `onItemClick position=${idx} item="${text}"`));
@@ -467,8 +477,13 @@ export interface DecorateResult {
   interactive: number;
 }
 
-export function decorateRunScreen(root: HTMLElement, parsedRoot: XmlNode | null, hooks: DecorateHooks): DecorateResult {
-  const ctx: Ctx = { root, parsedRoot, hooks, cleanups: [], seen: new WeakSet() };
+export function decorateRunScreen(
+  root: HTMLElement,
+  parsedRoot: XmlNode | null,
+  hooks: DecorateHooks,
+  table: ResourceTable | null = null,
+): DecorateResult {
+  const ctx: Ctx = { root, parsedRoot, table, hooks, cleanups: [], seen: new WeakSet() };
   let interactive = 0;
   // 文档顺序：父容器先装饰（列表注入），子节点随后各自装饰
   const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-tag]"));

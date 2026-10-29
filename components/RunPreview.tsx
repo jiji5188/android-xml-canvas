@@ -242,7 +242,7 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
     // 等 React 把这一屏的 DOM 落完再装饰
     let cleanup: (() => void) | null = null;
     const t = window.setTimeout(() => {
-      const r = decorateRunScreen(screen, parsed.root, { log, tap, toast: showToast });
+      const r = decorateRunScreen(screen, parsed.root, { log, tap, toast: showToast }, resources);
       cleanup = r.cleanup;
       setInteractive(r.interactive);
       if (r.interactive > 0) log("D", `本屏可交互控件 ${r.interactive} 个`);

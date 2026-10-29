@@ -37,6 +37,8 @@ export interface ResourceTable {
   vectorNames?: string[];
   /** 可选：styles.xml 解析后的展开样式（@style/xxx → attrs） */
   styles?: Record<string, { name: string; parent?: string; attrs: Record<string, string> }>;
+  /** M19：string-array（@array/xxx → 项），Spinner 等下拉控件用它取候选 */
+  stringArrays?: Record<string, string[]>;
   /** M2x：?attr/xxx 主题属性（主题样式里收集到的 名 → 原始值），颜色引用在 resolve 时再展开 */
   themeAttrs?: Record<string, string>;
   /** M2w：res/drawable/*.xml 里的 <shape> 原文（名 → xml），用来还原渐变/圆角/描边背景 */

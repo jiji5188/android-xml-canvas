@@ -2,6 +2,7 @@
 // M18：run-decorate 的结构行为（jsdom 没有布局，所以只断言 DOM/属性/文字这些确定的点）
 import { beforeEach, describe, expect, it } from "vitest";
 import { decorateRunScreen, type DecorateHooks } from "../components/run-decorate";
+import { DEFAULT_RESOURCES } from "../lib/xml/resources";
 import { parseLayoutXml } from "../lib/xml/parser";
 
 function hooks() {
@@ -182,6 +183,19 @@ describe("M18 run-decorate：Spinner", () => {
     expect(logs.some((l) => l.includes("选择") && l.includes("选项二"))).toBe(true);
   });
 
+  it("@array/cities 没写 values 时用内置默认数组（5 个城市）", () => {
+    const { root, make, parsed } = build(
+      `<Spinner android:id="@+id/sp" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:entries="@array/cities"/>`,
+    );
+    const sp = make("Spinner", "#0/0");
+    const { h } = hooks();
+    decorateRunScreen(root, parsed.root, h, DEFAULT_RESOURCES);
+    sp.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const items = Array.from(root.querySelectorAll(".axv-run-popup-item")).map((n) => n.textContent);
+    expect(items).toEqual(["北京", "上海", "广州", "深圳", "成都"]);
+  });
+
   it("android:entries 写了就用自己的选项", () => {
     const { root, make, parsed } = build(
       `<Spinner android:id="@+id/sp" android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -189,7 +203,9 @@ describe("M18 run-decorate：Spinner", () => {
     );
     const sp = make("Spinner", "#0/0");
     const { h } = hooks();
-    decorateRunScreen(root, parsed.root, h);
+    // values 里写了 <string-array name="cities"> → 资源表能解析出来，就该用真数据
+    const table = { ...DEFAULT_RESOURCES, stringArrays: { ...DEFAULT_RESOURCES.stringArrays, cities: ["北京", "上海", "广州"] } };
+    decorateRunScreen(root, parsed.root, h, table);
     sp.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const items = Array.from(root.querySelectorAll(".axv-run-popup-item")).map((n) => n.textContent);
     expect(items).toEqual(["北京", "上海", "广州"]);

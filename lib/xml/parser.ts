@@ -269,7 +269,10 @@ export function serialize(node: XmlNode, indent = ""): string {
     .join(" ");
   const attrsStr = Object.entries(node.attrs)
     // M12：优先还原原始前缀；新增的属性（没有原始前缀）才按白名单猜
-    .map(([k, v]) => `    ${node.attrNs?.[k] ? `${node.attrNs[k]}:` : attrPrefixFor(k) === "app" ? "app:" : "android:"}${k}="${v}"`)
+    .map(([k, v]) => {
+      const p = node.attrNs?.[k] ?? attrPrefixFor(k);
+      return `    ${p ? `${p}:` : ""}${k}="${v}"`;
+    })
     .join("\n");
 
   const buildOpen = (selfClosed: boolean): string => {

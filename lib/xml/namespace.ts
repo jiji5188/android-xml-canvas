@@ -111,8 +111,7 @@ export const ANDROIDX_ATTRS = new Set<string>([
   "statusBarScrim",
 ]);
 
-/**
- * 平台属性里**没有**这些名字，所以写成 android: 一定编译不过；
+/** 平台属性里**没有**这些名字，所以写成 android: 一定编译不过；
  * 但 GridLayout 的 columnCount / layout_columnWeight 等确实是平台属性，绝不能改。
  */
 export const ANDROID_ONLY_ATTRS = new Set<string>([
@@ -127,6 +126,9 @@ export const ANDROID_ONLY_ATTRS = new Set<string>([
   "layout_columnWeight",
   "layout_rowWeight",
 ]);
+
+/** 完全不带命名空间的属性（写成 android:style 是 aapt 报错的主力） */
+export const NO_NAMESPACE_ATTRS = new Set<string>(["style", "class"]);
 
 export interface NamespaceIssue {
   /** 1 基行号 */

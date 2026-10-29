@@ -72,9 +72,10 @@
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 40%;
+  /* M11t：宽度跟 android:progress / max 走（原来写死 40%） */
+  width: calc(var(--axv-progress, 0.4) * 100%);
   height: 60%;
-  background: #6750A4;
+  background: var(--axv-progress-color, #6750A4);
   border-radius: inherit;
 }
 
@@ -99,7 +100,7 @@
 .axv-exporting .axv-node.axv-selected {
   outline: none !important;
 }
-.axv-exporting .axv-node.axv-selected::before {
+.axv-exporting .axv-node.axv-selected:not(.axv-switch):not(.axv-check):not(.axv-radio):not(.axv-progress):not(.axv-seek):not(.axv-spinner):not(.axv-rating)::before {
   display: none !important;
 }
 .axv-exporting .axv-drop-hit {
@@ -122,7 +123,7 @@
   outline: 2px dashed #04409F;
   outline-offset: -2px;
 }
-.axv-node.axv-selected::before {
+.axv-node.axv-selected:not(.axv-switch):not(.axv-check):not(.axv-radio):not(.axv-progress):not(.axv-seek):not(.axv-spinner):not(.axv-rating)::before {
   content: attr(data-tag);
   position: absolute;
   top: -18px;
@@ -140,7 +141,7 @@
   line-height: 1.4;
 }
 /* 标签头被父容器裁切时（overflow:hidden）不显示，只留虚线框 */
-.axv-node.axv-selected::after {
+.axv-node.axv-selected:not(.axv-switch):not(.axv-check):not(.axv-radio):not(.axv-progress):not(.axv-seek):not(.axv-spinner):not(.axv-rating)::after {
   content: none;
 }
 
@@ -2388,48 +2389,10 @@
 .axv-node.axv-switch {
   position: relative;
 }
-.axv-node.axv-switch::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 4px;
-  transform: translateY(-50%);
-  width: calc(100% - 8px);
-  max-width: 24px;
-  height: calc(100% - 8px);
-  max-height: 24px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  transition: left 0.12s ease-out;
-}
-.axv-node.axv-switch.axv-checked::after {
-  left: calc(100% - 4px);
-  transform: translate(-100%, -50%);
-}
+/* M11t：旧图形已移除，改由 globals.css 的 --axv-ctl-* 变量统一绘制 */
 
 /* CheckBox：勾选显示对勾 */
-.axv-node.axv-check::after,
-.axv-node.axv-radio::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  color: #fff;
-  font-size: 14px;
-  line-height: 1;
-}
-.axv-node.axv-check.axv-checked::after {
-  content: "\2713";
-}
-.axv-node.axv-radio.axv-checked::after {
-  content: "";
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #fff;
-}
+/* M11t：旧图形已移除，改由 globals.css 的 --axv-ctl-* 变量统一绘制 */
 
 /* SeekBar：轨道 + 按 --axv-progress 定位的滑块 */
 .axv-node.axv-seek {
@@ -3960,4 +3923,54 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   border-color: #6b5320;
   background: #3a2f13;
   color: #f2d79a;
+}
+
+/* ===== M11t：RatingBar 星星 / 不确定进度条 / SeekBar 滑块色 ===== */
+.axv-node.axv-rating {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  /* 星形 mask（白色五角星，靠 background-color 上色） */
+  --axv-star-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/%3E%3C/svg%3E");
+}
+.axv-node.axv-rating::before,
+.axv-node.axv-rating::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: var(--axv-star, 36px);
+  background-repeat: repeat-x;
+  background-size: var(--axv-star, 36px) var(--axv-star, 36px);
+  -webkit-mask-image: var(--axv-star-mask);
+  mask-image: var(--axv-star-mask);
+  -webkit-mask-size: var(--axv-star, 36px) var(--axv-star, 36px);
+  mask-size: var(--axv-star, 36px) var(--axv-star, 36px);
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+}
+.axv-node.axv-rating::before {
+  width: var(--axv-stars-w, 180px);
+  background-color: var(--axv-star-off, #dad5e0);
+}
+.axv-node.axv-rating::after {
+  width: var(--axv-rating-w, 0px);
+  background-color: var(--axv-star-on, #f5a524);
+}
+
+/* 不确定进度条：40% 宽的小条来回跑 */
+.axv-node.axv-indet::after {
+  animation: axv-indet-run 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes axv-indet-run {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+/* 进度条前景色 / SeekBar 滑块色改成变量（原来硬写 #6750A4） */
+.axv-node.axv-progress::after {
+  background-color: var(--axv-progress-color, #6750A4);
+}
+.axv-node.axv-seek::after {
+  background-color: var(--axv-seek-thumb, #6750A4);
 }

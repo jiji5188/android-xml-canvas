@@ -70,6 +70,9 @@ function viewClass(rawTag: string, a: ResolvedAttrs): string {
       return "axv-seek";
     case "Spinner":
       return "axv-spinner";
+    // M11t：评分条（5 颗星，按 rating/numStars 上色）
+    case "RatingBar":
+      return "axv-rating";
     // M2c：ConstraintLayout 辅助节点（渲染为参考线）
     case "Guideline":
       return "axv-guideline";
@@ -225,6 +228,45 @@ function rgbOf(raw: string | undefined): string | null {
   return null;
 }
 
+/** M11t：flex 对齐值 → CSS Grid 的 justify-items / align-items 值（grid 不认 flex-start/flex-end） */
+function gridAlign(v: string | undefined, fallback: string): string {
+  if (!v) return fallback;
+  if (v === "center") return "center";
+  if (v === "flex-start") return "start";
+  if (v === "flex-end") return "end";
+  if (v === "stretch") return "stretch";
+  return fallback;
+}
+
+/** M11t：GridLayout 子项的 layout_gravity → justify-self（横向）/ align-self（纵向） */
+function layoutGravityToGridSelf(g: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!g) return out;
+  const parts = g.split("|").map((s) => s.trim());
+  const has = (...vals: string[]) => parts.some((p) => vals.includes(p));
+  const h = has("center", "center_horizontal")
+    ? "center"
+    : has("start", "left")
+      ? "start"
+      : has("end", "right")
+        ? "end"
+        : has("fill_horizontal")
+          ? "stretch"
+          : "";
+  const v = has("center", "center_vertical")
+    ? "center"
+    : has("top")
+      ? "start"
+      : has("bottom")
+        ? "end"
+        : has("fill_vertical")
+          ? "stretch"
+          : "";
+  if (h) out.justifySelf = h;
+  if (v) out.alignSelf = v;
+  return out;
+}
+
 function layoutGravityToSelf(g: string): Record<string, string> {
   const v: Record<string, string> = {};
   if (!g) return v;
@@ -316,8 +358,10 @@ export function buildRenderModel(
       style.display = "grid";
       const cols = gridColumnCount(attrs["columnCount"], node);
       style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-      style.alignItems = "start";
-      style.justifyItems = "stretch";
+      // M11t：GridLayout 的 android:gravity → 格子内对齐（横向→justify-items，纵向→align-items）
+      const gg = gravityToFlexByOrientation((attrs["gravity"] as string) || "", false);
+      style.alignItems = gridAlign(gg.alignItems, "start");
+      style.justifyItems = gridAlign(gg.justifyContent, "stretch");
     } else if (tag === "LinearLayout" || isFrameLike || SCROLL_V.has(tag) || SCROLL_H.has(tag) || tag === "CardView" || tag === "MaterialCardView" || tag === "TableLayout" || tag === "TableRow" || isCL) {
       style.display = "flex";
       if (SCROLL_V.has(tag)) {
@@ -742,13 +786,39 @@ export function buildRenderModel(
       }
     }
 
+    // ===== M11t：此前漏渲染的一批属性 =====
+    const dpv = (v: unknown) => DP((v as number) || 0, scale);
+    if (((attrs["minWidth"] as number) || 0) > 0) style.minWidth = `${dpv(attrs["minWidth"])}px`;
+    if (((attrs["minHeight"] as number) || 0) > 0) style.minHeight = `${dpv(attrs["minHeight"])}px`;
+    if (((attrs["maxWidth"] as number) || 0) > 0) style.maxWidth = `${dpv(attrs["maxWidth"])}px`;
+    if (((attrs["maxHeight"] as number) || 0) > 0) style.maxHeight = `${dpv(attrs["maxHeight"])}px`;
+    // android:enabled="false" → Material 禁用态（整体降到 0.38；已有 alpha 取更小值）
+    if (attrs["enabled"] === false) {
+      const cur = Number(style.opacity ?? 1) || 1;
+      style.opacity = String(Math.min(cur, 0.38));
+    }
+
     if (cls === "axv-progress") {
       const styleAttr = (attrs["progressStyle"] as string) || "";
-      if (styleAttr.includes("horizontal")) {
+      if (/horizontal/i.test(styleAttr)) {
         style.height = style.height || `${DP(4, scale)}px`;
         style.backgroundColor = style.backgroundColor || "#E0D9E3";
         style.borderRadius = `${DP(2, scale)}px`;
         style.overflow = "hidden";
+        // M11t：progress / secondaryProgress / indeterminate
+        const maxP = (attrs["max"] as number) || 100;
+        const curP = (attrs["progress"] as number) || 0;
+        const ratio = maxP > 0 ? Math.min(1, Math.max(0, curP / maxP)) : 0;
+        const secRatio = maxP > 0 ? Math.min(1, Math.max(0, ((attrs["secondaryProgress"] as number) || 0) / maxP)) : 0;
+        (style as React.CSSProperties & Record<string, string>)["--axv-progress"] = String(ratio);
+        (style as React.CSSProperties & Record<string, string>)["--axv-progress-color"] =
+          (attrs["progressTint"] as string) || (attrs["tint"] as string) || "#6750A4";
+        if (secRatio > ratio) {
+          style.backgroundImage = `linear-gradient(to right, transparent 0 ${ratio * 100}%, #C9C0F0 ${ratio * 100}% ${secRatio * 100}%, transparent ${secRatio * 100}%)`;
+        }
+        if (attrs["indeterminate"]) {
+          (style as React.CSSProperties & Record<string, string>)["--axv-progress"] = "0.4";
+        }
       } else {
         style.width = style.width || `${DP(32, scale)}px`;
         style.height = style.height || `${DP(32, scale)}px`;
@@ -759,10 +829,15 @@ export function buildRenderModel(
     if (cls === "axv-card") {
       const cr = (attrs["cardCornerRadius"] as number) || 12;
       // M4i：background 可能是 shape/位图（backgroundColor 已由上面算好），不能无条件覆成白色
-      style.backgroundColor = style.backgroundColor || "#FFFFFF";
+      // M11t：android:cardBackgroundColor 优先（CardView 的底色不写在 background 上）
+      style.backgroundColor =
+        (attrs["cardBackgroundColor"] as string) || style.backgroundColor || "#FFFFFF";
       style.borderRadius = `${DP(cr, scale)}px`;
-      // 卡片没显式 elevation 时给个默认阴影（用了 elevation 就听 elevation 的）
-      if (elDp + tzDp <= 0) style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)";
+      // 卡片没显式 elevation 时给个默认阴影（用了 elevation 就听 elevation 的；
+      // M11t：android:cardElevation 也要算进来）
+      if (elDp + tzDp + ((attrs["cardElevation"] as number) || 0) <= 0) {
+        style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)";
+      }
       style.overflow = "hidden";
     }
 
@@ -789,17 +864,26 @@ export function buildRenderModel(
         cs["--axv-ctl-w"] = `${DP(40, scale)}px`;
         cs["--axv-ctl-h"] = `${DP(22, scale)}px`;
         cs["--axv-ctl-r"] = `calc(${DP(22, scale)}px / 2)`;
-        cs["--axv-ctl-bg"] = on ? "#6750A4" : "#E0D9E3";
+        // M11t：滑块尺寸与边框宽度也要跟 scale 走（原来 CSS 里硬写 4px / 2px，2 倍图下比例不对）
+        cs["--axv-ctl-thumb-d"] = `${DP(18, scale)}px`;
+        cs["--axv-ctl-bw"] = "0px";
+        // M11t：trackTint（轨道色）/ thumbTint（滑块色）优先于默认主题色
+        const tkOn = (attrs["trackTint"] as string) || "#6750A4";
+        const tkOff = (attrs["trackTint"] as string) || "#E0D9E3";
+        cs["--axv-ctl-bg"] = on ? tkOn : tkOff;
         cs["--axv-ctl-ring"] = "transparent";
         cs["--axv-ctl-img"] = "none";
-        cs["--axv-ctl-thumb"] = "#FFFFFF";
+        cs["--axv-ctl-thumb"] = (attrs["thumbTint"] as string) || "#FFFFFF";
         cs["--axv-ctl-thumb-x"] = on ? `${DP(20, scale)}px` : `${DP(2, scale)}px`;
       } else {
         cs["--axv-ctl-w"] = `${DP(20, scale)}px`;
         cs["--axv-ctl-h"] = `${DP(20, scale)}px`;
         cs["--axv-ctl-r"] = cls === "axv-radio" ? "50%" : `${DP(3, scale)}px`;
-        cs["--axv-ctl-bg"] = cls === "axv-radio" ? "#FFFFFF" : on ? "#6750A4" : "#FFFFFF";
-        cs["--axv-ctl-ring"] = on ? "#6750A4" : "#79747E";
+        cs["--axv-ctl-bw"] = `${DP(2, scale)}px`;
+        // M11t：buttonTint 同时作用于勾选态填充与边框色
+        const bt = (attrs["buttonTint"] as string) || "#6750A4";
+        cs["--axv-ctl-bg"] = cls === "axv-radio" ? "#FFFFFF" : on ? bt : "#FFFFFF";
+        cs["--axv-ctl-ring"] = on ? bt : "#79747E";
         cs["--axv-ctl-img"] = on
           ? cls === "axv-radio"
             ? "radial-gradient(circle, #6750A4 0 42%, transparent 45%)"
@@ -807,6 +891,26 @@ export function buildRenderModel(
           : "none";
         cs["--axv-ctl-thumb-x"] = "0px";
       }
+    }
+
+    // M11t：RatingBar —— 星星用 mask 画（灰底 + 亮色裁剪），numStars / rating / stepSize 都生效
+    if (cls === "axv-rating") {
+      const stars = Math.max(1, (attrs["numStars"] as number) || 5);
+      const rawRating = Math.max(0, Math.min(stars, (attrs["rating"] as number) || 0));
+      const step = (attrs["stepSize"] as number) || 0.5;
+      const rating = step > 0 ? Math.round(rawRating / step) * step : rawRating;
+      const starPx = DP(18, scale);
+      const cs = style as React.CSSProperties & Record<string, string>;
+      style.display = "inline-flex";
+      style.alignItems = "center";
+      if (String(style.width ?? "auto") === "auto") style.width = `${starPx * stars}px`;
+      if (String(style.height ?? "auto") === "auto") style.height = `${starPx}px`;
+      if (!style.position || style.position === "static") style.position = "relative";
+      cs["--axv-star"] = `${starPx}px`;
+      cs["--axv-stars-w"] = `${starPx * stars}px`;
+      cs["--axv-rating-w"] = `${starPx * Math.min(stars, rating)}px`;
+      cs["--axv-star-on"] = (attrs["buttonTint"] as string) || "#F5A524";
+      cs["--axv-star-off"] = "#DAD5E0";
     }
 
     if (cls === "axv-seek") {
@@ -817,6 +921,8 @@ export function buildRenderModel(
       const p = (attrs["progress"] as number) || 0;
       const maxV = (attrs["max"] as number) || 100;
       style["--axv-progress"] = String(Math.min(1, maxV > 0 ? p / maxV : 0));
+      // M11t：SeekBar 的滑块色（thumbTint，否则用主题色）
+      style["--axv-seek-thumb"] = (attrs["thumbTint"] as string) || "#6750A4";
     }
 
     if (cls === "axv-spinner") {
@@ -870,6 +976,12 @@ export function buildRenderModel(
 
     // M2v：GridLayout 子项落格（layout_column/layout_row 0 基 → CSS 1 基）
     if (parentTag === "GridLayout") {
+      // M11t：格子内的 layout_gravity 用 justify-self / align-self（原来的 alignSelf 在 grid 里只管纵向）
+      const gSelf = layoutGravityToGridSelf((attrs["layoutGravity"] as string) || "");
+      // 先抹掉上面按 flex 语义算出来的 alignSelf（横向分量在 grid 里不能当纵向用）
+      delete (style as Record<string, unknown>).alignSelf;
+      if (gSelf.justifySelf) style.justifySelf = gSelf.justifySelf;
+      if (gSelf.alignSelf) style.alignSelf = gSelf.alignSelf;
       const col = attrs["gridColumn"] as number;
       const row = attrs["gridRow"] as number;
       const cs = (attrs["gridColumnSpan"] as number) || 1;
@@ -883,6 +995,15 @@ export function buildRenderModel(
 
     // 开关/勾选类不渲染文字到框里（会在 title 提示里显示）
     let text = (attrs["text"] as string) || "";
+    // M11t：EditText 单行 / 最少行数（代入高度）+ hint 颜色
+    if (cls === "axv-text") {
+      if (attrs["singleLine"]) style.whiteSpace = "nowrap";
+      if (((attrs["minLines"] as number) || 0) > 1) {
+        const lh = ((attrs["textSize"] as number) || 14) * 1.3;
+        style.minHeight = `${DP(lh * ((attrs["minLines"] as number) || 1), scale)}px`;
+      }
+    }
+
     if (cls === "axv-seek") {
       text = "";
     } else if (cls === "axv-include") {
@@ -924,7 +1045,11 @@ export function buildRenderModel(
       path: node.path,
       style,
       compound,
-      className: cls + (attrs["checked"] ? " axv-checked" : ""),
+      className:
+        cls +
+        (attrs["checked"] ? " axv-checked" : "") +
+        // M11t：不确定进度条要多一个类来挂动画
+        (cls === "axv-progress" && attrs["indeterminate"] ? " axv-indet" : ""),
       text,
       issues: nIssues,
       children: node.children.map((c) => resolveAll(c)),

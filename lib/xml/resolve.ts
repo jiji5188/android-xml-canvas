@@ -418,6 +418,36 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["max"] = a["max"] !== undefined ? parseFloat(a["max"]) || 100 : 100;
   out["cardCornerRadius"] = a["cardCornerRadius"] !== undefined ? (resolveSize(a["cardCornerRadius"], res, issues, path, "cardCornerRadius").kind as string === "dp" ? (resolveSize(a["cardCornerRadius"], res, issues, path, "cardCornerRadius") as { kind: "dp"; value: number }).value : 0) : 0;
 
+  // ===== M11t：补齐此前「只解析不渲染 / 完全没解析」的一批属性 =====
+  const dpNum = (name: string) => {
+    if (a[name] === undefined) return 0;
+    const s = resolveSize(a[name], res, issues, path, name);
+    return s.kind === "dp" || s.kind === "px" ? (s.value as number) : 0;
+  };
+  out["maxWidth"] = dpNum("maxWidth");
+  out["maxHeight"] = dpNum("maxHeight");
+  // RatingBar
+  out["numStars"] = a["numStars"] !== undefined ? Math.max(1, parseInt(a["numStars"], 10) || 5) : 5;
+  out["rating"] = a["rating"] !== undefined ? parseFloat(a["rating"]) || 0 : 0;
+  out["stepSize"] = a["stepSize"] !== undefined ? parseFloat(a["stepSize"]) || 0.5 : 0.5;
+  out["isIndicator"] = a["isIndicator"] === "true";
+  // ProgressBar
+  out["secondaryProgress"] = a["secondaryProgress"] !== undefined ? parseFloat(a["secondaryProgress"]) || 0 : 0;
+  out["indeterminate"] = a["indeterminate"] === "true";
+  // 染色（Button/CheckBox/RadioButton 的 buttonTint、SeekBar/Switch 的 thumbTint/trackTint）
+  out["buttonTint"] = a["buttonTint"] !== undefined ? resolveColor(a["buttonTint"], res, issues, path, "buttonTint") : "";
+  out["thumbTint"] = a["thumbTint"] !== undefined ? resolveColor(a["thumbTint"], res, issues, path, "thumbTint") : "";
+  out["trackTint"] = a["trackTint"] !== undefined ? resolveColor(a["trackTint"], res, issues, path, "trackTint") : "";
+  out["progressTint"] = a["progressTint"] !== undefined ? resolveColor(a["progressTint"], res, issues, path, "progressTint") : "";
+  out["indeterminateTint"] = a["indeterminateTint"] !== undefined ? resolveColor(a["indeterminateTint"], res, issues, path, "indeterminateTint") : "";
+  // 文本：hint 颜色 / 单行 / 最少行数
+  out["textColorHint"] = a["textColorHint"] !== undefined ? resolveColor(a["textColorHint"], res, issues, path, "textColorHint") : "";
+  out["singleLine"] = a["singleLine"] === "true";
+  out["minLines"] = a["minLines"] !== undefined ? parseInt(a["minLines"], 10) || 0 : 0;
+  // CardView
+  out["cardBackgroundColor"] = a["cardBackgroundColor"] !== undefined ? resolveColor(a["cardBackgroundColor"], res, issues, path, "cardBackgroundColor") : "";
+  out["cardElevation"] = dpNum("cardElevation");
+
   return { attrs: out, issues };
 }
 

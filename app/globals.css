@@ -450,7 +450,7 @@ input.m3-number {
   background-repeat: no-repeat;
   background-position: center;
   background-size: 72%;
-  border: 2px solid var(--axv-ctl-ring, transparent);
+  border: var(--axv-ctl-bw, 2px) solid var(--axv-ctl-ring, transparent);
 }
 .axv-switch::after {
   content: "";
@@ -458,8 +458,8 @@ input.m3-number {
   left: var(--axv-ctl-thumb-x, 2px);
   top: 50%;
   transform: translateY(-50%);
-  width: calc(var(--axv-ctl-h, 22px) - 4px);
-  height: calc(var(--axv-ctl-h, 22px) - 4px);
+  width: var(--axv-ctl-thumb-d, calc(var(--axv-ctl-h, 22px) - 4px));
+  height: var(--axv-ctl-thumb-d, calc(var(--axv-ctl-h, 22px) - 4px));
   border-radius: 50%;
   background-color: var(--axv-ctl-thumb, #ffffff);
   pointer-events: none;

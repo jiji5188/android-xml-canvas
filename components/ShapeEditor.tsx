@@ -137,7 +137,40 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
       </div>
 
         <div className="axv-shape-body">
-          {/* 左：参数 */}
+          {/* 左：预览 + 资源名（M20d：与参数面板对调位置） */}
+          <div className="axv-shape-side">
+            <div className="axv-shape-preview-box">
+              <div
+                className="axv-shape-preview"
+                style={{
+                  background: css.background,
+                  borderRadius: css.borderRadius,
+                  border: css.border,
+                  // M5c：inset 预览——背景向内裁掉 l/t/r/b（画布里由独立背景层实现）
+                  clipPath: css.clipPath,
+                  width: spec.kind === "line" ? "100%" : 180,
+                  height: spec.kind === "line" ? 2 : 100,
+                }}
+              />
+            </div>
+            <div className="axv-shape-preview-note">预览 = 画布效果（同一套渲染规则）</div>
+            <div className="axv-shape-name">
+              <label>资源名</label>
+              <div className="axv-shape-name-row">
+                <code>@drawable/</code>
+                <input
+                  className="axv-attr-input"
+                  value={name}
+                  spellCheck={false}
+                  placeholder="bg_card"
+                  onChange={(e) => setName(sanitizeResName(e.target.value, ""))}
+                />
+              </div>
+              {nameConflicts ? <div className="axv-shape-warn">这个名字已被占用，换一个或改已有资源</div> : null}
+            </div>
+          </div>
+
+          {/* 右：参数 */}
           <div className="axv-shape-form">
             <div className="axv-shape-field">
               <label>形状</label>
@@ -522,39 +555,8 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                 </>
               ) : null}
             </details>
-          </div>
 
-          {/* 右：预览 + 生成结果 */}
-          <div className="axv-shape-side">
-            <div className="axv-shape-preview-box">
-              <div
-                className="axv-shape-preview"
-                style={{
-                  background: css.background,
-                  borderRadius: css.borderRadius,
-                  border: css.border,
-                  // M5c：inset 预览——背景向内裁掉 l/t/r/b（画布里由独立背景层实现）
-                  clipPath: css.clipPath,
-                  width: spec.kind === "line" ? "100%" : 180,
-                  height: spec.kind === "line" ? 2 : 100,
-                }}
-              />
-            </div>
-            <div className="axv-shape-preview-note">预览 = 画布效果（同一套渲染规则）</div>
-            <div className="axv-shape-name">
-              <label>资源名</label>
-              <div className="axv-shape-name-row">
-                <code>@drawable/</code>
-                <input
-                  className="axv-attr-input"
-                  value={name}
-                  spellCheck={false}
-                  placeholder="bg_card"
-                  onChange={(e) => setName(sanitizeResName(e.target.value, ""))}
-                />
-              </div>
-              {nameConflicts ? <div className="axv-shape-warn">这个名字已被占用，换一个或改已有资源</div> : null}
-            </div>
+            {/* M20d：生成结果跟着参数走，放在「高级：渐变」后面 */}
             <pre className="axv-shape-xml">{xml}</pre>
           </div>
         </div>

@@ -456,12 +456,12 @@
   place-items: center;
   opacity: 0.75;
 }
-.axv-nav-btn svg {
-  /* M11：导航栏图标放大 2 倍 */
-  width: 36px;
-  height: 36px;
-  display: block;
-}
+/* M20e：返回按钮换成像素风 SVG（RunPreview.tsx 内联），尺寸跟导航栏图标协调 */
+/* M11：导航栏图标放大 2 倍；M20e：返回 1.6 倍（36 → 57.6），主页/多任务 1.3 倍（36 → 46.8） */
+.axv-nav-btn svg { width: 36px; height: 36px; display: block; }
+.axv-nav-btn[title='返回'] svg { width: 57.6px; height: 57.6px; }
+.axv-nav-btn[title^='主页'] svg,
+.axv-nav-btn[title^='多任务'] svg { width: 46.8px; height: 46.8px; }
 
 /* ===== 顶部悬浮工具栏（M6b 三栏布局） ===== */
 .axv-toolbar-v2 {
@@ -476,8 +476,8 @@
      M10：gap 3px + 主题背景填充（整条工具栏） */
   gap: 3px;
   padding: 3px 6px;
+  /* M20c：恢复主题变量背景（浅色主题下为 #F3F3F9） */
   background: var(--axv-toolbar-bg);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   /* M11：工具栏 9，标签栏 10（标签栏压在工具栏之上） */
   z-index: 9;
   pointer-events: none;
@@ -503,8 +503,8 @@
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
-  /* M11g：中区底色（半透明，透出工具栏主题背景） */
-  background-color: var(--axv-toolbar-soft);
+  /* M20c：中区底色改半透明深灰 */
+  background-color: #6767672e;
   /* M11h：中区圆角胶囊 */
   border-radius: 20px;
   /* 圆角会裁掉首尾按钮的两端，左右给 4px 缓冲 */
@@ -887,6 +887,8 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  /* M20c：半透明白底 */
+  background-color: #ffffff1a;
 }
 .axv-rail-head {
   display: flex;
@@ -965,6 +967,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* M20c：半透明白底 */
+  background-color: #ffffff1a;
 }
 
 /* 代码 / 资源 编辑器 */
@@ -2031,6 +2035,9 @@
   display: flex;
   align-items: center;
   gap: 3px;
+  /* M20b：左右留 8px 内边距 + 半透明灰背景 */
+  padding: 0px 8px;
+  background-color: #b1b1b142;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
@@ -2821,7 +2828,7 @@
 /* ===== M3h 自定义形状编辑器 ===== */
 .axv-shape-modal { width: min(880px, 94vw); max-height: 88vh; display: flex; flex-direction: column; }
 .axv-shape-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
-.axv-shape-form { flex: 1 1 52%; min-width: 0; overflow-y: auto; padding: 12px 16px; border-right: 1px solid rgba(0,0,0,.08); }
+.axv-shape-form { flex: 1 1 52%; min-width: 0; overflow-y: auto; padding: 12px 16px; border-left: 1px solid rgba(0,0,0,.08); background-color: #d5d5d517; }
 .axv-shape-field { margin-bottom: 12px; }
 .axv-shape-field > label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #4a4a55; margin-bottom: 5px; }
 .axv-shape-hint { font-weight: 400; color: #8b8b98; font-size: 11px; }
@@ -2842,8 +2849,8 @@
 .axv-shape-check-line { font-weight: 600; color: #4a4a55; }
 .axv-shape-adv { margin-top: 4px; padding-top: 10px; border-top: 1px dashed rgba(0,0,0,.12); }
 .axv-shape-adv > summary { font-size: 12px; font-weight: 600; color: #4a4a55; cursor: pointer; margin-bottom: 10px; }
-.axv-shape-side { flex: 1 1 48%; min-width: 0; display: flex; flex-direction: column; padding: 12px 16px; overflow-y: auto; background: #faf9fd; }
-.axv-shape-preview-box { display: grid; place-items: center; height: 140px; border: 1px dashed rgba(0,0,0,.14); border-radius: 12px; background: #fff; }
+.axv-shape-side { flex: 1 1 48%; min-width: 0; display: flex; flex-direction: column; padding: 12px 16px; overflow-y: auto; background-color: #d5d5d517; }
+.axv-shape-preview-box { display: grid; place-items: center; height: 140px; border: 1px dashed rgba(0,0,0,.14); border-radius: 12px; background: #ffffff61; }
 .axv-shape-preview { max-width: 100%; }
 .axv-shape-preview-note { font-size: 11px; color: #8b8b98; text-align: center; margin: 6px 0 12px; }
 .axv-shape-name > label { font-size: 12px; font-weight: 600; color: #4a4a55; display: block; margin-bottom: 5px; }
@@ -3161,14 +3168,15 @@
   gap: 12px;
   height: 52px;
   padding: 0 16px;
-  background: var(--axv-surface);
+  /* M20e：半透明白底 */
+  background: #ffffff24;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 .axv-shape-back {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  height: 30px;
+  height: 60px;
   padding: 0 12px 0 6px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 999px;
@@ -3177,9 +3185,9 @@
   font-size: 12.5px;
   cursor: pointer;
 }
-.axv-shape-back:hover { background: #f4f3f8; }
-.axv-shape-back .msr { font-size: 18px; }
-.axv-shape-title { font-size: 13.5px; font-weight: 600; color: #1d1b20; }
+.axv-shape-back:hover { background: #ffffff54; }
+.axv-shape-back .msr { font-size: 54px; }
+.axv-shape-title { font-size: 13.5px; font-weight: 600; color: var(--axv-title); }
 .axv-shape-head .axv-icon-btn { margin-left: auto; }
 
 /* 页面内两栏：左参数 / 右预览+XML，各自滚动 */
@@ -3197,15 +3205,16 @@
   min-width: 0;
   padding: 18px 22px 28px;
   overflow-y: auto;
-  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
   border-bottom: none;
+  background-color: #d5d5d517;
 }
 .axv-shape-page .axv-shape-side {
   flex: none;
   min-width: 0;
   padding: 18px 22px 28px;
   overflow-y: auto;
-  background: var(--axv-surface-sunken);
+  background-color: #d5d5d517;
 }
 .axv-shape-page .axv-shape-preview-box { height: auto; min-height: 220px; }
 .axv-shape-page .axv-shape-xml { min-height: 120px; max-height: none; flex: 0 0 auto; }
@@ -3592,7 +3601,7 @@
   border-radius: 7px;
 }
 .axv-btn.axv-ghost {
-  background: transparent;
+  background: #73717140;
 }
 @media (max-width: 640px) {
   .axv-assets-foot {
@@ -3925,6 +3934,9 @@
   flex-direction: column;
   gap: 8px;
   align-items: center;
+  /* M20e：底色 + 收紧内边距 */
+  background-color: #ffffff14;
+  padding: 6px;
 }
 .axv-icon-ed-canvas {
   width: 200px;
@@ -4154,6 +4166,8 @@
   gap: 16px;
   padding: 16px;
   align-items: flex-start;
+  /* M20e：半透明白底 */
+  background: #ffffff14;
 }
 .axv-icon-page-foot {
   flex: 0 0 auto;
@@ -4166,7 +4180,7 @@
   height: auto;
   padding: 0 16px 16px;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
-  background: var(--axv-surface, var(--axv-surface));
+  background: #ffffff24;
   font-size: 12px;
   color: var(--axv-muted, var(--axv-on-surface-variant));
 }
@@ -4214,7 +4228,8 @@
   .axv-icon-page .axv-icon-ed-preview {
     flex: 0 0 auto;
     position: static;
-    flex-direction: row;
+    /* M20e：移动端改成竖排（与桌面一致，不并排挤） */
+    flex-direction: column;
     justify-content: center;
     width: 100%;
   }

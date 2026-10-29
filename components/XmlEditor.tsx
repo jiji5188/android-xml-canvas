@@ -1713,11 +1713,15 @@ export function XmlEditor() {
     // 现在缩放是乘数：放大到超宽就出横向滚动条，看细节；缩小则整体变小。
     // M20：widthPx 里已经乘过 scale，这里只负责「装进视口」，不能再乘一次
     // （以前 ×scale 导致缩小 0.6 → 布局 0.6 再 transform 0.6 = 视觉 0.36）
+    // M20f：方向纠正——fitRatio 必须是「单调不减」：放大 → 1:1 甚至滚动（不缩小）；
+    //       缩小 → 布局已变小 → 不额外套 transform，保持真实尺寸；
+    //       只有缩放后仍装不下（且是缩小/复位档）时才按基准装入比轻微压缩，
+    //       否则窄窗缩小后外壳反而比 1:1 还大，方向是反的
     const baseW = device.w * SCALE + PHONE_BORDER * 2;
-    const fitBase = Math.min(1, avail / Math.max(1, baseW));
-    // 缩放后本来就装得下 → 不要再套贴合缩放（否则缩到 0.6 却只剩 0.48）
     const layoutW = Math.round(device.w * SCALE * scale) + PHONE_BORDER * 2;
-    return layoutW <= avail ? 1 : fitBase;
+    if (layoutW <= avail) return 1;
+    if (scale >= 1) return 1; // 放大档：超宽就滚动看细节，不压回窗口
+    return Math.min(1, avail / Math.max(1, baseW)); // 缩小档且装不下：轻微压缩
   })();
 
   function shortTag(t: string): string {

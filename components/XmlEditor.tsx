@@ -350,7 +350,7 @@ const SAMPLES: Record<string, string> = {
 </LinearLayout>`,
 };
 
-const APP_VERSION = "1.12";
+const APP_VERSION = "1.13";
 const SCALE = 2; // 1dp = 2px
 
 export function XmlEditor() {
@@ -518,10 +518,30 @@ export function XmlEditor() {
   /** M5b：已生成资源管理面板 */
   // M11：设置 / 关于面板
   // M16h：界面主题改成「预设配色方案 + 亮/暗」，token 见 lib/xml/theme-presets.ts
-  const [theme, setTheme] = useState<ThemeMode>("light");
-  const [themePreset, setThemePreset] = useState<string>(DEFAULT_PRESET_ID);
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    try {
+      return window.localStorage.getItem("axv.theme") === "dark" ? "dark" : "light";
+    } catch {
+      return "light";
+    }
+  });
+  const [themePreset, setThemePreset] = useState<string>(() => {
+    try {
+      const p = window.localStorage.getItem("axv.themePreset");
+      return p && THEME_PRESETS.some((x) => x.id === p) ? p : DEFAULT_PRESET_ID;
+    } catch {
+      return DEFAULT_PRESET_ID;
+    }
+  });
   /** M16d：预览渲染主题（默认 AppCompat，跟 AIDE 真机一致） */
-  const [renderTheme, setRenderTheme] = useState<RenderTheme>(DEFAULT_RENDER_THEME);
+  const [renderTheme, setRenderTheme] = useState<RenderTheme>(() => {
+    try {
+      const rt = window.localStorage.getItem("axv.renderTheme");
+      return rt === "material3" || rt === "appcompat" ? rt : DEFAULT_RENDER_THEME;
+    } catch {
+      return DEFAULT_RENDER_THEME;
+    }
+  });
   const [showSystemBars, setShowSystemBars] = useState(true);
   const [showIssues, setShowIssues] = useState(true);
 
@@ -537,17 +557,8 @@ export function XmlEditor() {
   }, [theme, themePreset]);
 
   // M11：启动时恢复主题（兼容旧 key：axv.theme=dark）
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem("axv.theme") === "dark") setTheme("dark");
-      const preset = window.localStorage.getItem("axv.themePreset");
-      if (preset && THEME_PRESETS.some((p) => p.id === preset)) setThemePreset(preset);
-      const rt = window.localStorage.getItem("axv.renderTheme");
-      if (rt === "material3" || rt === "appcompat") setRenderTheme(rt);
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  // 注意：读 localStorage 必须在 useState 初始化里做，不能放 effect——
+  // 否则「持久化 effect」会先一步把默认值写回去，刚存的主题被自己覆盖。
 
   // M16d：渲染主题持久化
   useEffect(() => {
@@ -2537,7 +2548,7 @@ const findResolved = findResolvedNode;
                 />
               ) : (
                 <>
-                  <div style={{ padding: "8px 12px 4px", fontSize: 12, color: "#6B7280", lineHeight: 1.5 }}>
+                  <div style={{ padding: "8px 12px 4px", fontSize: 12, color: "var(--axv-on-surface-variant)", lineHeight: 1.5 }}>
                     上传 res/ 目录后可在这里以树形浏览资源文件，点击 layout/*.xml 直接预览。
                   </div>
                   <div className="axv-res-box">

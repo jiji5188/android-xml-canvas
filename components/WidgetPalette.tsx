@@ -134,7 +134,11 @@ export function WidgetPalette({ onInsert, hasSelection }: Props) {
                               }}
                               onClick={() => onInsert(w)}
                             >
-                              <span className="msr" aria-hidden="true" style={{ fontSize: 26, color: "#04409F" }}>
+                              <span
+                                className="msr"
+                                aria-hidden="true"
+                                style={{ fontSize: 26, color: "var(--axv-primary)" }}
+                              >
                                 {w.icon}
                               </span>
                               <span className="axv-pp-tile-label">{w.label}</span>

@@ -190,7 +190,7 @@ export function ResTree({ tree, onOpenLayout, layouts, extras, onOpenDrawable, o
   return (
     <div className="axv-restree">
       {entries.length === 0 ? (
-        <div style={{ padding: 12, color: "#888", fontSize: 12 }}>
+        <div style={{ padding: 12, color: "var(--axv-on-surface-variant)", fontSize: 12 }}>
           尚无资源，请用工具栏「选择 res 文件 / res 目录」导入
         </div>
       ) : (

@@ -67,6 +67,19 @@ function viewClass(rawTag: string, a: ResolvedAttrs): string {
       return "axv-timepicker";
     case "ViewStub":
       return "axv-viewstub";
+    // M16b：网页 / 视频 / 画布 / 日历等占位（真机 UI 无法用 DOM 复原）
+    case "WebView":
+      return "axv-webview";
+    case "VideoView":
+    case "TextureView":
+    case "SurfaceView":
+      return "axv-video";
+    case "Chronometer":
+      return "axv-clock";
+    case "CalendarView":
+      return "axv-calendar";
+    case "ViewPager":
+      return "axv-list";
     case "Switch":
     case "SwitchMaterial":
     case "SwitchCompat":

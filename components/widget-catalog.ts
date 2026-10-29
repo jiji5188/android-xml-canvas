@@ -20,6 +20,8 @@ export interface WidgetDef {
 }
 
 const A = 'xmlns:android="http://schemas.android.com/apk/res/android"';
+/** M16b：带 app: 属性的模板要同时声明 res-auto 命名空间 */
+const AP = 'xmlns:app="http://schemas.android.com/apk/res-auto"';
 
 export const WIDGETS: WidgetDef[] = [
   // ===== 布局 =====
@@ -822,6 +824,174 @@ export const WIDGETS: WidgetDef[] = [
     android:layout_height="wrap_content"
     android:text="可勾选文本"
     android:checkMark="?android:attr/listChoiceIndicatorMultiple" />`,
+  },
+
+  // ===== M16b：第二批补齐（带占位渲染） =====
+  {
+    key: "webview", label: "网页视图", tag: "WebView", icon: "language", lib: "android", group: "控件",
+    xml: `<WebView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="200dp" />`,
+  },
+  {
+    key: "videoview", label: "视频播放", tag: "VideoView", icon: "videocam", lib: "android", group: "图片",
+    xml: `<VideoView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="200dp" />`,
+  },
+  {
+    key: "textureview", label: "纹理视图", tag: "TextureView", icon: "texture", lib: "android", group: "图片",
+    xml: `<TextureView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="200dp" />`,
+  },
+  {
+    key: "surfaceview", label: "画布表面", tag: "SurfaceView", icon: "brush", lib: "android", group: "图片",
+    xml: `<SurfaceView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="200dp" />`,
+  },
+  {
+    key: "chronometer", label: "计时器", tag: "Chronometer", icon: "timer", lib: "android", group: "文本",
+    xml: `<Chronometer ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:format="%s" />`,
+  },
+  {
+    key: "calendar_view", label: "日历", tag: "CalendarView", icon: "calendar_month", lib: "android", group: "控件",
+    xml: `<CalendarView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" />`,
+  },
+  {
+    key: "view_flipper", label: "轮播容器", tag: "ViewFlipper", icon: "auto_awesome_motion", lib: "android", group: "布局",
+    xml: `<ViewFlipper ${A}
+    android:layout_width="match_parent"
+    android:layout_height="200dp">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+    </FrameLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+    </FrameLayout>
+</ViewFlipper>`,
+  },
+  {
+    key: "view_animator", label: "页面动画容器", tag: "ViewAnimator", icon: "animation", lib: "android", group: "布局",
+    xml: `<ViewAnimator ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="第一页" />
+</ViewAnimator>`,
+  },
+  {
+    key: "view_pager", label: "翻页（旧）", tag: "ViewPager", icon: "view_carousel", lib: "androidx", group: "布局",
+    xml: `<androidx.viewpager.widget.ViewPager ${A}
+    android:layout_width="match_parent"
+    android:layout_height="200dp" />`,
+  },
+  {
+    key: "tabhost", label: "选项卡容器", tag: "TabHost", icon: "tabs", lib: "android", group: "布局",
+    xml: `<TabHost ${A}
+    android:id="@android:id/tabhost"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <TabWidget
+            android:id="@android:id/tabs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <FrameLayout
+            android:id="@android:id/tabcontent"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+</TabHost>`,
+  },
+  {
+    key: "tabwidget", label: "选项卡标签", tag: "TabWidget", icon: "tab_unselected", lib: "android", group: "控件",
+    xml: `<TabWidget ${A}
+    android:id="@android:id/tabs"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" />`,
+  },
+  {
+    key: "mat_btn_toggle", label: "M 按钮组", tag: "MaterialButtonToggleGroup", icon: "join_full", lib: "material", group: "控件",
+    xml: `<com.google.android.material.button.MaterialButtonToggleGroup ${A}
+    ${AP}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    app:singleSelection="true">
+
+    <com.google.android.material.button.MaterialButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="左"
+        style="@style/Widget.Material3.Button.OutlinedButton" />
+
+    <com.google.android.material.button.MaterialButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="右"
+        style="@style/Widget.Material3.Button.OutlinedButton" />
+</com.google.android.material.button.MaterialButtonToggleGroup>`,
+  },
+  {
+    key: "mat_collapsing", label: "折叠标题栏", tag: "CollapsingToolbarLayout", icon: "unfold_more", lib: "material", group: "布局",
+    xml: `<com.google.android.material.appbar.CollapsingToolbarLayout ${A}
+    ${AP}
+    android:layout_width="match_parent"
+    android:layout_height="200dp"
+    app:layout_scrollFlags="scroll|exitUntilCollapsed"
+    app:title="折叠标题">
+
+    <androidx.appcompat.widget.Toolbar
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        app:layout_collapseMode="pin" />
+</com.google.android.material.appbar.CollapsingToolbarLayout>`,
+  },
+  {
+    key: "mat_nav_view", label: "侧滑菜单", tag: "NavigationView", icon: "menu", lib: "material", group: "布局",
+    xml: `<com.google.android.material.navigation.NavigationView ${A}
+    ${AP}
+    android:layout_width="280dp"
+    android:layout_height="match_parent"
+    app:headerLayout="@layout/nav_header"
+    app:menu="@menu/nav_menu" />`,
+  },
+  {
+    key: "motion_layout", label: "动效布局", tag: "MotionLayout", icon: "animation", lib: "androidx", group: "布局",
+    xml: `<androidx.constraintlayout.motion.widget.MotionLayout ${A}
+    ${AP}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:layoutDescription="@xml/scene">
+</androidx.constraintlayout.motion.widget.MotionLayout>`,
+  },
+  {
+    key: "flow", label: "流式辅助", tag: "Flow", icon: "wrap_text", lib: "androidx", group: "布局",
+    xml: `<androidx.constraintlayout.helper.widget.Flow ${A}
+    ${AP}
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    app:flow_wrapMode="chain"
+    app:constraint_referenced_ids="" />`,
   },
 ];
 

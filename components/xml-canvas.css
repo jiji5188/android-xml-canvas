@@ -4184,3 +4184,57 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
     transform: rotate(360deg);
   }
 }
+
+/* ===== M16b：系统接管 UI 的控件 —— 占位渲染 ===== */
+.axv-node.axv-webview,
+.axv-node.axv-video,
+.axv-node.axv-calendar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  position: relative;
+  background: #FFFFFF;
+  border: 1px dashed #B0AEB8;
+  border-radius: 8px;
+  color: #757575;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.axv-node.axv-webview::before {
+  content: "WebView 网页";
+}
+
+.axv-node.axv-video {
+  background: #212121;
+  border-color: #212121;
+  color: #FFFFFF;
+}
+
+.axv-node.axv-video::before {
+  content: "▶ 视频画面";
+}
+
+.axv-node.axv-calendar {
+  min-height: 240px;
+  background: #FFFFFF;
+  border: 1px solid #DADCE0;
+  border-radius: 12px;
+}
+
+.axv-node.axv-calendar::before {
+  content: "CalendarView 日历（系统 UI）";
+}
+
+/* 计时器：画成普通文本的样子 */
+.axv-node.axv-clock {
+  display: inline-block;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.axv-node.axv-clock::before {
+  content: "00:00";
+}

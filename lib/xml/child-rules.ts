@@ -143,6 +143,14 @@ export const C4_LEAF = [
   "SearchView", // LinearLayout 子类，内部 UI 系统接管，不给塞子控件
   "TabItem", // TabLayout 的子项
   "CheckedTextView",
+  // M16b
+  "WebView", // ViewGroup 子类但内容由 WebView 引擎接管，不给塞子控件
+  "VideoView",
+  "TextureView",
+  "SurfaceView",
+  "Chronometer",
+  "CalendarView", // FrameLayout 子类，日历 UI 系统接管
+  "Flow", // ConstraintLayout 辅助，不是真控件
 ];
 
 /** 类别 5：特殊标签（不是 View / ViewGroup） */

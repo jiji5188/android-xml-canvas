@@ -462,6 +462,19 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["boxStrokeColor"] = a["boxStrokeColor"] !== undefined ? resolveColor(a["boxStrokeColor"], res, issues, path, "boxStrokeColor") : "";
   out["boxBackgroundColor"] = a["boxBackgroundColor"] !== undefined ? resolveColor(a["boxBackgroundColor"], res, issues, path, "boxBackgroundColor") : "";
   out["boxBackgroundMode"] = a["boxBackgroundMode"] ?? "";
+  // M11x：卡片 / MaterialButton 描边、Chip 的 checkable、TabItem 选中态、Toolbar 标题、
+  // NumberPicker 当前值、SearchView 提示文案（这些以前压根没透传，渲染层永远拿不到）
+  out["strokeColor"] = a["strokeColor"] !== undefined ? resolveColor(a["strokeColor"], res, issues, path, "strokeColor") : "";
+  out["strokeWidth"] = dpNum("strokeWidth");
+  out["checkable"] = a["checkable"] === "true";
+  out["checkedTab"] = a["checked"] === "true";
+  out["title"] = a["title"] !== undefined ? resolveText(a["title"], res, issues, path) : "";
+  out["subtitle"] = a["subtitle"] !== undefined ? resolveText(a["subtitle"], res, issues, path) : "";
+  out["queryHint"] = a["queryHint"] !== undefined ? resolveText(a["queryHint"], res, issues, path) : "";
+  out["value"] = a["value"] !== undefined ? parseFloat(a["value"]) || 0 : NaN;
+  out["valueFrom"] = a["valueFrom"] !== undefined ? parseFloat(a["valueFrom"]) || 0 : 0;
+  out["valueTo"] = a["valueTo"] !== undefined ? parseFloat(a["valueTo"]) || 100 : 100;
+  out["indicatorColor"] = a["indicatorColor"] !== undefined ? resolveColor(a["indicatorColor"], res, issues, path, "indicatorColor") : "";
 
   return { attrs: out, issues };
 }

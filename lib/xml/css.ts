@@ -34,6 +34,11 @@ function viewClass(rawTag: string, a: ResolvedAttrs): string {
     case "EditText":
     case "AppCompatEditText":
     case "TextInputEditText":
+    case "AutoCompleteTextView":
+    case "AppCompatAutoCompleteTextView":
+    case "SearchView":
+    case "AppCompatSearchView":
+    case "MultiAutoCompleteTextView":
       return "axv-text";
     case "ImageView":
     case "AppCompatImageView":
@@ -68,6 +73,33 @@ function viewClass(rawTag: string, a: ResolvedAttrs): string {
     case "SeekBar":
     case "Slider":
       return "axv-seek";
+    case "ToggleButton":
+    case "AppCompatToggleButton":
+      return "axv-text";
+    case "NumberPicker":
+      return "axv-numberpicker";
+    // M11x：Material 组件
+    case "Chip":
+      return "axv-chip";
+    case "ChipGroup":
+      return "axv-chipgroup";
+    case "TabLayout":
+      return "axv-tabs";
+    case "TabItem":
+      return "axv-tab";
+    case "FloatingActionButton":
+      return "axv-fab";
+    case "ExtendedFloatingActionButton":
+      return "axv-fab-ext";
+    case "BottomNavigationView":
+    case "NavigationBarView":
+      return "axv-bottomnav";
+    case "Toolbar":
+    case "MaterialToolbar":
+      return "axv-toolbar";
+    case "CircularProgressIndicator":
+    case "LinearProgressIndicator":
+      return "axv-progress";
     case "Spinner":
       return "axv-spinner";
     // M11t：评分条（5 颗星，按 rating/numStars 上色）
@@ -659,6 +691,20 @@ export function buildRenderModel(
         style.alignItems = style.alignItems ?? "center";
         if (tag !== "MaterialButton" && attrs["textAllCaps"] === undefined) style.textTransform = "uppercase";
       }
+      // M11x：ToggleButton 是带底色的按钮（默认 ON/OFF 文案）——复用 button 的壳子
+      if (tag === "ToggleButton" || tag === "AppCompatToggleButton") {
+        style.minWidth = style.minWidth ?? `${DP(88, scale)}px`;
+        style.minHeight = style.minHeight ?? `${DP(48, scale)}px`;
+        style.paddingLeft = style.paddingLeft ?? `${DP(16, scale)}px`;
+        style.paddingRight = style.paddingRight ?? `${DP(16, scale)}px`;
+        style.textAlign = style.textAlign ?? "center";
+        style.justifyContent = style.justifyContent ?? "center";
+        style.alignItems = style.alignItems ?? "center";
+        style.backgroundColor = style.backgroundColor ?? "#E8E8EC";
+        style.color = style.color ?? "#1D1B20";
+        style.borderRadius = style.borderRadius ?? `${DP(4, scale)}px`;
+        style.cursor = "pointer";
+      }
       // 排版细节：letterSpacing / lineSpacingExtra / maxLines / ellipsize
       const fsPx = parseFloat(String(style.fontSize ?? "28")) || 28;
       const ls = attrs["letterSpacing"] as number;
@@ -669,7 +715,9 @@ export function buildRenderModel(
       const ellip = (attrs["ellipsize"] as string) || "";
       if (ml > 0 || ellip) {
         if (ml > 0) {
+          // M11x：少了 -webkit-box-orient: vertical，line-clamp 完全不生效（多行照样溢出）
           style.display = "-webkit-box";
+          style.WebkitBoxOrient = "vertical";
           style.WebkitLineClamp = String(ml);
           style.overflow = "hidden";
         }
@@ -695,6 +743,17 @@ export function buildRenderModel(
         style.borderRadius = style.borderRadius ?? `${DP(20, scale)}px`;
         style.fontWeight = 500;
         style.cursor = "pointer";
+        // M11x：app:strokeColor + strokeWidth 的 MaterialButton 是「描边按钮」（OutlinedButton），
+        // 底色应透明、文字跟描边同色 —— 以前一律涂满主色，看起来像实心按钮
+        const sCol = (attrs["strokeColor"] as string) || "";
+        const sW = (attrs["strokeWidth"] as number) || 0;
+        if (tag === "MaterialButton" && sCol && !tint && !bg) {
+          style.backgroundColor = "transparent";
+          style.border = `${DP(sW || 1, scale)}px solid ${sCol}`;
+          style.color = tcRaw || sCol;
+        } else if (tag === "MaterialButton" && sCol && sW) {
+          style.border = `${DP(sW, scale)}px solid ${sCol}`;
+        }
       }
       if (tag === "EditText" || tag === "AppCompatEditText" || tag === "TextInputEditText") {
         style.border = style.border ?? "1px solid #E0D9E3";
@@ -812,7 +871,8 @@ export function buildRenderModel(
     let progressRing = false;
     if (cls === "axv-progress") {
       const styleAttr = (attrs["progressStyle"] as string) || "";
-      if (/horizontal/i.test(styleAttr)) {
+      const linearTag = tag === "LinearProgressIndicator";
+      if (/horizontal/i.test(styleAttr) || linearTag) {
         style.height = style.height || `${DP(4, scale)}px`;
         style.backgroundColor = style.backgroundColor || "#E0D9E3";
         style.borderRadius = `${DP(2, scale)}px`;
@@ -824,7 +884,7 @@ export function buildRenderModel(
         const secRatio = maxP > 0 ? Math.min(1, Math.max(0, ((attrs["secondaryProgress"] as number) || 0) / maxP)) : 0;
         (style as React.CSSProperties & Record<string, string>)["--axv-progress"] = String(ratio);
         (style as React.CSSProperties & Record<string, string>)["--axv-progress-color"] =
-          (attrs["progressTint"] as string) || (attrs["tint"] as string) || "#6750A4";
+          (attrs["indicatorColor"] as string) || (attrs["progressTint"] as string) || (attrs["tint"] as string) || "#6750A4";
         if (secRatio > ratio) {
           style.backgroundImage = `linear-gradient(to right, transparent 0 ${ratio * 100}%, #C9C0F0 ${ratio * 100}% ${secRatio * 100}%, transparent ${secRatio * 100}%)`;
         }
@@ -844,7 +904,7 @@ export function buildRenderModel(
         style.width = style.width || `${DP(32, scale)}px`;
         style.height = style.height || `${DP(32, scale)}px`;
         (style as React.CSSProperties & Record<string, string>)["--axv-progress-color"] =
-          (attrs["progressTint"] as string) || (attrs["indeterminateTint"] as string) || "#6750A4";
+          (attrs["indicatorColor"] as string) || (attrs["progressTint"] as string) || (attrs["indeterminateTint"] as string) || "#6750A4";
         (style as React.CSSProperties & Record<string, string>)["--axv-ring-w"] = `${DP(3, scale)}px`;
         progressRing = true;
       }
@@ -1075,6 +1135,21 @@ export function buildRenderModel(
 
     if (cls === "axv-seek") {
       text = "";
+    } else if (tag === "ToggleButton" || tag === "AppCompatToggleButton") {
+      // Android ToggleButton：checked 时显示 textOn（默认 ON），反之 textOff（默认 OFF）
+      const onNow = !!attrs["checked"];
+      const onOff = (onNow ? (attrs["textOn"] as string) || "ON" : (attrs["textOff"] as string) || "OFF");
+      text = text || onOff;
+    } else if (tag === "NumberPicker") {
+      // 只画中间那一行当前值
+      const v = attrs["value"] as number;
+      text = Number.isFinite(v) ? String(v) : text;
+    } else if (cls === "axv-fab-ext") {
+      text = text || (attrs["title"] as string) || "";
+    } else if (cls === "axv-toolbar") {
+      text = (attrs["title"] as string) || text;
+    } else if (cls === "axv-text" && tag === "SearchView") {
+      text = text || (attrs["queryHint"] as string) || (attrs["hint"] as string) || "";
     } else if (cls === "axv-include") {
       text = "⟳ include " + ((node.attrs["layout"] as string) || "");
     } else if (cls === "axv-viewstub") {
@@ -1105,6 +1180,92 @@ export function buildRenderModel(
       style.alignItems = "center";
     }
 
+    // ===== M11x：Material 组件外观默认值（以前全靠 axv-container 空壳） =====
+    if (cls === "axv-chip") {
+      // Chip：小胶囊（不是整宽卡片），选中态用同色系深一号底
+      style.display = "inline-flex";
+      style.alignItems = "center";
+      style.justifyContent = "center";
+      style.height = style.height === "auto" ? `${DP(32, scale)}px` : style.height;
+      style.minHeight = `${DP(32, scale)}px`;
+      style.paddingLeft = style.paddingLeft === "0px" || !style.paddingLeft ? `${DP(12, scale)}px` : style.paddingLeft;
+      style.paddingRight = style.paddingRight === "0px" || !style.paddingRight ? `${DP(12, scale)}px` : style.paddingRight;
+      style.borderRadius = style.borderRadius ?? `${DP(8, scale)}px`;
+      style.backgroundColor = style.backgroundColor ?? (attrs["checked"] ? "#D0BCFF" : "#E8DEF8");
+      style.color = style.color ?? "#1D192B";
+      style.fontSize = style.fontSize === "28px" || !style.fontSize ? `${DP(14, scale)}px` : style.fontSize;
+      style.flex = "0 0 auto";
+    } else if (cls === "axv-chipgroup") {
+      style.display = "flex";
+      style.flexDirection = "row";
+      style.flexWrap = "wrap";
+      style.alignItems = "center";
+      style.gap = style.gap ?? `${DP(8, scale)}px`;
+    } else if (cls === "axv-tabs") {
+      style.display = "flex";
+      style.flexDirection = "row";
+      style.alignItems = "stretch";
+      style.minHeight = `${DP(48, scale)}px`;
+      style.borderBottom = style.borderBottom ?? `1px solid #E0D9E3`;
+    } else if (cls === "axv-tab") {
+      style.display = "flex";
+      style.flex = "1 1 0";
+      style.alignItems = "center";
+      style.justifyContent = "center";
+      style.height = `${DP(48, scale)}px`;
+      style.fontSize = style.fontSize === "28px" || !style.fontSize ? `${DP(14, scale)}px` : style.fontSize;
+      style.fontWeight = 500;
+      style.color = style.color ?? (attrs["checkedTab"] ? "#6750A4" : "#49454F");
+      if (attrs["checkedTab"]) style.boxShadow = `inset 0 -${DP(3, scale)}px 0 #6750A4`;
+    } else if (cls === "axv-fab" || cls === "axv-fab-ext") {
+      const fabBg = (attrs["backgroundTint"] as string) || "#6750A4";
+      style.backgroundColor = style.backgroundColor ?? fabBg;
+      style.color = style.color ?? "#FFFFFF";
+      style.flex = "0 0 auto";
+      style.display = "inline-flex";
+      style.alignItems = "center";
+      style.justifyContent = "center";
+      style.boxShadow = style.boxShadow ?? "0 4px 10px rgba(0,0,0,0.22)";
+      if (cls === "axv-fab") {
+        const d = DP(56, scale);
+        style.width = style.width === "auto" || !style.width ? `${d}px` : style.width;
+        style.height = style.height === "auto" || !style.height ? `${d}px` : style.height;
+        style.borderRadius = style.borderRadius ?? "50%";
+        // 图标用 padding 收成 24dp（img 层铺满内容区，padding 就是它的内缩）
+        style.paddingLeft = style.paddingRight = style.paddingTop = style.paddingBottom = `${DP(16, scale)}px`;
+        const fabSrc = (attrs["src"] as string) || "";
+        if (fabSrc && /^(data:|builtin:)/.test(fabSrc)) imgSrc = fabSrc;
+      } else {
+        style.borderRadius = style.borderRadius ?? `${DP(16, scale)}px`;
+        style.paddingLeft = style.paddingLeft ?? `${DP(20, scale)}px`;
+        style.paddingRight = style.paddingRight ?? `${DP(20, scale)}px`;
+        style.height = style.height === "auto" || !style.height ? `${DP(56, scale)}px` : style.height;
+        style.fontWeight = 500;
+      }
+    } else if (cls === "axv-numberpicker") {
+      // Android NumberPicker：上下两行淡字 + 中间选中值 + 两条分割线
+      style.display = "flex";
+      style.flexDirection = "column";
+      style.alignItems = "center";
+      style.justifyContent = "center";
+      style.width = style.width === "auto" || !style.width ? `${DP(120, scale)}px` : style.width;
+      style.height = style.height === "auto" || !style.height ? `${DP(120, scale)}px` : style.height;
+      style.fontSize = style.fontSize === "28px" || !style.fontSize ? `${DP(16, scale)}px` : style.fontSize;
+      style.color = style.color ?? "#1D1B20";
+    } else if (cls === "axv-toolbar") {
+      style.display = "flex";
+      style.flexDirection = "row";
+      style.alignItems = "center";
+      style.paddingLeft = style.paddingLeft ?? `${DP(16, scale)}px`;
+      style.fontSize = style.fontSize === "28px" || !style.fontSize ? `${DP(20, scale)}px` : style.fontSize;
+    } else if (cls === "axv-bottomnav") {
+      style.display = "flex";
+      style.flexDirection = "row";
+      style.alignItems = "center";
+      style.justifyContent = "space-around";
+      style.minHeight = `${DP(56, scale)}px`;
+    }
+
     // M2q：include 展开的节点在渲染模型里是「只读投影」，标记来源文件（UI 据此禁用编辑）。
     // 嵌套 include 时子树自带更近的 includeFile，逐层传递。
     const sourceFile = node.includeFile;
@@ -1122,7 +1283,17 @@ export function buildRenderModel(
         (cls === "axv-progress" && progressRing ? " axv-progress-ring" : ""),
       text,
       issues: nIssues,
-      children: node.children.map((c) => resolveAll(c)),
+      children: node.children.map((c) => {
+        const rc = resolveAll(c);
+        // M11x：TextInputLayout 的 EditText 自己不画边框/底色（描边由外层 TIL 负责），
+        // 否则预览里会套一个「框中框」
+        if (shortTag(node.tag) === "TextInputLayout") {
+          delete rc.style.border;
+          delete rc.style.borderRadius;
+          rc.style.backgroundColor = "transparent";
+        }
+        return rc;
+      }),
       rawAttrs: node.attrs,
     };
     if (sourceFile) resolved.sourceFile = sourceFile;

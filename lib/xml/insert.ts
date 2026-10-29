@@ -44,6 +44,9 @@ const CONTAINER_TAGS = new Set([
   "TextInputLayout",
   "MotionLayout",
   "ChipGroup",
+  // MaterialButtonToggleGroup 本质是 LinearLayout，XML 里直接放 MaterialButton 是合法的
+  "MaterialButtonToggleGroup",
+  "SquareButtonToggleGroup",
   "TabLayout",
   "Toolbar",
   "MaterialToolbar",

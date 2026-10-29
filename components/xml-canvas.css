@@ -3125,6 +3125,35 @@
 }
 .axv-img-layer {
   z-index: 1;
+  display: block;
+}
+
+/* ===== M11x：NumberPicker（上下淡字 + 中间选中值 + 两条分割线） ===== */
+.axv-node.axv-numberpicker::before,
+.axv-node.axv-numberpicker::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 1px;
+  background: #cac4d0;
+  pointer-events: none;
+}
+.axv-node.axv-numberpicker::before {
+  top: 33%;
+}
+.axv-node.axv-numberpicker::after {
+  bottom: 33%;
+}
+
+/* Chip 文字不换行 */
+.axv-node.axv-chip {
+  white-space: nowrap;
+}
+
+/* Toolbar 副标题（用 attr 占位不划算，这里只保主标题居中左对齐已由内联样式给） */
+.axv-node.axv-toolbar {
+  overflow: hidden;
 }
 
 /* ===== M4u：资源树里的图片预览框 ===== */

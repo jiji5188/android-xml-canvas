@@ -13,19 +13,35 @@ import { isContainerTag } from "@/lib/xml/insert";
 export type ConstraintSide = "start" | "end" | "top" | "bottom";
 export type GeomMode = "move" | "left" | "right" | "top" | "bottom";
 
-/** M11：src 内容区要避开 padding（Android 里 src 只能画在 content box 内）。
- *  从 ResolvedNode.style 的 padding* 取出 px 值拼成 inset 字符串。 */
-function padInset(style: ResolvedNode["style"]): string {
+/** M11：src 内容区要避开 padding（Android 里 src 只能画在 content box 内）。 */
+function padEdges(style: ResolvedNode["style"]): { t: number; r: number; b: number; l: number } {
   const n = (v: unknown) => {
     const f = parseFloat(String(v ?? 0));
     return Number.isFinite(f) ? f : 0;
   };
-  const t = n(style?.paddingTop);
-  const r = n(style?.paddingRight);
-  const b = n(style?.paddingBottom);
-  const l = n(style?.paddingLeft);
-  if (!t && !r && !b && !l) return "0px";
-  return `${t}px ${r}px ${b}px ${l}px`;
+  return {
+    t: n(style?.paddingTop),
+    r: n(style?.paddingRight),
+    b: n(style?.paddingBottom),
+    l: n(style?.paddingLeft),
+  };
+}
+
+/** M11x：src 图层的矩形。以前是 inset + width:auto/height:auto，
+ *  绝对定位的替换元素（<img>）在宽高都 auto 时按自身宽高比定尺寸 →
+ *  正方形图被撑成 width×width，96dp 高的 ImageView 画出 500px 的方块盖住下面的内容。
+ *  改成显式算宽高（100% 减 padding）。 */
+function imgBox(style: ResolvedNode["style"]): React.CSSProperties {
+  const e = padEdges(style);
+  return {
+    position: "absolute",
+    top: e.t,
+    left: e.l,
+    width: `calc(100% - ${e.l + e.r}px)`,
+    height: `calc(100% - ${e.t + e.b}px)`,
+    boxSizing: "border-box",
+    pointerEvents: "none",
+  };
 }
 
 /** M11：scaleType → CSS mask-size（mask 不吃 object-fit，要自己映射） */
@@ -520,8 +536,7 @@ export function XmlCanvas({
             title={node.imgSrc.slice(8)}
             aria-hidden="true"
             style={{
-              position: "absolute",
-              inset: padInset(node.style),
+              ...imgBox(node.style),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -540,8 +555,7 @@ export function XmlCanvas({
             className="axv-img-layer"
             aria-hidden="true"
             style={{
-              position: "absolute",
-              inset: padInset(node.style),
+              ...imgBox(node.style),
               backgroundColor: node.imgTint,
               WebkitMaskImage: `url(${node.imgSrc})`,
               maskImage: `url(${node.imgSrc})`,
@@ -551,7 +565,6 @@ export function XmlCanvas({
               maskPosition: node.imgPos ?? "center",
               WebkitMaskSize: maskSizeOf(node.imgFit),
               maskSize: maskSizeOf(node.imgFit),
-              pointerEvents: "none",
             }}
           />
         ) : (
@@ -562,13 +575,9 @@ export function XmlCanvas({
               alt=""
               draggable={false}
               style={{
-                position: "absolute",
-                inset: padInset(node.style),
-                width: "auto",
-                height: "auto",
+                ...imgBox(node.style),
                 objectFit: (node.imgFit as React.CSSProperties["objectFit"]) ?? "contain",
                 objectPosition: node.imgPos ?? "center",
-                pointerEvents: "none",
               }}
             />
             {node.imgTint && node.imgBlend ? (
@@ -577,14 +586,12 @@ export function XmlCanvas({
                 className="axv-img-layer"
                 aria-hidden="true"
                 style={{
-                  position: "absolute",
-                  inset: padInset(node.style),
+                  ...imgBox(node.style),
                   backgroundColor: node.imgTint,
                   mixBlendMode:
                     node.imgBlend === "overlay"
                       ? undefined
                       : (node.imgBlend as React.CSSProperties["mixBlendMode"]),
-                  pointerEvents: "none",
                 }}
               />
             ) : null}

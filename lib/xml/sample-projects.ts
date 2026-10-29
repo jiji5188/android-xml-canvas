@@ -1114,6 +1114,995 @@ const DASHBOARD_VALUES = `<resources>
 /* ============================================================
    汇总
    ============================================================ */
+/* ============================================================
+   9. 全组件总览 —— 把常用控件按分类摆一遍，用来检查渲染保真度
+   （同时挂在 public/samples/all-widgets.xml，可以单独下载）
+   ============================================================ */
+const ALL_WIDGETS_LAYOUT = `<?xml version="1.0" encoding="utf-8"?>
+<!-- 全组件总览：一条纵向 ScrollView 里把常用控件全摆一遍，用来看渲染保真度 -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F4F7"
+    android:fillViewport="true">
+
+  <LinearLayout
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:orientation="vertical"
+      android:padding="12dp">
+
+    <!-- ========== 1. 文本 ========== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="1. 文本类"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#6750A4"
+        android:paddingBottom="8dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="标题 TextView（20sp bold + 阴影）"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="#1D1B20"
+        android:shadowColor="#406750A4"
+        android:shadowDx="1"
+        android:shadowDy="2"
+        android:shadowRadius="3" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="正文 TextView：14sp、行距 1.3、字间距 0.02em，用来检查换行、行高与中文排版是否和 Android 一致。"
+        android:textSize="14sp"
+        android:textColor="#49454F"
+        android:lineSpacingMultiplier="1.3"
+        android:letterSpacing="0.02"
+        android:paddingTop="4dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="单行省略：这是一段很长很长很长很长很长很长很长很长很长很长的文字"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="14sp"
+        android:paddingTop="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="fontFamily=sans-serif-medium"
+        android:fontFamily="sans-serif-medium"
+        android:textSize="14sp"
+        android:paddingTop="4dp" />
+
+    <CheckedTextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="CheckedTextView（勾选）"
+        android:checkMark="@drawable/ic_check"
+        android:checked="true"
+        android:textSize="14sp"
+        android:paddingTop="4dp" />
+
+    <Chronometer
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="00:12"
+        android:textSize="14sp"
+        android:paddingTop="4dp" />
+
+    <!-- ========== 2. 按钮 ========== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="2. 按钮"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#6750A4"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp" />
+
+    <Button
+        android:id="@+id/btn_primary"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="普通 Button"
+        android:textAllCaps="false"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_btn_primary" />
+
+    <com.google.android.material.button.MaterialButton
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:text="MaterialButton（描边）"
+        app:cornerRadius="14dp"
+        app:strokeColor="#6750A4"
+        app:strokeWidth="1dp"
+        app:icon="@drawable/ic_add"
+        app:iconGravity="textStart"
+        app:iconPadding="8dp" />
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:text="禁用按钮"
+        android:enabled="false"
+        android:background="@drawable/bg_btn_primary" />
+
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp">
+
+      <Button
+          android:layout_width="wrap_content"
+          android:layout_height="40dp"
+          android:text="左" />
+
+      <Button
+          android:layout_width="wrap_content"
+          android:layout_height="40dp"
+          android:text="中" />
+
+      <Button
+          android:layout_width="wrap_content"
+          android:layout_height="40dp"
+          android:text="右" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
+
+    <ToggleButton
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_marginTop="8dp"
+        android:textOn="开"
+        android:textOff="关"
+        android:checked="true" />
+
+    <!-- ========== 3. 输入 ========== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="3. 输入"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#6750A4"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp" />
+
+    <EditText
+        android:id="@+id/et_plain"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:hint="普通 EditText（hint）"
+        android:textColorHint="#8C8794"
+        android:inputType="text"
+        android:singleLine="true"
+        android:background="@drawable/bg_input"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="TextInputLayout（outline）"
+        android:boxBackgroundMode="outline"
+        android:boxStrokeColor="#6750A4">
+
+      <com.google.android.material.textfield.TextInputEditText
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="输入内容"
+          android:inputType="text" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <AutoCompleteTextView
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="8dp"
+        android:hint="AutoCompleteTextView"
+        android:background="@drawable/bg_input"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp" />
+
+    <SearchView
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="8dp"
+        android:queryHint="SearchView 搜索" />
+
+    <NumberPicker
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:value="30" />
+
+    <!-- ========== 4. 图片 ========== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="4. 图片"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#6750A4"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+      <ImageView
+          android:layout_width="56dp"
+          android:layout_height="56dp"
+          android:src="@drawable/ic_home"
+          android:scaleType="fitCenter"
+          android:padding="8dp"
+          android:background="@drawable/bg_card" />
+
+      <ImageView
+          android:layout_width="56dp"
+          android:layout_height="56dp"
+          android:layout_marginStart="8dp"
+          android:src="@drawable/ic_favorite"
+          android:scaleType="centerCrop"
+          android:tint="#E91E63"
+          android:background="@drawable/bg_card" />
+
+      <ImageButton
+          android:layout_width="56dp"
+          android:layout_height="56dp"
+          android:layout_marginStart="8dp"
+          android:src="@drawable/ic_search"
+          android:tint="#6750A4"
+          android:background="@drawable/bg_stat" />
+
+      <ImageView
+          android:layout_width="56dp"
+          android:layout_height="56dp"
+          android:layout_marginStart="8dp"
+          android:src="@drawable/ic_person"
+          android:scaleType="fitXY"
+          android:tint="#1D1B20"
+          android:background="@drawable/bg_chip" />
+    </LinearLayout>
+
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:layout_marginTop="8dp"
+        android:src="@drawable/ic_image"
+        android:scaleType="centerInside"
+        android:background="@drawable/bg_hero" />
+
+    <!-- ========== 5. 选择 ========== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="5. 选择"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#6750A4"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp" />
+
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="CheckBox 已勾选"
+        android:checked="true" />
+
+    <CheckBox
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="CheckBox 未勾选"
+        android:buttonTint="#6750A4" />
+
+    <RadioGroup
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+      <RadioButton
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="选项 A"
+          android:checked="true" />
+
+      <RadioButton
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="选项 B" />
+    </RadioGroup>
+
+    <Switch
+        android:id="@+id/sw_plain"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Switch 打开"
+        android:checked="true" />
+
+    <Switch
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Switch 关闭 + 染色"
+        android:trackTint="#B0AEB8"
+        android:thumbTint="#6750A4" />
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="SwitchMaterial 打开"
+        android:checked="true" />
+
+    <SeekBar
+        android:id="@+id/seek_1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="40" />
+
+    <SeekBar
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="75"
+        android:progressTint="#E91E63"
+        android:thumbTint="#E91E63"
+        android:trackTint="#F8BBD0" />
+
+    <RatingBar
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:numStars="5"
+        android:rating="3.5"
+        android:stepSize="0.5"
+        android:buttonTint="#F5A524" />
+
+    <RatingBar
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:numStars="5"
+        android:rating="4"
+        android:isIndicator="true" />
+
+    <com.google.android.material.slider.Slider
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:valueFrom="0"
+        android:valueTo="100"
+        android:value="60" />
+
+    <!-- ========== 6. 进度 ========== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="6. 进度"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#6750A4"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp" />
+
+    <ProgressBar
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="30"
+        android:secondaryProgress="60"
+        android:progressTint="#6750A4" />
+
+    <ProgressBar
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:indeterminate="true"
+        android:indeterminateTint="#E91E63" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="8dp">
+
+      <ProgressBar
+          android:layout_width="48dp"
+          android:layout_height="48dp"
+          android:indeterminate="true"
+          android:indeterminateTint="#6750A4" />
+
+      <com.google.android.material.progressindicator.CircularProgressIndicator
+          android:layout_width="48dp"
+          android:layout_height="48dp"
+          android:layout_marginStart="8dp"
+          android:indeterminate="true"
+          app:indicatorColor="#E91E63" />
+
+      <com.google.android.material.progressindicator.LinearProgressIndicator
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:layout_weight="1"
+          android:layout_marginStart="8dp"
+          android:progress="55"
+          app:indicatorColor="#6750A4" />
+    </LinearLayout>
+
+    <!-- ========== 7. 列表 / 容器 ========== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="7. 列表与容器"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#6750A4"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:background="@drawable/bg_card" />
+
+    <ListView
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_card" />
+
+    <Spinner
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_input" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="vertical"
+        android:divider="#E0D9E3"
+        android:dividerHeight="1dp"
+        android:showDividers="middle"
+        android:background="@drawable/bg_card">
+
+      <TextView
+          android:layout_width="match_parent"
+          android:layout_height="40dp"
+          android:text="分割线上一行"
+          android:gravity="center_vertical"
+          android:paddingStart="12dp" />
+
+      <TextView
+          android:layout_width="match_parent"
+          android:layout_height="40dp"
+          android:text="分割线中间行"
+          android:gravity="center_vertical"
+          android:paddingStart="12dp" />
+
+      <TextView
+          android:layout_width="match_parent"
+          android:layout_height="40dp"
+          android:text="分割线下一行"
+          android:gravity="center_vertical"
+          android:paddingStart="12dp" />
+    </LinearLayout>
+
+    <TableLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:stretchColumns="0"
+        android:background="@drawable/bg_card">
+
+      <TableRow>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="表格 A1"
+            android:gravity="center_vertical" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="B1"
+            android:gravity="center_vertical" />
+      </TableRow>
+
+      <TableRow>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="表格 A2"
+            android:gravity="center_vertical" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="B2"
+            android:gravity="center_vertical" />
+      </TableRow>
+    </TableLayout>
+
+    <GridLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:columnCount="3">
+
+      <TextView
+          android:layout_width="0dp"
+          android:layout_height="56dp"
+          android:layout_columnWeight="1"
+          android:text="格 1"
+          android:gravity="center"
+          android:background="@drawable/bg_chip" />
+
+      <TextView
+          android:layout_width="0dp"
+          android:layout_height="56dp"
+          android:layout_columnWeight="1"
+          android:text="格 2"
+          android:gravity="center"
+          android:background="@drawable/bg_stat" />
+
+      <TextView
+          android:layout_width="0dp"
+          android:layout_height="56dp"
+          android:layout_columnWeight="1"
+          android:text="格 3"
+          android:gravity="center"
+          android:background="@drawable/bg_chip" />
+    </GridLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="12dp"
+        android:background="#E0D9E3" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="12dp" />
+
+    <!-- ========== 8. Material 组件 ========== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="8. Material 卡片 / Chip / FAB"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#6750A4"
+        android:paddingBottom="8dp" />
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:cardCornerRadius="16dp"
+        android:cardElevation="2dp"
+        android:cardBackgroundColor="#FFFFFF"
+        android:contentPadding="16dp">
+
+      <TextView
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:text="CardView + contentPadding 16dp"
+          android:textSize="14sp" />
+    </androidx.cardview.widget.CardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="4dp"
+        app:strokeColor="#E0D9E3"
+        app:strokeWidth="1dp">
+
+      <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:orientation="vertical"
+          android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="MaterialCardView 带描边" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+          <com.google.android.material.chip.Chip
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="Chip"
+              android:checkable="true"
+              android:checked="true" />
+
+          <com.google.android.material.chip.Chip
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="可关闭"
+              app:closeIcon="@drawable/ic_check" />
+        </com.google.android.material.chip.ChipGroup>
+      </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:src="@drawable/ic_add"
+        android:backgroundTint="#6750A4" />
+
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Extended FAB"
+        app:icon="@drawable/ic_add" />
+
+    <com.google.android.material.tabs.TabLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp">
+
+      <com.google.android.material.tabs.TabItem
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="页签一" />
+
+      <com.google.android.material.tabs.TabItem
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="页签二" />
+    </com.google.android.material.tabs.TabLayout>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_bottom_bar" />
+
+    <androidx.appcompat.widget.Toolbar
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:background="#6750A4"
+        android:title="Toolbar 标题"
+        android:subtitle="副标题"
+        android:titleTextColor="#FFFFFF"
+        android:subtitleTextColor="#EADDFF"
+        android:navigationIcon="@drawable/ic_arrow_back" />
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp">
+
+      <com.google.android.material.appbar.CollapsingToolbarLayout
+          android:layout_width="match_parent"
+          android:layout_height="120dp"
+          android:background="@drawable/bg_hero"
+          app:layout_scrollFlags="scroll|exitUntilCollapsed">
+
+        <androidx.appcompat.widget.Toolbar
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            app:layout_collapseMode="pin"
+            android:title="折叠标题" />
+      </com.google.android.material.appbar.CollapsingToolbarLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_card">
+
+      <TextView
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:text="SwipeRefreshLayout 内容"
+          android:gravity="center" />
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_stat" />
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <!-- ========== 9. 约束布局 ========== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="9. ConstraintLayout（约束 + 参考线 + 屏障）"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#6750A4"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp" />
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:background="@drawable/bg_card">
+
+      <TextView
+          android:id="@+id/tv_a"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="A"
+          android:textSize="16sp"
+          android:textStyle="bold"
+          app:layout_constraintStart_toStartOf="parent"
+          app:layout_constraintTop_toTopOf="parent"
+          android:layout_marginStart="16dp"
+          android:layout_marginTop="16dp" />
+
+      <TextView
+          android:id="@+id/tv_b"
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:text="B：宽 0dp + 左右约束 + 50% 水平偏置"
+          app:layout_constraintStart_toEndOf="@id/tv_a"
+          app:layout_constraintEnd_toEndOf="parent"
+          app:layout_constraintTop_toTopOf="@id/tv_a"
+          app:layout_constraintHorizontal_bias="0.5"
+          android:layout_marginStart="8dp"
+          android:layout_marginEnd="16dp" />
+
+      <androidx.constraintlayout.widget.Guideline
+          android:id="@+id/guide_mid"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:orientation="horizontal"
+          app:layout_constraintGuide_percent="0.45" />
+
+      <TextView
+          android:layout_width="0dp"
+          android:layout_height="wrap_content"
+          android:text="参考线下方 + 宽度 60%"
+          android:gravity="center"
+          android:background="@drawable/bg_chip"
+          app:layout_constraintTop_toBottomOf="@id/guide_mid"
+          app:layout_constraintStart_toStartOf="parent"
+          app:layout_constraintEnd_toEndOf="parent"
+          app:layout_constraintWidth_percent="0.6" />
+
+      <androidx.constraintlayout.widget.Barrier
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          app:barrierDirection="bottom"
+          app:constraint_referenced_ids="tv_a,tv_b" />
+
+      <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_marginTop="8dp"
+          android:text="屏障下方"
+          app:layout_constraintTop_toBottomOf="@id/barrier"
+          app:layout_constraintStart_toStartOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- ========== 10. 相对布局 / 帧布局 / 抽屉 ========== -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="10. RelativeLayout / FrameLayout / DrawerLayout"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#6750A4"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:background="@drawable/bg_card">
+
+      <ImageView
+          android:id="@+id/rl_icon"
+          android:layout_width="40dp"
+          android:layout_height="40dp"
+          android:layout_alignParentStart="true"
+          android:layout_centerVertical="true"
+          android:layout_marginStart="12dp"
+          android:src="@drawable/ic_person" />
+
+      <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_toEndOf="@id/rl_icon"
+          android:layout_alignTop="@id/rl_icon"
+          android:layout_marginStart="12dp"
+          android:text="RelativeLayout 标题" />
+
+      <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_toEndOf="@id/rl_icon"
+          android:layout_below="@id/rl_icon"
+          android:layout_marginStart="12dp"
+          android:text="下方描述文字"
+          android:textSize="12sp"
+          android:textColor="#8C8794" />
+    </RelativeLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_stat">
+
+      <ImageView
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:src="@drawable/ic_image"
+          android:scaleType="centerCrop" />
+
+      <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_gravity="bottom|end"
+          android:layout_margin="8dp"
+          android:padding="4dp"
+          android:text="FrameLayout 叠层"
+          android:background="#CCFFFFFF" />
+
+      <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_gravity="center"
+          android:text="居中"
+          android:textColor="#FFFFFF"
+          android:textSize="18sp"
+          android:textStyle="bold" />
+    </FrameLayout>
+
+    <androidx.drawerlayout.widget.DrawerLayout
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:layout_marginTop="8dp">
+
+      <LinearLayout
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:orientation="vertical"
+          android:gravity="center"
+          android:background="@drawable/bg_card">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DrawerLayout 主内容" />
+      </LinearLayout>
+
+      <LinearLayout
+          android:layout_width="200dp"
+          android:layout_height="match_parent"
+          android:layout_gravity="start"
+          android:orientation="vertical"
+          android:background="#F3EDF7"
+          android:padding="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="抽屉面板" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="第二项"
+            android:paddingTop="8dp" />
+      </LinearLayout>
+    </androidx.drawerlayout.widget.DrawerLayout>
+
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_hero">
+
+      <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_gravity="center"
+          android:text="CoordinatorLayout" />
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_card">
+
+      <TextView
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:padding="12dp"
+          android:text="NestedScrollView：内容可以比它高，超出部分滚动" />
+    </androidx.core.widget.NestedScrollView>
+
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_chip">
+
+      <LinearLayout
+          android:layout_width="wrap_content"
+          android:layout_height="match_parent"
+          android:orientation="horizontal"
+          android:gravity="center_vertical"
+          android:padding="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="横向滚动一  " />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="横向滚动二  " />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="横向滚动三  " />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="横向滚动四  " />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="横向滚动五  " />
+      </LinearLayout>
+    </HorizontalScrollView>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="—— 全组件总览结束 ——"
+        android:gravity="center"
+        android:paddingTop="24dp"
+        android:paddingBottom="24dp"
+        android:textColor="#8C8794" />
+  </LinearLayout>
+</ScrollView>
+`;
+
 export const SAMPLE_PROJECTS: SampleProject[] = [
   {
     key: "login",
@@ -1211,6 +2200,30 @@ export const SAMPLE_PROJECTS: SampleProject[] = [
       "bg_card",
     ]),
     values: DASHBOARD_VALUES,
+  },
+  {
+    key: "all-widgets",
+    name: "全组件总览",
+    library: "全部常用控件（10 大类）",
+    desc: "文本/按钮/输入/图片/选择/进度/列表/Material/约束/容器 一次摆全，用来核对渲染。",
+    layout: ALL_WIDGETS_LAYOUT,
+    drawables: pickDrawables([
+      "ic_check",
+      "ic_add",
+      "ic_home",
+      "ic_favorite",
+      "ic_search",
+      "ic_person",
+      "ic_image",
+      "ic_arrow_back",
+      "bg_btn_primary",
+      "bg_input",
+      "bg_card",
+      "bg_stat",
+      "bg_chip",
+      "bg_hero",
+      "bg_bottom_bar",
+    ]),
   },
 ];
 

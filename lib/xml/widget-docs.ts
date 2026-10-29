@@ -521,7 +521,7 @@ const PARSED: Record<string, WidgetDoc> = {
   TextInputEditText: {
     title: "Material 输入框",
     summary: "配合 TextInputLayout 使用的输入控件本体。",
-    category: "输入",
+    category: "Material",
     attrs: [...TEXT_ATTRS, ...INPUT_ATTRS],
   },
   CheckBox: {
@@ -777,7 +777,7 @@ const PARSED: Record<string, WidgetDoc> = {
   TabItem: {
     title: "标签项",
     summary: "TabLayout 里的单个标签（也可以用代码添加）。",
-    category: "其他",
+    category: "Material",
     attrs: [
       { name: "android:text", type: "文本", desc: "标签文字", values: ["待处理"] },
       { name: "android:icon", type: "drawable", desc: "标签图标" },

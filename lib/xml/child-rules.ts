@@ -137,6 +137,12 @@ export const C4_LEAF = [
   "NumberPicker",
   "DatePicker",
   "TimePicker",
+  // M16：面板新增
+  "Guideline", // 约束辅助节点，不是真控件
+  "Barrier",
+  "SearchView", // LinearLayout 子类，内部 UI 系统接管，不给塞子控件
+  "TabItem", // TabLayout 的子项
+  "CheckedTextView",
 ];
 
 /** 类别 5：特殊标签（不是 View / ViewGroup） */
@@ -167,6 +173,8 @@ const OVERRIDES: Record<string, ChildRule> = {
   NavigationRailView: { kind: "adapter", max: 0, cat: 2, desc: "子项由 menu 动态生成，禁止静态 XML 子控件" },
   // TabWidget 是 LinearLayout 子类，可静态放子控件，但里面只该有 tab
   Toolbar: { kind: "multi", cat: 3, desc: "支持多个直接子控件" },
+  // FragmentContainerView 只应装 1 个 Fragment
+  FragmentContainerView: { kind: "single", max: 1, cat: 1, desc: "只允许 1 个直接子控件（内部应只放 1 个 Fragment）" },
 };
 
 const S = new Set<string>(C1_SINGLE);

@@ -73,6 +73,8 @@ function viewClass(rawTag: string, a: ResolvedAttrs): string {
       return "axv-switch";
     case "CheckBox":
     case "AppCompatCheckBox":
+    // M16：CheckedTextView = 勾选框 + 文本，复用复选框图形
+    case "CheckedTextView":
       return "axv-check";
     case "RadioButton":
     case "AppCompatRadioButton":

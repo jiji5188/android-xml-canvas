@@ -674,6 +674,155 @@ export const WIDGETS: WidgetDef[] = [
     android:layout_width="match_parent"
     android:layout_height="200dp"/>`,
   },
+
+  // ===== M16：补齐「文档/渲染已有、面板却点不到」的遗漏组件 =====
+  {
+    key: "grid_layout", label: "网格布局", tag: "GridLayout", icon: "grid_on", lib: "android", group: "布局",
+    xml: `<GridLayout ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:columnCount="2"
+    android:rowCount="2">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="1"
+        android:layout_columnWeight="1"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="2"
+        android:layout_columnWeight="1"
+        android:gravity="center" />
+</GridLayout>`,
+  },
+  {
+    key: "space", label: "间距占位", tag: "Space", icon: "space_bar", lib: "android", group: "布局",
+    xml: `<Space ${A}
+    android:layout_width="match_parent"
+    android:layout_height="16dp"/>`,
+  },
+  {
+    key: "coordinator", label: "协调布局", tag: "CoordinatorLayout", icon: "layers", lib: "androidx", group: "布局",
+    xml: `<androidx.coordinatorlayout.widget.CoordinatorLayout ${A}
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+</androidx.coordinatorlayout.widget.CoordinatorLayout>`,
+  },
+  {
+    key: "drawer", label: "抽屉布局", tag: "DrawerLayout", icon: "view_sidebar", lib: "androidx", group: "布局",
+    xml: `<androidx.drawerlayout.widget.DrawerLayout ${A}
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+    </FrameLayout>
+
+    <FrameLayout
+        android:layout_width="280dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="#FFFFFF">
+    </FrameLayout>
+</androidx.drawerlayout.widget.DrawerLayout>`,
+  },
+  {
+    key: "fragment_container", label: "Fragment 容器", tag: "FragmentContainerView", icon: "view_quilt", lib: "androidx", group: "布局",
+    xml: `<androidx.fragment.app.FragmentContainerView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />`,
+  },
+  {
+    key: "guideline", label: "参考线", tag: "Guideline", icon: "border_vertical", lib: "androidx", group: "布局",
+    xml: `<androidx.constraintlayout.widget.Guideline ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    app:layout_constraintGuide_percent="0.5"
+    xmlns:app="http://schemas.android.com/apk/res-auto" />`,
+  },
+  {
+    key: "barrier", label: "屏障", tag: "Barrier", icon: "block", lib: "androidx", group: "布局",
+    xml: `<androidx.constraintlayout.widget.Barrier ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    app:barrierDirection="end"
+    xmlns:app="http://schemas.android.com/apk/res-auto" />`,
+  },
+  {
+    key: "viewstub", label: "懒加载占位", tag: "ViewStub", icon: "inbox", lib: "android", group: "布局",
+    xml: `<ViewStub ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout="@layout/placeholder" />`,
+  },
+  {
+    key: "autocomplete", label: "自动完成输入", tag: "AutoCompleteTextView", icon: "manage_search", lib: "android", group: "输入",
+    xml: `<AutoCompleteTextView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:hint="输入关键词"
+    android:completionThreshold="1" />`,
+  },
+  {
+    key: "multi_autocomplete", label: "多值自动完成", tag: "MultiAutoCompleteTextView", icon: "dynamic_feed", lib: "android", group: "输入",
+    xml: `<MultiAutoCompleteTextView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:hint="多个值用逗号分隔" />`,
+  },
+  {
+    key: "search_view", label: "搜索视图", tag: "SearchView", icon: "search", lib: "android", group: "输入",
+    xml: `<SearchView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:queryHint="搜索" />`,
+  },
+  {
+    key: "mat_text_input_edit", label: "M 输入框（内层）", tag: "TextInputEditText", icon: "edit_note", lib: "material", group: "输入",
+    xml: `<TextInputEditText ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:hint="内容" />`,
+  },
+  {
+    key: "toggle", label: "开关按钮", tag: "ToggleButton", icon: "toggle_on", lib: "android", group: "控件",
+    xml: `<ToggleButton ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:textOn="开"
+    android:textOff="关"
+    android:checked="true" />`,
+  },
+  {
+    key: "rating", label: "评分条", tag: "RatingBar", icon: "star", lib: "android", group: "控件",
+    xml: `<RatingBar ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:numStars="5"
+    android:rating="3.5"
+    android:stepSize="0.5" />`,
+  },
+  {
+    key: "mat_tab_item", label: "标签项", tag: "TabItem", icon: "tab", lib: "material", group: "布局",
+    xml: `<com.google.android.material.tabs.TabItem ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="标签" />`,
+  },
+  {
+    key: "checked_text", label: "可选文本", tag: "CheckedTextView", icon: "checklist", lib: "android", group: "控件",
+    xml: `<CheckedTextView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="可勾选文本"
+    android:checkMark="?android:attr/listChoiceIndicatorMultiple" />`,
+  },
 ];
 
 /** 组件 key → 定义 */

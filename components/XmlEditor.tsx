@@ -6,6 +6,7 @@
 
 "use client";
 
+import AiPanel from "@/components/AiPanel";
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue } from "react";
 import { parseLayoutXml, findNode, serialize, nodeAtLine } from "@/lib/xml/parser";
 import { pathChainOf } from "@/lib/xml/path-chain";
@@ -486,7 +487,7 @@ export function XmlEditor() {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
   const [leftView, setLeftView] = useState<
-    "parts" | "layers" | "code" | "res" | "assets" | "settings" | "about"
+    "parts" | "layers" | "ai" | "code" | "res" | "assets" | "settings" | "about"
   >("parts");
   /* ===== M16i：工作目录 ===== */
   const [projectTab, setProjectTab] = useState<"workspace" | "current">("current");
@@ -2283,6 +2284,21 @@ const findResolved = findResolvedNode;
               account_tree
             </span>
           </button>
+          {/* M17：AI 助手（模型调用 + 后续写代码） */}
+          <button
+            className={"axv-rail-btn" + (leftView === "ai" ? " on" : "")}
+            title="AI 助手"
+            aria-label="AI 助手"
+            aria-pressed={leftView === "ai"}
+            onClick={() => {
+              setLeftView("ai");
+              setLeftOpen(true);
+            }}
+          >
+            <span className="msr" aria-hidden="true" data-fill={leftView === "ai" ? "1" : "0"} style={{ fontSize: 24 }}>
+              auto_awesome
+            </span>
+          </button>
           <button
             className={"axv-rail-btn" + (leftView === "assets" ? " on" : "")}
             title="已生成资源"
@@ -2349,13 +2365,15 @@ const findResolved = findResolvedNode;
                 ? "组件"
                 : leftView === "layers"
                   ? "图层"
-                  : leftView === "res"
-                    ? "项目管理"
-                    : leftView === "assets"
-                      ? "已生成资源"
-                      : leftView === "settings"
-                        ? "设置"
-                        : "关于"}
+                  : leftView === "ai"
+                    ? "AI 助手"
+                    : leftView === "res"
+                      ? "项目管理"
+                      : leftView === "assets"
+                        ? "已生成资源"
+                        : leftView === "settings"
+                          ? "设置"
+                          : "关于"}
             </span>
             <button
               className="axv-icon-btn"
@@ -2383,6 +2401,17 @@ const findResolved = findResolvedNode;
                 onDragMove={onDragMoveNode}
               />
             </div>
+          )}
+          {leftView === "ai" && (
+            <AiPanel
+              xml={xml}
+              selection={pathChain.length ? pathChain.map((p) => `${p.tag}${p.id ? "#" + String(p.id).replace("@+id/", "") : ""}`).join(" > ") : null}
+              onReplaceXml={(next) => setXmlAndTrack(next, "")}
+              onNote={(text) => {
+                setExportNote(text);
+                window.setTimeout(() => setExportNote(" "), 3000);
+              }}
+            />
           )}
           {leftView === "assets" && (
             <div className="axv-rail-scroll axv-assets-inline-wrap">

@@ -20,6 +20,10 @@ import { parseShapeSpec } from "@/lib/xml/shape-gen";
 
 interface Props {
   node: ResolvedNode;
+  /** M16e：根 → 当前节点的层级链（ScrollView > LinearLayout > TextView） */
+  chain?: { tag: string; path: string; id?: string }[];
+  /** M16e：点面包屑跳层 */
+  onSelectPath?: (path: string) => void;
   /** 提交单个属性值（已和原值不同才调用） */
   onCommit: (name: string, value: string) => void;
   /** 删除属性 */
@@ -109,6 +113,8 @@ function drawableNames(extras: ResourceExtras | null | undefined): string[] {
 
 export function AttrPanel({
   node,
+  chain,
+  onSelectPath,
   onCommit,
   onRemove,
   onAddAttr,
@@ -381,6 +387,25 @@ export function AttrPanel({
 
   return (
     <div className="axv-attr-panel">
+      {/* M16e：层级链（根 → 当前），比只看单层更清楚自己在哪一层 */}
+      {chain && chain.length > 1 ? (
+        <div className="axv-attr-chain" title="层级链：点任意一层可直接选中它">
+          {chain.map((c, i) => (
+            <span key={c.path} className="axv-chain-item">
+              {i > 0 ? <span className="axv-chain-sep">&gt;</span> : null}
+              <button
+                type="button"
+                className={"axv-chain-node" + (i === chain.length - 1 ? " on" : "")}
+                onClick={() => onSelectPath?.(c.path)}
+                title={c.id ? `${c.tag}  ${c.id}` : c.tag}
+              >
+                {shortTag(c.tag)}
+                {c.id ? <i className="axv-chain-id">{c.id.replace(/^@\+?id\//, "")}</i> : null}
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="axv-attr-head">
         <span className="axv-attr-tag">{tag}</span>
         {node.rawAttrs.id ? <span className="axv-attr-id">{node.rawAttrs.id}</span> : null}

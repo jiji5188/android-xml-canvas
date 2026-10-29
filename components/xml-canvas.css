@@ -1588,6 +1588,69 @@
   margin-bottom: 10px;
   flex-wrap: wrap;
 }
+/* M16e：层级链（ScrollView > LinearLayout > TextView），横向可滚，不折行 */
+.axv-attr-chain {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: -2px 0 8px;
+  padding: 4px 6px;
+  background: #F7F7FA;
+  border: 1px solid #ECECF1;
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.axv-attr-chain::-webkit-scrollbar {
+  height: 0;
+  display: none;
+}
+.axv-chain-item {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.axv-chain-sep {
+  color: #B6B6C2;
+  margin: 0 2px;
+  font-size: 11px;
+}
+.axv-chain-node {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  border: 0;
+  background: transparent;
+  padding: 1px 3px;
+  border-radius: 4px;
+  color: #5D5D69;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.axv-chain-node:hover {
+  background: rgba(103, 80, 164, 0.1);
+  color: #6750A4;
+}
+.axv-chain-node.on {
+  color: #6750A4;
+  font-weight: 700;
+  background: rgba(103, 80, 164, 0.12);
+}
+.axv-chain-id {
+  font-style: normal;
+  font-size: 10px;
+  color: #8A8FA3;
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .axv-attr-tag {
   font-size: 14px;
   font-weight: 700;

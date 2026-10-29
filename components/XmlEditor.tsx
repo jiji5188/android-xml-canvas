@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue } from "react";
 import { parseLayoutXml, findNode, serialize, nodeAtLine } from "@/lib/xml/parser";
+import { pathChainOf } from "@/lib/xml/path-chain";
 import { buildRenderModel } from "@/lib/xml/css";
 import type { MeasuredMap } from "@/lib/xml/constraints";
 import { commitHistoryState, EMPTY_MARK, type MergeMark } from "@/lib/xml/history";
@@ -1037,6 +1038,9 @@ export function XmlEditor() {
   /* ===== ConstraintLayout 约束编辑（一期：表单 + 自动推断） ===== */
   const [autoNotes, setAutoNotes] = useState<string[]>([]);
   useEffect(() => setAutoNotes([]), [selectedPath]);
+
+  /** M16e：根 → 当前节点的层级链（右侧属性面板顶部展示，可点击跳层） */
+  const pathChain = useMemo(() => pathChainOf(treeRoot, selectedPath), [treeRoot, selectedPath]);
 
   /** 选中节点的父节点（XmlNode） */
   const selectedParent = useMemo(() => {
@@ -2510,6 +2514,8 @@ const findResolved = findResolvedNode;
               )}
               <AttrPanel
                 node={selectedNode}
+                chain={pathChain}
+                onSelectPath={(p) => setSelectedPath(p)}
                 onCommit={commitAttr}
                 onRemove={removeAttr}
                 onAddAttr={() => setAddModalOpen(true)}

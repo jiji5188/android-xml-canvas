@@ -28,6 +28,7 @@ const CONTAINER_TAGS = new Set([
   "GridLayout",
   "TableLayout",
   "TableRow",
+  "AbsoluteLayout",
   "ScrollView",
   "HorizontalScrollView",
   "NestedScrollView",

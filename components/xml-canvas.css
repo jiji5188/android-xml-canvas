@@ -2456,6 +2456,23 @@
   );
 }
 
+/* M14d：DatePicker / TimePicker 占位框（平台控件的日历/时钟 UI 无法用 DOM 复原） */
+.axv-node.axv-datepicker,
+.axv-node.axv-timepicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  box-sizing: border-box;
+  background: #FFFFFF;
+  border: 1px solid #DADCE0;
+  border-radius: 12px;
+  color: #757575;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px;
+}
+
 /* Switch：track + thumb */
 .axv-node.axv-switch {
   position: relative;

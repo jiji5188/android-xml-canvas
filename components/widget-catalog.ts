@@ -41,7 +41,7 @@ export const WIDGETS: WidgetDef[] = [
 </LinearLayout>`,
   },
   {
-    key: "frame", label: "框架布局", tag: "FrameLayout", icon: "view_compact", lib: "android", group: "布局",
+    key: "frame", label: "帧布局", tag: "FrameLayout", icon: "view_compact", lib: "android", group: "布局",
     xml: `<FrameLayout ${A}
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
@@ -76,6 +76,115 @@ export const WIDGETS: WidgetDef[] = [
     android:layout_height="wrap_content"
     android:scrollbars="horizontal">
 </HorizontalScrollView>`,
+  },
+  {
+    key: "absolute", label: "绝对布局", tag: "AbsoluteLayout", icon: "open_with", lib: "android", group: "布局",
+    xml: `<AbsoluteLayout ${A}
+    android:layout_width="match_parent"
+    android:layout_height="240dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_x="16dp"
+        android:layout_y="16dp"
+        android:text="坐标 16,16"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_x="64dp"
+        android:layout_y="96dp"
+        android:text="坐标 64,96"/>
+</AbsoluteLayout>`,
+  },
+  {
+    key: "table", label: "表格布局", tag: "TableLayout", icon: "table_chart", lib: "android", group: "布局",
+    xml: `<TableLayout ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:stretchColumns="*">
+
+    <TableRow
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:padding="8dp"
+            android:text="名称"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:padding="8dp"
+            android:text="数量"/>
+    </TableRow>
+
+    <TableRow
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:padding="8dp"
+            android:text="椅子"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:padding="8dp"
+            android:text="3"/>
+    </TableRow>
+</TableLayout>`,
+  },
+  {
+    key: "table_row", label: "表格行", tag: "TableRow", icon: "table_rows", lib: "android", group: "布局",
+    xml: `<TableRow ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:padding="8dp"
+        android:text="单元格 1"/>
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:padding="8dp"
+        android:text="单元格 2"/>
+</TableRow>`,
+  },
+  {
+    key: "button_bar", label: "按钮条", tag: "LinearLayout", icon: "horizontal_split", lib: "android", group: "布局",
+    xml: `<LinearLayout ${A}
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="end|center_vertical"
+    android:padding="8dp">
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:text="取消"/>
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="确定"/>
+</LinearLayout>`,
   },
   {
     key: "card", label: "卡片", tag: "CardView", icon: "screenshot", lib: "androidx", group: "布局",
@@ -117,6 +226,15 @@ export const WIDGETS: WidgetDef[] = [
     android:numColumns="3"
     android:horizontalSpacing="4dp"
     android:verticalSpacing="4dp"/>`,
+  },
+  {
+    key: "expandable_list", label: "可展开列表", tag: "ExpandableListView", icon: "account_tree", lib: "android", group: "布局",
+    xml: `<ExpandableListView ${A}
+    android:layout_width="match_parent"
+    android:layout_height="240dp"
+    android:groupIndicator="@null"
+    android:divider="#E0E0E0"
+    android:dividerHeight="1dp"/>`,
   },
   {
     key: "include", label: "引入布局", tag: "include", icon: "insert_drive_file", lib: "android", group: "布局",
@@ -268,6 +386,29 @@ export const WIDGETS: WidgetDef[] = [
     xml: `<Spinner ${A}
     android:layout_width="match_parent"
     android:layout_height="wrap_content"/>`,
+  },
+  {
+    key: "number_picker", label: "数字选择器", tag: "NumberPicker", icon: "pin", lib: "android", group: "控件",
+    xml: `<NumberPicker ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:minValue="0"
+    android:maxValue="99"
+    android:value="8"/>`,
+  },
+  {
+    key: "date_picker", label: "日期选择器", tag: "DatePicker", icon: "calendar_month", lib: "android", group: "控件",
+    xml: `<DatePicker ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:datePickerMode="calendar"/>`,
+  },
+  {
+    key: "time_picker", label: "时间选择器", tag: "TimePicker", icon: "schedule", lib: "android", group: "控件",
+    xml: `<TimePicker ${A}
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:timePickerMode="clock"/>`,
   },
 
   // ===== 进度 =====

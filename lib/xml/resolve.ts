@@ -216,6 +216,10 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["gridColumnWeight"] = parseFloat(a["layout_columnWeight"] ?? "") || 0;
   out["columnCount"] = parseInt(a["columnCount"] ?? "", 10) || 0;
 
+  // M14d：AbsoluteLayout 的 layout_x / layout_y（单位 dp，转成数字供 css 层乘 scale）
+  out["absX"] = parseFloat(a["layout_x"] ?? "") || 0;
+  out["absY"] = parseFloat(a["layout_y"] ?? "") || 0;
+
   // 四角 margin/padding（支持简写 padding="16dp" 展开四边；Start/End 是 RTL 语义，映射到 Left/Right）
   // Android 语义：简写值先铺四边，单独属性只覆盖自己那一边。
   // （旧实现：只要存在任何一个单独边就直接返回四边值，其余边变 0 → 会出现左右不对称）

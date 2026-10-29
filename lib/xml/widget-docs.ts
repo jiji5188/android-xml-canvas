@@ -390,6 +390,17 @@ const PARSED: Record<string, WidgetDoc> = {
       { name: "layout_rowSpan", type: "数值", desc: "纵向跨几行" },
     ],
   },
+  AbsoluteLayout: {
+    title: "绝对布局",
+    summary:
+      "子控件按 layout_x / layout_y 的绝对坐标摆放（单位 dp）。已废弃，官方不推荐，但老工程里常见；屏幕尺寸一变位置就错。",
+    category: "布局",
+    attrs: [
+      { name: "layout_x", type: "尺寸", desc: "左上角距容器左边（dp）", values: ["0dp", "16dp"] },
+      { name: "layout_y", type: "尺寸", desc: "左上角距容器上边（dp）", values: ["0dp", "16dp"] },
+      { name: "—", type: "—", desc: "子控件仍可写 layout_width/height，但位置完全由 x/y 决定，与兄弟控件无关" },
+    ],
+  },
   TableLayout: {
     title: "表格布局",
     summary: "由若干 TableRow 组成的表格；列宽由内容或 stretchColumns 决定。",

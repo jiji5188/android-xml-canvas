@@ -57,7 +57,14 @@ function viewClass(rawTag: string, a: ResolvedAttrs): string {
       return "axv-card";
     case "RecyclerView":
     case "ListView":
+    case "GridView":
+    case "ExpandableListView":
       return "axv-list";
+    // M14d：日期 / 时间选择器（平台控件的固有 UI 无法用 DOM 复原，画一个带标签的占位框）
+    case "DatePicker":
+      return "axv-datepicker";
+    case "TimePicker":
+      return "axv-timepicker";
     case "ViewStub":
       return "axv-viewstub";
     case "Switch":
@@ -383,6 +390,10 @@ export function buildRenderModel(
     // RelativeLayout：子项位置由规则求解（见 relative.ts），容器自身仍需 position:relative
     // 作为 absolute 子项的定位基准
     if (isRL) {
+      style.display = "block";
+      style.position = "relative";
+    } else if (tag === "AbsoluteLayout") {
+      // M14d：绝对布局（已废弃但仍能在老工程里看到）——子项按 layout_x/layout_y 绝对定位
       style.display = "block";
       style.position = "relative";
     } else if (isGrid) {
@@ -1220,6 +1231,10 @@ export function buildRenderModel(
       text = `⚡ ViewStub → @layout/${layoutName || "?"}`;
     } else if (cls === "axv-text" && !text && (attrs["hint"] as string)) {
       text = attrs["hint"] as string;
+    } else if (cls === "axv-datepicker") {
+      text = "DatePicker 日期选择器（运行时为系统日历）";
+    } else if (cls === "axv-timepicker") {
+      text = "TimePicker 时间选择器（运行时为系统时钟）";
     }
 
     // ===== 组合图标（drawableLeft 等）：交给渲染层画 img =====
@@ -1350,6 +1365,14 @@ export function buildRenderModel(
       issues: nIssues,
       children: node.children.map((c) => {
         const rc = resolveAll(c);
+        // M14d：AbsoluteLayout 的子项按 layout_x / layout_y 绝对定位（dp → px）
+        if (shortTag(node.tag) === "AbsoluteLayout") {
+          const ca = resolveNodeAttrs(c, res).attrs;
+          rc.style.position = "absolute";
+          rc.style.left = `${DP((ca["absX"] as number) || 0, scale)}px`;
+          rc.style.top = `${DP((ca["absY"] as number) || 0, scale)}px`;
+          rc.style.margin = 0;
+        }
         // M11x：TextInputLayout 的 EditText 自己不画边框/底色（描边由外层 TIL 负责），
         // 否则预览里会套一个「框中框」
         if (shortTag(node.tag) === "TextInputLayout") {

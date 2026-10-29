@@ -10,6 +10,8 @@ export const KNOWN_TAGS = new Set([
   "LinearLayout", "FrameLayout", "ScrollView", "HorizontalScrollView",
   "TextView", "Button", "ImageView", "EditText", "ProgressBar", "View",
   "Space", "ImageView",
+  // M14d：常见容器（不进去会当 unknown 占位，子控件就丢了）
+  "AbsoluteLayout", "TableLayout", "TableRow", "RelativeLayout", "GridLayout",
   // M2c：ConstraintLayout 专用辅助节点
   "Guideline", "Barrier",
 ]);

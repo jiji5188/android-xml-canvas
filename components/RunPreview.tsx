@@ -9,15 +9,21 @@
 //   android:onClick="toast:hello"    → 只打日志，不跳转
 // 找不到目标布局时在日志里报 W 级并列出可用布局。
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseLayoutXml, findNode } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
 import { readableOn } from "@/lib/xml/theme";
 import { DEFAULT_RENDER_THEME, type RenderTheme } from "@/lib/xml/theme";
 import type { ResourceTable } from "@/lib/xml/types";
 import { XmlCanvas } from "./XmlCanvas";
+import { decorateRunScreen } from "./run-decorate";
+import { eventText, shortName, targetLabel } from "@/lib/xml/run-sim";
 
 const SCALE = 2; // 1dp = 2px（与编辑器一致）
+
+/** 画布在运行态只渲染一次：包一层 memo，日志/Toast 引起的重渲染不会重写 DOM，
+ *  否则用户刚输入的文字会被 React 的旧文本节点覆盖回去。 */
+const StaticCanvas = memo(XmlCanvas);
 
 export interface RunDevice {
   label: string;
@@ -77,7 +83,15 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
   const [showLog, setShowLog] = useState(true);
   const [fit, setFit] = useState(1);
   const logRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   const seq = useRef(0);
+  /** Android 风格 Toast：{ id, text } */
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
+  /** 本屏可交互控件数（装饰层统计） */
+  const [interactive, setInteractive] = useState(0);
+  const toastTimer = useRef<number | null>(null);
+  /** 启动日志只打一次（React 严格模式下 effect 会跑两遍） */
+  const bootedRef = useRef(false);
 
   const dev = rotated ? { ...device, w: device.h, h: device.w } : device;
   const cur = stack[stack.length - 1];
@@ -87,12 +101,22 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
     setLogs((ls) => [...ls.slice(-299), line]);
   }, []);
 
+  const showToast = useCallback((text: string) => {
+    if (!text) return;
+    setToast({ id: Date.now(), text });
+    if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 2200);
+  }, []);
+
   // 启动日志
   useEffect(() => {
+    if (bootedRef.current) return;
+    bootedRef.current = true;
     log("I", `启动 ${entryName}.xml · ${dev.w}×${dev.h}dp · 可跳转布局 ${Object.keys(layouts).length} 个`);
     if (Object.keys(layouts).length === 0) {
       log("W", "没有其它布局可跳转：先在左侧「资源」上传 res/ 目录");
     }
+    log("D", "交互已开启：按钮有涟漪、输入框可直接打字、下拉可展开、列表项可点选、开关/勾选/进度条可操作");
     // 只在挂载时打一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -169,35 +193,58 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
     (path: string) => {
       const node = parsed.root ? findNode(parsed.root, path) : null;
       if (!node) return;
-      const tag = node.tag.includes(".") ? node.tag.slice(node.tag.lastIndexOf(".") + 1) : node.tag;
-      const id = String(node.attrs["id"] ?? "").replace(/^@\+?id\//, "");
-      const label = id ? `${tag}#${id}` : tag;
+      const label = targetLabel(node.tag, node.attrs["id"]);
       const action = String(node.attrs["onClick"] ?? "").trim();
 
       if (!action) {
-        log("D", `点击 ${label}（无 onClick）`);
+        log("D", eventText("click", label, "无 onClick"));
         return;
       }
       if (BACK_WORDS.has(action)) {
-        log("I", `点击 ${label} · onClick="${action}" → 返回`);
+        log("I", eventText("click", label, `onClick="${action}" → 返回`));
         back();
         return;
       }
       if (action.startsWith("toast:")) {
-        log("I", `点击 ${label} · toast: ${action.slice(6).trim() || "(空)"}`);
+        const msg = action.slice(6).trim() || "(空)";
+        log("I", eventText("click", label, `toast: ${msg}`));
+        showToast(msg);
         return;
       }
       const target = findLayout(action);
       if (!target) {
-        log("W", `点击 ${label} · 找不到布局 "${action}"（可用：${Object.keys(layouts).join(", ") || "无"}）`);
+        log("W", eventText("click", label, `找不到布局 "${action}"（可用：${Object.keys(layouts).join(", ") || "无"}）`));
         return;
       }
-      log("I", `点击 ${label} · onClick="${action}" → ${target.name}.xml`);
+      log("I", eventText("click", label, `onClick="${action}" → ${target.name}.xml`));
       setDir("fwd");
       setStack((s) => [...s, target]);
     },
-    [parsed.root, findLayout, log, back],
+    [parsed.root, findLayout, log, back, showToast],
   );
+
+  // M18：换屏后给 DOM 加交互（输入/勾选/拖动/下拉/列表行/涟漪）
+  // 只依赖屏幕标识：日志变化不会重跑（否则用户输入会被反复重新装饰）
+  const screenKey = cur.name + "|" + dir + "|" + stack.length;
+  useEffect(() => {
+    const host = bodyRef.current;
+    if (!host) return;
+    const screen = host.querySelector<HTMLElement>(".axv-run-screen");
+    if (!screen) return;
+    // 等 React 把这一屏的 DOM 落完再装饰
+    let cleanup: (() => void) | null = null;
+    const t = window.setTimeout(() => {
+      const r = decorateRunScreen(screen, parsed.root, { log, tap, toast: showToast });
+      cleanup = r.cleanup;
+      setInteractive(r.interactive);
+      if (r.interactive > 0) log("D", `本屏可交互控件 ${r.interactive} 个`);
+    }, 0);
+    return () => {
+      window.clearTimeout(t);
+      cleanup?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screenKey]);
 
   // 键盘：Esc = 返回；栈空了再关
   useEffect(() => {
@@ -299,14 +346,19 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
                 </span>
               </div>
 
-              <div className="axv-phone-body axv-run-body">
+              <div className="axv-phone-body axv-run-body" ref={bodyRef}>
                 {parsed.root && model ? (
                   <div key={cur.name + dir} className={"axv-run-screen " + (dir === "fwd" ? "in-fwd" : "in-back")}>
-                    <XmlCanvas node={model.root} selectedPath={null} onSelect={tap} scale={SCALE} />
+                    <StaticCanvas node={model.root} selectedPath={null} onSelect={tap} scale={SCALE} />
                   </div>
                 ) : (
                   <div className="axv-run-error">XML 解析失败，无法运行</div>
                 )}
+                {toast ? (
+                  <div key={toast.id} className="axv-run-toast" role="status">
+                    {toast.text}
+                  </div>
+                ) : null}
               </div>
 
               <div className="axv-navbar" style={{ height: NAV_BAR_H }}>
@@ -333,10 +385,28 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
         {showLog ? (
           <aside className="axv-run-log">
             <div className="axv-run-log-head">
-              <span>logcat</span>
-              <button className="axv-run-log-clear" onClick={() => setLogs([])}>
-                清空
-              </button>
+              <span className="axv-run-log-title">
+                logcat
+                {interactive > 0 ? <em className="axv-run-log-badge">{interactive} 个可交互</em> : null}
+              </span>
+              <span className="axv-run-log-tools">
+                <button
+                  className="axv-run-log-clear"
+                  title="复制全部日志"
+                  onClick={() => {
+                    const text = logs.map((l) => `${l.t} ${l.level} ${l.msg}`).join("\n");
+                    void navigator.clipboard.writeText(text).then(
+                      () => log("D", `已复制 ${logs.length} 条日志`),
+                      () => log("W", "复制失败：浏览器拒绝了剪贴板权限"),
+                    );
+                  }}
+                >
+                  复制
+                </button>
+                <button className="axv-run-log-clear" onClick={() => setLogs([])}>
+                  清空
+                </button>
+              </span>
             </div>
             <div className="axv-run-log-body" ref={logRef}>
               {logs.length === 0 ? (

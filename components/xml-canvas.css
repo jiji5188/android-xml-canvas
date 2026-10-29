@@ -2964,8 +2964,8 @@
   justify-content: center;
 }
 .axv-run-log {
-  width: 360px;
-  flex: 0 0 360px;
+  width: 430px;
+  flex: 0 0 430px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -2982,6 +2982,17 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-family: ui-monospace, Cascadia, Consolas, monospace;
 }
+.axv-run-log-title { display: inline-flex; align-items: center; gap: 8px; }
+.axv-run-log-badge {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(126, 200, 255, 0.16);
+  color: #7ec8ff;
+}
+.axv-run-log-tools { display: inline-flex; gap: 6px; }
 .axv-run-log-clear {
   border: none;
   background: rgba(255, 255, 255, 0.08);
@@ -2995,13 +3006,14 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 6px 10px 12px;
+  padding: 8px 12px 14px;
   font-family: ui-monospace, Cascadia, Consolas, monospace;
-  font-size: 11.5px;
-  line-height: 1.65;
+  font-size: 12.5px;
+  line-height: 1.7;
 }
-.axv-run-line { display: flex; gap: 6px; white-space: pre-wrap; word-break: break-word; }
-.axv-run-line .t { color: #62627a; flex: 0 0 auto; }
+.axv-run-line { display: flex; gap: 7px; white-space: pre-wrap; word-break: break-word; }
+.axv-run-line + .axv-run-line { margin-top: 2px; }
+.axv-run-line .t { color: #82829c; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
 .axv-run-line .lv { flex: 0 0 auto; font-weight: 700; }
 .axv-run-line .m { color: #d6d6e4; }
 .axv-run-line.lv-I .lv { color: #7ec8ff; }
@@ -3013,7 +3025,7 @@
 .axv-run-log-empty { color: #62627a; font-size: 11.5px; padding: 8px 2px; }
 @media (max-width: 900px) {
   .axv-run-main { flex-direction: column; }
-  .axv-run-log { width: auto; flex: 0 0 34vh; border-left: none; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+  .axv-run-log { width: auto; flex: 0 0 38vh; border-left: none; border-top: 1px solid rgba(255, 255, 255, 0.08); }
   .axv-run-stack { display: none; }
 }
 
@@ -4882,3 +4894,145 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 }
 .axv-ai-send { min-width: 72px; display: inline-flex; align-items: center; gap: 4px; justify-content: center; }
 .axv-ai-send:disabled { opacity: 0.5; cursor: default; }
+
+/* ===== M18：运行调试的可交互模拟 ===== */
+.axv-run-body { position: relative; overflow: hidden; }
+.axv-run-screen { position: relative; height: 100%; }
+
+/* 按下反馈：只在可交互控件上，避免拖动预览时整片变暗 */
+.axv-run-body [data-run-pressed],
+.axv-run-body .axv-run-pressed {
+  filter: brightness(0.94);
+}
+.axv-run-ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 6;
+  animation: axv-run-ripple 0.45s ease-out forwards;
+}
+@keyframes axv-run-ripple {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+.axv-run-body [data-tag="Button"],
+.axv-run-body [data-tag$="Button"],
+.axv-run-body [data-tag="ImageButton"],
+.axv-run-body [data-tag="Chip"],
+.axv-run-body [data-tag="Spinner"] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.axv-run-body [data-tag="Button"] { transition: filter 0.12s ease; }
+
+/* 输入框：contentEditable 后要去掉编辑器的选中虚线感，光标按主题色 */
+.axv-run-input {
+  cursor: text;
+  outline: none !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+  caret-color: var(--axv-run-caret, #6750A4);
+}
+.axv-run-input.axv-run-focused { box-shadow: inset 0 0 0 1px color-mix(in srgb, #6750A4 55%, transparent); }
+.axv-run-input.axv-run-input-empty::before {
+  content: attr(data-run-hint);
+  color: #9AA0A6;
+  pointer-events: none;
+}
+.axv-run-input[data-single="1"] { white-space: nowrap; overflow: hidden; }
+
+/* 列表 / 网格：演示行 */
+.axv-run-list { display: block; overflow: auto; }
+.axv-run-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px;
+  align-content: start;
+  overflow: auto;
+}
+.axv-run-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: 6px 16px;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.12s ease;
+}
+.axv-run-grid .axv-run-row {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  align-items: center;
+  padding: 12px 8px;
+  min-height: 64px;
+}
+.axv-run-row:hover { background: rgba(103, 80, 164, 0.06); }
+.axv-run-row.on { background: rgba(103, 80, 164, 0.14); }
+.axv-run-row-title { font-size: 14px; line-height: 1.3; color: #1d1b20; }
+.axv-run-row-sub { font-size: 11.5px; color: #79747e; }
+.axv-run-row-static { cursor: pointer; }
+.axv-run-row-static.on { background: rgba(103, 80, 164, 0.14); }
+
+/* 下拉候选菜单（Android Spinner 弹窗） */
+.axv-run-popup {
+  position: absolute;
+  z-index: 30;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  padding: 4px 0;
+  animation: axv-run-pop-in 0.12s ease-out;
+}
+@keyframes axv-run-pop-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.axv-run-popup-item {
+  padding: 9px 14px;
+  font-size: 13.5px;
+  color: #1d1b20;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-run-popup-item:hover { background: rgba(103, 80, 164, 0.08); }
+.axv-run-popup-item.on {
+  color: #6750a4;
+  font-weight: 700;
+  background: rgba(103, 80, 164, 0.1);
+}
+
+/* Android 风格 Toast */
+.axv-run-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  max-width: 82%;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(32, 26, 38, 0.92);
+  color: #ffffff;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+  z-index: 40;
+  animation: axv-run-toast-in 0.18s ease-out;
+}
+@keyframes axv-run-toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

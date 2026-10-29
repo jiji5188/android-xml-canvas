@@ -15,7 +15,7 @@ import { vectorToDataUrl } from "./vector-svg";
 const DP = (n: number, scale = 2) => n * scale;
 
 /** 勾选框里的白色对勾（画在 ::before 的 background-image 上） */
-const CTL_CHECK_IMG =
+export const CTL_CHECK_IMG =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E\")";
 
 /** 全限定类名 → 短名：androidx.recyclerview.widget.RecyclerView → RecyclerView */

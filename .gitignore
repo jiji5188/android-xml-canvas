@@ -66,3 +66,6 @@ playwright-report/
 apk/build/
 apk/assets/
 apk/debug.keystore
+
+# 本地日志
+_dev.log

@@ -92,7 +92,7 @@ describe("M11x 全组件总览修正", () => {
     expect(list[1].text).toBe("OFF");
   });
 
-  it("NumberPicker 画当前值；TabItem 均分并标选中色", () => {
+  it("NumberPicker 显示 0（XML 的 android:value 在真机上无效）；TabItem 均分并标选中色", () => {
     const root = build(`<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
       android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
       <NumberPicker android:layout_width="wrap_content" android:layout_height="wrap_content" android:value="30" />
@@ -102,7 +102,8 @@ describe("M11x 全组件总览修正", () => {
       </com.google.android.material.tabs.TabLayout>
     </LinearLayout>`);
     const np = find(root, "NumberPicker");
-    expect(np.text).toBe("30");
+    // M16c：NumberPicker 不认 android:value（那是代码 setValue 的事），真机就是 0
+    expect(np.text).toBe("0");
     expect(np.className).toContain("axv-numberpicker");
     const tabs = find(root, "TabLayout");
     expect(tabs.className).toContain("axv-tabs");
@@ -121,7 +122,7 @@ describe("M11x 全组件总览修正", () => {
     expect(child.style.backgroundColor).toBe("transparent");
   });
 
-  it("AutoCompleteTextView / SearchView 的 hint 能显示出来", () => {
+  it("AutoCompleteTextView 的 hint 能显示出来；SearchView 收起态不显示 hint", () => {
     const root = build(`<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
       android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
       <AutoCompleteTextView android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -130,7 +131,8 @@ describe("M11x 全组件总览修正", () => {
         android:queryHint="搜索提示" />
     </LinearLayout>`);
     expect(root.children[0].text).toBe("AC 提示");
-    expect(root.children[1].text).toBe("搜索提示");
+    // M16c：SearchView 收起态只显示放大镜，queryHint 不渲染
+    expect(root.children[1].text).toBe("");
   });
 
   it("MaterialButton 有 strokeColor 时按描边按钮画（透明底 + 同色文字）", () => {

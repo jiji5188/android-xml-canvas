@@ -52,7 +52,7 @@ describe("M11y 细节补齐", () => {
     expect(root.label).toBe("手机号");
   });
 
-  it("SearchView 是圆角搜索框（浅底 + 左侧留给放大镜）", () => {
+  it("SearchView 收起态：无底色无圆角，只保留放大镜（真机一致）", () => {
     const root = build(`<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
       android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
       <SearchView android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -60,10 +60,11 @@ describe("M11y 细节补齐", () => {
     </LinearLayout>`);
     const sv = root.children[0];
     expect(sv.className).toContain("axv-search");
-    expect(sv.style.borderRadius).toBe("48px");
-    expect(sv.style.backgroundColor).toBe("#F3EDF7");
+    // M16c：Android 的 SearchView 收起态就是一个放大镜图标，没有底色/圆角，也不显示 hint
+    expect(sv.style.borderRadius).toBe("0px");
+    expect(sv.style.backgroundColor).toBe("transparent");
     expect(sv.style.paddingLeft).toBe("80px");
-    expect(sv.text).toBe("搜索订单");
+    expect(sv.text).toBe("");
   });
 
   it("Chip 有 closeIcon 时多一个 axv-chip-close 类", () => {

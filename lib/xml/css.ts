@@ -985,12 +985,13 @@ export function buildRenderModel(
       }
     }
 
-    // M11y：SearchView —— 搜索框外观（圆角浅底 + 放大镜 + 左侧留位）
+    // M11y / M16c：SearchView 在 Android 里默认是「收起态」---- 只有一个放大镜图标，
+    // 没有底色也没有圆角（展开后才变成搜索框）。老版本画成紫色胶囊，与真机不符。
     if (tag === "SearchView" || tag === "AppCompatSearchView") {
       style.display = style.display ?? "flex";
       style.alignItems = "center";
-      style.backgroundColor = style.backgroundColor ?? "#F3EDF7";
-      style.borderRadius = style.borderRadius ?? `${DP(24, scale)}px`;
+      style.backgroundColor = "transparent";
+      style.borderRadius = "0px";
       style.paddingLeft = style.paddingLeft ?? `${DP(40, scale)}px`;
       style.paddingRight = style.paddingRight ?? `${DP(16, scale)}px`;
       style.color = style.color ?? "#49454F";
@@ -1229,15 +1230,17 @@ export function buildRenderModel(
       const onOff = (onNow ? (attrs["textOn"] as string) || "ON" : (attrs["textOff"] as string) || "OFF");
       text = text || onOff;
     } else if (tag === "NumberPicker") {
-      // 只画中间那一行当前值
-      const v = attrs["value"] as number;
-      text = Number.isFinite(v) ? String(v) : text;
+      // M16c：Android 的 NumberPicker 不认 android:value（那是代码 setValue 用的），
+      // XML 里写了也照样显示最小值 0 ---- 真机截图就是 0，预览之前跟着 XML 走是错的。
+      void attrs["value"];
+      text = "0";
     } else if (cls === "axv-fab-ext") {
       text = text || (attrs["title"] as string) || "";
     } else if (cls === "axv-toolbar") {
       text = (attrs["title"] as string) || text;
-    } else if (cls === "axv-text" && tag === "SearchView") {
-      text = text || (attrs["queryHint"] as string) || (attrs["hint"] as string) || "";
+    } else if (cls === "axv-text" && (tag === "SearchView" || tag === "AppCompatSearchView")) {
+      // M16c：收起态不显示 queryHint（真机只有放大镜），只留占位宽度
+      text = "";
     } else if (cls === "axv-include") {
       text = "⟳ include " + ((node.attrs["layout"] as string) || "");
     } else if (cls === "axv-viewstub") {
@@ -1679,6 +1682,40 @@ export function buildRenderModel(
     n.children.forEach(patchDividers);
   };
   patchDividers(rootNode);
+
+  // M16c：TableLayout 的 stretchColumns / shrinkColumns
+  // Android 里被 stretch 的列会吃掉剩余宽度（所以「表格 A1 / B1」B1 是贴右的），
+  // 之前当成普通 flex 行处理 → 所有列挤在左边，和真机不一致。
+  const patchTableStretch = (n: ResolvedNode): void => {
+    if (shortTag(n.tag) === "TableLayout") {
+      const parseCols = (v: unknown): number[] =>
+        String(v ?? "")
+          .split(",")
+          .map((x) => parseInt(x.trim(), 10))
+          .filter((x) => Number.isFinite(x) && x >= 0);
+      const stretch = parseCols(n.rawAttrs["stretchColumns"]);
+      const shrink = parseCols(n.rawAttrs["shrinkColumns"]);
+      if (stretch.length || shrink.length) {
+        for (const row of n.children) {
+          row.children.forEach((cell, i) => {
+            if (stretch.includes(i)) {
+              cell.style.flex = "1 1 0%";
+            }
+            if (shrink.includes(i)) {
+              cell.style.flexShrink = "1";
+              cell.style.minWidth = "0px";
+            }
+            if (stretch.includes(i) || shrink.includes(i)) {
+              cell.style.minWidth = "0px";
+              cell.style.overflow = "hidden";
+            }
+          });
+        }
+      }
+    }
+    n.children.forEach(patchTableStretch);
+  };
+  patchTableStretch(rootNode);
 
   return { root: rootNode, issues };
 }

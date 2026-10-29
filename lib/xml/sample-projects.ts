@@ -1295,8 +1295,8 @@ const ALL_WIDGETS_LAYOUT = `<?xml version="1.0" encoding="utf-8"?>
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:hint="TextInputLayout（outline）"
-        android:boxBackgroundMode="outline"
-        android:boxStrokeColor="#6750A4">
+        app:boxBackgroundMode="outline"
+        app:boxStrokeColor="#6750A4">
 
       <com.google.android.material.textfield.TextInputEditText
           android:layout_width="match_parent"
@@ -1694,10 +1694,10 @@ const ALL_WIDGETS_LAYOUT = `<?xml version="1.0" encoding="utf-8"?>
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:cardCornerRadius="16dp"
-        android:cardElevation="2dp"
-        android:cardBackgroundColor="#FFFFFF"
-        android:contentPadding="16dp">
+        app:cardCornerRadius="16dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="#FFFFFF"
+        app:contentPadding="16dp">
 
       <TextView
           android:layout_width="match_parent"
@@ -1752,7 +1752,7 @@ const ALL_WIDGETS_LAYOUT = `<?xml version="1.0" encoding="utf-8"?>
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:src="@drawable/ic_add"
-        android:backgroundTint="#6750A4" />
+        app:backgroundTint="#6750A4" />
 
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:layout_width="wrap_content"
@@ -1788,11 +1788,11 @@ const ALL_WIDGETS_LAYOUT = `<?xml version="1.0" encoding="utf-8"?>
         android:layout_height="56dp"
         android:layout_marginTop="8dp"
         android:background="#6750A4"
-        android:title="Toolbar 标题"
-        android:subtitle="副标题"
-        android:titleTextColor="#FFFFFF"
-        android:subtitleTextColor="#EADDFF"
-        android:navigationIcon="@drawable/ic_arrow_back" />
+        app:title="Toolbar 标题"
+        app:subtitle="副标题"
+        app:titleTextColor="#FFFFFF"
+        app:subtitleTextColor="#EADDFF"
+        app:navigationIcon="@drawable/ic_arrow_back" />
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
@@ -1809,7 +1809,7 @@ const ALL_WIDGETS_LAYOUT = `<?xml version="1.0" encoding="utf-8"?>
             android:layout_width="match_parent"
             android:layout_height="56dp"
             app:layout_collapseMode="pin"
-            android:title="折叠标题" />
+            app:title="折叠标题" />
       </com.google.android.material.appbar.CollapsingToolbarLayout>
     </com.google.android.material.appbar.AppBarLayout>
 

@@ -8,10 +8,17 @@
 // 支持：改已有属性值、新增属性（自动补 android:/app: 前缀与 xmlns:app）、删除属性。
 
 import { scanElements, elementAt } from "./reorder";
+import { scanElements, elementAt } from "./reorder";
+import { ANDROIDX_ATTRS } from "./namespace";
 
 /** ConstraintLayout / MotionLayout 专用属性：必须用 app: 前缀 */
 export const APP_ATTR_RE =
   /^(layout_constraint|layout_guideline|layout_barrier|layout_wrapBehavior|layout_optimizationLevel|layout_behavior|layout_anchor|layout_keyline|layout_scrollFlags|layout_collapseMode|layout_collapseParallaxMultiplier|flow_|motion_|constraint_referenced_ids|constraint_referenced_tags|barrierDirection|barrierMargin|barrierAllowsGoneWidgets|visibilityMode)/;
+
+/** M12：新属性该用哪个前缀（androidx/Material 库属性 → app:） */
+export function attrPrefixFor(name: string): "app" | "android" {
+  return APP_ATTR_RE.test(name) || ANDROIDX_ATTRS.has(name) ? "app" : "android";
+}
 
 export const APP_NS = "http://schemas.android.com/apk/res-auto";
 export const ANDROID_NS = "http://schemas.android.com/apk/res/android";
@@ -147,9 +154,7 @@ export function setNodeAttrs(
     const bare = rawName.includes(":") ? rawName.slice(rawName.indexOf(":") + 1) : rawName;
     const prefix = rawName.includes(":")
       ? rawName.slice(0, rawName.indexOf(":"))
-      : APP_ATTR_RE.test(bare)
-        ? "app"
-        : "android";
+      : attrPrefixFor(bare);
     const full = `${prefix}:${bare}`;
     const existing = byBare.get(bare);
     if (existing) {

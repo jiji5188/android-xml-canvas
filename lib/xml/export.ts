@@ -3,6 +3,7 @@
 
 import { parseLayoutXml, serialize } from "./parser";
 import { lintXml } from "./lint";
+import { fixNamespacePrefixes } from "./namespace";
 import type { XmlNode } from "./types";
 
 export interface ExportCheck {
@@ -16,13 +17,15 @@ export interface ExportCheck {
 
 /** 把当前 XML 文本规范成可直接下载的 Android 布局文件 */
 export function exportLayoutXml(src: string): string {
-  const declMatch = src.match(/^<\?xml[^>]*>/i);
+  // M12：先把 android:cornerRadius 这类库属性改成 app:，否则 aapt 编译直接报错
+  const fixed = fixNamespacePrefixes(src);
+  const declMatch = fixed.match(/^<\?xml[^>]*>/i);
   const declLine = declMatch ? declMatch[0] : '<?xml version="1.0" encoding="utf-8"?>';
 
-  const { root } = parseLayoutXml(src);
+  const { root } = parseLayoutXml(fixed);
   if (!root) {
     // 解析失败时不吞用户原文：去掉旧声明后补一个，保持内容原样
-    const body = src.trim().replace(/^<\?xml[\s\S]*?\?>/i, "").trim();
+    const body = fixed.trim().replace(/^<\?xml[\s\S]*?\?>/i, "").trim();
     return `${declLine}\n${body}\n`;
   }
   return `${declLine}\n${serialize(root)}\n`;

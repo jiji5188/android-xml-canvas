@@ -3,6 +3,7 @@
 // 不做属性语义校验（那是渲染层 issues 的事）。
 
 import { isContainerTag, isKnownLeafTag } from "./insert";
+import { namespaceIssues } from "./namespace";
 
 export interface LintIssue {
   line: number;
@@ -18,6 +19,17 @@ function lineAt(src: string, offset: number): number {
 
 export function lintXml(src: string): LintIssue[] {
   const issues: LintIssue[] = [];
+  // M12：命名空间错（android:cornerRadius 这类）→ aapt 编译不过，导出时会被自动改成 app:
+  for (const ns of namespaceIssues(src)) {
+    issues.push({
+      line: ns.line,
+      level: "warn",
+      message:
+        ns.to === "style"
+          ? `android:style 不是带命名空间的属性，应写成 style="@style/…"`
+          : `${ns.from} 是 androidx/Material 属性，必须写成 ${ns.to}（否则 aapt 报 No resource identifier found）`,
+    });
+  }
   const stack: { tag: string; line: number }[] = [];
   /** 已提示过的父标签行号（同一个非容器不重复报） */
   const warned = new Set<number>();

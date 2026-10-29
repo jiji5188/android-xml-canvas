@@ -7,6 +7,10 @@ export interface XmlNode {
   attrs: Record<string, string>; // 原始属性（未解析引用）
   /** 命名空间声明（xmlns:android="..."），writeback 序列化时补回，不进 attrs */
   nsDecls?: Record<string, string>;
+  /** M12：每个属性原本用的前缀（android / app / …），序列化时原样还原。
+   *  之前只存 localName + 靠 APP_ATTR_RE 猜前缀，用户写的 app:cardCornerRadius
+   *  导出后会变成 android:cardCornerRadius → aapt 报 No resource identifier found */
+  attrNs?: Record<string, string>;
   /** M2y：源文件行号（1 基，标签 < 所在行），用于代码 → 画布反跳 */
   line?: number;
   children: XmlNode[];

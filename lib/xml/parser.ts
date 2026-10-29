@@ -3,7 +3,7 @@
 // 规避 M3E 运行环境里 Node 冒烟脚本拿不到 DOM 的问题）。
 
 import type { XmlNode, XmlIssue } from "./types";
-import { setNodeAttrs, APP_ATTR_RE, APP_NS } from "./attrs";
+import { setNodeAttrs, APP_ATTR_RE, APP_NS, attrPrefixFor } from "./attrs";
 
 /** M1 支持的标签（其余走 unknown 占位，不阻断） */
 export const KNOWN_TAGS = new Set([
@@ -70,6 +70,7 @@ function parseElement(s: string, pos: { i: number; lineOf?: (o: number) => numbe
   }
 
   const attrs: Record<string, string> = {};
+  const attrNs: Record<string, string> = {}; // M12：属性原始前缀
   const nsDecls: Record<string, string> = {};
   let selfClosed = false; // <tag ... /> 无子元素
   // 解析属性
@@ -139,10 +140,22 @@ function parseElement(s: string, pos: { i: number; lineOf?: (o: number) => numbe
         value = unescapeXml(s.slice(vStart, pos.i));
       }
     }
-    if (!isTools) attrs[localName] = value;
+    if (!isTools) {
+      attrs[localName] = value;
+      // M12：记下原始前缀，导出时原样还原（否则 app:cardCornerRadius 会被写成 android:）
+      if (prefix && !attrNs[localName]) attrNs[localName] = prefix;
+    }
   }
 
-  const node: XmlNode = { tag, attrs, nsDecls: Object.keys(nsDecls).length ? nsDecls : undefined, children: [], path, line: pos.lineOf ? pos.lineOf(openIdx) : undefined };
+  const node: XmlNode = {
+    tag,
+    attrs,
+    nsDecls: Object.keys(nsDecls).length ? nsDecls : undefined,
+    attrNs: Object.keys(attrNs).length ? attrNs : undefined, // M12
+    children: [],
+    path,
+    line: pos.lineOf ? pos.lineOf(openIdx) : undefined,
+  };
 
   // 自闭合标签没有子元素，直接返回（不要吞掉后面的兄弟节点）
   if (selfClosed) return node;
@@ -241,7 +254,8 @@ export { APP_ATTR_RE, APP_NS };
 
 /** 子树里是否用了 app: 命名空间的属性 */
 function usesAppNs(n: XmlNode): boolean {
-  if (Object.keys(n.attrs).some((k) => APP_ATTR_RE.test(k))) return true;
+  if (Object.keys(n.attrs).some((k) => APP_ATTR_RE.test(k) || attrPrefixFor(k) === "app")) return true;
+  if (Object.values(n.attrNs ?? {}).some((p) => p === "app")) return true;
   return n.children.some(usesAppNs);
 }
 
@@ -254,7 +268,8 @@ export function serialize(node: XmlNode, indent = ""): string {
     .map(([p, uri]) => `xmlns:${p}="${uri}"`)
     .join(" ");
   const attrsStr = Object.entries(node.attrs)
-    .map(([k, v]) => `    ${APP_ATTR_RE.test(k) ? "app:" : "android:"}${k}="${v}"`)
+    // M12：优先还原原始前缀；新增的属性（没有原始前缀）才按白名单猜
+    .map(([k, v]) => `    ${node.attrNs?.[k] ? `${node.attrNs[k]}:` : attrPrefixFor(k) === "app" ? "app:" : "android:"}${k}="${v}"`)
     .join("\n");
 
   const buildOpen = (selfClosed: boolean): string => {

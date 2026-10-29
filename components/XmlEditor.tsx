@@ -1542,8 +1542,11 @@ export function XmlEditor() {
   const widthPx = Math.round(device.w * SCALE * scale);
   const heightPx = Math.round(device.h * SCALE * scale);  /** 屏 dp → px（含用户缩放） */
   const DPX = SCALE * scale;
-  /** 手机外壳边框宽（px）；内容区保持 412x892dp 不被边框吃算 */
-  const PHONE_BORDER = 2;
+  /** 手机外壳边框宽（px）；内容区保持 412x892dp 不被边框吃掉
+   *  M12：必须和 xml-canvas.css 里 `.axv-phone` 的 `border: 8px` 一致。
+   *  之前这里是 2，CSS 是 8 → border-box 下内容区比模型假设窄 12px，
+   *  导致 CL/RL 的 match_parent 子项比内容区宽 12px，肉眼看到「右边偏窄/贴边」。 */
+  const PHONE_BORDER = 8;
   const outerW = widthPx + PHONE_BORDER * 2;
   const outerH = heightPx + PHONE_BORDER * 2;
   /** 状态栏 24dp（Android 默认高度） */

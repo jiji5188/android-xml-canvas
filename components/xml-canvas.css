@@ -45,6 +45,17 @@
   position: relative;
   font-family: system-ui, "Segoe UI", Roboto, sans-serif;
   overflow: visible;
+  /* M12：滚动容器不显示滚动条。桌面 Chrome 的经典滚动条会吃掉 15px 内容宽度，
+     而 Android 的滚动条是浮动（fade）的、不占布局 → 模型按 824px 算出来的 match_parent 宽度
+     会超出真正内容区 15px，肉眼就是「左右间距不一致、右边偏窄」。*/
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.axv-node::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 /* 文本类 */

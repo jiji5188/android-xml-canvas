@@ -641,6 +641,12 @@ export function XmlEditor() {
 
   /* ===== M16i：工作目录 ===== */
   const wsSigRef = useRef<string>("");
+  /** M30：工作目录状态签名（避免 4s 轮询把同一个 info 重设成新对象 → 整面板重渲染） */
+  const wsInfoSigRef = useRef<string>("");
+  /** M30：静默轮询用上次的 info，不再每轮都问一次 bridge */
+  const wsInfoRef = useRef<WsInfo | null>(null);
+  /** M30：轮询重入锁（上一次还在读文件就不再发新的） */
+  const wsTickingRef = useRef(false);
   /** M25d：已经分析过名称/图标的项目（rel），避免 4s 轮询重复读文件 */
   const analyzedRef = useRef<Set<string>>(new Set());
 
@@ -661,10 +667,19 @@ export function XmlEditor() {
 
   const refreshWorkspace = useCallback(async (opts?: { quiet?: boolean }) => {
     const quiet = !!opts?.quiet;
+    if (quiet && wsTickingRef.current) return;
+    if (quiet) wsTickingRef.current = true;
     if (!quiet) setWsBusy(true);
     try {
-      const info = await wsInfo();
-      setWsState(info);
+      // M30：静默轮询复用上次 info（native 下 getWorkspaceInfo 每次都要走 JNI），
+      // 只有手动刷新才重新问一次。
+      const info: WsInfo = quiet && wsInfoRef.current ? wsInfoRef.current : await wsInfo();
+      wsInfoRef.current = info;
+      const infoSig = `${info.mode}:${info.label}:${info.custom ? 1 : 0}:${info.allFiles ? 1 : 0}`;
+      if (!quiet || infoSig !== wsInfoSigRef.current) {
+        wsInfoSigRef.current = infoSig;
+        setWsState(info);
+      }
       let next: WsProject[] = [];
       if (info.mode === "unsupported") {
         next = [];
@@ -683,6 +698,7 @@ export function XmlEditor() {
       if (!quiet) setWsMsg(e instanceof Error ? e.message : String(e));
     } finally {
       if (!quiet) setWsBusy(false);
+      wsTickingRef.current = false;
     }
   }, [analyzeProjects]);
 
@@ -690,14 +706,15 @@ export function XmlEditor() {
     if (leftView === "res" || leftView === "settings") void refreshWorkspace();
   }, [leftView, refreshWorkspace]);
 
-  /* M24：项目列表自动刷新 —— 面板开着就每 4s 扫一次；切回页面/窗口获得焦点时立即刷一次 */
+  /* M24/M30：项目列表自动刷新 —— 12s 一次（原来 4s，在手机上频繁走 JNI 会卡）；
+     切回页面/窗口获得焦点时立即刷一次。 */
   useEffect(() => {
     if (leftView !== "res") return;
     const tick = () => {
       if (typeof document !== "undefined" && document.hidden) return;
       void refreshWorkspace({ quiet: true });
     };
-    const timer = window.setInterval(tick, 4000);
+    const timer = window.setInterval(tick, 12000);
     const onVisible = () => {
       if (!document.hidden) tick();
     };

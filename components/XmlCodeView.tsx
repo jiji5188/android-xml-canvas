@@ -5,7 +5,6 @@
 // 状态全在 XmlEditor，这里纯展示 + 回调。
 
 import type { ReactNode } from "react";
-import { SAMPLE_BLANKS, SAMPLE_PROJECTS } from "@/lib/xml/sample-projects";
 import type { LintIssue } from "@/lib/xml/lint";
 import { XmlCodeEditor } from "./XmlCodeEditor";
 
@@ -68,32 +67,6 @@ export function XmlCodeView(props: XmlCodeViewProps) {
         <button className="axv-mob-tool-btn axv-ghost" onClick={props.onFormat} title="重排缩进（保留注释）">
           格式化
         </button>
-        <select
-          className="axv-tb-select"
-          title="载入完整示例项目（布局 + 自带图标/背景资源）"
-          value=""
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v) props.onSample(v);
-          }}
-        >
-          <option value="">示例项目…</option>
-          <optgroup label="完整示例（带资源）">
-            {SAMPLE_PROJECTS.map((p) => (
-              <option key={p.key} value={p.key}>
-                {p.name}
-              </option>
-            ))}
-          </optgroup>
-          <optgroup label="新建（空白）">
-            {SAMPLE_BLANKS.map((b) => (
-              <option key={b.key} value={`blank:${b.key}`}>
-                {b.name}
-              </option>
-            ))}
-          </optgroup>
-        </select>
-        {props.fileSelect}
         <button className="axv-mob-tool-btn" onClick={props.onOpenFile} title="打开本地 XML 文件">
           打开
         </button>

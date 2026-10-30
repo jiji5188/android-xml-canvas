@@ -130,6 +130,26 @@ export async function wsListProjects(): Promise<WsProject[]> {
 export async function wsListTopProjects(): Promise<WsProject[]> {
   const b = nativeBridge();
   if (b) {
+    // M30：新版 bridge 直接给顶层列表（不递归），老 APK 没有这个方法就回退合并
+    if (b.listTopProjects) {
+      try {
+        const raw = JSON.parse(b.listTopProjects() || "{}") as {
+          ok?: boolean;
+          items?: { name: string; kind: "dir" | "file"; rel: string; layoutCount?: number; mainPath?: string; docUri?: string }[];
+        };
+        if (raw.ok !== false && Array.isArray(raw.items)) {
+          return raw.items.map((it) => ({
+            name: it.name,
+            kind: it.kind,
+            rel: it.rel,
+            layoutCount: it.layoutCount ?? 0,
+            target: it.docUri ?? it.mainPath,
+          }));
+        }
+      } catch {
+        /* 回退到旧路径 */
+      }
+    }
     const all = await wsListProjects();
     const map = new Map<string, WsProject>();
     for (const it of all) {

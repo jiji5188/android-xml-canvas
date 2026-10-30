@@ -6,7 +6,7 @@
 //
 // 树的展开状态、已加载的子项都放在组件内部：它们是纯 UI 状态，没必要塞回 XmlEditor。
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useState, type ReactNode } from "react";
 import { ResTree } from "./ResTree";
 import type { BrowseEntry, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
 import type { WsInfo, WsProject } from "@/lib/xml/workspace";
@@ -63,7 +63,7 @@ type LoadState = BrowseEntry[] | "loading";
 
 /* ---------------- 懒加载结构树 ---------------- */
 
-function LazyTree(props: {
+function LazyTreeInner(props: {
   source: ProjectSource;
   rev: number;
   currentFileName: string;
@@ -178,6 +178,12 @@ function LazyTree(props: {
 
   return <ul className="axv-ws-list axv-proj-tree">{renderRows("", 0)}</ul>;
 }
+
+/** M30：树只关心「换了项目 / 手动刷新 / 当前文件名」，父组件其它 state 变化不该让它重建。
+ *  onOpenEntry 是内联箭头函数（每帧都是新引用），所以比较时跳过它。 */
+const LazyTree = memo(LazyTreeInner, (a, b) =>
+  a.source === b.source && a.rev === b.rev && a.currentFileName === b.currentFileName,
+);
 
 /* ---------------- 面板 ---------------- */
 

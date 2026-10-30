@@ -573,6 +573,17 @@ public class MainActivity extends Activity {
             }
         }
 
+        /** M30：只列**顶层**项目卡片（不递归整棵树）——面板轮询用这个，避免每个 final 都深扫 */
+        @JavascriptInterface
+        public String listTopProjects() {
+            try {
+                return listTopProjectsJson();
+            } catch (Throwable t) {
+                Log.e(TAG, "listTopProjects", t);
+                return "{\"ok\":false,\"error\":\"" + t.getMessage() + "\"}";
+            }
+        }
+
         /** 读文本：支持绝对路径（限默认目录下）或 content:// URI */
         @JavascriptInterface
         public String readText(String target) {
@@ -663,6 +674,117 @@ public class MainActivity extends Activity {
 
     /* ================= M20n：工作目录多级列表 ================= */
 
+    /** M30：只扫顶层（项目卡片用）——File 与 SAF 两种模式都只列一层 */
+    private String listTopProjectsJson() throws Exception {
+        JSONObject out = new JSONObject();
+        JSONArray items = new JSONArray();
+        out.put("ok", true);
+        out.put("allFiles", hasAllFiles());
+
+        if (treeUri != null) {
+            out.put("dir", workspaceLabel());
+            out.put("kind", "tree");
+            String rootId = DocumentsContract.getTreeDocumentId(treeUri);
+            collectTreeTop(rootId, items, 0);
+            out.put("items", items);
+            return out.toString();
+        }
+
+        File d = defaultDir();
+        out.put("dir", "AndroidUIIDE/Project");
+        out.put("path", d.getAbsolutePath());
+        out.put("kind", "file");
+        File[] fs = d.listFiles();
+        if (fs != null) {
+            java.util.Arrays.sort(fs, (a, b) -> {
+                if (a.isDirectory() != b.isDirectory()) return a.isDirectory() ? -1 : 1;
+                return a.getName().compareToIgnoreCase(b.getName());
+            });
+            for (File f : fs) {
+                String nm = f.getName().toLowerCase(Locale.ROOT);
+                if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
+                if (f.isDirectory()) {
+                    int cnt = countXmlDeep(f, 0);
+                    if (cnt == 0) continue;
+                    JSONObject it = new JSONObject();
+                    it.put("name", f.getName());
+                    it.put("kind", "dir");
+                    it.put("rel", f.getName());
+                    it.put("layoutCount", cnt);
+                    it.put("depth", 0);
+                    it.put("path", f.getAbsolutePath());
+                    File main = firstXmlDeep(f, 0);
+                    if (main != null) it.put("mainPath", main.getAbsolutePath());
+                    items.put(it);
+                } else if (nm.endsWith(".xml")) {
+                    JSONObject it = new JSONObject();
+                    it.put("name", f.getName());
+                    it.put("kind", "file");
+                    it.put("rel", f.getName());
+                    it.put("layoutCount", 1);
+                    it.put("depth", 0);
+                    it.put("path", f.getAbsolutePath());
+                    items.put(it);
+                }
+            }
+        }
+        out.put("items", items);
+        return out.toString();
+    }
+
+    /** SAF：只列根目录的直接子项 */
+    private void collectTreeTop(String rootDocId, JSONArray out, int depth) throws Exception {
+        Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootDocId);
+        java.util.List<String[]> rows = new java.util.ArrayList<>();
+        try (android.database.Cursor c = getContentResolver().query(children,
+                new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                        DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
+            if (c == null) return;
+            while (c.moveToNext()) rows.add(new String[]{c.getString(0), c.getString(1), c.getString(2)});
+        }
+        rows.sort((a, b) -> {
+            boolean da = DocumentsContract.Document.MIME_TYPE_DIR.equals(a[2]);
+            boolean db = DocumentsContract.Document.MIME_TYPE_DIR.equals(b[2]);
+            if (da != db) return da ? -1 : 1;
+            return (a[1] == null ? "" : a[1]).compareToIgnoreCase(b[1] == null ? "" : b[1]);
+        });
+        for (String[] row : rows) {
+            String id = row[0];
+            String name = row[1];
+            String mime = row[2];
+            if (name == null) continue;
+            String lower = name.toLowerCase(Locale.ROOT);
+            if (SKIP_DIRS.contains(lower)) continue;
+            boolean isDir = DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
+            if (isDir) {
+                int cnt = countXmlDeepTree(id, 0);
+                if (cnt == 0) continue;
+                JSONObject it = new JSONObject();
+                it.put("name", name);
+                it.put("kind", "dir");
+                it.put("rel", name);
+                it.put("layoutCount", cnt);
+                it.put("depth", depth);
+                it.put("docId", id);
+                String mainDoc = firstXmlDocIdInTree(id);
+                if (mainDoc != null) {
+                    it.put("docUri", DocumentsContract.buildDocumentUriUsingTree(treeUri, mainDoc).toString());
+                }
+                out.put(it);
+            } else if (lower.endsWith(".xml")) {
+                JSONObject it = new JSONObject();
+                it.put("name", name);
+                it.put("kind", "file");
+                it.put("rel", name);
+                it.put("layoutCount", 1);
+                it.put("depth", depth);
+                it.put("docId", id);
+                it.put("docUri", DocumentsContract.buildDocumentUriUsingTree(treeUri, id).toString());
+                out.put(it);
+            }
+        }
+    }
     /** 递归扫描时跳过的噪声目录 */
     private static final java.util.Set<String> SKIP_DIRS = new java.util.HashSet<>(java.util.Arrays.asList(
             ".git", ".gradle", ".idea", "build", "node_modules", ".svn", "__pycache__"));

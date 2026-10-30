@@ -103,6 +103,31 @@ function lineFromEvent(ta: HTMLTextAreaElement, x: number, y: number): number {
   return Math.max(1, Math.floor(relY / CODE_LINE_HEIGHT) + 1);
 }
 
+/** M30：常用符号/片段快捷插入（手机上打 < > " @ 和 @drawable/ 太痛苦） */
+export const SYMBOLS: { label: string; insert: string; back?: number; title?: string }[] = [
+  { label: "<", insert: "<", title: "小于号（开标签）" },
+  { label: ">", insert: ">", title: "大于号（闭合标签）" },
+  { label: "</", insert: "</", title: "闭标签开头" },
+  { label: "/>", insert: "/>", title: "自闭合" },
+  { label: "=", insert: "=", title: "等号" },
+  { label: '""', insert: '""', back: 1, title: "双引号（光标落在中间）" },
+  { label: "@", insert: "@", title: "资源引用" },
+  { label: "#", insert: "#", title: "颜色值" },
+  { label: ":", insert: ":", title: "命名空间分隔" },
+  { label: "?attr/", insert: "?attr/", title: "主题属性引用" },
+  { label: "&", insert: "&amp;", title: "转义的 &" },
+  { label: "<!-- -->", insert: "<!--  -->", back: 4, title: "注释" },
+  { label: "@+id/", insert: "@+id/", title: "新建 id" },
+  { label: "@drawable/", insert: "@drawable/", title: "引用 drawable" },
+  { label: "@string/", insert: "@string/", title: "引用字符串" },
+  { label: "@color/", insert: "@color/", title: "引用颜色" },
+  { label: "@dimen/", insert: "@dimen/", title: "引用尺寸" },
+  { label: "match_parent", insert: "match_parent", title: "填满父容器" },
+  { label: "wrap_content", insert: "wrap_content", title: "包裹内容" },
+  { label: "dp", insert: "dp", title: "密度无关像素" },
+  { label: "sp", insert: "sp", title: "字体尺寸单位" },
+];
+
 export function XmlCodeEditor({ value, onChange, errors, className, focusLine, focusTick, onCursorLine }: Props) {
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const preRef = useRef<HTMLPreElement | null>(null);
@@ -217,6 +242,29 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
     ta.focus();
     ta.setSelectionRange(start, end);
   }, [focusLine, focusTick, value]);
+
+  /** M30：把符号/片段插到光标处（有选区则替换选区；back = 光标回退几个字符） */
+  const insertSymbol = useCallback(
+    (text: string, back = 0) => {
+      const ta = taRef.current;
+      if (!ta) return;
+      const s = ta.selectionStart ?? 0;
+      const e = ta.selectionEnd ?? 0;
+      ta.focus();
+      try {
+        ta.setRangeText(text, s, e, "end");
+      } catch {
+        // 极旧内核没有 setRangeText：退化成拼接
+        const next = value.slice(0, s) + text + value.slice(e);
+        onChange(next);
+        return;
+      }
+      const pos = Math.max(0, s + text.length - back);
+      ta.setSelectionRange(pos, pos);
+      onChange(ta.value);
+    },
+    [onChange, value],
+  );
 
   return (
     <div className={"axv-code" + (className ? " " + className : "")}>
@@ -340,6 +388,23 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
           </span>
         </div>
       )}
+      {/* M30：常用符号快捷条（横向滑，不抢编辑器焦点） */}
+      <div className="axv-sym-bar" role="toolbar" aria-label="常用符号">
+        {SYMBOLS.map((s) => (
+          <button
+            key={s.label}
+            type="button"
+            className="axv-sym-btn"
+            title={s.title || s.label}
+            // 按下事件就拦：否则 textarea 先失焦、光标位置丢了
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.preventDefault()}
+            onClick={() => insertSymbol(s.insert, s.back ?? 0)}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

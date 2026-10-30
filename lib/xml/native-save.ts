@@ -20,6 +20,8 @@ export interface AxvNativeBridge {
   getWorkspaceInfo?(): string;
   /** 是否已拿到「所有文件访问」 */
   hasAllFilesAccess?(): boolean;
+  /** M30：只列顶层项目卡片（不递归），轮询面板用；返回 JSON 字符串，旧 APK 没有此方法 */
+  listTopProjects?(): string;
   /** 跳系统设置申请「所有文件访问」 */
   requestAllFilesAccess?(): void;
   /** 列工作目录下的项目（JSON 字符串） */

@@ -2407,13 +2407,13 @@
 }
 .axv-mob-xml-tools {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 .axv-mob-tool-btn {
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 20px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 17px;
   border: none;
   background: var(--axv-primary);
   color: var(--axv-on-primary);
@@ -5577,4 +5577,48 @@ button.axv-sb-item:hover {
 .axv-lt-row.hit .axv-lt-tag {
   color: var(--axv-primary);
   font-weight: 700;
+}
+/* M30：常用符号快捷条 + 工具按钮收矮 */
+.axv-sym-bar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid color-mix(in srgb, var(--axv-on-surface) 10%, transparent);
+  background: var(--axv-surface-head);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.axv-sym-bar::-webkit-scrollbar {
+  display: none;
+}
+.axv-sym-btn {
+  flex: 0 0 auto;
+  height: 28px;
+  min-width: 30px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 14%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--axv-on-surface) 5%, transparent);
+  color: var(--axv-on-surface);
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.axv-sym-btn:active {
+  background: var(--axv-primary);
+  border-color: var(--axv-primary);
+  color: var(--axv-on-primary);
+}
+@media (hover: hover) {
+  .axv-sym-btn:hover {
+    border-color: var(--axv-primary);
+    color: var(--axv-primary);
+  }
 }

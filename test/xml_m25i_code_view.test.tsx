@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { isValidElement, type ReactNode } from "react";
 import { XmlCodeView, type XmlCodeViewProps } from "../components/XmlCodeView";
 import { XmlCodeEditor } from "../components/XmlCodeEditor";
+import { SYMBOLS } from "../components/XmlCodeEditor";
 
 type El = { type: unknown; props: Record<string, any> };
 
@@ -53,6 +54,19 @@ function render(over: Partial<XmlCodeViewProps> = {}) {
     all.find((e) => e.type === "button" && String(e.props.children).trim() === label);
   return { p, tree, all, btn };
 }
+
+describe("XmlCodeEditor — M30 常用符号快捷条", () => {
+  it("SYMBOLS 数据完整：label/insert 齐全，特殊符号带 back", () => {
+    expect(SYMBOLS.length).toBeGreaterThanOrEqual(20);
+    for (const s of SYMBOLS) {
+      expect(s.label).toBeTruthy();
+      expect(s.insert).toBeTruthy();
+    }
+    const empty = SYMBOLS.find((s) => s.label === '""');
+    expect(empty?.back).toBe(1);
+    expect(SYMBOLS.find((s) => s.label === "&")?.insert).toBe("&amp;");
+  });
+});
 
 describe("XmlCodeView — 显隐与位置", () => {
   it("open=false 时完全不渲染", () => {
@@ -120,25 +134,10 @@ describe("XmlCodeView — 工具栏", () => {
     expect(b2("存至")?.props.title).toBe("保存位置：默认目录");
   });
 
-  it("示例下拉：两个分组，选值透传（空白带 blank: 前缀）", () => {
-    const { all, p } = render();
-    const sel = all.find((e) => e.type === "select");
-    expect(sel).toBeTruthy();
-    const groups = collect(sel?.props.children as ReactNode).filter((e) => e.type === "optgroup");
-    expect(groups.map((g) => g.props.label)).toEqual(["完整示例（带资源）", "新建（空白）"]);
-    const opts = collect(sel?.props.children as ReactNode).filter((e) => e.type === "option");
-    expect(opts[0].props.value).toBe("");
-    expect(opts.some((o) => String(o.props.value).startsWith("blank:"))).toBe(true);
-    (sel?.props.onChange as (e: unknown) => void)({ target: { value: "blank:empty" } });
-    expect(p.onSample).toHaveBeenCalledWith("blank:empty");
-    // 选空值不触发
-    vi.mocked(p.onSample).mockClear();
-    (sel?.props.onChange as (e: unknown) => void)({ target: { value: "" } });
-    expect(p.onSample).not.toHaveBeenCalled();
-  });
-
-  it("fileSelect 作为插槽渲染进去", () => {
-    const { all } = render({ fileSelect: <select data-slot="files" /> });
-    expect(all.some((e) => e.props["data-slot"] === "files")).toBe(true);
+  it("M30：示例下拉/fileSelect 已从工具栏移除，props 保留供调用方（M9 标签栏）使用", () => {
+    const { all } = render();
+    expect(all.find((e) => e.type === "select")).toBeUndefined();
+    const { p } = render();
+    expect(p.onSample).toBeTypeOf("function");
   });
 });

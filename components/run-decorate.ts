@@ -116,12 +116,14 @@ function attachRipple(ctx: Ctx, el: HTMLElement, label?: string) {
 
   const off = on(el, "pointerdown", (e) => {
     if (getComputedStyle(el).position === "static") el.style.position = "relative";
+    // M20j：涟漪必须裁剪在控件内部（Android 的 ripple 就是被 View 边界裁掉的）。
+    // 以前不裁剪：全屏宽度的按钮 → 波浪半径 = max(w,h)*2 直接盖住整屏，看起来「整页闪一下」
+    if (getComputedStyle(el).overflow === "visible") el.style.overflow = "hidden";
     const rect = el.getBoundingClientRect();
     const size = Math.max(rect.width, rect.height) * 2;
     const span = document.createElement("span");
     span.className = "axv-run-ripple";
-    span.style.width = span.style.height = `${size}px`;
-    span.style.left = `${e.clientX - rect.left - size / 2}px`;
+    span.style.width = span.style.height = `${size}px`;    span.style.left = `${e.clientX - rect.left - size / 2}px`;
     span.style.top = `${e.clientY - rect.top - size / 2}px`;
     span.style.background = rippleColor(el);
     el.appendChild(span);

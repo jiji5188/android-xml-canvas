@@ -17,7 +17,7 @@ import { DEFAULT_RENDER_THEME, type RenderTheme } from "@/lib/xml/theme";
 import type { ResourceTable } from "@/lib/xml/types";
 import { XmlCanvas } from "./XmlCanvas";
 import { decorateRunScreen } from "./run-decorate";
-import { eventText, targetLabel } from "@/lib/xml/run-sim";
+import { eventText, runRoleOf, targetLabel } from "@/lib/xml/run-sim";
 
 const SCALE = 2; // 1dp = 2px（与编辑器一致）
 
@@ -201,6 +201,11 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
     (path: string) => {
       const node = parsed.root ? findNode(parsed.root, path) : null;
       if (!node) return;
+      // M20j：只有「真正可操作」的控件才响应点击。
+      // 容器/纯展示文本（LinearLayout、View、ImageView、普通 TextView…）点了不做事，也不打日志；
+      // 输入框只靠聚焦 + 输入（由 decorateInput 接管），不走点击逻辑。
+      const clickRole = runRoleOf(node.tag);
+      if (clickRole === "none" || clickRole === "input") return;
       const label = targetLabel(node.tag, node.attrs["id"]);
       const action = String(node.attrs["onClick"] ?? "").trim();
 

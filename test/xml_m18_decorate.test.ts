@@ -213,7 +213,7 @@ describe("M18 run-decorate：Spinner", () => {
 });
 
 describe("M18 run-decorate：统计 / 清理", () => {
-  it("interactive 只数能操作的控件（ImageView 这类不算）", () => {
+  it("interactive 只数能操作的控件（TextView/ImageView 这类纯展示不算）", () => {
     const { root, make, parsed } = build(
       `<TextView android:layout_width="wrap_content" android:layout_height="wrap_content"/>
        <Button android:id="@+id/b" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
@@ -224,8 +224,8 @@ describe("M18 run-decorate：统计 / 清理", () => {
     make("ImageView", "#0/2");
     const { h } = hooks();
     const r = decorateRunScreen(root, parsed.root, h);
-    // TextView + Button 可点，ImageView 不在可交互清单里
-    expect(r.interactive).toBe(2);
+    // M20j：只有真按钮才可交互（TextView 只是展示文本，不绑点击/涟漪）
+    expect(r.interactive).toBe(1);
   });
 
   it("cleanup 之后按钮不再有涟漪节点", () => {

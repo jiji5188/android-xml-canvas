@@ -39,12 +39,8 @@ const BUTTON_TAGS = new Set([
   "ExtendedFloatingActionButton",
   "AppCompatButton",
   "Chip",
-  "ChipGroup",
   "ToggleButton",
   "ImageButtonCompat",
-  "TextView",
-  "CardView",
-  "MaterialCardView",
 ]);
 
 /** 短类名 */

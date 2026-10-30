@@ -39,7 +39,7 @@ import {
 } from "@/lib/xml/theme-presets";
 import {
   wsInfo,
-  wsListProjects,
+  wsListTopProjects,
   wsOpenProject,
   wsPickCustom,
   wsUseDefault,
@@ -49,12 +49,17 @@ import {
 } from "@/lib/xml/workspace";
 import {
   openProjectFolder,
+  openProjectFromItem,
   restoreProjectFolder,
-  buildProjectTree,
-  mainLayoutEntry,
-  type ProjectNode,
+  type OpenedProject,
 } from "@/lib/xml/project";
-import { buildWsTree, type WsNode } from "@/lib/xml/wstree";
+import {
+  findMainLayout,
+  readProjectMeta,
+  type BrowseEntry,
+  type ProjectMeta,
+  type ProjectSource,
+} from "@/lib/xml/project-browse";
 import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
 import {
   activeFile,
@@ -530,8 +535,12 @@ export function XmlEditor() {
   const [projectTab, setProjectTab] = useState<"projects" | "current">("current");
   const [wsState, setWsState] = useState<WsInfo | null>(null);
   const [wsProjects, setWsProjects] = useState<WsProject[]>([]);
-  /** M24：当前项目（项目名 + 结构树）。entries 只在内存里（带句柄/路径），rels 存 localStorage 供刷新后展示 */
-  const [activeProject, setActiveProject] = useState<{ name: string; entries: WsProject[] } | null>(null);
+  /** M24：当前项目（项目名 + 懒加载浏览源）。M25d 起不再一次性深扫整棵树 */
+  const [activeProject, setActiveProject] = useState<{ name: string; source: ProjectSource | null } | null>(null);
+  /** M25d：手动刷新项目结构时 +1，让面板丢掉懒加载缓存重新读根目录 */
+  const [projectRev, setProjectRev] = useState(0);
+  /** M25d：项目卡片分析结果（app_name / 图标），key = 项目 rel */
+  const [projMeta, setProjMeta] = useState<Record<string, ProjectMeta>>({});
   /** M24：新建项目对话框 */
   const [newProjOpen, setNewProjOpen] = useState(false);
   const [newProjName, setNewProjName] = useState("MyApp");
@@ -552,40 +561,6 @@ export function XmlEditor() {
   /** M21：另存对话框（新建文件时先确认文件名） */
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState("activity_main.xml");
-  /* ===== M20n：工作目录多级树（默认全展开） ===== */
-  const wsTree = useMemo(() => buildWsTree(wsProjects), [wsProjects]);
-  const [wsOpen, setWsOpen] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    // 目录变化后默认把文件夹全展开（安卓工程层数不多，先让用户看到全貌）
-    setWsOpen(new Set(wsProjects.filter((p) => p.kind === "dir").map((p) => p.rel)));
-  }, [wsProjects]);
-  const toggleWsOpen = useCallback((rel: string) => {
-    setWsOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(rel)) next.delete(rel);
-      else next.add(rel);
-      return next;
-    });
-  }, []);
-
-  /* M24：项目结构默认全展开（和项目列表一致，先给用户看全貌） */
-  useEffect(() => {
-    if (!activeProject) return;
-    const dirs = activeProject.entries.filter((e) => e.kind === "dir").map((e) => e.rel);
-    if (!dirs.length) return;
-    setWsOpen((prev) => {
-      const next = new Set(prev);
-      let changed = false;
-      for (const d of dirs) {
-        if (!next.has(d)) {
-          next.add(d);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [activeProject]);
-
   const [wsBusy, setWsBusy] = useState(false);
   /** M25b：从项目目录打开的文件名（用于结构树里标「正在编辑」；应用内文件为空） */
   const [wsActiveName, setWsActiveName] = useState("");
@@ -667,6 +642,24 @@ export function XmlEditor() {
 
   /* ===== M16i：工作目录 ===== */
   const wsSigRef = useRef<string>("");
+  /** M25d：已经分析过名称/图标的项目（rel），避免 4s 轮询重复读文件 */
+  const analyzedRef = useRef<Set<string>>(new Set());
+
+  /** M25d：后台分析项目名/图标（串行，读不到就跳过，不影响列表渲染） */
+  const analyzeProjects = useCallback(async (list: WsProject[]) => {
+    for (const it of list) {
+      if (it.kind !== "dir" || !it.handle) continue;
+      if (analyzedRef.current.has(it.rel)) continue;
+      analyzedRef.current.add(it.rel);
+      try {
+        const meta = await readProjectMeta(it.handle, it.name);
+        setProjMeta((prev) => ({ ...prev, [it.rel]: meta }));
+      } catch {
+        /* 分析失败就当没有，卡片回退到文件夹名 */
+      }
+    }
+  }, []);
+
   const refreshWorkspace = useCallback(async (opts?: { quiet?: boolean }) => {
     const quiet = !!opts?.quiet;
     if (!quiet) setWsBusy(true);
@@ -677,20 +670,22 @@ export function XmlEditor() {
       if (info.mode === "unsupported") {
         next = [];
       } else if (info.mode === "native" || info.custom) {
-        next = await wsListProjects();
+        // M25d：只读一层（不再深扫整个工作目录）
+        next = await wsListTopProjects();
       }
-      // M24：自动刷新时列表没变就不 setState（否则树会一直重建、展开状态被打断）
-      const sig = next.map((p) => `${p.kind}:${p.rel}:${p.layoutCount}`).join("|");
+      // 自动刷新时列表没变就不 setState（否则卡片/树一直重建）
+      const sig = next.map((p) => `${p.kind}:${p.rel}`).join("|");
       if (!quiet || sig !== wsSigRef.current) {
         wsSigRef.current = sig;
         setWsProjects(next);
+        void analyzeProjects(next);
       }
     } catch (e) {
       if (!quiet) setWsMsg(e instanceof Error ? e.message : String(e));
     } finally {
       if (!quiet) setWsBusy(false);
     }
-  }, []);
+  }, [analyzeProjects]);
 
   useEffect(() => {
     if (leftView === "res" || leftView === "settings") void refreshWorkspace();
@@ -1485,23 +1480,23 @@ export function XmlEditor() {
     [flushTextTimer, commitHistory],
   );
 
-  /** M16i：从工作目录打开项目（依赖 setXmlAndTrack，必须放在它后面） */
-  const openWsProject = useCallback(
-    async (p: WsProject) => {
+  /** M25d：把一个条目载入画布（记住来源，保存时写回原文件） */
+  const loadEntry = useCallback(
+    async (source: ProjectSource, entry: BrowseEntry) => {
       try {
-        const r = await wsOpenProject(p);
-        if (!r) {
-          setWsMsg(`打不开《${p.name}》：没有可读的 layout xml，或目录权限已被收回`);
+        const text = await source.readText(entry.rel);
+        if (text === null) {
+          setWsMsg(`打不开《${entry.name}》：文件已不存在或目录权限被收回`);
           return;
         }
-        setXmlAndTrack(r.text);
+        setXmlAndTrack(text);
         // M25b：结构树里标「正在编辑」用
-        setWsActiveName(r.name || p.name);
+        setWsActiveName(entry.name);
         // M21：记住来源，保存时优先写回原路径
-        if (p.target) setSaveOrigin({ kind: "native", target: p.target, name: p.name });
-        else if (p.handle) setSaveOrigin({ kind: "handle", handle: p.handle, name: p.name });
+        if (entry.target) setSaveOrigin({ kind: "native", target: entry.target, name: entry.name });
+        else if (entry.handle) setSaveOrigin({ kind: "handle", handle: entry.handle, name: entry.name });
         else setSaveOrigin(null);
-        setWsMsg(`已打开 ${r.name}`);
+        setWsMsg(`已打开 ${entry.name}`);
       } catch (e) {
         setWsMsg(`打开失败：${e instanceof Error ? e.message : String(e)}`);
       }
@@ -1509,7 +1504,71 @@ export function XmlEditor() {
     [setXmlAndTrack],
   );
 
-  /** M24：打开一个项目目录（弹系统选择器），成功后把结构树放进「当前项目」 */
+  /** 当前项目的浏览源（用 ref 拿，避免面板回调闭包里拿到旧值） */
+  const activeProjectRef = useRef<{ name: string; source: ProjectSource | null } | null>(null);
+  useEffect(() => {
+    activeProjectRef.current = activeProject;
+  }, [activeProject]);
+
+  /** 结构树里点一个 xml */
+  const openProjectEntry = useCallback(
+    (entry: BrowseEntry) => {
+      const src = activeProjectRef.current?.source;
+      if (src) void loadEntry(src, entry);
+    },
+    [loadEntry],
+  );
+
+  /** 激活一个已打开的项目：切到「当前项目」tab，并自动载入主布局（找不到就只显示结构树） */
+  const activateProject = useCallback(
+    async (opened: OpenedProject) => {
+      setActiveProject(opened);
+      setProjectRev((n) => n + 1);
+      setProjectTab("current");
+      setWsActiveName("");
+      const main = await findMainLayout(opened.source);
+      if (main) await loadEntry(opened.source, main);
+      else setWsMsg(`已打开《${opened.name}》，但里面没找到 layout xml`);
+    },
+    [loadEntry],
+  );
+
+  /** M25d：项目列表里点一项 —— 打开这个项目（网页端也能直接读工作目录里的文件夹） */
+  const openWsProject = useCallback(
+    async (item: WsProject) => {
+      setWsBusy(true);
+      try {
+        if (item.kind === "file") {
+          const r = await wsOpenProject(item);
+          if (!r) {
+            setWsMsg(`打不开《${item.name}》：文件已不存在或目录权限被收回`);
+            return;
+          }
+          setXmlAndTrack(r.text);
+          setWsActiveName(item.name);
+          if (item.target) setSaveOrigin({ kind: "native", target: item.target, name: item.name });
+          else if (item.handle) setSaveOrigin({ kind: "handle", handle: item.handle, name: item.name });
+          else setSaveOrigin(null);
+          setWsMsg(`已打开 ${item.name}`);
+          return;
+        }
+        const opened = await openProjectFromItem(item);
+        if (!opened) {
+          setWsMsg(`打不开《${item.name}》：目录权限可能已失效，请重新选目录`);
+          return;
+        }
+        const shownName = projMeta[item.rel]?.name || item.name;
+        await activateProject({ ...opened, name: shownName });
+      } catch (e) {
+        setWsMsg(`打开失败：${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        setWsBusy(false);
+      }
+    },
+    [activateProject, projMeta, setXmlAndTrack],
+  );
+
+  /** M24：打开一个项目目录（弹系统选择器），成功后切到「当前项目」 */
   const openProjectDir = useCallback(async () => {
     setWsBusy(true);
     setWsMsg("正在等你选项目文件夹…");
@@ -1519,19 +1578,14 @@ export function XmlEditor() {
         setWsMsg(wsState?.mode === "unsupported" ? "当前环境不支持选目录，请用 Chrome / Edge 或 APK" : "已取消打开");
         return;
       }
-      setActiveProject(proj);
-      setProjectTab("current");
-      // 自动打开主布局
-      const main = mainLayoutEntry(proj.entries);
-      if (main) await openWsProject(main);
-      else setWsMsg(`已打开《${proj.name}》，但里面没找到 layout xml`);
+      await activateProject(proj);
       window.setTimeout(() => void refreshWorkspace({ quiet: true }), 600);
     } catch (e) {
       setWsMsg(`打开项目失败：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setWsBusy(false);
     }
-  }, [openWsProject, refreshWorkspace, wsState?.mode]);
+  }, [activateProject, refreshWorkspace, wsState?.mode]);
 
   /** M24：新建项目 —— 应用内建一个带 activity_main.xml 的空项目 */  const createNewProject = useCallback(
     (rawName: string) => {
@@ -1555,7 +1609,7 @@ export function XmlEditor() {
       setXmlAndTrack(tpl);
       setSelectedPath(null);
       setSaveOrigin(null);
-      setActiveProject({ name, entries: [] });
+      setActiveProject({ name, source: null });
       setProjectTab("current");
       setNewProjOpen(false);
       setExportNote(`已新建项目《${name}》· 点「保存」选择落地目录`);
@@ -1564,12 +1618,18 @@ export function XmlEditor() {
     [setXmlAndTrack],
   );
 
-  /** M24：重读当前项目结构（手动刷新） */
+  /** M24：重读当前项目结构（手动刷新）——M25d：只重置懒加载缓存，不深扫 */
   const refreshActiveProject = useCallback(async () => {
+    if (activeProjectRef.current?.source) {
+      setProjectRev((n) => n + 1);
+      setWsMsg("已刷新项目结构");
+      return;
+    }
     try {
       const p = await restoreProjectFolder();
       if (p) {
         setActiveProject(p);
+        setProjectRev((n) => n + 1);
         setWsMsg(`已刷新《${p.name}》`);
       } else {
         setWsMsg("刷新失败：项目目录权限可能已失效，请重新「打开」");
@@ -2885,25 +2945,26 @@ const findResolved = findResolvedNode;
               wsState={wsState}
               wsBusy={wsBusy}
               wsMsg={wsMsg}
-              wsProjects={wsProjects}
-              wsTree={wsTree}
-              wsOpen={wsOpen}
-              onToggleOpen={toggleWsOpen}
-              onOpenItem={(item) => void openWsProject(item)}
+              projects={wsProjects}
+              metaOf={(p) => projMeta[p.rel]}
+              onOpenProject={(item) => void openWsProject(item)}
               onRefresh={() => void refreshWorkspace()}
               onOpenDir={() => void openProjectDir()}
               onRequestAllFiles={() => wsRequestAllFiles()}
-              project={project}
-              activeProject={activeProject}
+              projectName={activeProject?.name || project.name || ""}
+              projectSource={activeProject?.source ?? null}
+              projectRev={projectRev}
               currentFileName={wsActiveName || (currentFile?.name ?? "")}
-              onSelectFile={(id) => {
-                setWsActiveName("");
-                selectFile(id);
-              }}
+              onOpenEntry={openProjectEntry}
               onRefreshProject={() => void refreshActiveProject()}
               onNewProject={(suggest) => {
                 setNewProjName(suggest);
                 setNewProjOpen(true);
+              }}
+              appProject={project}
+              onSelectFile={(id) => {
+                setWsActiveName("");
+                selectFile(id);
               }}
               resExtras={resExtras}
               generatedDrawables={generatedDrawables}

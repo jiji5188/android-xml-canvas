@@ -1,33 +1,32 @@
-// lib/xml/project.ts — M24「项目」：打开一个项目文件夹 / 新建项目
+// lib/xml/project.ts — M24/M25d「项目」：打开 / 恢复项目，项目结构工具函数
 //
 // 与「工作目录」（workspace.ts）的区别：
-//   - 工作目录 = 一个装着多个项目的父目录，列表里列项目；
-//   - 项目     = 某个具体工程目录（含 layout/ drawable/ values/ 或直接一堆 xml），
-//                「当前项目」面板展示它的结构树。
+//   - 工作目录 = 一个装着多个项目的父目录，列表里平铺列项目（M25d：不再多级展开）；
+//   - 项目     = 某个具体工程目录（含 layout/ drawable/ values/ 或直接一堆 xml）。
 //
-// 打开方式：
-//   native（APK）：弹 SAF 选目录（chooseWorkspace 同款选择器）→ listProjects 拿结构树
-//   web（Chrome/Edge）：showDirectoryPicker 选目录 → 句柄存 IndexedDB，刷新后可复用
+// M25d 起：打开的项目返回 ProjectSource（懒加载浏览源），不再一次性深扫整棵树，
+// 结构树在点开目录时才逐层读，避免几百次目录句柄调用把面板卡住。
 
 import { nativeBridge } from "./native-save";
 import { wsInfo, wsListProjects, wsPickCustom, type WsProject } from "./workspace";
+import { fsAccessSupported, restoreProjectDir, saveProjectDir } from "./workspace-fs";
 import {
-  fsAccessSupported,
-  listProjects as webListProjects,
-  restoreProjectDir,
-  saveProjectDir,
-  type WorkspaceEntry,
-} from "./workspace-fs";
+  nativeProjectSource,
+  projectSourceFromDir,
+  projectSourceFromWorkspaceItem,
+  webProjectSource,
+  type ProjectSource,
+} from "./project-browse";
 
 export interface OpenedProject {
-  /** 项目名（目录名） */
+  /** 项目名（先用目录名，UI 会再用 strings.xml 的 app_name 覆盖） */
   name: string;
-  /** 结构树（扁平，rel 带层级，前端再画树） */
-  entries: WsProject[];
+  /** 分层浏览源（listChildren 每次只读一层） */
+  source: ProjectSource;
 }
 
 /** web：选一个「项目目录」（不覆盖工作目录的句柄） */
-async function pickWebProjectDir(): Promise<{ name: string; entries: WorkspaceEntry[] } | null> {
+async function pickWebProjectDir(): Promise<{ name: string; dir: unknown } | null> {
   const picker = (window as unknown as { showDirectoryPicker?: (o?: unknown) => Promise<unknown> })
     .showDirectoryPicker;
   if (typeof picker !== "function") return null;
@@ -42,26 +41,15 @@ async function pickWebProjectDir(): Promise<{ name: string; entries: WorkspaceEn
   } catch {
     /* 句柄存不进去也不影响本次使用 */
   }
-  const entries = await webListProjects(dir as never);
   const name = (dir as { name?: string })?.name || "项目";
-  return { name, entries };
+  return { name, dir };
 }
 
-function toWsProject(e: WorkspaceEntry): WsProject {
-  return {
-    name: e.name,
-    kind: e.kind,
-    rel: e.rel,
-    layoutCount: e.layoutCount ?? (e.kind === "file" ? 1 : 0),
-    handle: e.kind === "dir" ? e.dirHandle : e.fileHandle,
-  };
-}
-
-function dirNameOf(entries: WorkspaceEntry[]): string {
-  // 从第一条 rel 里拿不到目录名，交给调用方补；这里只做兜底
-  const first = entries[0]?.rel ?? "";
-  const top = first.split("/")[0];
-  return top || "项目";
+/** 从工作目录的一张项目卡片打开（项目列表项点击走这里） */
+export async function openProjectFromItem(item: WsProject): Promise<OpenedProject | null> {
+  const source = await projectSourceFromWorkspaceItem(item);
+  if (!source) return null;
+  return { name: item.name, source };
 }
 
 /**
@@ -75,17 +63,18 @@ export async function openProjectFolder(): Promise<OpenedProject | null> {
     if (!ok) return null;
     const info = await wsInfo();
     const entries = await wsListProjects();
-    return { name: info.label || "项目", entries };
+    const name = info.label || "项目";
+    return { name, source: nativeProjectSource(name, entries) };
   }
 
   if (!fsAccessSupported()) return null;
 
-  const entries = await pickWebProjectDir();
-  if (!entries) return null;
-  return { name: entries.name, entries: entries.entries.map(toWsProject) };
+  const picked = await pickWebProjectDir();
+  if (!picked) return null;
+  return { name: picked.name, source: projectSourceFromDir(picked.dir, picked.name) };
 }
 
-/** 读回上次打开的项目目录结构（不弹窗，可能为空） */
+/** 读回上次打开的项目目录（不弹窗，可能为空） */
 export async function restoreProjectFolder(): Promise<OpenedProject | null> {
   const b = nativeBridge();
   if (b) {
@@ -93,16 +82,16 @@ export async function restoreProjectFolder(): Promise<OpenedProject | null> {
     const info = await wsInfo();
     if (info.mode !== "native" || !info.custom) return null;
     const entries = await wsListProjects();
-    return entries.length ? { name: info.label || "项目", entries } : null;
+    if (!entries.length) return null;
+    const name = info.label || "项目";
+    return { name, source: nativeProjectSource(name, entries) };
   }
   if (!fsAccessSupported()) return null;
   try {
     const dir = await restoreProjectDir();
     if (!dir) return null;
-    const entries = await webListProjects(dir as never);
-    if (!entries.length) return null;
     const name = (dir as { name?: string })?.name || "项目";
-    return { name, entries: entries.map(toWsProject) };
+    return { name, source: webProjectSource(dir, name) };
   } catch {
     return null;
   }
@@ -171,7 +160,7 @@ export function buildProjectTree(entries: WsProject[]): ProjectNode[] {
   return roots;
 }
 
-/** 项目里第一个「像主布局」的文件条目 */
+/** 项目里第一个「像主布局」的文件条目（native 扁平列表用） */
 export function mainLayoutEntry(entries: WsProject[]): WsProject | null {
   const files = entries.filter((e) => e.kind === "file");
   if (!files.length) {

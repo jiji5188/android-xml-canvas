@@ -259,6 +259,32 @@ export async function listProjects(dir: DirHandle): Promise<WorkspaceEntry[]> {
   return out;
 }
 
+/**
+ * M25d：只列**一层**（项目列表用）。
+ * 不递归、不数 xml —— 一个真安卓工程递归下去要读几百个目录句柄，列表会明显卡顿。
+ * 项目内部的层级结构由 project-browse 的懒加载在点开后再逐层读。
+ */
+export async function listTopLevel(dir: DirHandle): Promise<WorkspaceEntry[]> {
+  const dirs: WorkspaceEntry[] = [];
+  const files: WorkspaceEntry[] = [];
+  try {
+    for await (const e of dir.values()) {
+      const lower = e.name.toLowerCase();
+      if (e.kind === "directory") {
+        if (SKIP_DIRS.has(lower)) continue;
+        dirs.push({ kind: "dir", name: e.name, rel: e.name, dirHandle: e });
+      } else if (/\.xml$/i.test(e.name)) {
+        files.push({ kind: "file", name: e.name, rel: e.name, fileHandle: e, layoutCount: 1 });
+      }
+    }
+  } catch {
+    throw new WorkspacePermissionError();
+  }
+  dirs.sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+  files.sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+  return [...dirs, ...files];
+}
+
 /** 读一个文件句柄的文本内容 */
 export async function readHandleText(handle: unknown): Promise<string> {
   const h = handle as FileHandle;

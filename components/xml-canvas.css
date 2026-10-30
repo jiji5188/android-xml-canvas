@@ -5312,3 +5312,52 @@ html[data-axv-theme="dark"] .axv-struct-warn {
 .axv-newproj-input {
   text-transform: none;
 }
+
+/* M25d: 项目列表卡片（扁平，一层） */
+.axv-proj-card {
+  border: 1px solid var(--axv-outline-variant, #00000014);
+  border-radius: 12px;
+  background: var(--axv-surface-2, #ffffff0a);
+  overflow: hidden;
+}
+.axv-proj-card-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.axv-proj-card-btn:hover { background: var(--axv-hover); }
+.axv-proj-card-ico {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--axv-primary-container, #6750a41f);
+  color: var(--axv-primary);
+  overflow: hidden;
+}
+.axv-proj-card-ico img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.axv-proj-card-ico .msr { font-size: 20px; }
+.axv-proj-card-btn .axv-ws-item-main { flex: 1 1 auto; }
+.axv-proj-card-go { flex: 0 0 auto; font-size: 18px; color: var(--axv-desc); opacity: 0.6; }
+
+/* M25d: 懒加载结构树 */
+.axv-proj-tree { max-height: 46vh; overflow: auto; margin-top: 6px; }
+.axv-ws-row-loading { display: flex; align-items: center; gap: 6px; padding: 5px 6px; }
+.axv-ws-spin {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--axv-outline, #8883);
+  border-top-color: var(--axv-primary);
+  animation: axv-spin 0.7s linear infinite;
+}
+@keyframes axv-spin { to { transform: rotate(360deg); } }

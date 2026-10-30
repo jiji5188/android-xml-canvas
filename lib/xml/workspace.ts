@@ -11,6 +11,7 @@ import { nativeBridge, nativeAvailable, chooseWorkspace } from "./native-save";
 import {
   fsAccessSupported,
   listProjects as webListProjects,
+  listTopLevel,
   pickWorkspace as webPickWorkspace,
   readHandleText,
   pickMainLayout,
@@ -112,6 +113,48 @@ export async function wsListProjects(): Promise<WsProject[]> {
     if (!ok) return [];
   }
   const entries = await webListProjects(dir);
+  return entries.map((e: WorkspaceEntry) => ({
+    name: e.name,
+    kind: e.kind,
+    rel: e.rel,
+    layoutCount: e.layoutCount ?? (e.kind === "file" ? 1 : 0),
+    handle: e.kind === "dir" ? e.dirHandle : e.fileHandle,
+  }));
+}
+
+/**
+ * M25d：列工作目录下的**项目卡片**（只读一层，不递归）。
+ * native：bridge 给的仍是深列表，这里把深层项按第一段归并成顶层项目；
+ * web：直接 listTopLevel，毫秒级。
+ */
+export async function wsListTopProjects(): Promise<WsProject[]> {
+  const b = nativeBridge();
+  if (b) {
+    const all = await wsListProjects();
+    const map = new Map<string, WsProject>();
+    for (const it of all) {
+      const top = it.rel.split("/")[0];
+      if (!top) continue;
+      if (it.rel === top) {
+        map.set(top, { ...it, rel: top });
+        continue;
+      }
+      const cur = map.get(top) ?? { name: top, kind: "dir", rel: top, layoutCount: 0 };
+      if (it.kind === "file") cur.layoutCount += 1;
+      map.set(top, cur);
+    }
+    return [...map.values()].sort((x, y) =>
+      x.kind === y.kind ? x.name.localeCompare(y.name, "zh-Hans-CN") : x.kind === "dir" ? -1 : 1,
+    );
+  }
+
+  const dir = await restoreWorkspace();
+  if (!dir) return [];
+  if ((await workspacePermission(dir)) !== "granted") {
+    const ok = await requestWorkspacePermission(dir);
+    if (!ok) return [];
+  }
+  const entries = await listTopLevel(dir);
   return entries.map((e: WorkspaceEntry) => ({
     name: e.name,
     kind: e.kind,

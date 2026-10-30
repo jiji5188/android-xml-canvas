@@ -1,5 +1,5 @@
 // components/LayerTree.tsx — 左侧滑面板「图层」页
-// 当前屏幕的节点树，支持：展开/折叠、选中、上下移、置顶/置底、删除。
+// 当前屏幕的节点树，支持：展开/折叠、选中、上下移、删除。
 //
 // M3d：拖拽排序（对标 Android Studio 的 Component Tree）
 //  - 拖到某行的**上 1/4**  → 成为该节点的上一个兄弟（移到兄弟层）
@@ -166,8 +166,6 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
           <span className="axv-lt-actions">
             <button title="上移一层" aria-label="上移" disabled={isRoot || myIndex <= 0} onClick={(e) => { e.stopPropagation(); onMove(n.path, myIndex - 1); }}>↑</button>
             <button title="下移一层" aria-label="下移" disabled={isRoot || myIndex >= siblingCount - 1} onClick={(e) => { e.stopPropagation(); onMove(n.path, myIndex + 1); }}>↓</button>
-            <button title="置顶（画在最上层）" aria-label="置顶" disabled={isRoot || myIndex <= 0} onClick={(e) => { e.stopPropagation(); onMove(n.path, 0); }}>⤒</button>
-            <button title="置底（画在最下层）" aria-label="置底" disabled={isRoot || myIndex >= siblingCount - 1} onClick={(e) => { e.stopPropagation(); onMove(n.path, siblingCount); }}>⤓</button>
             <button title="删除" aria-label="删除" className="danger" disabled={isRoot} onClick={(e) => { e.stopPropagation(); onRemove(n.path); }}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>delete</span>
             </button>

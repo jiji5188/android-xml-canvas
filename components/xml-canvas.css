@@ -4739,7 +4739,6 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   top: 50%;
   transform: translateY(-50%);
 }
-.axv-ai-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .axv-ai-mini {
   display: inline-flex;
   align-items: center;
@@ -4917,6 +4916,33 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 .axv-run-screen { position: relative; height: 100%; }
 
 .axv-run-pressed { filter: brightness(0.94); }
+/* M20k：涟漪改成伪元素，天然被控件自己的 overflow:hidden 裁掉；
+   不再往 DOM 插 span（旧做法半径 max(w,h)*2，全宽按钮会盖住整屏，
+   看起来像“所有控件都被按下”）。 */
+.axv-run-rippleable {
+  position: relative;
+  overflow: hidden;
+}
+.axv-run-rippleable::after {
+  content: "";
+  position: absolute;
+  left: var(--axv-rip-x, 50%);
+  top: var(--axv-rip-y, 50%);
+  width: var(--axv-rip-r, 0px);
+  height: var(--axv-rip-r, 0px);
+  margin-left: calc(var(--axv-rip-r, 0px) / -2);
+  margin-top: calc(var(--axv-rip-r, 0px) / -2);
+  border-radius: 50%;
+  background: var(--axv-rip-c, rgba(0, 0, 0, 0.18));
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+.axv-run-rippleable.axv-run-rippling::after {
+  opacity: 0.9;
+  animation: axv-run-ripple 0.45s ease-out forwards;
+}
 .axv-run-ripple {
   position: absolute;
   border-radius: 50%;

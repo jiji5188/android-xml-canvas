@@ -82,6 +82,22 @@ function rippleColor(el: HTMLElement): string {
 /* ===================== 涟漪 ===================== */
 
 function attachRipple(ctx: Ctx, el: HTMLElement, label?: string) {
+  // M20k：涟漪改用伪元素（::after）+ CSS 变量，不再往 DOM 里插 span。
+  // 插 span 的老做法即使加了 overflow:hidden 也容易漏（兄弟节点/相邻控件被盖），
+  // 而且圆半径按 max(w,h)*2 算，全宽按钮 → 盖满整屏，看起来“所有控件都按下了”。
+  // 伪元素必然被自身的 overflow:hidden 裁掉，尺寸也只按控件对角线算。
+  // 例外：Spinner/SeekBar/ProgressBar/RatingBar/NumberPicker 自己的 ::after 已经在用，不抢。
+  const AFTER_OWNERS = [
+    "axv-spinner",
+    "axv-seek",
+    "axv-progress",
+    "axv-progress-ring",
+    "axv-rating",
+    "axv-indet",
+    "axv-numberpicker",
+    "axv-chip-close",
+  ];
+  if (!AFTER_OWNERS.some((c) => el.classList.contains(c))) el.classList.add("axv-run-rippleable");
   let longFired = false;
   let timer: number | null = null;
   const clearTimer = () => {
@@ -115,21 +131,18 @@ function attachRipple(ctx: Ctx, el: HTMLElement, label?: string) {
   );
 
   const off = on(el, "pointerdown", (e) => {
-    if (getComputedStyle(el).position === "static") el.style.position = "relative";
-    // M20j：涟漪必须裁剪在控件内部（Android 的 ripple 就是被 View 边界裁掉的）。
-    // 以前不裁剪：全屏宽度的按钮 → 波浪半径 = max(w,h)*2 直接盖住整屏，看起来「整页闪一下」
-    if (getComputedStyle(el).overflow === "visible") el.style.overflow = "hidden";
     const rect = el.getBoundingClientRect();
-    const size = Math.max(rect.width, rect.height) * 2;
-    const span = document.createElement("span");
-    span.className = "axv-run-ripple";
-    span.style.width = span.style.height = `${size}px`;    span.style.left = `${e.clientX - rect.left - size / 2}px`;
-    span.style.top = `${e.clientY - rect.top - size / 2}px`;
-    span.style.background = rippleColor(el);
-    el.appendChild(span);
-    const kill = () => span.remove();
-    span.addEventListener("animationend", kill);
-    window.setTimeout(kill, 700);
+    // 半径只要盖住控件四角即可（对角线长度），不再 *2 放大到溢出
+    const radius = Math.round(Math.hypot(rect.width, rect.height) * 2);
+    el.style.setProperty("--axv-rip-x", `${e.clientX - rect.left}px`);
+    el.style.setProperty("--axv-rip-y", `${e.clientY - rect.top}px`);
+    el.style.setProperty("--axv-rip-r", `${radius}px`);
+    el.style.setProperty("--axv-rip-c", rippleColor(el));
+    // 重启动画：去类 → 强制重排 → 加类
+    el.classList.remove("axv-run-rippling");
+    void el.offsetWidth;
+    el.classList.add("axv-run-rippling");
+    window.setTimeout(() => el.classList.remove("axv-run-rippling"), 500);
 
     el.classList.add("axv-run-pressed");
     window.setTimeout(() => el.classList.remove("axv-run-pressed"), 140);

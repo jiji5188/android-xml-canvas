@@ -102,6 +102,7 @@ import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/path
 import { LS_KEY_XML, LS_KEY_HIST, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, lsGet, lsSet } from "@/lib/xml/storage";
 import { RunPreview } from "./RunPreview";
 import { Toolbar } from "./Toolbar";
+import { LeftRail, type LeftView } from "./LeftRail";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
@@ -501,9 +502,7 @@ export function XmlEditor() {
 
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
-  const [leftView, setLeftView] = useState<
-    "parts" | "layers" | "ai" | "code" | "res" | "assets" | "settings" | "about"
-  >("parts");
+  const [leftView, setLeftView] = useState<LeftView>("parts");
   /* ===== M20m：图层锁定（锁定后画布点不中、不能拖动/上下移） ===== */
   const [lockedPaths, setLockedPaths] = useState<Set<string>>(new Set());
   const toggleLockPath = useCallback((path: string) => {
@@ -2609,138 +2608,17 @@ const findResolved = findResolvedNode;
         </div>
       )}
 
-      {/* 左侧滑面板：52px 图标条 + 内容列（M3E 同款布局；移动端宽 75vw） */}
-      <aside className={"axv-slide-left" + (leftOpen ? " axv-open" : "")}>
-        <div className="axv-rail">
-          <button
-            className={"axv-rail-btn" + (leftView === "parts" ? " on" : "")}
-            title={tr("rail.parts", "组件")}
-            aria-label={tr("rail.parts", "组件")}
-            aria-pressed={leftView === "parts"}
-            onClick={() => {
-              setLeftView("parts");
-              setLeftOpen(true);
-            }}
-          >
-            <span className="msr" aria-hidden="true" data-fill={leftView === "parts" ? "1" : "0"} style={{ fontSize: 24 }}>
-              widgets
-            </span>
-          </button>
-          <button
-            className={"axv-rail-btn" + (leftView === "layers" ? " on" : "")}
-            title={tr("rail.layers", "图层")}
-            aria-label={tr("rail.layers", "图层")}
-            aria-pressed={leftView === "layers"}
-            onClick={() => {
-              setLeftView("layers");
-              setLeftOpen(true);
-            }}
-          >
-            <span className="msr" aria-hidden="true" data-fill={leftView === "layers" ? "1" : "0"} style={{ fontSize: 24 }}>
-              account_tree
-            </span>
-          </button>
-          {/* M17：AI 助手（模型调用 + 后续写代码） */}
-          <button
-            className={"axv-rail-btn" + (leftView === "ai" ? " on" : "")}
-            title={tr("rail.ai", "AI 助手")}
-            aria-label={tr("rail.ai", "AI 助手")}
-            aria-pressed={leftView === "ai"}
-            onClick={() => {
-              setLeftView("ai");
-              setLeftOpen(true);
-            }}
-          >
-            <span className="msr" aria-hidden="true" data-fill={leftView === "ai" ? "1" : "0"} style={{ fontSize: 24 }}>
-              auto_awesome
-            </span>
-          </button>
-          <button
-            className={"axv-rail-btn" + (leftView === "assets" ? " on" : "")}
-            title={tr("rail.assets", "已生成资源")}
-            aria-label={tr("rail.assets", "已生成资源")}
-            aria-pressed={leftView === "assets"}
-            onClick={() => {
-              setLeftView("assets");
-              setLeftOpen(true);
-            }}
-          >
-            <span className="msr" aria-hidden="true" data-fill={leftView === "assets" ? "1" : "0"} style={{ fontSize: 24 }}>
-              category
-            </span>
-          </button>
-          <button
-            className={"axv-rail-btn" + (leftView === "res" ? " on" : "")}
-            title={tr("rail.res", "项目管理")}
-            aria-label={tr("rail.res", "项目管理")}
-            aria-pressed={leftView === "res"}
-            onClick={() => {
-              setLeftView("res");
-              setLeftOpen(true);
-            }}
-          >
-            <span className="msr" aria-hidden="true" data-fill={leftView === "res" ? "1" : "0"} style={{ fontSize: 24 }}>
-              folder_open
-            </span>
-          </button>
-          <div className="axv-rail-gap" />
-          <button
-            className={"axv-rail-btn" + (leftView === "settings" ? " on" : "")}
-            title={tr("rail.settings", "设置")}
-            aria-label={tr("rail.settings", "设置")}
-            aria-pressed={leftView === "settings"}
-            onClick={() => {
-              setLeftView("settings");
-              setLeftOpen(true);
-            }}
-          >
-            <span className="msr" aria-hidden="true" data-fill={leftView === "settings" ? "1" : "0"} style={{ fontSize: 24 }}>
-              settings
-            </span>
-          </button>
-          <button
-            className={"axv-rail-btn" + (leftView === "about" ? " on" : "")}
-            title={tr("rail.about", "关于")}
-            aria-label={tr("rail.about", "关于")}
-            aria-pressed={leftView === "about"}
-            onClick={() => {
-              setLeftView("about");
-              setLeftOpen(true);
-            }}
-          >
-            <span className="msr" aria-hidden="true" data-fill={leftView === "about" ? "1" : "0"} style={{ fontSize: 24 }}>
-              info
-            </span>
-          </button>
-        </div>
-
-        <div className="axv-rail-body">
-          <div className="axv-rail-head">
-            <span className="axv-rail-title">
-              {leftView === "parts"
-                ? tr("rail.parts", "组件")
-                : leftView === "layers"
-                  ? tr("rail.layers", "图层")
-                  : leftView === "ai"
-                    ? tr("rail.ai", "AI 助手")
-                    : leftView === "res"
-                      ? tr("rail.res", "项目管理")
-                      : leftView === "assets"
-                        ? tr("rail.assets", "已生成资源")
-                        : leftView === "settings"
-                          ? tr("rail.settings", "设置")
-                          : tr("rail.about", "关于")}
-            </span>
-            <button
-              className="axv-icon-btn"
-              title={tr("rail.close", "关闭面板")}
-              aria-label={tr("rail.close", "关闭面板")}
-              onClick={() => setLeftOpen(false)}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 24 }}>left_panel_close</span>
-            </button>
-          </div>
-
+      {/* 左侧滑面板（M25g：图标条 + 标题栏搬到 components/LeftRail.tsx） */}
+      <LeftRail
+        tr={tr}
+        view={leftView}
+        open={leftOpen}
+        onPick={(v) => {
+          setLeftView(v);
+          setLeftOpen(true);
+        }}
+        onClose={() => setLeftOpen(false)}
+      >
           {leftView === "parts" && (
             <div className="axv-rail-scroll">
               <WidgetPalette onInsert={insertWidget} hasSelection={!!selectedPath} />
@@ -2855,8 +2733,7 @@ const findResolved = findResolvedNode;
           )}
 
           {leftView === "about" && <AboutPanel version={APP_VERSION} tr={tr} />}
-        </div>
-      </aside>
+      </LeftRail>
 
       {/* 右侧滑面板：属性（移动端宽 75vw） */}
       <aside className={"axv-slide-right" + (rightOpen ? " axv-open" : "")}>

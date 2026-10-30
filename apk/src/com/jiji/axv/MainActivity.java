@@ -62,11 +62,15 @@ public class MainActivity extends Activity {
     private static final String ASSET_ROOT = "www";
     private static final int REQ_FILE = 1001;
     private static final int REQ_TREE = 1002;
+    private static final int REQ_SAVE_TREE = 1003;
     /** 默认工作目录名（外存根下）：AndroidUIIDE/Project */
     private static final String DEFAULT_DIR = "AndroidUIIDE/Project";
     private static final String PREF = "axv";
 
     private Uri treeUri;
+    /** M21：另存为时的待写内容（等用户在系统选择器里选完文件夹再写） */
+    private String pendingBundleJson;
+    private String pendingBundleName;
 
     private WebView web;
     private FrameLayout root;
@@ -301,6 +305,40 @@ public class MainActivity extends Activity {
             }
             return;
         }
+        if (req == REQ_SAVE_TREE) {
+            String json = pendingBundleJson;
+            pendingBundleJson = null;
+            if (res != RESULT_OK || data == null || data.getData() == null) {
+                notifySaved("{\"ok\":false,\"canceled\":true,\"reason\":\"已取消\"}");
+                return;
+            }
+            Uri target = data.getData();
+            int flags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            try {
+                getContentResolver().takePersistableUriPermission(target, flags);
+            } catch (Throwable ignored) {
+            }
+            try {
+                org.json.JSONArray files = new org.json.JSONArray(json == null ? "[]" : json);
+                org.json.JSONArray saved = new org.json.JSONArray();
+                writeBundleToTree(target, files, saved);
+                String label;
+                try {
+                    String id = DocumentsContract.getTreeDocumentId(target);
+                    int slash = id.lastIndexOf(':');
+                    label = slash >= 0 ? id.substring(slash + 1) : id;
+                } catch (Throwable t) {
+                    label = "所选文件夹";
+                }
+                toast("已保存 " + saved.length() + " 个文件到 " + label);
+                notifySaved("{\"ok\":true,\"label\":\"" + esc(label) + "\",\"count\":" + saved.length() + "}");
+            } catch (Throwable t) {
+                Log.e(TAG, "saveBundle write fail", t);
+                notifySaved("{\"ok\":false,\"reason\":\"" + esc(t.getMessage()) + "\"}");
+            }
+            return;
+        }
         if (req == REQ_FILE) {
             Uri[] out = null;
             if (res == RESULT_OK && data != null && data.getData() != null) {
@@ -362,6 +400,42 @@ public class MainActivity extends Activity {
                 toast("保存失败：" + t.getMessage());
                 return "err:" + t;
             }
+        }
+
+        /** M21：把文本写回原路径（content:// 或默认目录内的绝对路径） */
+        @JavascriptInterface
+        public String writeText(String target, String base64) {
+            try {
+                byte[] data = Base64.decode(base64, Base64.DEFAULT);
+                if (target == null) return "err:target 为空";
+                if (target.startsWith("content://")) {
+                    try (OutputStream os = getContentResolver().openOutputStream(Uri.parse(target), "wt")) {
+                        if (os == null) return "err:无法打开输出流";
+                        os.write(data);
+                    }
+                    return "ok:" + target;
+                }
+                File f = new File(target);
+                String base = defaultDir().getCanonicalPath();
+                String canon = f.getCanonicalPath();
+                if (!canon.startsWith(base)) return "err:超出工作目录";
+                File parent = f.getParentFile();
+                if (parent != null && !parent.exists()) parent.mkdirs();
+                try (OutputStream os = new FileOutputStream(f)) {
+                    os.write(data);
+                }
+                return "ok:" + canon;
+            } catch (Throwable t) {
+                Log.e(TAG, "writeText fail", t);
+                return "err:" + t;
+            }
+        }
+
+        /** M21：另存整包 —— 弹系统文件夹选择器（可新建文件夹），
+         *  然后把 layout/drawable/values 一起写进去；完成后回调 JS：AxvNativeSaved(json) */
+        @JavascriptInterface
+        public void saveBundle(String name, String filesJson) {
+            runOnUiThread(() -> startSaveBundle(name, filesJson));
         }
 
         @JavascriptInterface
@@ -571,36 +645,8 @@ public class MainActivity extends Activity {
             out.put("dir", workspaceLabel());
             out.put("kind", "tree");
             String rootId = DocumentsContract.getTreeDocumentId(treeUri);
-            Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, rootId);
-            try (android.database.Cursor c = getContentResolver().query(children,
-                    new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                            DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
-                if (c != null) {
-                    while (c.moveToNext()) {
-                        String id = c.getString(0);
-                        String name = c.getString(1);
-                        String mime = c.getString(2);
-                        boolean isDir = DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
-                        if (!isDir && !(name != null && name.toLowerCase(Locale.ROOT).endsWith(".xml"))) continue;
-                        JSONObject it = new JSONObject();
-                        it.put("name", name);
-                        it.put("kind", isDir ? "dir" : "file");
-                        it.put("rel", name);
-                        it.put("layoutCount", isDir ? countXmlInTree(id) : 1);
-                        it.put("docId", id);
-                        if (isDir) {
-                            String mainDoc = firstXmlDocIdInTree(id);
-                            if (mainDoc != null) {
-                                it.put("docUri", DocumentsContract.buildDocumentUriUsingTree(treeUri, mainDoc).toString());
-                            }
-                        } else {
-                            it.put("docUri", DocumentsContract.buildDocumentUriUsingTree(treeUri, id).toString());
-                        }
-                        items.put(it);
-                    }
-                }
-            }
+            // M20n：递归列出（同 File 模式）
+            collectTree(rootId, "", 0, items);
             out.put("items", items);
             return out.toString();
         }
@@ -609,30 +655,183 @@ public class MainActivity extends Activity {
         out.put("dir", "AndroidUIIDE/Project");
         out.put("path", d.getAbsolutePath());
         out.put("kind", "file");
-        File[] fs = d.listFiles();
-        if (fs != null) {
-            java.util.Arrays.sort(fs, (a, b) -> {
-                if (a.isDirectory() != b.isDirectory()) return a.isDirectory() ? -1 : 1;
-                return a.getName().compareToIgnoreCase(b.getName());
-            });
-            for (File f : fs) {
-                boolean isDir = f.isDirectory();
-                if (!isDir && !f.getName().toLowerCase(Locale.ROOT).endsWith(".xml")) continue;
-                JSONObject it = new JSONObject();
-                it.put("name", f.getName());
-                it.put("kind", isDir ? "dir" : "file");
-                it.put("rel", f.getName());
-                it.put("layoutCount", isDir ? countXml(f) : 1);
-                it.put("path", f.getAbsolutePath());
-                if (isDir) {
-                    File main = firstXmlIn(f);
-                    if (main != null) it.put("mainPath", main.getAbsolutePath());
-                }
-                items.put(it);
-            }
-        }
+        // M20n：递归列出（安卓工程是 app/src/main/res/layout/xxx.xml 多层结构）
+        collectFileTree(d, d, items, 0);
         out.put("items", items);
         return out.toString();
+    }
+
+    /* ================= M20n：工作目录多级列表 ================= */
+
+    /** 递归扫描时跳过的噪声目录 */
+    private static final java.util.Set<String> SKIP_DIRS = new java.util.HashSet<>(java.util.Arrays.asList(
+            ".git", ".gradle", ".idea", "build", "node_modules", ".svn", "__pycache__"));
+    private static final int MAX_TREE_DEPTH = 6;
+
+    /** 递归数 xml（含子目录） */
+    private int countXmlDeep(File dir, int depth) {
+        if (depth > MAX_TREE_DEPTH) return 0;
+        File[] fs = dir.listFiles();
+        if (fs == null) return 0;
+        int n = 0;
+        for (File f : fs) {
+            String nm = f.getName().toLowerCase(Locale.ROOT);
+            if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
+            if (f.isDirectory()) n += countXmlDeep(f, depth + 1);
+            else if (nm.endsWith(".xml")) n++;
+        }
+        return n;
+    }
+
+    /** 递归找「最像主布局」的 xml */
+    private File firstXmlDeep(File dir, int depth) {
+        if (depth > MAX_TREE_DEPTH) return null;
+        File[] fs = dir.listFiles();
+        if (fs == null) return null;
+        File best = null;
+        java.util.Arrays.sort(fs, (a, b) -> {
+            if (a.isDirectory() != b.isDirectory()) return a.isDirectory() ? -1 : 1;
+            return a.getName().compareToIgnoreCase(b.getName());
+        });
+        for (File f : fs) {
+            String nm = f.getName().toLowerCase(Locale.ROOT);
+            if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
+            if (f.isDirectory()) {
+                File sub = firstXmlDeep(f, depth + 1);
+                if (sub != null) return sub;
+            } else if (nm.endsWith(".xml")) {
+                if (best == null) best = f;
+                if (nm.equals("activity_main.xml") || nm.equals("main.xml")) return f;
+            }
+        }
+        return best;
+    }
+
+    private String relOf(File root, File f) {
+        return root.toURI().relativize(f.toURI()).getPath();
+    }
+
+    private void collectFileTree(File root, File dir, JSONArray out, int depth) throws Exception {
+        if (depth > MAX_TREE_DEPTH) return;
+        File[] fs = dir.listFiles();
+        if (fs == null) return;
+        java.util.Arrays.sort(fs, (a, b) -> {
+            if (a.isDirectory() != b.isDirectory()) return a.isDirectory() ? -1 : 1;
+            return a.getName().compareToIgnoreCase(b.getName());
+        });
+        for (File f : fs) {
+            String nm = f.getName().toLowerCase(Locale.ROOT);
+            if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
+            if (f.isDirectory()) {
+                int cnt = countXmlDeep(f, 0);
+                if (cnt == 0) continue;
+                JSONObject it = new JSONObject();
+                it.put("name", f.getName());
+                it.put("kind", "dir");
+                it.put("rel", relOf(root, f));
+                it.put("layoutCount", cnt);
+                it.put("depth", depth);
+                it.put("path", f.getAbsolutePath());
+                File main = firstXmlDeep(f, 0);
+                if (main != null) it.put("mainPath", main.getAbsolutePath());
+                out.put(it);
+                collectFileTree(root, f, out, depth + 1);
+            } else if (nm.endsWith(".xml")) {
+                JSONObject it = new JSONObject();
+                it.put("name", f.getName());
+                it.put("kind", "file");
+                it.put("rel", relOf(root, f));
+                it.put("layoutCount", 1);
+                it.put("depth", depth);
+                it.put("path", f.getAbsolutePath());
+                out.put(it);
+            }
+        }
+    }
+
+    /** SAF tree 模式：递归数 xml */
+    private int countXmlDeepTree(String dirDocId, int depth) {
+        if (depth > MAX_TREE_DEPTH) return 0;
+        try {
+            Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, dirDocId);
+            int n = 0;
+            java.util.List<String[]> dirs = new java.util.ArrayList<>();
+            try (android.database.Cursor c = getContentResolver().query(children,
+                    new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                            DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
+                if (c == null) return 0;
+                while (c.moveToNext()) {
+                    String id = c.getString(0);
+                    String name = c.getString(1);
+                    String mime = c.getString(2);
+                    boolean isDir = DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
+                    String lower = name == null ? "" : name.toLowerCase(Locale.ROOT);
+                    if (SKIP_DIRS.contains(lower)) continue;
+                    if (isDir) dirs.add(new String[]{id});
+                    else if (lower.endsWith(".xml")) n++;
+                }
+            }
+            for (String[] dId : dirs) n += countXmlDeepTree(dId[0], depth + 1);
+            return n;
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    private void collectTree(String parentDocId, String prefix, int depth, JSONArray out) throws Exception {
+        if (depth > MAX_TREE_DEPTH) return;
+        Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId);
+        java.util.List<String[]> rows = new java.util.ArrayList<>();
+        try (android.database.Cursor c = getContentResolver().query(children,
+                new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                        DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
+            if (c == null) return;
+            while (c.moveToNext()) rows.add(new String[]{c.getString(0), c.getString(1), c.getString(2)});
+        }
+        rows.sort((a, b) -> {
+            boolean da = DocumentsContract.Document.MIME_TYPE_DIR.equals(a[2]);
+            boolean db = DocumentsContract.Document.MIME_TYPE_DIR.equals(b[2]);
+            if (da != db) return da ? -1 : 1;
+            return (a[1] == null ? "" : a[1]).compareToIgnoreCase(b[1] == null ? "" : b[1]);
+        });
+        for (String[] row : rows) {
+            String id = row[0];
+            String name = row[1];
+            String mime = row[2];
+            if (name == null) continue;
+            String lower = name.toLowerCase(Locale.ROOT);
+            if (SKIP_DIRS.contains(lower)) continue;
+            boolean isDir = DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
+            if (isDir) {
+                int cnt = countXmlDeepTree(id, 0);
+                if (cnt == 0) continue;
+                JSONObject it = new JSONObject();
+                it.put("name", name);
+                it.put("kind", "dir");
+                it.put("rel", prefix + name);
+                it.put("layoutCount", cnt);
+                it.put("depth", depth);
+                it.put("docId", id);
+                String mainDoc = firstXmlDocIdInTree(id);
+                if (mainDoc != null) {
+                    it.put("docUri", DocumentsContract.buildDocumentUriUsingTree(treeUri, mainDoc).toString());
+                }
+                out.put(it);
+                collectTree(id, prefix + name + "/", depth + 1, out);
+            } else if (lower.endsWith(".xml")) {
+                JSONObject it = new JSONObject();
+                it.put("name", name);
+                it.put("kind", "file");
+                it.put("rel", prefix + name);
+                it.put("layoutCount", 1);
+                it.put("depth", depth);
+                it.put("docId", id);
+                it.put("docUri", DocumentsContract.buildDocumentUriUsingTree(treeUri, id).toString());
+                out.put(it);
+            }
+        }
     }
 
     /** tree 模式下一个子目录里的 xml 数（尽力而为，失败就是 0） */
@@ -781,6 +980,100 @@ public class MainActivity extends Activity {
             }
         }
         return "AndroidUIIDE/Project";
+    }
+
+    /* ================= M21：另存为（选文件夹 + 一并写依赖） ================= */
+
+    private void startSaveBundle(String name, String filesJson) {
+        try {
+            pendingBundleName = name;
+            pendingBundleJson = filesJson;
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            startActivityForResult(i, REQ_SAVE_TREE);
+        } catch (Throwable t) {
+            Log.e(TAG, "saveBundle picker fail", t);
+            pendingBundleJson = null;
+            pendingBundleName = null;
+            notifySaved("{\"ok\":false,\"reason\":\"打不开文件夹选择器：" + esc(t.getMessage()) + "\"}");
+        }
+    }
+
+    private static String esc(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "/").replace("\"", "'").replace("\n", " ");
+    }
+
+    private void notifySaved(String json) {
+        try {
+            final String js = "window.AxvNativeSaved && window.AxvNativeSaved(" + json + ");";
+            if (web != null) web.post(() -> web.evaluateJavascript(js, null));
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 在 tree 里按相对路径（a/b/c.xml）建目录 + 写文件 */
+    private void writeBundleToTree(Uri tree, org.json.JSONArray files, org.json.JSONArray saved) throws Exception {
+        String rootId = DocumentsContract.getTreeDocumentId(tree);
+        Uri rootDoc = DocumentsContract.buildDocumentUriUsingTree(tree, rootId);
+        for (int i = 0; i < files.length(); i++) {
+            org.json.JSONObject f = files.getJSONObject(i);
+            String rel = f.getString("path");
+            byte[] data = Base64.decode(f.getString("base64"), Base64.DEFAULT);
+            String mime = f.optString("mime", "application/xml");
+            String[] parts = rel.split("/");
+            Uri dir = rootDoc;
+            for (int k = 0; k < parts.length - 1; k++) dir = ensureChildDir(tree, dir, parts[k]);
+            String fileName = parts[parts.length - 1];
+            Uri out = ensureChildFile(tree, dir, parts[parts.length - 1], mime);
+            if (out == null) throw new IOException("无法创建 " + fileName);
+            try (OutputStream os = getContentResolver().openOutputStream(out, "wt")) {
+                if (os == null) throw new IOException("无法写入 " + fileName);
+                os.write(data);
+            }
+            saved.put(rel);
+        }
+    }
+
+    private Uri ensureChildDir(Uri tree, Uri parentDoc, String name) throws Exception {
+        Uri child = findChild(tree, parentDoc, name, true);
+        if (child != null) return child;
+        Uri created = DocumentsContract.createDocument(
+                getContentResolver(), parentDoc, DocumentsContract.Document.MIME_TYPE_DIR, name);
+        if (created == null) throw new IOException("建目录失败：" + name);
+        return created;
+    }
+
+    private Uri ensureChildFile(Uri tree, Uri parentDoc, String name, String mime) throws Exception {
+        Uri child = findChild(tree, parentDoc, name, false);
+        if (child != null) return child;
+        return DocumentsContract.createDocument(getContentResolver(), parentDoc, mime, name);
+    }
+
+    /** 在 parentDoc 下按名字找子项；wantDir 决定只要目录还是只要文件 */
+    private Uri findChild(Uri tree, Uri parentDoc, String name, boolean wantDir) {
+        try {
+            String parentId = DocumentsContract.getDocumentId(parentDoc);
+            Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId);
+            String[] proj = new String[]{
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE};
+            try (android.database.Cursor c = getContentResolver().query(children, proj, null, null, null)) {
+                if (c == null) return null;
+                while (c.moveToNext()) {
+                    String nm = c.getString(1);
+                    if (nm == null || !nm.equalsIgnoreCase(name)) continue;
+                    boolean isDir = DocumentsContract.Document.MIME_TYPE_DIR.equals(c.getString(2));
+                    if (isDir != wantDir) continue;
+                    return DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0));
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 
     /** 写文件：优先用户选的文件夹，否则存到「AndroidUIIDE/Project」 */

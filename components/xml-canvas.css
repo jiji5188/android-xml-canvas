@@ -5139,3 +5139,131 @@ button.axv-ws-caret:hover {
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 /* M18-END */
+
+/* ===== M21：另存对话框（文件名 + 选文件夹） ===== */
+.axv-saveas-mask {
+  position: fixed; inset: 0;
+  background: var(--axv-scrim);
+  z-index: 120;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.axv-saveas-card {
+  width: min(430px, 94vw);
+  background: var(--axv-surface);
+  border: 1px solid var(--axv-outline);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.28);
+  padding: 18px 18px 14px;
+}
+.axv-saveas-title { font-size: 15px; font-weight: 700; color: var(--axv-title); }
+.axv-saveas-hint { margin-top: 8px; font-size: 12px; line-height: 1.6; color: var(--axv-desc); }
+.axv-saveas-hint code { background: var(--axv-surface-sunken); border-radius: 4px; padding: 0 4px; }
+.axv-saveas-field { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
+.axv-saveas-field > span { font-size: 12px; color: var(--axv-on-surface-variant); }
+.axv-saveas-input {
+  border: 1px solid var(--axv-outline);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  outline: none;
+}
+.axv-saveas-input:focus { border-color: var(--axv-primary); }
+.axv-saveas-btns { margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px; }
+.axv-saveas-btns .axv-set-btn { padding: 7px 14px; font-size: 12.5px; }
+.axv-saveas-ok { background: var(--axv-primary); color: var(--axv-on-primary); border-color: var(--axv-primary); }
+
+/* M22：结构问题提示条（能渲染但有错，可一键跳代码面板） */
+.axv-struct-warn {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 8px 0;
+  padding: 7px 10px;
+  max-width: min(520px, 92%);
+  border-radius: 9px;
+  border: 1px solid #f0d9a8;
+  background: #fff8e6;
+  color: #7a5b00;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.axv-struct-warn-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+  border: 1px solid #d9b45a;
+  background: #fff;
+  color: #7a5b00;
+  border-radius: 7px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+html[data-axv-theme="dark"] .axv-struct-warn {
+  background: #3a3115;
+  border-color: #5a4a1d;
+  color: #f2d789;
+}
+
+/* ===== M22：解析/渲染失败卡片（不白屏，直接引到代码面板） ===== */
+.axv-parse-fail {
+  margin: 14px 10px;
+  padding: 16px 14px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  max-width: 340px;
+}
+.axv-parse-fail-icon { font-size: 30px; color: var(--axv-danger); }
+.axv-parse-fail-title { font-size: 13.5px; font-weight: 700; color: var(--axv-title); }
+.axv-parse-fail-msg {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--axv-danger);
+  word-break: break-word;
+  max-height: 108px;
+  overflow: auto;
+}
+.axv-parse-fail-hint { font-size: 11.5px; line-height: 1.6; color: var(--axv-desc); }
+.axv-parse-fail-btns { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; justify-content: center; }
+.axv-parse-fail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--axv-primary);
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-parse-fail-btn.ghost {
+  background: var(--axv-surface);
+  color: var(--axv-primary);
+}
+.axv-parse-fail-btn:hover { filter: brightness(1.06); }
+
+/* M23：设置里的语言下拉 */
+.axv-lang-select {
+  width: 100%;
+  margin-top: 2px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font-size: 12.5px;
+}

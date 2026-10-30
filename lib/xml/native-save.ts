@@ -29,11 +29,19 @@ export interface AxvNativeBridge {
   /** M19：触觉反馈。type: "long"(长按) / "toggle"(开关·勾选·单选)。
    *  原生用 Vibrator 精确时长；无马达设备静默。返回 true 表示原生已处理。 */
   haptic?(type: string): void;
+
+  /* ===== M21：保存回原路径 / 另存为 ===== */
+  /** 把文本写回原路径（content:// 或默认目录内绝对路径）；返回 "ok:..."/"err:..." */
+  writeText?(target: string, base64: string): string;
+  /** 另存整包：Java 弹文件夹选择器，写完回调 window.AxvNativeSaved(json) */
+  saveBundle?(name: string, filesJson: string): void;
 }
 
 declare global {
   interface Window {
     AxvNative?: AxvNativeBridge;
+    /** M21：saveBundle 完成回调（Java 侧 evaluateJavascript 调用） */
+    AxvNativeSaved?: (json: string) => void;
   }
 }
 
@@ -122,6 +130,18 @@ export function saveBytesNative(name: string, bytes: Uint8Array, mime?: string):
 export function saveTextNative(name: string, text: string, mime?: string): boolean {
   try {
     return saveBytesNative(name, new TextEncoder().encode(text), mime || mimeOfName(name));
+  } catch {
+    return false;
+  }
+}
+
+/** M21：把文本写回原路径（content:// 或默认目录内绝对路径） */
+export function writeTextNative(target: string, text: string): boolean {
+  const b = nativeBridge();
+  if (!b?.writeText) return false;
+  try {
+    const r = b.writeText(target, bytesToBase64(new TextEncoder().encode(text)));
+    return typeof r === "string" && r.startsWith("ok");
   } catch {
     return false;
   }

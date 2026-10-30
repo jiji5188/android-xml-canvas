@@ -237,6 +237,20 @@ export async function readHandleText(handle: unknown): Promise<string> {
   return await file.text();
 }
 
+interface WritableFileHandle {
+  createWritable(): Promise<{ write(data: string | Blob): Promise<void>; close(): Promise<void> }>;
+}
+
+/** M21：把文本写回已授权的文件句柄（原路保存） */
+export async function writeHandleText(handle: unknown, text: string): Promise<boolean> {
+  const h = handle as unknown as WritableFileHandle;
+  if (!h || typeof h.createWritable !== "function") return false;
+  const w = await h.createWritable();
+  await w.write(text);
+  await w.close();
+  return true;
+}
+
 /** 项目文件夹里挑一个「最像主布局」的 xml（优先 activity_main / main / content_main） */
 export async function pickMainLayout(dir: DirHandle): Promise<{ name: string; text: string } | null> {
   const candidates: FileHandle[] = [];

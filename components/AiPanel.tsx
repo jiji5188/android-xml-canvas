@@ -139,8 +139,10 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
     }
     setTesting(true);
     setErr("");
+    // 测试连接只求一句短回复，但思考型模型（如 glm-5.3-flash）会先话一段 reasoning，
+    // token 给太少就只剩 reasoning、正文为空。所以不能用最小值 64，给 1024。
     const res = await callAi(
-      { ...cfg, maxTokens: 32 },
+      { ...cfg, maxTokens: 1024 },
       [{ role: "user", content: "只回复两个字：可用" }],
       { timeoutMs: 30_000 },
     );
@@ -238,30 +240,36 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
               </span>
             </label>
 
-            <div className="axv-ai-row2">
-              <label className="axv-ai-field">
-                <span>温度</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  value={cfg.temperature}
-                  onChange={(e) => patch({ temperature: Number(e.target.value) })}
-                />
-              </label>
-              <label className="axv-ai-field">
-                <span>最大 token</span>
-                <input
-                  type="number"
-                  min={64}
-                  max={32000}
-                  step={64}
-                  value={cfg.maxTokens}
-                  onChange={(e) => patch({ maxTokens: Number(e.target.value) })}
-                />
-              </label>
-            </div>
+            <label className="axv-ai-field">
+              <span>温度</span>
+              <input
+                type="number"
+                min={0}
+                max={2}
+                step={0.1}
+                value={cfg.temperature}
+                onChange={(e) => {
+                  const raw = e.target.value.trim();
+                  if (!raw) return; // 清空时保留原值，避免存进 0/NaN 后再也校验不过
+                  patch({ temperature: Number(raw) });
+                }}
+              />
+            </label>
+            <label className="axv-ai-field">
+              <span>最大 token</span>
+              <input
+                type="number"
+                min={64}
+                max={32000}
+                step={64}
+                value={cfg.maxTokens}
+                onChange={(e) => {
+                  const raw = e.target.value.trim();
+                  if (!raw) return; // 同上：空字符串会被 Number() 变成 0，低于下限
+                  patch({ maxTokens: Number(raw) });
+                }}
+              />
+            </label>
 
             <button className="axv-set-btn" disabled={testing || !!cfgProblem} onClick={() => void testConn()}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
@@ -270,7 +278,7 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
               {testing ? "测试中…" : "测试连接"}
             </button>
             <div className="axv-ai-hint">
-              Key 只存在这台设备的浏览器里，不经过任何中转。网页版受浏览器跨域限制：DeepSeek / 通义 / 智谱 / Kimi 一般可直连，OpenAI 官方接口可能被拦。
+              Key 只存在这台设备的浏览器里，不经过任何中转。网页版受浏览器跨域限制：DeepSeek / 通义 / 智谱 / Kimi 支持浏览器直连；腾讯 TokenHub 不响应 CORS 预检（OPTIONS 直接 405），需先跑本地代理 `npm run ai-proxy`，再把接口地址填成 `http://127.0.0.1:8787/v1`。思考型模型（如 glm-5.3-flash）会先把 token 花在 reasoning 上，「最大 token」建议 4096 以上，否则正文可能是空的。
             </div>
           </div>
         ) : null}

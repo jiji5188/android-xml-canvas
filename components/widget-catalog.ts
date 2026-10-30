@@ -381,9 +381,9 @@ export const WIDGETS: WidgetDef[] = [
     xml: `<Button ${A}
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#6750A4"
+    android:background="#E8E8EC"
     android:text="确定"
-    android:textColor="#FFFFFF"/>`,
+    android:textColor="#1D1B20"/>`,
   },
   {
     key: "btn_text", label: "文字按钮", tag: "Button", icon: "touch_app", lib: "android", group: "控件",

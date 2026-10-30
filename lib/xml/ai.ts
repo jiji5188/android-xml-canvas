@@ -42,6 +42,7 @@ export const AI_PROVIDERS: AiProviderPreset[] = [
   { id: "zhipu", name: "智谱 GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-flash", keyHint: "bigmodel.cn" },
   { id: "moonshot", name: "Kimi", baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-8k", keyHint: "platform.moonshot.cn" },
   { id: "openai", name: "OpenAI", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", keyHint: "platform.openai.com" },
+  { id: "tencent", name: "腾讯 TokenHub", baseUrl: "https://tokenhub.tencentmaas.com/v1", model: "glm-5.3-flash", keyHint: "腾讯 MaaS 控制台；浏览器直连需 npm run ai-proxy" },
   { id: "custom", name: "自定义（OpenAI 兼容）", baseUrl: "", model: "", keyHint: "填兼容 /v1/chat/completions 的地址" },
 ];
 
@@ -108,8 +109,12 @@ export function loadAiConfig(raw: string | null): AiConfig {
       baseUrl: typeof p.baseUrl === "string" ? p.baseUrl : DEFAULT_AI_CONFIG.baseUrl,
       model: typeof p.model === "string" ? p.model : DEFAULT_AI_CONFIG.model,
       apiKey: typeof p.apiKey === "string" ? p.apiKey : "",
-      temperature: typeof p.temperature === "number" ? p.temperature : DEFAULT_AI_CONFIG.temperature,
-      maxTokens: typeof p.maxTokens === "number" ? p.maxTokens : DEFAULT_AI_CONFIG.maxTokens,
+      temperature: Number.isFinite(p.temperature) ? (p.temperature as number) : DEFAULT_AI_CONFIG.temperature,
+      // NaN / 0 / 越界值一旦写进 localStorage 会永久卡在校验上，这里直接回落默认
+      maxTokens:
+        Number.isFinite(p.maxTokens) && (p.maxTokens as number) >= 64 && (p.maxTokens as number) <= 32000
+          ? (p.maxTokens as number)
+          : DEFAULT_AI_CONFIG.maxTokens,
     };
   } catch {
     return { ...DEFAULT_AI_CONFIG };
@@ -133,6 +138,13 @@ export function buildRequestBody(cfg: AiConfig, messages: AiMessage[], stream = 
     max_tokens: cfg.maxTokens,
     stream,
   };
+}
+
+/** 从 OpenAI 兼容响应里取 reasoning_content（思考型模型有，普通模型没有） */
+export function extractReasoning(json: unknown): string {
+  const j = json as { choices?: { message?: { reasoning_content?: unknown } }[] };
+  const r = j?.choices?.[0]?.message?.reasoning_content;
+  return typeof r === "string" ? r : "";
 }
 
 /** 从 OpenAI 兼容响应里取正文；结构不符返回空串 */
@@ -226,7 +238,19 @@ export async function callAi(cfg: AiConfig, messages: AiMessage[], opts: CallAiO
       return { ok: false, content: "", error: "服务端返回的不是 JSON，可能 Base URL 指向了网页而不是 API。" };
     }
     const content = extractContent(json);
-    if (!content) return { ok: false, content: "", error: "服务端返回空内容，换个模型或降低 token 上限试试。" };
+    if (!content) {
+      // 思考型模型（glm-5.x / o 系列等）会把 max_tokens 先花在 reasoning 上，
+      // 预算不够时正文就是空的，这时说“返回空内容”会让人一头雾水。
+      const reasoning = extractReasoning(json);
+      if (reasoning) {
+        return {
+          ok: false,
+          content: "",
+          error: "模型把 token 预算都用在思考上了（返回只有 reasoning），正文为空。把「最大 token」调大（比如 2048 以上）再试。",
+        };
+      }
+      return { ok: false, content: "", error: "服务端返回空内容，换个模型或降低 token 上限试试。" };
+    }
     return { ok: true, content };
   } catch (e) {
     return { ok: false, content: "", error: humanizeError(e) };

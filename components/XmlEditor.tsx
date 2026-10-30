@@ -15,7 +15,7 @@ import type { MeasuredMap } from "@/lib/xml/constraints";
 import { commitHistoryState, EMPTY_MARK, type MergeMark } from "@/lib/xml/history";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
-import type { ResolvedNode, ResourceTable, XmlNode } from "@/lib/xml/types";
+import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild, childLimitOf } from "@/lib/xml/insert";
 import { moveNodeRaw, scanElements } from "@/lib/xml/reorder";
@@ -28,7 +28,9 @@ import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
 import { hasIcon } from "@/lib/xml/icon-vectors";
 import { makeZip, downloadBytes } from "@/lib/xml/zip";
-import { saveTextNative, workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative } from "@/lib/xml/native-save";
+import { saveTextNative, workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative, writeTextNative } from "@/lib/xml/native-save";
+import { saveBundleAnywhere, pickXmlFile, type SaveFileSpec } from "@/lib/xml/save-as";
+import { writeHandleText } from "@/lib/xml/workspace-fs";
 import {
   THEME_PRESETS,
   DEFAULT_PRESET_ID,
@@ -68,6 +70,8 @@ import { ExportCheckModal, type ExportReport, type ExportMode } from "./ExportCh
 import { ExportImageModal } from "./ExportImageModal";
 import type { ExportTarget } from "@/lib/xml/export-image";
 import { XmlCanvas } from "./XmlCanvas";
+import CanvasBoundary from "@/components/CanvasBoundary";
+import { LANG_OPTIONS, loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
 import { XmlCodeEditor } from "./XmlCodeEditor";
 import { AttrPanel } from "./AttrPanel";
 import { AddAttrModal } from "./AddAttrModal";
@@ -555,6 +559,23 @@ export function XmlEditor() {
   const [projectTab, setProjectTab] = useState<"workspace" | "current">("current");
   const [wsState, setWsState] = useState<WsInfo | null>(null);
   const [wsProjects, setWsProjects] = useState<WsProject[]>([]);
+  /** M21：当前编辑内容的来源 —— 决定「保存」是写回原路还是弹选择器 */
+  const [saveOrigin, setSaveOrigin] = useState<
+    { kind: "native"; target: string; name: string } | { kind: "handle"; handle: unknown; name: string } | null
+  >(null);
+  /** M23：界面语言（默认跟随系统） */
+  const [langPref, setLangPref] = useState<LangPref>(() => loadLangPref());
+  const lang = useMemo(() => resolveLang(langPref), [langPref]);
+  const tr = useMemo(() => makeT(lang), [lang]);
+  useEffect(() => {
+    saveLangPref(langPref);
+    // 让 <html lang> 跟着走（影响字距/断行规则，也便于辅助技术识别）
+    if (typeof document !== "undefined") document.documentElement.lang = lang;
+  }, [langPref, lang]);
+
+  /** M21：另存对话框（新建文件时先确认文件名） */
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [saveAsName, setSaveAsName] = useState("activity_main.xml");
   /* ===== M20n：工作目录多级树（默认全展开） ===== */
   const wsTree = useMemo(() => buildWsTree(wsProjects), [wsProjects]);
   const [wsOpen, setWsOpen] = useState<Set<string>>(new Set());
@@ -1129,17 +1150,50 @@ export function XmlEditor() {
    *  DPX = 1dp 对应 px（含用户缩放），仅用于状态栏/导航栏高度与圆角。 */
   const DPX = SCALE * scale;
 
-  const { model, issues, parseErr } = useMemo(() => {
-    const { root, issues } = parseLayoutXml(parsedXml);
-    if (!root) return { model: null, issues, parseErr: true };
-    // M2q：把上传 res/layout 里的布局传进去，供 <include> 就地展开
-    // M2r：屏幕尺寸传入，影响 match_parent 根 / CL 内容区回落值
-    // M2t：wrap 实测表传入，CL/RL 求解的 wrap 维度不再靠 estSize 估
-    return {
-      model: buildRenderModel(root, resources, SCALE, resExtras?.layouts, { w: device.w, h: device.h }, measured ?? undefined, renderTheme),
-      issues,
-      parseErr: false,
-    };
+  const { model, issues, parseErr, parseReason } = useMemo((): {
+    model: RenderModel | null;
+    issues: XmlIssue[];
+    parseErr: boolean;
+    parseReason: string;
+  } => {
+    // M22：解析 / 约束求解全程兜住异常 —— 半个 XML、错标签、坏属性都不能让整个页面白屏
+    try {
+      const parsed = parseLayoutXml(parsedXml);
+      if (!parsed.root) {
+        const first = parsed.issues.find((i) => i.level === "error");
+        return {
+          model: null,
+          issues: parsed.issues,
+          parseErr: true,
+          parseReason: first ? first.message : "没有可识别的根布局节点",
+        };
+      }
+      // M2q：把上传 res/layout 里的布局传进去，供 <include> 就地展开
+      // M2r：屏幕尺寸传入，影响 match_parent 根 / CL 内容区回落值
+      // M2t：wrap 实测表传入，CL/RL 求解的 wrap 维度不再靠 estSize 估
+      return {
+        model: buildRenderModel(
+          parsed.root,
+          resources,
+          SCALE,
+          resExtras?.layouts,
+          { w: device.w, h: device.h },
+          measured ?? undefined,
+          renderTheme,
+        ),
+        issues: parsed.issues,
+        parseErr: false,
+        parseReason: "",
+      };
+    } catch (e) {
+      console.error("[axv] 渲染模型构建失败", e);
+      return {
+        model: null,
+        issues: [],
+        parseErr: true,
+        parseReason: `渲染失败：${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
   }, [parsedXml, resources, resExtras?.layouts, device, measured, renderTheme]);
 
   /** M2t：XML / 设备变了 → 旧 path 可能指向别的节点，实测表作废重测 */
@@ -1185,10 +1239,33 @@ export function XmlEditor() {
   }, [model, measured]);
 
   /** 图层树用的原始节点树（不经渲染模型） */
-  const treeRoot = useMemo(() => (parseErr ? null : parseLayoutXml(parsedXml).root), [parsedXml, parseErr]);
+  const treeRoot = useMemo(() => {
+    if (parseErr) return null;
+    try {
+      return parseLayoutXml(parsedXml).root;
+    } catch (e) {
+      console.error("[axv] 解析图层树失败", e);
+      return null;
+    }
+  }, [parsedXml, parseErr]);
 
   /** 代码视图的结构检查（带行号，标红用） */
-  const lints = useMemo(() => lintXml(parsedXml), [parsedXml]);
+  const lints = useMemo(() => {
+    try {
+      return lintXml(parsedXml);
+    } catch (e) {
+      console.error("[axv] 结构检查失败", e);
+      return [] as ReturnType<typeof lintXml>;
+    }
+  }, [parsedXml]);
+  /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
+  const lintErrCount = useMemo(() => {
+    try {
+      return lints.filter((l) => l.level === "error").length;
+    } catch {
+      return 0;
+    }
+  }, [lints]);
 
   /** M2y：代码编辑器光标行 → 选中对应画布节点（反跳，和画布 → 行号正跳对称） */
   const onCodeCursorLine = useCallback(
@@ -1377,6 +1454,10 @@ export function XmlEditor() {
           return;
         }
         setXmlAndTrack(r.text);
+        // M21：记住来源，保存时优先写回原路径
+        if (p.target) setSaveOrigin({ kind: "native", target: p.target, name: p.name });
+        else if (p.handle) setSaveOrigin({ kind: "handle", handle: p.handle, name: p.name });
+        else setSaveOrigin(null);
         setWsMsg(`已打开 ${r.name}`);
       } catch (e) {
         setWsMsg(`打开失败：${e instanceof Error ? e.message : String(e)}`);
@@ -1900,30 +1981,44 @@ const findResolved = findResolvedNode;
     // 3) 读取（try/catch，File.text() 会 reject）
     f.text()
       .then((txt) => {
-        // 4) 载入前预检：能解析出根元素吗？解析不了 → 报错不写入，画布保持原内容
-        const { root, issues } = parseLayoutXml(txt);
-        if (!root) {
-          const errIssues = issues.filter((i) => i.level === "error");
-          const detail = errIssues.length > 0 ? `：${errIssues[0].message}` : "";
-          setExportNote(`「${f.name}」无法解析为布局 XML${detail}，未载入（画布保持不变）`);
-          window.setTimeout(() => setExportNote(""), 5000);
-          return;
+        // 4) M22：坏文件也照常载入 —— 由用户在代码面板修正，而不是被拒之门外
+        let parseOk = true;
+        let firstErr = "";
+        try {
+          const { root, issues } = parseLayoutXml(txt);
+          const errs = issues.filter((i) => i.level === "error");
+          if (!root) {
+            parseOk = false;
+            firstErr = errs[0]?.message || "没有可识别的根布局节点";
+          } else if (errs.length > 0) {
+            firstErr = errs[0].message;
+          }
+        } catch (e) {
+          parseOk = false;
+          firstErr = e instanceof Error ? e.message : String(e);
         }
+
         // M9：打开的文件作为项目里的一个新文件（同名自动加序号），不再冲掉当前内容
         const res2 = addFile(project, f.name, txt);
-        if (!res2.id) {
-          setExportNote(`项目文件已达上限（${MAX_FILES} 个），仍已载入「${f.name}」但未入项目`);
-          window.setTimeout(() => setExportNote(""), 4600);
-          setXmlAndTrack(txt);
+        if (res2.id) setProject(res2.project);
+        setXmlAndTrack(txt);
+
+        if (!parseOk) {
+          // 解析失败 → 切到代码面板，让用户就地改；画布会显示失败说明，不会崩
+          setLeftView("code");
+          setLeftOpen(true);
+          setFocusLine(1);
+          setFocusTick((t) => t + 1);
+          setExportNote(`「${f.name}」有不完整或错误的结构（${firstErr}），已切到代码面板，改好画布会自动恢复`);
+          window.setTimeout(() => setExportNote(""), 7000);
           return;
         }
-        setProject(res2.project);
-        setXmlAndTrack(txt);
-        // 5) 载入后语义检查：有 error 级问题给出提示（不阻断，用户可继续编辑）
-        const errs = issues.filter((i) => i.level === "error");
-        if (errs.length > 0) {
-          setExportNote(`已载入「${f.name}」，但检测到 ${errs.length} 条结构错误，切「XML 代码」tab 查看行号提示`);
+        if (firstErr) {
+          setExportNote(`已载入「${f.name}」，但有结构问题：${firstErr}（可在代码面板修正）`);
           window.setTimeout(() => setExportNote(""), 6000);
+        } else if (!res2.id) {
+          setExportNote(`项目文件已达上限（${MAX_FILES} 个），仍已载入「${f.name}」但未入项目`);
+          window.setTimeout(() => setExportNote(""), 4600);
         } else {
           setExportNote(`已载入「${f.name}」`);
           window.setTimeout(() => setExportNote(""), 2400);
@@ -1932,20 +2027,33 @@ const findResolved = findResolvedNode;
       .catch((err) => {
         console.error("[axv] 读取 xml 文件失败", err);
         setExportNote(`读取「${f.name}」失败，请重试`);
-        window.setTimeout(() => setExportNote(""), 4000);
+          window.setTimeout(() => setExportNote(""), 4000);
       });
   };
 
   /** 打开 .xml 文件（弹系统文件选择器） */
   const openProject = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".xml";
-    input.onchange = () => {
-      const f = input.files?.[0];
-      if (f) loadXmlFile(f);
-    };
-    input.click();
+    // M21：浏览器支持 File System Access 时带句柄打开 → 之后「保存」能写回原路径
+    void (async () => {
+      const picked = await pickXmlFile();
+      if (picked) {
+        const fake = new File([picked.text], picked.name, { type: "text/xml" });
+        loadXmlFile(fake);
+        setSaveOrigin({ kind: "handle", handle: picked.handle, name: picked.name });
+        return;
+      }
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".xml";
+      input.onchange = () => {
+        const f = input.files?.[0];
+        if (f) {
+          setSaveOrigin(null); // 普通 <input> 拿不到写句柄
+          loadXmlFile(f);
+        }
+      };
+      input.click();
+    })();
   };
 
   /** M3b：上传 res/ 目录，解析 drawable/vector/values/styles。
@@ -2029,6 +2137,99 @@ const findResolved = findResolvedNode;
     URL.revokeObjectURL(a.href);
     setExportNote(`已导出 activity_main.xml`);
     window.setTimeout(() => setExportNote(""), 2400);
+  };
+
+  /** M21：保存
+   *  - 从工作目录/本地打开的文件：写回**原路径**（依赖资源写到同级 res 目录）
+   *  - 新建文件：先确认文件名 → 再弹系统文件夹选择器（可新建文件夹）→ 按 res 结构一起写
+   *  - 依赖资源（生成的 shape/vector/values）一并写到 drawable/ values/ */
+  const flashNote = (msg: string, ms = 3600) => {
+    setExportNote(msg);
+    window.setTimeout(() => setExportNote(""), ms);
+  };
+
+  /** 组装当前要落盘的文件（layout + 依赖） */
+  const buildSaveFiles = (name: string): SaveFileSpec[] => {
+    const body = exportLayoutXml(xml, { mode: exportMode });
+    const entries = buildResBundle({
+      layoutXml: body,
+      layoutName: name,
+      generatedDrawables,
+      extras: resExtrasAll,
+    });
+    return entries.map((e) => ({ path: e.path, text: e.text }));
+  };
+
+  /** 写回原路径（含依赖资源） */
+  const saveBack = async (): Promise<boolean> => {
+    if (!saveOrigin) return false;
+    const name = saveOrigin.name || activeFile(project)?.name || "activity_main.xml";
+    const body = exportLayoutXml(xml, { mode: exportMode });
+    const deps = buildSaveFiles(name).filter((f) => !f.path.startsWith("layout/"));
+    let ok = false;
+    if (saveOrigin.kind === "native") ok = writeTextNative(saveOrigin.target, body);
+    else {
+      try {
+        ok = await writeHandleText(saveOrigin.handle, body);
+      } catch {
+        ok = false;
+      }
+    }
+    if (!ok) return false;
+    let depNote = "";
+    if (saveOrigin.kind === "native" && saveOrigin.target.startsWith("/") && deps.length > 0) {
+      // .../res/layout/activity_main.xml → res 根是上上级；其它情况就把同目录当 res 根
+      const dir = saveOrigin.target.slice(0, saveOrigin.target.lastIndexOf("/"));
+      const resRoot = dir.endsWith("/layout") ? dir.slice(0, dir.lastIndexOf("/")) : dir;
+      let n = 0;
+      for (const d of deps) if (writeTextNative(`${resRoot}/${d.path}`, d.text)) n++;
+      depNote = n > 0 ? `，依赖资源 ${n} 个` : `（${deps.length} 个依赖资源没写成，请检查目录权限）`;
+    } else if (deps.length > 0) {
+      depNote = `；另有 ${deps.length} 个依赖资源，可用「另存到文件夹」一起写出`;
+    }
+    flashNote(tr("save.doneBack", "已保存 {name}（原路径）", { name }) + depNote, 4200);
+    return true;
+  };
+
+  /** 另存：走系统文件夹选择器，按 res 结构整包写 */
+  const saveAsTo = async (name: string) => {
+    const files = buildSaveFiles(name);
+    const r = await saveBundleAnywhere(files, name);
+    if (r.ok) {
+      flashNote(
+        tr("save.doneAs", "已保存到「{dir}」：{n} 个文件（含依赖资源）", {
+          dir: r.label || "所选文件夹",
+          n: r.count ?? files.length,
+        }),
+        5000,
+      );
+      return true;
+    }
+    if (r.canceled) {
+      flashNote(tr("save.canceled", "已取消保存"));
+      return false;
+    }
+    flashNote(tr("save.failed", "保存失败：{reason}", { reason: r.reason || "未知原因" }), 5000);
+    return false;
+  };
+
+  const doSave = async () => {
+    // A) 有来源 → 直接写回原路径
+    if (saveOrigin) {
+      if (await saveBack()) return;
+      flashNote(tr("save.backFailed", "写回原文件失败，改为另存到文件夹…"), 2600);
+    }
+    // B) 新建文件 → 先让用户确认文件名，再选文件夹
+    const def = activeFile(project)?.name || "activity_main.xml";
+    setSaveAsName(def);
+    setSaveAsOpen(true);
+  };
+
+  const confirmSaveAs = async () => {
+    const raw = saveAsName.trim() || "activity_main.xml";
+    const name = /\.xml$/i.test(raw) ? raw : `${raw}.xml`;
+    setSaveAsOpen(false);
+    await saveAsTo(name);
   };
 
   const buildReport = (mode: ExportMode = exportMode): ExportReport => {
@@ -2218,8 +2419,35 @@ const findResolved = findResolvedNode;
               {Math.round(zoomHud * 100)}%
             </div>
           ) : null}
+          {!parseErr && lintErrCount > 0 ? (
+            <div className="axv-struct-warn" role="status">
+              <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>warning</span>
+              <span>
+                {tr("err.structWarn", "有 {n} 处结构问题（不影响预览）", { n: lintErrCount })}
+              </span>
+              <button className="axv-struct-warn-btn" onClick={() => gotoLine(1)}>
+                {tr("err.fix", "去代码面板修正")}
+              </button>
+            </div>
+          ) : null}
           {parseErr ? (
-            <div className="axv-canvas-empty">XML 解析失败，请检查结构</div>
+            <div className="axv-parse-fail" role="alert">
+              <span className="msr axv-parse-fail-icon" aria-hidden="true">error</span>
+              <div className="axv-parse-fail-title">{tr("err.parseTitle", "这个 XML 现在画不出来")}</div>
+              <div className="axv-parse-fail-msg">
+                {parseReason || tr("err.parseMsg", "XML 结构不完整或有语法错误")}
+              </div>
+              <div className="axv-parse-fail-hint">
+                {tr(
+                  "err.parseHint",
+                  "先到「代码」面板修正这段内容，画布会自动恢复；改动不会丢失，也不会影响你原来的文件。",
+                )}
+              </div>
+              <button className="axv-parse-fail-btn" onClick={() => gotoLine(1)}>
+                <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>code</span>
+                {tr("err.fix", "去代码面板修正")}
+              </button>
+            </div>
           ) : model ? (
             <div
               style={{
@@ -2272,16 +2500,30 @@ const findResolved = findResolvedNode;
 
               {/* 应用内容区：根布局填满这里 */}
               <div className="axv-phone-body">
-                <XmlCanvas
-                  node={model.root}
-                  selectedPath={selectedPath}
-                  onSelect={setSelectedPath}
-                  onDropWidget={onDropWidget}
-                  onConstraintDraw={onConstraintDraw}
-                  onGeometryChange={onGeometryChange}
-                  isLocked={isPathLocked}
-                  scale={DPX}
-                />
+                <CanvasBoundary
+                  resetKey={parsedXml}
+                  onFix={() => gotoLine(1)}
+                  labels={{
+                    title: tr("err.crashTitle", "画布渲染出错了"),
+                    hint: tr(
+                      "err.crashHint",
+                      "这不是你操作的问题，多半是某段布局数据超出了支持范围。到「代码」面板改一下（哪怕加个空格再删掉）画布会自动重试。",
+                    ),
+                    fix: tr("err.fix", "去代码面板修正"),
+                    retry: tr("err.retry", "重试渲染"),
+                  }}
+                >
+                  <XmlCanvas
+                    node={model.root}
+                    selectedPath={selectedPath}
+                    onSelect={setSelectedPath}
+                    onDropWidget={onDropWidget}
+                    onConstraintDraw={onConstraintDraw}
+                    onGeometryChange={onGeometryChange}
+                    isLocked={isPathLocked}
+                    scale={DPX}
+                  />
+                </CanvasBoundary>
               </div>
 
               {/* 导航栏（三键导航：返回 / 主页 / 多任务） */}
@@ -2375,7 +2617,7 @@ const findResolved = findResolvedNode;
             </select>
             {fileSelect}
             <button className="axv-mob-tool-btn" onClick={openProject} title="打开本地 XML 文件">打开</button>
-            <button className="axv-mob-tool-btn" onClick={saveProject} title="保存">保存</button>
+            <button className="axv-mob-tool-btn" onClick={() => void doSave()} title="保存">保存</button>
             {resExtras || Object.keys(generatedDrawables).length > 0 ? (
               <button className="axv-mob-tool-btn" onClick={doDownloadResZip} title="导出 res 包（含图标）">res 包</button>
             ) : null}
@@ -2403,8 +2645,8 @@ const findResolved = findResolvedNode;
         <div className="axv-rail">
           <button
             className={"axv-rail-btn" + (leftView === "parts" ? " on" : "")}
-            title="组件"
-            aria-label="组件"
+            title={tr("rail.parts", "组件")}
+            aria-label={tr("rail.parts", "组件")}
             aria-pressed={leftView === "parts"}
             onClick={() => {
               setLeftView("parts");
@@ -2417,8 +2659,8 @@ const findResolved = findResolvedNode;
           </button>
           <button
             className={"axv-rail-btn" + (leftView === "layers" ? " on" : "")}
-            title="图层"
-            aria-label="图层"
+            title={tr("rail.layers", "图层")}
+            aria-label={tr("rail.layers", "图层")}
             aria-pressed={leftView === "layers"}
             onClick={() => {
               setLeftView("layers");
@@ -2432,8 +2674,8 @@ const findResolved = findResolvedNode;
           {/* M17：AI 助手（模型调用 + 后续写代码） */}
           <button
             className={"axv-rail-btn" + (leftView === "ai" ? " on" : "")}
-            title="AI 助手"
-            aria-label="AI 助手"
+            title={tr("rail.ai", "AI 助手")}
+            aria-label={tr("rail.ai", "AI 助手")}
             aria-pressed={leftView === "ai"}
             onClick={() => {
               setLeftView("ai");
@@ -2446,8 +2688,8 @@ const findResolved = findResolvedNode;
           </button>
           <button
             className={"axv-rail-btn" + (leftView === "assets" ? " on" : "")}
-            title="已生成资源"
-            aria-label="已生成资源"
+            title={tr("rail.assets", "已生成资源")}
+            aria-label={tr("rail.assets", "已生成资源")}
             aria-pressed={leftView === "assets"}
             onClick={() => {
               setLeftView("assets");
@@ -2460,8 +2702,8 @@ const findResolved = findResolvedNode;
           </button>
           <button
             className={"axv-rail-btn" + (leftView === "res" ? " on" : "")}
-            title="项目管理"
-            aria-label="项目管理"
+            title={tr("rail.res", "项目管理")}
+            aria-label={tr("rail.res", "项目管理")}
             aria-pressed={leftView === "res"}
             onClick={() => {
               setLeftView("res");
@@ -2475,8 +2717,8 @@ const findResolved = findResolvedNode;
           <div className="axv-rail-gap" />
           <button
             className={"axv-rail-btn" + (leftView === "settings" ? " on" : "")}
-            title="设置"
-            aria-label="设置"
+            title={tr("rail.settings", "设置")}
+            aria-label={tr("rail.settings", "设置")}
             aria-pressed={leftView === "settings"}
             onClick={() => {
               setLeftView("settings");
@@ -2489,8 +2731,8 @@ const findResolved = findResolvedNode;
           </button>
           <button
             className={"axv-rail-btn" + (leftView === "about" ? " on" : "")}
-            title="关于"
-            aria-label="关于"
+            title={tr("rail.about", "关于")}
+            aria-label={tr("rail.about", "关于")}
             aria-pressed={leftView === "about"}
             onClick={() => {
               setLeftView("about");
@@ -2507,23 +2749,23 @@ const findResolved = findResolvedNode;
           <div className="axv-rail-head">
             <span className="axv-rail-title">
               {leftView === "parts"
-                ? "组件"
+                ? tr("rail.parts", "组件")
                 : leftView === "layers"
-                  ? "图层"
+                  ? tr("rail.layers", "图层")
                   : leftView === "ai"
-                    ? "AI 助手"
+                    ? tr("rail.ai", "AI 助手")
                     : leftView === "res"
-                      ? "项目管理"
+                      ? tr("rail.res", "项目管理")
                       : leftView === "assets"
-                        ? "已生成资源"
+                        ? tr("rail.assets", "已生成资源")
                         : leftView === "settings"
-                          ? "设置"
-                          : "关于"}
+                          ? tr("rail.settings", "设置")
+                          : tr("rail.about", "关于")}
             </span>
             <button
               className="axv-icon-btn"
-              title="关闭面板"
-              aria-label="关闭面板"
+              title={tr("rail.close", "关闭面板")}
+              aria-label={tr("rail.close", "关闭面板")}
               onClick={() => setLeftOpen(false)}
             >
               <span className="msr" aria-hidden="true" style={{ fontSize: 24 }}>left_panel_close</span>
@@ -2729,7 +2971,7 @@ const findResolved = findResolvedNode;
             <div className="axv-rail-scroll">
               {/* ===== 外观：预设配色方案 ===== */}
               <div className="axv-set-group">
-                <div className="axv-set-label">配色方案</div>
+                <div className="axv-set-label">{tr("set.theme", "配色方案")}</div>
                 <div className="axv-theme-grid">
                   {THEME_PRESETS.map((p) => {
                     const t = themeTokens(p.id, theme);
@@ -2761,13 +3003,13 @@ const findResolved = findResolvedNode;
                     className={"axv-set-seg-btn" + (theme === "light" ? " on" : "")}
                     onClick={() => setTheme("light")}
                   >
-                    浅色
+                    {tr("set.themeLight", "浅色")}
                   </button>
                   <button
                     className={"axv-set-seg-btn" + (theme === "dark" ? " on" : "")}
                     onClick={() => setTheme("dark")}
                   >
-                    深色
+                    {tr("set.themeDark", "深色")}
                   </button>
                 </div>
                 <div className="axv-set-hint">
@@ -2777,9 +3019,27 @@ const findResolved = findResolvedNode;
 
               {/* M20m：设置面板不再列「配色明细」（用户要求去掉），配色方案卡片保留 */}
 
+              {/* ===== M23：界面语言 ===== */}
+              <div className="axv-set-group">
+                <div className="axv-set-label">{tr("set.lang", "界面语言")}</div>
+                <select
+                  className="axv-tb-select axv-lang-select"
+                  value={langPref}
+                  aria-label={tr("set.lang", "界面语言")}
+                  onChange={(e) => setLangPref(e.target.value as LangPref)}
+                >
+                  {LANG_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.value === "auto" ? `${o.label}（${o.native}）` : o.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="axv-set-hint">{tr("set.langHint", "默认跟随系统语言；切换只影响编辑器界面文字，不影响布局内容。")}</div>
+              </div>
+
               {/* ===== 工作目录 ===== */}
               <div className="axv-set-group">
-                <div className="axv-set-label">工作目录</div>
+                <div className="axv-set-label">{tr("set.workspace", "工作目录")}</div>
                 <div className="axv-set-kv">
                   <span>当前</span>
                   <b title={wsState?.label || ""}>
@@ -2821,7 +3081,7 @@ const findResolved = findResolvedNode;
               </div>
 
               <div className="axv-set-group">
-                <div className="axv-set-label">渲染主题</div>
+                <div className="axv-set-label">{tr("set.device", "渲染设备")}</div>
                 <div className="axv-set-seg">
                   {RENDER_THEMES.map((t) => (
                     <button
@@ -2839,7 +3099,7 @@ const findResolved = findResolvedNode;
               </div>
 
               <div className="axv-set-group">
-                <div className="axv-set-label">预览</div>
+                <div className="axv-set-label">{tr("set.preview", "预览")}</div>
                 <label className="axv-set-row">
                   <span>显示系统状态栏 / 导航栏</span>
                   <input
@@ -2859,7 +3119,7 @@ const findResolved = findResolvedNode;
               </div>
 
               <div className="axv-set-group">
-                <div className="axv-set-label">数据</div>
+                <div className="axv-set-label">{tr("set.data", "数据")}</div>
                 <div className="axv-set-hint">
                   布局、资源与生成的图标都自动存在本机浏览器（localStorage），关页面不丢。
                 </div>
@@ -2911,7 +3171,7 @@ const findResolved = findResolvedNode;
 
               {/* M16f：项目来源 + 开源致谢（列表数据在 lib/xml/credits.ts，跟 README 同一口径） */}
               <div className="axv-set-group">
-                <div className="axv-set-label">项目来源</div>
+                <div className="axv-set-label">{tr("set.projectRes", "项目资源")}</div>
                 <div className="axv-credit-upstream">
                   本项目由 <b>{UPSTREAM.name}</b>（{UPSTREAM.license}，作者 {UPSTREAM.by}）拓展而来。
                   {UPSTREAM.role}
@@ -2922,7 +3182,7 @@ const findResolved = findResolvedNode;
               </div>
 
               <div className="axv-set-group">
-                <div className="axv-set-label">致谢 · 开源共享</div>
+                <div className="axv-set-label">{tr("set.credits", "鸣谢 / 开源组件")}</div>
                 <div className="axv-set-hint" style={{ marginBottom: 8 }}>
                   这个编辑器能跑到今天，靠的是下面这些开源项目与作者的分享。在此致谢。
                 </div>
@@ -2940,7 +3200,7 @@ const findResolved = findResolvedNode;
                 </ul>
               </div>
               <div className="axv-set-group">
-                <div className="axv-set-label">快捷键</div>
+                <div className="axv-set-label">{tr("set.shortcuts", "快捷键")}</div>
                 <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>Z</kbd><span>撤销</span></div>
                 <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd><span>重做</span></div>
                 <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>F</kbd><span>代码内查找</span></div>
@@ -2949,7 +3209,7 @@ const findResolved = findResolvedNode;
                 <div className="axv-about-kv"><kbd>Delete</kbd><span>删除选中控件</span></div>
               </div>
               <div className="axv-set-group">
-                <div className="axv-set-label">说明</div>
+                <div className="axv-set-label">{tr("set.notes", "说明")}</div>
                 <div className="axv-set-hint">
                   渲染为近似实现，不是 aapt / Android 运行时；个别属性（自定义 View、动画、第三方库）
                   只做占位。最终效果以真机为准。
@@ -3088,7 +3348,12 @@ const findResolved = findResolvedNode;
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>redo</span>
           </button>
-          <button className="axv-tb-btn" title="保存为 XML 文件" aria-label="保存" onClick={saveProject}>
+          <button
+            className="axv-tb-btn"
+            title="保存（打开的文件写回原路径；新建文件选择保存位置）"
+            aria-label="保存"
+            onClick={() => void doSave()}
+          >
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save</span>
           </button>
           <button className="axv-tb-btn" title="打开本地 XML 文件（也可直接把文件拖进来）" aria-label="打开 XML 文件" onClick={openProject}>
@@ -3175,6 +3440,50 @@ const findResolved = findResolvedNode;
       ) : null}
 
       {/* M6a：导出预览图（PNG / SVG） */}
+      {/* M21：新建文件保存 → 先确认文件名，再选文件夹（系统选择器里可新建文件夹） */}
+      {saveAsOpen ? (
+        <div
+          className="axv-saveas-mask"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSaveAsOpen(false);
+          }}
+        >
+          <div className="axv-saveas-card">
+            <div className="axv-saveas-title">{tr("save.title", "保存布局")}</div>
+            <div className="axv-saveas-hint">
+              {tr(
+                "save.hint",
+                "下一步会让你选择保存位置（系统选择器里可以新建文件夹）。生成的形状、图标等依赖资源会一起写进 drawable/，values 写进 values/。",
+              )}
+            </div>
+            <label className="axv-saveas-field">
+              <span>{tr("save.fileName", "文件名")}</span>
+              <input
+                className="axv-saveas-input"
+                value={saveAsName}
+                autoFocus
+                spellCheck={false}
+                onChange={(e) => setSaveAsName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void confirmSaveAs();
+                  if (e.key === "Escape") setSaveAsOpen(false);
+                }}
+              />
+            </label>
+            <div className="axv-saveas-btns">
+              <button className="axv-set-btn" onClick={() => setSaveAsOpen(false)}>
+                {tr("save.cancel", "取消")}
+              </button>
+              <button className="axv-set-btn axv-saveas-ok" onClick={() => void confirmSaveAs()}>
+                {tr("save.confirm", "选择文件夹并保存")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {imgExportOpen ? (
         <ExportImageModal
           getTarget={(): ExportTarget | null =>

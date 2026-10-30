@@ -65,7 +65,10 @@ export function highlightXml(src: string): string {
     }
     // 普通文本
     const j = src.indexOf("<", i);
-    const end = j === -1 ? src.length : j;
+    // M22：indexOf 返回 i 时（如 "<<<" 不构成合法标签名）必须至少吃一个字符，
+    // 否则 i 不前进 → 死循环 → out 无限增长 → RangeError: Invalid array length
+    let end = j === -1 ? src.length : j;
+    if (end <= i) end = i + 1;
     push(null, src.slice(i, end));
     i = end;
   }
@@ -123,12 +126,35 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
     if (bandRef.current) bandRef.current.style.transform = `translateY(${-ta.scrollTop}px)`;
   }, []);
 
-  const lines = useMemo(() => value.split("\n").length, [value]);
+  const lines = useMemo(() => {
+    try {
+      return value.split("\n").length;
+    } catch {
+      return 1;
+    }
+  }, [value]);
+
+  /** M22：高亮 HTML 兜底 —— 畸形/超长 XML 也不许把编辑器搞崩 */
+  const hlHtml = useMemo(() => {
+    try {
+      return highlightXml(value);
+    } catch (e) {
+      console.error("[axv] XML 高亮失败，退回纯文本", e);
+      return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+  }, [value]);
   const errLines = useMemo(() => {
     const set = new Map<number, string>();
-    for (const e of errors || []) if (!set.has(e.line)) set.set(e.line, e.message);
+    for (const e of errors || []) {
+      // M22：行号必须落在文件实际行范围内，坏数据直接跳过（否则色带/行号会画到负数坐标）
+      if (!Number.isFinite(e.line) || e.line < 1 || e.line > lines) continue;
+      if (!set.has(e.line)) set.set(e.line, e.message);
+    }
     return set;
-  }, [errors]);
+  }, [errors, lines]);
   const firstErr = errors && errors.length > 0 ? errors[0] : null;
 
   // M2t：wrap_content 等估算不参与；M6e：查找命中列表（不区分大小写，不重叠）
@@ -212,7 +238,7 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
           <pre className="axv-code-hl" ref={preRef} aria-hidden="true">
             <code
               className="axv-code-code"
-              dangerouslySetInnerHTML={{ __html: highlightXml(value) }}
+              dangerouslySetInnerHTML={{ __html: hlHtml }}
             />
           </pre>
           <div className="axv-code-bands" ref={bandRef} aria-hidden="true">

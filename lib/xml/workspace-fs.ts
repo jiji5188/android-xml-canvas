@@ -162,44 +162,72 @@ export async function requestWorkspacePermission(dir: DirHandle): Promise<boolea
 
 const LAYOUT_DIR = "layout";
 
-/** 列一个目录下的项目：子文件夹优先，其次 .xml 文件 */
-export async function listProjects(dir: DirHandle): Promise<WorkspaceEntry[]> {
-  const dirs: WorkspaceEntry[] = [];
-  const files: WorkspaceEntry[] = [];
+/** 读目录时跳过的噪声目录（安卓工程里 build/.gradle 体积大且没布局） */
+const SKIP_DIRS = new Set([".git", ".gradle", ".idea", "build", "node_modules", ".svn", "__pycache__"]);
+const MAX_DEPTH = 6;
+
+/** 递归数一个目录（含子目录）里的 .xml */
+async function countXmlDeep(dir: DirHandle, depth = 0): Promise<number> {
+  if (depth > MAX_DEPTH) return 0;
+  let n = 0;
   try {
-    for await (const entry of dir.values()) {
-      if (entry.kind === "directory") {
-        let layoutCount = 0;
-        try {
-          const layout = await entry.getDirectoryHandle(LAYOUT_DIR);
-          for await (const f of layout.values()) {
-            if (f.kind === "file" && /\.xml$/i.test(f.name)) layoutCount++;
-          }
-        } catch {
-          // 没有 layout/ 子目录：退化成数一下根下 xml
-          try {
-            for await (const f of entry.values()) if (f.kind === "file" && /\.xml$/i.test(f.name)) layoutCount++;
-          } catch {
-            /* ignore */
-          }
-        }
-        dirs.push({
-          kind: "dir",
-          name: entry.name,
-          rel: entry.name,
-          dirHandle: entry,
-          layoutCount,
-        });
-      } else if (/\.xml$/i.test(entry.name)) {
-        files.push({ kind: "file", name: entry.name, rel: entry.name, fileHandle: entry });
+    for await (const e of dir.values()) {
+      if (e.kind === "directory") {
+        if (SKIP_DIRS.has(e.name.toLowerCase())) continue;
+        n += await countXmlDeep(e, depth + 1);
+      } else if (/\.xml$/i.test(e.name)) {
+        n++;
       }
     }
   } catch {
-    throw new WorkspacePermissionError();
+    /* ignore */
   }
-  dirs.sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
-  files.sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
-  return [...dirs, ...files];
+  return n;
+}
+
+/**
+ * M20n：列工作目录 → **多级**列表（保留相对路径，前端再画成树）。
+ * 安卓工程一般是 app/src/main/res/layout/xxx.xml 这种多层结构，
+ * 以前只列一层，用户根本看不到 app 里的布局。
+ */
+export async function listProjects(dir: DirHandle): Promise<WorkspaceEntry[]> {
+  const out: WorkspaceEntry[] = [];
+  const walk = async (d: DirHandle, prefix: string, depth: number) => {
+    if (depth > MAX_DEPTH) return;
+    const dirs: WorkspaceEntry[] = [];
+    const files: WorkspaceEntry[] = [];
+    try {
+      for await (const entry of d.values()) {
+        const lower = entry.name.toLowerCase();
+        if (SKIP_DIRS.has(lower)) continue;
+        if (entry.kind === "directory") {
+          const layoutCount = await countXmlDeep(entry);
+          // 没有任何 xml 的目录不列（build/ 这种会被 SKIP 掉，这里兜剩下的）
+          if (layoutCount === 0) continue;
+          dirs.push({
+            kind: "dir",
+            name: entry.name,
+            rel: prefix + entry.name,
+            dirHandle: entry,
+            layoutCount,
+          });
+        } else if (/\.xml$/i.test(entry.name)) {
+          files.push({ kind: "file", name: entry.name, rel: prefix + entry.name, fileHandle: entry, layoutCount: 1 });
+        }
+      }
+    } catch {
+      throw new WorkspacePermissionError();
+    }
+    dirs.sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+    files.sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+    for (const d2 of dirs) {
+      out.push(d2);
+      await walk(d2.dirHandle as DirHandle, d2.rel + "/", depth + 1);
+    }
+    for (const f of files) out.push(f);
+  };
+  await walk(dir, "", 0);
+  return out;
 }
 
 /** 读一个文件句柄的文本内容 */

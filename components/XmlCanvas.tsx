@@ -77,6 +77,8 @@ interface XmlCanvasProps {
    *  - move 手柄 → 只写 x/y（layout_marginStart/Top）
    *  - 四角 resize → 只写 w/h（layout_width/height） */
   onGeometryChange?: (path: string, patch: GeomPatch) => void;
+  /** M20m：该节点（或祖先）是否被锁定 —— 锁定后画布点不中、不出手柄 */
+  isLocked?: (path: string) => boolean;
   /** 1dp = scale px（默认 2，与 css.ts 一致） */
   scale?: number;
   /** 递归用：父节点 path / tag / 是否 ConstraintLayout */
@@ -132,6 +134,7 @@ export function XmlCanvas({
   onDropWidget,
   onConstraintDraw,
   onGeometryChange,
+  isLocked,
   scale = 2,
   _parentPath,
   _parentTag,
@@ -211,9 +214,10 @@ export function XmlCanvas({
   const absParent = inCL || inRL;
   const st = shortTag(node.tag);
   const isAux = st === "Guideline" || st === "Barrier";
-  const showHandles = !!onConstraintDraw && isSel && inCL && !isAux;
+  const lockedHere = isLocked?.(node.path) ?? false;
+  const showHandles = !!onConstraintDraw && isSel && inCL && !isAux && !lockedHere;
   // 自由几何手柄：选中 + 非绝对定位父级 + 不是辅助节点
-  const showGeom = !!onGeometryChange && isSel && !absParent && !isAux;
+  const showGeom = !!onGeometryChange && isSel && !absParent && !isAux && !lockedHere;
   // CL / RL 子项：位置由约束/规则决定，但仍然要给「改宽高」手柄。
   // 左侧/上侧能不能用：CL 看有没有锚点（marginStart 才有作用）；
   // RL 看这个方向是不是 end 驱动（end 驱动时 marginStart 推不动，但 width 仍然能改）。
@@ -471,6 +475,7 @@ export function XmlCanvas({
       style={style}
       onClick={(e) => {
         e.stopPropagation();
+        if (lockedHere) return;
         onSelect(node.path);
       }}
       onDragOver={
@@ -659,6 +664,7 @@ export function XmlCanvas({
           onDropWidget={onDropWidget}
           onConstraintDraw={onConstraintDraw}
           onGeometryChange={onGeometryChange}
+          isLocked={isLocked}
           scale={scale}
           _parentPath={node.path}
           _parentTag={node.tag}

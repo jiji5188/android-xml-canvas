@@ -93,7 +93,7 @@
   /* M11t：宽度跟 android:progress / max 走（原来写死 40%） */
   width: calc(var(--axv-progress, 0.4) * 100%);
   height: 100%;
-  background: var(--axv-progress-color, #6750A4);
+  background: var(--axv-progress-color, #757575);
   border-radius: inherit;
 }
 
@@ -1291,6 +1291,25 @@
 .axv-lt-actions button:disabled:hover {
   background: transparent;
 }
+/* M20m：锁定开关 + 锁定行的观感 */
+.axv-lt-actions button.axv-lt-lock.on {
+  color: var(--axv-primary, #5b5b66);
+  background: rgba(0, 0, 0, 0.07);
+}
+.axv-lt-row.locked .axv-lt-tag,
+.axv-lt-row.locked .axv-lt-label {
+  opacity: 0.5;
+}
+.axv-lt-row.locked {
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.025) 0 6px,
+    transparent 6px 12px
+  );
+}
+.axv-lt-row.locked[draggable="true"] {
+  cursor: default;
+}
 
 /* ===== M3d：拖拽排序的落点提示 ===== */
 .axv-lt-hint {
@@ -1370,7 +1389,7 @@
   font-family: ui-monospace, Consolas, monospace;
   font-size: 11.5px;
   color: var(--axv-primary);
-  background: rgba(103, 80, 164, 0.1);
+  background: rgba(0, 0, 0, 0.06);
   border-radius: 5px;
   padding: 0 6px;
 }
@@ -1383,7 +1402,7 @@
 .axv-elev-range {
   width: 100%;
   height: 16px;
-  accent-color: #6750A4;
+  accent-color: #757575;
   cursor: pointer;
 }
 .axv-elev-presets {
@@ -1476,7 +1495,7 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--axv-primary);
-  background: rgba(103, 80, 164, 0.1);
+  background: rgba(0, 0, 0, 0.06);
   border-radius: 6px;
   padding: 1px 7px;
 }
@@ -1648,13 +1667,13 @@
   text-overflow: ellipsis;
 }
 .axv-chain-node:hover {
-  background: rgba(103, 80, 164, 0.1);
+  background: rgba(0, 0, 0, 0.06);
   color: var(--axv-primary);
 }
 .axv-chain-node.on {
   color: var(--axv-primary);
   font-weight: 700;
-  background: rgba(103, 80, 164, 0.12);
+  background: rgba(0, 0, 0, 0.07);
 }
 .axv-chain-id {
   font-style: normal;
@@ -1671,7 +1690,7 @@
 .axv-attr-id {
   font-size: 11px;
   color: var(--axv-primary);
-  background: rgba(103, 80, 164, 0.1);
+  background: rgba(0, 0, 0, 0.06);
   border-radius: 6px;
   padding: 1px 8px;
 }
@@ -1782,7 +1801,7 @@
   cursor: pointer;
 }
 .axv-attr-add:hover {
-  background: rgba(103, 80, 164, 0.08);
+  background: rgba(0, 0, 0, 0.05);
   border-color: var(--axv-primary);
 }
 
@@ -2577,7 +2596,7 @@
   background-color: var(--axv-seek-track-bg, #e0d9e3);
   background-image: linear-gradient(
     to right,
-    var(--axv-seek-color, #6750a4) 0 var(--axv-seek-pct, 40%),
+    var(--axv-seek-color, #757575) 0 var(--axv-seek-pct, 40%),
     transparent var(--axv-seek-pct, 40%)
   );
   pointer-events: none;
@@ -2594,7 +2613,7 @@
   width: var(--axv-seek-thumb-d, 40px);
   height: var(--axv-seek-thumb-d, 40px);
   border-radius: 50%;
-  background-color: var(--axv-seek-thumb, #6750a4);
+  background-color: var(--axv-seek-thumb, #757575);
   background-image: var(--axv-seek-thumb-img, none);
   background-size: contain;
   background-repeat: no-repeat;
@@ -3762,7 +3781,7 @@
   height: 44px;
   border-radius: 12px;
   flex: 0 0 auto;
-  box-shadow: 0 2px 8px rgba(103, 80, 164, 0.28);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
 }
 .axv-about-desc {
   padding: 0 14px 14px;
@@ -4318,10 +4337,10 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 
 /* 进度条前景色 / SeekBar 滑块色改成变量（原来硬写 #6750A4） */
 .axv-node.axv-progress::after {
-  background-color: var(--axv-progress-color, #6750A4);
+  background-color: var(--axv-progress-color, #757575);
 }
 .axv-node.axv-seek::after {
-  background-color: var(--axv-seek-thumb, #6750A4);
+  background-color: var(--axv-seek-thumb, #757575);
 }
 
 
@@ -4330,7 +4349,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 .axv-node.axv-progress-ring {
   border-radius: 50%;
   border: var(--axv-ring-w, 6px) solid #e0d9e3;
-  border-top-color: var(--axv-progress-color, #6750a4);
+  border-top-color: var(--axv-progress-color, #757575);
   background: transparent;
   box-sizing: border-box;
   animation: axv-ring-spin 1s linear infinite;
@@ -4507,7 +4526,54 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+}
+/* M20n：多级列表（文件夹可折叠，缩进表示层级） */
+.axv-ws-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+.axv-ws-caret {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--axv-desc);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 6px;
+}
+button.axv-ws-caret:hover {
+  background: var(--axv-hover);
+}
+.axv-ws-row .axv-ws-item {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  padding: 5px 6px;
+}
+.axv-ws-open {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.axv-ws-open:hover {
+  background: var(--axv-hover);
+  color: var(--axv-primary);
 }
 .axv-ws-item {
   width: 100%;
@@ -4970,9 +5036,9 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   outline: none !important;
   white-space: pre-wrap;
   word-break: break-word;
-  caret-color: #6750a4;
+  caret-color: #1d1b20;
 }
-.axv-run-input.axv-run-focused { box-shadow: inset 0 0 0 2px rgba(103, 80, 164, 0.55); }
+.axv-run-input.axv-run-focused { box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.45); }
 .axv-run-input.axv-run-input-empty::before {
   content: attr(data-run-hint);
   color: #9aa0a6;
@@ -5012,12 +5078,12 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   padding: 24px 16px;
   min-height: 128px;
 }
-.axv-run-row:hover { background: rgba(103, 80, 164, 0.06); }
-.axv-run-row.on { background: rgba(103, 80, 164, 0.14); }
+.axv-run-row:hover { background: rgba(0, 0, 0, 0.04); }
+.axv-run-row.on { background: rgba(0, 0, 0, 0.08); }
 .axv-run-row-title { font-size: 28px; line-height: 1.3; color: #1d1b20; }
 .axv-run-row-sub { font-size: 23px; line-height: 1.3; color: #79747e; }
 .axv-run-row-static { cursor: pointer; }
-.axv-run-row-static.on { background: rgba(103, 80, 164, 0.14); }
+.axv-run-row-static.on { background: rgba(0, 0, 0, 0.08); }
 
 /* 下拉候选菜单（Android Spinner 弹窗） */
 .axv-run-popup {
@@ -5043,11 +5109,11 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   cursor: pointer;
   white-space: nowrap;
 }
-.axv-run-popup-item:hover { background: rgba(103, 80, 164, 0.08); }
+.axv-run-popup-item:hover { background: rgba(0, 0, 0, 0.05); }
 .axv-run-popup-item.on {
-  color: #6750a4;
+  color: #1d1b20;
   font-weight: 700;
-  background: rgba(103, 80, 164, 0.1);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 /* Android 风格 Toast */

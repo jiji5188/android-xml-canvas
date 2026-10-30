@@ -15,9 +15,9 @@ function attrColor(xml: string, res: ResourceTable = DEFAULT_RESOURCES): string 
 }
 
 describe("M2x ?attr 主题解析", () => {
-  it("未上传主题时走内置 Material3 兜底（colorPrimary=#6750A4）", () => {
+  it("未上传主题时走内置兜底配色（中性 #757575，不带紫）", () => {
     const c = attrColor(`<TextView ${A} android:textColor="?attr/colorPrimary" />`);
-    expect(c).toBe("#6750A4");
+    expect(c).toBe("#757575");
   });
 
   it("上传主题后 ?attr/brandColor 使用主题值（@color 引用能展开）", () => {

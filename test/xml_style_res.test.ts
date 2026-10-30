@@ -95,7 +95,7 @@ describe("@android:color 框架色", () => {
 
   it("?attr/colorPrimary 有默认 Material3 色", () => {
     const issues: import("../lib/xml/types").XmlIssue[] = [];
-    expect(resolveColor("?attr/colorPrimary", baseRes(), issues, "#0", "background")).toBe("#6750A4");
+    expect(resolveColor("?attr/colorPrimary", baseRes(), issues, "#0", "background")).toBe("#757575");
   });
 });
 

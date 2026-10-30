@@ -34,7 +34,7 @@ describe("M1a 渲染引擎（XML → CSS 树）", () => {
 
     const btn = root.children[4];
     expect(btn.tag).toBe("Button");
-    expect(btn.style.backgroundColor).toBe("#6750A4");
+    expect(btn.style.backgroundColor).toBe("#757575");
     expect(btn.text).toBe("确定");
     expect(btn.style.marginTop).toBe("48px");
   });

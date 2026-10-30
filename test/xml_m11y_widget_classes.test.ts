@@ -115,7 +115,7 @@ describe("M11x 全组件总览修正", () => {
     const tabs = find(root, "TabLayout");
     expect(tabs.className).toContain("axv-tabs");
     expect(tabs.children[0].style.flex).toBe("1 1 0");
-    expect(tabs.children[1].style.color).toBe("#6750A4");
+    expect(tabs.children[1].style.color).toBe("#1D1B20");
   });
 
   it("TextInputLayout 的子 EditText 不再自带边框（避免框中框）", () => {

@@ -264,7 +264,7 @@ function ctlVars(role: RunRole, on: boolean, tint: string) {
   return {
     "--axv-ctl-bg": role === "radio" ? "#FFFFFF" : on ? tint : "#FFFFFF",
     "--axv-ctl-ring": on ? tint : "#79747E",
-    "--axv-ctl-img": on ? (role === "radio" ? "radial-gradient(circle, #6750A4 0 42%, transparent 45%)" : CTL_CHECK_IMG) : "none",
+    "--axv-ctl-img": on ? (role === "radio" ? "radial-gradient(circle, #757575 0 42%, transparent 45%)" : CTL_CHECK_IMG) : "none",
   } as Record<string, string>;
 }
 
@@ -277,7 +277,7 @@ function applyCtl(el: HTMLElement, role: RunRole, on: boolean, tint: string) {
 
 function decorateCtl(ctx: Ctx, el: HTMLElement, path: string, role: RunRole, label: string) {
   const a = attrsOf(ctx, path);
-  const tint = String(a["buttonTint"] ?? a["thumbTint"] ?? "#6750A4");
+  const tint = String(a["buttonTint"] ?? a["thumbTint"] ?? "#757575");
   let checked = Boolean(a["checked"]);
   applyCtl(el, role, checked, tint);
 

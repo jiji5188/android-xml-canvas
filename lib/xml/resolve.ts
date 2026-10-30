@@ -94,15 +94,15 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
     if (c !== undefined) return argbToCss(c);
     // 常见 Material3 主题属性→默认色（未上传 styles 时的预览兜底）
     const themeAttrs: Record<string, string> = {
-      colorPrimary: "#6750A4",
+      colorPrimary: "#757575",
       colorOnPrimary: "#FFFFFF",
-      colorPrimaryContainer: "#EADDFF",
-      colorOnPrimaryContainer: "#21005D",
-      colorSecondary: "#625B71",
+      colorPrimaryContainer: "#E6E6E9",
+      colorOnPrimaryContainer: "#1D1B20",
+      colorSecondary: "#6B6B70",
       colorOnSecondary: "#FFFFFF",
       colorOnBackground: "#1D1B20",
       colorOnSurface: "#1D1B20",
-      colorSurface: "#FEF7FF",
+      colorSurface: "#FAFAFA",
       colorBackground: "#FEF7FF",
       colorError: "#B3261E",
       textColorPrimary: "#1D1B20",

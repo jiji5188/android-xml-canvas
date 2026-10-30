@@ -54,7 +54,7 @@ describe("M2a 复合控件占位渲染", () => {
     expect(sw.className).toBe("axv-switch axv-checked");
     // M8：轨道改由 ::before 画，颜色走 CSS 变量（节点本身不再铺满背景色）
     const vars = sw.style as unknown as Record<string, string>;
-    expect(vars["--axv-ctl-bg"]).toBe("#6750A4");
+    expect(vars["--axv-ctl-bg"]).toBe("#757575");
     expect(vars["--axv-ctl-thumb"]).toBe("#FFFFFF");
     expect(sw.text).toBe(""); // 没写 android:text 时不显示文字
   });
@@ -69,9 +69,9 @@ describe("M2a 复合控件占位渲染", () => {
     const offVars = off.style as unknown as Record<string, string>;
     const onVars = on.style as unknown as Record<string, string>;
     expect(offVars["--axv-ctl-bg"]).toBe("#FFFFFF");
-    expect(offVars["--axv-ctl-ring"]).toBe("#79747E");
+    expect(offVars["--axv-ctl-ring"]).toBe("#8E8E93");
     expect(on.className).toBe("axv-check axv-checked");
-    expect(onVars["--axv-ctl-bg"]).toBe("#6750A4");
+    expect(onVars["--axv-ctl-bg"]).toBe("#757575");
     expect(onVars["--axv-ctl-img"]).toContain("data:image/svg+xml");
   });
 
@@ -91,7 +91,7 @@ describe("M2a 复合控件占位渲染", () => {
     expect(root.className).toBe("axv-radio");
     const vars = root.style as unknown as Record<string, string>;
     expect(vars["--axv-ctl-r"]).toBe("50%");
-    expect(vars["--axv-ctl-ring"]).toBe("#79747E");
+    expect(vars["--axv-ctl-ring"]).toBe("#8E8E93");
   });
 
   it("SeekBar 按 progress/max 换算百分比", () => {

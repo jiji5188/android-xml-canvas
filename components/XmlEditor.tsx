@@ -32,8 +32,6 @@ import { saveTextNative, workspaceLabel, chooseWorkspace, nativeAvailable, copyT
 import {
   THEME_PRESETS,
   DEFAULT_PRESET_ID,
-  THEME_TOKEN_ORDER,
-  THEME_TOKEN_LABEL,
   themeTokens,
   applyThemeToDom,
   type ThemeMode,
@@ -351,6 +349,46 @@ const SAMPLES: Record<string, string> = {
 </LinearLayout>`,
 };
 
+
+/** M20n：工作目录多级列表的树节点 */
+interface WsNode {
+  name: string;
+  rel: string;
+  kind: "dir" | "file";
+  layoutCount: number;
+  item: WsProject;
+  children: WsNode[];
+}
+
+/** 把「相对路径扁平列表」还原成树（后端按 DFS 顺序返回，rel 带 / 分隔） */
+function buildWsTree(items: WsProject[]): WsNode[] {
+  const root: WsNode = {
+    name: "",
+    rel: "",
+    kind: "dir",
+    layoutCount: 0,
+    item: null as unknown as WsProject,
+    children: [],
+  };
+  const map = new Map<string, WsNode>();
+  for (const it of items) {
+    const parts = it.rel.split("/").filter(Boolean);
+    const parentRel = parts.slice(0, Math.max(0, parts.length - 1)).join("/");
+    const parent = parentRel ? map.get(parentRel) ?? root : root;
+    const node: WsNode = {
+      name: it.name,
+      rel: it.rel,
+      kind: it.kind,
+      layoutCount: it.layoutCount,
+      item: it,
+      children: [],
+    };
+    map.set(it.rel, node);
+    parent.children.push(node);
+  }
+  return root.children;
+}
+
 const APP_VERSION = "1.13";
 const SCALE = 2; // 1dp = 2px
 
@@ -489,10 +527,50 @@ export function XmlEditor() {
   const [leftView, setLeftView] = useState<
     "parts" | "layers" | "ai" | "code" | "res" | "assets" | "settings" | "about"
   >("parts");
+  /* ===== M20m：图层锁定（锁定后画布点不中、不能拖动/上下移） ===== */
+  const [lockedPaths, setLockedPaths] = useState<Set<string>>(new Set());
+  const toggleLockPath = useCallback((path: string) => {
+    setLockedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+  /** 自己或任一祖先被锁定 → 视为锁定（路径形如 #0/1/2） */
+  const isPathLocked = useCallback(
+    (path: string) => {
+      let cur = path;
+      for (;;) {
+        if (lockedPaths.has(cur)) return true;
+        const i = cur.lastIndexOf("/");
+        if (i < 0) return false;
+        cur = cur.slice(0, i);
+      }
+    },
+    [lockedPaths],
+  );
+
   /* ===== M16i：工作目录 ===== */
   const [projectTab, setProjectTab] = useState<"workspace" | "current">("current");
   const [wsState, setWsState] = useState<WsInfo | null>(null);
   const [wsProjects, setWsProjects] = useState<WsProject[]>([]);
+  /* ===== M20n：工作目录多级树（默认全展开） ===== */
+  const wsTree = useMemo(() => buildWsTree(wsProjects), [wsProjects]);
+  const [wsOpen, setWsOpen] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    // 目录变化后默认把文件夹全展开（安卓工程层数不多，先让用户看到全貌）
+    setWsOpen(new Set(wsProjects.filter((p) => p.kind === "dir").map((p) => p.rel)));
+  }, [wsProjects]);
+  const toggleWsOpen = useCallback((rel: string) => {
+    setWsOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(rel)) next.delete(rel);
+      else next.add(rel);
+      return next;
+    });
+  }, []);
+
   const [wsBusy, setWsBusy] = useState(false);
   const [wsMsg, setWsMsg] = useState<string>("");
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -1306,6 +1384,64 @@ export function XmlEditor() {
     },
     [setXmlAndTrack],
   );
+
+  /** M20n：把树拍平成行（文件夹可折叠，缩进表示层级） */
+  const renderWsRows = (nodes: WsNode[], depth: number): React.ReactNode[] => {
+    const rows: React.ReactNode[] = [];
+    for (const n of nodes) {
+      const isDir = n.kind === "dir";
+      const open = wsOpen.has(n.rel);
+      rows.push(
+        <li key={n.rel + ":" + n.kind}>
+          <div className="axv-ws-row" style={{ paddingLeft: depth * 14 }}>
+            {isDir ? (
+              <button
+                className="axv-ws-caret"
+                title={open ? "折叠" : "展开"}
+                aria-label={open ? "折叠" : "展开"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleWsOpen(n.rel);
+                }}
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
+                  {open ? "expand_more" : "chevron_right"}
+                </span>
+              </button>
+            ) : (
+              <span className="axv-ws-caret" aria-hidden="true" />
+            )}
+            <button className="axv-ws-item" onClick={() => void openWsProject(n.item)} title={n.rel}>
+              <span className="msr axv-ws-item-icon" aria-hidden="true">
+                {isDir ? (open ? "folder_open" : "folder") : "description"}
+              </span>
+              <span className="axv-ws-item-main">
+                <span className="axv-ws-item-name">{n.name}</span>
+                <span className="axv-ws-item-sub">
+                  {isDir ? `${n.layoutCount} 个布局` : "单个 xml"}
+                </span>
+              </span>
+            </button>
+            {isDir && n.layoutCount > 0 ? (
+              <button
+                className="axv-ws-open"
+                title="打开这个文件夹里的主布局"
+                aria-label="打开项目"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void openWsProject(n.item);
+                }}
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>play_arrow</span>
+              </button>
+            ) : null}
+          </div>
+        </li>,
+      );
+      if (isDir && open && n.children.length > 0) rows.push(...renderWsRows(n.children, depth + 1));
+    }
+    return rows;
+  };
 
   /** 载入完整示例项目：布局 + 自带 drawable + values 一起换（合并语义：用户已有资源不会被覆盖） */
   const applySampleProject = useCallback(
@@ -2143,6 +2279,7 @@ const findResolved = findResolvedNode;
                   onDropWidget={onDropWidget}
                   onConstraintDraw={onConstraintDraw}
                   onGeometryChange={onGeometryChange}
+                  isLocked={isPathLocked}
                   scale={DPX}
                 />
               </div>
@@ -2407,6 +2544,8 @@ const findResolved = findResolvedNode;
                 onMove={onMoveSibling}
                 onRemove={onRemoveNode}
                 onDragMove={onDragMoveNode}
+                lockedPaths={lockedPaths}
+                onToggleLock={toggleLockPath}
               />
             </div>
           )}
@@ -2519,23 +2658,7 @@ const findResolved = findResolvedNode;
                   {wsBusy ? <div className="axv-ws-hint">正在读取…</div> : null}
 
                   {wsProjects.length > 0 ? (
-                    <ul className="axv-ws-list">
-                      {wsProjects.map((p) => (
-                        <li key={p.rel + p.kind}>
-                          <button className="axv-ws-item" onClick={() => void openWsProject(p)} title={p.rel}>
-                            <span className="msr axv-ws-item-icon" aria-hidden="true">
-                              {p.kind === "dir" ? "folder" : "description"}
-                            </span>
-                            <span className="axv-ws-item-main">
-                              <span className="axv-ws-item-name">{p.name}</span>
-                              <span className="axv-ws-item-sub">
-                                {p.kind === "dir" ? `项目 · ${p.layoutCount} 个布局` : "单个 xml"}
-                              </span>
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                    <ul className="axv-ws-list">{renderWsRows(wsTree, 0)}</ul>
                   ) : !wsBusy && (wsState?.mode === "native" || wsState?.custom) ? (
                     <div className="axv-ws-hint">
                       目录里还没有项目。把项目文件夹（内含 layout/*.xml）放到这个目录下，点刷新即可。
@@ -2652,23 +2775,7 @@ const findResolved = findResolvedNode;
                 </div>
               </div>
 
-              {/* 配色明细：把工具栏/背景/面板/标题/描述这些真用到的色值列出来 */}
-              <div className="axv-set-group">
-                <div className="axv-set-label">配色明细</div>
-                <div className="axv-token-list">
-                  {THEME_TOKEN_ORDER.map((k) => {
-                    const tokens = themeTokens(themePreset, theme);
-                    const val = tokens[k] ?? "";
-                    return (
-                      <div className="axv-token-row" key={k}>
-                        <span className="axv-token-dot" style={{ background: val }} />
-                        <span className="axv-token-name">{THEME_TOKEN_LABEL[k]}</span>
-                        <code className="axv-token-hex">{val.toUpperCase()}</code>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* M20m：设置面板不再列「配色明细」（用户要求去掉），配色方案卡片保留 */}
 
               {/* ===== 工作目录 ===== */}
               <div className="axv-set-group">

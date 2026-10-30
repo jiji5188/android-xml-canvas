@@ -1,5 +1,5 @@
 // components/LayerTree.tsx — 左侧滑面板「图层」页
-// 当前屏幕的节点树，支持：展开/折叠、选中、上下移、删除。
+// 当前屏幕的节点树，支持：展开/折叠、选中、上下移、删除、锁定（M20m）。
 //
 // M3d：拖拽排序（对标 Android Studio 的 Component Tree）
 //  - 拖到某行的**上 1/4**  → 成为该节点的上一个兄弟（移到兄弟层）
@@ -31,11 +31,15 @@ interface Props {
   onRemove: (path: string) => void;
   /** 把 fromPath 拖到目标位置（M3d）；不传则禁用拖拽 */
   onDragMove?: (fromPath: string, target: DropTarget) => void;
+  /** M20m：被锁定的节点路径（锁定后不能拖动/上下移/画布选中） */
+  lockedPaths?: Set<string>;
+  /** M20m：切换某个节点的锁定状态 */
+  onToggleLock?: (path: string) => void;
 }
 
 const DRAG_MIME = "application/x-axv-layer";
 
-export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDragMove }: Props) {
+export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDragMove, lockedPaths, onToggleLock }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragPath, setDragPath] = useState<string | null>(null);
   const [drop, setDrop] = useState<DropTarget | null>(null);
@@ -88,6 +92,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
     const open = !collapsed.has(n.path) && kids.length > 0;
     const myIndex = Number(n.path.split("/").pop());
     const isRoot = n.path === "#0";
+    const locked = lockedPaths?.has(n.path) ?? false;
     const isContainer = isContainerTag(n.tag);
     const zone = drop?.path === n.path ? drop.zone : null;
     const dragging = dragPath === n.path;
@@ -122,13 +127,14 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
             (dragging ? " dragging" : "") +
             (zone === "inside" ? " drop-inside" : "") +
             (zone === "before" ? " drop-before" : "") +
-            (zone === "after" ? " drop-after" : "")
+            (zone === "after" ? " drop-after" : "") +
+            (locked ? " locked" : "")
           }
           style={{ paddingLeft: 10 + depth * 14 }}
           onClick={() => onSelect(n.path)}
-          draggable={!!onDragMove && !isRoot}
+          draggable={!!onDragMove && !isRoot && !locked}
           onDragStart={(e) => {
-            if (!onDragMove || isRoot) return;
+            if (!onDragMove || isRoot || locked) return;
             e.stopPropagation();
             e.dataTransfer.setData(DRAG_MIME, n.path);
             e.dataTransfer.effectAllowed = "move";
@@ -164,8 +170,23 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
           <span className="axv-lt-tag">{n.tag.split(".").pop()}</span>
           <span className="axv-lt-label">{label(n)}</span>
           <span className="axv-lt-actions">
-            <button title="上移一层" aria-label="上移" disabled={isRoot || myIndex <= 0} onClick={(e) => { e.stopPropagation(); onMove(n.path, myIndex - 1); }}>↑</button>
-            <button title="下移一层" aria-label="下移" disabled={isRoot || myIndex >= siblingCount - 1} onClick={(e) => { e.stopPropagation(); onMove(n.path, myIndex + 1); }}>↓</button>
+            {onToggleLock ? (
+              <button
+                className={"axv-lt-lock" + (locked ? " on" : "")}
+                title={locked ? "解除锁定" : "锁定组件（锁定后画布点不中、不能拖动）"}
+                aria-label={locked ? "解锁" : "锁定"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleLock(n.path);
+                }}
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 15 }}>
+                  {locked ? "lock" : "lock_open"}
+                </span>
+              </button>
+            ) : null}
+            <button title="上移一层" aria-label="上移" disabled={isRoot || locked || myIndex <= 0} onClick={(e) => { e.stopPropagation(); onMove(n.path, myIndex - 1); }}>↑</button>
+            <button title="下移一层" aria-label="下移" disabled={isRoot || locked || myIndex >= siblingCount - 1} onClick={(e) => { e.stopPropagation(); onMove(n.path, myIndex + 1); }}>↓</button>
             <button title="删除" aria-label="删除" className="danger" disabled={isRoot} onClick={(e) => { e.stopPropagation(); onRemove(n.path); }}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>delete</span>
             </button>

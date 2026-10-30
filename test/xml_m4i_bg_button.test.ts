@@ -87,10 +87,10 @@ describe("M4i background 属性 → 画布绘制", () => {
     expect(s.backgroundImage).toBeUndefined();
   });
 
-  it("没写 background 的 Button 才用默认主色 #6750A4", () => {
+  it("没写 background 的 Button 才用默认中性底色 #E8E8EC", () => {
     const s = styleOf(`<Button ${A} android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="OK"/>`);
-    expect(s.backgroundColor).toBe("#6750A4");
-    expect(String(s.color).toUpperCase()).toBe("#FFFFFF");
+    expect(s.backgroundColor).toBe("#E8E8EC");
+    expect(String(s.color).toUpperCase()).toBe("#1D1B20");
   });
 
   it("app:backgroundTint 生效（MaterialButton 抠色）", () => {

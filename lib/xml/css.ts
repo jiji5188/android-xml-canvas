@@ -14,6 +14,17 @@ import { vectorToDataUrl } from "./vector-svg";
 
 const DP = (n: number, scale = 2) => n * scale;
 
+/**
+ * M20m：预览默认配色改为中性灰白。
+ * 以前所有未显式指定颜色的控件都套 Material 主色 #6750A4（紫），
+ * 用户要求预览里不要再出现紫色 —— 默认底色用浅灰，强调色用中灰。
+ */
+export const NEUTRAL_FILL = "#E8E8EC";
+export const NEUTRAL_ACCENT = "#757575";
+export const NEUTRAL_TRACK = "#E3E3E6";
+export const NEUTRAL_OUTLINE = "#8E8E93";
+export const NEUTRAL_INK = "#1D1B20";
+
 /** 勾选框里的白色对勾（画在 ::before 的 background-image 上） */
 export const CTL_CHECK_IMG =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E\")";
@@ -757,10 +768,10 @@ export function buildRenderModel(
       // Button/EditText 默认样式
       if (tag === "Button" || tag === "MaterialButton" || tag === "AppCompatButton") {
         // M4i：显式 background 优先（颜色 / shape 填色 / 渐变 / 位图），都没有才用默认主色。
-        // 以前是 style.backgroundColor = bg || "#6750A4"，会把 shape 的 solid 抹成灰色/默认色。
+        // 以前是 style.backgroundColor = bg || 主色紫，会把 shape 的 solid 抹成灰色/默认色。
         const tint = (attrs["backgroundTint"] as string) || "";
         if (tint && !bg) style.backgroundColor = tint;
-        if (!style.backgroundColor && !style.backgroundImage) style.backgroundColor = "#6750A4";
+        if (!style.backgroundColor && !style.backgroundImage) style.backgroundColor = NEUTRAL_FILL;
         // 文字色：显式 textColor > 按背景亮度自动反色（tc 有默认值不能直接拿来做判断）
         const tcRaw = (attrs["textColor"] as string) || "";
         const solidBg = typeof style.backgroundColor === "string" ? style.backgroundColor : "";
@@ -922,7 +933,7 @@ export function buildRenderModel(
         const secRatio = maxP > 0 ? Math.min(1, Math.max(0, ((attrs["secondaryProgress"] as number) || 0) / maxP)) : 0;
         (style as React.CSSProperties & Record<string, string>)["--axv-progress"] = String(ratio);
         (style as React.CSSProperties & Record<string, string>)["--axv-progress-color"] =
-          (attrs["indicatorColor"] as string) || (attrs["progressTint"] as string) || (attrs["tint"] as string) || "#6750A4";
+          (attrs["indicatorColor"] as string) || (attrs["progressTint"] as string) || (attrs["tint"] as string) || NEUTRAL_ACCENT;
         if (secRatio > ratio) {
           style.backgroundImage = `linear-gradient(to right, transparent 0 ${ratio * 100}%, #C9C0F0 ${ratio * 100}% ${secRatio * 100}%, transparent ${secRatio * 100}%)`;
         }
@@ -945,7 +956,7 @@ export function buildRenderModel(
         if (!w0 || w0 === "auto") style.width = `${DP(32, scale)}px`;
         if (!h0 || h0 === "auto") style.height = `${DP(32, scale)}px`;
         (style as React.CSSProperties & Record<string, string>)["--axv-progress-color"] =
-          (attrs["indicatorColor"] as string) || (attrs["progressTint"] as string) || (attrs["indeterminateTint"] as string) || "#6750A4";
+          (attrs["indicatorColor"] as string) || (attrs["progressTint"] as string) || (attrs["indeterminateTint"] as string) || NEUTRAL_ACCENT;
         (style as React.CSSProperties & Record<string, string>)["--axv-ring-w"] = `${DP(3, scale)}px`;
         progressRing = true;
       }
@@ -1035,8 +1046,8 @@ export function buildRenderModel(
         cs["--axv-ctl-thumb-d"] = `${DP(18, scale)}px`;
         cs["--axv-ctl-bw"] = "0px";
         // M11t：trackTint（轨道色）/ thumbTint（滑块色）优先于默认主题色
-        const tkOn = (attrs["trackTint"] as string) || "#6750A4";
-        const tkOff = (attrs["trackTint"] as string) || "#E0D9E3";
+        const tkOn = (attrs["trackTint"] as string) || NEUTRAL_ACCENT;
+        const tkOff = (attrs["trackTint"] as string) || NEUTRAL_TRACK;
         cs["--axv-ctl-bg"] = on ? tkOn : tkOff;
         cs["--axv-ctl-ring"] = "transparent";
         cs["--axv-ctl-img"] = "none";
@@ -1048,12 +1059,12 @@ export function buildRenderModel(
         cs["--axv-ctl-r"] = cls === "axv-radio" ? "50%" : `${DP(3, scale)}px`;
         cs["--axv-ctl-bw"] = `${DP(2, scale)}px`;
         // M11t：buttonTint 同时作用于勾选态填充与边框色
-        const bt = (attrs["buttonTint"] as string) || "#6750A4";
+        const bt = (attrs["buttonTint"] as string) || NEUTRAL_ACCENT;
         cs["--axv-ctl-bg"] = cls === "axv-radio" ? "#FFFFFF" : on ? bt : "#FFFFFF";
-        cs["--axv-ctl-ring"] = on ? bt : "#79747E";
+        cs["--axv-ctl-ring"] = on ? bt : NEUTRAL_OUTLINE;
         cs["--axv-ctl-img"] = on
           ? cls === "axv-radio"
-            ? "radial-gradient(circle, #6750A4 0 42%, transparent 45%)"
+            ? `radial-gradient(circle, ${NEUTRAL_ACCENT} 0 42%, transparent 45%)`
             : CTL_CHECK_IMG
           : "none";
         cs["--axv-ctl-thumb-x"] = "0px";
@@ -1094,10 +1105,10 @@ export function buildRenderModel(
       style["--axv-seek-pct"] = `${(ratio * 100).toFixed(2)}%`;
       style["--axv-seek-track-h"] = `${DP(4, scale)}px`;
       style["--axv-seek-thumb-d"] = `${DP(20, scale)}px`;
-      style["--axv-seek-color"] = (attrs["progressTint"] as string) || "#6750A4";
-      style["--axv-seek-track-bg"] = (attrs["trackTint"] as string) || "#E0D9E3";
+      style["--axv-seek-color"] = (attrs["progressTint"] as string) || NEUTRAL_ACCENT;
+      style["--axv-seek-track-bg"] = (attrs["trackTint"] as string) || NEUTRAL_TRACK;
       // M11t：SeekBar 的滑块色（thumbTint，否则用主题色）
-      style["--axv-seek-thumb"] = (attrs["thumbTint"] as string) || "#6750A4";
+      style["--axv-seek-thumb"] = (attrs["thumbTint"] as string) || NEUTRAL_ACCENT;
       // M11v：android:thumb 是图片（上传 res 后能解析成 data URL）就直接画图，颜色只做兜底
       const thumbImg = (attrs["thumb"] as string) || "";
       if (thumbImg.startsWith("data:")) {
@@ -1322,13 +1333,13 @@ export function buildRenderModel(
       style.height = `${DP(48, scale)}px`;
       style.fontSize = style.fontSize === "28px" || !style.fontSize ? `${DP(14, scale)}px` : style.fontSize;
       style.fontWeight = 500;
-      style.color = style.color ?? (attrs["checkedTab"] ? "#6750A4" : "#49454F");
-      if (attrs["checkedTab"]) style.boxShadow = `inset 0 -${DP(3, scale)}px 0 #6750A4`;
+      style.color = style.color ?? (attrs["checkedTab"] ? NEUTRAL_INK : "#49454F");
+      if (attrs["checkedTab"]) style.boxShadow = `inset 0 -${DP(3, scale)}px 0 ${NEUTRAL_INK}`;
     } else if (cls === "axv-fab" || cls === "axv-fab-ext") {
       // M16d：AppCompat 下 FAB 没有 Material 主题的色/阴影 → 灰底方角块（真机截图就是这样）
-      const fabBg = (attrs["backgroundTint"] as string) || (appcompat ? "#E8E8EC" : "#6750A4");
+      const fabBg = (attrs["backgroundTint"] as string) || NEUTRAL_FILL;
       style.backgroundColor = style.backgroundColor ?? fabBg;
-      style.color = style.color ?? (appcompat ? "#1D1B20" : "#FFFFFF");
+      style.color = style.color ?? "#1D1B20";
       style.flex = "0 0 auto";
       style.display = "inline-flex";
       style.alignItems = "center";

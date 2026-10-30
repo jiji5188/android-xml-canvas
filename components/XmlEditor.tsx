@@ -762,7 +762,8 @@ export function XmlEditor() {
     window.setTimeout(() => void refreshWorkspace(), 400);
   }, [refreshWorkspace]);
 
-  const [mobileTab, setMobileTab] = useState<"preview" | "xml">("preview");
+  // M30b：默认落在「XML 代码」tab
+  const [mobileTab, setMobileTab] = useState<"preview" | "xml">("xml");
 
 
   /** M6g：统一的缩放入口（带钳位 + 锚点）。anchor 传鼠标/双指中心的视口坐标 */
@@ -964,11 +965,11 @@ export function XmlEditor() {
     const apply = () => {
       const m = mq.matches;
       setIsMobile(m);
-      // 进移动端：两侧面板收起，默认看预览 tab
+      // 进移动端：两侧面板收起，默认看「XML 代码」tab（M30b）
       if (m) {
         setLeftOpen(false);
         setRightOpen(false);
-        setMobileTab("preview");
+        setMobileTab("xml");
       } else {
         setLeftOpen(true);
         setRightOpen(true);
@@ -2510,6 +2511,16 @@ const findResolved = findResolvedNode;
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>phone_android</span>
             预览
           </button>
+          <button
+            role="tab"
+            aria-selected={mobileTab === "xml"}
+            className={mobileTab === "xml" ? "on" : ""}
+            onClick={() => setMobileTab("xml")}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
+            XML 代码
+          </button>
+          {/* M30b：两个下拉框挪到两个 tab 按钮后面 */}
           <select
             className="axv-tb-select axv-tab-sample"
             title="载入完整示例项目（布局 + 自带图标/背景资源）"
@@ -2539,15 +2550,6 @@ const findResolved = findResolvedNode;
             </optgroup>
           </select>
           {fileSelect}
-          <button
-            role="tab"
-            aria-selected={mobileTab === "xml"}
-            className={mobileTab === "xml" ? "on" : ""}
-            onClick={() => setMobileTab("xml")}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
-            XML 代码
-          </button>
           </div>
         </div>
       )}
@@ -2604,24 +2606,6 @@ const findResolved = findResolvedNode;
         focusTick={focusTick}
         onCursorLine={onCodeCursorLine}
         onFormat={doFormat}
-        onSample={(v) => {
-          if (v.startsWith("blank:")) applyBlankTemplate(v.slice(6));
-          else applySampleProject(v);
-        }}
-        fileSelect={fileSelect}
-        onOpenFile={openProject}
-        onSave={() => void doSave()}
-        onExportRes={doDownloadResZip}
-        onRun={() => setRunOpen(true)}
-        hasRes={Boolean(resExtras) || Object.keys(generatedDrawables).length > 0}
-        nativeAvailable={nativeAvailable()}
-        workspaceLabel={workspaceLabel()}
-        onChooseWorkspace={() => {
-          if (chooseWorkspace()) {
-            setExportNote(`保存位置：${workspaceLabel()}`);
-            window.setTimeout(() => setExportNote(""), 2400);
-          }
-        }}
       />
 
       {/* 左侧滑面板（M25g：图标条 + 标题栏搬到 components/LeftRail.tsx） */}

@@ -88,6 +88,8 @@ interface Props {
   focusTick?: number;
   /** M2y：光标所在行（1 基）变化时回调，用于代码 → 画布反跳选中对应节点 */
   onCursorLine?: (line: number) => void;
+  /** M30b：格式化（重排缩进，保留注释），按钮放在符号快捷条最前面 */
+  onFormat?: () => void;
 }
 
 function lineFromCursor(ta: HTMLTextAreaElement): number {
@@ -128,7 +130,7 @@ export const SYMBOLS: { label: string; insert: string; back?: number; title?: st
   { label: "sp", insert: "sp", title: "字体尺寸单位" },
 ];
 
-export function XmlCodeEditor({ value, onChange, errors, className, focusLine, focusTick, onCursorLine }: Props) {
+export function XmlCodeEditor({ value, onChange, errors, className, focusLine, focusTick, onCursorLine, onFormat }: Props) {
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const preRef = useRef<HTMLPreElement | null>(null);
   const gutRef = useRef<HTMLDivElement | null>(null);
@@ -390,6 +392,19 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
       )}
       {/* M30：常用符号快捷条（横向滑，不抢编辑器焦点） */}
       <div className="axv-sym-bar" role="toolbar" aria-label="常用符号">
+        {/* M30b：格式化提到最前面（原底部工具条已删除） */}
+        {onFormat ? (
+          <button
+            type="button"
+            className="axv-sym-btn axv-sym-action"
+            title="重排缩进（保留注释）"
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.preventDefault()}
+            onClick={onFormat}
+          >
+            格式化
+          </button>
+        ) : null}
         {SYMBOLS.map((s) => (
           <button
             key={s.label}

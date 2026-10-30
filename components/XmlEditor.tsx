@@ -99,7 +99,7 @@ import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/paths";
 import { LS_KEY_XML, LS_KEY_HIST, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, lsGet, lsSet } from "@/lib/xml/storage";
 import { RunPreview } from "./RunPreview";
-import { ViewSettingsMenu } from "./ViewSettingsMenu";
+import { Toolbar } from "./Toolbar";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
@@ -3026,131 +3026,39 @@ const findResolved = findResolvedNode;
       />
 
       {/* 顶部工具栏（桌面端只占两侧面板之间的画布区，不重叠侧栏） */}
-      <div
-        className="axv-toolbar-v2"
-        style={
-          isMobile
-            ? undefined
-            : {
-                left: leftOpen ? 320 : 0,
-                right: rightOpen ? 320 : 0,
-                transition: "left 0.22s, right 0.22s",
-              }
-        }
-      >
-        {leftOpen ? null : (
-          <button
-            className="axv-tb-btn axv-tb-side-btn"
-            title="展开左侧面板"
-            aria-label="展开左侧面板"
-            aria-pressed={false}
-            onClick={() => setLeftOpen(true)}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>left_panel_open</span>
-          </button>
-        )}
-
-        {/* M6b：中间可横向滚动的工具栏区（左/右侧滑按钮各占一边，不悬浮不吸边） */}
-        <div className="axv-tb-scroll">
-          <div className="axv-tb-group">
-            {/* M6c/M10：设备 + 缩放收进这个按钮，并与其它工具同处一个工具组 */}
-            <ViewSettingsMenu deviceId={deviceId} onDevice={changeDevice} scale={scale} onScale={setScale} />
-            <button
-              className="axv-tb-btn"
-              title="撤销"
-            aria-label="撤销"
-            disabled={!canUndo}
-            onClick={undo}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>undo</span>
-          </button>
-          <button
-            className="axv-tb-btn"
-            title="重做"
-            aria-label="重做"
-            disabled={!canRedo}
-            onClick={redo}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>redo</span>
-          </button>
-          <button
-            className="axv-tb-btn"
-            title="保存（打开的文件写回原路径；新建文件选择保存位置）"
-            aria-label="保存"
-            onClick={() => void doSave()}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save</span>
-          </button>
-          <button className="axv-tb-btn" title="打开本地 XML 文件（也可直接把文件拖进来）" aria-label="打开 XML 文件" onClick={openProject}>
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>file_open</span>
-          </button>
-          <button className="axv-tb-btn" title="复制生成的 XML" aria-label="复制 XML" onClick={copyExportedXml}>
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>content_copy</span>
-          </button>
-          {resExtras || Object.keys(generatedDrawables).length > 0 ? (
-            <button className="axv-tb-btn" title="导出 res 目录（zip：布局 + 图标矢量 + shape/values）" aria-label="导出 res 包" onClick={doDownloadResZip}>
-              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>folder_zip</span>
-            </button>
-          ) : null}
-          <button
-            className="axv-tb-btn"
-            title="导出预览图（PNG / SVG）"
-            aria-label="导出预览图"
-            onClick={() => setImgExportOpen(true)}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>image</span>
-          </button>
-          {resExtras ? (
-            <button className="axv-tb-btn" title="清除已上传的 res 资源" aria-label="清除 res" onClick={clearRes}>
-              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>hide_image</span>
-            </button>
-          ) : null}
-          {nativeAvailable() ? (
-            <button
-              className="axv-tb-btn"
-              title={`保存位置：${workspaceLabel() || "默认目录"}（点击更换）`}
-              aria-label="更换保存位置"
-              onClick={() => {
-                if (chooseWorkspace()) {
-                  setExportNote("已更换保存位置（下次保存生效）");
-                  window.setTimeout(() => setExportNote(""), 2400);
-                }
-              }}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save_location</span>
-            </button>
-          ) : null}
-          <button
-            className="axv-tb-btn axv-tb-run"
-            title="运行调试：全屏交互预览，可点控件跳布局（Esc 退出）"
-            aria-label="运行"
-            onClick={() => setRunOpen(true)}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>play_arrow</span>
-          </button>
-          <button
-            className="axv-tb-btn"
-            title="格式化代码（重排缩进，保留注释）"
-            aria-label="格式化"
-            onClick={doFormat}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 22 }}>format_shapes</span>
-          </button>
-        </div>
-        </div>
-
-        {rightOpen ? null : (
-          <button
-            className="axv-tb-btn axv-tb-side-btn"
-            title="展开右侧属性面板"
-            aria-label="右侧属性面板"
-            aria-pressed={false}
-            onClick={() => setRightOpen(true)}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>right_panel_open</span>
-          </button>
-        )}
-      </div>
+      <Toolbar
+        isMobile={isMobile}
+        leftOpen={leftOpen}
+        rightOpen={rightOpen}
+        onOpenLeft={() => setLeftOpen(true)}
+        onOpenRight={() => setRightOpen(true)}
+        deviceId={deviceId}
+        onChangeDevice={changeDevice}
+        scale={scale}
+        onScale={setScale}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+        onSave={() => void doSave()}
+        onOpenFile={openProject}
+        onCopyXml={copyExportedXml}
+        showResZip={Boolean(resExtras) || Object.keys(generatedDrawables).length > 0}
+        onExportRes={doDownloadResZip}
+        onExportImage={() => setImgExportOpen(true)}
+        hasRes={Boolean(resExtras)}
+        onClearRes={clearRes}
+        nativeAvailable={nativeAvailable()}
+        workspaceLabel={workspaceLabel()}
+        onChangeWorkspace={() => {
+          if (chooseWorkspace()) {
+            setExportNote("已更换保存位置（下次保存生效）");
+            window.setTimeout(() => setExportNote(""), 2400);
+          }
+        }}
+        onRun={() => setRunOpen(true)}
+        onFormat={doFormat}
+      />
       </div>
 
       {runOpen ? (

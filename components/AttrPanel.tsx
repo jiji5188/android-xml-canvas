@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ResolvedNode } from "@/lib/xml/types";
 import type { ResourceExtras } from "@/lib/xml/resdir";
-import { editorFor, type AttrEditor } from "./attr-catalog";
+import { editorFor, defaultFor, type AttrEditor } from "./attr-catalog";
 import { getWidgetDoc, docAttrs, attrHint } from "@/lib/xml/widget-docs";
 import { officialDocUrl } from "@/lib/xml/widget-links";
 import { IconPickerPanel } from "./IconPickerPanel";
@@ -18,7 +18,7 @@ import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { specToCss } from "@/lib/xml/shape-gen";
 import { parseShapeSpec } from "@/lib/xml/shape-gen";
 
-interface Props {
+export interface AttrPanelProps {
   node: ResolvedNode;
   /** M16e：根 → 当前节点的层级链（ScrollView > LinearLayout > TextView） */
   chain?: { tag: string; path: string; id?: string }[];
@@ -125,7 +125,7 @@ export function AttrPanel({
   iconNames,
   onSaveShape,
   generatedXml,
-}: Props) {
+}: AttrPanelProps) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   /** M3g：当前正在选图标的属性 */
   const [iconPick, setIconPick] = useState<string | null>(null);
@@ -143,10 +143,15 @@ export function AttrPanel({
   const [tab, setTab] = useState<"attrs" | "docs">("attrs");
   /** 属性行展开的说明（点 ? 切换） */
   const [hintOpen, setHintOpen] = useState<string | null>(null);
+  /** M28：属性搜索 + 只看已修改（30+ 属性时靠肉眼找太累） */
+  const [q, setQ] = useState("");
+  const [onlyChanged, setOnlyChanged] = useState(false);
   // 换节点时清空草稿
   useEffect(() => {
     setDrafts({});
     setHintOpen(null);
+    setQ("");
+    setOnlyChanged(false);
   }, [node.path]);
 
   const commit = (name: string, value: string) => {
@@ -155,7 +160,20 @@ export function AttrPanel({
     onCommit(name, value);
   };
 
-  const rows = Object.entries(node.rawAttrs);
+  const allRows = Object.entries(node.rawAttrs);
+  /** 与默认值相同 = 没改过（没有默认值的属性只要存在就算改过） */
+  const isChanged = (name: string, value: string) => {
+    const def = defaultFor(name);
+    if (!def) return true;
+    return String(value) !== def;
+  };
+  const qq = q.trim().toLowerCase();
+  const rows = allRows.filter(([name, value]) => {
+    if (onlyChanged && !isChanged(name, String(value))) return false;
+    if (!qq) return true;
+    return name.toLowerCase().includes(qq) || String(value).toLowerCase().includes(qq);
+  });
+  const changedCount = allRows.filter(([n, v]) => isChanged(n, String(v))).length;
   const dNames = drawableNames(resExtras);
 
   /** M4b：颜色输入区新布局 ——
@@ -477,8 +495,7 @@ export function AttrPanel({
       </div>
 
       {tab === "docs" ? (
-        <div className="axv-doc-body">
-          <div className="axv-doc-title">
+        <div className="axv-doc-body">          <div className="axv-doc-title">
             {wdoc.title}
             <span className="axv-doc-cat">{wdoc.category}</span>
           </div>
@@ -527,8 +544,36 @@ export function AttrPanel({
         </div>
       ) : (
         <>
+      {/* M28：属性搜索 + 只看已修改 */}
+      {allRows.length > 0 ? (
+        <div className="axv-attr-filter">
+          <input
+            className="axv-attr-filter-input"
+            placeholder={`过滤 ${allRows.length} 个属性…`}
+            aria-label="过滤属性"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <button
+            type="button"
+            className={"axv-attr-filter-toggle" + (onlyChanged ? " is-on" : "")}
+            title="只显示与默认值不同的属性"
+            onClick={() => setOnlyChanged((v) => !v)}
+          >
+            只看已修改 {changedCount}
+          </button>
+          {qq ? (
+            <button type="button" className="axv-attr-filter-clear" title="清空搜索" onClick={() => setQ("")}>✕</button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="axv-attr-rows">
-        {rows.length === 0 && <div className="axv-attr-empty">该节点还没有属性</div>}
+        {allRows.length === 0 && <div className="axv-attr-empty">该节点还没有属性</div>}
+        {allRows.length > 0 && rows.length === 0 && (
+          <div className="axv-attr-empty">
+            {onlyChanged && !qq ? `没有已修改的属性（共 ${allRows.length} 个都是默认值）` : `没有匹配「${q}」的属性`}
+          </div>
+        )}
         {rows.map(([name, value]) => {
           const hint = attrHint(node.tag, name);
           const vstr = String(value);

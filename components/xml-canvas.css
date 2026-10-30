@@ -5479,3 +5479,61 @@ button.axv-sb-item:hover {
     max-width: 55%;
   }
 }
+/* M28：属性面板搜索 + 只看已修改 */
+.axv-attr-filter {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 12px 2px;
+  flex: 0 0 auto;
+}
+.axv-attr-filter-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 18%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--axv-on-surface) 5%, transparent);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  outline: none;
+}
+.axv-attr-filter-input:focus {
+  border-color: var(--axv-primary);
+}
+.axv-attr-filter-toggle {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 18%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: color-mix(in srgb, var(--axv-on-surface) 72%, transparent);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-attr-filter-toggle:hover {
+  color: var(--axv-on-surface);
+}
+.axv-attr-filter-toggle.is-on {
+  background: var(--axv-primary);
+  border-color: var(--axv-primary);
+  color: var(--axv-on-primary, #fff);
+}
+.axv-attr-filter-toggle:focus-visible {
+  outline: 2px solid var(--axv-primary);
+  outline-offset: 1px;
+}
+.axv-attr-filter-clear {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--axv-on-surface) 8%, transparent);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  cursor: pointer;
+}

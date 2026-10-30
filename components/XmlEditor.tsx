@@ -93,7 +93,6 @@ import { defaultFor } from "./attr-catalog";
 import { WidgetPalette } from "./WidgetPalette";
 import { ConstraintPanel, type SibOption } from "./ConstraintPanel";
 import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } from "@/lib/xml/autoconstrain";
-import { ResTree } from "./ResTree";
 import { ResImagePreview } from "./ResImagePreview";
 import { ShapeEditor } from "./ShapeEditor";
 import { GenAssetsPanel } from "./GenAssetsPanel";
@@ -2698,10 +2697,6 @@ const findResolved = findResolvedNode;
               }}
               resExtras={resExtras}
               generatedDrawables={generatedDrawables}
-              onPickResDir={() => resDirRef.current?.click()}
-              onOpenXml={openProject}
-              onClearRes={clearRes}
-              onOpenLayout={(_fileName, content) => setXmlAndTrack(content)}
               onOpenDrawable={(_rel, name, xml) => setResShape({ name, xml })}
               onPreviewImage={(rel, name, url) => setResImage({ rel, name, url })}
               resourceFragment={resourceFragment}

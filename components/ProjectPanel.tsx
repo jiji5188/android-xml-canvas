@@ -7,10 +7,10 @@
 // 树的展开状态、已加载的子项都放在组件内部：它们是纯 UI 状态，没必要塞回 XmlEditor。
 
 import { memo, useCallback, useEffect, useState, type ReactNode } from "react";
-import { ResTree } from "./ResTree";
 import type { BrowseEntry, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
 import type { WsInfo, WsProject } from "@/lib/xml/workspace";
 import type { ResourceExtras } from "@/lib/xml/resdir";
+import { resOpenAction } from "@/lib/xml/resource-open";
 import type { Project } from "@/lib/xml/multi-file";
 
 export interface ProjectPanelProps {
@@ -46,13 +46,10 @@ export interface ProjectPanelProps {
   appProject: Project;
   onSelectFile: (id: string) => void;
 
-  /** res 资源区 */
+  /** res 资源区（M30c：资源树已删，onOpenLayout/onPickResDir/onOpenXml/onClearRes 不再需要，
+   *  点击行为走 LazyTree 的 onOpenDrawable/onPreviewImage） */
   resExtras: ResourceExtras | null;
   generatedDrawables: Record<string, string>;
-  onPickResDir: () => void;
-  onOpenXml: () => void;
-  onClearRes: () => void;
-  onOpenLayout: (fileName: string, content: string) => void;
   onOpenDrawable: (rel: string, name: string, xml: string) => void;
   onPreviewImage: (rel: string, name: string, url: string) => void;
   resourceFragment: string;
@@ -68,8 +65,12 @@ function LazyTreeInner(props: {
   rev: number;
   currentFileName: string;
   onOpenEntry: (e: BrowseEntry) => void;
+  /** M30c：合并资源树的点击行为——drawable/mipmap 里的 xml 走绘制编辑器 / 图片预览 */
+  extras: ResourceExtras | null;
+  onOpenDrawable: (rel: string, name: string, xml: string) => void;
+  onPreviewImage: (rel: string, name: string, url: string) => void;
 }) {
-  const { source, rev, currentFileName, onOpenEntry } = props;
+  const { source, rev, currentFileName, onOpenEntry, extras, onOpenDrawable, onPreviewImage } = props;
   const [kids, setKids] = useState<Record<string, LoadState>>({});
   const [open, setOpen] = useState<Set<string>>(new Set([""]));
 
@@ -104,6 +105,29 @@ function LazyTreeInner(props: {
       return next;
     });
     if (kids[rel] === undefined) void load(rel);
+  };
+
+  /** M30c：原 axv-restree 的点击分流搬到这里
+   *  - res/drawable|mipmap 里的 xml：形状 → 绘制编辑器；vector → 图片预览
+   *  - 其余（layout / values / menu…）：照旧用编辑器打开（布局会在预览里画出来） */
+  const openEntry = async (e: BrowseEntry) => {
+    const path = e.rel.toLowerCase();
+    const inResDrawable = /(^|\/)(drawable|mipmap)(-[^/]*)?\//.test(path);
+    if (inResDrawable) {
+      const text = await source.readText(e.rel);
+      if (text) {
+        const action = resOpenAction(e.rel, text, extras);
+        if (action.kind === "drawable") {
+          onOpenDrawable(e.rel, action.name, action.xml);
+          return;
+        }
+        if (action.kind === "image" || action.kind === "vector") {
+          onPreviewImage(e.rel, action.name, action.url);
+          return;
+        }
+      }
+    }
+    onOpenEntry(e);
   };
 
   const renderRows = (rel: string, depth: number): ReactNode[] => {
@@ -156,7 +180,7 @@ function LazyTreeInner(props: {
             <button
               className="axv-ws-item"
               title={n.rel}
-              onClick={() => (isDir ? toggle(n.rel) : onOpenEntry(n))}
+              onClick={() => (isDir ? toggle(n.rel) : void openEntry(n))}
             >
               <span className="msr axv-ws-item-icon" aria-hidden="true">
                 {isDir ? (isOpen ? "folder_open" : "folder") : "description"}
@@ -180,9 +204,12 @@ function LazyTreeInner(props: {
 }
 
 /** M30：树只关心「换了项目 / 手动刷新 / 当前文件名」，父组件其它 state 变化不该让它重建。
- *  onOpenEntry 是内联箭头函数（每帧都是新引用），所以比较时跳过它。 */
+ *  onOpenEntry / onOpenDrawable / onPreviewImage 是内联箭头函数（每帧都是新引用），所以比较时跳过它们。 */
 const LazyTree = memo(LazyTreeInner, (a, b) =>
-  a.source === b.source && a.rev === b.rev && a.currentFileName === b.currentFileName,
+  a.source === b.source &&
+  a.rev === b.rev &&
+  a.currentFileName === b.currentFileName &&
+  a.extras === b.extras,
 );
 
 /* ---------------- 面板 ---------------- */
@@ -323,6 +350,16 @@ export function ProjectPanel(p: ProjectPanelProps) {
         </div>
       ) : (
         <>
+          {/* M30c：foot 放到 axv-proj-now 的前面 */}
+          <div className="axv-proj-now-foot">
+            <button className="axv-ws-link" onClick={() => void p.onOpenDir()}>
+              {tr("proj.openAnother", "打开其他项目…")}
+            </button>
+            <button className="axv-ws-link" onClick={() => p.onNewProject(p.projectName || "MyApp")}>
+              {tr("proj.new", "新建项目")}
+            </button>
+          </div>
+
           {/* M24：当前项目结构 */}
           <div className="axv-proj-now">
             <div className="axv-proj-now-head">
@@ -345,6 +382,9 @@ export function ProjectPanel(p: ProjectPanelProps) {
                 rev={p.projectRev}
                 currentFileName={p.currentFileName}
                 onOpenEntry={p.onOpenEntry}
+                extras={p.resExtras}
+                onOpenDrawable={p.onOpenDrawable}
+                onPreviewImage={p.onPreviewImage}
               />
             ) : (
               <ul className="axv-ws-list axv-proj-tree">
@@ -383,63 +423,21 @@ export function ProjectPanel(p: ProjectPanelProps) {
                 ))}
               </ul>
             )}
-            <div className="axv-proj-now-foot">
-              <button className="axv-ws-link" onClick={() => void p.onOpenDir()}>
-                {tr("proj.openAnother", "打开其他项目…")}
-              </button>
-              <button className="axv-ws-link" onClick={() => p.onNewProject(p.projectName || "MyApp")}>
-                {tr("proj.new", "新建项目")}
-              </button>
-            </div>
           </div>
 
-          {/* 资源操作按钮（横向排列，树形框上方） */}
-          <div style={{ display: "flex", gap: 8, padding: "8px 12px 6px" }}>
-            <button
-              className="axv-rail-mini-btn"
-              title="选择整个 res 目录（推荐：一次导入 drawable / values / mipmap）"
-              onClick={() => p.onPickResDir()}
-            >
-              📁 选择res目录
-            </button>
-            <button className="axv-rail-mini-btn" title="打开 XML 文件" onClick={p.onOpenXml}>
-              📄 打开xml
-            </button>
-            {p.resExtras ? (
-              <button
-                className="axv-rail-mini-btn axv-rail-mini-btn-danger"
-                style={{ flex: "0 0 auto" }}
-                title="清除已上传的 res 资源"
-                onClick={p.onClearRes}
-              >
-                ✖
-              </button>
-            ) : null}
+          {/* M30c：资源树（axv-restree）已删除——点击行为合并到上方 axv-ws-list axv-proj-tree 的行里；
+              原「选择res目录 / 打开xml」按钮行也删了（工具栏都有），
+              这里只保留手写 <resources> 的兜底输入框 */}
+          <div style={{ padding: "8px 12px 4px", fontSize: 12, color: "var(--axv-on-surface-variant)", lineHeight: 1.5 }}>
+            点上方结构树里的文件直接打开（drawable 形状 → 绘制编辑器，vector/图片 → 预览）。
           </div>
-          {p.resExtras?.tree ? (
-            <ResTree
-              tree={p.resExtras.tree}
-              layouts={p.resExtras.layouts}
-              extras={p.resExtras}
-              onOpenLayout={p.onOpenLayout}
-              onOpenDrawable={p.onOpenDrawable}
-              onPreviewImage={p.onPreviewImage}
-              generated={p.generatedDrawables}
+          <div className="axv-res-box">
+            <textarea
+              value={p.resourceFragment}
+              onChange={(e) => p.onResourceFragment(e.target.value)}
+              placeholder={'<resources>\n  <string name="app_name">My App</string>\n  <dimen name="margin_small">8dp</dimen>\n  <color name="primary">#FF0000</color>\n</resources>'}
             />
-          ) : (
-            <>
-              <div style={{ padding: "8px 12px 4px", fontSize: 12, color: "var(--axv-on-surface-variant)", lineHeight: 1.5 }}>
-                上传 res/ 目录后可在这里以树形浏览资源文件，点击 layout/*.xml 直接预览。
-              </div>
-              <div className="axv-res-box">
-                <textarea
-                  value={p.resourceFragment}
-                  onChange={(e) => p.onResourceFragment(e.target.value)}
-                  placeholder={'<resources>\n  <string name="app_name">My App</string>\n  <dimen name="margin_small">8dp</dimen>\n  <color name="primary">#FF0000</color>\n</resources>'}
-                />
-              </div>
-            </>
-          )}
+          </div>
         </>
       )}
     </div>

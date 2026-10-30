@@ -22,15 +22,13 @@ import { moveNodeRaw, scanElements } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml } from "@/lib/xml/lint";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
-import { buildResBundle, missingDrawables } from "@/lib/xml/bundle";
 import { sanitizeResName } from "@/lib/xml/resname";
 import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
 import { hasIcon } from "@/lib/xml/icon-vectors";
-import { makeZip, downloadBytes } from "@/lib/xml/zip";
-import { saveTextNative, workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative, writeTextNative } from "@/lib/xml/native-save";
-import { saveBundleAnywhere, pickXmlFile, type SaveFileSpec } from "@/lib/xml/save-as";
-import { writeHandleText } from "@/lib/xml/workspace-fs";
+import { workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative } from "@/lib/xml/native-save";
+import { pickXmlFile } from "@/lib/xml/save-as";
+import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import {
   THEME_PRESETS,
   DEFAULT_PRESET_ID,
@@ -2209,13 +2207,9 @@ const findResolved = findResolvedNode;
   /** M3g：导出 res 包（zip）：布局 + 图标矢量 + 上传的 shape/values 一起带走，
    *  避免别处打开工程时「找不到图标文件」。*/
   const doDownloadResZip = () => {
-    const layout = exportLayoutXml(xml, { mode: exportMode });
-    const entries = buildResBundle({ layoutXml: layout, generatedDrawables, extras: resExtrasAll });
-    const missing = missingDrawables(layout, entries);
-    const bytes = makeZip(entries);
-    downloadBytes(bytes, "res.zip");
+    const { count, missing } = downloadResZip(currentSaveInput());
     setExportNote(
-      `已导出 res.zip（${entries.length} 个文件）` +
+      `已导出 res.zip（${count} 个文件）` +
         (missing.length
           ? `；还有 ${missing.length} 个 @drawable 引用未覆盖：${missing.slice(0, 5).join(", ")}${missing.length > 5 ? " …" : ""}（需上传 res 目录补齐）`
           : "；布局里引用的图标资源已全部包含"),
@@ -2239,19 +2233,10 @@ const findResolved = findResolvedNode;
   /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续
    *  M2s：改成可视化检查面板（不再用 alert/confirm） */
   const doDownload = () => {
-    const body = exportLayoutXml(xml, { mode: exportMode });
-    if (saveTextNative("activity_main.xml", body, "text/xml")) {
-      setExportNote(`已保存 activity_main.xml（${workspaceLabel() || "工作目录"}）`);
-      window.setTimeout(() => setExportNote(""), 2400);
-      return;
-    }
-    const blob = new Blob([body], { type: "application/xml" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "activity_main.xml";
-    a.click();
-    URL.revokeObjectURL(a.href);
-    setExportNote(`已导出 activity_main.xml`);
+    const r = downloadLayout(currentSaveInput("activity_main.xml"));
+    setExportNote(
+      r.native ? `已保存 ${r.name}（${workspaceLabel() || "工作目录"}）` : `已导出 ${r.name}`,
+    );
     window.setTimeout(() => setExportNote(""), 2400);
   };
 
@@ -2264,58 +2249,41 @@ const findResolved = findResolvedNode;
     window.setTimeout(() => setExportNote(""), ms);
   };
 
-  /** 组装当前要落盘的文件（layout + 依赖） */
-  const buildSaveFiles = (name: string): SaveFileSpec[] => {
-    const body = exportLayoutXml(xml, { mode: exportMode });
-    const entries = buildResBundle({
-      layoutXml: body,
-      layoutName: name,
-      generatedDrawables,
-      extras: resExtrasAll,
-    });
-    return entries.map((e) => ({ path: e.path, text: e.text }));
-  };
+  /** 当前 xml → 落盘输入（四条保存路径共用） */
+  const currentSaveInput = (name?: string): SaveInput => ({
+    xml,
+    mode: exportMode,
+    name: name || saveOrigin?.name || activeFile(project)?.name || "activity_main.xml",
+    generatedDrawables,
+    extras: resExtrasAll,
+  });
 
   /** 写回原路径（含依赖资源） */
   const saveBack = async (): Promise<boolean> => {
     if (!saveOrigin) return false;
-    const name = saveOrigin.name || activeFile(project)?.name || "activity_main.xml";
-    const body = exportLayoutXml(xml, { mode: exportMode });
-    const deps = buildSaveFiles(name).filter((f) => !f.path.startsWith("layout/"));
-    let ok = false;
-    if (saveOrigin.kind === "native") ok = writeTextNative(saveOrigin.target, body);
-    else {
-      try {
-        ok = await writeHandleText(saveOrigin.handle, body);
-      } catch {
-        ok = false;
-      }
-    }
-    if (!ok) return false;
+    const input = currentSaveInput();
+    const r = await saveBackPure(input, saveOrigin);
+    if (!r.ok) return false;
     let depNote = "";
-    if (saveOrigin.kind === "native" && saveOrigin.target.startsWith("/") && deps.length > 0) {
-      // .../res/layout/activity_main.xml → res 根是上上级；其它情况就把同目录当 res 根
-      const dir = saveOrigin.target.slice(0, saveOrigin.target.lastIndexOf("/"));
-      const resRoot = dir.endsWith("/layout") ? dir.slice(0, dir.lastIndexOf("/")) : dir;
-      let n = 0;
-      for (const d of deps) if (writeTextNative(`${resRoot}/${d.path}`, d.text)) n++;
-      depNote = n > 0 ? `，依赖资源 ${n} 个` : `（${deps.length} 个依赖资源没写成，请检查目录权限）`;
-    } else if (deps.length > 0) {
-      depNote = `；另有 ${deps.length} 个依赖资源，可用「另存到文件夹」一起写出`;
+    if (r.depsWritten) depNote = `，依赖资源 ${r.depsWritten} 个`;
+    else if (r.depsTotal) {
+      depNote =
+        saveOrigin.kind === "native"
+          ? `（${r.depsTotal} 个依赖资源没写成，请检查目录权限）`
+          : `；另有 ${r.depsTotal} 个依赖资源，可用「另存到文件夹」一起写出`;
     }
-    flashNote(tr("save.doneBack", "已保存 {name}（原路径）", { name }) + depNote, 4200);
+    flashNote(tr("save.doneBack", "已保存 {name}（原路径）", { name: input.name }) + depNote, 4200);
     return true;
   };
 
   /** 另存：走系统文件夹选择器，按 res 结构整包写 */
   const saveAsTo = async (name: string) => {
-    const files = buildSaveFiles(name);
-    const r = await saveBundleAnywhere(files, name);
+    const r = await saveAsBundle(currentSaveInput(name));
     if (r.ok) {
       flashNote(
         tr("save.doneAs", "已保存到「{dir}」：{n} 个文件（含依赖资源）", {
           dir: r.label || "所选文件夹",
-          n: r.count ?? files.length,
+          n: r.count ?? 0,
         }),
         5000,
       );
@@ -2331,13 +2299,12 @@ const findResolved = findResolvedNode;
 
   const doSave = async () => {
     // A) 有来源 → 直接写回原路径
-    if (saveOrigin) {
+    if (saveOrigin && nextSaveAction(saveOrigin) === "back") {
       if (await saveBack()) return;
       flashNote(tr("save.backFailed", "写回原文件失败，改为另存到文件夹…"), 2600);
     }
     // B) 新建文件 → 先让用户确认文件名，再选文件夹
-    const def = activeFile(project)?.name || "activity_main.xml";
-    setSaveAsName(def);
+    setSaveAsName(activeFile(project)?.name || "activity_main.xml");
     setSaveAsOpen(true);
   };
 

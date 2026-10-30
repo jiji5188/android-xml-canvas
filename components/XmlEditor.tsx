@@ -85,7 +85,7 @@ import { AboutPanel } from "@/components/AboutPanel";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { ProjectPanel } from "@/components/ProjectPanel";
 import { loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
-import { XmlCodeEditor } from "./XmlCodeEditor";
+import { XmlCodeView } from "./XmlCodeView";
 import { AttrPanel } from "./AttrPanel";
 import { AddAttrModal } from "./AddAttrModal";
 import { defaultFor } from "./attr-catalog";
@@ -2530,84 +2530,38 @@ const findResolved = findResolvedNode;
         isPathLocked={isPathLocked}
       />
 
-      {/* XML 代码视图（tab 切过来的全屏编辑器） */}
-      {mobileTab === "xml" && (
-        <div
-          className="axv-mob-xml"
-          style={
-            isMobile
-              ? undefined
-              : {
-                  left: (leftOpen ? 320 : 0) + 16,
-                  right: (rightOpen ? 320 : 0) + 16,
-                  transition: "left 0.22s, right 0.22s",
-                }
+      {/* XML 代码视图（M25i：搬到 components/XmlCodeView.tsx） */}
+      <XmlCodeView
+        open={mobileTab === "xml"}
+        isMobile={isMobile}
+        leftOpen={leftOpen}
+        rightOpen={rightOpen}
+        value={xml}
+        onChange={onChangeXmlText}
+        errors={lints}
+        focusLine={focusLine}
+        focusTick={focusTick}
+        onCursorLine={onCodeCursorLine}
+        onFormat={doFormat}
+        onSample={(v) => {
+          if (v.startsWith("blank:")) applyBlankTemplate(v.slice(6));
+          else applySampleProject(v);
+        }}
+        fileSelect={fileSelect}
+        onOpenFile={openProject}
+        onSave={() => void doSave()}
+        onExportRes={doDownloadResZip}
+        onRun={() => setRunOpen(true)}
+        hasRes={Boolean(resExtras) || Object.keys(generatedDrawables).length > 0}
+        nativeAvailable={nativeAvailable()}
+        workspaceLabel={workspaceLabel()}
+        onChooseWorkspace={() => {
+          if (chooseWorkspace()) {
+            setExportNote(`保存位置：${workspaceLabel()}`);
+            window.setTimeout(() => setExportNote(""), 2400);
           }
-        >
-          <XmlCodeEditor
-            className="axv-code-fill"
-            value={xml}
-            onChange={onChangeXmlText}
-            errors={lints}
-            focusLine={focusLine}
-            focusTick={focusTick}
-            onCursorLine={onCodeCursorLine}
-          />
-          <div className="axv-mob-xml-tools">
-            <button className="axv-mob-tool-btn axv-ghost" onClick={doFormat} title="重排缩进（保留注释）">
-              格式化
-            </button>
-            <select
-              className="axv-tb-select"
-              title="载入完整示例项目（布局 + 自带图标/背景资源）"
-              value=""
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!v) return;
-                if (v.startsWith("blank:")) applyBlankTemplate(v.slice(6));
-                else applySampleProject(v);
-              }}
-            >
-              <option value="">示例项目…</option>
-              <optgroup label="完整示例（带资源）">
-                {SAMPLE_PROJECTS.map((p) => (
-                  <option key={p.key} value={p.key}>
-                    {p.name}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="新建（空白）">
-                {SAMPLE_BLANKS.map((b) => (
-                  <option key={b.key} value={`blank:${b.key}`}>
-                    {b.name}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-            {fileSelect}
-            <button className="axv-mob-tool-btn" onClick={openProject} title="打开本地 XML 文件">打开</button>
-            <button className="axv-mob-tool-btn" onClick={() => void doSave()} title="保存">保存</button>
-            {resExtras || Object.keys(generatedDrawables).length > 0 ? (
-              <button className="axv-mob-tool-btn" onClick={doDownloadResZip} title="导出 res 包（含图标）">res 包</button>
-            ) : null}
-            <button className="axv-mob-tool-btn axv-mob-run" onClick={() => setRunOpen(true)} title="运行调试">▶ 运行</button>
-            {nativeAvailable() ? (
-              <button
-                className="axv-mob-tool-btn"
-                title={`保存位置：${workspaceLabel() || "默认目录"}`}
-                onClick={() => {
-                  if (chooseWorkspace()) {
-                    setExportNote(`保存位置：${workspaceLabel()}`);
-                    window.setTimeout(() => setExportNote(""), 2400);
-                  }
-                }}
-              >
-                存至
-              </button>
-            ) : null}
-          </div>
-        </div>
-      )}
+        }}
+      />
 
       {/* 左侧滑面板（M25g：图标条 + 标题栏搬到 components/LeftRail.tsx） */}
       <LeftRail

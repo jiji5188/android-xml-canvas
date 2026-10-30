@@ -5267,3 +5267,48 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   color: var(--axv-on-surface);
   font-size: 12.5px;
 }
+
+/* ===== M24：当前项目面板（项目结构树） ===== */
+.axv-proj-now {
+  margin: 8px 10px 4px;
+  border: 1px solid var(--axv-outline-variant, #0000001f);
+  border-radius: 10px;
+  background: var(--axv-surface-2, #ffffff0f);
+  overflow: hidden;
+}
+.axv-proj-now-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--axv-outline-variant, #00000014);
+}
+.axv-proj-now-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  max-width: 52%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-proj-now-sub {
+  font-size: 11px;
+  opacity: 0.62;
+  margin-left: auto;
+}
+.axv-proj-now .axv-ws-list {
+  max-height: 42vh;
+  overflow: auto;
+}
+.axv-proj-now-foot {
+  display: flex;
+  gap: 12px;
+  padding: 6px 9px 8px;
+  border-top: 1px solid var(--axv-outline-variant, #00000010);
+}
+.axv-ws-item-static {
+  cursor: default;
+}
+.axv-newproj-input {
+  text-transform: none;
+}

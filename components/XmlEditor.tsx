@@ -48,6 +48,13 @@ import {
   type WsInfo,
   type WsProject,
 } from "@/lib/xml/workspace";
+import {
+  openProjectFolder,
+  restoreProjectFolder,
+  buildProjectTree,
+  mainLayoutEntry,
+  type ProjectNode,
+} from "@/lib/xml/project";
 import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
 import {
   activeFile,
@@ -556,9 +563,14 @@ export function XmlEditor() {
   );
 
   /* ===== M16i：工作目录 ===== */
-  const [projectTab, setProjectTab] = useState<"workspace" | "current">("current");
+  const [projectTab, setProjectTab] = useState<"projects" | "current">("current");
   const [wsState, setWsState] = useState<WsInfo | null>(null);
   const [wsProjects, setWsProjects] = useState<WsProject[]>([]);
+  /** M24：当前项目（项目名 + 结构树）。entries 只在内存里（带句柄/路径），rels 存 localStorage 供刷新后展示 */
+  const [activeProject, setActiveProject] = useState<{ name: string; entries: WsProject[] } | null>(null);
+  /** M24：新建项目对话框 */
+  const [newProjOpen, setNewProjOpen] = useState(false);
+  const [newProjName, setNewProjName] = useState("MyApp");
   /** M21：当前编辑内容的来源 —— 决定「保存」是写回原路还是弹选择器 */
   const [saveOrigin, setSaveOrigin] = useState<
     { kind: "native"; target: string; name: string } | { kind: "handle"; handle: unknown; name: string } | null
@@ -591,6 +603,24 @@ export function XmlEditor() {
       return next;
     });
   }, []);
+
+  /* M24：项目结构默认全展开（和项目列表一致，先给用户看全貌） */
+  useEffect(() => {
+    if (!activeProject) return;
+    const dirs = activeProject.entries.filter((e) => e.kind === "dir").map((e) => e.rel);
+    if (!dirs.length) return;
+    setWsOpen((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const d of dirs) {
+        if (!next.has(d)) {
+          next.add(d);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [activeProject]);
 
   const [wsBusy, setWsBusy] = useState(false);
   const [wsMsg, setWsMsg] = useState<string>("");
@@ -669,29 +699,74 @@ export function XmlEditor() {
     }
   }, [renderTheme]);
 
-  /* ===== M16i：工作目录（默认 /AndroidUIIDE/Project）===== */
-  const refreshWorkspace = useCallback(async () => {
-    setWsBusy(true);
+  /* ===== M16i：工作目录 ===== */
+  const wsSigRef = useRef<string>("");
+  const refreshWorkspace = useCallback(async (opts?: { quiet?: boolean }) => {
+    const quiet = !!opts?.quiet;
+    if (!quiet) setWsBusy(true);
     try {
       const info = await wsInfo();
       setWsState(info);
+      let next: WsProject[] = [];
       if (info.mode === "unsupported") {
-        setWsProjects([]);
+        next = [];
       } else if (info.mode === "native" || info.custom) {
-        setWsProjects(await wsListProjects());
-      } else {
-        setWsProjects([]);
+        next = await wsListProjects();
+      }
+      // M24：自动刷新时列表没变就不 setState（否则树会一直重建、展开状态被打断）
+      const sig = next.map((p) => `${p.kind}:${p.rel}:${p.layoutCount}`).join("|");
+      if (!quiet || sig !== wsSigRef.current) {
+        wsSigRef.current = sig;
+        setWsProjects(next);
       }
     } catch (e) {
-      setWsMsg(e instanceof Error ? e.message : String(e));
+      if (!quiet) setWsMsg(e instanceof Error ? e.message : String(e));
     } finally {
-      setWsBusy(false);
+      if (!quiet) setWsBusy(false);
     }
   }, []);
 
   useEffect(() => {
     if (leftView === "res" || leftView === "settings") void refreshWorkspace();
   }, [leftView, refreshWorkspace]);
+
+  /* M24：项目列表自动刷新 —— 面板开着就每 4s 扫一次；切回页面/窗口获得焦点时立即刷一次 */
+  useEffect(() => {
+    if (leftView !== "res") return;
+    const tick = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void refreshWorkspace({ quiet: true });
+    };
+    const timer = window.setInterval(tick, 4000);
+    const onVisible = () => {
+      if (!document.hidden) tick();
+    };
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [leftView, refreshWorkspace]);
+
+  /** M24：打开项目面板时恢复上次的项目结构（不弹窗，权限失效就当没有） */
+  useEffect(() => {
+    if (leftView !== "res") return;
+    if (activeProject) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const p = await restoreProjectFolder();
+        if (alive && p) setActiveProject(p);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [leftView, activeProject]);
 
   const pickCustomDir = useCallback(async () => {
     const ok = await wsPickCustom();
@@ -1466,6 +1541,76 @@ export function XmlEditor() {
     [setXmlAndTrack],
   );
 
+  /** M24：打开一个项目目录（弹系统选择器），成功后把结构树放进「当前项目」 */
+  const openProjectDir = useCallback(async () => {
+    setWsBusy(true);
+    setWsMsg("正在等你选项目文件夹…");
+    try {
+      const proj = await openProjectFolder();
+      if (!proj) {
+        setWsMsg(wsState?.mode === "unsupported" ? "当前环境不支持选目录，请用 Chrome / Edge 或 APK" : "已取消打开");
+        return;
+      }
+      setActiveProject(proj);
+      setProjectTab("current");
+      // 自动打开主布局
+      const main = mainLayoutEntry(proj.entries);
+      if (main) await openWsProject(main);
+      else setWsMsg(`已打开《${proj.name}》，但里面没找到 layout xml`);
+      window.setTimeout(() => void refreshWorkspace({ quiet: true }), 600);
+    } catch (e) {
+      setWsMsg(`打开项目失败：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setWsBusy(false);
+    }
+  }, [openWsProject, refreshWorkspace, wsState?.mode]);
+
+  /** M24：新建项目 —— 应用内建一个带 activity_main.xml 的空项目 */  const createNewProject = useCallback(
+    (rawName: string) => {
+      const name = rawName.trim() || "MyApp";
+      const tpl = [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        '<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"',
+        '    android:layout_width="match_parent"',
+        '    android:layout_height="match_parent"',
+        '    android:orientation="vertical">',
+        '',
+        '    <TextView',
+        '        android:layout_width="wrap_content"',
+        '        android:layout_height="wrap_content"',
+        `        android:text="Hello ${name}" />`,
+        '',
+        '</LinearLayout>',
+        '',
+      ].join("\n");
+      setProject((p) => ({ ...createProject(name, { name: "activity_main.xml", xml: tpl }), name }));
+      setXmlAndTrack(tpl);
+      setSelectedPath(null);
+      setSaveOrigin(null);
+      setActiveProject({ name, entries: [] });
+      setProjectTab("current");
+      setNewProjOpen(false);
+      setExportNote(`已新建项目《${name}》· 点「保存」选择落地目录`);
+      window.setTimeout(() => setExportNote(" "), 3600);
+    },
+    [setXmlAndTrack],
+  );
+
+  /** M24：重读当前项目结构（手动刷新） */
+  const refreshActiveProject = useCallback(async () => {
+    try {
+      const p = await restoreProjectFolder();
+      if (p) {
+        setActiveProject(p);
+        setWsMsg(`已刷新《${p.name}》`);
+      } else {
+        setWsMsg("刷新失败：项目目录权限可能已失效，请重新「打开」");
+      }
+    } catch (e) {
+      setWsMsg(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
   /** M20n：把树拍平成行（文件夹可折叠，缩进表示层级） */
   const renderWsRows = (nodes: WsNode[], depth: number): React.ReactNode[] => {
     const rows: React.ReactNode[] = [];
@@ -1520,6 +1665,55 @@ export function XmlEditor() {
         </li>,
       );
       if (isDir && open && n.children.length > 0) rows.push(...renderWsRows(n.children, depth + 1));
+    }
+    return rows;
+  };
+
+  /** M24：当前项目结构树（目录可折叠，xml 点一下就当打开） */
+  const renderProjRows = (nodes: ProjectNode[], depth: number): React.ReactNode[] => {
+    const rows: React.ReactNode[] = [];
+    for (const n of nodes) {
+      const isDir = n.kind === "dir";
+      const open = wsOpen.has(n.rel);
+      rows.push(
+        <li key={n.rel + ":" + n.kind}>
+          <div className="axv-ws-row" style={{ paddingLeft: depth * 14 }}>
+            {isDir ? (
+              <button
+                className="axv-ws-caret"
+                title={open ? "折叠" : "展开"}
+                aria-label={open ? "折叠" : "展开"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleWsOpen(n.rel);
+                }}
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
+                  {open ? "expand_more" : "chevron_right"}
+                </span>
+              </button>
+            ) : (
+              <span className="axv-ws-caret" aria-hidden="true" />
+            )}
+            <button
+              className="axv-ws-item"
+              title={n.rel}
+              onClick={() => (isDir ? toggleWsOpen(n.rel) : void openWsProject(n.item))}
+            >
+              <span className="msr axv-ws-item-icon" aria-hidden="true">
+                {isDir ? (open ? "folder_open" : "folder") : "description"}
+              </span>
+              <span className="axv-ws-item-main">
+                <span className="axv-ws-item-name">{n.name}</span>
+                <span className="axv-ws-item-sub">
+                  {isDir ? `${n.layoutCount} 个布局` : n.name.toLowerCase() === (currentFile?.name ?? "").toLowerCase() ? "正在编辑" : "布局文件"}
+                </span>
+              </span>
+            </button>
+          </div>
+        </li>,
+      );
+      if (isDir && open && n.children.length > 0) rows.push(...renderProjRows(n.children, depth + 1));
     }
     return rows;
   };
@@ -2822,26 +3016,26 @@ const findResolved = findResolvedNode;
           )}
           {leftView === "res" && (
             <div className="axv-rail-scroll">
-              {/* M16i：项目管理两个 tab（工作目录在前，当前项目在后；默认停在当前项目） */}
+              {/* M16i：项目管理两个 tab（M24：「工作目录」→「项目列表」） */}
               <div className="axv-proj-tabs">
                 <button
-                  className={"axv-proj-tab" + (projectTab === "workspace" ? " on" : "")}
+                  className={"axv-proj-tab" + (projectTab === "projects" ? " on" : "")}
                   onClick={() => {
-                    setProjectTab("workspace");
+                    setProjectTab("projects");
                     void refreshWorkspace();
                   }}
                 >
-                  工作目录
+                  {tr("proj.list", "项目列表")}
                 </button>
                 <button
                   className={"axv-proj-tab" + (projectTab === "current" ? " on" : "")}
                   onClick={() => setProjectTab("current")}
                 >
-                  当前项目
+                  {tr("proj.current", "当前项目")}
                 </button>
               </div>
 
-              {projectTab === "workspace" ? (
+              {projectTab === "projects" ? (
                 <div className="axv-ws-panel">
                   <div className="axv-ws-path">
                     <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
@@ -2864,11 +3058,24 @@ const findResolved = findResolvedNode;
                   </div>
 
                   <div className="axv-ws-actions">
-                    <button className="axv-rail-mini-btn" onClick={() => void pickCustomDir()}>
-                      选择目录
+                    <button
+                      className="axv-rail-mini-btn"
+                      onClick={() => void openProjectDir()}
+                      title="选一个项目文件夹（含 layout/*.xml）作为当前项目"
+                    >
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
+                      {tr("proj.open", "打开")}
                     </button>
-                    <button className="axv-rail-mini-btn" onClick={() => void useDefaultDir()} title="回到内置默认目录">
-                      恢复默认
+                    <button
+                      className="axv-rail-mini-btn"
+                      onClick={() => {
+                        setNewProjName(project.name || "MyApp");
+                        setNewProjOpen(true);
+                      }}
+                      title="新建一个带 activity_main.xml 的空项目"
+                    >
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
+                      {tr("proj.new", "新建项目")}
                     </button>
                   </div>
 
@@ -2886,7 +3093,9 @@ const findResolved = findResolvedNode;
                     </div>
                   ) : null}
                   {wsState?.mode === "web" && !wsState.custom ? (
-                    <div className="axv-ws-hint">点「选择目录」授权一个文件夹，授权会被记住，下次打开不用再选。</div>
+                    <div className="axv-ws-hint">
+                      点「打开」授权一个项目文件夹，授权会被记住，下次打开不用再选。
+                    </div>
                   ) : null}
                   {wsState?.permission === "prompt" ? (
                     <div className="axv-ws-warn">
@@ -2911,6 +3120,83 @@ const findResolved = findResolvedNode;
                 </div>
               ) : (
                 <>
+                  {/* M24：当前项目结构 */}
+                  <div className="axv-proj-now">
+                    <div className="axv-proj-now-head">
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>work</span>
+                      <b className="axv-proj-now-name" title={activeProject?.name || project.name}>
+                        {activeProject?.name || project.name || tr("proj.untitled", "未命名项目")}
+                      </b>
+                      <span className="axv-proj-now-sub">
+                        {activeProject && activeProject.entries.length > 0
+                          ? `${activeProject.entries.filter((e) => e.kind === "file").length} 个文件`
+                          : `${project.files.length} 个布局`}
+                      </span>
+                      <button
+                        className="axv-ws-mini"
+                        title={tr("proj.refresh", "刷新项目结构")}
+                        onClick={() => void refreshActiveProject()}
+                      >
+                        <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
+                      </button>
+                    </div>
+                    {activeProject && activeProject.entries.length > 0 ? (
+                      <ul className="axv-ws-list axv-proj-tree">
+                        {renderProjRows(buildProjectTree(activeProject.entries), 0)}
+                      </ul>
+                    ) : (
+                      <ul className="axv-ws-list axv-proj-tree">
+                        <li>
+                          <div className="axv-ws-row" style={{ paddingLeft: 0 }}>
+                            <span className="axv-ws-caret" aria-hidden="true" />
+                            <span className="axv-ws-item axv-ws-item-static">
+                              <span className="msr axv-ws-item-icon" aria-hidden="true">folder_open</span>
+                              <span className="axv-ws-item-main">
+                                <span className="axv-ws-item-name">layout/</span>
+                                <span className="axv-ws-item-sub">{project.files.length} 个布局</span>
+                              </span>
+                            </span>
+                          </div>
+                        </li>
+                        {project.files.map((f) => (
+                          <li key={f.id}>
+                            <div className="axv-ws-row" style={{ paddingLeft: 14 }}>
+                              <span className="axv-ws-caret" aria-hidden="true" />
+                              <button
+                                className="axv-ws-item"
+                                onClick={() => selectFile(f.id)}
+                                title={f.name}
+                              >
+                                <span className="msr axv-ws-item-icon" aria-hidden="true">description</span>
+                                <span className="axv-ws-item-main">
+                                  <span className="axv-ws-item-name">
+                                    {f.id === project.activeId ? "● " : ""}
+                                    {f.name}
+                                  </span>
+                                  <span className="axv-ws-item-sub">布局文件</span>
+                                </span>
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <div className="axv-proj-now-foot">
+                      <button className="axv-ws-link" onClick={() => void openProjectDir()}>
+                        {tr("proj.openAnother", "打开其他项目…")}
+                      </button>
+                      <button
+                        className="axv-ws-link"
+                        onClick={() => {
+                          setNewProjName(project.name || "MyApp");
+                          setNewProjOpen(true);
+                        }}
+                      >
+                        {tr("proj.new", "新建项目")}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* 资源操作按钮（横向排列，树形框上方） */}
                   <div style={{ display: "flex", gap: 8, padding: "8px 12px 6px" }}>
                 <button
@@ -3478,6 +3764,51 @@ const findResolved = findResolvedNode;
               </button>
               <button className="axv-set-btn axv-saveas-ok" onClick={() => void confirmSaveAs()}>
                 {tr("save.confirm", "选择文件夹并保存")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* M24：新建项目对话框 */}
+      {newProjOpen ? (
+        <div
+          className="axv-saveas-mask"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setNewProjOpen(false);
+          }}
+        >
+          <div className="axv-saveas-card">
+            <div className="axv-saveas-title">{tr("proj.newTitle", "新建项目")}</div>
+            <div className="axv-saveas-hint">
+              {tr(
+                "proj.newHint",
+                "会建一个空项目（layout/activity_main.xml）。建好后点「保存」选一个文件夹，就能落到磁盘上。",
+              )}
+            </div>
+            <label className="axv-saveas-field">
+              <span>{tr("proj.newName", "项目名")}</span>
+              <input
+                className="axv-saveas-input axv-newproj-input"
+                value={newProjName}
+                autoFocus
+                spellCheck={false}
+                placeholder="MyApp"
+                onChange={(e) => setNewProjName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") createNewProject(newProjName);
+                  if (e.key === "Escape") setNewProjOpen(false);
+                }}
+              />
+            </label>
+            <div className="axv-saveas-btns">
+              <button className="axv-set-btn" onClick={() => setNewProjOpen(false)}>
+                {tr("save.cancel", "取消")}
+              </button>
+              <button className="axv-set-btn axv-saveas-ok axv-newproj-ok" onClick={() => createNewProject(newProjName)}>
+                {tr("proj.newOk", "创建项目")}
               </button>
             </div>
           </div>

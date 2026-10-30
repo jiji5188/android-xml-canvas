@@ -63,6 +63,8 @@ export function fsAccessSupported(): boolean {
 const DB_NAME = "axv.fs";
 const STORE = "handles";
 const KEY = "workspace";
+/** M24：当前项目目录的句柄（和「工作目录」分开存，别互相覆盖） */
+const KEY_PROJECT = "project";
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -134,6 +136,33 @@ export async function restoreWorkspace(): Promise<DirHandle | null> {
 export async function forgetWorkspace(): Promise<void> {
   try {
     await idbDel(KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/* ---------- M24：当前项目目录句柄 ---------- */
+
+export async function saveProjectDir(dir: unknown): Promise<void> {
+  try {
+    await idbSet(KEY_PROJECT, dir);
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function restoreProjectDir(): Promise<DirHandle | null> {
+  if (!fsAccessSupported()) return null;
+  try {
+    return await idbGet<DirHandle>(KEY_PROJECT);
+  } catch {
+    return null;
+  }
+}
+
+export async function forgetProjectDir(): Promise<void> {
+  try {
+    await idbDel(KEY_PROJECT);
   } catch {
     /* ignore */
   }

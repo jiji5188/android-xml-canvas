@@ -1,13 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.jiji.axv"
     android:versionCode="18"
-    android:versionName="1.13">
+    android:versionName="1.14">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- M16i：默认工作目录在存储根下 /AndroidUIIDE/Project，Android 11+ 需要「所有文件访问」 -->
+    <!-- M16i锛氶粯璁ゅ伐浣滅洰褰曞湪瀛樺偍鏍逛笅 /AndroidUIIDE/Project锛孉ndroid 11+ 闇€瑕併€屾墍鏈夋枃浠惰闂€?-->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" xmlns:tools="http://schemas.android.com/tools" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />

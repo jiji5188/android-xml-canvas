@@ -34,7 +34,6 @@ import { writeHandleText } from "@/lib/xml/workspace-fs";
 import {
   THEME_PRESETS,
   DEFAULT_PRESET_ID,
-  themeTokens,
   applyThemeToDom,
   type ThemeMode,
 } from "@/lib/xml/theme-presets";
@@ -78,7 +77,10 @@ import { ExportImageModal } from "./ExportImageModal";
 import type { ExportTarget } from "@/lib/xml/export-image";
 import { XmlCanvas } from "./XmlCanvas";
 import CanvasBoundary from "@/components/CanvasBoundary";
-import { LANG_OPTIONS, loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
+import { APP_VERSION } from "@/lib/version";
+import { AboutPanel } from "@/components/AboutPanel";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
 import { XmlCodeEditor } from "./XmlCodeEditor";
 import { AttrPanel } from "./AttrPanel";
 import { AddAttrModal } from "./AddAttrModal";
@@ -100,8 +102,7 @@ import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
 import { readableOn, deviceById } from "@/lib/xml/theme";
-import { DEFAULT_RENDER_THEME, RENDER_THEMES, type RenderTheme } from "@/lib/xml/theme";
-import { CREDITS, UPSTREAM, PROJECT_NAME, PROJECT_TAGLINE } from "@/lib/xml/credits";
+import { DEFAULT_RENDER_THEME, type RenderTheme } from "@/lib/xml/theme";
 
 const SAMPLES: Record<string, string> = {
   /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
@@ -400,7 +401,6 @@ function buildWsTree(items: WsProject[]): WsNode[] {
   return root.children;
 }
 
-const APP_VERSION = "1.13";
 const SCALE = 2; // 1dp = 2px
 
 export function XmlEditor() {
@@ -3254,255 +3254,29 @@ const findResolved = findResolvedNode;
           )}
 
           {leftView === "settings" && (
-            <div className="axv-rail-scroll">
-              {/* ===== 外观：预设配色方案 ===== */}
-              <div className="axv-set-group">
-                <div className="axv-set-label">{tr("set.theme", "配色方案")}</div>
-                <div className="axv-theme-grid">
-                  {THEME_PRESETS.map((p) => {
-                    const t = themeTokens(p.id, theme);
-                    const on = p.id === themePreset;
-                    return (
-                      <button
-                        key={p.id}
-                        className={"axv-theme-card" + (on ? " on" : "")}
-                        onClick={() => setThemePreset(p.id)}
-                        title={p.note}
-                      >
-                        <span
-                          className="axv-theme-swatch"
-                          style={{
-                            background: `linear-gradient(135deg, ${t.primary}, ${t.toolbarBg})`,
-                            borderColor: t.primary,
-                          }}
-                        >
-                          <span style={{ background: t.panelBg }} />
-                        </span>
-                        <span className="axv-theme-name">{p.name}</span>
-                        {on ? <span className="msr axv-theme-check" aria-hidden="true">check</span> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="axv-set-seg" style={{ marginTop: 8 }}>
-                  <button
-                    className={"axv-set-seg-btn" + (theme === "light" ? " on" : "")}
-                    onClick={() => setTheme("light")}
-                  >
-                    {tr("set.themeLight", "浅色")}
-                  </button>
-                  <button
-                    className={"axv-set-seg-btn" + (theme === "dark" ? " on" : "")}
-                    onClick={() => setTheme("dark")}
-                  >
-                    {tr("set.themeDark", "深色")}
-                  </button>
-                </div>
-                <div className="axv-set-hint">
-                  {THEME_PRESETS.find((p) => p.id === themePreset)?.note}。配色只作用于编辑器界面，不影响导出的布局。
-                </div>
-              </div>
-
-              {/* M20m：设置面板不再列「配色明细」（用户要求去掉），配色方案卡片保留 */}
-
-              {/* ===== M23：界面语言 ===== */}
-              <div className="axv-set-group">
-                <div className="axv-set-label">{tr("set.lang", "界面语言")}</div>
-                <select
-                  className="axv-tb-select axv-lang-select"
-                  value={langPref}
-                  aria-label={tr("set.lang", "界面语言")}
-                  onChange={(e) => setLangPref(e.target.value as LangPref)}
-                >
-                  {LANG_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.value === "auto" ? `${o.label}（${o.native}）` : o.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="axv-set-hint">{tr("set.langHint", "默认跟随系统语言；切换只影响编辑器界面文字，不影响布局内容。")}</div>
-              </div>
-
-              {/* ===== 工作目录 ===== */}
-              <div className="axv-set-group">
-                <div className="axv-set-label">{tr("set.workspace", "工作目录")}</div>
-                <div className="axv-set-kv">
-                  <span>当前</span>
-                  <b title={wsState?.label || ""}>
-                    {wsState?.mode === "native"
-                      ? wsState.label || "AndroidUIIDE/Project"
-                      : wsState?.mode === "unsupported"
-                        ? "不支持（请用 Chrome/Edge 或 APK）"
-                        : wsState?.custom
-                          ? wsState.label
-                          : "未授权目录"}
-                  </b>
-                </div>
-                {wsState?.defaultPath ? (
-                  <div className="axv-set-kv">
-                    <span>默认</span>
-                    <b className="axv-set-mono">{wsState.defaultPath}</b>
-                  </div>
-                ) : null}
-                <div className="axv-set-btns">
-                  <button className="axv-set-btn" onClick={() => void pickCustomDir()}>
-                    <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>folder_open</span>
-                    选择目录
-                  </button>
-                  <button className="axv-set-btn" onClick={() => void useDefaultDir()}>
-                    <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>settings_backup_restore</span>
-                    恢复默认
-                  </button>
-                </div>
-                {wsState?.mode === "native" && wsState.allFiles === false ? (
-                  <button className="axv-set-btn" onClick={() => wsRequestAllFiles()}>
-                    <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>shield</span>
-                    开启「所有文件访问」（默认目录在存储根下，必须开）
-                  </button>
-                ) : null}
-                <div className="axv-set-hint">
-                  默认目录：APK 是 <code>/AndroidUIIDE/Project</code>；网页版由你授权一个文件夹（授权会记住）。
-                  自定义目录失效时会自动回落到默认目录，两者都不会留空。
-                </div>
-              </div>
-
-              <div className="axv-set-group">
-                <div className="axv-set-label">{tr("set.device", "渲染设备")}</div>
-                <div className="axv-set-seg">
-                  {RENDER_THEMES.map((t) => (
-                    <button
-                      key={t.id}
-                      className={"axv-set-seg-btn" + (renderTheme === t.id ? " on" : "")}
-                      onClick={() => setRenderTheme(t.id)}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="axv-set-hint">
-                  {RENDER_THEMES.find((t) => t.id === renderTheme)?.hint}
-                </div>
-              </div>
-
-              <div className="axv-set-group">
-                <div className="axv-set-label">{tr("set.preview", "预览")}</div>
-                <label className="axv-set-row">
-                  <span>显示系统状态栏 / 导航栏</span>
-                  <input
-                    type="checkbox"
-                    checked={showSystemBars}
-                    onChange={(e) => setShowSystemBars(e.target.checked)}
-                  />
-                </label>
-                <label className="axv-set-row">
-                  <span>控件提示（缺资源红框等）</span>
-                  <input
-                    type="checkbox"
-                    checked={showIssues}
-                    onChange={(e) => setShowIssues(e.target.checked)}
-                  />
-                </label>
-              </div>
-
-              <div className="axv-set-group">
-                <div className="axv-set-label">{tr("set.data", "数据")}</div>
-                <div className="axv-set-hint">
-                  布局、资源与生成的图标都自动存在本机浏览器（localStorage），关页面不丢。
-                </div>
-                <button className="axv-set-btn" onClick={saveProject}>
-                  <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>save</span>
-                  立即导出当前 XML
-                </button>
-                <button
-                  className="axv-set-btn axv-set-btn-danger"
-                  onClick={() => {
-                    if (!window.confirm("清空本机所有缓存（布局 / 资源 / 生成的图标 / 文件列表）？此操作不可撤销。")) return;
-                    try {
-                      Object.keys(window.localStorage)
-                        .filter((k) => k.startsWith("axv."))
-                        .forEach((k) => window.localStorage.removeItem(k));
-                    } catch {
-                      /* ignore */
-                    }
-                    window.location.reload();
-                  }}
-                >
-                  <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>delete</span>
-                  清空本机缓存并重启
-                </button>
-              </div>
-            </div>
+            <SettingsPanel
+              tr={tr}
+              themePreset={themePreset}
+              onThemePreset={setThemePreset}
+              theme={theme}
+              onTheme={setTheme}
+              langPref={langPref}
+              onLangPref={setLangPref}
+              wsState={wsState}
+              onPickDir={() => void pickCustomDir()}
+              onUseDefault={() => void useDefaultDir()}
+              onRequestAllFiles={() => wsRequestAllFiles()}
+              renderTheme={renderTheme}
+              onRenderTheme={setRenderTheme}
+              showSystemBars={showSystemBars}
+              onShowSystemBars={setShowSystemBars}
+              showIssues={showIssues}
+              onShowIssues={setShowIssues}
+              onSaveXml={saveProject}
+            />
           )}
 
-          {leftView === "about" && (
-            <div className="axv-rail-scroll">
-              <div className="axv-about-hero">
-                {/* M16g：项目 logo（public/logo.svg，也是应用图标） */}
-                <img
-                  className="axv-about-logo"
-                  src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/logo.svg`}
-                  alt=""
-                  width={44}
-                  height={44}
-                />
-                <div>
-                  <div className="axv-about-name">{PROJECT_NAME}</div>
-                  <div className="axv-about-ver">版本 {APP_VERSION}</div>
-                </div>
-              </div>
-              <div className="axv-about-desc">
-                {PROJECT_TAGLINE}
-                支持 ConstraintLayout 约束求解、shape / selector / vector 资源、图标生成与 res 打包导出。
-              </div>
-
-              {/* M16f：项目来源 + 开源致谢（列表数据在 lib/xml/credits.ts，跟 README 同一口径） */}
-              <div className="axv-set-group">
-                <div className="axv-set-label">{tr("set.projectRes", "项目资源")}</div>
-                <div className="axv-credit-upstream">
-                  本项目由 <b>{UPSTREAM.name}</b>（{UPSTREAM.license}，作者 {UPSTREAM.by}）拓展而来。
-                  {UPSTREAM.role}
-                  <a href={UPSTREAM.url} target="_blank" rel="noreferrer noopener">
-                    查看上游仓库
-                  </a>
-                </div>
-              </div>
-
-              <div className="axv-set-group">
-                <div className="axv-set-label">{tr("set.credits", "鸣谢 / 开源组件")}</div>
-                <div className="axv-set-hint" style={{ marginBottom: 8 }}>
-                  这个编辑器能跑到今天，靠的是下面这些开源项目与作者的分享。在此致谢。
-                </div>
-                <ul className="axv-credit-list">
-                  {CREDITS.map((c) => (
-                    <li key={c.name}>
-                      <a href={c.url} target="_blank" rel="noreferrer noopener">
-                        {c.name}
-                      </a>
-                      <span className="axv-credit-by">{c.by}</span>
-                      <span className="axv-credit-lic">{c.license}</span>
-                      <div className="axv-credit-role">{c.role}</div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="axv-set-group">
-                <div className="axv-set-label">{tr("set.shortcuts", "快捷键")}</div>
-                <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>Z</kbd><span>撤销</span></div>
-                <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd><span>重做</span></div>
-                <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>F</kbd><span>代码内查找</span></div>
-                <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>滚轮</kbd><span>缩放画布</span></div>
-                <div className="axv-about-kv"><kbd>Ctrl</kbd>+<kbd>0</kbd><span>缩放复位</span></div>
-                <div className="axv-about-kv"><kbd>Delete</kbd><span>删除选中控件</span></div>
-              </div>
-              <div className="axv-set-group">
-                <div className="axv-set-label">{tr("set.notes", "说明")}</div>
-                <div className="axv-set-hint">
-                  渲染为近似实现，不是 aapt / Android 运行时；个别属性（自定义 View、动画、第三方库）
-                  只做占位。最终效果以真机为准。
-                </div>
-              </div>
-            </div>
-          )}
+          {leftView === "about" && <AboutPanel version={APP_VERSION} tr={tr} />}
         </div>
       </aside>
 

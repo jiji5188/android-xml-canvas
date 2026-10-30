@@ -366,7 +366,7 @@
 .axv-zoom-hud {
   position: fixed;
   left: 50%;
-  bottom: 28px;
+  bottom: 44px;
   transform: translateX(-50%);
   z-index: 5;
   padding: 4px 10px;
@@ -1188,7 +1188,7 @@
 }
 .axv-pp-foot {
   flex: 0 0 auto;
-  padding: 8px 14px;
+  padding: 8px 14px 36px 14px;
   font-size: 11px;
   color: var(--axv-on-surface-variant);
   border-top: 1px solid rgba(0, 0, 0, 0.06);
@@ -5361,3 +5361,121 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   animation: axv-spin 0.7s linear infinite;
 }
 @keyframes axv-spin { to { transform: rotate(360deg); } }
+
+/* ===== M27：底部状态条 ===== */
+.axv-appstatus {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  z-index: 7;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--axv-on-surface);
+  background: color-mix(in srgb, var(--axv-on-surface) 6%, var(--axv-surface));
+  backdrop-filter: blur(8px);
+  border-top: 1px solid color-mix(in srgb, var(--axv-on-surface) 14%, transparent);
+  user-select: none;
+}
+.axv-sb-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 45%;
+}
+.axv-sb-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.axv-sb-src {
+  opacity: 0.55;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+.axv-sb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 35%, transparent);
+  flex: 0 0 auto;
+}
+.axv-sb-dot.on {
+  background: #ffb300;
+  border-color: #ffb300;
+  box-shadow: 0 0 0 3px #ffb30021;
+}
+.axv-sb-gap {
+  flex: 1 1 auto;
+}
+.axv-sb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  opacity: 0.82;
+}
+button.axv-sb-item {
+  cursor: pointer;
+}
+button.axv-sb-item:hover {
+  background: color-mix(in srgb, var(--axv-on-surface) 10%, transparent);
+  opacity: 1;
+}
+.axv-sb-item:focus-visible {
+  outline: 2px solid var(--axv-primary);
+  outline-offset: 1px;
+}
+.axv-sb-issue {
+  color: #c62828;
+  opacity: 1;
+}
+.axv-sb-issue .msr,
+.axv-sb-ok .msr {
+  font-size: 15px;
+}
+.axv-sb-ok {
+  color: color-mix(in srgb, #2e7d32 80%, var(--axv-on-surface));
+}
+.axv-sb-dim {
+  opacity: 0.55;
+  margin-left: 4px;
+}
+.axv-sb-saved {
+  opacity: 0.5;
+}
+.axv-appstatus[data-dirty="1"] .axv-sb-saved {
+  display: none;
+}
+@media (max-width: 900px) {
+  .axv-appstatus {
+    height: 24px;
+    font-size: 11px;
+    gap: 6px;
+  }
+  .axv-sb-dim,
+  .axv-sb-saved {
+    display: none;
+  }
+  .axv-sb-file {
+    max-width: 55%;
+  }
+}

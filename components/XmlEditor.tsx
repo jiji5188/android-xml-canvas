@@ -29,6 +29,7 @@ import { hasIcon } from "@/lib/xml/icon-vectors";
 import { workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative } from "@/lib/xml/native-save";
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
+import { lineOfPath, shouldResync } from "@/lib/xml/line-sync";
 import {
   THEME_PRESETS,
   DEFAULT_PRESET_ID,
@@ -104,6 +105,7 @@ import { RunPreview } from "./RunPreview";
 import { Toolbar } from "./Toolbar";
 import { LeftRail, type LeftView } from "./LeftRail";
 import { Inspector } from "./Inspector";
+import { StatusBar } from "./StatusBar";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
@@ -1305,7 +1307,10 @@ export function XmlEditor() {
     (line: number) => {
       if (!treeRoot || line < 1) return;
       const n = nodeAtLine(treeRoot, line);
-      if (n && n.path !== selectedPath) setSelectedPath(n.path);
+      if (n && n.path !== selectedPath) {
+        fromCodeRef.current = true; // 这次选中是代码触发的，不要再反向拖动编辑器
+        setSelectedPath(n.path);
+      }
     },
     [treeRoot, selectedPath],
   );
@@ -2273,6 +2278,7 @@ const findResolved = findResolvedNode;
           : `；另有 ${r.depsTotal} 个依赖资源，可用「另存到文件夹」一起写出`;
     }
     flashNote(tr("save.doneBack", "已保存 {name}（原路径）", { name: input.name }) + depNote, 4200);
+    markSaved(xml);
     return true;
   };
 
@@ -2287,6 +2293,7 @@ const findResolved = findResolvedNode;
         }),
         5000,
       );
+      markSaved(xml);
       return true;
     }
     if (r.canceled) {
@@ -2373,6 +2380,43 @@ const findResolved = findResolvedNode;
     setExportReport(buildReport());
     setExportOpen(true);
   };
+
+  /** M27：保存基线（用于状态条「未保存」提示） */
+  const xmlRef = useRef(xml);
+  xmlRef.current = xml;
+  const [savedMark, setSavedMark] = useState<string>(() => xml);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const markSaved = useCallback((text: string) => {
+    setSavedMark(text);
+    setSavedAt(Date.now());
+  }, []);
+  const dirty = xml !== savedMark;
+  // 切换/打开文件 → 当前内容就是磁盘上的基线（避免一进来就顶着「未保存」）
+  useEffect(() => {
+    setSavedMark(xmlRef.current);
+    setSavedAt(null);
+  }, [saveOrigin]);
+
+  /** M26：画布选中 → 代码视图滚到并高亮对应行（反方向由 onCodeCursorLine 负责） */
+  const selectedLine = useMemo(() => lineOfPath(treeRoot, selectedPath), [treeRoot, selectedPath]);
+  const lastLineSyncRef = useRef("");
+  const fromCodeRef = useRef(false);
+  useEffect(() => {
+    // 切到代码视图时重置，保证每次都重新定位到当前选中块
+    if (mobileTab === "xml") lastLineSyncRef.current = "";
+  }, [mobileTab]);
+  useEffect(() => {
+    if (mobileTab !== "xml") return;
+    if (fromCodeRef.current) {
+      fromCodeRef.current = false;
+      return;
+    }
+    if (selectedLine == null) return;
+    if (!shouldResync(lastLineSyncRef.current, selectedPath ?? '', selectedLine)) return;
+    lastLineSyncRef.current = `${selectedPath}@${selectedLine}`;
+    setFocusLine(selectedLine);
+    setFocusTick((t) => t + 1);
+  }, [selectedPath, selectedLine, mobileTab]);
 
   /** M2s：跳转到代码 tab 并让代码编辑器滚动/选中到指定行 */
   const [focusLine, setFocusLine] = useState(0);
@@ -2961,6 +3005,27 @@ const findResolved = findResolvedNode;
           onClose={() => setResImage(null)}
         />
       ) : null}
+
+      {/* M27：底部状态条（文件 / 未保存 / 问题数 / 设备 / 缩放） */}
+      <StatusBar
+        isMobile={isMobile}
+        fileName={saveOrigin?.name || activeFile(project)?.name || currentFile?.name || "activity_main.xml"}
+        source={
+          saveOrigin?.kind === "native" ? saveOrigin.target : saveOrigin?.kind === "handle" ? saveOrigin.name : workspaceLabel() || null
+        }
+        deviceLabel={device.label}
+        deviceSize={`${device.w}×${device.h}`}
+        scale={scale}
+        dirty={dirty}
+        issueCount={lintErrCount}
+        onIssues={() => setShowIssues((v) => !v)}
+        onResetZoom={() => applyZoom(1)}
+        savedHint={
+          savedAt
+            ? `已保存 ${new Date(savedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`
+            : null
+        }
+      />
     </div>
   );
 }

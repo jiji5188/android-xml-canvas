@@ -5537,3 +5537,44 @@ button.axv-sb-item:hover {
   font-size: 12px;
   cursor: pointer;
 }
+/* M29：图层树搜索 */
+.axv-lt-search {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  flex: 0 0 auto;
+}
+.axv-lt-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 18%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--axv-on-surface) 5%, transparent);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  outline: none;
+}
+.axv-lt-search-input:focus {
+  border-color: var(--axv-primary);
+}
+.axv-lt-search-clear {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--axv-on-surface) 8%, transparent);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-lt-row.hit {
+  box-shadow: inset 2px 0 0 var(--axv-primary);
+  background: color-mix(in srgb, var(--axv-primary) 9%, transparent);
+}
+.axv-lt-row.hit .axv-lt-tag {
+  color: var(--axv-primary);
+  font-weight: 700;
+}

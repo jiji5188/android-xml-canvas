@@ -9,9 +9,10 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import type { XmlNode } from "../lib/xml/types";
 import { isContainerTag } from "../lib/xml/insert";
+import { filterLayerTree } from "../lib/xml/layer-filter";
 
 /** 拖拽落点位置 */
 export type DropZone = "before" | "inside" | "after";
@@ -43,6 +44,18 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragPath, setDragPath] = useState<string | null>(null);
   const [drop, setDrop] = useState<DropTarget | null>(null);
+  /** M29：搜索过滤（命中 + 祖先 + 后代） */
+  const [q, setQ] = useState("");
+  const filter = useMemo(() => filterLayerTree(root, q), [root, q]);
+  /** M29：画布点选时把图层行滚进可视区 */
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  useEffect(() => {
+    if (!selectedPath) return;
+    const el = rowRefs.current.get(selectedPath);
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedPath, q]);
 
   if (!root) return <div className="axv-lt-empty">没有节点</div>;
 
@@ -88,8 +101,8 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
   };
 
   const renderItem = (n: XmlNode, depth: number, siblingCount: number) => {
-    const kids = n.children;
-    const open = !collapsed.has(n.path) && kids.length > 0;
+    const kids = filter.active ? n.children.filter((c) => filter.keep.has(c.path)) : n.children;
+    const open = (!collapsed.has(n.path) || filter.active) && kids.length > 0;
     const myIndex = Number(n.path.split("/").pop());
     const isRoot = n.path === "#0";
     const locked = lockedPaths?.has(n.path) ?? false;
@@ -121,6 +134,10 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
     return (
       <div key={n.path}>
         <div
+          ref={(el) => {
+            if (el) rowRefs.current.set(n.path, el);
+            else rowRefs.current.delete(n.path);
+          }}
           className={
             "axv-lt-row" +
             (selectedPath === n.path ? " sel" : "") +
@@ -128,7 +145,8 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
             (zone === "inside" ? " drop-inside" : "") +
             (zone === "before" ? " drop-before" : "") +
             (zone === "after" ? " drop-after" : "") +
-            (locked ? " locked" : "")
+            (locked ? " locked" : "") +
+            (filter.active && filter.hits.has(n.path) ? " hit" : "")
           }
           style={{ paddingLeft: 10 + depth * 14 }}
           onClick={() => onSelect(n.path)}
@@ -199,10 +217,33 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
 
   return (
     <div className="axv-lt">
+      <div className="axv-lt-search">
+        <input
+          className="axv-lt-search-input"
+          placeholder={`搜索 ${root.children.length} 个节点…`}
+          aria-label="搜索图层"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        {q ? (
+          <button
+            type="button"
+            className="axv-lt-search-clear"
+            title="清空搜索"
+            onClick={() => setQ("")}
+          >
+            ✕
+          </button>
+        ) : null}
+      </div>
+      {filter.active && filter.keep.size === 0 ? (
+        <div className="axv-lt-empty">没有匹配「{q}」的节点</div>
+      ) : (
+        renderItem(root, 0, 1)
+      )}
       {onDragMove ? (
         <div className="axv-lt-hint">拖动可调整层级：靠上/靠下 = 换兄弟位置，中间 = 放进容器</div>
       ) : null}
-      {renderItem(root, 0, 1)}
     </div>
   );
 }

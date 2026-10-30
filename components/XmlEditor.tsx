@@ -103,6 +103,7 @@ import { LS_KEY_XML, LS_KEY_HIST, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, lsGe
 import { RunPreview } from "./RunPreview";
 import { Toolbar } from "./Toolbar";
 import { LeftRail, type LeftView } from "./LeftRail";
+import { Inspector } from "./Inspector";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
@@ -2735,60 +2736,32 @@ const findResolved = findResolvedNode;
           {leftView === "about" && <AboutPanel version={APP_VERSION} tr={tr} />}
       </LeftRail>
 
-      {/* 右侧滑面板：属性（移动端宽 75vw） */}
-      <aside className={"axv-slide-right" + (rightOpen ? " axv-open" : "")}>
-        <div className="axv-slide-head">
-          <span>属性</span>
-          <button
-            className="axv-icon-btn"
-            title="关闭面板"
-            aria-label="关闭面板"
-            onClick={() => setRightOpen(false)}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 24 }}>right_panel_close</span>
-          </button>
-        </div>
-        <div className="axv-slide-body">
-          {selectedNode ? (
-            <div className="axv-panel-stack">
-              {selectedNode.sourceFile ? (
-                <div className="axv-include-readonly" title="include 展开进来的节点：主 XML 里没有它的实体，改不了（要改去那个文件）">
-                  ⚠ 来自 <b>{selectedNode.sourceFile}</b>（include 展开，只读）
-                </div>
-              ) : null}
-              {isChildOfCL && (
-                <ConstraintPanel
-                  node={selectedNode}
-                  siblings={clSiblings}
-                  onCommitMany={commitMany}
-                  onAuto={runAutoConstrain}
-                  onClear={clearConstraints}
-                  autoNotes={autoNotes}
-                />
-              )}
-              <AttrPanel
-                node={selectedNode}
-                chain={pathChain}
-                onSelectPath={(p) => setSelectedPath(p)}
-                onCommit={commitAttr}
-                onRemove={removeAttr}
-                onAddAttr={() => setAddModalOpen(true)}
-                resExtras={resExtras}
-                onDeleteNode={() => onRemoveNode(selectedNode.path)}
-                onPickIcon={onPickIcon}
-                onEditIconResource={(name, iconXml, attr) =>
-                  setResIcon({ name: name || "ic_icon", xml: iconXml ?? "", attr })
-                }
-                iconNames={Object.keys(generatedDrawables)}
-                onSaveShape={onSaveShape}
-                generatedXml={generatedDrawables}
-              />
-            </div>
-          ) : (
-            <div className="axv-attr-hint">在画布或图层树上点任意控件查看并编辑属性</div>
-          )}
-        </div>
-      </aside>
+      {/* 右侧属性面板（M25h：搬到 components/Inspector.tsx） */}
+      <Inspector
+        open={rightOpen}
+        onClose={() => setRightOpen(false)}
+        node={selectedNode}
+        chain={pathChain}
+        isChildOfCL={isChildOfCL}
+        clSiblings={clSiblings}
+        onCommitMany={commitMany}
+        onAutoConstrain={runAutoConstrain}
+        onClearConstraints={clearConstraints}
+        autoNotes={autoNotes}
+        onSelectPath={setSelectedPath}
+        onCommitAttr={commitAttr}
+        onRemoveAttr={removeAttr}
+        onAddAttr={() => setAddModalOpen(true)}
+        onDeleteNode={onRemoveNode}
+        resExtras={resExtras}
+        onPickIcon={onPickIcon}
+        onEditIconResource={(name, iconXml, attr) =>
+          setResIcon({ name: name || "ic_icon", xml: iconXml ?? "", attr })
+        }
+        iconNames={Object.keys(generatedDrawables)}
+        onSaveShape={onSaveShape}
+        generatedXml={generatedDrawables}
+      />
 
       {/* 添加属性弹窗 */}
       <AddAttrModal

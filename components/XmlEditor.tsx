@@ -1044,8 +1044,10 @@ export function XmlEditor() {
   /** M20：画布缩放要进布局本身（不能只改外壳）。
    *  否则字号/padding/dp 全是 1x 尺寸、只有百分比宽度跟着长 → 缩放后「格子宽了、字没变大」；
    *  match_parent 被算成固定 px 的节点（CL/RL/表格里的）更是完全不动。
-   *  DPX = 1dp 对应的 px = SCALE(2) × 用户缩放。 */
-  const DPX = SCALE * scale;
+   *  DPX = 1dp 对应的 px = SCALE(2) × 用户缩放 × 视觉补偿因子。
+   *  M20h：缩小档 ÷1.3（边框/文字/图标显得太粗）、放大档 ×1.3（太细）、1:1 不变 */
+  const chromeFactor = scale < 1 ? 1.3 : scale > 1 ? 1 / 1.3 : 1;
+  const DPX = SCALE * scale * chromeFactor;
 
   const { model, issues, parseErr } = useMemo(() => {
     const { root, issues } = parseLayoutXml(parsedXml);
@@ -2112,7 +2114,7 @@ const findResolved = findResolvedNode;
                 transform: fitRatio < 1 ? `scale(${fitRatio})` : undefined,
                 transformOrigin: "top left",
                 /* M20g：边框视觉厚度恒定（CSS 边框不随 transform 变，除回系数） */
-                borderWidth: Math.max(2, Math.round(8 / fitRatio)) + "px",
+                borderWidth: Math.max(2, Math.round(8 / (fitRatio * (scale === 1 ? 1 : scale)))) + "px",
                 borderRadius: device.radius ? Math.round(device.radius * DPX) : undefined,
               }}
               onDragOver={(e) => {

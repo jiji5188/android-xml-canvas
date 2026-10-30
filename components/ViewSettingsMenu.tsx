@@ -120,7 +120,7 @@ export function ViewSettingsMenu({ deviceId, onDevice, scale, onScale }: ViewSet
                 <div className="axv-vs-zoom">
                   <button
                     type="button"
-                    onClick={() => onScale(Math.max(0.25, Math.round((scale - 0.05) * 100) / 100))}
+                    onClick={() => onScale(Math.max(0.4, Math.round((scale - 0.1) * 10) / 10))}
                     aria-label="缩小"
                   >
                     −
@@ -128,16 +128,16 @@ export function ViewSettingsMenu({ deviceId, onDevice, scale, onScale }: ViewSet
                   <input
                     id="axv-vs-zoom"
                     type="range"
-                    min={0.25}
-                    max={2}
-                    step={0.05}
+                    min={0.4}
+                    max={1.5}
+                    step={0.1}
                     value={scale}
                     onChange={(e) => onScale(parseFloat(e.target.value))}
                     aria-label="缩放"
                   />
                   <button
                     type="button"
-                    onClick={() => onScale(Math.min(2, Math.round((scale + 0.05) * 100) / 100))}
+                    onClick={() => onScale(Math.min(1.5, Math.round((scale + 0.1) * 10) / 10))}
                     aria-label="放大"
                   >
                     ＋

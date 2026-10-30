@@ -1045,9 +1045,11 @@ export function XmlEditor() {
    *  否则字号/padding/dp 全是 1x 尺寸、只有百分比宽度跟着长 → 缩放后「格子宽了、字没变大」；
    *  match_parent 被算成固定 px 的节点（CL/RL/表格里的）更是完全不动。
    *  DPX = 1dp 对应的 px = SCALE(2) × 用户缩放 × 视觉补偿因子。
-   *  M20h：缩小档 ÷1.3（边框/文字/图标显得太粗）、放大档 ×1.3（太细）、1:1 不变 */
-  const chromeFactor = scale < 1 ? 1.3 : scale > 1 ? 1 / 1.3 : 1;
-  const DPX = SCALE * scale * chromeFactor;
+   *  M20h→用户手动：缩小档 ×3、放大档 ÷3（原 1.3 太温和，用户直接改成 3 试试）；1:1 不变 */
+  /** M20i：回退到今天之前的实现（用户要求）。
+   *  布局模型固定用 SCALE（不随用户缩放），缩放只作用于外壳/状态栏/导航栏。
+   *  DPX = 1dp 对应 px（含用户缩放），仅用于状态栏/导航栏高度与圆角。 */
+  const DPX = SCALE * scale;
 
   const { model, issues, parseErr } = useMemo(() => {
     const { root, issues } = parseLayoutXml(parsedXml);
@@ -1056,17 +1058,17 @@ export function XmlEditor() {
     // M2r：屏幕尺寸传入，影响 match_parent 根 / CL 内容区回落值
     // M2t：wrap 实测表传入，CL/RL 求解的 wrap 维度不再靠 estSize 估
     return {
-      model: buildRenderModel(root, resources, DPX, resExtras?.layouts, { w: device.w, h: device.h }, measured ?? undefined, renderTheme),
+      model: buildRenderModel(root, resources, SCALE, resExtras?.layouts, { w: device.w, h: device.h }, measured ?? undefined, renderTheme),
       issues,
       parseErr: false,
     };
-  }, [parsedXml, resources, resExtras?.layouts, device, measured, renderTheme, DPX]);
+  }, [parsedXml, resources, resExtras?.layouts, device, measured, renderTheme]);
 
   /** M2t：XML / 设备变了 → 旧 path 可能指向别的节点，实测表作废重测 */
   useEffect(() => {
     measurePass.current = 0;
     setMeasured((m) => (m ? null : m));
-  }, [parsedXml, device, DPX]);
+  }, [parsedXml, device]);
 
   /**
    * M2t：wrap_content 真实尺寸回填。
@@ -1262,7 +1264,7 @@ export function XmlEditor() {
     const prevNode = idx > 0 ? selectedParent.children[idx - 1] : null;
     const prev = prevNode && prevNode.attrs.id ? sibs.find((s) => s.ref === prevNode.attrs.id) ?? null : null;
 
-    const res = autoConstrain({ attrs, box, parent: pbox, siblings: sibs, prev, scale: DPX });
+    const res = autoConstrain({ attrs, box, parent: pbox, siblings: sibs, prev, scale: SCALE });
     commitMany([...changes, ...res.changes]);
     setAutoNotes(res.notes);
   };
@@ -1711,22 +1713,10 @@ export function XmlEditor() {
     if (!vw) return 1;
     const panels = isMobile ? 0 : (leftOpen ? 320 : 0) + (rightOpen ? 320 : 0);
     const avail = vw - panels - (isMobile ? 28 : 48);
-    // M6g：fitRatio 改成「基准装入比 × 用户缩放」。
-    // 以前直接把 scale 算进分母，导致手机上永远被压回窗口宽度，放大没任何效果、也没有滚动条；
-    // 现在缩放是乘数：放大到超宽就出横向滚动条，看细节；缩小则整体变小。
-    // M20：widthPx 里已经乘过 scale，这里只负责「装进视口」，不能再乘一次
-    // （以前 ×scale 导致缩小 0.6 → 布局 0.6 再 transform 0.6 = 视觉 0.36）
-    // M20f：方向纠正——fitRatio 必须是「单调不减」：放大 → 1:1 甚至滚动（不缩小）；
-    //       缩小 → 布局已变小 → 不额外套 transform，保持真实尺寸；
-    //       只有缩放后仍装不下（且是缩小/复位档）时才按基准装入比轻微压缩，
-    //       否则窄窗缩小后外壳反而比 1:1 还大，方向是反的
+    // M20i：用户要求复原为之前的实现（基准装入比 × 用户缩放）
     const baseW = device.w * SCALE + PHONE_BORDER * 2;
-    const layoutW = Math.round(device.w * SCALE * scale) + PHONE_BORDER * 2;
-    if (layoutW <= avail) return 1;
-    if (scale >= 1) return 1; // 放大档：超宽就滚动看细节，不压回窗口
-    // 缩小档且装不下：压到装进可视区，下限 0.15（避免压到看不见）
-    const fit = Math.max(0.15, avail / Math.max(1, layoutW));
-    return Math.min(1, fit);
+    const fitBase = Math.min(1, avail / Math.max(1, baseW));
+    return Math.min(1, fitBase * scale);
   })();
 
   function shortTag(t: string): string {
@@ -2113,8 +2103,6 @@ const findResolved = findResolvedNode;
                 color: phoneFg,
                 transform: fitRatio < 1 ? `scale(${fitRatio})` : undefined,
                 transformOrigin: "top left",
-                /* M20g：边框视觉厚度恒定（CSS 边框不随 transform 变，除回系数） */
-                borderWidth: Math.max(2, Math.round(8 / (fitRatio * (scale === 1 ? 1 : scale)))) + "px",
                 borderRadius: device.radius ? Math.round(device.radius * DPX) : undefined,
               }}
               onDragOver={(e) => {

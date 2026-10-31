@@ -6,7 +6,8 @@
 // 状态全在 XmlEditor，这里纯展示 + 回调。
 
 import type { LintIssue } from "@/lib/xml/lint";
-import { XmlCodeEditor } from "./XmlCodeEditor";
+import type { EditorLang } from "@/lib/xml/editor-lang";
+import { CodeEditor } from "./CodeEditor";
 
 export interface XmlCodeViewProps {
   open: boolean;
@@ -20,6 +21,9 @@ export interface XmlCodeViewProps {
   focusLine?: number;
   focusTick?: number;
   onCursorLine?: (line: number) => void;
+
+  /** M38：当前文件语法（xml / java） */
+  lang?: EditorLang;
 
   /** 格式化（重排缩进，保留注释） */
   onFormat: () => void;
@@ -41,7 +45,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
             }
       }
     >
-      <XmlCodeEditor
+      <CodeEditor
         className="axv-code-fill"
         value={props.value}
         onChange={props.onChange}
@@ -50,6 +54,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
         focusTick={props.focusTick}
         onCursorLine={props.onCursorLine}
         onFormat={props.onFormat}
+        lang={props.lang}
       />
     </div>
   );

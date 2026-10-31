@@ -2362,6 +2362,22 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 1;
   min-height: 0;
 }
+/* M38：CodeMirror 6 容器（取代 textarea + pre 叠层） */
+.axv-cm {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.axv-cm .cm-editor {
+  height: 100%;
+}
+.axv-cm .cm-scroller {
+  -webkit-overflow-scrolling: touch;
+}
+.axv-cm .cm-line {
+  padding: 0 14px;
+}
 .axv-code-hl,
 .axv-code-ta {
   margin: 0;

@@ -8,6 +8,7 @@ import { isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { XmlCodeView, type XmlCodeViewProps } from "../components/XmlCodeView";
 import { XmlCodeEditor, SYMBOLS } from "../components/XmlCodeEditor";
+import { CodeEditor } from "../components/CodeEditor";
 
 type El = { type: unknown; props: Record<string, any> };
 
@@ -100,7 +101,7 @@ describe("XmlCodeView — 显隐与位置", () => {
 
   it("编辑器拿到 value / 焦点行 / 错误", () => {
     const { all } = render();
-    const ed = all.find((e) => e.type === XmlCodeEditor);
+    const ed = all.find((e) => e.type === CodeEditor);
     expect(ed?.props.value).toBe("<LinearLayout/>");
     expect(ed?.props.focusLine).toBe(3);
     expect(ed?.props.focusTick).toBe(2);
@@ -110,7 +111,7 @@ describe("XmlCodeView — 显隐与位置", () => {
 
   it("onFormat 透传给编辑器（格式化按钮在符号条里）", () => {
     const { p, all } = render();
-    const ed = all.find((e) => e.type === XmlCodeEditor);
+    const ed = all.find((e) => e.type === CodeEditor);
     expect(ed?.props.onFormat).toBe(p.onFormat);
   });
 });

@@ -35,6 +35,7 @@ import { pickXmlFile } from "@/lib/xml/save-as";
 import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, buildSaveFiles, type SaveInput } from "@/lib/xml/save-flow";
 import { projectSaveRoot, saveProjectFile, saveResFiles } from "@/lib/xml/project-save";
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
+import { pickLang } from "@/lib/xml/editor-lang";
 import { lineOfPath, shouldResync } from "@/lib/xml/line-sync";
 import {
   THEME_PRESETS,
@@ -1266,8 +1267,7 @@ export function XmlEditor() {
    *  DPX = 1dp 对应 px（含用户缩放），仅用于状态栏/导航栏高度与圆角。 */
   const DPX = SCALE * scale;
 
-  /** M37b：当前文档是布局还是「只读代码」（manifest / values / menu …） */
-  const docKind = useMemo(
+  /** M37b：当前文档是布局还是「只读代码」（manifest / values / menu …） */  const docKind = useMemo(
     () => detectDocKind(xml, openRel, saveOrigin?.name ?? null),
     [xml, openRel, saveOrigin?.name],
   );
@@ -1275,6 +1275,11 @@ export function XmlEditor() {
   const codeNotice = useMemo(
     () => (codeOnly ? codeOnlyNotice(openRel || saveOrigin?.name || "") : null),
     [codeOnly, openRel, saveOrigin?.name],
+  );
+  /** M38：编辑器语法（.java/.kt → java，其余 xml） */
+  const editorLang = useMemo(
+    () => pickLang(openRel || saveOrigin?.name || null),
+    [openRel, saveOrigin?.name],
   );
   /** M37b：打开非布局文件（如 AndroidManifest.xml）→ 手机上直接切到代码视图 */
   useEffect(() => {
@@ -2892,6 +2897,7 @@ const findResolved = findResolvedNode;
         focusTick={focusTick}
         onCursorLine={onCodeCursorLine}
         onFormat={doFormat}
+        lang={editorLang}
       />
 
       {/* 左侧滑面板（M25g：图标条 + 标题栏搬到 components/LeftRail.tsx） */}

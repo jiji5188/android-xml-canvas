@@ -4907,6 +4907,30 @@ button.axv-ws-caret:hover {
   word-break: break-word;
 }
 .axv-ai-typing { color: var(--axv-on-surface-variant); }
+/* M32：流式光标的闪烁 */
+.axv-ai-cursor {
+  display: inline-block;
+  margin-left: 1px;
+  color: var(--axv-primary);
+  animation: axv-ai-blink 1s steps(2, start) infinite;
+}
+@keyframes axv-ai-blink {
+  0%,
+  100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+/* M32：当前走的通道（原生直连 / 浏览器） */
+.axv-ai-badge {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  line-height: 16px;
+  color: var(--axv-on-surface-variant);
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface-sunken);
+  white-space: nowrap;
+}
 .axv-ai-code {
   border: 1px solid var(--axv-outline);
   border-radius: 10px;

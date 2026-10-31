@@ -619,6 +619,184 @@ public class MainActivity extends Activity {
                 return "{\"ok\":false}";
             }
         }
+
+        /* ===== M32：AI 流式直连（原生 HTTP，不受 WebView 跨域限制） =====
+         *  JS 侧约定：
+         *    window.__axvAiChunk(id, text)       —— 增量正文
+         *    window.__axvAiDone(id, status)      —— 正常结束
+         *    window.__axvAiError(id, message)    —— 失败（message 已转义安全）
+         *  回调都在主线程 evaluateJavascript 里发，所以不会碰 JS 线程。 */
+
+        private final java.util.Map<String, Thread> aiJobs = new java.util.concurrent.ConcurrentHashMap<>();
+        private final java.util.Map<String, java.net.HttpURLConnection> aiConns = new java.util.concurrent.ConcurrentHashMap<>();
+
+        private void aiEval(final String js) {
+            final WebView w = web;
+            if (w == null) return;
+            w.post(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        w.evaluateJavascript(js, null);
+                    } catch (Throwable ignored) {
+                    }
+                }
+            });
+        }
+
+        private void aiEmitChunk(String id, String text) {
+            if (text == null || text.isEmpty()) return;
+            aiEval("window.__axvAiChunk&&window.__axvAiChunk(" + JSONObject.quote(id) + "," + JSONObject.quote(text) + ")");
+        }
+
+        /** 发起对话（流式）。方法本身立刻返回，结果靠回调。 */
+        @JavascriptInterface
+        public void aiChatStream(final String id, final String url, final String apiKey, final String bodyJson, final int timeoutMs) {
+            if (id == null || url == null) return;
+            if (!url.startsWith("https://") && !url.startsWith("http://")) {
+                aiEval("window.__axvAiError&&window.__axvAiError(" + JSONObject.quote(id) + "," + JSONObject.quote("接口地址必须以 http(s):// 开头") + ")");
+                return;
+            }
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    java.net.HttpURLConnection conn = null;
+                    int status = 0;
+                    try {
+                        conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                        aiConns.put(id, conn);
+                        conn.setRequestMethod("POST");
+                        conn.setConnectTimeout(15000);
+                        conn.setReadTimeout(Math.max(20000, timeoutMs));
+                        conn.setDoOutput(true);
+                        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                        conn.setRequestProperty("Accept", "text/event-stream, application/json");
+                        if (apiKey != null && !apiKey.isEmpty()) {
+                            conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+                        }
+                        byte[] out = bodyJson.getBytes("UTF-8");
+                        conn.setFixedLengthStreamingMode(out.length);
+                        java.io.OutputStream os = conn.getOutputStream();
+                        os.write(out);
+                        os.flush();
+                        os.close();
+
+                        status = conn.getResponseCode();
+                        if (status >= 400) {
+                            String detail = readAll(conn.getErrorStream());
+                            aiEval("window.__axvAiError&&window.__axvAiError(" + JSONObject.quote(id) + ","
+                                    + JSONObject.quote(String.valueOf(status) + " " + detail) + ")");
+                            return;
+                        }
+
+                        java.io.BufferedReader br = new java.io.BufferedReader(
+                                new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
+                        String line;
+                        boolean any = false;
+                        while ((line = br.readLine()) != null) {
+                            if (aiConns.get(id) == null) break; // 被 aiAbort 拿掉就停
+                            String s = line.trim();
+                            if (s.isEmpty() || s.startsWith(":")) continue;
+                            String payload = s;
+                            if (s.startsWith("data:")) payload = s.substring(5).trim();
+                            if (payload.equals("[DONE]")) break;
+                            String delta = deltaOf(payload);
+                            if (delta != null && !delta.isEmpty()) {
+                                any = true;
+                                aiEmitChunk(id, delta);
+                            } else if (payload.startsWith("{") && !any) {
+                                // 非流式（服务端直接回完整 JSON）：把正文当一整块吐出去
+                                String whole = wholeContentOf(payload);
+                                if (whole != null && !whole.isEmpty()) {
+                                    any = true;
+                                    aiEmitChunk(id, whole);
+                                }
+                            }
+                        }
+                        br.close();
+                        aiEval("window.__axvAiDone&&window.__axvAiDone(" + JSONObject.quote(id) + "," + status + ")");
+                    } catch (Throwable e) {
+                        String msg = e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage());
+                        aiEval("window.__axvAiError&&window.__axvAiError(" + JSONObject.quote(id) + "," + JSONObject.quote(msg) + ")");
+                    } finally {
+                        aiConns.remove(id);
+                        aiJobs.remove(id);
+                        try {
+                            if (conn != null) conn.disconnect();
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                }
+            }, "axv-ai-" + id);
+            t.setDaemon(true);
+            aiJobs.put(id, t);
+            t.start();
+        }
+
+        /** 取消某个对话（面板关闭 / 用户点停止） */
+        @JavascriptInterface
+        public void aiAbort(String id) {
+            aiConns.remove(id);
+            Thread t = aiJobs.remove(id);
+            if (t != null) t.interrupt();
+        }
+
+        private String readAll(java.io.InputStream in) {
+            if (in == null) return "";
+            try {
+                java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[4096];
+                int n;
+                while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+                String s = new String(bos.toByteArray(), "UTF-8");
+                return s.length() > 400 ? s.substring(0, 400) : s;
+            } catch (Throwable t) {
+                return "";
+            } finally {
+                try {
+                    in.close();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+
+        /** 从 SSE 的 data 行里取 choices[0].delta.content */
+        private String deltaOf(String payload) {
+            try {
+                if (!payload.startsWith("{")) return null;
+                JSONObject o = new JSONObject(payload);
+                JSONArray ch = o.optJSONArray("choices");
+                if (ch == null || ch.length() == 0) return null;
+                JSONObject c = ch.optJSONObject(0);
+                if (c == null) return null;
+                JSONObject d = c.optJSONObject("delta");
+                if (d != null) {
+                    String s = d.optString("content", "");
+                    if (s != null && !s.isEmpty()) return s;
+                    return null;
+                }
+                JSONObject m = c.optJSONObject("message");
+                if (m != null) return m.optString("content", "");
+                return null;
+            } catch (Throwable t) {
+                return null;
+            }
+        }
+
+        private String wholeContentOf(String payload) {
+            try {
+                JSONObject o = new JSONObject(payload);
+                JSONArray ch = o.optJSONArray("choices");
+                if (ch == null || ch.length() == 0) return null;
+                JSONObject c = ch.optJSONObject(0);
+                if (c == null) return null;
+                JSONObject m = c.optJSONObject("message");
+                if (m != null) return m.optString("content", "");
+                return null;
+            } catch (Throwable t) {
+                return null;
+            }
+        }
     }
 
     /* ================= M16i：工作目录 ================= */

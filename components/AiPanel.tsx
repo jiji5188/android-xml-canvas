@@ -11,7 +11,6 @@ import {
   AI_QUICK_ACTIONS,
   AI_SYSTEM_PROMPT,
   applyProvider,
-  callAi,
   extractCodeBlock,
   loadAiConfig,
   normalizeBaseUrl,
@@ -19,6 +18,11 @@ import {
   type AiConfig,
   type AiMessage,
 } from "@/lib/xml/ai";
+import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
+import { AI_TOOL_PROMPT, createNativeIo, extractToolCalls, runTool, stripToolBlocks } from "@/lib/xml/ai-tools";
+
+/** 工具循环最多几轮（防模型无限读文件） */
+const MAX_TOOL_ROUNDS = 3;
 
 interface Props {
   /** 当前布局 XML（发送时作为上下文） */
@@ -31,14 +35,18 @@ interface Props {
   onReplaceXml: (xml: string) => void;
   /** 提示条（复用编辑器的 toast） */
   onNote?: (text: string) => void;
+  /** 当前项目名（相对工作目录），给「读写查文件」定位根目录 */
+  projectName?: string;
 }
 
 interface ChatItem extends AiMessage {
   /** 该条回复里抠出来的代码块（助手消息才有） */
   code?: string | null;
+  /** 该条是否还在流式生成中 */
+  streaming?: boolean;
 }
 
-export default function AiPanel({ xml, selection, resources, onReplaceXml, onNote }: Props) {
+export default function AiPanel({ xml, selection, resources, onReplaceXml, onNote, projectName }: Props) {
   const [cfg, setCfg] = useState<AiConfig>(() => {
     try {
       return loadAiConfig(window.localStorage.getItem(AI_LS_KEY));
@@ -95,11 +103,16 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
       }
       setErr("");
       setBusy(true);
-      const mine: ChatItem = { role: "user", content: q };
-      setChat((c) => [...c, mine]);
+      setChat((c) => [...c, { role: "user", content: q }]);
       setInput("");
       const ctrl = new AbortController();
       abortRef.current = ctrl;
+
+      // 本地文件能力只在原生壳里可用（浏览器要么没权限，要么跨域）
+      const io = createNativeIo(projectName || undefined);
+      const sys = io
+        ? `${AI_SYSTEM_PROMPT}\n\n${AI_TOOL_PROMPT}\n项目根目录：${projectName || "."}（项目内的相对路径都从这里算）`
+        : AI_SYSTEM_PROMPT;
 
       const history: AiMessage[] = chat.map((m) => ({ role: m.role, content: m.content }));
       const preamble = withXml && xml.trim() ? `当前布局 XML：\n\`\`\`xml\n${xml.trim()}\n\`\`\`` : "";
@@ -107,22 +120,89 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
       const resLine = ctxResources ? `可用资源：${ctxResources}` : "";
       const userContent = [selLine, resLine, preamble, q].filter(Boolean).join("\n\n");
 
-      const res = await callAi(cfg, [
-        { role: "system", content: AI_SYSTEM_PROMPT },
+      let msgs: AiMessage[] = [
+        { role: "system", content: sys },
         ...history,
         { role: "user", content: userContent },
-      ], { signal: ctrl.signal });
+      ];
 
-      abortRef.current = null;
-      setBusy(false);
-      if (!res.ok) {
-        setErr(res.error || "调用失败");
-        return;
+      const patchLast = (fn: (item: ChatItem) => ChatItem) =>
+        setChat((c) => {
+          if (!c.length) return c;
+          const n = [...c];
+          const last = n[n.length - 1];
+          if (!last.streaming) return c;
+          n[n.length - 1] = fn(last);
+          return n;
+        });
+
+      try {
+        for (let round = 0; ; round++) {
+          setChat((c) => [...c, { role: "assistant", content: "", streaming: true }]);
+          let acc = "";
+          const res = await streamChat(cfg, msgs, {
+            signal: ctrl.signal,
+            onChunk: (t) => {
+              acc += t;
+              patchLast((m) => ({ ...m, content: acc }));
+            },
+          });
+
+          if (!res.ok) {
+            setChat((c) => c.filter((m) => !m.streaming));
+            setErr(res.error || "调用失败");
+            return;
+          }
+
+          const calls = io ? extractToolCalls(res.content) : [];
+          const shown = stripToolBlocks(res.content);
+
+          if (!calls.length || round >= MAX_TOOL_ROUNDS || !io) {
+            patchLast((m) => ({
+              ...m,
+              content: shown,
+              streaming: false,
+              code: extractCodeBlock(shown),
+            }));
+            break;
+          }
+
+          // 有工具调用：先把模型这轮的说明落下来，再执行工具
+          patchLast((m) => ({ ...m, content: shown, streaming: false }));
+          const results: string[] = [];
+          for (const call of calls) {
+            const label =
+              call.tool === "write_file"
+                ? `写入 ${call.path}`
+                : call.tool === "read_file"
+                  ? `读取 ${call.path}`
+                  : call.tool === "list_files"
+                    ? `列出 ${call.dir || "/"}`
+                    : `搜索 ${call.query}`;
+            setChat((c) => [...c, { role: "assistant", content: `⏳ ${label}…`, streaming: false }]);
+            const out = await runTool(call, io);
+            results.push(out);
+            setChat((c) => {
+              const n = [...c];
+              const last = n[n.length - 1];
+              if (last && !last.streaming && last.content.startsWith("⏳")) {
+                n[n.length - 1] = { ...last, content: `✅ ${label}` };
+              }
+              return n;
+            });
+          }
+          msgs = [
+            ...msgs,
+            { role: "assistant", content: res.content },
+            { role: "user", content: `工具结果：\n${results.join("\n\n")}` },
+          ];
+        }
+      } finally {
+        abortRef.current = null;
+        setBusy(false);
       }
-      const code = extractCodeBlock(res.content);
-      setChat((c) => [...c, { role: "assistant", content: res.content, code }]);
     },
-    [busy, cfg, chat, ctxResources, ctxSelection, withXml, xml],
+    [busy, cfg, chat, ctxResources, ctxSelection, projectName, withXml, xml],
   );
 
   const stop = () => {
@@ -141,7 +221,7 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
     setErr("");
     // 测试连接只求一句短回复，但思考型模型（如 glm-5.3-flash）会先话一段 reasoning，
     // token 给太少就只剩 reasoning、正文为空。所以不能用最小值 64，给 1024。
-    const res = await callAi(
+    const res = await streamChat(
       { ...cfg, maxTokens: 1024 },
       [{ role: "user", content: "只回复两个字：可用" }],
       { timeoutMs: 30_000 },
@@ -178,6 +258,16 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
           <span className="axv-ai-cfg-title">
             {cfg.model || "未配置模型"}
             {cfg.apiKey ? <span className="axv-ai-dot" title="已配置 Key" /> : null}
+          </span>
+          <span
+            className="axv-ai-badge"
+            title={
+              nativeAiAvailable()
+                ? "走安卓原生 HTTP，没有跨域限制"
+                : "浏览器直连，部分服务商会被跨域拦"
+            }
+          >
+            {nativeAiAvailable() ? "原生直连" : "浏览器"}
           </span>
           <span className={"msr axv-ai-caret" + (cfgOpen ? " on" : "")} aria-hidden="true">
             expand_more
@@ -298,7 +388,10 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
 
         {chat.map((m, i) => (
           <div key={i} className={"axv-ai-msg " + m.role}>
-            <div className="axv-ai-bubble">{m.content.replace(/```[a-zA-Z0-9_-]*\s*\n[\s\S]*?```/g, "〔代码见下〕")}</div>
+            <div className="axv-ai-bubble">
+              {m.content.replace(/```[a-zA-Z0-9_-]*\s*\n[\s\S]*?```/g, "〔代码见下〕")}
+              {m.streaming ? <span className="axv-ai-cursor">▍</span> : null}
+            </div>
             {m.code ? (
               <div className="axv-ai-code">
                 <div className="axv-ai-code-bar">
@@ -323,7 +416,7 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
           </div>
         ))}
 
-        {busy ? (
+        {busy && !chat.some((m) => m.streaming) ? (
           <div className="axv-ai-msg assistant">
             <div className="axv-ai-bubble axv-ai-typing">正在生成…</div>
           </div>

@@ -4453,6 +4453,11 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   color: var(--axv-on-surface);
   font-weight: 600;
 }
+/* M31c：操作按钮行挪到路径条里 —— 横向排开并吃掉剩余宽度 */
+.axv-ws-path .axv-ws-actions {
+  flex: 1 1 auto;
+  margin-top: 0;
+}
 .axv-ws-mini {
   flex: 0 0 auto;
   width: 24px;

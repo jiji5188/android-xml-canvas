@@ -2549,7 +2549,7 @@ const findResolved = findResolvedNode;
             className={mobileTab === "xml" ? "on" : ""}
             onClick={() => setMobileTab("xml")}
           >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code_xml</span>
             代码
           </button>
           <button

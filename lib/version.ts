@@ -4,4 +4,4 @@
 // （2026-10-30 就出现过 APK 是 1.14、界面还显示 1.13）。
 // 现在只有这里一份：apk/bump-version.mjs 在升版本时会同时改本文件 + AndroidManifest。
 
-export const APP_VERSION = "1.14.16";
+export const APP_VERSION = "1.14.17";

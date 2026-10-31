@@ -12,6 +12,7 @@
 // 具体句柄从 workspace-fs 拿，不在这里存。
 
 import { nativeBridge } from "./native-save";
+import { hasAsyncIo, listDirQueued, readBase64Queued, readTextQueued } from "./native-async";
 import { wsListProjects, type WsProject } from "./workspace";
 
 /** 列目录时跳过的噪声目录（安卓工程里 build/.gradle 体积大且没布局） */
@@ -146,7 +147,13 @@ export async function readEntryImageUrl(entry: BrowseEntry): Promise<string | nu
   } else if (entry.target) {
     const b = nativeBridge();
     try {
-      const b64 = b?.readBase64 ? b.readBase64(entry.target) : null;
+      // M33：优先异步读（不卡 UI）；旧 APK 退回同步
+      let b64: string | null = null;
+      if (hasAsyncIo()) {
+        b64 = await readBase64Queued(entry.target);
+      } else {
+        b64 = b?.readBase64 ? b.readBase64(entry.target) : null;
+      }
       url = b64 ? `data:${mimeOfIcon(entry.name)};base64,${b64}` : null;
     } catch {
       url = null;
@@ -259,10 +266,11 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
     name,
     async listChildren(rel: string) {
       const b = nativeBridge();
-      if (rootDir && b?.listDir) {
+      const tryListDir = !!(rootDir && (b?.listDir || hasAsyncIo()));
+      if (tryListDir) {
         try {
           const abs = rel ? `${rootDir.replace(/\/+$/, "")}/${rel}` : rootDir;
-          const raw = b.listDir(abs);
+          const raw = hasAsyncIo() ? await listDirQueued(abs) : b && b.listDir ? b.listDir(abs) : null;
           const parsed = raw ? (JSON.parse(raw) as { ok?: boolean; items?: { name: string; kind: string; path?: string }[] }) : null;
           if (parsed?.ok && Array.isArray(parsed.items)) {
             const out: BrowseEntry[] = [];
@@ -301,6 +309,7 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
       if (!target) return null;
       const b = nativeBridge();
       try {
+        if (hasAsyncIo()) return (await readTextQueued(target)) || null;
         return b?.readText ? b.readText(target) || null : null;
       } catch {
         return null;
@@ -309,7 +318,7 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
     /** M31：从扁平列表里找 ic_launcher* 图片，走 bridge.readBase64 读字节 → data URL */
     async appIconUrl() {
       const b = nativeBridge();
-      if (!b?.readBase64) return null;
+      if (!b?.readBase64 && !hasAsyncIo()) return null;
       const cands = all
         .filter((it) => it.kind === "file" && ICON_REL_RE.test(it.rel) && /ic_launcher|app_icon|(^|\/)icon\./i.test(it.name) && !!it.target)
         .sort((a, b2) => {
@@ -320,7 +329,9 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
         });
       for (const c of cands) {
         try {
-          const b64 = b.readBase64(c.target as string);
+          const b64 = hasAsyncIo()
+            ? await readBase64Queued(c.target as string)
+            : b && b.readBase64 ? b.readBase64(c.target as string) : null;
           if (b64) return `data:${mimeOfIcon(c.name)};base64,${b64}`;
         } catch {
           /* 换下一个 */
@@ -377,6 +388,14 @@ export const NATIVE_ICON_NAMES = [
 
 const nativeMetaCache = new Map<string, ProjectMeta>();
 
+/** M33：从目录列表里挑最合适的图标文件名（纯函数，可单测）
+ *  只认图片扩展名；`ic_launcher.xml`（自适应图标）要排除 */
+export function pickIconFromNames(names: string[]): string | null {
+  const imgs = names.filter((n) => isImageName(n) && /^(ic_launcher|icon|app_icon)/i.test(n));
+  if (!imgs.length) return null;
+  return imgs.sort((a, b) => iconRank(a) - iconRank(b) || a.localeCompare(b))[0];
+}
+
 export async function readProjectMetaNative(
   name: string,
   dirPath: string | undefined | null,
@@ -390,11 +409,12 @@ export async function readProjectMetaNative(
   const norm = dirPath.replace(/[\\/]+$/, "");
   const sep = norm.includes("\\") ? "\\" : "/";
   const abs = (rel: string) => `${norm}${sep}${rel.split("/").join(sep)}`;
+  const io = hasAsyncIo();
 
   // 1) 名称
   for (const rel of NATIVE_STRINGS_RELS) {
     try {
-      const text = b.readText ? b.readText(abs(rel)) : null;
+      const text = io ? await readTextQueued(abs(rel)) : b.readText ? b.readText(abs(rel)) : null;
       const appName = text ? parseAppName(text) : null;
       if (appName) {
         fallback.name = appName;
@@ -405,10 +425,33 @@ export async function readProjectMetaNative(
     }
   }
 
-  // 2) 图标
-  if (b.readBase64) {
-    outer: for (const dir of NATIVE_ICON_DIRS) {
-      for (const icon of NATIVE_ICON_NAMES) {
+  // 2) 图标：先用 listDir 看目录里到底有哪张图（每目录一次调用），
+  //    而不是拿 19×7 个路径一个个试读 —— 这是手机上卡顿的主因。
+  const canList = !!b.listDir || io;
+  if (canList) {
+    for (const dir of NATIVE_ICON_DIRS) {
+      try {
+        const raw = io ? await listDirQueued(abs(dir)) : b.listDir ? b.listDir(abs(dir)) : null;
+        if (!raw) continue;
+        const parsed = JSON.parse(raw) as { ok?: boolean; items?: { name?: string; kind?: string }[] };
+        if (!parsed?.ok || !Array.isArray(parsed.items)) continue;
+        const names = parsed.items.filter((it) => it.kind !== "dir").map((it) => String(it.name || ""));
+        const pick = pickIconFromNames(names);
+        if (pick) {
+          const b64 = io ? await readBase64Queued(abs(`${dir}/${pick}`)) : b.readBase64 ? b.readBase64(abs(`${dir}/${pick}`)) : null;
+          if (b64) {
+            fallback.iconUrl = `data:${mimeOfIcon(pick)};base64,${b64}`;
+            break;
+          }
+        }
+      } catch {
+        /* 下一个目录 */
+      }
+    }
+  } else if (b.readBase64) {
+    // 旧 APK（没有 listDir）只能盲试；为了不卡，最多试前 4 个目录 × 2 个名字
+    outer: for (const dir of NATIVE_ICON_DIRS.slice(0, 4)) {
+      for (const icon of ["ic_launcher.png", "ic_launcher.webp"]) {
         try {
           const b64 = b.readBase64(abs(`${dir}/${icon}`));
           if (b64) {

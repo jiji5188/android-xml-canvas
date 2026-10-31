@@ -27,6 +27,7 @@ import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
 import { hasIcon } from "@/lib/xml/icon-vectors";
 import { workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative } from "@/lib/xml/native-save";
+import { yieldToUi } from "@/lib/xml/native-async";
 // M31i：新建项目时把完整 Android 工程骨架落盘
 import { createAndroidProject, safeProjectName } from "@/lib/xml/new-project";
 import { nativeNewProjectIO, webNewProjectIO } from "@/lib/xml/new-project-io";
@@ -663,6 +664,7 @@ export function XmlEditor() {
   /** M25d/M31：后台分析项目名/图标（串行，读不到就跳过，不影响列表渲染）
    *  web：有 DirHandle 走 readProjectMeta；APK：没有句柄，按项目绝对路径试读 strings.xml + ic_launcher */
   const analyzeProjects = useCallback(async (list: WsProject[]) => {
+    const patch: Record<string, ProjectMeta> = {};
     for (const it of list) {
       if (it.kind !== "dir") continue;
       if (!it.handle && !it.dirPath) continue;
@@ -673,11 +675,15 @@ export function XmlEditor() {
           : await readProjectMetaNative(it.name, it.dirPath);
         // M31d：成功才记账，失败（权限未授权/目录刚变）下一轮轮询再试
         analyzedRef.current.add(it.rel);
-        setProjMeta((prev) => ({ ...prev, [it.rel]: meta }));
+        patch[it.rel] = meta;
       } catch {
         /* 分析失败就当没有，卡片回退到文件夹名 */
       }
+      // M33：一个一个来，每个之间让出一帧，列表可以边读边显示（不再整页卡住）
+      await yieldToUi();
     }
+    // 一次性合并，避免 N 次 setState 引发 N 轮重渲染
+    if (Object.keys(patch).length) setProjMeta((prev) => ({ ...prev, ...patch }));
   }, []);
 
   const refreshWorkspace = useCallback(async (opts?: { quiet?: boolean }) => {

@@ -82,6 +82,12 @@ if (typeof window !== "undefined" && typeof window.addEventListener === "functio
     if (ev.data === "axv-ai-init" && ev.ports && ev.ports.length) {
       aiPort = ev.ports[0];
       aiPort.onmessage = (e: MessageEvent) => dispatchPort(e.data);
+      // 握手：告诉原生「这条路真通了」，否则原生回包会走 evaluateJavascript
+      try {
+        aiPort.postMessage(JSON.stringify({ type: "aiHello" }));
+      } catch {
+        /* ignore */
+      }
     }
   });
 }
@@ -245,6 +251,10 @@ export interface StreamResult {
   via: "native" | "fetch";
   /** 内部用：桥对象失效，调用方应重试 fetch */
   bridgeDead?: boolean;
+  /** 内部用：通道一条事件都没回（可能静默丢消息）*/ 
+  silent?: boolean;
+  /** 实际用的通道（诊断用） */
+  channel?: string;
 }
 
 let seq = 0;
@@ -270,9 +280,41 @@ export async function streamChat(
       probe = false;
       return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
     }
+    // M33：一条事件都没回（典型：port 静默丢消息）→ 换旧 JS 桥重试一次，再不行走 fetch
+    if (r.silent && ch.label !== "bridge") {
+      const b = bridge();
+      if (b) {
+        const alt = bridgeChannel();
+        if (alt) {
+          const r2 = await streamViaNative(alt, url, cfg.apiKey.trim(), body, timeoutMs, opts);
+          if (!r2.silent) return r2;
+        }
+      }
+      return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
+    }
     return r;
   }
   return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
+}
+
+/** 只用旧 @JavascriptInterface 桥的通道（port 静默失败时用它重试） */
+function bridgeChannel(): NativeChannel | null {
+  const b = bridge();
+  if (!b) return null;
+  return {
+    label: "bridge",
+    send(req) {
+      try {
+        if (req.type === "aiChatStream") {
+          b.aiChatStream?.(req.id, req.url || "", req.apiKey || "", req.body || "", req.timeoutMs ?? 120_000);
+        } else if (req.type === "aiAbort") {
+          b.aiAbort?.(req.id);
+        }
+      } catch {
+        nativeDead = true;
+      }
+    },
+  };
 }
 
 /* ---------- 原生直连（WebMessage 优先，旧 JS 桥兜底） ---------- */
@@ -293,6 +335,18 @@ function streamViaNative(
     const prevChunk = window.__axvAiChunk;
     const prevDone = window.__axvAiDone;
     const prevErr = window.__axvAiError;
+    let sawAny = false;
+
+    // M33：首事件看门狗 —— 非 bridge 通道 8s 内一条事件都没回，就当静默失败（上层换路）
+    const firstEventMs = 8_000;
+    const watchdog =
+      ch.label === "bridge"
+        ? 0
+        : setTimeout(() => {
+            if (settled || sawAny) return;
+            ch.send({ type: "aiAbort", id });
+            finish(false, undefined, false, true);
+          }, firstEventMs);
 
     const onAbort = () => {
       ch.send({ type: "aiAbort", id });
@@ -301,39 +355,43 @@ function streamViaNative(
 
     const timer = setTimeout(() => {
       ch.send({ type: "aiAbort", id });
-      finish(false, "请求超时，可能是网络慢或模型响应太长，把最大 token 调小再试。");
+      finish(false, `请求超时（通过 ${ch.label} 通道，${Math.round(timeoutMs / 1000)}s），可能是网络慢或模型响应太长，把最大 token 调小再试。`);
     }, timeoutMs + 5_000);
 
     function cleanup() {
       clearTimeout(timer);
+      if (watchdog) clearTimeout(watchdog);
       opts.signal?.removeEventListener("abort", onAbort);
       window.__axvAiChunk = prevChunk;
       window.__axvAiDone = prevDone;
       window.__axvAiError = prevErr;
     }
 
-    function finish(ok: boolean, error?: string, bridgeDead = false) {
+    function finish(ok: boolean, error?: string, bridgeDead = false, silent = false) {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve({ ok, content: acc, error, via: "native", bridgeDead });
+      resolve({ ok, content: acc, error, via: "native", bridgeDead, silent, channel: ch.label });
     }
 
     window.__axvAiChunk = (rid, text) => {
       if (rid !== id || settled) return;
+      sawAny = true;
       acc += text;
       opts.onChunk?.(text);
     };
     window.__axvAiDone = (rid, status) => {
       if (rid !== id || settled) return;
+      sawAny = true;
       if (!acc) {
-        finish(false, `服务端返回空内容（HTTP ${status}），换个模型或把最大 token 调大再试。`);
+        finish(false, `服务端返回空内容（HTTP ${status}，通道 ${ch.label}），换个模型或把最大 token 调大再试。`);
       } else {
         finish(true);
       }
     };
     window.__axvAiError = (rid, msg) => {
       if (rid !== id || settled) return;
+      sawAny = true;
       const m = /^(\d{3})\s?/.exec(msg || "");
       if (m && Number(m[1]) >= 400) {
         finish(false, humanizeError(null, Number(m[1]), (msg || "").slice(4)));

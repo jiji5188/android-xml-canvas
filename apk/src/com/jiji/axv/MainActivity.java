@@ -77,6 +77,8 @@ public class MainActivity extends Activity {
     private Bridge bridge;
     /** M32c：AI 专用 MessagePort（不依赖 JS 桥对象注册表，页面重载后重建） */
     private android.webkit.WebMessagePort aiPort;
+    /** M33：port 是否经过 JS 握手确认（未确认就用 evaluateJavascript，避免静默丢消息） */
+    private volatile boolean aiPortOk = false;
     private FrameLayout root;
     private TextView diag;
     private ScrollView diagScroll;
@@ -261,6 +263,7 @@ public class MainActivity extends Activity {
             android.webkit.WebMessagePort[] ch = web.createWebMessageChannel();
             final android.webkit.WebMessagePort mine = ch[0];
             android.webkit.WebMessagePort theirs = ch[1];
+            aiPortOk = false;
             mine.setWebMessageCallback(new android.webkit.WebMessagePort.WebMessageCallback() {
                 @Override
                 public void onMessage(android.webkit.WebMessagePort port, android.webkit.WebMessage message) {
@@ -269,8 +272,9 @@ public class MainActivity extends Activity {
                 }
             });
             aiPort = mine;
+            // targetOrigin 只能是 scheme://host[:port]，带路径会被当非法 origin 直接丢掉
             web.postWebMessage(new android.webkit.WebMessage("axv-ai-init",
-                    new android.webkit.WebMessagePort[]{theirs}), Uri.parse(HOST + "/xml/"));
+                    new android.webkit.WebMessagePort[]{theirs}), Uri.parse(HOST));
         } catch (Throwable t) {
             Log.e(TAG, "setupAiPort", t);
             aiPort = null;
@@ -618,6 +622,64 @@ public class MainActivity extends Activity {
             }
         }
 
+        /** M33：异步读文件（后台线程，不卡 UI 线程/JS）。结果回调：
+         *    window.__axvIo(id, textOrNull)    —— 文本
+         *    window.__axvIo(id, base64OrNull)  —— base64
+         *    window.__axvIo(id, listDirJson)   —— listDir
+         *  为什么：APK 里所有读操作原都是同步 JAN 调用，项目列要读几十个文件，
+         *  直接把 JS 线程堵住 → 项目页面一点就卡。 */
+        @JavascriptInterface
+        public void readTextAsync(final String id, final String target) {
+            ioAsync(id, new java.util.concurrent.Callable<String>() {
+                @Override
+                public String call() throws Exception {
+                    return readTextTarget(target);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void readBase64Async(final String id, final String target) {
+            ioAsync(id, new java.util.concurrent.Callable<String>() {
+                @Override
+                public String call() throws Exception {
+                    byte[] bytes = readBytesTarget(target);
+                    return bytes == null ? null
+                            : android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void listDirAsync(final String id, final String path) {
+            ioAsync(id, new java.util.concurrent.Callable<String>() {
+                @Override
+                public String call() throws Exception {
+                    return listDirJson(path);
+                }
+            });
+        }
+
+        private void ioAsync(final String id, final java.util.concurrent.Callable<String> job) {
+            if (id == null) return;
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    String out = null;
+                    try {
+                        out = job.call();
+                    } catch (Throwable t) {
+                        out = null;
+                    }
+                    final String js = "window.__axvIo&&window.__axvIo(" + JSONObject.quote(id) + ","
+                            + (out == null ? "null" : JSONObject.quote(out)) + ")";
+                    aiEval(js);
+                }
+            }, "axv-io-" + id);
+            t.setDaemon(true);
+            t.start();
+        }
+
         /** 读文本：支持绝对路径（限默认目录下）或 content:// URI */
         @JavascriptInterface
         public String readText(String target) {
@@ -691,12 +753,13 @@ public class MainActivity extends Activity {
             } catch (Throwable ignored) {
             }
             android.webkit.WebMessagePort p = aiPort;
-            if (p != null && payload != null) {
+            if (p != null && aiPortOk && payload != null) {
                 try {
                     p.postMessage(new android.webkit.WebMessage(payload));
                     return;
                 } catch (Throwable t) {
                     aiPort = null;
+                    aiPortOk = false;
                 }
             }
             // 回退：老路（evaluateJavascript 调 window.__axvAi*）
@@ -720,7 +783,10 @@ public class MainActivity extends Activity {
             try {
                 JSONObject o = new JSONObject(json == null ? "{}" : json);
                 String type = o.optString("type", "");
-                if (type.equals("aiChatStream")) {
+                if (type.equals("aiHello")) {
+                    // JS 收到 port 后回握手 —— 证明这条路真的是通的
+                    aiPortOk = true;
+                } else if (type.equals("aiChatStream")) {
                     runAiStream(
                             o.optString("id"),
                             o.optString("url"),

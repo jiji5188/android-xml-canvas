@@ -227,7 +227,8 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
     const res = await streamChat(
       { ...cfg, maxTokens: 1024 },
       [{ role: "user", content: "只回复两个字：可用" }],
-      { timeoutMs: 30_000 },
+      // M33：首包可能慢（思考型模型先打 reasoning）+ 手机网络，30s 太紧
+      { timeoutMs: 60_000 },
     );
     setTesting(false);
     if (res.ok) {
@@ -235,7 +236,9 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
       onNote?.("连接正常：" + res.content.trim().slice(0, 20));
       setChat((c) => [...c, { role: "assistant", content: `连接测试通过，模型回复：${res.content.trim().slice(0, 60)}` }]);
     } else {
-      setErr(res.error || "连接失败");
+      // 带上通道名，方便判断是网络/通道问题还是服务端慢
+      const tail = res.channel ? `（通道 ${res.channel}）` : "";
+      setErr((res.error || "连接失败") + tail);
     }
   }, [cfg, onNote]);
 

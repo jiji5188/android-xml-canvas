@@ -6,6 +6,10 @@
 //  - 拖到某行的**下 1/4**  → 成为该节点的下一个兄弟（移到兄弟层）
 //  - 拖到某行的**中间 1/2** 且目标是容器 → 成为它的最后一个子项（移到子组件层）
 //  三种落点分别显示蓝线 / 蓝线 / 高亮框，一眼能看出会掉到哪一层。
+//
+// M31j：拖拽从 HTML5 drag&drop 改成 pointer 事件。
+//   原实现桌面能拖、**APK（WebView 触摸）完全拖不动**——WebView 不派发 dragstart。
+//   现在鼠标直接拖、手指长按 220ms 后拖，两者共用同一套落点判定。
 
 "use client";
 
@@ -13,9 +17,10 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import type { XmlNode } from "../lib/xml/types";
 import { isContainerTag } from "../lib/xml/insert";
 import { filterLayerTree } from "../lib/xml/layer-filter";
+import { autoScrollDelta, canDropOn, shouldStartDrag, zoneAt, type DropZone } from "../lib/xml/layer-drag";
 
 /** 拖拽落点位置 */
-export type DropZone = "before" | "inside" | "after";
+export type { DropZone };
 
 export interface DropTarget {
   path: string;
@@ -37,8 +42,6 @@ interface Props {
   /** M20m：切换某个节点的锁定状态 */
   onToggleLock?: (path: string) => void;
 }
-
-const DRAG_MIME = "application/x-axv-layer";
 
 export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDragMove, lockedPaths, onToggleLock }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -75,14 +78,102 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
     return n.tag;
   };
 
-  /** 光标在行内的相对位置 → 落点 */
-  const zoneOf = (e: React.DragEvent<HTMLDivElement>, isContainer: boolean): DropZone => {
-    const r = e.currentTarget.getBoundingClientRect();
-    const y = (e.clientY - r.top) / r.height;
-    if (!isContainer) return y < 0.5 ? "before" : "after";
-    if (y < 0.25) return "before";
-    if (y > 0.75) return "after";
-    return "inside";
+  /* ===== M31j：pointer 拖拽（鼠标 + 触摸通用） ===== */
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const dragFromRef = useRef<string | null>(null);
+  const dropRef = useRef<DropTarget | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => cleanupRef.current?.(), []);
+
+  const endDrag = () => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    dragFromRef.current = null;
+    dropRef.current = null;
+    setDragPath(null);
+    setDrop(null);
+    document.body.classList.remove("axv-lt-dragging");
+  };
+
+  /** 在手势开始时绑窗口监听（不依赖行的 pointermove，手指移出行也能继续拖） */
+  const beginPress = (path: string, e: React.PointerEvent<HTMLDivElement>) => {
+    if (!onDragMove) return;
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    if ((e.target as HTMLElement).closest("button, input, select, a")) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const t0 = Date.now();
+    const pointerType = e.pointerType || "mouse";
+    const pointerId = e.pointerId;
+
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      if (!dragFromRef.current) {
+        if (!shouldStartDrag({ pointerType, dx: ev.clientX - startX, dy: ev.clientY - startY, elapsedMs: Date.now() - t0 })) return;
+        dragFromRef.current = path;
+        setDragPath(path);
+        document.body.classList.add("axv-lt-dragging");
+      }
+      ev.preventDefault();
+      // 命中测试：取指针下最上层的图层行
+      const els = document.elementsFromPoint(ev.clientX, ev.clientY) as HTMLElement[];
+      const rowEl = els.find((el) => el?.classList?.contains("axv-lt-row"));
+      if (!rowEl) {
+        if (dropRef.current) {
+          dropRef.current = null;
+          setDrop(null);
+        }
+      } else {
+        const targetPath = rowEl.dataset.path || "";
+        const r = rowEl.getBoundingClientRect();
+        const isContainer = rowEl.dataset.container === "1";
+        const z = canDropOn(path, targetPath) ? zoneAt(ev.clientY, r.top, r.height, isContainer) : null;
+        if (z) {
+          const next = { path: targetPath, zone: z };
+          if (!dropRef.current || dropRef.current.path !== next.path || dropRef.current.zone !== next.zone) {
+            dropRef.current = next;
+            setDrop(next);
+          }
+        } else if (dropRef.current) {
+          dropRef.current = null;
+          setDrop(null);
+        }
+      }
+      // 列表上下边缘自动滚动
+      const list = listRef.current;
+      if (list) {
+        const lr = list.getBoundingClientRect();
+        const d = autoScrollDelta(ev.clientY, lr.top, lr.bottom);
+        if (d) list.scrollTop += d;
+      }
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const from = dragFromRef.current;
+      const target = dropRef.current;
+      if (from && target && onDragMove) onDragMove(from, target);
+      endDrag();
+    };
+
+    const onTouchMove = (ev: TouchEvent) => {
+      if (dragFromRef.current) ev.preventDefault();
+    };
+
+    const onCancel = () => endDrag();
+
+    cleanupRef.current = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      document.removeEventListener("touchmove", onTouchMove);
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
   };
 
   const isDescendant = (child: string, ancestor: string): boolean => {
@@ -92,12 +183,10 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
     return a.every((seg, i) => seg === c[i]);
   };
 
+  /** 旧接口保留：供行高亮模板与外部复用（新拖拽走 lib/xml/layer-drag.ts） */
   const allowDrop = (targetPath: string): boolean => {
     if (!dragPath) return false;
-    if (dragPath === targetPath) return false;
-    // 不能拖进自己内部
-    if (isDescendant(targetPath, dragPath)) return false;
-    return true;
+    return canDropOn(dragPath, targetPath);
   };
 
   const renderItem = (n: XmlNode, depth: number, siblingCount: number) => {
@@ -110,25 +199,13 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
     const zone = drop?.path === n.path ? drop.zone : null;
     const dragging = dragPath === n.path;
 
-    const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-      if (!onDragMove || !allowDrop(n.path)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const z = zoneOf(e, isContainer && !isRoot);
-      e.dataTransfer.dropEffect = "move";
-      if (!drop || drop.path !== n.path || drop.zone !== z) setDrop({ path: n.path, zone: z });
+    const onDragOver = (_e: React.DragEvent<HTMLDivElement>) => {
+      /* M31j：HTML5 拖拽已废弃（WebView 触摸不触发），改成 pointer；这里只吞掉原生拖拽事件 */
     };
 
     const onDropHere = (e: React.DragEvent<HTMLDivElement>) => {
-      if (!onDragMove) return;
       e.preventDefault();
       e.stopPropagation();
-      const from = e.dataTransfer.getData(DRAG_MIME) || dragPath;
-      const z = zone ?? "after";
-      setDrop(null);
-      setDragPath(null);
-      if (!from || from === n.path) return;
-      onDragMove(from, { path: n.path, zone: z });
     };
 
     return (
@@ -148,25 +225,15 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
             (locked ? " locked" : "") +
             (filter.active && filter.hits.has(n.path) ? " hit" : "")
           }
+          data-path={n.path}
+          data-container={isContainer ? "1" : "0"}
           style={{ paddingLeft: 10 + depth * 14 }}
           onClick={() => onSelect(n.path)}
-          draggable={!!onDragMove && !isRoot && !locked}
-          onDragStart={(e) => {
-            if (!onDragMove || isRoot || locked) return;
-            e.stopPropagation();
-            e.dataTransfer.setData(DRAG_MIME, n.path);
-            e.dataTransfer.effectAllowed = "move";
-            setDragPath(n.path);
-          }}
-          onDragEnd={() => {
-            setDragPath(null);
-            setDrop(null);
+          onPointerDown={(e) => {
+            if (isRoot || locked) return;
+            beginPress(n.path, e);
           }}
           onDragOver={onDragOver}
-          onDragLeave={(e) => {
-            if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-            if (drop?.path === n.path) setDrop(null);
-          }}
           onDrop={onDropHere}
         >
           {kids.length > 0 ? (
@@ -216,7 +283,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
   };
 
   return (
-    <div className="axv-lt">
+    <div className="axv-lt" ref={listRef}>
       <div className="axv-lt-search">
         <input
           className="axv-lt-search-input"
@@ -242,7 +309,11 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
         renderItem(root, 0, 1)
       )}
       {onDragMove ? (
-        <div className="axv-lt-hint">拖动可调整层级：靠上/靠下 = 换兄弟位置，中间 = 放进容器</div>
+        <div className="axv-lt-hint">
+          {dragPath
+            ? "松手完成移动：行上方/下方 = 换兄弟位置，容器中间 = 放进容器"
+            : "拖动可调整层级（手机长按 0.2 秒再拖）：靠上/靠下 = 换兄弟位置，中间 = 放进容器"}
+        </div>
       ) : null}
     </div>
   );

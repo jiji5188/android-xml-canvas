@@ -1176,6 +1176,10 @@
   border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
+  /* M31j：拖拽是 pointer 实现，行内禁止选中/长按菜单，否则手机长按会弹系统菜单 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .axv-lt-row:hover {
   background: rgba(4, 64, 159, 0.06);
@@ -1281,8 +1285,15 @@
   border-bottom: 1px dashed #ececf2;
   margin-bottom: 4px;
 }
-.axv-lt-row[draggable="true"] {
+/* M31j：不再用 draggable 属性，改用可按压状态给 grab 光标 */
+.axv-lt-row {
   cursor: grab;
+}
+body.axv-lt-dragging,
+body.axv-lt-dragging .axv-lt-row {
+  cursor: grabbing !important;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .axv-lt-row.dragging {
   opacity: 0.4;
@@ -2061,7 +2072,7 @@
   color: var(--axv-on-primary);
 }
 /* tab 之间的示例下拉框 */
-.axv-mob-tabs .axv-tab-sample {
+.axv-tab-sample {
   height: 24px;
   padding: 0 8px;
   border: none;
@@ -2075,7 +2086,7 @@
   max-width: 120px;
   flex: 0 0 auto;
 }
-.axv-mob-tabs .axv-tab-sample:focus { outline: 2px solid #04409F; }
+.axv-tab-sample:focus { outline: 2px solid #04409F; }
 .axv-mob-xml {
   position: absolute;
   /* M11d：工具栏贴顶后整体上移（0~46 工具栏 + 52~92 标签栏 → 100 起） */

@@ -414,7 +414,7 @@ export function XmlEditor() {
   /** M9：文件切换下拉框（桌面/移动共用）：项目里的文件 + 3 个操作项 */
   const fileSelect = (
     <select
-      className="axv-tb-select"
+      className="axv-tb-select axv-tab-sample"
       title="项目文件（多文件切换）"
       value=""
       onChange={(e) => {

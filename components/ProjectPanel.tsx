@@ -244,32 +244,29 @@ export function ProjectPanel(p: ProjectPanelProps) {
         <div className="axv-ws-panel">
           <div className="axv-ws-path">
             <button
+              className="axv-rail-mini-btn"
+              onClick={() => void p.onOpenDir()}
+              title="选一个项目文件夹（含 layout/*.xml）作为当前项目"
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
+              {tr("proj.open", "打开")}
+            </button>
+            <button
+              className="axv-rail-mini-btn"
+              onClick={() => p.onNewProject(p.projectName || "MyApp")}
+              title="新建一个带 activity_main.xml 的空项目"
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
+              {tr("proj.new", "新建项目")}
+            </button>
+
+            <button
               className="axv-ws-mini"
               title="刷新列表"
               onClick={() => void p.onRefresh()}
             >
               <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
             </button>
-
-            {/* M31c：操作按钮挪进路径条内（原来的 folder_open 图标与路径文字已删） */}
-            <div className="axv-ws-actions">
-              <button
-                className="axv-rail-mini-btn"
-                onClick={() => void p.onOpenDir()}
-                title="选一个项目文件夹（含 layout/*.xml）作为当前项目"
-              >
-                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
-                {tr("proj.open", "打开")}
-              </button>
-              <button
-                className="axv-rail-mini-btn"
-                onClick={() => p.onNewProject(p.projectName || "MyApp")}
-                title="新建一个带 activity_main.xml 的空项目"
-              >
-                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
-                {tr("proj.new", "新建项目")}
-              </button>
-            </div>
           </div>
 
           {wsState?.mode === "native" && wsState.allFiles === false ? (

@@ -2542,6 +2542,16 @@ const findResolved = findResolvedNode;
           }
         >
           <div className="axv-mob-tabs-inner" role="tablist" aria-label="视图">
+          {/* M31e：「XML 代码」改叫「代码」并挪到「预览」前面 —— 以后要在这里接 Java 代码显示 */}
+          <button
+            role="tab"
+            aria-selected={mobileTab === "xml"}
+            className={mobileTab === "xml" ? "on" : ""}
+            onClick={() => setMobileTab("xml")}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
+            代码
+          </button>
           <button
             role="tab"
             aria-selected={mobileTab === "preview"}
@@ -2550,15 +2560,6 @@ const findResolved = findResolvedNode;
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>phone_android</span>
             预览
-          </button>
-          <button
-            role="tab"
-            aria-selected={mobileTab === "xml"}
-            className={mobileTab === "xml" ? "on" : ""}
-            onClick={() => setMobileTab("xml")}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
-            XML 代码
           </button>
           {/* M30b：两个下拉框挪到两个 tab 按钮后面 */}
           <select

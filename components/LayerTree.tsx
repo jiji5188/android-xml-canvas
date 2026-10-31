@@ -32,7 +32,8 @@ interface Props {
   selectedPath: string | null;
   onSelect: (path: string) => void;
   /** 把 targetPath 挪到 toIndex（父级兄弟位置） */
-  onMove: (targetPath: string, toIndex: number) => void;
+  /** M34：上移/下移按钮改成拖拽手柄后不再使用，保留以免破坏调用方 */
+  onMove?: (targetPath: string, toIndex: number) => void;
   /** 删除节点 */
   onRemove: (path: string) => void;
   /** 把 fromPath 拖到目标位置（M3d）；不传则禁用拖拽 */
@@ -46,6 +47,8 @@ interface Props {
 export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDragMove, lockedPaths, onToggleLock }: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragPath, setDragPath] = useState<string | null>(null);
+  /** M34：正按着手柄但还没达到拖拽阈值（长按前 220ms 的视觉反馈） */
+  const [pressPath, setPressPath] = useState<string | null>(null);
   const [drop, setDrop] = useState<DropTarget | null>(null);
   /** M29：搜索过滤（命中 + 祖先 + 后代） */
   const [q, setQ] = useState("");
@@ -91,16 +94,27 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
     cleanupRef.current = null;
     dragFromRef.current = null;
     dropRef.current = null;
+    setPressPath(null);
     setDragPath(null);
     setDrop(null);
     document.body.classList.remove("axv-lt-dragging");
   };
 
-  /** 在手势开始时绑窗口监听（不依赖行的 pointermove，手指移出行也能继续拖） */
-  const beginPress = (path: string, e: React.PointerEvent<HTMLDivElement>) => {
+  /** 在手势开始时绑窗口监听（不依赖行的 pointermove，手指移出行也能继续拖）
+   *  M34：只从**拖拽手柄**启动（fromHandle=true）；在行上按不触发拖拽，避免和滚动/点选打架 */
+  const beginPress = (path: string, e: React.PointerEvent<HTMLElement>, fromHandle = false) => {
     if (!onDragMove) return;
     if (e.button !== 0 && e.pointerType === "mouse") return;
-    if ((e.target as HTMLElement).closest("button, input, select, a")) return;
+    if (!fromHandle && (e.target as HTMLElement).closest("button, input, select, a")) return;
+    // 手柄是真正的拖拽起点：阻止默认行为（文字选中/长按菜单），并让手指移动不滚列表
+    if (fromHandle) {
+      try {
+        e.preventDefault();
+      } catch {
+        /* ignore */
+      }
+      setPressPath(path);
+    }
     const startX = e.clientX;
     const startY = e.clientY;
     const t0 = Date.now();
@@ -112,6 +126,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
       if (!dragFromRef.current) {
         if (!shouldStartDrag({ pointerType, dx: ev.clientX - startX, dy: ev.clientY - startY, elapsedMs: Date.now() - t0 })) return;
         dragFromRef.current = path;
+        setPressPath(null);
         setDragPath(path);
         document.body.classList.add("axv-lt-dragging");
       }
@@ -168,6 +183,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
       document.removeEventListener("touchmove", onTouchMove);
+      setPressPath(null);
     };
 
     window.addEventListener("pointermove", onMove, { passive: false });
@@ -229,10 +245,6 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
           data-container={isContainer ? "1" : "0"}
           style={{ paddingLeft: 10 + depth * 14 }}
           onClick={() => onSelect(n.path)}
-          onPointerDown={(e) => {
-            if (isRoot || locked) return;
-            beginPress(n.path, e);
-          }}
           onDragOver={onDragOver}
           onDrop={onDropHere}
         >
@@ -254,6 +266,34 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
           )}
           <span className="axv-lt-tag">{n.tag.split(".").pop()}</span>
           <span className="axv-lt-label">{label(n)}</span>
+          {/* M34：拖拽手柄放在 actions 之外 —— actions 平时 display:none（只在 hover/选中显示），
+              手柄必须一直看得见，否则手机上根本不知道能拖。右键的⊕↓按钮已去掉 */}
+          {n.path !== "#0" ? (
+            <button
+              className={
+                "axv-lt-handle" +
+                (dragging ? " on" : "") +
+                (pressPath === n.path ? " arming" : "") +
+                (locked ? " off" : "")
+              }
+              title={locked ? "已锁定，不能拖动" : "按住拖动：调顺序 / 放进容器"}
+              aria-label="拖动调整层级"
+              disabled={locked}
+              onPointerDown={(e) => {
+                if (locked) return;
+                e.stopPropagation();
+                beginPress(n.path, e, true);
+              }}
+              onClick={(e) => {
+                // 手柄只负责拖拽，不触发选中
+                e.stopPropagation();
+              }}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>
+                drag_indicator
+              </span>
+            </button>
+          ) : null}
           <span className="axv-lt-actions">
             {onToggleLock ? (
               <button
@@ -270,8 +310,6 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
                 </span>
               </button>
             ) : null}
-            <button title="上移一层" aria-label="上移" disabled={isRoot || locked || myIndex <= 0} onClick={(e) => { e.stopPropagation(); onMove(n.path, myIndex - 1); }}>↑</button>
-            <button title="下移一层" aria-label="下移" disabled={isRoot || locked || myIndex >= siblingCount - 1} onClick={(e) => { e.stopPropagation(); onMove(n.path, myIndex + 1); }}>↓</button>
             <button title="删除" aria-label="删除" className="danger" disabled={isRoot} onClick={(e) => { e.stopPropagation(); onRemove(n.path); }}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>delete</span>
             </button>
@@ -312,7 +350,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
         <div className="axv-lt-hint">
           {dragPath
             ? "松手完成移动：行上方/下方 = 换兄弟位置，容器中间 = 放进容器"
-            : "拖动可调整层级（手机长按 0.2 秒再拖）：靠上/靠下 = 换兄弟位置，中间 = 放进容器"}
+            : "按住右侧 ⠿ 手柄拖动（手机长按 0.2 秒）：靠上/靠下 = 换兄弟位置，中间 = 放进容器"}
         </div>
       ) : null}
     </div>

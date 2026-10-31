@@ -1220,9 +1220,9 @@
 }
 .axv-lt-actions {
   display: none;
+  flex: 0 0 auto;
   align-items: center;
   gap: 2px;
-  margin-left: auto;
 }
 .axv-lt-row:hover .axv-lt-actions,
 .axv-lt-row.sel .axv-lt-actions {
@@ -1251,6 +1251,39 @@
 /* M3b：已在顶/底时按钮置灰（看一眼就知道不能再移） */
 .axv-lt-actions button:disabled {
   color: var(--axv-on-surface-variant);
+  cursor: default;
+}
+/* M34：拖拽手柄：始终可见（手机上没有 hover，靠它才知道能拖）、按下/拖拽中变色、锁定置灰；touch-action none 保证长按 220ms 后能拖而不是滚列表 */
+.axv-lt-handle {
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--axv-on-surface-variant);
+  cursor: grab;
+  touch-action: none;
+}
+.axv-lt-handle:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--axv-on-surface);
+}
+.axv-lt-handle.arming {
+  background: var(--axv-primary-soft);
+  color: var(--axv-primary);
+}
+.axv-lt-handle.on {
+  cursor: grabbing;
+  color: var(--axv-primary);
+}
+.axv-lt-handle.off {
+  color: var(--axv-on-surface-variant);
+  opacity: 0.4;
   cursor: default;
 }
 .axv-lt-actions button:disabled:hover {

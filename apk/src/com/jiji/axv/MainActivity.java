@@ -424,6 +424,10 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** M46：文件操作回调（放在 MainActivity 顶层，Bridge 是内部类，不能声明静态成员） */
+    private interface FileOp { String run(String abs) throws Exception; }
+    private interface FileOp2 { String run(String a, String b) throws Exception; }
+
     /** JS 桥：网页通过 window.AxvNative 调用 */
     public class Bridge {
         @JavascriptInterface
@@ -714,6 +718,184 @@ public class MainActivity extends Activity {
                 Log.e(TAG, "listDir", t);
                 return "{\"ok\":false}";
             }
+        }
+
+        /* ===== M46：项目树文件管理（新建/重命名/移动/复制/删除/存在检查） =====
+         *  全部限默认目录下；每个方法返回 JSON 字符串 {"ok":bool,"error":..}
+         *  越界/失败返回 ok:false，不崩溃。 */
+
+        /** M46：判断路径是否存在 → {"ok":true,"exists":bool} */
+        @JavascriptInterface
+        public String fileExists(String path) {
+            try {
+                return fileOpJson((b) -> {
+                    File f = new File(b);
+                    JSONObject o = new JSONObject();
+                    o.put("ok", true);
+                    o.put("exists", f.exists());
+                    return o.toString();
+                }, path);
+            } catch (Throwable t) {
+                return opError(t);
+            }
+        }
+
+        /** M46：创建空文件或目录（isDir=true 建目录，否则建空文件）→ {"ok":bool,"error":..} */
+        @JavascriptInterface
+        public String createEntry(String path, boolean isDir) {
+            try {
+                return fileOpJson((b) -> {
+                    File f = new File(b);
+                    String base = defaultDir().getCanonicalPath();
+                    String canon = f.getCanonicalPath();
+                    if (!canon.equals(base) && !canon.startsWith(base + File.separator))
+                        return "err:超出工作目录";
+                    if (f.exists()) return "err:同名已存在";
+                    boolean ok;
+                    if (isDir) {
+                        ok = f.mkdirs() || f.isDirectory();
+                    } else {
+                        File parent = f.getParentFile();
+                        if (parent != null && !parent.exists()) parent.mkdirs();
+                        ok = f.createNewFile();
+                    }
+                    JSONObject o = new JSONObject();
+                    o.put("ok", ok);
+                    if (!ok) o.put("error", "创建失败");
+                    return o.toString();
+                }, path);
+            } catch (Throwable t) {
+                return opError(t);
+            }
+        }
+
+        /** M46：重命名/移动（同父目录内改名或跨目录移动）→ {"ok":bool,"error":..} */
+        @JavascriptInterface
+        public String renameEntry(String from, String to) {
+            try {
+                return fileOp2Json((a, b) -> {
+                    File f = new File(a), d = new File(b);
+                    String base = defaultDir().getCanonicalPath();
+                    String ca = f.getCanonicalPath(), cb = d.getCanonicalPath();
+                    String chk = base + File.separator;
+                    if (!ca.equals(base) && !ca.startsWith(chk)) return "err:源超出工作目录";
+                    if (!cb.equals(base) && !cb.startsWith(chk)) return "err:目标超出工作目录";
+                    if (!f.exists()) return "err:源不存在";
+                    if (d.exists()) return "err:目标同名已存在";
+                    File parent = d.getParentFile();
+                    if (parent != null && !parent.exists()) parent.mkdirs();
+                    boolean ok = f.renameTo(d);
+                    JSONObject o = new JSONObject();
+                    o.put("ok", ok);
+                    if (!ok) o.put("error", "重命名失败（跨存储卷时可能需复制+删除）");
+                    return o.toString();
+                }, from, to);
+            } catch (Throwable t) {
+                return opError(t);
+            }
+        }
+
+        /** M46：删除（recursive=true 递归删目录）→ {"ok":bool,"error":..} */
+        @JavascriptInterface
+        public String deleteEntry(String path, boolean recursive) {
+            try {
+                return fileOpJson((b) -> {
+                    File f = new File(b);
+                    String base = defaultDir().getCanonicalPath();
+                    String canon = f.getCanonicalPath();
+                    String chk = base + File.separator;
+                    if (!canon.equals(base) && !canon.startsWith(chk)) return "err:超出工作目录";
+                    // 不允许删工作目录自身
+                    if (canon.equals(base)) return "err:不能删除工作目录本身";
+                    if (!f.exists()) return "err:不存在";
+                    boolean ok = recursive ? deleteRec(f) : f.delete();
+                    JSONObject o = new JSONObject();
+                    o.put("ok", ok);
+                    if (!ok) o.put("error", "删除失败");
+                    return o.toString();
+                }, path);
+            } catch (Throwable t) {
+                return opError(t);
+            }
+        }
+
+        /** M46：复制（目录 recursive=true 递归）→ {"ok":bool,"error":..} */
+        @JavascriptInterface
+        public String copyEntry(String from, String to, boolean recursive) {
+            try {
+                return fileOp2Json((a, b) -> {
+                    File f = new File(a), d = new File(b);
+                    String base = defaultDir().getCanonicalPath();
+                    String ca = f.getCanonicalPath(), cb = d.getCanonicalPath();
+                    String chk = base + File.separator;
+                    if (!ca.equals(base) && !ca.startsWith(chk)) return "err:源超出工作目录";
+                    if (!cb.equals(base) && !cb.startsWith(chk)) return "err:目标超出工作目录";
+                    if (!f.exists()) return "err:源不存在";
+                    if (d.exists()) return "err:目标同名已存在";
+                    boolean ok;
+                    if (f.isDirectory()) {
+                        if (!recursive) return "err:目录需 recursive=true";
+                        ok = copyRec(f, d);
+                    } else {
+                        File parent = d.getParentFile();
+                        if (parent != null && !parent.exists()) parent.mkdirs();
+                        ok = copyFileRec(f, d);
+                    }
+                    JSONObject o = new JSONObject();
+                    o.put("ok", ok);
+                    if (!ok) o.put("error", "复制失败");
+                    return o.toString();
+                }, from, to);
+            } catch (Throwable t) {
+                return opError(t);
+            }
+        }
+
+        /* M46 helper：越界检查 + 执行 */
+        private String opError(Throwable t) {
+            try {
+                JSONObject o = new JSONObject();
+                o.put("ok", false);
+                o.put("error", String.valueOf(t.getMessage()));
+                return o.toString();
+            } catch (Throwable e) {
+                return "{\"ok\":false}";
+            }
+        }
+
+        private String fileOpJson(FileOp op, String path) throws Exception {
+            if (path == null) return opError(new Exception("path 为空"));
+            return op.run(path);
+        }
+        private String fileOp2Json(FileOp2 op, String a, String b) throws Exception {
+            if (a == null || b == null) return opError(new Exception("参数为空"));
+            return op.run(a, b);
+        }
+
+        private boolean deleteRec(File f) {
+            File[] kids = f.listFiles();
+            if (kids != null) for (File c : kids) deleteRec(c);
+            return f.delete();
+        }
+        private boolean copyRec(File f, File d) {
+            if (!d.isDirectory() && !d.mkdirs()) return false;
+            File[] kids = f.listFiles();
+            if (kids == null) return true;
+            for (File c : kids) {
+                File dst = new File(d, c.getName());
+                if (!c.isDirectory() || !copyRec(c, dst)) {
+                    if (c.isDirectory() && !copyRec(c, dst)) return false;
+                }
+            }
+            return true;
+        }
+        private boolean copyFileRec(File f, File d) {
+            try (InputStream in = new java.io.FileInputStream(f);
+                 OutputStream os = new java.io.FileOutputStream(d)) {
+                byte[] buf = new byte[8192]; int n;
+                while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
+                return true;
+            } catch (Throwable t) { return false; }
         }
 
         /* ===== M32：AI 流式直连（原生 HTTP，不受 WebView 跨域限制） =====

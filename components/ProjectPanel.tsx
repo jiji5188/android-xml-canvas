@@ -6,13 +6,24 @@
 //
 // 树的展开状态、已加载的子项都放在组件内部：它们是纯 UI 状态，没必要塞回 XmlEditor。
 
-import { memo, useCallback, useEffect, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { BrowseEntry, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
 import { isIconDirRel, isImageName, readEntryImageUrl, resDirDescription } from "@/lib/xml/project-browse";
 import type { WsInfo, WsProject } from "@/lib/xml/workspace";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import { resOpenAction } from "@/lib/xml/resource-open";
 import type { Project } from "@/lib/xml/multi-file";
+import type { FileOpsCtx } from "@/lib/xml/file-ops";
+import { createEntry, deleteEntry, renameEntry } from "@/lib/xml/file-ops";
+import {
+  ConfirmDialog,
+  MessageDialog,
+  NewEntryDialog,
+  RenameDialog,
+  TreeFileMenu,
+  type MenuAction,
+  type TreeNodeRef,
+} from "@/components/TreeFileMenu";
 
 export interface ProjectPanelProps {
   tr: (key: string, fallback: string) => string;
@@ -54,6 +65,11 @@ export interface ProjectPanelProps {
   resExtras: ResourceExtras | null;
   onOpenDrawable: (rel: string, name: string, xml: string) => void;
   onPreviewImage: (rel: string, name: string, url: string) => void;
+
+  /** M46：文件操作后端（null = 拿不到根，不显示长按菜单） */
+  fileOps?: FileOpsCtx | null;
+  /** M46：写操作完成后通知外部刷新（+1 projectRev 即可） */
+  onFilesChanged?: () => void;
 }
 
 type LoadState = BrowseEntry[] | "loading";
@@ -96,7 +112,8 @@ function TreeRowIcon(props: { entry: BrowseEntry; isDir: boolean; isOpen: boolea
 
 /* ---------------- 懒加载结构树 ---------------- */
 
-function LazyTreeInner(props: {
+/** M46：导出供 jsdom 测试直接挂载（正式使用走下方 memo 包装） */
+export function LazyTreeInner(props: {
   source: ProjectSource;
   rev: number;
   currentFileName: string;
@@ -105,10 +122,26 @@ function LazyTreeInner(props: {
   extras: ResourceExtras | null;
   onOpenDrawable: (rel: string, name: string, xml: string) => void;
   onPreviewImage: (rel: string, name: string, url: string) => void;
+  /** M46：文件操作（null = 不支持，不绑长按） */
+  fileOps?: FileOpsCtx | null;
+  onFilesChanged?: () => void;
 }) {
-  const { source, rev, currentFileName, onOpenEntry, extras, onOpenDrawable, onPreviewImage } = props;
+  const { source, rev, currentFileName, onOpenEntry, extras, onOpenDrawable, onPreviewImage, fileOps } = props;
   const [kids, setKids] = useState<Record<string, LoadState>>({});
   const [open, setOpen] = useState<Set<string>>(new Set([""]));
+
+  /* ---- M46：长按菜单 / 弹窗状态 ---- */
+  const [menu, setMenu] = useState<{ x: number; y: number; target: TreeNodeRef } | null>(null);
+  const [dlg, setDlg] = useState<
+    | { kind: "new"; target: TreeNodeRef }
+    | { kind: "rename"; target: TreeNodeRef }
+    | { kind: "delete"; target: TreeNodeRef }
+    | { kind: "msg"; title: string; text: string }
+    | null
+  >(null);
+  const [busy, setBusy] = useState(false);
+  /** 复制标记（M46 第二步的粘贴功能用；本步只记录） */
+  const [clipboard, setClipboard] = useState<TreeNodeRef | null>(null);
 
   /** 读某一层（已读过就不重复读） */
   const load = useCallback(
@@ -174,6 +207,144 @@ function LazyTreeInner(props: {
     onOpenEntry(e);
   };
 
+  /* ---- M46：长按 → 操作菜单 ---- */
+  const pressRef = useRef<{ timer: number | null; x: number; y: number; moved: boolean }>({
+    timer: null,
+    x: 0,
+    y: 0,
+    moved: false,
+  });
+
+  const cancelPress = () => {
+    const st = pressRef.current;
+    if (st.timer != null) {
+      window.clearTimeout(st.timer);
+      st.timer = null;
+    }
+  };
+
+  const beginPress = (e: React.PointerEvent, node: TreeNodeRef) => {
+    if (!fileOps) return;
+    if (e.button === 2) {
+      e.preventDefault();
+      setMenu({ x: e.clientX, y: e.clientY, target: node });
+      return;
+    }
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const st = pressRef.current;
+    cancelPress();
+    st.x = e.clientX;
+    st.y = e.clientY;
+    st.moved = false;
+    st.timer = window.setTimeout(() => {
+      st.timer = null;
+      if (st.moved) return;
+      setMenu({ x: st.x, y: st.y, target: node });
+    }, 450);
+  };
+
+  const movePress = (e: React.PointerEvent) => {
+    const st = pressRef.current;
+    if (st.timer == null) return;
+    if (Math.abs(e.clientX - st.x) > 8 || Math.abs(e.clientY - st.y) > 8) {
+      st.moved = true;
+      cancelPress();
+    }
+  };
+
+  /** 取某个目录层已加载的名字集合（查重用） */
+  const takenOf = (parentRel: string): Set<string> => {
+    const items = kids[parentRel];
+    if (!items || items === "loading") return new Set();
+    return new Set(items.map((it) => it.name));
+  };
+
+  const parentOfRel = (rel: string) => (rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "");
+
+  /** 写操作完 → 重读父目录（并清掉该目录下子缓存） */
+  const refreshDir = async (parentRel: string) => {
+    const items = await source.listChildren(parentRel);
+    setKids((prev) => {
+      const next: Record<string, LoadState> = { ...prev, [parentRel]: items };
+      for (const k of Object.keys(next)) {
+        if (k !== parentRel && k.startsWith(parentRel ? parentRel + "/" : "")) delete next[k];
+      }
+      return next;
+    });
+    props.onFilesChanged?.();
+  };
+
+  const runAction = (a: MenuAction) => {
+    const target = menu?.target;
+    setMenu(null);
+    if (!target) return;
+    if (a === "new") return setDlg({ kind: "new", target });
+    if (a === "rename") return setDlg({ kind: "rename", target });
+    if (a === "delete") return setDlg({ kind: "delete", target });
+    if (a === "copy") {
+      setClipboard(target);
+      setDlg({ kind: "msg", title: "已复制", text: `已记下「${target.name}」，粘贴功能在下一步提供。` });
+      return;
+    }
+    if (a === "move" || a === "paste") {
+      setDlg({ kind: "msg", title: "下一步支持", text: "移动 / 拖拽排序 / 粘贴将在下一步实现。" });
+    }
+  };
+
+  const doCreate = async (o: { name: string; isDir: boolean; parentRel: string }) => {
+    if (!fileOps) return;
+    setDlg(null);
+    setBusy(true);
+    const r = await createEntry(fileOps, o);
+    setBusy(false);
+    if (!r.ok) {
+      setDlg({
+        kind: "msg",
+        title: "创建失败",
+        text: r.reason === "web" ? "网页版不支持写操作，请用 APK。" : r.reason || "未知错误",
+      });
+      return;
+    }
+    if (o.parentRel) setOpen((prev) => new Set(prev).add(o.parentRel));
+    await refreshDir(o.parentRel);
+  };
+
+  const doRename = async (newName: string) => {
+    const target = dlg?.kind === "rename" ? dlg.target : null;
+    if (!fileOps || !target) return;
+    setDlg(null);
+    setBusy(true);
+    const r = await renameEntry(fileOps, target.rel, newName);
+    setBusy(false);
+    if (!r.ok) {
+      setDlg({
+        kind: "msg",
+        title: "重命名失败",
+        text: r.reason === "web" ? "网页版不支持重命名，请用 APK。" : r.reason || "未知错误",
+      });
+      return;
+    }
+    await refreshDir(parentOfRel(target.rel));
+  };
+
+  const doDelete = async () => {
+    const target = dlg?.kind === "delete" ? dlg.target : null;
+    if (!fileOps || !target) return;
+    setDlg(null);
+    setBusy(true);
+    const r = await deleteEntry(fileOps, target.rel, target.isDir);
+    setBusy(false);
+    if (!r.ok) {
+      setDlg({
+        kind: "msg",
+        title: "删除失败",
+        text: r.reason === "web" ? "网页版不支持删除，请用 APK。" : r.reason || "未知错误",
+      });
+      return;
+    }
+    await refreshDir(parentOfRel(target.rel));
+  };
+
   const renderRows = (rel: string, depth: number): ReactNode[] => {
     const items = kids[rel];
     const iconDir = isIconDirRel(rel);
@@ -202,9 +373,23 @@ function LazyTreeInner(props: {
       const isDir = n.kind === "dir";
       const isOpen = isDir && open.has(n.rel);
       const editing = !isDir && currentFileName && n.name.toLowerCase() === currentFileName.toLowerCase();
+      const nodeRef: TreeNodeRef = { rel: n.rel, name: n.name, isDir };
       rows.push(
         <li key={n.rel + ":" + n.kind}>
-          <div className="axv-ws-row" style={{ paddingLeft: depth * 14 }}>
+          <div
+            className="axv-ws-row"
+            style={{ paddingLeft: depth * 14 }}
+            onPointerDown={(e) => beginPress(e, nodeRef)}
+            onPointerMove={movePress}
+            onPointerUp={cancelPress}
+            onPointerCancel={cancelPress}
+            onPointerLeave={cancelPress}
+            onContextMenu={(e) => {
+              if (!fileOps) return;
+              e.preventDefault();
+              setMenu({ x: e.clientX, y: e.clientY, target: nodeRef });
+            }}
+          >
             {isDir ? (
               <button
                 className="axv-ws-caret"
@@ -249,7 +434,56 @@ function LazyTreeInner(props: {
     return rows;
   };
 
-  return <ul className="axv-ws-list axv-proj-tree">{renderRows("", 0)}</ul>;
+  return (
+    <>
+      <ul className="axv-ws-list axv-proj-tree">{renderRows("", 0)}</ul>
+      {busy ? <div className="axv-ws-hint">正在处理…</div> : null}
+
+      {menu ? (
+        <TreeFileMenu
+          x={menu.x}
+          y={menu.y}
+          target={menu.target}
+          canWrite={!!fileOps && fileOps.backend === "native"}
+          hasClipboard={!!clipboard}
+          onAction={runAction}
+          onClose={() => setMenu(null)}
+        />
+      ) : null}
+
+      {dlg?.kind === "new" ? (
+        <NewEntryDialog
+          target={dlg.target}
+          takenNames={takenOf(dlg.target.isDir && dlg.target.rel ? dlg.target.rel : parentOfRel(dlg.target.rel))}
+          onSubmit={(o) => void doCreate(o)}
+          onClose={() => setDlg(null)}
+        />
+      ) : null}
+
+      {dlg?.kind === "rename" ? (
+        <RenameDialog
+          target={dlg.target}
+          takenNames={takenOf(parentOfRel(dlg.target.rel))}
+          onSubmit={(n) => void doRename(n)}
+          onClose={() => setDlg(null)}
+        />
+      ) : null}
+
+      {dlg?.kind === "delete" ? (
+        <ConfirmDialog
+          title="删除"
+          text={`确定删除「${dlg.target.name}」？${dlg.target.isDir ? "目录及其内容将被递归删除，" : ""}此操作不可撤销。`}
+          danger
+          onOk={() => void doDelete()}
+          onClose={() => setDlg(null)}
+        />
+      ) : null}
+
+      {dlg?.kind === "msg" ? (
+        <MessageDialog title={dlg.title} text={dlg.text} onClose={() => setDlg(null)} />
+      ) : null}
+    </>
+  );
 }
 
 /** M30：树只关心「换了项目 / 手动刷新 / 当前文件名」，父组件其它 state 变化不该让它重建。
@@ -258,7 +492,8 @@ const LazyTree = memo(LazyTreeInner, (a, b) =>
   a.source === b.source &&
   a.rev === b.rev &&
   a.currentFileName === b.currentFileName &&
-  a.extras === b.extras,
+  a.extras === b.extras &&
+  a.fileOps === b.fileOps,
 );
 
 /* ---------------- 面板 ---------------- */
@@ -433,6 +668,8 @@ export function ProjectPanel(p: ProjectPanelProps) {
                 extras={p.resExtras}
                 onOpenDrawable={p.onOpenDrawable}
                 onPreviewImage={p.onPreviewImage}
+                fileOps={p.fileOps ?? null}
+                onFilesChanged={p.onFilesChanged}
               />
             ) : (
               <ul className="axv-ws-list axv-proj-tree">

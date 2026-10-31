@@ -14,6 +14,7 @@
 import { nativeBridge } from "./native-save";
 import { hasAsyncIo, listDirQueued, readBase64Queued, readTextQueued } from "./native-async";
 import { wsListProjects, type WsProject } from "./workspace";
+import type { FileOpsCtx } from "./file-ops";
 
 /** 列目录时跳过的噪声目录（安卓工程里 build/.gradle 体积大且没布局） */
 export const SKIP_DIRS = new Set([
@@ -558,6 +559,18 @@ export async function projectSourceFromWorkspaceItem(item: WsProject): Promise<P
 /** 新建/恢复的项目目录句柄 → ProjectSource */
 export function projectSourceFromDir(dir: unknown, name: string): ProjectSource {
   return webProjectSource(dir, name);
+}
+
+/** M46：从 OpenedProject 推导文件操作的后端和根（native=rootPath/dirPath 绝对路径；web=handle 句柄）
+ *  拿不到 root 时返回 null（调用方不显示文件操作菜单）。 */
+export function fileOpsCtxOf(
+  p: { dirPath?: string; rootPath?: string; handle?: unknown; source?: ProjectSource | null } | null | undefined,
+): FileOpsCtx | null {
+  if (!p) return null;
+  const root = p.rootPath || p.dirPath;
+  if (root && root.startsWith("/")) return { backend: "native", root };
+  if (p.handle) return { backend: "web", root: p.handle };
+  return null;
 }
 
 /* ---------------- 项目名 / 图标 ---------------- */

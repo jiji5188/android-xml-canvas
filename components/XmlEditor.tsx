@@ -64,6 +64,7 @@ import {
 } from "@/lib/xml/project";
 import {
   findMainLayout,
+  fileOpsCtxOf,
   readProjectMeta,
   readProjectMetaNative,
   readProjectMetaFromSource,
@@ -3037,6 +3038,8 @@ const findResolved = findResolvedNode;
               currentFileName={wsActiveName || (currentFile?.name ?? "")}
               onOpenEntry={openProjectEntry}
               onRefreshProject={() => void refreshActiveProject()}
+              fileOps={activeProject ? fileOpsCtxOf(activeProject) : null}
+              onFilesChanged={() => setProjectRev((n) => n + 1)}
               onNewProject={(suggest) => {
                 setNewProjName(suggest);
                 setNewProjOpen(true);

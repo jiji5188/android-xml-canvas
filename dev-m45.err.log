@@ -1,0 +1,181 @@
+⚠ You are using a non-standard "NODE_ENV" value in your environment. This creates inconsistencies in the project and is strongly advised against. Read more: https://nextjs.org/docs/messages/non-standard-node-env
+[browser] ./lib/xml/project-browse.ts:209:160
+Error: Expected ')', got '{'
+  207 | ...
+  208 | ...
+> 209 | ...sJavaDirRel(rel) && isJavaSrcName(e.name)) {
+      |                                               ^
+  210 | ...
+  211 | ...
+  212 | ...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/xml/project-browse.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/xml/project-browse.ts:209:160
+Error: Expected ')', got '{'
+  207 | ...
+  208 | ...
+> 209 | ...sJavaDirRel(rel) && isJavaSrcName(e.name)) {
+      |                                               ^
+  210 | ...
+  211 | ...
+  212 | ...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/xml/project-browse.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/xml/project-browse.ts:209:160
+Error: Expected ')', got '{'
+  207 | ...
+  208 | ...
+> 209 | ...sJavaDirRel(rel) && isJavaSrcName(e.name)) {
+      |                                               ^
+  210 | ...
+  211 | ...
+  212 | ...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/xml/project-browse.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/xml/project-browse.ts:209:160
+Error: Expected ')', got '{'
+  207 | ...
+  208 | ...
+> 209 | ...sJavaDirRel(rel) && isJavaSrcName(e.name)) {
+      |                                               ^
+  210 | ...
+  211 | ...
+  212 | ...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/xml/project-browse.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/xml/project-browse.ts:209:160
+Error: Expected ')', got '{'
+  207 | ...
+  208 | ...
+> 209 | ...sJavaDirRel(rel) && isJavaSrcName(e.name)) {
+      |                                               ^
+  210 | ...
+  211 | ...
+  212 | ...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/xml/project-browse.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/xml/project-browse.ts:209:160
+Error: Expected ')', got '{'
+  207 | ...
+  208 | ...
+> 209 | ...sJavaDirRel(rel) && isJavaSrcName(e.name)) {
+      |                                               ^
+  210 | ...
+  211 | ...
+  212 | ...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/xml/project-browse.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/xml/project-browse.ts:209:160
+Error: Expected ')', got '{'
+  207 | ...
+  208 | ...
+> 209 | ...sJavaDirRel(rel) && isJavaSrcName(e.name)) {
+      |                                               ^
+  210 | ...
+  211 | ...
+  212 | ...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/xml/project-browse.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/xml/project-browse.ts:209:160
+Error: Expected ')', got '{'
+  207 | ...
+  208 | ...
+> 209 | ...sJavaDirRel(rel) && isJavaSrcName(e.name)) {
+      |                                               ^
+  210 | ...
+  211 | ...
+  212 | ...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/xml/project-browse.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/xml/project-browse.ts:209:160
+Error: Expected ')', got '{'
+  207 | ...
+  208 | ...
+> 209 | ...sJavaDirRel(rel) && isJavaSrcName(e.name)) {
+      |                                               ^
+  210 | ...
+  211 | ...
+  212 | ...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/xml/project-browse.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/xml/project-browse.ts:209:160
+Error: Expected ')', got '{'
+  207 | ...
+  208 | ...
+> 209 | ...sJavaDirRel(rel) && isJavaSrcName(e.name)) {
+      |                                               ^
+  210 | ...
+  211 | ...
+  212 | ...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/xml/project-browse.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 

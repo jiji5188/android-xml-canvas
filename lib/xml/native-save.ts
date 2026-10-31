@@ -32,6 +32,16 @@ export interface AxvNativeBridge {
   readBase64?(target: string): string | null;
   /** M31h：列一层目录（绝对路径）→ {"ok":true,"items":[{name,kind,path}]}；越界/不支持返回 ok:false */
   listDir?(path: string): string | null;
+
+  /* ===== M46：项目树文件管理（限默认目录，均返回 JSON 字符串） ===== */
+  /** 创建空文件（isDir=true 建目录）→ {"ok":bool,"error"?} */
+  createEntry?(path: string, isDir: boolean): string;
+  /** 重命名 / 跨目录移动 → {"ok":bool,"error"?} */
+  renameEntry?(from: string, to: string): string;
+  /** 删除（recursive 递归删目录）→ {"ok":bool,"error"?} */
+  deleteEntry?(path: string, recursive: boolean): string;
+  /** 复制（recursive 递归拷贝目录）→ {"ok":bool,"error"?} */
+  copyEntry?(from: string, to: string, recursive: boolean): string;
   /** M19：触觉反馈。type: "long"(长按) / "toggle"(开关·勾选·单选)。
    *  原生用 Vibrator 精确时长；无马达设备静默。返回 true 表示原生已处理。 */
   haptic?(type: string): void;

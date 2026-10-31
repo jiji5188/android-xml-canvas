@@ -472,11 +472,65 @@ export async function readProjectMetaNative(
 /** native 扁平 rel 里的图标文件：.../res/mipmap-xxxhdpi/ic_launcher.png 这类图片 */
 const ICON_REL_RE = /(^|\/)res\/(mipmap|drawable)(-[^\/]*)?\/[^\/]+\.(png|webp|jpe?g)$/i;
 
+/** M44：res/ 直接子目录的作用说明（目录名 → 固定用途）
+ *  例：rel="res/layout" → "界面布局文件"；"res/drawable-xxhdpi" → "图片与矢量资源（xxhdpi 变体）" */
+export const RES_DIR_DESC: Record<string, string> = {
+  layout: "界面布局文件",
+  values: "字符串 / 颜色等资源值",
+  color: "颜色资源",
+  anim: "帧动画",
+  animator: "属性动画",
+  array: "数组资源",
+  drawable: "图片与矢量资源",
+  font: "字体资源",
+  raw: "原始文件（音频、视频等）",
+  menu: "菜单",
+  xml: "自定义 XML 配置",
+  mipmap: "应用图标资源",
+  transition: "场景转场动画",
+  backup: "备份规则",
+  navigation: "导航图",
+  interpolator: "动画插值器",
+};
+
+/** M44：这个目录是不是 res/ 的直接子目录；返回它的作用说明（没有说明返回 null） */
+export function resDirDescription(rel: string): string | null {
+  const parts = rel.split("/").filter(Boolean);
+  if (parts.length < 2) return null;
+  const parent = parts[parts.length - 2].toLowerCase();
+  if (parent !== "res") return null;
+  const name = parts[parts.length - 1].toLowerCase();
+  const [base, ...quals] = name.split("-");
+  const desc = RES_DIR_DESC[base];
+  if (!desc) return null;
+  return quals.length ? `${desc}（${quals.join("-")} 变体）` : desc;
+}
+
+/** M43：这个目录是不是 res/ 的直接子目录（纯函数，可单测） */
+export function isResChildDirRel(rel: string): boolean {
+  const parts = rel.split("/").filter(Boolean);
+  if (parts.length < 2) return false;
+  return parts[parts.length - 2].toLowerCase() === "res";
+}
+
 /** 工作目录里的一个顶层项（文件夹=项目）→ ProjectSource */
 export async function projectSourceFromWorkspaceItem(item: WsProject): Promise<ProjectSource | null> {
   if (nativeBridge()) {
+    // M43：native 的扁平列表里 rel 是「工作目录 → 文件」的完整相对路径，
+    // 而 LazyTree 永远拿 rel="" 当项目根。旧实现直接把整个工作目录喂进来，
+    // 结果「当前项目」树显示的是跟「项目列表」一样的根目录。现在把 item.rel
+    // 剥掉一层：所有 rel 统一映射成「项目内相对路径」再交给 source。
     const all = await wsListProjects();
-    return nativeProjectSource(item.name, all, item.dirPath);
+    const rootRel = item.rel;
+    const prefix = rootRel + "/";
+    const scoped = all.filter((it) => it.rel === rootRel || it.rel.startsWith(prefix));
+    // 相对路径重映射：项目内 rel="" → rootRel；"res" → rootRel/res
+    const remapped: WsProject[] = scoped.map((it) => ({
+      ...it,
+      rel: it.rel === rootRel ? "" : it.rel.slice(prefix.length),
+    }));
+    const base = nativeProjectSource(item.name, remapped, item.dirPath);
+    return base;
   }
   if (item.kind === "dir" && item.handle) return webProjectSource(item.handle, item.name);
   // 单个 xml 文件：把它所在目录当项目根

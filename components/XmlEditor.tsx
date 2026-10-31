@@ -37,6 +37,7 @@ import { projectSaveRoot, saveProjectFile, saveResFiles } from "@/lib/xml/projec
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
 import { isValuesPath } from "@/lib/xml/doc-kind";
 import { looksLikeValuesDoc } from "@/lib/xml/values-edit";
+import { isManifestPath, looksLikeManifest } from "@/lib/xml/manifest-edit";
 import { pickLang } from "@/lib/xml/editor-lang";
 import { lineOfPath, shouldResync } from "@/lib/xml/line-sync";
 import {
@@ -1035,7 +1036,7 @@ export function XmlEditor() {
       if (m) {
         setLeftOpen(false);
         setRightOpen(false);
-        setMobileTab(valuesFileRef.current ? "values" : "xml");
+        setMobileTab(hasViewTabRef.current ? "values" : "xml");
       } else {
         setLeftOpen(true);
         setRightOpen(true);
@@ -1290,14 +1291,22 @@ export function XmlEditor() {
       (docKind === "code" && looksLikeValuesDoc(xml)),
     [openRel, saveOrigin?.name, docKind, xml],
   );
+  /** M43：AndroidManifest.xml → 「视图」页编辑基本字段/权限/组件 */
+  const isManifestFile = useMemo(
+    () => isManifestPath(openRel || saveOrigin?.name || null) || (docKind === "code" && looksLikeManifest(xml)),
+    [openRel, saveOrigin?.name, docKind, xml],
+  );
+  /** 支持表格/表单视图的文件（values / manifest） */
+  const hasViewTab = isValuesFile || isManifestFile;
+  const viewKind: "values" | "manifest" | null = isManifestFile ? "manifest" : isValuesFile ? "values" : null;
   /** M37b/M42：按文件类型定默认页 —— values 文件进「视图」，其他只读代码文件进「代码」 */
   const docKey = openRel || saveOrigin?.name || "";
-  const valuesFileRef = useRef(isValuesFile);
-  valuesFileRef.current = isValuesFile;
+  const hasViewTabRef = useRef(hasViewTab);
+  hasViewTabRef.current = hasViewTab;
   useEffect(() => {
-    if (isValuesFile) setMobileTab("values");
+    if (hasViewTab) setMobileTab("values");
     else if (codeOnly) setMobileTab("xml");
-  }, [isValuesFile, codeOnly, docKey]);
+  }, [hasViewTab, codeOnly, docKey]);
 
   const { model, issues, parseErr, parseReason } = useMemo((): {
     model: RenderModel | null;
@@ -2815,7 +2824,7 @@ const findResolved = findResolvedNode;
             代码
           </button>
           {/* M42：values 资源才有「视图」—— 键值对表格页（.axv-val），紧跟「代码」后面 */}
-          {isValuesFile && (
+          {hasViewTab && (
             <button
               role="tab"
               aria-selected={mobileTab === "values"}
@@ -2927,7 +2936,7 @@ const findResolved = findResolvedNode;
         onFormat={doFormat}
         lang={editorLang}
         indent={editorTheme.indent}
-        view={mobileTab === "values" ? "values" : "code"}
+        view={mobileTab === "values" ? viewKind ?? "code" : "code"}
         fileKey={openRel || saveOrigin?.name || ""}
         onNote={flashNote}
       />

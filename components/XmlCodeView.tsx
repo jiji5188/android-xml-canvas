@@ -11,6 +11,7 @@ import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
 import { CodeEditor } from "./CodeEditor";
 import { ValuesEditor } from "./ValuesEditor";
+import { ManifestEditor } from "./ManifestEditor";
 
 export interface XmlCodeViewProps {
   open: boolean;
@@ -33,7 +34,7 @@ export interface XmlCodeViewProps {
   /** M40：缩进宽度（空格数） */
   indent?: number;
   /** M39/M42：当前页 —— values 文件的键值对表格（`axv-val`）还是代码编辑器（`axv-code-fill`） */
-  view?: "code" | "values";
+  view?: "code" | "values" | "manifest";
   /** M39：文件身份（切文件时重置视图模式） */
   fileKey?: string;
   /** M39：表格视图给个提示回调 */
@@ -56,8 +57,17 @@ export function XmlCodeView(props: XmlCodeViewProps) {
             }
       }
     >
-      {props.view === "values" ? (
+      {props.view === "manifest" ? (
+        <ManifestEditor
+          key={props.fileKey || "manifest"}
+          className="axv-code-fill"
+          xml={props.value}
+          onChange={props.onChange}
+          onNote={props.onNote}
+        />
+      ) : props.view === "values" ? (
         <ValuesEditor
+          key={props.fileKey || "values"}
           className="axv-code-fill"
           xml={props.value}
           onChange={props.onChange}

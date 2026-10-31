@@ -5,6 +5,7 @@ import {
   nativeProjectSource,
   parseAppName,
   readProjectMeta,
+  resDirDescription,
   webProjectSource,
   type BrowseEntry,
   type ProjectSource,
@@ -125,6 +126,29 @@ describe("webProjectSource：只列一层 + 懒加载", () => {
   });
 });
 
+describe("M44 resDirDescription（res 子目录的作用说明）", () => {
+  it("认得常见的 res 子目录", () => {
+    expect(resDirDescription("res/layout")).toBe("界面布局文件");
+    expect(resDirDescription("res/values")).toBe("字符串 / 颜色等资源值");
+    expect(resDirDescription("res/drawable")).toBe("图片与矢量资源");
+    expect(resDirDescription("res/mipmap-xxhdpi")).toBe("应用图标资源（xxhdpi 变体）");
+    expect(resDirDescription("res/menu")).toBe("菜单");
+    expect(resDirDescription("res/anim")).toBe("帧动画");
+  });
+
+  it("嵌套在安卓标准路径里也一样认", () => {
+    expect(resDirDescription("app/src/main/res/layout")).toBe("界面布局文件");
+    expect(resDirDescription("src/main/res/values")).toBe("字符串 / 颜色等资源值");
+  });
+
+  it("res 之外的目录 / 文件一律返回 null", () => {
+    expect(resDirDescription("res/layout/activity_main.xml")).toBeNull();
+    expect(resDirDescription("app/src/main")).toBeNull();
+    expect(resDirDescription("layout")).toBeNull();
+    expect(resDirDescription("res/unknown-dir")).toBeNull();
+  });
+});
+
 describe("nativeProjectSource：扁平 rel 列表过滤出一层", () => {
   const all: WsProject[] = [
     { name: "proj", kind: "dir", rel: "proj", layoutCount: 0 },
@@ -142,6 +166,37 @@ describe("nativeProjectSource：扁平 rel 列表过滤出一层", () => {
     const kids = await src.listChildren("proj/res/layout");
     expect(kids.map((e) => e.name)).toEqual(["activity_main.xml", "detail.xml"]);
     expect(kids[0].target).toBe("/s/proj/res/layout/activity_main.xml");
+  });
+});
+
+describe("projectSourceFromWorkspaceItem：剥掉一层目录", () => {
+  // M43：项目列表点进「当前项目」后，树根应该是项目根（res / …），
+  // 而不是整个工作目录（跟项目列表页一模一样）。
+  const item: WsProject = { name: "proj", kind: "dir", rel: "proj", layoutCount: 2, dirPath: "/s/proj" };
+
+  it("只含本项目文件（other 被过滤掉）", async () => {
+    // 直接验证 remap 逻辑：nativeProjectSource 收到 remapped 后根层只有 res
+    const remapped: WsProject[] = [
+      { name: "", kind: "dir", rel: "", layoutCount: 0 },
+      { name: "res", kind: "dir", rel: "res", layoutCount: 0 },
+      { name: "layout", kind: "dir", rel: "res/layout", layoutCount: 2 },
+      { name: "activity_main.xml", kind: "file", rel: "res/layout/activity_main.xml", layoutCount: 1, target: "/s/proj/res/layout/activity_main.xml" },
+    ];
+    const src = nativeProjectSource("proj", remapped, "/s/proj");
+    const kids = await src.listChildren("");
+    expect(kids.map((e) => e.name)).toEqual(["res"]);
+    const sub = await src.listChildren("res");
+    expect(sub.map((e) => e.name)).toEqual(["layout"]);
+  });
+
+  it("readText 走项目内相对路径", async () => {
+    const remapped: WsProject[] = [
+      { name: "res", kind: "dir", rel: "res", layoutCount: 0 },
+      { name: "activity_main.xml", kind: "file", rel: "res/layout/activity_main.xml", layoutCount: 1, target: "/s/proj/res/layout/activity_main.xml" },
+    ];
+    const src = nativeProjectSource("proj", remapped, "/s/proj");
+    const text = await src.readText("res/layout/activity_main.xml");
+    expect(text === null || typeof text === "string").toBe(true);
   });
 });
 

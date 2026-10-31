@@ -2612,6 +2612,145 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-val-tip {
   opacity: 0.7;
 }
+/* M43：AndroidManifest.xml 视图 */
+.axv-mf .axv-mf-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 0 2px;
+}
+.axv-mf-sec {
+  padding: 4px 10px 10px;
+  border-bottom: 1px solid var(--axv-outline);
+}
+.axv-mf-sec:last-of-type {
+  border-bottom: none;
+}
+.axv-mf-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 8px;
+  color: var(--axv-on-surface);
+  font-size: 12.5px;
+}
+.axv-mf-head .msr {
+  font-size: 17px;
+  opacity: 0.65;
+}
+.axv-mf-count {
+  margin-left: auto;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--axv-on-surface-variant);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.axv-mf-grid {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: center;
+}
+.axv-mf-label {
+  color: var(--axv-on-surface-variant);
+  font-size: 12px;
+  text-align: right;
+}
+.axv-mf-input {
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font: inherit;
+  font-size: 12px;
+}
+.axv-mf-input:focus {
+  border-color: var(--axv-primary);
+  outline: none;
+}
+.axv-mf-input.mono {
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+}
+.axv-mf-input.wide {
+  flex: 1;
+}
+.axv-mf-input.sel {
+  flex: 0 0 92px;
+  padding: 0 4px;
+}
+.axv-mf-input.label {
+  flex: 0 0 112px;
+}
+.axv-mf-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.axv-mf-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.axv-mf-row.comp {
+  gap: 5px;
+}
+.axv-mf-tag {
+  flex: 0 0 40px;
+  padding: 3px 0;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--axv-on-surface-variant);
+  font-size: 10.5px;
+  text-align: center;
+  white-space: nowrap;
+}
+.axv-mf-tag.comp {
+  flex-basis: 56px;
+  color: #0b5fa5;
+  background: rgba(11, 95, 165, 0.11);
+}
+.axv-mf-empty {
+  padding: 4px 2px 6px;
+  color: var(--axv-on-surface-variant);
+  font-size: 12px;
+  opacity: 0.75;
+}
+.axv-mf-new {
+  display: flex;
+  gap: 6px;
+  padding-top: 8px;
+}
+.axv-mf-new .axv-mf-input {
+  flex: 1;
+}
+.axv-mf-new .axv-val-ok {
+  flex: 0 0 auto;
+}
+.axv-mf-warn {
+  margin-top: 6px;
+  color: #a15c00;
+  font-size: 12px;
+}
+@media (max-width: 520px) {
+  .axv-mf-grid {
+    grid-template-columns: 78px minmax(0, 1fr);
+  }
+  .axv-mf-input.label {
+    flex-basis: 78px;
+  }
+  .axv-mf-row.comp .axv-mf-input.sel {
+    flex-basis: 78px;
+  }
+}
 /* M38：CodeMirror 6 容器（取代 textarea + pre 叠层） */
 .axv-cm {
   flex: 1;

@@ -8,7 +8,7 @@
 
 import { memo, useCallback, useEffect, useState, type ReactNode } from "react";
 import type { BrowseEntry, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
-import { isIconDirRel, isImageName, readEntryImageUrl } from "@/lib/xml/project-browse";
+import { isIconDirRel, isImageName, readEntryImageUrl, resDirDescription } from "@/lib/xml/project-browse";
 import type { WsInfo, WsProject } from "@/lib/xml/workspace";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import { resOpenAction } from "@/lib/xml/resource-open";
@@ -231,7 +231,13 @@ function LazyTreeInner(props: {
               <span className="axv-ws-item-main">
                 <span className="axv-ws-item-name">{n.name}</span>
                 <span className="axv-ws-item-sub">
-                  {isDir ? "文件夹" : editing ? "正在编辑" : isImageName(n.name) ? "图片资源" : "布局文件"}
+                  {isDir
+                    ? resDirDescription(n.rel) ?? "文件夹"
+                    : editing
+                      ? "正在编辑"
+                      : isImageName(n.name)
+                        ? "图片资源"
+                        : "布局文件"}
                 </span>
               </span>
             </button>

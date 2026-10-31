@@ -2739,11 +2739,8 @@ const findResolved = findResolvedNode;
                 selectFile(id);
               }}
               resExtras={resExtras}
-              generatedDrawables={generatedDrawables}
               onOpenDrawable={(_rel, name, xml) => setResShape({ name, xml })}
               onPreviewImage={(rel, name, url) => setResImage({ rel, name, url })}
-              resourceFragment={resourceFragment}
-              onResourceFragment={setResourceFragment}
             />
           )}
 

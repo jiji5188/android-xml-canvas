@@ -30,6 +30,8 @@ export interface AxvNativeBridge {
   readText?(target: string): string | null;
   /** M31：读二进制（项目图标等）→ base64；读不到返回 null */
   readBase64?(target: string): string | null;
+  /** M31h：列一层目录（绝对路径）→ {"ok":true,"items":[{name,kind,path}]}；越界/不支持返回 ok:false */
+  listDir?(path: string): string | null;
   /** M19：触觉反馈。type: "long"(长按) / "toggle"(开关·勾选·单选)。
    *  原生用 Vibrator 精确时长；无马达设备静默。返回 true 表示原生已处理。 */
   haptic?(type: string): void;

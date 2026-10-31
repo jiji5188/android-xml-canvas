@@ -34,11 +34,8 @@ function props(over: Partial<ProjectPanelProps> = {}): ProjectPanelProps {
     appProject: createProject("Demo", { name: "activity_main.xml", xml: "<a/>" }),
     onSelectFile: vi.fn(),
     resExtras: null,
-    generatedDrawables: {},
     onOpenDrawable: vi.fn(),
     onPreviewImage: vi.fn(),
-    resourceFragment: "",
-    onResourceFragment: vi.fn(),
     ...over,
   };
 }

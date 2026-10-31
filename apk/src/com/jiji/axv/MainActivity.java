@@ -595,7 +595,7 @@ public class MainActivity extends Activity {
             }
         }
 
-        /** M31：读二进制（图片图标等）→ base64；同样限默认目录 或 content:// */
+        /** M31h：读二进制（图片图标等）→ base64；同样限默认目录 或 content:// */
         @JavascriptInterface
         public String readBase64(String target) {
             try {
@@ -605,6 +605,18 @@ public class MainActivity extends Activity {
             } catch (Throwable t) {
                 Log.e(TAG, "readBase64", t);
                 return null;
+            }
+        }
+
+        /** M31h：列一层的直接子项（目录 + 文件）→ {"ok":true,"items":[{name,kind,path}]}；
+         *  给结构树懒加载用，这样 drawable/mipmap 里的图片也能列出来。同样限默认目录。 */
+        @JavascriptInterface
+        public String listDir(String path) {
+            try {
+                return listDirJson(path);
+            } catch (Throwable t) {
+                Log.e(TAG, "listDir", t);
+                return "{\"ok\":false}";
             }
         }
     }
@@ -1088,6 +1100,31 @@ public class MainActivity extends Activity {
             if (bo.size() > 8 * 1024 * 1024) return null;
         }
         return bo.toByteArray();
+    }
+
+    /** M31h：列一层目录 → {"ok":true,"items":[{name,kind,path}]}；限默认目录，越界或非目录返回 ok:false */
+    private String listDirJson(String path) throws Exception {
+        if (path == null) return "{\"ok\":false}";
+        File d = new File(path);
+        String base = defaultDir().getCanonicalPath();
+        String canon = d.getCanonicalPath();
+        if (!canon.equals(base) && !canon.startsWith(base + File.separator)) return "{\"ok\":false}";
+        if (!d.isDirectory()) return "{\"ok\":false}";
+        JSONObject out = new JSONObject();
+        out.put("ok", true);
+        JSONArray items = new JSONArray();
+        File[] fs = d.listFiles();
+        if (fs != null) {
+            for (File f : fs) {
+                JSONObject it = new JSONObject();
+                it.put("name", f.getName());
+                it.put("kind", f.isDirectory() ? "dir" : "file");
+                it.put("path", f.getAbsolutePath());
+                items.put(it);
+            }
+        }
+        out.put("items", items);
+        return out.toString();
     }
 
     private void toast(String msg) {

@@ -543,7 +543,7 @@
   color: var(--axv-danger);
 }
 .axv-tb-select {
-  height: 28px;
+  height: 24px;
   padding: 0 12px;
   border-radius: 20px;
   border: none;
@@ -969,27 +969,7 @@
   line-height: 1.6;
   tab-size: 2;
 }
-.axv-res-box {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.axv-res-box textarea {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  box-sizing: border-box;
-  border: none;
-  outline: none;
-  resize: none;
-  padding: 12px;
-  background: var(--axv-surface-head);
-  color: var(--axv-on-surface);
-  font-family: "Cascadia Code", Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.6;
-}
+/* M31g：axv-res-box（手写 <resources> 兜底输入框）及其样式已删除 */
 
 /* ===== 组件面板（M3E 浅色系磁贴）===== */
 .axv-pp {
@@ -2048,7 +2028,7 @@
   gap: 3px;
   /* M20b：左右留 8px 内边距 + 半透明灰背景 */
   padding: 0px 8px;
-  background-color: #b1b1b142;
+  background-color: #d1cdcd26;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
@@ -2082,7 +2062,7 @@
 }
 /* tab 之间的示例下拉框 */
 .axv-mob-tabs .axv-tab-sample {
-  height: 28px;
+  height: 24px;
   padding: 0 8px;
   border: none;
   border-radius: 17px;
@@ -3035,7 +3015,7 @@
 }
 
 .axv-mob-run { color: #a8c7fa; }
-.axv-tb-run { color: #7ec8ff; }
+.axv-tb-run { color: #1cbc1b; }
 
 /* ===== M4b drawable 选择对话框（background 一行 = 输入框 + 一个按钮）===== */
 .axv-dp-row { align-items: center; }
@@ -4578,6 +4558,23 @@ button.axv-ws-caret:hover {
 .axv-ws-item-icon {
   font-size: 20px;
   color: var(--axv-primary);
+}
+/* M31h：drawable/mipmap 里的图片行 —— 直接用文件本身当图标 */
+.axv-ws-item-thumb {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.axv-ws-item-thumb img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  border-radius: 4px;
+  display: block;
+  background: var(--axv-surface-sunken);
 }
 .axv-ws-item-main {
   min-width: 0;

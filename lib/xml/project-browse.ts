@@ -117,6 +117,45 @@ export function pickBestIconName(names: string[]): string | null {
   return hits[0];
 }
 
+/** M31h：图片扩展名 —— res/drawable*|mipmap* 里的这些文件在结构树里也列出来，并直接显示缩略图 */
+export const IMAGE_EXT_RE = /\.(png|webp|jpe?g|gif|bmp)$/i;
+
+export function isImageName(name: string): boolean {
+  return IMAGE_EXT_RE.test(name);
+}
+
+/** M31h：这个目录是不是图标资源目录（res/drawable*、res/mipmap*） */
+export function isIconDirRel(rel: string): boolean {
+  return /(^|\/)(drawable|mipmap)(-[^/]*)?(\/|$)/i.test(rel);
+}
+
+/** M31h：读一行文件的缩略图（web：File → objectURL；native：bridge.readBase64 → data URL），同一路径只读一次 */
+const entryImageCache = new Map<string, string | null>();
+export async function readEntryImageUrl(entry: BrowseEntry): Promise<string | null> {
+  if (!isImageName(entry.name)) return null;
+  const key = entry.target || entry.rel;
+  if (entryImageCache.has(key)) return entryImageCache.get(key) ?? null;
+  let url: string | null = null;
+  const fh = entry.handle as FileLike | undefined;
+  if (fh && typeof fh.getFile === "function") {
+    try {
+      url = URL.createObjectURL(await fh.getFile());
+    } catch {
+      url = null;
+    }
+  } else if (entry.target) {
+    const b = nativeBridge();
+    try {
+      const b64 = b?.readBase64 ? b.readBase64(entry.target) : null;
+      url = b64 ? `data:${mimeOfIcon(entry.name)};base64,${b64}` : null;
+    } catch {
+      url = null;
+    }
+  }
+  if (url) entryImageCache.set(key, url);
+  return url;
+}
+
 const IMG_EXT_MIME: Record<string, string> = {
   png: "image/png",
   webp: "image/webp",
@@ -146,7 +185,7 @@ export function webProjectSource(root: unknown, name: string): ProjectSource {
           if (e.kind === "directory") {
             if (SKIP_DIRS.has(lower)) continue;
             dirs.push({ kind: "dir", name: e.name, rel: joinRel(rel, e.name), handle: e });
-          } else if (/\.xml$/i.test(e.name)) {
+          } else if (/\.xml$/i.test(e.name) || (isIconDirRel(rel) && isImageName(e.name))) {
             files.push({ kind: "file", name: e.name, rel: joinRel(rel, e.name), handle: e });
           }
         }
@@ -212,11 +251,38 @@ async function webIconUrl(dir: DirLike): Promise<string | null> {
   return null;
 }
 
-/** native：APK 里 bridge 一次给出扁平（带 rel）列表，这里按前缀过滤出一层 */
-export function nativeProjectSource(name: string, all: WsProject[]): ProjectSource {
+/** native：APK 里 bridge 一次给出扁平（带 rel）列表，这里按前缀过滤出一层
+ *  M31h：传了 rootDir 且 bridge 有新 listDir 时，改成真读一层目录（能列出 drawable/mipmap 里的图片）；
+ *  旧 APK（没有 listDir）自动退回扁平列表。 */
+export function nativeProjectSource(name: string, all: WsProject[], rootDir?: string): ProjectSource {
   return {
     name,
     async listChildren(rel: string) {
+      const b = nativeBridge();
+      if (rootDir && b?.listDir) {
+        try {
+          const abs = rel ? `${rootDir.replace(/\/+$/, "")}/${rel}` : rootDir;
+          const raw = b.listDir(abs);
+          const parsed = raw ? (JSON.parse(raw) as { ok?: boolean; items?: { name: string; kind: string; path?: string }[] }) : null;
+          if (parsed?.ok && Array.isArray(parsed.items)) {
+            const out: BrowseEntry[] = [];
+            for (const it of parsed.items) {
+              if (it.kind === "dir") {
+                if (SKIP_DIRS.has(it.name.toLowerCase())) continue;
+                out.push({ kind: "dir", name: it.name, rel: joinRel(rel, it.name) });
+              } else if (/\.xml$/i.test(it.name) || (isIconDirRel(rel) && isImageName(it.name))) {
+                out.push({ kind: "file", name: it.name, rel: joinRel(rel, it.name), target: it.path });
+              }
+            }
+            return [
+              ...sortEntries(out.filter((e) => e.kind === "dir")),
+              ...sortEntries(out.filter((e) => e.kind === "file")),
+            ];
+          }
+        } catch {
+          /* 退回下面的扁平列表 */
+        }
+      }
       const prefix = rel ? `${rel}/` : "";
       const out: BrowseEntry[] = [];
       for (const it of all) {
@@ -224,6 +290,7 @@ export function nativeProjectSource(name: string, all: WsProject[]): ProjectSour
         if (!it.rel.startsWith(prefix)) continue;
         const rest = it.rel.slice(prefix.length);
         if (!rest || rest.includes("/")) continue;
+        if (it.kind === "file" && !/\.xml$/i.test(it.name) && !(isIconDirRel(rel) && isImageName(it.name))) continue;
         out.push({ kind: it.kind, name: it.name, rel: it.rel, target: it.target });
       }
       return [...sortEntries(out.filter((e) => e.kind === "dir")), ...sortEntries(out.filter((e) => e.kind === "file"))];
@@ -366,7 +433,7 @@ const ICON_REL_RE = /(^|\/)res\/(mipmap|drawable)(-[^\/]*)?\/[^\/]+\.(png|webp|j
 export async function projectSourceFromWorkspaceItem(item: WsProject): Promise<ProjectSource | null> {
   if (nativeBridge()) {
     const all = await wsListProjects();
-    return nativeProjectSource(item.name, all);
+    return nativeProjectSource(item.name, all, item.dirPath);
   }
   if (item.kind === "dir" && item.handle) return webProjectSource(item.handle, item.name);
   // 单个 xml 文件：把它所在目录当项目根

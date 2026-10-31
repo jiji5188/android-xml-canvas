@@ -8,6 +8,7 @@
 
 import { memo, useCallback, useEffect, useState, type ReactNode } from "react";
 import type { BrowseEntry, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
+import { isIconDirRel, isImageName, readEntryImageUrl } from "@/lib/xml/project-browse";
 import type { WsInfo, WsProject } from "@/lib/xml/workspace";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import { resOpenAction } from "@/lib/xml/resource-open";
@@ -51,14 +52,47 @@ export interface ProjectPanelProps {
   /** res 资源区（M30c：资源树已删，onOpenLayout/onPickResDir/onOpenXml/onClearRes 不再需要，
    *  点击行为走 LazyTree 的 onOpenDrawable/onPreviewImage） */
   resExtras: ResourceExtras | null;
-  generatedDrawables: Record<string, string>;
   onOpenDrawable: (rel: string, name: string, xml: string) => void;
   onPreviewImage: (rel: string, name: string, url: string) => void;
-  resourceFragment: string;
-  onResourceFragment: (v: string) => void;
 }
 
 type LoadState = BrowseEntry[] | "loading";
+
+/** M31h：文件行图标 —— res/drawable*|mipmap* 里的图片读文件当缩略图，其余用通用图标 */
+function TreeRowIcon(props: { entry: BrowseEntry; isDir: boolean; isOpen: boolean; iconDir: boolean }) {
+  const { entry, isDir, isOpen, iconDir } = props;
+  const wantThumb = !isDir && iconDir && isImageName(entry.name);
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!wantThumb) return;
+    let alive = true;
+    void readEntryImageUrl(entry).then((u) => {
+      if (alive) setUrl(u);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [wantThumb, entry]);
+  if (isDir) {
+    return (
+      <span className="msr axv-ws-item-icon" aria-hidden="true">
+        {isOpen ? "folder_open" : "folder"}
+      </span>
+    );
+  }
+  if (url) {
+    return (
+      <span className="axv-ws-item-icon axv-ws-item-thumb" aria-hidden="true">
+        <img src={url} alt="" />
+      </span>
+    );
+  }
+  return (
+    <span className="msr axv-ws-item-icon" aria-hidden="true">
+      {isImageName(entry.name) ? "image" : "description"}
+    </span>
+  );
+}
 
 /* ---------------- 懒加载结构树 ---------------- */
 
@@ -114,7 +148,15 @@ function LazyTreeInner(props: {
    *  - 其余（layout / values / menu…）：照旧用编辑器打开（布局会在预览里画出来） */
   const openEntry = async (e: BrowseEntry) => {
     const path = e.rel.toLowerCase();
-    const inResDrawable = /(^|\/)(drawable|mipmap)(-[^/]*)?\//.test(path);
+    const inResDrawable = isIconDirRel(e.rel);
+    // M31h：图片（png/webp/jpg…）直接当图片预览，不去读成文本
+    if (isImageName(e.name)) {
+      const url = await readEntryImageUrl(e);
+      if (url) {
+        onPreviewImage(e.rel, e.name.replace(/\.[^.]+$/, ""), url);
+        return;
+      }
+    }
     if (inResDrawable) {
       const text = await source.readText(e.rel);
       if (text) {
@@ -134,6 +176,7 @@ function LazyTreeInner(props: {
 
   const renderRows = (rel: string, depth: number): ReactNode[] => {
     const items = kids[rel];
+    const iconDir = isIconDirRel(rel);
     if (items === "loading") {
       return [
         <li key={`${rel}:loading`}>
@@ -184,13 +227,11 @@ function LazyTreeInner(props: {
               title={n.rel}
               onClick={() => (isDir ? toggle(n.rel) : void openEntry(n))}
             >
-              <span className="msr axv-ws-item-icon" aria-hidden="true">
-                {isDir ? (isOpen ? "folder_open" : "folder") : "description"}
-              </span>
+              <TreeRowIcon entry={n} isDir={isDir} isOpen={isOpen} iconDir={iconDir} />
               <span className="axv-ws-item-main">
                 <span className="axv-ws-item-name">{n.name}</span>
                 <span className="axv-ws-item-sub">
-                  {isDir ? "文件夹" : editing ? "正在编辑" : "布局文件"}
+                  {isDir ? "文件夹" : editing ? "正在编辑" : isImageName(n.name) ? "图片资源" : "布局文件"}
                 </span>
               </span>
             </button>
@@ -427,17 +468,9 @@ export function ProjectPanel(p: ProjectPanelProps) {
           </div>
 
           {/* M30c：资源树（axv-restree）已删除——点击行为合并到上方 axv-ws-list axv-proj-tree 的行里；
-              原「选择res目录 / 打开xml」按钮行也删了（工具栏都有），
-              这里只保留手写 <resources> 的兜底输入框 */}
+              原「选择res目录 / 打开xml」按钮行也删了（工具栏都有） */}
           <div style={{ padding: "8px 12px 4px", fontSize: 12, color: "var(--axv-on-surface-variant)", lineHeight: 1.5 }}>
             点上方结构树里的文件直接打开（drawable 形状 → 绘制编辑器，vector/图片 → 预览）。
-          </div>
-          <div className="axv-res-box">
-            <textarea
-              value={p.resourceFragment}
-              onChange={(e) => p.onResourceFragment(e.target.value)}
-              placeholder={'<resources>\n  <string name="app_name">My App</string>\n  <dimen name="margin_small">8dp</dimen>\n  <color name="primary">#FF0000</color>\n</resources>'}
-            />
           </div>
         </>
       )}

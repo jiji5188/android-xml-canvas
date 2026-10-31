@@ -25,6 +25,14 @@ export interface OpenedProject {
   source: ProjectSource;
   /** M31：项目目录绕对路径（仅 native，用来直读 strings.xml / ic_launcher） */
   dirPath?: string;
+  /** M31h：结构树根目录的绝对路径（native 且不是 SAF 自选目录时才有，用来真读一层目录） */
+  rootPath?: string;
+}
+
+/** M31h：native 下能拿去 readdir 的根路径；SAF（自定义目录）只有 label，返回 undefined */
+function nativeRootPath(info: { custom?: boolean; defaultPath?: string }): string | undefined {
+  if (info.custom) return undefined;
+  return info.defaultPath || undefined;
 }
 
 /** web：选一个「项目目录」（不覆盖工作目录的句柄） */
@@ -51,7 +59,7 @@ async function pickWebProjectDir(): Promise<{ name: string; dir: unknown } | nul
 export async function openProjectFromItem(item: WsProject): Promise<OpenedProject | null> {
   const source = await projectSourceFromWorkspaceItem(item);
   if (!source) return null;
-  return { name: item.name, source, dirPath: item.dirPath };
+  return { name: item.name, source, dirPath: item.dirPath, rootPath: item.dirPath };
 }
 
 /**
@@ -66,7 +74,7 @@ export async function openProjectFolder(): Promise<OpenedProject | null> {
     const info = await wsInfo();
     const entries = await wsListProjects();
     const name = info.label || "项目";
-    return { name, source: nativeProjectSource(name, entries) };
+    return { name, source: nativeProjectSource(name, entries, nativeRootPath(info)) };
   }
 
   if (!fsAccessSupported()) return null;
@@ -86,7 +94,7 @@ export async function restoreProjectFolder(): Promise<OpenedProject | null> {
     const entries = await wsListProjects();
     if (!entries.length) return null;
     const name = info.label || "项目";
-    return { name, source: nativeProjectSource(name, entries) };
+    return { name, source: nativeProjectSource(name, entries, nativeRootPath(info)) };
   }
   if (!fsAccessSupported()) return null;
   try {

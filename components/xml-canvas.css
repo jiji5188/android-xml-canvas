@@ -4438,7 +4438,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 8px;
+  padding: 4px 8px;
   border-radius: 10px;
   background: var(--axv-surface-sunken);
   color: var(--axv-on-surface-variant);
@@ -4460,8 +4460,8 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 }
 .axv-ws-mini {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

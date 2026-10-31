@@ -661,11 +661,12 @@ export function XmlEditor() {
       if (it.kind !== "dir") continue;
       if (!it.handle && !it.dirPath) continue;
       if (analyzedRef.current.has(it.rel)) continue;
-      analyzedRef.current.add(it.rel);
       try {
         const meta = it.handle
           ? await readProjectMeta(it.handle, it.name)
           : await readProjectMetaNative(it.name, it.dirPath);
+        // M31d：成功才记账，失败（权限未授权/目录刚变）下一轮轮询再试
+        analyzedRef.current.add(it.rel);
         setProjMeta((prev) => ({ ...prev, [it.rel]: meta }));
       } catch {
         /* 分析失败就当没有，卡片回退到文件夹名 */

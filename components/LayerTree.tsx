@@ -266,34 +266,6 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
           )}
           <span className="axv-lt-tag">{n.tag.split(".").pop()}</span>
           <span className="axv-lt-label">{label(n)}</span>
-          {/* M34：拖拽手柄放在 actions 之外 —— actions 平时 display:none（只在 hover/选中显示），
-              手柄必须一直看得见，否则手机上根本不知道能拖。右键的⊕↓按钮已去掉 */}
-          {n.path !== "#0" ? (
-            <button
-              className={
-                "axv-lt-handle" +
-                (dragging ? " on" : "") +
-                (pressPath === n.path ? " arming" : "") +
-                (locked ? " off" : "")
-              }
-              title={locked ? "已锁定，不能拖动" : "按住拖动：调顺序 / 放进容器"}
-              aria-label="拖动调整层级"
-              disabled={locked}
-              onPointerDown={(e) => {
-                if (locked) return;
-                e.stopPropagation();
-                beginPress(n.path, e, true);
-              }}
-              onClick={(e) => {
-                // 手柄只负责拖拽，不触发选中
-                e.stopPropagation();
-              }}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>
-                drag_indicator
-              </span>
-            </button>
-          ) : null}
           <span className="axv-lt-actions">
             {onToggleLock ? (
               <button
@@ -314,6 +286,35 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
               <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>delete</span>
             </button>
           </span>
+          {/* M35b：拖拽手柄放在最右，且**只在选中行显示**（未选中时占用位置但不可见/不可点），
+              避免“点行→选中→展开的删除按钮就在手指下→抬手误删” */}
+          {n.path !== "#0" ? (
+            <button
+              className={
+                "axv-lt-handle" +
+                (selectedPath === n.path ? " shown" : "") +
+                (dragging ? " on" : "") +
+                (pressPath === n.path ? " arming" : "") +
+                (locked ? " off" : "")
+              }
+              title={locked ? "已锁定，不能拖动" : "按住拖动：调顺序 / 放进容器"}
+              aria-label="拖动调整层级"
+              disabled={locked}
+              onPointerDown={(e) => {
+                if (locked || selectedPath !== n.path) return;
+                e.stopPropagation();
+                beginPress(n.path, e, true);
+              }}
+              onClick={(e) => {
+                // 手柄只负责拖拽，不触发选中
+                e.stopPropagation();
+              }}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>
+                drag_indicator
+              </span>
+            </button>
+          ) : null}
         </div>
         {open && kids.map((c) => renderItem(c, depth + 1, kids.length))}
       </div>
@@ -350,7 +351,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
         <div className="axv-lt-hint">
           {dragPath
             ? "松手完成移动：行上方/下方 = 换兄弟位置，容器中间 = 放进容器"
-            : "按住右侧 ⠿ 手柄拖动（手机长按 0.2 秒）：靠上/靠下 = 换兄弟位置，中间 = 放进容器"}
+            : "选中一行后，按住行尾的 ⣿ 手柄拖动（手机长按 0.2 秒）：靠上/靠下 = 换兄弟位置，中间 = 放进容器"}
         </div>
       ) : null}
     </div>

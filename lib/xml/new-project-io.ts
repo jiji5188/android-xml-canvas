@@ -8,7 +8,6 @@
 import { nativeBridge, writeTextNative } from "./native-save";
 import { restoreWorkspace, workspacePermission, requestWorkspacePermission } from "./workspace-fs";
 import type { NewProjectIO } from "./new-project";
-
 interface DirLike {
   kind: "directory";
   name: string;
@@ -33,6 +32,8 @@ export function nativeNewProjectIO(root: string, projectName: string): NewProjec
     },
     async writeBinary(rel, base64) {
       try {
+        // writeText 在 Java 侧会先把 base64 解码成字节再写，
+        // 所以这里传 base64 字符串即可（旧实现其实是对的，只是写个注释说清楚）
         const r = b.writeText?.(`${base}/${rel}`, base64);
         return typeof r === "string" && r.startsWith("ok");
       } catch {
@@ -40,6 +41,21 @@ export function nativeNewProjectIO(root: string, projectName: string): NewProjec
       }
     },
   };
+}
+
+/** native：项目写完后再 listDir 一层，确认真的落盘了（没权限/失败时返回 0） */
+export function nativeVerifyProject(root: string, projectName: string): number {
+  const b = nativeBridge();
+  if (!b?.listDir) return 0;
+  try {
+    const abs = `${root.replace(/[/\\]+$/, "")}/${projectName}`;
+    const raw = b.listDir(abs);
+    const parsed = (raw ? (JSON.parse(raw) as { ok?: boolean; items?: unknown[] }) : null) ?? null;
+    if (parsed?.ok && Array.isArray(parsed.items)) return parsed.items.length;
+  } catch {
+    /* 桥抛错 → 验证不了，返回 0 让调用方明确提示写失败（而不是 null 被当成"没验证"） */
+  }
+  return 0;
 }
 
 /** web：在工作目录句柄下建「项目名/...」；没有句柄或没权限返回 null */

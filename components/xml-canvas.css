@@ -1256,7 +1256,6 @@
 /* M34：拖拽手柄：始终可见（手机上没有 hover，靠它才知道能拖）、按下/拖拽中变色、锁定置灰；touch-action none 保证长按 220ms 后能拖而不是滚列表 */
 .axv-lt-handle {
   flex: 0 0 auto;
-  margin-left: auto;
   width: 22px;
   height: 22px;
   border: none;
@@ -1268,6 +1267,14 @@
   color: var(--axv-on-surface-variant);
   cursor: grab;
   touch-action: none;
+  /* M35b：默认隐藏（只有选中行才显示），但**占位不让位** → 删除按钮位置不挪，
+     避免「点行选中 → 删除按钮刚出现在手指下 → 抬手就删」的误删 */
+  visibility: hidden;
+  pointer-events: none;
+}
+.axv-lt-handle.shown {
+  visibility: visible;
+  pointer-events: auto;
 }
 .axv-lt-handle:hover {
   background: rgba(0, 0, 0, 0.1);
@@ -4487,6 +4494,11 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   cursor: pointer;
   min-width: 0;
   flex: 0 0 auto;
+  width: auto;
+  margin-top: 0;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 .axv-newproj-icontip {
   font-size: 11.5px;

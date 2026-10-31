@@ -52,14 +52,14 @@ function stubRows(host: HTMLElement) {
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 describe("M34 图层树拖拽手柄", () => {
-  it("↑↓按钮已移除，手柄存在（每非根行一个）", async () => {
+  it("↑↓按钮已移除，手柄每非根行都有但默认隐藏（只选中行显 shown）", async () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
     const root = createRoot(host);
     root.render(
       <LayerTree
         root={makeRoot()}
-        selectedPath=""
+        selectedPath="#2"
         onSelect={() => {}}
         onMove={() => {}}
         onRemove={() => {}}
@@ -69,7 +69,42 @@ describe("M34 图层树拖拽手柄", () => {
     await tick();
     expect(host.querySelector("button[aria-label='上移']")).toBeNull();
     expect(host.querySelector("button[aria-label='下移']")).toBeNull();
-    expect(host.querySelectorAll("button.axv-lt-handle").length).toBe(3);
+    const handles = host.querySelectorAll("button.axv-lt-handle");
+    expect(handles.length).toBe(3);
+    // 只有选中那行的手柄可见
+    expect(host.querySelectorAll("button.axv-lt-handle.shown").length).toBe(1);
+    const row2 = host.querySelector('.axv-lt-row[data-path="#2"]') as HTMLElement;
+    expect(row2.querySelector(".axv-lt-handle")!.classList.contains("shown")).toBe(true);
+    document.body.removeChild(host);
+  });
+
+  it("未选中行的手柄按下不启动拖拽", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const onDragMove = vi.fn();
+    const root = createRoot(host);
+    root.render(
+      <LayerTree
+        root={makeRoot()}
+        selectedPath=""
+        onSelect={() => {}}
+        onMove={() => {}}
+        onRemove={() => {}}
+        onDragMove={onDragMove}
+      />,
+    );
+    await tick();
+    const rows = stubRows(host);
+    const row2 = rows.find((r) => r.dataset.path === "#2")!;
+    const row1 = rows.find((r) => r.dataset.path === "#1")!;
+    const handle = row2.querySelector(".axv-lt-handle") as HTMLElement;
+    const r2 = row2.getBoundingClientRect();
+    const r1 = row1.getBoundingClientRect();
+    firePointer(handle, "pointerdown", r2.left + 40, r2.top + r2.height / 2);
+    firePointer(windowEl, "pointermove", r2.left + 40, r1.top + r1.height * 0.1);
+    firePointer(windowEl, "pointerup", r2.left + 40, r1.top + r1.height * 0.1);
+    await tick();
+    expect(onDragMove).not.toHaveBeenCalled();
     document.body.removeChild(host);
   });
 
@@ -81,7 +116,7 @@ describe("M34 图层树拖拽手柄", () => {
     root.render(
       <LayerTree
         root={makeRoot()}
-        selectedPath=""
+        selectedPath="#2"
         onSelect={() => {}}
         onMove={() => {}}
         onRemove={() => {}}
@@ -118,7 +153,7 @@ describe("M34 图层树拖拽手柄", () => {
     root.render(
       <LayerTree
         root={makeRoot()}
-        selectedPath=""
+        selectedPath="#2"
         onSelect={onSelect}
         onMove={() => {}}
         onRemove={() => {}}

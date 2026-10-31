@@ -30,7 +30,7 @@ import { workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative } from
 import { yieldToUi } from "@/lib/xml/native-async";
 // M31i：新建项目时把完整 Android 工程骨架落盘
 import { createAndroidProject, safeProjectName } from "@/lib/xml/new-project";
-import { nativeNewProjectIO, webNewProjectIO } from "@/lib/xml/new-project-io";
+import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/xml/new-project-io";
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { lineOfPath, shouldResync } from "@/lib/xml/line-sync";
@@ -1677,22 +1677,34 @@ export function XmlEditor() {
       setProjectTab("current");
       setNewProjOpen(false);
 
-      // M31i：落盘。native 用默认工作目录，web 用已授权的工作目录句柄；SAF 自选目录写不了，只能保留应用内项目
+      // M31i：落盘。native 用默认工作目录（绝对路径）；用户曾自选目录时 Bridge 只能写默认目录，
+      // web 用已授权的工作目录句柄；SAF 自选目录写不了，只能保留应用内项目
       setNewProjBusy(true);
       const icon = newProjIcon;
       setNewProjIcon(null);
+      let io: ReturnType<typeof nativeNewProjectIO> | (Awaited<ReturnType<typeof webNewProjectIO>>) | null;
+      let usedNativeDefault = false;
+      let customNote = "";
+      let nativeRoot = "";
       try {
-        const info = wsState?.mode === "native" ? await wsInfo() : null;
-        const io =
-          info?.mode === "native"
-            ? info.custom
-              ? null
-              : nativeNewProjectIO(info.defaultPath || "", name)
-            : await webNewProjectIO(name);
+        // M35：不依赖可能滞后的 wsState，直接用刚查的 wsInfo；native 时即便 custom 也写默认目录
+        const info = await wsInfo();
+        if (info.mode === "native" && info.defaultPath) {
+          io = nativeNewProjectIO(info.defaultPath, name);
+          usedNativeDefault = true;
+          nativeRoot = info.defaultPath;
+          if (info.custom) customNote = "（你自选过工作目录，但原生桥只能写默认目录，项目建在 AndroidUIIDE/Project 下）";
+          if (!info.allFiles) customNote += " 未拿到「所有文件访问」权限，可能写不进去";
+        } else if (info.mode === "web") {
+          io = await webNewProjectIO(name);
+        } else {
+          io = null;
+        }
 
         if (!io) {
-          setExportNote(`已新建项目《${name}》（仅应用内）· 当前目录不支持直接写入，点「保存」可导出文件`);
-          window.setTimeout(() => setExportNote(" "), 4200);
+          setExportNote(`已新建项目《${name}》（仅应用内）${customNote}· 当前目录不支持直接写入，点「保存」可导出文件`);
+          window.setTimeout(() => setExportNote(" "), 5200);
+          setNewProjBusy(false);
           return;
         }
 
@@ -1700,11 +1712,21 @@ export function XmlEditor() {
           iconBase64: icon?.base64,
           iconMime: icon?.mime,
         });
+        // M35：native 落盘后再 listDir 验一层，确认真的写进去了（没权限/失败时 0）
+        if (usedNativeDefault) {
+          const dirCount = nativeVerifyProject(nativeRoot, name);
+          if (dirCount === 0) {
+            setExportNote(`《${name}》工程已生成但目录里没写进任何文件${customNote}。请确认已授予「所有文件访问」权限`);
+            window.setTimeout(() => setExportNote(" "), 7000);
+            setNewProjBusy(false);
+            return;
+          }
+        }
         if (res.ok) {
-          setExportNote(`已创建《${name}》· ${res.written} 个文件已写入 ${name}/app/src/main/`);
+          setExportNote(`已创建《${name}》· ${res.written} 个文件已写入 ${name}/app/src/main/${customNote}`);
           window.setTimeout(() => void refreshWorkspace({ quiet: true }), 400);
         } else {
-          setExportNote(`《${name}》已创建，但有 ${res.failed.length} 个文件没写进去（${res.failed[0]} 等）`);
+          setExportNote(`《${name}》已创建，但有 ${res.failed.length} 个文件没写进去（${res.failed[0]} 等）${customNote}`);
         }
       } catch (e) {
         setExportNote(`《${name}》已创建，落盘失败：${e instanceof Error ? e.message : String(e)}`);
@@ -1713,7 +1735,7 @@ export function XmlEditor() {
         window.setTimeout(() => setExportNote(" "), 5200);
       }
     },
-    [setXmlAndTrack, newProjIcon, wsState?.mode, refreshWorkspace],
+    [setXmlAndTrack, newProjIcon, refreshWorkspace],
   );
 
   /** M24：重读当前项目结构（手动刷新）——M25d：只重置懒加载缓存，不深扫 */

@@ -18,6 +18,7 @@ import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { parseShapeSpec, specToCss } from "@/lib/xml/shape-gen";
 import { sanitizeResName } from "@/lib/xml/resname";
 import { saveTextNative } from "@/lib/xml/native-save";
+import { saveResFiles, type ProjectSaveRoot } from "@/lib/xml/project-save";
 
 interface Props {
   /** 已生成资源：资源名 → xml 原文 */
@@ -37,6 +38,10 @@ interface Props {
   onEditShape?: (name: string, xml: string) => void;
   /** M11j：双击图标（vector）→ 打开图标编辑器 */
   onEditIcon?: (name: string, xml: string) => void;
+  /** M36：当前项目的可写根（有则「下载」直接写进 app/src/main/res/drawable/） */
+  projectRoot?: ProjectSaveRoot | null;
+  /** M36：项目名（写盘提示用） */
+  projectName?: string;
 }
 
 /** 缩略图：vector → data URL；shape/selector/layer-list → 按 CSS 近似画个色块 */
@@ -63,6 +68,8 @@ export function GenAssetsPanel({
   inline,
   onEditShape,
   onEditIcon,
+  projectRoot,
+  projectName,
 }: Props) {
   const [q, setQ] = useState("");
   /** 正在改名的资源名 */
@@ -144,6 +151,17 @@ export function GenAssetsPanel({
   };
 
   const downloadXml = (name: string, xml: string) => {
+    // M36：有打开的项目 → 直接写进它的 res/drawable，不再丢到下载目录
+    if (projectRoot) {
+      void saveResFiles(projectRoot, [{ path: `drawable/${name}.xml`, text: xml }]).then((r) => {
+        onNote?.(
+          r.ok
+            ? `已写入《${projectName || "项目"}》app/src/main/res/drawable/${name}.xml`
+            : `写入项目失败：${r.failed[0] || "目录不可写"}`,
+        );
+      });
+      return;
+    }
     if (saveTextNative(`${name}.xml`, xml, "text/xml")) return;
     const blob = new Blob([xml], { type: "text/xml" });
     const a = document.createElement("a");

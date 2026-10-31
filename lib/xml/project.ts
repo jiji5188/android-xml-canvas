@@ -27,6 +27,8 @@ export interface OpenedProject {
   dirPath?: string;
   /** M31h：结构树根目录的绝对路径（native 且不是 SAF 自选目录时才有，用来真读一层目录） */
   rootPath?: string;
+  /** M36：项目根目录句柄（web 用，保存时写进 <项目>/app/src/main/res/） */
+  handle?: unknown;
 }
 
 /** M31h：native 下能拿去 readdir 的根路径；SAF（自定义目录）只有 label，返回 undefined */
@@ -42,7 +44,7 @@ async function pickWebProjectDir(): Promise<{ name: string; dir: unknown } | nul
   if (typeof picker !== "function") return null;
   let dir: unknown;
   try {
-    dir = await picker.call(window, { mode: "read", id: "axv-project" });
+    dir = await picker.call(window, { mode: "readwrite", id: "axv-project" });
   } catch {
     return null; // 用户取消
   }
@@ -59,7 +61,7 @@ async function pickWebProjectDir(): Promise<{ name: string; dir: unknown } | nul
 export async function openProjectFromItem(item: WsProject): Promise<OpenedProject | null> {
   const source = await projectSourceFromWorkspaceItem(item);
   if (!source) return null;
-  return { name: item.name, source, dirPath: item.dirPath, rootPath: item.dirPath };
+  return { name: item.name, source, dirPath: item.dirPath, rootPath: item.dirPath, handle: item.handle };
 }
 
 /**
@@ -81,7 +83,7 @@ export async function openProjectFolder(): Promise<OpenedProject | null> {
 
   const picked = await pickWebProjectDir();
   if (!picked) return null;
-  return { name: picked.name, source: projectSourceFromDir(picked.dir, picked.name) };
+  return { name: picked.name, source: projectSourceFromDir(picked.dir, picked.name), handle: picked.dir };
 }
 
 /** 读回上次打开的项目目录（不弹窗，可能为空） */
@@ -101,7 +103,7 @@ export async function restoreProjectFolder(): Promise<OpenedProject | null> {
     const dir = await restoreProjectDir();
     if (!dir) return null;
     const name = (dir as { name?: string })?.name || "项目";
-    return { name, source: webProjectSource(dir, name) };
+    return { name, source: webProjectSource(dir, name), handle: dir };
   } catch {
     return null;
   }

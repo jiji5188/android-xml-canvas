@@ -32,7 +32,8 @@ import { yieldToUi } from "@/lib/xml/native-async";
 import { createAndroidProject, safeProjectName } from "@/lib/xml/new-project";
 import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/xml/new-project-io";
 import { pickXmlFile } from "@/lib/xml/save-as";
-import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
+import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, buildSaveFiles, type SaveInput } from "@/lib/xml/save-flow";
+import { projectSaveRoot, saveResFiles } from "@/lib/xml/project-save";
 import { lineOfPath, shouldResync } from "@/lib/xml/line-sync";
 import {
   THEME_PRESETS,
@@ -68,7 +69,15 @@ import {
 import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
 
 /** M31：当前打开的项目（name = app 名称；iconUrl = ic_launcher 图标） */
-type ActiveProject = { name: string; source: ProjectSource | null; iconUrl?: string | null };
+type ActiveProject = {
+  name: string;
+  source: ProjectSource | null;
+  iconUrl?: string | null;
+  /* M36：保存时定位 <项目>/app/src/main/res/ 用 */
+  dirPath?: string;
+  rootPath?: string;
+  handle?: unknown;
+};
 import {
   activeFile,
   addFile,
@@ -2345,6 +2354,19 @@ const findResolved = findResolvedNode;
   /** M3g：导出 res 包（zip）：布局 + 图标矢量 + 上传的 shape/values 一起带走，
    *  避免别处打开工程时「找不到图标文件」。*/
   const doDownloadResZip = () => {
+    // M36：有打开的项目 → 直接写进它的 res 目录，不再丢一个 res.zip 在工作目录根
+    if (projRoot) {
+      void saveResFiles(projRoot, buildSaveFiles(currentSaveInput())).then((r) => {
+        setExportNote(
+          r.ok
+            ? `已写入《${activeProject?.name || "项目"}》的 app/src/main/res/：${r.written}/${r.total} 个文件` +
+                (r.failed.length ? `（失败 ${r.failed.length}）` : "")
+            : `写入项目失败：${r.failed[0] || "目录不可写"}`,
+        );
+        window.setTimeout(() => setExportNote(""), 4800);
+      });
+      return;
+    }
     const { count, missing } = downloadResZip(currentSaveInput());
     setExportNote(
       `已导出 res.zip（${count} 个文件）` +
@@ -2396,8 +2418,35 @@ const findResolved = findResolvedNode;
     extras: resExtrasAll,
   });
 
+  /** M36：当前打开项目的可写根（有则保存一律落进 <项目>/app/src/main/res/） */
+  const projRoot = useMemo(() => projectSaveRoot(activeProject), [activeProject]);
+
+  /** 把当前内容整包写进当前项目的 res 目录（layout + 依赖 drawable/values） */
+  const saveIntoProject = async (name?: string): Promise<boolean> => {
+    if (!projRoot) return false;
+    const input = currentSaveInput(name);
+    const files = buildSaveFiles(input);
+    const r = await saveResFiles(projRoot, files);
+    if (!r.ok) {
+      flashNote(
+        `写入项目失败（${r.failed[0] || "未知原因"}）。请确认「所有文件访问」已开启、项目目录可写`,
+        5000,
+      );
+      return false;
+    }
+    flashNote(
+      `已保存《${activeProject?.name || "项目"}》：${r.written} 个文件 → app/src/main/res/` +
+        (r.failed.length ? `（${r.failed.length} 个失败）` : ""),
+      4200,
+    );
+    markSaved(xml);
+    return true;
+  };
+
   /** 写回原路径（含依赖资源） */
   const saveBack = async (): Promise<boolean> => {
+    // M36：有打开的项目 → 优先进项目 res（不依赖 saveOrigin）
+    if (projRoot && (await saveIntoProject())) return true;
     if (!saveOrigin) return false;
     const input = currentSaveInput();
     const r = await saveBackPure(input, saveOrigin);
@@ -2438,6 +2487,8 @@ const findResolved = findResolvedNode;
   };
 
   const doSave = async () => {
+    // M36：优先存进当前打开的项目（<项目>/app/src/main/res/）
+    if (projRoot && (await saveIntoProject())) return;
     // A) 有来源 → 直接写回原路径
     if (saveOrigin && nextSaveAction(saveOrigin) === "back") {
       if (await saveBack()) return;
@@ -2777,6 +2828,8 @@ const findResolved = findResolvedNode;
                 onEditShape={(name, shapeXml) => setResShape({ name, xml: shapeXml })}
                 onEditIcon={(name, iconXml) => setResIcon({ name, xml: iconXml })}
                 onClose={() => setLeftView("parts")}
+                projectRoot={projRoot}
+                projectName={activeProject?.name || ""}
                 onNote={(text) => {
                   setExportNote(text);
                   window.setTimeout(() => setExportNote(" "), 3200);

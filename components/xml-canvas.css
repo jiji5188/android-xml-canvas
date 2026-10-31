@@ -2151,7 +2151,7 @@ body.axv-lt-dragging .axv-lt-row {
   min-height: 0;
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  background: var(--axv-surface);
+  background: var(--axv-code-bg, var(--axv-surface));
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -2166,7 +2166,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 0 0 52px;
   width: 52px;
   overflow: hidden;
-  background: var(--axv-surface-head);
+  background: var(--axv-code-bg, var(--axv-surface-head));
   border-right: 1px solid rgba(0, 0, 0, 0.06);
   position: relative;
 }
@@ -2178,7 +2178,7 @@ body.axv-lt-dragging .axv-lt-row {
   height: 21px;
   line-height: 21px;
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
-  font-size: 12px;
+  font-size: calc(var(--axv-code-font-size, 13px) - 1px);
   text-align: right;
   padding-right: 8px;
   color: var(--axv-on-surface-variant);
@@ -2358,7 +2358,7 @@ body.axv-lt-dragging .axv-lt-row {
   margin: 0;
   padding: 12px 14px;
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--axv-code-font-size, 13px);
   line-height: 21px; /* 必须与 XmlCodeEditor 的 CODE_LINE_HEIGHT 一致（行号/错误色带定位靠它） */
   tab-size: 2;
   /* 禁用连字：Cascadia/JetBrains Mono 的编程连字（::, =>, # 等）会两字合一、
@@ -2375,8 +2375,8 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-code-hl {
   pointer-events: none;
-  color: var(--axv-on-surface);
-  background: var(--axv-surface);
+  color: var(--axv-code-fg, var(--axv-on-surface));
+  background: var(--axv-code-bg, var(--axv-surface));
   overflow: hidden;
 }
 /* 关键：<pre> 里的 <code> 会被浏览器 UA 样式表强制 font-family: monospace，
@@ -2398,30 +2398,30 @@ body.axv-lt-dragging .axv-lt-row {
   background: transparent;
   /* 文字透明，只留光标（高亮层负责显示） */
   color: transparent;
-  caret-color: #24292F;
+  caret-color: var(--axv-code-cursor, #24292F);
   overflow: auto;
 }
 .axv-code-ta::selection {
-  background: rgba(4, 64, 159, 0.18);
-  color: transparent;
+  background: var(--axv-code-sel-bg, rgba(4, 64, 159, 0.18));
+  color: var(--axv-code-sel-fg, transparent);
 }
 
 /* 高亮色（浅色主题） */
 .x-p {
-  color: var(--axv-primary);
+  color: var(--axv-x-tag, var(--axv-primary));
 } /* 标签名 */
 .x-a {
-  color: #953800;
+  color: var(--axv-x-attr, #953800);
 } /* 属性名 */
 .x-s {
-  color: var(--axv-ok);
+  color: var(--axv-x-str, var(--axv-ok));
 } /* 字符串值 */
 .x-c {
-  color: var(--axv-on-surface-variant);
+  color: var(--axv-x-comm, var(--axv-on-surface-variant));
   font-style: italic;
 } /* 注释 */
 .x-m {
-  color: #8250DF;
+  color: var(--axv-x-decl, #8250DF);
 } /* XML 声明 */
 
 /* 桌面端：代码 tab 也占满画布区（在 tab 条下方） */
@@ -3736,6 +3736,30 @@ body.axv-lt-dragging .axv-lt-row {
   height: 18px;
   accent-color: var(--axv-primary);
   cursor: pointer;
+}
+/* M37：设置面板里的颜色/滑杆控件 */
+.axv-set-color {
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.axv-set-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.axv-set-range input[type="range"] {
+  width: 120px;
+}
+.axv-set-range b {
+  font-size: 12px;
+  min-width: 34px;
+  text-align: right;
+  color: var(--axv-on-surface-variant);
 }
 .axv-set-hint {
   font-size: 12px;

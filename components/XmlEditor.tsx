@@ -128,6 +128,13 @@ import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
 import { readableOn, deviceById } from "@/lib/xml/theme";
 import { DEFAULT_RENDER_THEME, type RenderTheme } from "@/lib/xml/theme";
+import {
+  DEFAULT_EDITOR_THEME,
+  LS_KEY_EDITOR_THEME,
+  applyEditorTheme,
+  parseTheme,
+  type EditorTheme,
+} from "@/lib/xml/editor-theme";
 
 const SAMPLES: Record<string, string> = {
   /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
@@ -596,6 +603,20 @@ export function XmlEditor() {
       return "modern";
     }
   });
+  /** M37：代码编辑器外观（光标/选区/高亮/字号，localStorage 记住） */
+  const [editorTheme, setEditorTheme] = useState<EditorTheme>(() => {
+    try {
+      return parseTheme(window.localStorage.getItem(LS_KEY_EDITOR_THEME));
+    } catch {
+      return DEFAULT_EDITOR_THEME;
+    }
+  });
+  const patchEditorTheme = useCallback((patch: Partial<EditorTheme>) => {
+    setEditorTheme((t) => ({ ...t, ...patch }));
+  }, []);
+  const resetEditorTheme = useCallback(() => {
+    setEditorTheme(DEFAULT_EDITOR_THEME);
+  }, []);
   /** 兼容模式的转换摘要（选 compat 时重算） */
   const [compatNotes, setCompatNotes] = useState<string[]>([]);
   /** M6a：导出预览图（PNG / SVG）弹窗 */
@@ -658,6 +679,16 @@ export function XmlEditor() {
       /* ignore */
     }
   }, [renderTheme]);
+
+  // M37：代码编辑器外观（CSS 变量 + localStorage 持久化）
+  useEffect(() => {
+    applyEditorTheme(editorTheme);
+    try {
+      window.localStorage.setItem(LS_KEY_EDITOR_THEME, JSON.stringify(editorTheme));
+    } catch {
+      /* ignore */
+    }
+  }, [editorTheme]);
 
   /* ===== M16i：工作目录 ===== */
   const wsSigRef = useRef<string>("");
@@ -2892,6 +2923,9 @@ const findResolved = findResolvedNode;
               onShowSystemBars={setShowSystemBars}
               showIssues={showIssues}
               onShowIssues={setShowIssues}
+              editorTheme={editorTheme}
+              onEditorTheme={patchEditorTheme}
+              onResetEditorTheme={resetEditorTheme}
               onSaveXml={saveProject}
             />
           )}

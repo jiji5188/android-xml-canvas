@@ -7,6 +7,13 @@ import { THEME_PRESETS, themeTokens, type ThemeMode } from "@/lib/xml/theme-pres
 import { RENDER_THEMES, type RenderTheme } from "@/lib/xml/theme";
 import { LANG_OPTIONS, type LangPref } from "@/lib/i18n";
 import type { WsInfo } from "@/lib/xml/workspace";
+import {
+  DEFAULT_EDITOR_THEME,
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  HL_PRESETS,
+  type EditorTheme,
+} from "@/lib/xml/editor-theme";
 
 export interface SettingsPanelProps {
   tr: (key: string, fallback: string) => string;
@@ -37,13 +44,32 @@ export interface SettingsPanelProps {
   showIssues: boolean;
   onShowIssues: (v: boolean) => void;
 
+  // M37：代码编辑器外观
+  editorTheme: EditorTheme;
+  onEditorTheme: (patch: Partial<EditorTheme>) => void;
+  onResetEditorTheme: () => void;
+
   // 数据
   onSaveXml: () => void;
 }
 
+/** <input type="color"> 只收 #rrggbb；rgba()/transparent 一律给回退色 */
+function toHex(v: string, fallback: string): string {
+  const s = (v || "").trim();
+  if (/^#[0-9a-f]{6}$/i.test(s)) return s;
+  if (/^#[0-9a-f]{3}$/i.test(s)) {
+    return "#" + s.slice(1).split("").map((c) => c + c).join("");
+  }
+  const m = s.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i);
+  if (m) {
+    const hex = (n: string) => Math.min(255, Number(n)).toString(16).padStart(2, "0");
+    return `#${hex(m[1])}${hex(m[2])}${hex(m[3])}`;
+  }
+  return fallback;
+}
+
 export function SettingsPanel(p: SettingsPanelProps) {
   const { tr } = p;
-
   return (
     <div className="axv-rail-scroll">
       {/* ===== 外观：预设配色方案 ===== */}
@@ -202,6 +228,85 @@ export function SettingsPanel(p: SettingsPanelProps) {
             onChange={(e) => p.onShowIssues(e.target.checked)}
           />
         </label>
+      </div>
+
+      <div className="axv-set-group">
+        <div className="axv-set-label">{tr("set.editor", "代码编辑器")}</div>
+
+        <div className="axv-set-kv">
+          <span>高亮风格</span>
+        </div>
+        <select
+          className="axv-tb-select"
+          aria-label="高亮风格"
+          value={p.editorTheme.hl}
+          onChange={(e) => p.onEditorTheme({ hl: e.target.value })}
+        >
+          {HL_PRESETS.map((h) => (
+            <option key={h.id} value={h.id}>
+              {h.label}
+            </option>
+          ))}
+        </select>
+
+        <label className="axv-set-row">
+          <span>光标颜色</span>
+          <input
+            className="axv-set-color"
+            type="color"
+            aria-label="光标颜色"
+            value={toHex(p.editorTheme.cursor, DEFAULT_EDITOR_THEME.cursor)}
+            onChange={(e) => p.onEditorTheme({ cursor: e.target.value })}
+          />
+        </label>
+
+        <label className="axv-set-row">
+          <span>选中背景色</span>
+          <input
+            className="axv-set-color"
+            type="color"
+            aria-label="选中背景色"
+            value={toHex(p.editorTheme.selBg, "#04409f")}
+            onChange={(e) => p.onEditorTheme({ selBg: e.target.value })}
+          />
+        </label>
+
+        <label className="axv-set-row">
+          <span>选中文字颜色</span>
+          <input
+            className="axv-set-color"
+            type="color"
+            aria-label="选中文字颜色"
+            value={toHex(p.editorTheme.selFg, "#ffffff")}
+            onChange={(e) => p.onEditorTheme({ selFg: e.target.value })}
+          />
+        </label>
+
+        <label className="axv-set-row">
+          <span>字号</span>
+          <span className="axv-set-range">
+            <input
+              type="range"
+              min={FONT_SIZE_MIN}
+              max={FONT_SIZE_MAX}
+              step={1}
+              aria-label="代码字号"
+              value={p.editorTheme.fontSize}
+              onChange={(e) => p.onEditorTheme({ fontSize: Number(e.target.value) })}
+            />
+            <b>{p.editorTheme.fontSize}px</b>
+          </span>
+        </label>
+
+        <button className="axv-set-btn" onClick={p.onResetEditorTheme}>
+          <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
+            settings_backup_restore
+          </span>
+          恢复代码编辑器默认
+        </button>
+        <div className="axv-set-hint">
+          只影响「代码」tab 的显示，不改号出的 XML。选中文字设为不透明背景时才完全盖住底层高亮字。
+        </div>
       </div>
 
       <div className="axv-set-group">

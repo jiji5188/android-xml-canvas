@@ -2659,6 +2659,21 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-cm .cm-line {
   padding: 0 14px;
 }
+/* M41：安卓 WebView 会把原生选区用系统强调色（紫）画一层，和 CM 自绘选区叠在一起
+   就出现双色块 + 手柄错位。这里把原生选区高亮压掉，只留 .cm-selectionBackground（配置色）。 */
+.axv-cm .cm-content::selection,
+.axv-cm .cm-content *::selection,
+.axv-cm .cm-line::selection,
+.axv-cm .cm-line *::selection {
+  background-color: transparent !important;
+  color: var(--axv-code-sel-fg, inherit);
+}
+.axv-cm .cm-selectionBackground,
+.axv-cm .cm-editor.cm-focused .cm-selectionBackground,
+.axv-cm .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
+.axv-cm .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+  background: var(--axv-code-sel-bg, rgba(4, 64, 159, 0.18));
+}
 .axv-code-hl,
 .axv-code-ta {
   margin: 0;

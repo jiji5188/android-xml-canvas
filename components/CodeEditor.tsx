@@ -130,9 +130,21 @@ const cmTheme = EditorView.theme({
     backgroundColor: "var(--axv-code-cur-bg, rgba(11, 95, 165, 0.08))",
     color: "var(--axv-on-surface)",
   },
-  ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": {
-    backgroundColor: "var(--axv-code-sel-bg, rgba(4, 64, 159, 0.18))",
-    color: "var(--axv-code-sel-fg, transparent)",
+  // M41：选区颜色。注意 CodeMirror 自带主题里有更高优先级的规则：
+  //   .cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground { background: #D7D4F0 }
+  // 所以光写 &.cm-focused .cm-selectionBackground 会被它压住（用户看到的淡紫就是它）。
+  // 这里用相同/更高优先级的选择器覆盖，并用 background 简写（对方也是简写）。
+  ".cm-selectionLayer .cm-selectionBackground": {
+    background: "var(--axv-code-sel-bg, rgba(4, 64, 159, 0.18))",
+  },
+  "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
+    background: "var(--axv-code-sel-bg, rgba(4, 64, 159, 0.18))",
+  },
+  "::selection": {
+    backgroundColor: "transparent !important",
+  },
+  "&.cm-focused ::selection": {
+    backgroundColor: "transparent !important",
   },
   ".cm-cursor, .cm-dropCursor": {
     borderLeftColor: "var(--axv-code-cursor, #24292F)",

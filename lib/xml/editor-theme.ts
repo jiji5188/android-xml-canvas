@@ -186,7 +186,9 @@ export function themeVars(t: EditorTheme): Record<string, string> {
   const vars: Record<string, string> = {
     "--axv-code-cursor": t.cursor || DEFAULT_EDITOR_THEME.cursor,
     "--axv-code-sel-bg": t.selBg || DEFAULT_EDITOR_THEME.selBg,
-    "--axv-code-sel-fg": t.selFg || "transparent",
+    // M41：选区文字色默认透明（= 保留高亮色）；透明时写 inherit，否则文字会看不见
+    "--axv-code-sel-fg":
+      t.selFg && t.selFg !== "transparent" ? t.selFg : "inherit",
     // M37b：关掉时写 transparent，CSS 不用再判开关
     "--axv-code-cur-bg": t.showCur ? t.curBg || DEFAULT_EDITOR_THEME.curBg : "transparent",
     "--axv-code-font-size": `${normalizeTheme(t).fontSize}px`,

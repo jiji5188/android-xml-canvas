@@ -2362,38 +2362,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 1;
   min-height: 0;
 }
-/* M39：values 表格视图 */
-.axv-code-switch {
-  display: flex;
-  gap: 4px;
-  padding: 4px 6px;
-  align-self: flex-start;
-  border-radius: 10px;
-  background: var(--axv-surface-head);
-  border: 1px solid var(--axv-outline);
-  margin-bottom: 6px;
-}
-.axv-code-switch button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 26px;
-  padding: 0 10px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--axv-on-surface-variant);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-.axv-code-switch button .msr {
-  font-size: 16px;
-}
-.axv-code-switch button.on {
-  background: var(--axv-primary);
-  color: #fff;
-}
+/* M42：切换条（.axv-code-switch）已删——「视图 / 代码」搬进顶部 .axv-mob-tabs-inner 了 */
 .axv-val {
   display: flex;
   flex-direction: column;

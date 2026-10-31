@@ -19,7 +19,7 @@ function props(over: Partial<XmlCodeViewProps> = {}): XmlCodeViewProps {
     onChange: vi.fn(),
     errors: [],
     onFormat: vi.fn(),
-    values: true,
+    view: "values",
     fileKey: "app/src/main/res/values/colors.xml",
     onNote: vi.fn(),
     ...over,
@@ -57,39 +57,22 @@ describe("M39 isValuesPath", () => {
   });
 });
 
-describe("M39 XmlCodeView 接线", () => {
-  it("values 文件渲染切换条，默认是表格视图", () => {
+describe("M39/M42 XmlCodeView 接线（切换条已搬进顶部 tab，这里只渲染哪一页）", () => {
+  it("view=values 渲染 axv-val 表格页（带 axv-code-fill 类）", () => {
     const html = renderToStaticMarkup(<XmlCodeView {...props()} />);
-    expect(html).toContain("axv-code-switch");
-    expect(html).toContain("表格");
-    expect(html).toContain("代码");
-    // 默认进入表格：出现 values 表格的类
-    expect(html).toContain("axv-val");
-    expect(html).toContain('aria-selected="true"');
-  });
-
-  it("values 文件的表格里解析出条目", () => {
-    const html = renderToStaticMarkup(<XmlCodeView {...props()} />);
+    expect(html).toContain("axv-val axv-code-fill");
     expect(html).toContain('value="a"');
-    expect(html).toContain('value="#fff"');
+    expect(html).toContain("共 1 条资源");
+    expect(html).not.toContain("axv-code-switch");
   });
 
-  it("非 values 文件不出现切换条，直接是代码编辑器", () => {
-    const p = props({ values: false, fileKey: "res/layout/a.xml", value: "<LinearLayout/>" });
+  it("非 values 文件直接是代码编辑器（axv-code-fill）", () => {
+    const p = props({ view: "code", fileKey: "res/layout/a.xml", value: "<LinearLayout/>" });
     const tree = XmlCodeView(p) as unknown as El;
     const all = collect(tree as unknown as ReactNode);
     expect(all.some((e) => String(e.props.className ?? "").includes("axv-code-switch"))).toBe(false);
     expect(all.some((e) => e.type === CodeEditor)).toBe(true);
     expect(all.some((e) => e.type === ValuesEditor)).toBe(false);
-  });
-
-  it("values 文件里表格拿得到 xml / onChange / onNote", () => {
-    const p = props();
-    const tree = XmlCodeView(p) as unknown as El;
-    // values 分支是函数组件 ValuesTabs，直接渲染成静态标记即可验证内容
-    const html = renderToStaticMarkup(<XmlCodeView {...p} />);
-    expect(html).toContain("共 1 条资源");
-    expect(tree).toBeTruthy();
   });
 
   it("open=false 依旧完全不渲染", () => {

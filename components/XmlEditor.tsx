@@ -829,7 +829,7 @@ export function XmlEditor() {
   }, [refreshWorkspace]);
 
   // M30b：默认落在「XML 代码」tab
-  const [mobileTab, setMobileTab] = useState<"preview" | "xml">("xml");
+  const [mobileTab, setMobileTab] = useState<"preview" | "xml" | "values">("xml");
 
 
   /** M6g：统一的缩放入口（带钳位 + 锚点）。anchor 传鼠标/双指中心的视口坐标 */
@@ -1031,11 +1031,11 @@ export function XmlEditor() {
     const apply = () => {
       const m = mq.matches;
       setIsMobile(m);
-      // 进移动端：两侧面板收起，默认看「XML 代码」tab（M30b）
+      // 进移动端：两侧面板收起，默认看代码 tab（M30b）；values 文件则直接进「视图」（M42）
       if (m) {
         setLeftOpen(false);
         setRightOpen(false);
-        setMobileTab("xml");
+        setMobileTab(valuesFileRef.current ? "values" : "xml");
       } else {
         setLeftOpen(true);
         setRightOpen(true);
@@ -1290,10 +1290,14 @@ export function XmlEditor() {
       (docKind === "code" && looksLikeValuesDoc(xml)),
     [openRel, saveOrigin?.name, docKind, xml],
   );
-  /** M37b：打开非布局文件（如 AndroidManifest.xml）→ 手机上直接切到代码视图 */
+  /** M37b/M42：按文件类型定默认页 —— values 文件进「视图」，其他只读代码文件进「代码」 */
+  const docKey = openRel || saveOrigin?.name || "";
+  const valuesFileRef = useRef(isValuesFile);
+  valuesFileRef.current = isValuesFile;
   useEffect(() => {
-    if (codeOnly) setMobileTab("xml");
-  }, [codeOnly]);
+    if (isValuesFile) setMobileTab("values");
+    else if (codeOnly) setMobileTab("xml");
+  }, [isValuesFile, codeOnly, docKey]);
 
   const { model, issues, parseErr, parseReason } = useMemo((): {
     model: RenderModel | null;
@@ -2810,15 +2814,30 @@ const findResolved = findResolvedNode;
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code_xml</span>
             代码
           </button>
-          <button
-            role="tab"
-            aria-selected={mobileTab === "preview"}
-            className={mobileTab === "preview" ? "on" : ""}
-            onClick={() => setMobileTab("preview")}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>phone_android</span>
-            预览
-          </button>
+          {/* M42：values 资源才有「视图」—— 键值对表格页（.axv-val），紧跟「代码」后面 */}
+          {isValuesFile && (
+            <button
+              role="tab"
+              aria-selected={mobileTab === "values"}
+              className={mobileTab === "values" ? "on" : ""}
+              onClick={() => setMobileTab("values")}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>table_chart</span>
+              视图
+            </button>
+          )}
+          {/* M42：「预览」只在能画布局的文档上出现（manifest / values / menu 等不显示） */}
+          {!codeOnly && (
+            <button
+              role="tab"
+              aria-selected={mobileTab === "preview"}
+              className={mobileTab === "preview" ? "on" : ""}
+              onClick={() => setMobileTab("preview")}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>phone_android</span>
+              预览
+            </button>
+          )}
           {/* M30b：两个下拉框挪到两个 tab 按钮后面 */}
           <select
             className="axv-tb-select axv-tab-sample"
@@ -2895,7 +2914,7 @@ const findResolved = findResolvedNode;
 
       {/* XML 代码视图（M25i：搬到 components/XmlCodeView.tsx） */}
       <XmlCodeView
-        open={mobileTab === "xml"}
+        open={mobileTab === "xml" || mobileTab === "values"}
         isMobile={isMobile}
         leftOpen={leftOpen}
         rightOpen={rightOpen}
@@ -2908,7 +2927,7 @@ const findResolved = findResolvedNode;
         onFormat={doFormat}
         lang={editorLang}
         indent={editorTheme.indent}
-        values={isValuesFile}
+        view={mobileTab === "values" ? "values" : "code"}
         fileKey={openRel || saveOrigin?.name || ""}
         onNote={flashNote}
       />

@@ -63,6 +63,8 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
   const [withXml, setWithXml] = useState(true);
   const [withSelection, setWithSelection] = useState(true);
   const [testing, setTesting] = useState(false);
+  // 实际生效的通道：原生直连失败会自动回退 fetch，徐标跟着真实结果走
+  const [useNative, setUseNative] = useState(() => nativeAiAvailable());
   const abortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -147,6 +149,7 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
               patchLast((m) => ({ ...m, content: acc }));
             },
           });
+          setUseNative(res.via === "native");
 
           if (!res.ok) {
             setChat((c) => c.filter((m) => !m.streaming));
@@ -262,12 +265,12 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
           <span
             className="axv-ai-badge"
             title={
-              nativeAiAvailable()
+              useNative
                 ? "走安卓原生 HTTP，没有跨域限制"
-                : "浏览器直连，部分服务商会被跨域拦"
+                : "浏览器直连，部分服务商会被跨域拦（原生通道失效时会自动回退到这里）"
             }
           >
-            {nativeAiAvailable() ? "原生直连" : "浏览器"}
+            {useNative ? "原生直连" : "浏览器"}
           </span>
           <span className={"msr axv-ai-caret" + (cfgOpen ? " on" : "")} aria-hidden="true">
             expand_more

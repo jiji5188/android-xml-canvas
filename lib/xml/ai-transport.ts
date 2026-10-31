@@ -19,7 +19,11 @@ import {
 interface AiNativeBridge {
   aiChatStream?(id: string, url: string, apiKey: string, bodyJson: string, timeoutMs: number): void;
   aiAbort?(id: string): void;
+  aiPing?(): string;
 }
+
+/** 桥对象一旦绑不住（Chromium: non-injected object），本次会话就永远走 fetch */
+let nativeDead = false;
 
 declare global {
   interface Window {
@@ -31,14 +35,28 @@ declare global {
 
 function bridge(): AiNativeBridge | null {
   if (typeof window === "undefined") return null;
+  if (nativeDead) return null;
   const b = (window as unknown as { AxvNative?: AiNativeBridge }).AxvNative;
-  return b && typeof b.aiChatStream === "function" ? b : null;
+  if (!b || typeof b.aiChatStream !== "function") return null;
+  // M32b：先探活。抛错或返回不是 pong，说明桥对象已失效
+  if (typeof b.aiPing === "function") {
+    try {
+      if (b.aiPing() !== "pong") nativeDead = true;
+    } catch {
+      nativeDead = true;
+    }
+    if (nativeDead) return null;
+  }
+  return b;
 }
 
 /** 当前环境是否能用原生直连（APK 里为 true） */
 export function nativeAiAvailable(): boolean {
-  return bridge() !== null;
+  if (probe === null) probe = bridge() !== null;
+  return probe;
 }
+
+let probe: boolean | null = null;
 
 /* ---------- SSE 解析（纯函数，可单测） ---------- */
 
@@ -116,6 +134,8 @@ export interface StreamResult {
   error?: string;
   /** 走了哪条路，UI 上显示用 */
   via: "native" | "fetch";
+  /** 内部用：桥对象失效，调用方应重试 fetch */
+  bridgeDead?: boolean;
 }
 
 let seq = 0;
@@ -135,7 +155,13 @@ export async function streamChat(
   const b = bridge();
   const fn = b?.aiChatStream;
   if (b && fn) {
-    return streamViaNative({ ...b, aiChatStream: fn }, url, cfg.apiKey.trim(), body, timeoutMs, opts);
+    const r = await streamViaNative({ ...b, aiChatStream: fn }, url, cfg.apiKey.trim(), body, timeoutMs, opts);
+    // 桥掉了：标记并当场改走 fetch，用户无感知
+    if (r.bridgeDead) {
+      nativeDead = true;
+      return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
+    }
+    return r;
   }
   return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
 }
@@ -177,11 +203,11 @@ function streamViaNative(
       window.__axvAiError = prevErr;
     }
 
-    function finish(ok: boolean, error?: string) {
+    function finish(ok: boolean, error?: string, bridgeDead = false) {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve({ ok, content: acc, error, via: "native" });
+      resolve({ ok, content: acc, error, via: "native", bridgeDead });
     }
 
     window.__axvAiChunk = (rid, text) => {
@@ -212,7 +238,8 @@ function streamViaNative(
     try {
       b.aiChatStream?.(id, url, apiKey, body, timeoutMs);
     } catch (e) {
-      finish(false, humanizeError(e));
+      // 「Java bridge method can't be invoked on a non-injected object」就是这里
+      finish(false, humanizeError(e), !acc);
     }
   });
 }

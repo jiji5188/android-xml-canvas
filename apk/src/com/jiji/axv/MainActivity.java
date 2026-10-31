@@ -73,6 +73,8 @@ public class MainActivity extends Activity {
     private String pendingBundleName;
 
     private WebView web;
+    /** M32b：桥实例持强引用，防被 GC；onResume 重新注入也用同一个 */
+    private Bridge bridge;
     private FrameLayout root;
     private TextView diag;
     private ScrollView diagScroll;
@@ -227,7 +229,7 @@ public class MainActivity extends Activity {
             } catch (Throwable ignored) {
             }
         }
-        web.addJavascriptInterface(new Bridge(), "AxvNative");
+        web.addJavascriptInterface(bridge = new Bridge(), "AxvNative");
 
         String crash = readLastCrash();
         if (crash != null) {
@@ -647,6 +649,12 @@ public class MainActivity extends Activity {
         private void aiEmitChunk(String id, String text) {
             if (text == null || text.isEmpty()) return;
             aiEval("window.__axvAiChunk&&window.__axvAiChunk(" + JSONObject.quote(id) + "," + JSONObject.quote(text) + ")");
+        }
+
+        /** M32b：JS 探活（桥还活着返回 pong） */
+        @JavascriptInterface
+        public String aiPing() {
+            return "pong";
         }
 
         /** 发起对话（流式）。方法本身立刻返回，结果靠回调。 */
@@ -1580,6 +1588,22 @@ public class MainActivity extends Activity {
             return;
         }
         super.onBackPressed();
+    }
+
+    /* ===== M32b：JS 桥自愈 =====
+     * 现象：WebView 重载/渲染进程重启后，页面里 window.AxvNative 还在，但 Java 对象已从
+     * 注册表掉丢，调用就报「Java bridge method can't be invoked on a non-injected object」。
+     * 对策：① 强引用桥实例（防 GC）；② 每次 onResume 重新注入一遍；
+     *      ③ JS 侧先 aiPing 探活，探不到就自动回退 fetch。 */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        try {
+            if (bridge == null) bridge = new Bridge();
+            if (web != null) web.addJavascriptInterface(bridge, "AxvNative");
+        } catch (Throwable t) {
+            Log.e(TAG, "re-inject bridge", t);
+        }
     }
 
     @Override

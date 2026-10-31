@@ -765,6 +765,54 @@
   cursor: default;
 }
 
+/* M45：输入关键词检索弹窗（光标下方/上方，x 跟随光标） */
+.axv-sug {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--axv-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.axv-sug-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  flex: 0 0 auto;
+  padding: 0 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--axv-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.axv-sug-item.sel {
+  background: var(--axv-primary-soft);
+  color: var(--axv-primary);
+}
+.axv-sug-text {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.axv-sug-kind {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-family: inherit;
+  opacity: 0.55;
+  padding-left: 4px;
+}
+
 /* 分段控件：胶囊内 3px 缝，首尾圆角（M3E 同款） */
 .axv-seg {
   display: flex;
@@ -2160,6 +2208,7 @@ body.axv-lt-dragging .axv-lt-row {
   display: flex;
   flex: 1;
   min-height: 0;
+  position: relative;
 }
 /* 行号栏 */
 .axv-gutter {

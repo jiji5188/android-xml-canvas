@@ -2936,6 +2936,19 @@ const findResolved = findResolvedNode;
         onFormat={doFormat}
         lang={editorLang}
         indent={editorTheme.indent}
+        resNames={useMemo(() => {
+          const out: string[] = [];
+          // ① 已上传 res 目录的资源（drawable 名 + vector 名）
+          if (resExtras) {
+            Object.keys(resExtras.drawables).forEach((n) => out.push(n));
+            Object.keys(resExtras.drawableXml).forEach((n) => out.push(n));
+            (resExtras.vectorNames ?? []).forEach((n) => out.push(n));
+          }
+          // ② 本工具生成的 drawable
+          Object.keys(generatedDrawables).forEach((n) => out.push(n));
+          // 去重，纯资源名（不带扩展/密度后缀）
+          return [...new Set(out)];
+        }, [resExtras, generatedDrawables])}
         view={mobileTab === "values" ? viewKind ?? "code" : "code"}
         fileKey={openRel || saveOrigin?.name || ""}
         onNote={flashNote}

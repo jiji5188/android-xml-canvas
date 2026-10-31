@@ -11,7 +11,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
+import { Compartment, EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -45,6 +45,8 @@ import { xml } from "@codemirror/lang-xml";
 import { java } from "@codemirror/lang-java";
 import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
+import { computeSuggest, type SuggestKind } from "@/lib/xml/keyword-suggest";
+import { estimateSuggestSize, placeSuggest, type Placement } from "@/lib/xml/suggest-position";
 import { SYMBOLS } from "./XmlCodeEditor";
 
 export interface CodeEditorProps {
@@ -60,7 +62,27 @@ export interface CodeEditorProps {
   lang?: EditorLang;
   /** M40：缩进宽度（空格数，默认 4） */
   indent?: number;
+  /** M45：资源名候选（@drawable/xxx 补全用），不传就只用文档里的 token */
+  resNames?: string[];
 }
+
+/** M45：弹窗当前状态 */
+interface SugState {
+  items: string[];
+  sel: number;
+  kind: SuggestKind;
+  prefix: string;
+  placement: Placement;
+  width: number;
+}
+
+const KIND_LABEL: Record<SuggestKind, string> = {
+  tag: "标签",
+  attr: "属性",
+  value: "值",
+  resource: "资源",
+  plain: "词",
+};
 
 /* ===== 错误行装饰：行底色 + 左侧红条 + 悬停看原因 ===== */
 const setErrLines = StateEffect.define<Map<number, string>>();
@@ -198,8 +220,10 @@ export function CodeEditor({
   onFormat,
   lang = "xml",
   indent = 4,
+  resNames,
 }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const langComp = useRef(new Compartment());
   /** M40：缩进宽度（indentUnit + tabSize）单独一个 compartment，改设置即时生效 */
@@ -214,6 +238,19 @@ export function CodeEditor({
   const [query, setQuery] = useState("");
   const [hitIdx, setHitIdx] = useState(0);
   const findRef = useRef<HTMLInputElement | null>(null);
+
+  /* ===== M45：输入关键词检索弹窗 ===== */
+  const [sug, setSug] = useState<SugState | null>(null);
+  const sugRef = useRef<SugState | null>(null);
+  const setSugBoth = useCallback((v: SugState | null) => {
+    sugRef.current = v;
+    setSug(v);
+  }, []);
+  /** 刚接受过一次（此时不要再弹，否则回车确认后立刻又弹出来） */
+  const lastAcceptRef = useRef(0);
+  const sugTimer = useRef<number | null>(null);
+  const resNamesRef = useRef<string[] | undefined>(resNames);
+  resNamesRef.current = resNames;
 
   const errLines = useMemo(() => {
     const m = new Map<number, string>();
@@ -233,6 +270,97 @@ export function CodeEditor({
     v.dispatch({ selection: { anchor: pos } });
     v.focus();
   }, []);
+
+  /* ===== M45：算候选 + 算光标坐标 → 定位弹窗 ===== */
+  const refreshSuggest = useCallback(() => {
+    const v = viewRef.current;
+    const body = bodyRef.current;
+    if (!v || !body) return;
+    // 刚接受过：不再弹（否则回车确认后马上又弹一个）
+    if (Date.now() - lastAcceptRef.current < 160) return;
+
+    const sel = v.state.selection.main;
+    if (!sel.empty) {
+      setSugBoth(null);
+      return;
+    }
+    const head = sel.head;
+    const line = v.state.doc.lineAt(head);
+    const col = head - line.from + 1;
+    const ctx = computeSuggest(v.state.doc.toString(), { line: line.number, col }, resNamesRef.current);
+    if (!ctx) {
+      setSugBoth(null);
+      return;
+    }
+    // 光标后面还有词字符 → 不弹（免得替掉后面的字）
+    const rest = line.text.slice(col - 1);
+    if (/^[A-Za-z0-9_.:@#+\/-]/.test(rest)) {
+      setSugBoth(null);
+      return;
+    }
+
+    const coords = v.coordsAtPos(head);
+    if (!coords) {
+      setSugBoth(null);
+      return;
+    }
+    const rect = body.getBoundingClientRect();
+    const size = estimateSuggestSize(ctx.items);
+    const placement = placeSuggest(
+      {
+        left: coords.left - rect.left,
+        right: coords.right - rect.left,
+        top: coords.top - rect.top,
+        bottom: coords.bottom - rect.top,
+      },
+      size,
+      { width: rect.width, height: rect.height },
+    );
+    setSugBoth({ items: ctx.items, sel: 0, kind: ctx.kind, prefix: ctx.prefix, placement, width: size.width });
+  }, [setSugBoth]);
+
+  /** 防抖：连续打字时不要每个键都算一遍 */
+  const scheduleSuggest = useCallback(() => {
+    if (sugTimer.current !== null) window.clearTimeout(sugTimer.current);
+    sugTimer.current = window.setTimeout(() => {
+      sugTimer.current = null;
+      refreshSuggest();
+    }, 90);
+  }, [refreshSuggest]);
+
+  /* ===== M45：接受候选（用 item 替掉光标左边的 prefix） ===== */
+  const acceptSuggest = useCallback(
+    (idx: number) => {
+      const v = viewRef.current;
+      const s = sugRef.current;
+      if (!v || !s) return;
+      const item = s.items[idx];
+      if (item === undefined) return;
+      const head = v.state.selection.main.head;
+      const from = Math.max(0, head - s.prefix.length);
+      lastAcceptRef.current = Date.now();
+      setSugBoth(null);
+      v.dispatch({
+        changes: { from, to: head, insert: item },
+        selection: { anchor: from + item.length },
+        userEvent: "input.complete",
+      });
+      v.focus();
+    },
+    [setSugBoth],
+  );
+
+  /** 弹窗内上下移动 / 关闭 */
+  const moveSel = useCallback(
+    (delta: number) => {
+      const s = sugRef.current;
+      if (!s || s.items.length === 0) return false;
+      const n = (s.sel + delta + s.items.length) % s.items.length;
+      setSugBoth({ ...s, sel: n });
+      return true;
+    },
+    [setSugBoth],
+  );
 
   /* ===== 建视图（只一次） ===== */
   useEffect(() => {
@@ -261,6 +389,45 @@ export function CodeEditor({
         cmTheme,
         fontTheme,
         errLineField,
+        // M45：候选列表开着时抢下方向键/回车/取消，未开时完全透明
+        Prec.highest(
+          keymap.of([
+            {
+              key: "ArrowDown",
+              run: () => moveSel(1),
+            },
+            {
+              key: "ArrowUp",
+              run: () => moveSel(-1),
+            },
+            {
+              key: "Enter",
+              run: () => {
+                const s = sugRef.current;
+                if (!s) return false;
+                acceptSuggest(s.sel);
+                return true;
+              },
+            },
+            {
+              key: "Tab",
+              run: () => {
+                const s = sugRef.current;
+                if (!s) return false;
+                acceptSuggest(s.sel);
+                return true;
+              },
+            },
+            {
+              key: "Escape",
+              run: () => {
+                if (!sugRef.current) return false;
+                setSugBoth(null);
+                return true;
+              },
+            },
+          ]),
+        ),
         keymap.of([
           {
             key: "Mod-f",
@@ -288,13 +455,26 @@ export function CodeEditor({
             const head = u.state.selection.main.head;
             onCursorLineRef.current?.(u.state.doc.lineAt(head).number);
           }
+          // M45：光标/内容变了重算候选（防抖）
+          if (u.docChanged || u.selectionSet) scheduleSuggest();
+        }),
+        // M45：失焦就关（点弹窗内部不会触发，因为那里 preventDefault 了）
+        EditorView.domEventHandlers({
+          blur: () => {
+            setSugBoth(null);
+            return false;
+          },
         }),
       ],
     });
 
     const view = new EditorView({ state, parent: host });
     viewRef.current = view;
+    // M45：滚动就关（光标坐标靠的是当前视口，滚走了就对不上了）
+    const onScroll = () => setSugBoth(null);
+    view.scrollDOM.addEventListener("scroll", onScroll, { passive: true });
     return () => {
+      view.scrollDOM.removeEventListener("scroll", onScroll);
       view.destroy();
       viewRef.current = null;
     };
@@ -392,8 +572,45 @@ export function CodeEditor({
 
   return (
     <div className={"axv-code" + (className ? " " + className : "")}>
-      <div className="axv-code-body">
+      <div className="axv-code-body" ref={bodyRef}>
         <div className="axv-cm" ref={hostRef} />
+        {sug ? (
+          <div
+            className="axv-sug"
+            role="listbox"
+            aria-label="关键词提示"
+            style={{
+              left: sug.placement.left,
+              top: sug.placement.top,
+              width: sug.width,
+              maxHeight: sug.placement.maxHeight,
+            }}
+            data-placement={sug.placement.placement}
+          >
+            {sug.items.map((it, i) => (
+              <div
+                key={it}
+                className={"axv-sug-item" + (i === sug.sel ? " sel" : "")}
+                role="option"
+                aria-selected={i === sug.sel}
+                title={it}
+                // 按下就拦：不然编辑器先失焦，弹窗先被 blur 关掉
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  acceptSuggest(i);
+                }}
+                onMouseEnter={() => {
+                  if (sugRef.current && sugRef.current.sel !== i) {
+                    setSugBoth({ ...sugRef.current, sel: i });
+                  }
+                }}
+              >
+                <span className="axv-sug-text">{it}</span>
+                <span className="axv-sug-kind">{KIND_LABEL[sug.kind]}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {findOpen ? (
           <div className="axv-find" role="search">
             <input

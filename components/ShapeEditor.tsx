@@ -128,7 +128,6 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
       <div className="axv-shape-head">
         <button className="axv-shape-back" onClick={onClose} aria-label="返回编辑器">
           <span className="msr" aria-hidden="true">arrow_back</span>
-          返回
         </button>
         <span className="axv-shape-title">自定义形状 · {attrName}</span>
         <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">

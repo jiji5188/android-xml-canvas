@@ -330,9 +330,15 @@ export function ProjectPanel(p: ProjectPanelProps) {
                           )}
                         </span>
                         <span className="axv-ws-item-main">
-                          <span className="axv-ws-item-name">{meta?.name || it.name}</span>
+                          <span className="axv-ws-item-name" title={meta?.name || it.name}>
+                            {meta?.name || it.name}
+                          </span>
                           <span className="axv-ws-item-sub">
-                            {it.kind === "dir" ? "项目" : "单个布局"} · {it.name}
+                            {it.kind === "dir"
+                              ? meta?.name && meta.name !== it.name
+                                ? `项目 · ${it.name}`
+                                : "项目"
+                              : `单个布局 · ${it.name}`}
                           </span>
                         </span>
                         <span className="msr axv-proj-card-go" aria-hidden="true">chevron_right</span>

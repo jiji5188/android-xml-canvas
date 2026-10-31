@@ -84,7 +84,7 @@ export function ResImagePreview({ rel, name, url, xml, onEdit, onClose }: Props)
             }}
             title="复制资源引用"
           >
-            复制引用
+            引用
           </button>
           {isVector ? (
             <button

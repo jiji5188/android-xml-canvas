@@ -35,6 +35,8 @@ import { pickXmlFile } from "@/lib/xml/save-as";
 import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, buildSaveFiles, type SaveInput } from "@/lib/xml/save-flow";
 import { projectSaveRoot, saveProjectFile, saveResFiles } from "@/lib/xml/project-save";
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
+import { isValuesPath } from "@/lib/xml/doc-kind";
+import { looksLikeValuesDoc } from "@/lib/xml/values-edit";
 import { pickLang } from "@/lib/xml/editor-lang";
 import { lineOfPath, shouldResync } from "@/lib/xml/line-sync";
 import {
@@ -1280,6 +1282,13 @@ export function XmlEditor() {
   const editorLang = useMemo(
     () => pickLang(openRel || saveOrigin?.name || null),
     [openRel, saveOrigin?.name],
+  );
+  /** M39：values 资源文件 → 代码视图默认走表格（路径优先，其次看内容根节点是不是 <resources>） */
+  const isValuesFile = useMemo(
+    () =>
+      isValuesPath(openRel || saveOrigin?.name || null) ||
+      (docKind === "code" && looksLikeValuesDoc(xml)),
+    [openRel, saveOrigin?.name, docKind, xml],
   );
   /** M37b：打开非布局文件（如 AndroidManifest.xml）→ 手机上直接切到代码视图 */
   useEffect(() => {
@@ -2898,6 +2907,9 @@ const findResolved = findResolvedNode;
         onCursorLine={onCodeCursorLine}
         onFormat={doFormat}
         lang={editorLang}
+        values={isValuesFile}
+        fileKey={openRel || saveOrigin?.name || ""}
+        onNote={flashNote}
       />
 
       {/* 左侧滑面板（M25g：图标条 + 标题栏搬到 components/LeftRail.tsx） */}

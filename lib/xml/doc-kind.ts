@@ -140,8 +140,14 @@ export function detectDocKind(
   return "layout";
 }
 
-/** 给界面用的人话说明 */
-export function codeOnlyNotice(name: string): { title: string; msg: string } {
+/** M39：是不是 res/values*\/*.xml（有可视化编辑的那种） */
+export function isValuesPath(relOrName?: string | null): boolean {
+  if (!relOrName) return false;
+  const p = relOrName.replace(/\\/g, "/");
+  return /(^|\/)res\/values[^/]*\/[^/]+\.xml$/i.test(p) || /(^|\/)values[^/]*\/[^/]+\.xml$/i.test(p);
+}
+
+/** 给界面用的人话说明 */export function codeOnlyNotice(name: string): { title: string; msg: string } {
   const n = (name || "").replace(/\\/g, "/").split("/").pop() || "该文件";
   if (n === "AndroidManifest.xml") {
     return {

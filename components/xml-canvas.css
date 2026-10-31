@@ -2362,6 +2362,287 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 1;
   min-height: 0;
 }
+/* M39：values 表格视图 */
+.axv-code-switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  align-self: flex-start;
+  border-radius: 10px;
+  background: var(--axv-surface-head);
+  border: 1px solid var(--axv-outline);
+  margin-bottom: 6px;
+}
+.axv-code-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.axv-code-switch button .msr {
+  font-size: 16px;
+}
+.axv-code-switch button.on {
+  background: var(--axv-primary);
+  color: #fff;
+}
+.axv-val {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--axv-surface);
+  overflow: hidden;
+}
+.axv-val-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--axv-outline);
+  background: var(--axv-surface-head);
+  flex-wrap: wrap;
+}
+.axv-val-chips {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.axv-val-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--axv-on-surface-variant);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-val-chip b {
+  font-weight: 600;
+  opacity: 0.6;
+  font-size: 11px;
+}
+.axv-val-chip.on {
+  background: var(--axv-primary);
+  color: #fff;
+  border-color: var(--axv-primary);
+}
+.axv-val-chip.on b {
+  opacity: 0.85;
+}
+.axv-val-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.axv-val-search {
+  width: 130px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font: inherit;
+  font-size: 12px;
+}
+.axv-val-add {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  color: var(--axv-primary);
+  cursor: pointer;
+}
+.axv-val-add .msr {
+  font-size: 18px;
+}
+.axv-val-new {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+}
+.axv-val-new input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font: inherit;
+  font-size: 12px;
+}
+.axv-val-ok {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--axv-primary);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-val-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+.axv-val-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+}
+.axv-val-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+.axv-val-tag {
+  flex: 0 0 44px;
+  font-size: 11px;
+  color: var(--axv-on-surface-variant);
+  text-align: center;
+  padding: 2px 0;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.05);
+}
+.axv-val-tag.k-color {
+  color: #8a4b00;
+  background: rgba(255, 170, 0, 0.16);
+}
+.axv-val-tag.k-dimen,
+.axv-val-tag.k-integer {
+  color: #0b5fa5;
+  background: rgba(11, 95, 165, 0.12);
+}
+.axv-val-row input.axv-val-name {
+  flex: 0 0 34%;
+  min-width: 0;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--axv-on-surface);
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+}
+.axv-val-row input.axv-val-value {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--axv-on-surface);
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+}
+.axv-val-row input.axv-val-name:hover,
+.axv-val-row input.axv-val-value:hover {
+  border-color: var(--axv-outline);
+}
+.axv-val-row input.axv-val-name:focus,
+.axv-val-row input.axv-val-value:focus {
+  border-color: var(--axv-primary);
+  background: var(--axv-surface);
+  outline: none;
+}
+.axv-val-swatch {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--axv-outline);
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+.axv-val-del {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+}
+.axv-val-del:hover {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--axv-danger);
+}
+.axv-val-del .msr {
+  font-size: 17px;
+}
+.axv-val-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--axv-on-surface-variant);
+  font-size: 13px;
+  text-align: center;
+  padding: 24px;
+}
+.axv-val-empty .msr {
+  font-size: 30px;
+  opacity: 0.5;
+}
+.axv-val-hint {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.axv-val-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--axv-outline);
+  background: var(--axv-surface-head);
+  font-size: 11.5px;
+  color: var(--axv-on-surface-variant);
+}
+.axv-val-msg {
+  color: var(--axv-primary);
+  font-weight: 600;
+}
+.axv-val-tip {
+  opacity: 0.7;
+}
 /* M38：CodeMirror 6 容器（取代 textarea + pre 叠层） */
 .axv-cm {
   flex: 1;

@@ -65,6 +65,7 @@ import {
 import {
   findMainLayout,
   fileOpsCtxOf,
+  nativeProjectSource,
   readProjectMeta,
   readProjectMetaNative,
   readProjectMetaFromSource,
@@ -1815,6 +1816,20 @@ export function XmlEditor() {
         }
         if (res.ok) {
           setExportNote(`已创建《${name}》· ${res.written} 个文件已写入 ${name}/app/src/main/${customNote}`);
+          // M46c：新建项目也要带上目录根，否则结构树写操作（重命名/移动/删除）全被置灰
+          if (usedNativeDefault) {
+            const projDir = `${nativeRoot.replace(/\/+$/, "")}/${name}`;
+            setActiveProject((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    dirPath: projDir,
+                    rootPath: projDir,
+                    source: nativeProjectSource(name, [], projDir),
+                  }
+                : prev,
+            );
+          }
           window.setTimeout(() => void refreshWorkspace({ quiet: true }), 400);
         } else {
           setExportNote(`《${name}》已创建，但有 ${res.failed.length} 个文件没写进去（${res.failed[0]} 等）${customNote}`);

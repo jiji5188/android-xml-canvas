@@ -76,7 +76,8 @@ export async function openProjectFolder(): Promise<OpenedProject | null> {
     const info = await wsInfo();
     const entries = await wsListProjects();
     const name = info.label || "项目";
-    return { name, source: nativeProjectSource(name, entries, nativeRootPath(info)) };
+    const root = nativeRootPath(info);
+    return { name, source: nativeProjectSource(name, entries, root), dirPath: root, rootPath: root };
   }
 
   if (!fsAccessSupported()) return null;
@@ -96,7 +97,8 @@ export async function restoreProjectFolder(): Promise<OpenedProject | null> {
     const entries = await wsListProjects();
     if (!entries.length) return null;
     const name = info.label || "项目";
-    return { name, source: nativeProjectSource(name, entries, nativeRootPath(info)) };
+    const root = nativeRootPath(info);
+    return { name, source: nativeProjectSource(name, entries, root), dirPath: root, rootPath: root };
   }
   if (!fsAccessSupported()) return null;
   try {

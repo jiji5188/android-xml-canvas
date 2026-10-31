@@ -41,6 +41,8 @@ export interface BrowseEntry {
 
 export interface ProjectSource {
   name: string;
+  /** M46c：native 源的根绝对路径（派生 fileOps 用，避免上层拿不到 dirPath） */
+  rootPath?: string;
   /** 列某一层的直接子项（rel="" 为项目根）；只读一层，不递归 */
   listChildren(rel: string): Promise<BrowseEntry[]>;
   /** 读一个 xml 文件内容 */
@@ -277,7 +279,7 @@ async function webIconUrl(dir: DirLike): Promise<string | null> {
  *  M31h：传了 rootDir 且 bridge 有新 listDir 时，改成真读一层目录（能列出 drawable/mipmap 里的图片）；
  *  旧 APK（没有 listDir）自动退回扁平列表。 */
 export function nativeProjectSource(name: string, all: WsProject[], rootDir?: string): ProjectSource {
-  return {
+  const src: ProjectSource = {
     name,
     async listChildren(rel: string) {
       const b = nativeBridge();
@@ -359,6 +361,8 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
       return null;
     },
   };
+  if (rootDir) src.rootPath = rootDir.replace(/\/+$/, "");
+  return src;
 }
 
 /**
@@ -564,11 +568,17 @@ export function projectSourceFromDir(dir: unknown, name: string): ProjectSource 
 /** M46：从 OpenedProject 推导文件操作的后端和根（native=rootPath/dirPath 绝对路径；web=handle 句柄）
  *  拿不到 root 时返回 null（调用方不显示文件操作菜单）。 */
 export function fileOpsCtxOf(
-  p: { dirPath?: string; rootPath?: string; handle?: unknown; source?: ProjectSource | null } | null | undefined,
+  p:
+    | { dirPath?: string; rootPath?: string; handle?: unknown; source?: ProjectSource | null }
+    | null
+    | undefined,
 ): FileOpsCtx | null {
   if (!p) return null;
-  const root = p.rootPath || p.dirPath;
-  if (root && root.startsWith("/")) return { backend: "native", root };
+  // M46c：dirPath/rootPath 可能缺（新建项目、恢复项目），再从 source.rootPath 垓一层
+  const roots = [p.rootPath, p.dirPath, p.source?.rootPath];
+  for (const r of roots) {
+    if (r && r.startsWith("/")) return { backend: "native", root: r.replace(/\/+$/, "") };
+  }
   if (p.handle) return { backend: "web", root: p.handle };
   return null;
 }

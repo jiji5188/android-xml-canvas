@@ -28,6 +28,7 @@ import {
   ConfirmDialog,
   MessageDialog,
   NewEntryDialog,
+  Overlay,
   RenameDialog,
   TreeFileMenu,
   type MenuAction,
@@ -238,6 +239,8 @@ export function LazyTreeInner(props: {
     y: 0,
     moved: false,
   });
+  /** 长按已弹菜单 → 抬起时补发的那次 click 不要再打开文件 */
+  const suppressClick = useRef(false);
 
   const cancelPress = () => {
     const st = pressRef.current;
@@ -251,6 +254,7 @@ export function LazyTreeInner(props: {
     if (!fileOps || moving) return;
     if (e.button === 2) {
       e.preventDefault();
+      suppressClick.current = true;
       setMenu({ x: e.clientX, y: e.clientY, target: node });
       return;
     }
@@ -263,6 +267,7 @@ export function LazyTreeInner(props: {
     st.timer = window.setTimeout(() => {
       st.timer = null;
       if (st.moved) return;
+      suppressClick.current = true;
       setMenu({ x: st.x, y: st.y, target: node });
     }, 450);
     // ⚠ 手机 WebView 长按后自身会派 pointercancel（文本选择/上下文菜单），
@@ -360,6 +365,7 @@ export function LazyTreeInner(props: {
     }
     if (parent) setOpen((prev) => new Set(prev).add(parent));
     await refreshDir(parent);
+    setClipboard(null); // 用户要求：粘贴完成后清掉复制标记
     setDlg({ kind: "msg", title: "已粘贴", text: `已复制到 ${parent || "项目根"}/` });
   };
 
@@ -380,8 +386,13 @@ export function LazyTreeInner(props: {
     }
     if (d.parentRel) setOpen((prev) => new Set(prev).add(d.parentRel));
     await refreshDir(d.parentRel);
-    if (d.action === "move") await refreshDir(parentOfRel(d.node.rel));
-    setMoving(null);
+    if (d.action === "move") {
+      await refreshDir(parentOfRel(d.node.rel));
+      setMoving(null);
+    } else {
+      setClipboard(null); // 改名粘贴成功也清标记
+      setDlg({ kind: "msg", title: "已粘贴", text: `已复制为 ${newName}` });
+    }
   };
 
   const reasonText = (r?: string) =>
@@ -581,6 +592,17 @@ export function LazyTreeInner(props: {
             data-treename={n.name}
             data-treedir={isDir ? "1" : "0"}
             style={{ paddingLeft: depth * 14 }}
+            onClick={(e) => {
+              // M46c：点击/长按统一绑在行上（子元素不自己处理 click）
+              if (moving) return;
+              if (suppressClick.current) {
+                suppressClick.current = false;
+                return;
+              }
+              if ((e.target as HTMLElement).closest(".axv-move-handle")) return;
+              if (isDir) toggle(n.rel);
+              else void openEntry(n);
+            }}
             onPointerDown={(e) => beginPress(e, nodeRef)}
             onPointerMove={movePress}
             onContextMenu={(e) => {
@@ -606,11 +628,7 @@ export function LazyTreeInner(props: {
             ) : (
               <span className="axv-ws-caret" aria-hidden="true" />
             )}
-            <button
-              className="axv-ws-item"
-              title={n.rel}
-              onClick={() => (isDir ? toggle(n.rel) : void openEntry(n))}
-            >
+            <button className="axv-ws-item" title={n.rel} type="button">
               <TreeRowIcon entry={n} isDir={isDir} isOpen={isOpen} iconDir={iconDir} />
               <span className="axv-ws-item-main">
                 <span className="axv-ws-item-name">{n.name}</span>
@@ -631,6 +649,7 @@ export function LazyTreeInner(props: {
                 title="按住拖动到目标目录"
                 aria-label="拖动移动"
                 onPointerDown={(e) => beginDrag(e, nodeRef)}
+                onClick={(e) => e.stopPropagation()}
               >
                 <span className="msr" aria-hidden="true">drag_indicator</span>
               </span>
@@ -663,6 +682,9 @@ export function LazyTreeInner(props: {
       <ul className="axv-ws-list axv-proj-tree">{renderRows("", 0)}</ul>
       {busy ? <div className="axv-ws-hint">正在处理…</div> : null}
 
+      {/* M46c：菜单与弹窗都挂到 .axv-main 下（用户要求），不再留在树内部 */}
+      <Overlay>
+        <>
       {menu ? (
         <TreeFileMenu
           x={menu.x}
@@ -718,6 +740,8 @@ export function LazyTreeInner(props: {
           onClose={() => setDlg(null)}
         />
       ) : null}
+        </>
+      </Overlay>
     </>
   );
 }

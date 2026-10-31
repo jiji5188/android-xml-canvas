@@ -6,7 +6,19 @@
 //     web 后端把这些项置灰并提示「网页版暂不支持，请用 APK」；
 //   · 所有弹窗都是受控组件，状态由 ProjectPanel 持有。
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+
+/** M46c：所有浮层挂到 .axv-main 下（用户要求），拿不到就回 body */
+export function Overlay({ children }: { children: ReactNode }) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const el = document.querySelector(".axv-main");
+    setHost((el as HTMLElement) || document.body);
+  }, []);
+  if (!host) return null;
+  return createPortal(children, host);
+}
 
 export type MenuAction = "new" | "rename" | "move" | "copy" | "paste" | "delete";
 

@@ -14,7 +14,15 @@ import {
   type AiMessage,
 } from "./ai";
 
-/* ---------- 原生桥类型 ---------- */
+/* ---------- 原生通道类型 ---------- */
+
+/** JS→Java 的通道：WebMessage（M32c 首选，不依赖 JS 桥对象注册表）或 旧 @JavascriptInterface */
+interface NativeChannel {
+  /** 发对话请求。返回 true 表示已发出（结果靠 window.__axvAi* 回调） */
+  send(req: { type: "aiChatStream" | "aiAbort" | "aiPing"; id: string; url?: string; apiKey?: string; body?: string; timeoutMs?: number }): void;
+  /** 当前通道名，UI 上显示用 */
+  label: "port" | "webmessage" | "bridge";
+}
 
 interface AiNativeBridge {
   aiChatStream?(id: string, url: string, apiKey: string, bodyJson: string, timeoutMs: number): void;
@@ -22,41 +30,142 @@ interface AiNativeBridge {
   aiPing?(): string;
 }
 
-/** 桥对象一旦绑不住（Chromium: non-injected object），本次会话就永远走 fetch */
+/** 原生通道一旦彻底坏掉（两条 JS→Java 路都走不通），本次会话就永远走 fetch */
 let nativeDead = false;
+
+interface WebMsgHandlers {
+  axvAi?: { postMessage(payload: string | Record<string, unknown>): void };
+}
+
+function webMsgSender(): WebMsgHandlers["axvAi"] | null {
+  if (typeof window === "undefined") return null;
+  const h = (window as unknown as { webkit?: { messageHandlers?: WebMsgHandlers } }).webkit?.messageHandlers;
+  return h && h.axvAi && typeof h.axvAi.postMessage === "function" ? h.axvAi : null;
+}
+
+function bridge(): AiNativeBridge | null {
+  if (typeof window === "undefined") return null;
+  const b = (window as unknown as { AxvNative?: AiNativeBridge }).AxvNative;
+  if (!b || typeof b.aiChatStream !== "function") return null;
+  return b;
+}
+
+/* ---------- M32c：MessagePort 通道（不依赖 JS 桥注册表） ---------- */
+
+let aiPort: MessagePort | null = null;
+
+interface PortEnvelope {
+  t: "chunk" | "done" | "error" | "pong";
+  id: string;
+  v?: string;
+  status?: number;
+}
+
+function dispatchPort(raw: unknown): void {
+  if (typeof raw !== "string") return;
+  let o: PortEnvelope;
+  try {
+    o = JSON.parse(raw) as PortEnvelope;
+  } catch {
+    return;
+  }
+  if (!o || typeof o.id !== "string") return;
+  if (o.t === "chunk") window.__axvAiChunk?.(o.id, o.v ?? "");
+  else if (o.t === "done") window.__axvAiDone?.(o.id, o.status ?? 0);
+  else if (o.t === "error") window.__axvAiError?.(o.id, o.v ?? "未知错误");
+  else if (o.t === "pong") window.__axvAiPong?.(o.id);
+}
+
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("message", (ev: MessageEvent) => {
+    // 原生在 onPageFinished 里 postWebMessage("axv-ai-init", [port]) 交过来
+    if (ev.data === "axv-ai-init" && ev.ports && ev.ports.length) {
+      aiPort = ev.ports[0];
+      aiPort.onmessage = (e: MessageEvent) => dispatchPort(e.data);
+    }
+  });
+}
+
+/** 优先 WebMessage；拿不到就用旧 JS 桥（M32c：旧桥的探活逻辑收进 nativeDead 判断里） */
+function nativeChannel(): NativeChannel | null {
+  if (typeof window === "undefined") return null;
+  if (nativeDead) return null;
+
+  // 1) MessagePort（最稳：独立通道，页面重载后由原生重建）
+  if (aiPort) {
+    const p = aiPort;
+    return {
+      label: "port",
+      send(req) {
+        try {
+          p.postMessage(JSON.stringify(req));
+        } catch {
+          aiPort = null;
+          nativeDead = true;
+        }
+      },
+    };
+  }
+
+  // 2) window.webkit.messageHandlers（androidx WebViewCompat 场景，本壳暂未用）
+  const wm = webMsgSender();
+  if (wm) {
+    return {
+      label: "webmessage",
+      send(req) {
+        try {
+          wm.postMessage(JSON.stringify(req));
+        } catch {
+          nativeDead = true;
+        }
+      },
+    };
+  }
+
+  // 3) 旧 @JavascriptInterface 桥（带探活）
+  const b = bridge();
+  if (b) {
+    // M32b：探活。抛错说明桥对象绑定失效，回退 fetch
+    try {
+      if (b.aiPing && b.aiPing() !== "pong") return null;
+    } catch {
+      return null;
+    }
+    return {
+      label: "bridge",
+      send(req) {
+        try {
+          if (req.type === "aiChatStream") {
+            b.aiChatStream?.(req.id, req.url || "", req.apiKey || "", req.body || "", req.timeoutMs ?? 120_000);
+          } else if (req.type === "aiAbort") {
+            b.aiAbort?.(req.id);
+          }
+        } catch {
+          nativeDead = true;
+        }
+      },
+    };
+  }
+  return null;
+}
+
+/** 当前环境是否能用原生直连（APK 里为 true） */
+export function nativeAiAvailable(): boolean {
+  if (probe === null) probe = nativeChannel() !== null;
+  return probe;
+}
+
+let probe: boolean | null = null;
 
 declare global {
   interface Window {
     __axvAiChunk?: (id: string, text: string) => void;
     __axvAiDone?: (id: string, status: number) => void;
     __axvAiError?: (id: string, message: string) => void;
+    /** M32c：Java 对 aiPing 的回应 */
+    __axvAiPong?: (id: string) => void;
   }
 }
-
-function bridge(): AiNativeBridge | null {
-  if (typeof window === "undefined") return null;
-  if (nativeDead) return null;
-  const b = (window as unknown as { AxvNative?: AiNativeBridge }).AxvNative;
-  if (!b || typeof b.aiChatStream !== "function") return null;
-  // M32b：先探活。抛错或返回不是 pong，说明桥对象已失效
-  if (typeof b.aiPing === "function") {
-    try {
-      if (b.aiPing() !== "pong") nativeDead = true;
-    } catch {
-      nativeDead = true;
-    }
-    if (nativeDead) return null;
-  }
-  return b;
-}
-
-/** 当前环境是否能用原生直连（APK 里为 true） */
-export function nativeAiAvailable(): boolean {
-  if (probe === null) probe = bridge() !== null;
-  return probe;
-}
-
-let probe: boolean | null = null;
 
 /* ---------- SSE 解析（纯函数，可单测） ---------- */
 
@@ -152,12 +261,13 @@ export async function streamChat(
   const body = JSON.stringify(buildRequestBody(cfg, messages, true));
   const timeoutMs = opts.timeoutMs ?? 120_000;
 
-  const b = bridge();
-  if (b && typeof b.aiChatStream === "function") {
-    const r = await streamViaNative(b, url, cfg.apiKey.trim(), body, timeoutMs, opts);
-    // 桥掉了：标记并当场改走 fetch，用户无感知
+  const ch = nativeChannel();
+  if (ch) {
+    const r = await streamViaNative(ch, url, cfg.apiKey.trim(), body, timeoutMs, opts);
+    // 通道掉了：标记并当场改走 fetch，用户无感知
     if (r.bridgeDead) {
       nativeDead = true;
+      probe = false;
       return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
     }
     return r;
@@ -165,10 +275,10 @@ export async function streamChat(
   return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
 }
 
-/* ---------- 原生直连 ---------- */
+/* ---------- 原生直连（WebMessage 优先，旧 JS 桥兜底） ---------- */
 
 function streamViaNative(
-  b: AiNativeBridge,
+  ch: NativeChannel,
   url: string,
   apiKey: string,
   body: string,
@@ -185,12 +295,12 @@ function streamViaNative(
     const prevErr = window.__axvAiError;
 
     const onAbort = () => {
-      b.aiAbort?.(id);
+      ch.send({ type: "aiAbort", id });
       finish(false, "已取消");
     };
 
     const timer = setTimeout(() => {
-      b.aiAbort?.(id);
+      ch.send({ type: "aiAbort", id });
       finish(false, "请求超时，可能是网络慢或模型响应太长，把最大 token 调小再试。");
     }, timeoutMs + 5_000);
 
@@ -235,9 +345,8 @@ function streamViaNative(
     opts.signal?.addEventListener("abort", onAbort);
 
     try {
-      b.aiChatStream?.(id, url, apiKey, body, timeoutMs);
+      ch.send({ type: "aiChatStream", id, url, apiKey, body, timeoutMs });
     } catch (e) {
-      // 「Java bridge method can't be invoked on a non-injected object」就是这里
       finish(false, humanizeError(e), !acc);
     }
   });

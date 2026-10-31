@@ -75,6 +75,8 @@ public class MainActivity extends Activity {
     private WebView web;
     /** M32b：桥实例持强引用，防被 GC；onResume 重新注入也用同一个 */
     private Bridge bridge;
+    /** M32c：AI 专用 MessagePort（不依赖 JS 桥对象注册表，页面重载后重建） */
+    private android.webkit.WebMessagePort aiPort;
     private FrameLayout root;
     private TextView diag;
     private ScrollView diagScroll;
@@ -146,6 +148,7 @@ public class MainActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                setupAiPort();
                 // 页面渲染完还是一片空白时，把诊断信息直接显示出来。
                 // 查两次：load 事件可能早于 React hydration，只查一次会误报。
                 probe(0);
@@ -243,6 +246,35 @@ public class MainActivity extends Activity {
             return;
         }
         web.loadUrl(HOST + "/xml/");
+    }
+
+    /**
+     * M32c：建一条 AI 专用 WebMessagePort 通道。
+     * 为什么：addJavascriptInterface 的对象会在 WebView 重载/渲染进程重启后从注册表掉丢，
+     * 调用时报「Java bridge method can't be invoked on a non-injected object」。
+     * WebMessagePort 是独立通道（API 23+），页面重载后重建一条即可，不碰那个注册表。
+     * 每次 onPageFinished 重建（旧 port 直接丢弃）。
+     */
+    private void setupAiPort() {
+        if (Build.VERSION.SDK_INT < 23 || web == null) return;
+        try {
+            android.webkit.WebMessagePort[] ch = web.createWebMessageChannel();
+            final android.webkit.WebMessagePort mine = ch[0];
+            android.webkit.WebMessagePort theirs = ch[1];
+            mine.setWebMessageCallback(new android.webkit.WebMessagePort.WebMessageCallback() {
+                @Override
+                public void onMessage(android.webkit.WebMessagePort port, android.webkit.WebMessage message) {
+                    String data = message.getData();
+                    if (bridge != null) bridge.handleAiWebMessage(data);
+                }
+            });
+            aiPort = mine;
+            web.postWebMessage(new android.webkit.WebMessage("axv-ai-init",
+                    new android.webkit.WebMessagePort[]{theirs}), Uri.parse(HOST + "/xml/"));
+        } catch (Throwable t) {
+            Log.e(TAG, "setupAiPort", t);
+            aiPort = null;
+        }
     }
 
     /** getAssets() 读 zip 失败会直接崩进程；包一层，把异常显示在屏幕上 */
@@ -646,9 +678,63 @@ public class MainActivity extends Activity {
             });
         }
 
+        /** M32c：优先走 MessagePort 推事件（不依赖 JS 桥对象）；port 不在就退回 evaluateJavascript */
+        private void aiNotify(String kind, String id, String text, int status) {
+            String payload = null;
+            try {
+                JSONObject o = new JSONObject();
+                o.put("t", kind);
+                o.put("id", id);
+                if (text != null) o.put("v", text);
+                o.put("status", status);
+                payload = o.toString();
+            } catch (Throwable ignored) {
+            }
+            android.webkit.WebMessagePort p = aiPort;
+            if (p != null && payload != null) {
+                try {
+                    p.postMessage(new android.webkit.WebMessage(payload));
+                    return;
+                } catch (Throwable t) {
+                    aiPort = null;
+                }
+            }
+            // 回退：老路（evaluateJavascript 调 window.__axvAi*）
+            String fn = kind.equals("chunk") ? "__axvAiChunk" : kind.equals("done") ? "__axvAiDone" : kind.equals("pong") ? "__axvAiPong" : "__axvAiError";
+            String args = kind.equals("chunk") || kind.equals("error")
+                    ? JSONObject.quote(id) + "," + JSONObject.quote(text == null ? "" : text)
+                    : JSONObject.quote(id) + "," + status;
+            aiEval("window." + fn + "&&window." + fn + "(" + args + ")");
+        }
+
         private void aiEmitChunk(String id, String text) {
             if (text == null || text.isEmpty()) return;
-            aiEval("window.__axvAiChunk&&window.__axvAiChunk(" + JSONObject.quote(id) + "," + JSONObject.quote(text) + ")");
+            aiNotify("chunk", id, text, 0);
+        }
+
+        /** M32c：WebMessageListener 入口。JS 侧：
+         *   window.webkit.messageHandlers.axvAi.postMessage(JSON.stringify({type:"aiChatStream",id,url,apiKey,body,timeoutMs}))
+         *  优点：不依赖 addJavascriptInterface 的对象注册表，渲染进程重启后仍然可用；
+         *  响应仍走 evaluateJavascript（Java→JS 方向本来就不能用 WebMessage）。 */
+        void handleAiWebMessage(String json) {
+            try {
+                JSONObject o = new JSONObject(json == null ? "{}" : json);
+                String type = o.optString("type", "");
+                if (type.equals("aiChatStream")) {
+                    runAiStream(
+                            o.optString("id"),
+                            o.optString("url"),
+                            o.optString("apiKey"),
+                            o.optString("body"),
+                            o.optInt("timeoutMs", 120000));
+                } else if (type.equals("aiAbort")) {
+                    aiAbort(o.optString("id"));
+                } else if (type.equals("aiPing")) {
+                    aiNotify("pong", o.optString("id"), null, 0);
+                }
+            } catch (Throwable t) {
+                Log.e(TAG, "handleAiWebMessage", t);
+            }
         }
 
         /** M32b：JS 探活（桥还活着返回 pong） */
@@ -657,12 +743,12 @@ public class MainActivity extends Activity {
             return "pong";
         }
 
-        /** 发起对话（流式）。方法本身立刻返回，结果靠回调。 */
-        @JavascriptInterface
-        public void aiChatStream(final String id, final String url, final String apiKey, final String bodyJson, final int timeoutMs) {
+        /** M32c：发起对话（流式）—— 逻辑抽到 runAiStream，
+         *  既给 @JavascriptInterface 旧桥用，也给 WebMessageListener（M32c）用 */
+        void runAiStream(final String id, final String url, final String apiKey, final String bodyJson, final int timeoutMs) {
             if (id == null || url == null) return;
             if (!url.startsWith("https://") && !url.startsWith("http://")) {
-                aiEval("window.__axvAiError&&window.__axvAiError(" + JSONObject.quote(id) + "," + JSONObject.quote("接口地址必须以 http(s):// 开头") + ")");
+                aiNotify("error", id, "接口地址必须以 http(s):// 开头", 0);
                 return;
             }
             Thread t = new Thread(new Runnable() {
@@ -692,8 +778,7 @@ public class MainActivity extends Activity {
                         status = conn.getResponseCode();
                         if (status >= 400) {
                             String detail = readAll(conn.getErrorStream());
-                            aiEval("window.__axvAiError&&window.__axvAiError(" + JSONObject.quote(id) + ","
-                                    + JSONObject.quote(String.valueOf(status) + " " + detail) + ")");
+                            aiNotify("error", id, String.valueOf(status) + " " + detail, 0);
                             return;
                         }
 
@@ -722,10 +807,10 @@ public class MainActivity extends Activity {
                             }
                         }
                         br.close();
-                        aiEval("window.__axvAiDone&&window.__axvAiDone(" + JSONObject.quote(id) + "," + status + ")");
+                        aiNotify("done", id, null, status);
                     } catch (Throwable e) {
                         String msg = e.getClass().getSimpleName() + ": " + String.valueOf(e.getMessage());
-                        aiEval("window.__axvAiError&&window.__axvAiError(" + JSONObject.quote(id) + "," + JSONObject.quote(msg) + ")");
+                        aiNotify("error", id, msg, 0);
                     } finally {
                         aiConns.remove(id);
                         aiJobs.remove(id);
@@ -741,7 +826,13 @@ public class MainActivity extends Activity {
             t.start();
         }
 
-        /** 取消某个对话（面板关闭 / 用户点停止） */
+        /** M32b/c：发起对话（旧 JS 桥路径，WebMessage 注册成功后自动降级为兼容层） */
+        @JavascriptInterface
+        public void aiChatStream(String id, String url, String apiKey, String bodyJson, int timeoutMs) {
+            runAiStream(id, url, apiKey, bodyJson, timeoutMs);
+        }
+
+        /** M32c：取消某个对话（面板关闭 / 用户点停止） */
         @JavascriptInterface
         public void aiAbort(String id) {
             aiConns.remove(id);

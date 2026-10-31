@@ -261,7 +261,7 @@ export function ProjectPanel(p: ProjectPanelProps) {
   const { tr, tab, onTab, wsState, wsBusy, wsMsg, projects, metaOf, projectSource } = p;
 
   return (
-    <div className="axv-rail-scroll">
+    <div className="axv-rail-scroll axv-rail-fill">
       {/* M16i：项目管理两个 tab（M24：「工作目录」→「项目列表」） */}
       <div className="axv-proj-tabs">
         <button

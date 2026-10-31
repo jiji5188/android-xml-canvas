@@ -4410,9 +4410,63 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
+/* M31i：新建项目对话框的项目图标行 */
+.axv-newproj-iconrow .axv-newproj-iconbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.axv-newproj-iconprev {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  border: 1px solid var(--axv-outline-variant, #0000001f);
+  background: var(--axv-surface-sunken);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.axv-newproj-iconprev img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.axv-newproj-iconprev .msr {
+  font-size: 19px;
+  color: var(--axv-on-surface-variant);
+}
+.axv-newproj-iconpick {
+  cursor: pointer;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+.axv-newproj-icontip {
+  font-size: 11.5px;
+  color: var(--axv-on-surface-variant);
+  opacity: 0.75;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+/* M31i：项目管理面板要撑满剩余高度（rail-scroll 默认 block + overflow:auto，会把 flex 子项的 flex:1 废掉） */
+.axv-rail-scroll.axv-rail-fill {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* 工作目录面板 */
 .axv-ws-panel {
   padding: 2px 10px 14px;
+  /* M31i：吃满左栏剩余高度，内部列表自己滚（不再写死 max-height） */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .axv-ws-path {
   display: flex;
@@ -5257,6 +5311,11 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   border-radius: 10px;
   background: var(--axv-surface-2, #ffffff0f);
   overflow: hidden;
+  /* M31i：原来靠子列表 max-height:42vh 限制，窗口一变高就空一大块；改成撑满剩余高度 */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .axv-proj-now-head {
   display: flex;
@@ -5287,7 +5346,10 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   margin-left: auto;
 }
 .axv-proj-now .axv-ws-list {
-  max-height: 42vh;
+  /* M31i：不再固定 42vh，改成占满 axv-proj-now 里剩下的高度 */
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
   overflow: auto;
 }
 .axv-proj-now-foot {

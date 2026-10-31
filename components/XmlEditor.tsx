@@ -27,6 +27,9 @@ import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
 import { hasIcon } from "@/lib/xml/icon-vectors";
 import { workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative } from "@/lib/xml/native-save";
+// M31i：新建项目时把完整 Android 工程骨架落盘
+import { createAndroidProject, safeProjectName } from "@/lib/xml/new-project";
+import { nativeNewProjectIO, webNewProjectIO } from "@/lib/xml/new-project-io";
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { lineOfPath, shouldResync } from "@/lib/xml/line-sync";
@@ -547,6 +550,9 @@ export function XmlEditor() {
   /** M24：新建项目对话框 */
   const [newProjOpen, setNewProjOpen] = useState(false);
   const [newProjName, setNewProjName] = useState("MyApp");
+  /** M31i：新建项目可选图标（data URL 预览 + base64 落盘 + mime；null = 用默认自适应图标） */
+  const [newProjIcon, setNewProjIcon] = useState<{ dataUrl: string; base64: string; mime: string } | null>(null);
+  const [newProjBusy, setNewProjBusy] = useState(false);
   /** M21：当前编辑内容的来源 —— 决定「保存」是写回原路还是弹选择器 */
   const [saveOrigin, setSaveOrigin] = useState<
     { kind: "native"; target: string; name: string } | { kind: "handle"; handle: unknown; name: string } | null
@@ -1632,24 +1638,31 @@ export function XmlEditor() {
     }
   }, [activateProject, refreshWorkspace, wsState?.mode]);
 
-  /** M24：新建项目 —— 应用内建一个带 activity_main.xml 的空项目 */  const createNewProject = useCallback(
-    (rawName: string) => {
-      const name = rawName.trim() || "MyApp";
+  /** M24/M31i：新建项目 —— 应用内建一个带 activity_main.xml 的项目，
+   *  并在工作目录里直接落盘完整 Android 工程结构：项目名/app/src/main/... */
+  const createNewProject = useCallback(
+    async (rawName: string) => {
+      const name = safeProjectName(rawName);
       const tpl = [
         '<?xml version="1.0" encoding="utf-8"?>',
         '<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"',
         '    android:layout_width="match_parent"',
         '    android:layout_height="match_parent"',
+        '    android:gravity="center"',
         '    android:orientation="vertical">',
         '',
         '    <TextView',
+        '        android:id="@+id/tv_hello"',
         '        android:layout_width="wrap_content"',
         '        android:layout_height="wrap_content"',
-        `        android:text="Hello ${name}" />`,
+        `        android:text="Hello ${name}!"`,
+        '        android:textSize="20sp" />',
         '',
         '</LinearLayout>',
         '',
       ].join("\n");
+
+      // 先把应用内状态切过去（落盘失败也不影响继续编辑）
       setProject((p) => ({ ...createProject(name, { name: "activity_main.xml", xml: tpl }), name }));
       setXmlAndTrack(tpl);
       setSelectedPath(null);
@@ -1657,10 +1670,44 @@ export function XmlEditor() {
       setActiveProject({ name, source: null });
       setProjectTab("current");
       setNewProjOpen(false);
-      setExportNote(`已新建项目《${name}》· 点「保存」选择落地目录`);
-      window.setTimeout(() => setExportNote(" "), 3600);
+
+      // M31i：落盘。native 用默认工作目录，web 用已授权的工作目录句柄；SAF 自选目录写不了，只能保留应用内项目
+      setNewProjBusy(true);
+      const icon = newProjIcon;
+      setNewProjIcon(null);
+      try {
+        const info = wsState?.mode === "native" ? await wsInfo() : null;
+        const io =
+          info?.mode === "native"
+            ? info.custom
+              ? null
+              : nativeNewProjectIO(info.defaultPath || "", name)
+            : await webNewProjectIO(name);
+
+        if (!io) {
+          setExportNote(`已新建项目《${name}》（仅应用内）· 当前目录不支持直接写入，点「保存」可导出文件`);
+          window.setTimeout(() => setExportNote(" "), 4200);
+          return;
+        }
+
+        const res = await createAndroidProject(io, name, {
+          iconBase64: icon?.base64,
+          iconMime: icon?.mime,
+        });
+        if (res.ok) {
+          setExportNote(`已创建《${name}》· ${res.written} 个文件已写入 ${name}/app/src/main/`);
+          window.setTimeout(() => void refreshWorkspace({ quiet: true }), 400);
+        } else {
+          setExportNote(`《${name}》已创建，但有 ${res.failed.length} 个文件没写进去（${res.failed[0]} 等）`);
+        }
+      } catch (e) {
+        setExportNote(`《${name}》已创建，落盘失败：${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        setNewProjBusy(false);
+        window.setTimeout(() => setExportNote(" "), 5200);
+      }
     },
-    [setXmlAndTrack],
+    [setXmlAndTrack, newProjIcon, wsState?.mode, refreshWorkspace],
   );
 
   /** M24：重读当前项目结构（手动刷新）——M25d：只重置懒加载缓存，不深扫 */
@@ -2929,7 +2976,7 @@ const findResolved = findResolvedNode;
             <div className="axv-saveas-hint">
               {tr(
                 "proj.newHint",
-                "会建一个空项目（layout/activity_main.xml）。建好后点「保存」选一个文件夹，就能落到磁盘上。",
+                "会在工作目录里直接建出完整工程：项目名/app/src/main/{java,res,AndroidManifest.xml} + gradle 文件。不选图标就用默认自适应图标。",
               )}
             </div>
             <label className="axv-saveas-field">
@@ -2942,17 +2989,67 @@ const findResolved = findResolvedNode;
                 placeholder="MyApp"
                 onChange={(e) => setNewProjName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") createNewProject(newProjName);
+                  if (e.key === "Enter") void createNewProject(newProjName);
                   if (e.key === "Escape") setNewProjOpen(false);
                 }}
               />
             </label>
+            {/* M31i：项目图标（不选就是默认自适应图标） */}
+            <div className="axv-saveas-field axv-newproj-iconrow">
+              <span>{tr("proj.newIcon", "项目图标")}</span>
+              <div className="axv-newproj-iconbox">
+                <span className="axv-newproj-iconprev" aria-hidden="true">
+                  {newProjIcon ? <img src={newProjIcon.dataUrl} alt="" /> : <span className="msr">apps</span>}
+                </span>
+                <label className="axv-set-btn axv-newproj-iconpick">
+                  {tr("proj.newPickIcon", "选图片…")}
+                  <input
+                    type="file"
+                    accept="image/png,image/webp,image/jpeg"
+                    hidden
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!f) return;
+                      if (f.size > 2 * 1024 * 1024) {
+                        setExportNote("图标建议小于 2MB");
+                        window.setTimeout(() => setExportNote(" "), 3000);
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const dataUrl = String(reader.result || "");
+                        const comma = dataUrl.indexOf(",");
+                        if (comma < 0) return;
+                        setNewProjIcon({
+                          dataUrl,
+                          base64: dataUrl.slice(comma + 1),
+                          mime: f.type || "image/png",
+                        });
+                      };
+                      reader.readAsDataURL(f);
+                    }}
+                  />
+                </label>
+                {newProjIcon ? (
+                  <button className="axv-ws-link" onClick={() => setNewProjIcon(null)}>
+                    {tr("proj.newIconReset", "用默认")}
+                  </button>
+                ) : (
+                  <span className="axv-newproj-icontip">{tr("proj.newIconTip", "默认自适应图标")}</span>
+                )}
+              </div>
+            </div>
             <div className="axv-saveas-btns">
-              <button className="axv-set-btn" onClick={() => setNewProjOpen(false)}>
+              <button className="axv-set-btn" onClick={() => setNewProjOpen(false)} disabled={newProjBusy}>
                 {tr("save.cancel", "取消")}
               </button>
-              <button className="axv-set-btn axv-saveas-ok axv-newproj-ok" onClick={() => createNewProject(newProjName)}>
-                {tr("proj.newOk", "创建项目")}
+              <button
+                className="axv-set-btn axv-saveas-ok axv-newproj-ok"
+                onClick={() => void createNewProject(newProjName)}
+                disabled={newProjBusy}
+              >
+                {newProjBusy ? tr("proj.newBusy", "创建中…") : tr("proj.newOk", "创建项目")}
               </button>
             </div>
           </div>

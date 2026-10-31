@@ -12,6 +12,8 @@ import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
   HL_PRESETS,
+  INDENT_MAX,
+  INDENT_MIN,
   type EditorTheme,
 } from "@/lib/xml/editor-theme";
 
@@ -295,6 +297,22 @@ export function SettingsPanel(p: SettingsPanelProps) {
               onChange={(e) => p.onEditorTheme({ fontSize: Number(e.target.value) })}
             />
             <b>{p.editorTheme.fontSize}px</b>
+          </span>
+        </label>
+
+        <label className="axv-set-row">
+          <span>缩进宽度</span>
+          <span className="axv-set-range">
+            <input
+              type="range"
+              min={INDENT_MIN}
+              max={INDENT_MAX}
+              step={1}
+              aria-label="代码缩进宽度"
+              value={p.editorTheme.indent}
+              onChange={(e) => p.onEditorTheme({ indent: Number(e.target.value) })}
+            />
+            <b>{p.editorTheme.indent} 空格</b>
           </span>
         </label>
 

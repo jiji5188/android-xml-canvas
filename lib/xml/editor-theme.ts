@@ -38,6 +38,8 @@ export interface EditorTheme {
   showCur: boolean;
   /** 字号 px（11-16） */
   fontSize: number;
+  /** M40：缩进宽度（空格数，2-8） */
+  indent: number;
 }
 
 export interface HlPreset {
@@ -122,10 +124,14 @@ export const DEFAULT_EDITOR_THEME: EditorTheme = {
   curBg: "rgba(11, 95, 165, 0.08)",
   showCur: true,
   fontSize: 13,
+  indent: 4,
 };
 
 export const FONT_SIZE_MIN = 11;
 export const FONT_SIZE_MAX = 16;
+export const INDENT_MIN = 2;
+export const INDENT_MAX = 8;
+export const INDENT_PRESETS = [2, 3, 4, 6, 8];
 
 export function paletteOf(id: string): EditorPalette {
   return (HL_PRESETS.find((p) => p.id === id) || HL_PRESETS[0]).palette;
@@ -150,6 +156,9 @@ export function normalizeTheme(raw: unknown): EditorTheme {
   let fontSize = Number(o.fontSize);
   if (!Number.isFinite(fontSize)) fontSize = DEFAULT_EDITOR_THEME.fontSize;
   fontSize = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, Math.round(fontSize)));
+  let indent = Number(o.indent);
+  if (!Number.isFinite(indent)) indent = DEFAULT_EDITOR_THEME.indent;
+  indent = Math.min(INDENT_MAX, Math.max(INDENT_MIN, Math.round(indent)));
   return {
     hl,
     cursor: pick(o.cursor, DEFAULT_EDITOR_THEME.cursor),
@@ -158,6 +167,7 @@ export function normalizeTheme(raw: unknown): EditorTheme {
     curBg: pick(o.curBg, DEFAULT_EDITOR_THEME.curBg),
     showCur: typeof o.showCur === "boolean" ? o.showCur : DEFAULT_EDITOR_THEME.showCur,
     fontSize,
+    indent,
   };
 }
 

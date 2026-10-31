@@ -31,6 +31,7 @@ import {
   history,
   historyKeymap,
   indentWithTab,
+  insertNewlineAndIndent,
 } from "@codemirror/commands";
 import {
   HighlightStyle,
@@ -57,6 +58,8 @@ export interface CodeEditorProps {
   onFormat?: () => void;
   /** M38：语法（默认 xml） */
   lang?: EditorLang;
+  /** M40：缩进宽度（空格数，默认 4） */
+  indent?: number;
 }
 
 /* ===== 错误行装饰：行底色 + 左侧红条 + 悬停看原因 ===== */
@@ -182,10 +185,13 @@ export function CodeEditor({
   onCursorLine,
   onFormat,
   lang = "xml",
+  indent = 4,
 }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const langComp = useRef(new Compartment());
+  /** M40：缩进宽度（indentUnit + tabSize）单独一个 compartment，改设置即时生效 */
+  const indentComp = useRef(new Compartment());
   /** 回调放进 ref：view 只建一次，避免每次 render 重建 */
   const onChangeRef = useRef(onChange);
   const onCursorLineRef = useRef(onCursorLine);
@@ -235,8 +241,10 @@ export function CodeEditor({
         highlightActiveLine(),
         indentOnInput(),
         bracketMatching(),
-        indentUnit.of("    "),
-        EditorState.tabSize.of(4),
+        indentComp.current.of([
+          indentUnit.of(" ".repeat(indent)),
+          EditorState.tabSize.of(indent),
+        ]),
         syntaxHighlighting(cmHl),
         cmTheme,
         fontTheme,
@@ -250,6 +258,8 @@ export function CodeEditor({
               return true;
             },
           },
+          // M40：回车 = 换行 + 按语法自动缩进（放在 defaultKeymap 前，保证优先）
+          { key: "Enter", run: insertNewlineAndIndent },
           ...defaultKeymap,
           ...historyKeymap,
           indentWithTab,
@@ -294,6 +304,18 @@ export function CodeEditor({
     if (!v) return;
     v.dispatch({ effects: langComp.current.reconfigure(langExt(lang)) });
   }, [lang]);
+
+  /* ===== M40：缩进宽度变化（设置面板里改） ===== */
+  useEffect(() => {
+    const v = viewRef.current;
+    if (!v) return;
+    v.dispatch({
+      effects: indentComp.current.reconfigure([
+        indentUnit.of(" ".repeat(indent)),
+        EditorState.tabSize.of(indent),
+      ]),
+    });
+  }, [indent]);
 
   /* ===== 错误行装饰 ===== */
   useEffect(() => {

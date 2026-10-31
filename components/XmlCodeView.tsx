@@ -31,6 +31,8 @@ export interface XmlCodeViewProps {
 
   /** M38：当前文件语法（xml / java） */
   lang?: EditorLang;
+  /** M40：缩进宽度（空格数） */
+  indent?: number;
   /** M39：当前文件是 values 资源 → 默认「表格」视图 */
   values?: boolean;
   /** M39：文件身份（切文件时重置视图模式） */
@@ -89,6 +91,7 @@ function ValuesTabs(props: XmlCodeViewProps) {
           onCursorLine={props.onCursorLine}
           onFormat={props.onFormat}
           lang={props.lang}
+          indent={props.indent}
         />
       )}
     </>
@@ -124,6 +127,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           onCursorLine={props.onCursorLine}
           onFormat={props.onFormat}
           lang={props.lang}
+          indent={props.indent}
         />
       )}
     </div>

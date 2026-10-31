@@ -14,6 +14,14 @@ import {
 } from "@/lib/xml/editor-theme";
 
 describe("M37 editor-theme 纯逻辑", () => {
+
+  it("M40：indent 归一（越界收进 2-8，字符串/NaN 回默认）", () => {
+    expect(normalizeTheme({ indent: 24 }).indent).toBe(8);
+    expect(normalizeTheme({ indent: 1 }).indent).toBe(2);
+    expect(normalizeTheme({ indent: "6" }).indent).toBe(6);
+    expect(normalizeTheme({ indent: "abc" }).indent).toBe(4);
+    expect(normalizeTheme(null).indent).toBe(4);
+  });
   it("默认值与字号边界", () => {
     expect(DEFAULT_EDITOR_THEME).toEqual({
       hl: "light",
@@ -23,6 +31,7 @@ describe("M37 editor-theme 纯逻辑", () => {
       curBg: "rgba(11, 95, 165, 0.08)",
       showCur: true,
       fontSize: 13,
+      indent: 4,
     });
     expect(FONT_SIZE_MIN).toBe(11);
     expect(FONT_SIZE_MAX).toBe(16);
@@ -101,6 +110,7 @@ describe("M37 editor-theme 纯逻辑", () => {
     const t = normalizeTheme({ showCur: "yes", curBg: "chartreuse" });
     expect(t.showCur).toBe(true);
     expect(t.curBg).toBe(DEFAULT_EDITOR_THEME.curBg);
+    expect(t.indent).toBe(4);
     expect(normalizeTheme({ showCur: false }).showCur).toBe(false);
   });
 });

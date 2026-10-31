@@ -2907,6 +2907,7 @@ const findResolved = findResolvedNode;
         onCursorLine={onCodeCursorLine}
         onFormat={doFormat}
         lang={editorLang}
+        indent={editorTheme.indent}
         values={isValuesFile}
         fileKey={openRel || saveOrigin?.name || ""}
         onNote={flashNote}

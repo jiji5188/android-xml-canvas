@@ -4671,9 +4671,10 @@ button.axv-ws-caret:hover {
   align-items: center;
   gap: 7px;
   padding: 6px 7px;
-  border: 1px solid var(--axv-outline);
+  /* M31l：对比度加强一点点——描边用 strong，底色调进 10% 文字色，卡片从面板里凸显出来 */
+  border: 1px solid var(--axv-outline-strong);
   border-radius: 10px;
-  background: var(--axv-surface);
+  background: color-mix(in srgb, var(--axv-surface) 90%, var(--axv-on-surface) 10%);
   cursor: pointer;
 }
 .axv-theme-card:hover {
@@ -4687,7 +4688,8 @@ button.axv-ws-caret:hover {
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  border: 1px solid transparent;
+  /* M31l：色块也加一圈可见描边，浅色主题下不至于和白底粘在一起 */
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 24%, transparent);
   display: flex;
   align-items: flex-end;
   justify-content: center;

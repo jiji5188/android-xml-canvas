@@ -125,6 +125,20 @@ export function isImageName(name: string): boolean {
   return IMAGE_EXT_RE.test(name);
 }
 
+/** M45b：java/kt 源码目录（/main/java、/main/kotlin 等），rel 里任意一段为 java/kotlin/kt 都算 */
+export const JAVA_SRC_EXT_RE = /\.(java|kt|kts)$/i;
+
+export function isJavaDirRel(rel: string): boolean {
+  const parts = rel.split("/").filter(Boolean);
+  if (!parts.length) return false;
+  const lower = parts.map((p) => p.toLowerCase());
+  return lower.includes("java") || lower.includes("kotlin") || lower.includes("kt");
+}
+
+export function isJavaSrcName(name: string): boolean {
+  return JAVA_SRC_EXT_RE.test(name);
+}
+
 /** M31h：这个目录是不是图标资源目录（res/drawable*、res/mipmap*） */
 export function isIconDirRel(rel: string): boolean {
   return /(^|\/)(drawable|mipmap)(-[^/]*)?(\/|$)/i.test(rel);
@@ -192,7 +206,7 @@ export function webProjectSource(root: unknown, name: string): ProjectSource {
           if (e.kind === "directory") {
             if (SKIP_DIRS.has(lower)) continue;
             dirs.push({ kind: "dir", name: e.name, rel: joinRel(rel, e.name), handle: e });
-          } else if (/\.xml$/i.test(e.name) || (isIconDirRel(rel) && isImageName(e.name))) {
+          } else if (/\.xml$/i.test(e.name) || (isIconDirRel(rel) && isImageName(e.name)) || (isJavaDirRel(rel) && isJavaSrcName(e.name))) {
             files.push({ kind: "file", name: e.name, rel: joinRel(rel, e.name), handle: e });
           }
         }
@@ -278,7 +292,7 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
               if (it.kind === "dir") {
                 if (SKIP_DIRS.has(it.name.toLowerCase())) continue;
                 out.push({ kind: "dir", name: it.name, rel: joinRel(rel, it.name) });
-              } else if (/\.xml$/i.test(it.name) || (isIconDirRel(rel) && isImageName(it.name))) {
+              } else if (/\.xml$/i.test(it.name) || (isIconDirRel(rel) && isImageName(it.name)) || (isJavaDirRel(rel) && isJavaSrcName(it.name))) {
                 out.push({ kind: "file", name: it.name, rel: joinRel(rel, it.name), target: it.path });
               }
             }
@@ -298,14 +312,18 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
         if (!it.rel.startsWith(prefix)) continue;
         const rest = it.rel.slice(prefix.length);
         if (!rest || rest.includes("/")) continue;
-        if (it.kind === "file" && !/\.xml$/i.test(it.name) && !(isIconDirRel(rel) && isImageName(it.name))) continue;
+        if (it.kind === "file" && !/\.xml$/i.test(it.name) && !(isIconDirRel(rel) && isImageName(it.name)) && !(isJavaDirRel(rel) && isJavaSrcName(it.name))) continue;
         out.push({ kind: it.kind, name: it.name, rel: it.rel, target: it.target });
       }
       return [...sortEntries(out.filter((e) => e.kind === "dir")), ...sortEntries(out.filter((e) => e.kind === "file"))];
     },
     async readText(rel: string) {
       const hit = all.find((it) => it.rel === rel && it.kind === "file");
-      const target = hit?.target;
+      // M45b：java/kt 文件不在扁平列表里时，用 rootDir 拼绝对路径直接读
+      let target = hit?.target;
+      if (!target && rootDir && /\.(java|kt|kts)$/i.test(rel)) {
+        target = `${rootDir.replace(/\/+$/, "")}/${rel}`;
+      }
       if (!target) return null;
       const b = nativeBridge();
       try {

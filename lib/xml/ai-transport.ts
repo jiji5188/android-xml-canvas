@@ -153,9 +153,8 @@ export async function streamChat(
   const timeoutMs = opts.timeoutMs ?? 120_000;
 
   const b = bridge();
-  const fn = b?.aiChatStream;
-  if (b && fn) {
-    const r = await streamViaNative({ ...b, aiChatStream: fn }, url, cfg.apiKey.trim(), body, timeoutMs, opts);
+  if (b && typeof b.aiChatStream === "function") {
+    const r = await streamViaNative(b, url, cfg.apiKey.trim(), body, timeoutMs, opts);
     // 桥掉了：标记并当场改走 fetch，用户无感知
     if (r.bridgeDead) {
       nativeDead = true;

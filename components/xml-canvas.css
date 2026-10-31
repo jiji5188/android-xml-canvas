@@ -2209,6 +2209,15 @@ body.axv-lt-dragging .axv-lt-row {
   background: rgba(220, 38, 38, 0.07);
   border-left: 3px solid rgba(220, 38, 38, 0.55);
 }
+/* M37b：当前行背景（在错误行带之前渲染，错误行会盖在上面） */
+.axv-code-cur {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 21px;
+  background: var(--axv-code-cur-bg, rgba(11, 95, 165, 0.08));
+  pointer-events: none;
+}
 /* 底部错误提示条 */
 .axv-code-errbar {
   display: flex;
@@ -5368,6 +5377,9 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   max-width: 340px;
 }
 .axv-parse-fail-icon { font-size: 30px; color: var(--axv-danger); }
+/* M37b：非布局文件提示卡（蓝色调，不是错误） */
+.axv-codeonly-card .axv-parse-fail-icon { color: var(--axv-primary); }
+.axv-codeonly-card { border-style: dashed; }
 .axv-parse-fail-title { font-size: 13.5px; font-weight: 700; color: var(--axv-title); }
 .axv-parse-fail-msg {
   font-size: 12px;

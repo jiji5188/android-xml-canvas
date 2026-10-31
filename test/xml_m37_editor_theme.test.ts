@@ -20,6 +20,8 @@ describe("M37 editor-theme 纯逻辑", () => {
       cursor: "#24292F",
       selBg: "rgba(4, 64, 159, 0.18)",
       selFg: "transparent",
+      curBg: "rgba(11, 95, 165, 0.08)",
+      showCur: true,
       fontSize: 13,
     });
     expect(FONT_SIZE_MIN).toBe(11);
@@ -84,6 +86,22 @@ describe("M37 editor-theme 纯逻辑", () => {
     const l = themeVars(DEFAULT_EDITOR_THEME);
     expect(l["--axv-code-bg"]).toBeUndefined();
     expect(l["--axv-x-tag"]).toBe("#0B5FA5");
+  });
+
+  it("当前行背景：开关关掉时写 transparent", () => {
+    const on = themeVars(DEFAULT_EDITOR_THEME);
+    expect(on["--axv-code-cur-bg"]).toBe("rgba(11, 95, 165, 0.08)");
+    const off = themeVars({ ...DEFAULT_EDITOR_THEME, showCur: false });
+    expect(off["--axv-code-cur-bg"]).toBe("transparent");
+    const custom = themeVars({ ...DEFAULT_EDITOR_THEME, curBg: "#ffeecc" });
+    expect(custom["--axv-code-cur-bg"]).toBe("#ffeecc");
+  });
+
+  it("showCur 非布尔 → 回默认 true；curBg 非法 → 回默认色", () => {
+    const t = normalizeTheme({ showCur: "yes", curBg: "chartreuse" });
+    expect(t.showCur).toBe(true);
+    expect(t.curBg).toBe(DEFAULT_EDITOR_THEME.curBg);
+    expect(normalizeTheme({ showCur: false }).showCur).toBe(false);
   });
 });
 

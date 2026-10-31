@@ -48,6 +48,8 @@ export interface CanvasStageProps {
   showIssues: boolean;
   parseErr: boolean;
   parseReason: string;
+  /** M37b：非布局文件（manifest/values/menu…）在画布区的说明卡片；null = 不显示 */
+  notice?: { title: string; msg: string } | null;
   lintErrCount: number;
   exportNote: string;
 
@@ -93,6 +95,7 @@ export function CanvasStage(props: CanvasStageProps) {
     showIssues,
     parseErr,
     parseReason,
+    notice,
     lintErrCount,
     exportNote,
     selectedPath,
@@ -126,7 +129,21 @@ export function CanvasStage(props: CanvasStageProps) {
           </button>
         </div>
       ) : null}
-      {parseErr ? (
+      {notice ? (
+        <div className="axv-parse-fail axv-codeonly-card" role="status">
+          <span className="msr axv-parse-fail-icon" aria-hidden="true">
+            description
+          </span>
+          <div className="axv-parse-fail-title">{notice.title}</div>
+          <div className="axv-parse-fail-msg">{notice.msg}</div>
+          <button className="axv-parse-fail-btn" onClick={() => gotoLine(1)}>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>
+              code
+            </span>
+            {tr("err.toCode", "去代码面板")}
+          </button>
+        </div>
+      ) : parseErr ? (
         <div className="axv-parse-fail" role="alert">
           <span className="msr axv-parse-fail-icon" aria-hidden="true">error</span>
           <div className="axv-parse-fail-title">{tr("err.parseTitle", "这个 XML 现在画不出来")}</div>

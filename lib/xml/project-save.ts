@@ -17,6 +17,25 @@ export type ProjectSaveRoot =
   | { kind: "native"; base: string }
   | { kind: "handle"; handle: unknown };
 
+/** M37b：非布局文件（manifest / values / menu …）按工程内相对路径整文件写回
+ *  —— 不走 res 拼接，也不生成任何依赖资源 */
+export async function saveProjectFile(
+  root: ProjectSaveRoot,
+  rel: string,
+  text: string,
+): Promise<boolean> {
+  const clean = rel.replace(/\\/g, "/").replace(/^\/+/, "");
+  try {
+    if (root.kind === "native") {
+      const base = root.base.replace(/[/\\]+$/, "");
+      return writeTextNative(`${base}/${clean}`, text);
+    }
+    return await writeUnderHandle(root.handle, clean, text);
+  } catch {
+    return false;
+  }
+}
+
 export interface ProjectSaveResult {
   ok: boolean;
   written: number;

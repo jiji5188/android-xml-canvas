@@ -26,14 +26,15 @@ import { sanitizeResName } from "@/lib/xml/resname";
 import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
 import { hasIcon } from "@/lib/xml/icon-vectors";
-import { workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative } from "@/lib/xml/native-save";
+import { workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative, writeTextNative } from "@/lib/xml/native-save";
 import { yieldToUi } from "@/lib/xml/native-async";
 // M31i：新建项目时把完整 Android 工程骨架落盘
 import { createAndroidProject, safeProjectName } from "@/lib/xml/new-project";
 import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/xml/new-project-io";
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, buildSaveFiles, type SaveInput } from "@/lib/xml/save-flow";
-import { projectSaveRoot, saveResFiles } from "@/lib/xml/project-save";
+import { projectSaveRoot, saveProjectFile, saveResFiles } from "@/lib/xml/project-save";
+import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
 import { lineOfPath, shouldResync } from "@/lib/xml/line-sync";
 import {
   THEME_PRESETS,
@@ -603,14 +604,15 @@ export function XmlEditor() {
       return "modern";
     }
   });
-  /** M37：代码编辑器外观（光标/选区/高亮/字号，localStorage 记住） */
-  const [editorTheme, setEditorTheme] = useState<EditorTheme>(() => {
+  /** M37：代码编辑器外观（光标/选区/高亮/字号，localStorage 记住） */  const [editorTheme, setEditorTheme] = useState<EditorTheme>(() => {
     try {
       return parseTheme(window.localStorage.getItem(LS_KEY_EDITOR_THEME));
     } catch {
       return DEFAULT_EDITOR_THEME;
     }
   });
+  /** M37b：当前打开的工程内相对路径（判断是不是布局文件，以及非布局文件写回哪里） */
+  const [openRel, setOpenRel] = useState<string | null>(null);
   const patchEditorTheme = useCallback((patch: Partial<EditorTheme>) => {
     setEditorTheme((t) => ({ ...t, ...patch }));
   }, []);
@@ -1264,6 +1266,21 @@ export function XmlEditor() {
    *  DPX = 1dp 对应 px（含用户缩放），仅用于状态栏/导航栏高度与圆角。 */
   const DPX = SCALE * scale;
 
+  /** M37b：当前文档是布局还是「只读代码」（manifest / values / menu …） */
+  const docKind = useMemo(
+    () => detectDocKind(xml, openRel, saveOrigin?.name ?? null),
+    [xml, openRel, saveOrigin?.name],
+  );
+  const codeOnly = docKind === "code";
+  const codeNotice = useMemo(
+    () => (codeOnly ? codeOnlyNotice(openRel || saveOrigin?.name || "") : null),
+    [codeOnly, openRel, saveOrigin?.name],
+  );
+  /** M37b：打开非布局文件（如 AndroidManifest.xml）→ 手机上直接切到代码视图 */
+  useEffect(() => {
+    if (codeOnly) setMobileTab("xml");
+  }, [codeOnly]);
+
   const { model, issues, parseErr, parseReason } = useMemo((): {
     model: RenderModel | null;
     issues: XmlIssue[];
@@ -1272,6 +1289,8 @@ export function XmlEditor() {
   } => {
     // M22：解析 / 约束求解全程兜住异常 —— 半个 XML、错标签、坏属性都不能让整个页面白屏
     try {
+      // M37b：非布局文件不走布局管线（否则 manifest 会被报缺 layout_width 之类）
+      if (codeOnly) return { model: null, issues: [], parseErr: false, parseReason: "" };
       const parsed = parseLayoutXml(parsedXml);
       if (!parsed.root) {
         const first = parsed.issues.find((i) => i.level === "error");
@@ -1308,7 +1327,7 @@ export function XmlEditor() {
         parseReason: `渲染失败：${e instanceof Error ? e.message : String(e)}`,
       };
     }
-  }, [parsedXml, resources, resExtras?.layouts, device, measured, renderTheme]);
+  }, [parsedXml, resources, resExtras?.layouts, device, measured, renderTheme, codeOnly]);
 
   /** M2t：XML / 设备变了 → 旧 path 可能指向别的节点，实测表作废重测 */
   useEffect(() => {
@@ -1366,12 +1385,14 @@ export function XmlEditor() {
   /** 代码视图的结构检查（带行号，标红用） */
   const lints = useMemo(() => {
     try {
+      // M37b：非布局文件不做布局结构校验
+      if (codeOnly) return [] as ReturnType<typeof lintXml>;
       return lintXml(parsedXml);
     } catch (e) {
       console.error("[axv] 结构检查失败", e);
       return [] as ReturnType<typeof lintXml>;
     }
-  }, [parsedXml]);
+  }, [parsedXml, codeOnly]);
   /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
   const lintErrCount = useMemo(() => {
     try {
@@ -1573,6 +1594,8 @@ export function XmlEditor() {
         setXmlAndTrack(text);
         // M25b：结构树里标「正在编辑」用
         setWsActiveName(entry.name);
+        // M37b：记住工程内相对路径（非布局文件保存/判定都靠它）
+        setOpenRel(entry.rel || null);
         // M21：记住来源，保存时优先写回原路径
         if (entry.target) setSaveOrigin({ kind: "native", target: entry.target, name: entry.name });
         else if (entry.handle) setSaveOrigin({ kind: "handle", handle: entry.handle, name: entry.name });
@@ -1856,6 +1879,8 @@ export function XmlEditor() {
           histRef.current = { stack: [target.xml], idx: 0 };
           syncHist();
           setSelectedPath(null);
+          // M37b：吓得切到内置文件后，不再算「从工程里打开的文件」
+          setOpenRel(null);
         }
         return next;
       });
@@ -2385,6 +2410,11 @@ const findResolved = findResolvedNode;
   /** M3g：导出 res 包（zip）：布局 + 图标矢量 + 上传的 shape/values 一起带走，
    *  避免别处打开工程时「找不到图标文件」。*/
   const doDownloadResZip = () => {
+    // M37b：非布局文件没有「res 包」概念，直接阻止
+    if (codeOnly) {
+      flashNote("当前文件不是布局，无法导出 res 包；直接「保存」写回原文件即可", 4600);
+      return;
+    }
     // M36：有打开的项目 → 直接写进它的 res 目录，不再丢一个 res.zip 在工作目录根
     if (projRoot) {
       void saveResFiles(projRoot, buildSaveFiles(currentSaveInput())).then((r) => {
@@ -2424,6 +2454,10 @@ const findResolved = findResolvedNode;
   /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续
    *  M2s：改成可视化检查面板（不再用 alert/confirm） */
   const doDownload = () => {
+    if (codeOnly) {
+      flashNote("当前文件不是布局，不能导出为布局 XML；直接「保存」就行", 4600);
+      return;
+    }
     const r = downloadLayout(currentSaveInput("activity_main.xml"));
     setExportNote(
       r.native ? `已保存 ${r.name}（${workspaceLabel() || "工作目录"}）` : `已导出 ${r.name}`,
@@ -2517,7 +2551,56 @@ const findResolved = findResolvedNode;
     return false;
   };
 
+  /** M37b：非布局文件（manifest / values / menu …）—— 整文件原位写回，不生成任何布局/依赖资源 */
+  const saveRawFile = async (): Promise<boolean> => {
+    const name = saveOrigin?.name || (openRel ? openRel.split("/").pop() || "" : "") || "文件";
+    // 1) 原生绝对路径 / content URI
+    if (saveOrigin?.kind === "native") {
+      if (writeTextNative(saveOrigin.target, xml)) {
+        flashNote(`已保存 ${name}（原路径）`, 3200);
+        markSaved(xml);
+        return true;
+      }
+      flashNote(`写入失败：${name} —— 请确认「所有文件访问」已开启`, 5000);
+      return false;
+    }
+    // 2) 项目可写根 + 工程内相对路径（native 拼绝对路径 / web 走目录句柄）
+    if (projRoot && openRel) {
+      const ok = await saveProjectFile(projRoot, openRel, xml);
+      if (ok) {
+        flashNote(`已保存 ${name} → ${openRel}`, 3600);
+        markSaved(xml);
+        return true;
+      }
+      flashNote(`写入失败：${openRel}（目录不可写？）`, 5000);
+      return false;
+    }
+    // 3) 浏览器里打开的文件句柄
+    const h = saveOrigin?.kind === "handle" ? saveOrigin.handle : null;
+    if (h && typeof (h as { createWritable?: unknown }).createWritable === "function") {
+      try {
+        const w = await (
+          h as { createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void> }> }
+        ).createWritable();
+        await w.write(xml);
+        await w.close();
+        flashNote(`已保存 ${name}（原文件）`, 3200);
+        markSaved(xml);
+        return true;
+      } catch {
+        /* 往下退 */
+      }
+    }
+    flashNote(`没有可写回的位置：${name} —— 请用项目目录打开，或先「另存到文件夹」`, 5200);
+    return false;
+  };
+
   const doSave = async () => {
+    // M37b：非布局文件不拼 res 包，直接原文件写回
+    if (codeOnly) {
+      await saveRawFile();
+      return;
+    }
     // M36：优先存进当前打开的项目（<项目>/app/src/main/res/）
     if (projRoot && (await saveIntoProject())) return;
     // A) 有来源 → 直接写回原路径
@@ -2565,6 +2648,10 @@ const findResolved = findResolvedNode;
   };
 
   const saveProject = () => {
+    if (codeOnly) {
+      flashNote("当前文件不是布局，不能走「导出检查」；直接「保存」写回原文件即可", 4600);
+      return;
+    }
     setExportAction("download");
     setExportReport(buildReport());
     setExportOpen(true);
@@ -2781,6 +2868,7 @@ const findResolved = findResolvedNode;
         showIssues={showIssues}
         parseErr={parseErr}
         parseReason={parseReason}
+        notice={codeNotice}
         lintErrCount={lintErrCount}
         exportNote={exportNote}
         selectedPath={selectedPath}

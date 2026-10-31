@@ -142,6 +142,16 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
   const [hitIdx, setHitIdx] = useState(0);
   const findRef = useRef<HTMLInputElement | null>(null);
 
+  /** M37b：光标所在行（当前行背景色块用），与 onCursorLine 一起上报 */
+  const [curLine, setCurLine] = useState(0);
+  const reportLine = useCallback(
+    (line: number) => {
+      setCurLine((prev) => (prev === line ? prev : line));
+      onCursorLine?.(line);
+    },
+    [onCursorLine],
+  );
+
   const sync = useCallback(() => {
     const ta = taRef.current;
     const pre = preRef.current;
@@ -292,6 +302,10 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
             />
           </pre>
           <div className="axv-code-bands" ref={bandRef} aria-hidden="true">
+            {/* M37b：当前行背景（颜色由 CSS 变量 --axv-code-cur-bg 控制，关闭时透明） */}
+            {curLine > 0 ? (
+              <div className="axv-code-cur" style={{ top: (curLine - 1) * CODE_LINE_HEIGHT }} />
+            ) : null}
             {[...errLines.keys()].map((ln) => (
               <div
                 key={ln}
@@ -310,8 +324,8 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
             wrap="off"
             onChange={(e) => onChange(e.target.value)}
             onScroll={sync}
-            onClick={(e) => onCursorLine?.(lineFromEvent(e.currentTarget, e.clientX, e.clientY))}
-            onKeyUp={(e) => onCursorLine?.(lineFromCursor(e.currentTarget))}
+            onClick={(e) => reportLine(lineFromEvent(e.currentTarget, e.clientX, e.clientY))}
+            onKeyUp={(e) => reportLine(lineFromCursor(e.currentTarget))}
             onKeyDown={(e) => {
               // M6e：Ctrl/Cmd+F 在编辑器内直接打开查找
               if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
@@ -319,7 +333,7 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
                 openFind();
                 return;
               }
-              onCursorLine?.(lineFromCursor(e.currentTarget));
+              reportLine(lineFromCursor(e.currentTarget));
             }}
           />
           {findOpen ? (

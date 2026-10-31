@@ -298,6 +298,27 @@ export function SettingsPanel(p: SettingsPanelProps) {
           </span>
         </label>
 
+        <label className="axv-set-row">
+          <span>高亮当前行</span>
+          <input
+            type="checkbox"
+            checked={p.editorTheme.showCur}
+            onChange={(e) => p.onEditorTheme({ showCur: e.target.checked })}
+          />
+        </label>
+
+        <label className="axv-set-row">
+          <span>当前行背景色</span>
+          <input
+            className="axv-set-color"
+            type="color"
+            aria-label="当前行背景色"
+            disabled={!p.editorTheme.showCur}
+            value={toHex(p.editorTheme.curBg, "#0b5fa5")}
+            onChange={(e) => p.onEditorTheme({ curBg: e.target.value })}
+          />
+        </label>
+
         <button className="axv-set-btn" onClick={p.onResetEditorTheme}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
             settings_backup_restore

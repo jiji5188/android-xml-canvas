@@ -32,6 +32,10 @@ export interface EditorTheme {
   selBg: string;
   /** 选区文字颜色；transparent = 保留高亮层原色 */
   selFg: string;
+  /** M37b：当前行背景色 */
+  curBg: string;
+  /** M37b：是否显示当前行高亮 */
+  showCur: boolean;
   /** 字号 px（11-16） */
   fontSize: number;
 }
@@ -115,6 +119,8 @@ export const DEFAULT_EDITOR_THEME: EditorTheme = {
   cursor: "#24292F",
   selBg: "rgba(4, 64, 159, 0.18)",
   selFg: "transparent",
+  curBg: "rgba(11, 95, 165, 0.08)",
+  showCur: true,
   fontSize: 13,
 };
 
@@ -149,6 +155,8 @@ export function normalizeTheme(raw: unknown): EditorTheme {
     cursor: pick(o.cursor, DEFAULT_EDITOR_THEME.cursor),
     selBg: pick(o.selBg, DEFAULT_EDITOR_THEME.selBg),
     selFg: pick(o.selFg, DEFAULT_EDITOR_THEME.selFg),
+    curBg: pick(o.curBg, DEFAULT_EDITOR_THEME.curBg),
+    showCur: typeof o.showCur === "boolean" ? o.showCur : DEFAULT_EDITOR_THEME.showCur,
     fontSize,
   };
 }
@@ -169,6 +177,8 @@ export function themeVars(t: EditorTheme): Record<string, string> {
     "--axv-code-cursor": t.cursor || DEFAULT_EDITOR_THEME.cursor,
     "--axv-code-sel-bg": t.selBg || DEFAULT_EDITOR_THEME.selBg,
     "--axv-code-sel-fg": t.selFg || "transparent",
+    // M37b：关掉时写 transparent，CSS 不用再判开关
+    "--axv-code-cur-bg": t.showCur ? t.curBg || DEFAULT_EDITOR_THEME.curBg : "transparent",
     "--axv-code-font-size": `${normalizeTheme(t).fontSize}px`,
     "--axv-x-tag": p.tag,
     "--axv-x-attr": p.attr,

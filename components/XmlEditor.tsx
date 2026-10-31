@@ -3142,6 +3142,9 @@ const findResolved = findResolvedNode;
       {/* M27：底部状态条（文件 / 未保存 / 问题数 / 设备 / 缩放） */}
       <StatusBar
         isMobile={isMobile}
+        // M31k：桌面端侧栏展开时把状态条让出 320px，别被面板压住（移动端不动）
+        leftInset={isMobile ? undefined : leftOpen ? 320 : 0}
+        rightInset={isMobile ? undefined : rightOpen ? 320 : 0}
         fileName={saveOrigin?.name || activeFile(project)?.name || currentFile?.name || "activity_main.xml"}
         source={
           saveOrigin?.kind === "native" ? saveOrigin.target : saveOrigin?.kind === "handle" ? saveOrigin.name : workspaceLabel() || null

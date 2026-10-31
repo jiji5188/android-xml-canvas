@@ -23,12 +23,25 @@ export interface StatusBarProps {
   onResetZoom?: () => void;
   /** 上次保存时间文案，如「已保存 14:32」 */
   savedHint?: string | null;
+  /** M31k：桌面端左右侧栏展开时状态条要避让（px），否则被面板盖住 */
+  leftInset?: number;
+  rightInset?: number;
 }
 
 export function StatusBar(props: StatusBarProps) {
   const pct = Math.round(props.scale * 100);
+  const insetStyle =
+    props.leftInset || props.rightInset
+      ? { left: props.leftInset || 0, right: props.rightInset || 0, transition: "left 0.22s, right 0.22s" }
+      : undefined;
   return (
-    <div className="axv-appstatus" role="status" aria-live="polite" data-dirty={props.dirty ? "1" : "0"}>
+    <div
+      className="axv-appstatus"
+      role="status"
+      aria-live="polite"
+      data-dirty={props.dirty ? "1" : "0"}
+      style={insetStyle}
+    >
       <span className="axv-sb-file" title={props.source ? `${props.fileName} · ${props.source}` : props.fileName}>
         <span className={"axv-sb-dot" + (props.dirty ? " on" : "")} aria-hidden="true" />
         <span className="axv-sb-name">{props.fileName}</span>

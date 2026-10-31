@@ -484,8 +484,8 @@
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
-  /* M20c：中区底色改半透明深灰 */
-  background-color: #6767672e;
+  /* M20c：中区底色改半透明深灰；M31k：改成跟工具栏头同色系混白 */
+  background-color: color-mix(in srgb, var(--axv-surface-head) 10%, #a1a1a130);
   /* M11h：中区圆角胶囊 */
   border-radius: 20px;
   /* 圆角会裁掉首尾按钮的两端，左右给 4px 缓冲 */
@@ -1112,7 +1112,7 @@
   gap: 6px;
   padding: 12px 6px 10px;
   border-radius: 16px;
-  background: var(--axv-surface-head);
+  background: color-mix(in srgb, var(--axv-surface-head) 10%, #ffffff85);
   color: var(--axv-on-surface);
   border: none;
   cursor: grab;

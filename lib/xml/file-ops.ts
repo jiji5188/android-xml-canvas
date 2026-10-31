@@ -161,13 +161,16 @@ export async function renameEntry(ctx: FileOpsCtx, rel: string, newName: string)
   }
 }
 
-/** 移动（跨目录）。Web 不支持 → reason:"web"。Native：bridge.renameEntry。 */
+/** 移动（跨目录）。Web 不支持 → reason:"web"。Native：bridge.renameEntry。
+ *  asName：落地时换名（目标层重名冲突时需要），不传则沿用原名。 */
 export async function moveEntry(
   ctx: FileOpsCtx,
   rel: string,
   targetParentRel: string,
+  asName?: string,
 ): Promise<FileOpsResult> {
-  const name = nameOfRel(rel);
+  const name = (asName || nameOfRel(rel)).trim();
+  if (!name || name.includes("/") || name.includes("\\")) return { ok: false, reason: "名称不合法" };
   const newRel = targetParentRel ? `${targetParentRel}/${name}` : name;
   if (newRel === rel) return { ok: true, newRel }; // 原地，无操作
   if (ctx.backend === "web") return { ok: false, reason: "web" };
@@ -186,13 +189,16 @@ export async function moveEntry(
   }
 }
 
-/** 复制（目录递归）。Web 不支持 → reason:"web"。Native：bridge.copyEntry。 */
+/** 复制（目录递归）。Web 不支持 → reason:"web"。Native：bridge.copyEntry。
+ *  asName：落地时换名（目标层重名冲突时需要），不传则沿用原名。 */
 export async function copyEntry(
   ctx: FileOpsCtx,
   rel: string,
   targetParentRel: string,
+  asName?: string,
 ): Promise<FileOpsResult> {
-  const name = nameOfRel(rel);
+  const name = (asName || nameOfRel(rel)).trim();
+  if (!name || name.includes("/") || name.includes("\\")) return { ok: false, reason: "名称不合法" };
   const newRel = targetParentRel ? `${targetParentRel}/${name}` : name;
   if (newRel === rel) return { ok: false, reason: "目标与源相同" };
   if (ctx.backend === "web") return { ok: false, reason: "web" };
@@ -268,6 +274,40 @@ export async function checkNameExists(
     return false;
   }
   return hasNameAmong(items, name);
+}
+
+/** 列出某一层的名字（供冲突弹窗预填不重名的新名字）。Web：values；Native：bridge.listDir。 */
+export async function listNames(ctx: FileOpsCtx, parentRel: string): Promise<string[]> {
+  if (ctx.backend === "web") {
+    const root = ctx.root as WebDirLike;
+    const dir = parentRel ? await webResolveDir(root, parentRel) : root;
+    if (!dir) return [];
+    const out: string[] = [];
+    try {
+      for await (const e of dir.values()) if (e.name) out.push(e.name);
+    } catch {
+      /* 读不了当空 */
+    }
+    return out;
+  }
+  const b = nativeBridge();
+  if (!b) return [];
+  const base = (ctx.root as string).replace(/[/\\]+$/, "");
+  const abs = parentRel ? `${base}/${parentRel}` : base;
+  let items: { name?: string }[] = [];
+  try {
+    if (hasAsyncIo()) {
+      const { listDirQueued } = await import("./native-async");
+      const raw = await listDirQueued(abs);
+      if (raw) items = (JSON.parse(raw) as { items?: { name?: string }[] }).items || [];
+    } else {
+      const raw = b.listDir ? b.listDir(abs) : null;
+      if (raw) items = (JSON.parse(raw) as { items?: { name?: string }[] }).items || [];
+    }
+  } catch {
+    return [];
+  }
+  return items.map((i) => i.name).filter((n): n is string => !!n);
 }
 
 /** 取 ctx 的 root 绝对路径（native 才有，给 bridge 用） */

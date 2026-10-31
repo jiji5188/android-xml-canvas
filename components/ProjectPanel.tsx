@@ -14,7 +14,16 @@ import type { ResourceExtras } from "@/lib/xml/resdir";
 import { resOpenAction } from "@/lib/xml/resource-open";
 import type { Project } from "@/lib/xml/multi-file";
 import type { FileOpsCtx } from "@/lib/xml/file-ops";
-import { createEntry, deleteEntry, renameEntry } from "@/lib/xml/file-ops";
+import {
+  checkNameExists,
+  copyEntry,
+  createEntry,
+  deleteEntry,
+  listNames,
+  moveEntry,
+  renameEntry,
+  suggestUniqueName,
+} from "@/lib/xml/file-ops";
 import {
   ConfirmDialog,
   MessageDialog,
@@ -136,12 +145,27 @@ export function LazyTreeInner(props: {
     | { kind: "new"; target: TreeNodeRef }
     | { kind: "rename"; target: TreeNodeRef }
     | { kind: "delete"; target: TreeNodeRef }
+    | {
+        kind: "conflict";
+        title: string;
+        desc: string;
+        initial: string;
+        taken: Set<string>;
+        node: TreeNodeRef;
+        parentRel: string;
+        action: "move" | "paste";
+      }
     | { kind: "msg"; title: string; text: string }
     | null
   >(null);
   const [busy, setBusy] = useState(false);
-  /** 复制标记（M46 第二步的粘贴功能用；本步只记录） */
+  /** 复制标记（M46） */
   const [clipboard, setClipboard] = useState<TreeNodeRef | null>(null);
+  /** M46b：移动模式 —— target 为目标父目录（null = 还没选位置） */
+  const [moving, setMoving] = useState<{ node: TreeNodeRef; target: string | null } | null>(null);
+  /** 拖拽悬停高亮的目标行 rel */
+  const [dropHover, setDropHover] = useState<string | null>(null);
+  const dragRef = useRef<{ id: number; node: TreeNodeRef; moved: boolean } | null>(null);
 
   /** 读某一层（已读过就不重复读） */
   const load = useCallback(
@@ -224,7 +248,7 @@ export function LazyTreeInner(props: {
   };
 
   const beginPress = (e: React.PointerEvent, node: TreeNodeRef) => {
-    if (!fileOps) return;
+    if (!fileOps || moving) return;
     if (e.button === 2) {
       e.preventDefault();
       setMenu({ x: e.clientX, y: e.clientY, target: node });
@@ -241,6 +265,10 @@ export function LazyTreeInner(props: {
       if (st.moved) return;
       setMenu({ x: st.x, y: st.y, target: node });
     }, 450);
+    // ⚠ 手机 WebView 长按后自身会派 pointercancel（文本选择/上下文菜单），
+    //    所以抬起/取消都不靠行上的事件，直接挂 window；cancel 不清定时器，
+    //    只要没真的滑动（pointermove 超阈值）就照常弹菜单。
+    window.addEventListener("pointerup", cancelPress, { once: true });
   };
 
   const movePress = (e: React.PointerEvent) => {
@@ -283,12 +311,178 @@ export function LazyTreeInner(props: {
     if (a === "delete") return setDlg({ kind: "delete", target });
     if (a === "copy") {
       setClipboard(target);
-      setDlg({ kind: "msg", title: "已复制", text: `已记下「${target.name}」，粘贴功能在下一步提供。` });
+      setDlg({ kind: "msg", title: "已复制", text: `已复制「${target.name}」，到目标位置长按选「粘贴」。` });
       return;
     }
-    if (a === "move" || a === "paste") {
-      setDlg({ kind: "msg", title: "下一步支持", text: "移动 / 拖拽排序 / 粘贴将在下一步实现。" });
+    if (a === "move") {
+      // 进入移动模式：树顶部出确定/取消，每行右侧出拖拽图标
+      setMoving({ node: target, target: null });
+      return;
     }
+    if (a === "paste") void doPaste(target);
+  };
+
+  /* ================= M46b：粘贴（含同名冲突引导改名） ================= */
+
+  /** 粘贴 / 移动的目标父目录：目标是目录→里面，是文件→它的同层 */
+  const parentTargetOf = (t: TreeNodeRef) => (t.isDir ? t.rel : parentOfRel(t.rel));
+
+  const doPaste = async (target: TreeNodeRef) => {
+    if (!fileOps || !clipboard) return;
+    const parent = parentTargetOf(target);
+    // 防把目录粘到自己内部
+    if (clipboard.isDir && (parent === clipboard.rel || parent.startsWith(clipboard.rel + "/"))) {
+      setDlg({ kind: "msg", title: "不能粘贴", text: "目标位置在源目录内部。" });
+      return;
+    }
+    setBusy(true);
+    const exists = await checkNameExists(fileOps, parent, clipboard.name);
+    setBusy(false);
+    if (exists) {
+      // 冲突 → 引导改名（预填一个不重名的建议）
+      const names = await listNames(fileOps, parent);
+      setDlg({
+        kind: "conflict",
+        title: "同名冲突",
+        desc: `${parent || "项目根"} 下已有「${clipboard.name}」，请改名后再粘贴`,
+        initial: suggestUniqueName(clipboard.name, new Set(names)),
+        taken: new Set(names),
+        node: clipboard,
+        parentRel: parent,
+        action: "paste",
+      });
+      return;
+    }
+    const r = await copyEntry(fileOps, clipboard.rel, parent);
+    if (!r.ok) {
+      setDlg({ kind: "msg", title: "粘贴失败", text: reasonText(r.reason) });
+      return;
+    }
+    if (parent) setOpen((prev) => new Set(prev).add(parent));
+    await refreshDir(parent);
+    setDlg({ kind: "msg", title: "已粘贴", text: `已复制到 ${parent || "项目根"}/` });
+  };
+
+  /** 冲突弹窗确认：按新名字落地（移动或复制） */
+  const doConflict = async (newName: string) => {
+    if (!fileOps || dlg?.kind !== "conflict") return;
+    const d = dlg;
+    setDlg(null);
+    setBusy(true);
+    const r =
+      d.action === "move"
+        ? await moveEntry(fileOps, d.node.rel, d.parentRel, newName)
+        : await copyEntry(fileOps, d.node.rel, d.parentRel, newName);
+    setBusy(false);
+    if (!r.ok) {
+      setDlg({ kind: "msg", title: d.action === "move" ? "移动失败" : "粘贴失败", text: reasonText(r.reason) });
+      return;
+    }
+    if (d.parentRel) setOpen((prev) => new Set(prev).add(d.parentRel));
+    await refreshDir(d.parentRel);
+    if (d.action === "move") await refreshDir(parentOfRel(d.node.rel));
+    setMoving(null);
+  };
+
+  const reasonText = (r?: string) =>
+    r === "web" ? "网页版不支持这个操作，请用 APK。" : r || "未知错误";
+
+  /* ================= M46b：移动（拖拽图标 → 选目标 → 确定） ================= */
+
+  const beginDrag = (e: React.PointerEvent, node: TreeNodeRef) => {
+    if (!moving) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const id = e.pointerId;
+    dragRef.current = { id, node, moved: false };
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      dragRef.current && (dragRef.current.moved = true);
+      const hit = rowAtPoint(ev.clientX, ev.clientY);
+      setDropHover(hit ? (hit.isDir ? hit.rel : parentOfRel(hit.rel)) : "");
+    };
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      const hit = rowAtPoint(ev.clientX, ev.clientY);
+      const parent = hit ? (hit.isDir ? hit.rel : parentOfRel(hit.rel)) : "";
+      setDropHover(null);
+      dragRef.current = null;
+      setMoving((prev) => (prev ? { ...prev, target: parent } : prev));
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
+
+  /** 找指针下的树行 → {rel,isDir}；落在树容器空白→项目根("")；不在树里→null */
+  const rowAtPoint = (x: number, y: number): TreeNodeRef | null => {
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    const row = el?.closest?.("[data-treerel]") as HTMLElement | null;
+    if (row) {
+      return {
+        rel: row.getAttribute("data-treerel") || "",
+        name: row.getAttribute("data-treename") || "",
+        isDir: row.getAttribute("data-treedir") === "1",
+      };
+    }
+    const list = document.querySelector(".axv-proj-tree");
+    if (list) {
+      const r = list.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+        return { rel: "", name: "", isDir: true }; // 树内空白 = 项目根
+      }
+    }
+    return null;
+  };
+
+  const confirmMove = async () => {
+    if (!fileOps || !moving || moving.target == null) return;
+    const { node, target } = moving;
+    const srcParent = parentOfRel(node.rel);
+    if (target === srcParent) {
+      setMoving(null);
+      return;
+    }
+    if (node.isDir && (target === node.rel || target.startsWith(node.rel + "/"))) {
+      setDlg({ kind: "msg", title: "不能移动", text: "目标位置在该目录内部。" });
+      return;
+    }
+    setBusy(true);
+    const exists = await checkNameExists(fileOps, target, node.name);
+    if (exists) {
+      const names = await listNames(fileOps, target);
+      setBusy(false);
+      setDlg({
+        kind: "conflict",
+        title: "同名冲突",
+        desc: `${target || "项目根"} 下已有「${node.name}」，请改名后再移动`,
+        initial: suggestUniqueName(node.name, new Set(names)),
+        taken: new Set(names),
+        node,
+        parentRel: target,
+        action: "move",
+      });
+      return;
+    }
+    const r = await moveEntry(fileOps, node.rel, target);
+    setBusy(false);
+    if (!r.ok) {
+      setDlg({ kind: "msg", title: "移动失败", text: reasonText(r.reason) });
+      return;
+    }
+    setMoving(null);
+    if (target) setOpen((prev) => new Set(prev).add(target));
+    await refreshDir(target);
+    await refreshDir(srcParent);
+  };
+
+  const cancelMove = () => {
+    setMoving(null);
+    setDropHover(null);
+    dragRef.current = null;
   };
 
   const doCreate = async (o: { name: string; isDir: boolean; parentRel: string }) => {
@@ -377,15 +571,20 @@ export function LazyTreeInner(props: {
       rows.push(
         <li key={n.rel + ":" + n.kind}>
           <div
-            className="axv-ws-row"
+            className={
+              "axv-ws-row" +
+              (moving ? " axv-moving" : "") +
+              (moving && moving.node.rel === n.rel ? " axv-move-src" : "") +
+              (dropHover === n.rel || (dropHover === "" && false) ? " axv-drop" : "")
+            }
+            data-treerel={n.rel}
+            data-treename={n.name}
+            data-treedir={isDir ? "1" : "0"}
             style={{ paddingLeft: depth * 14 }}
             onPointerDown={(e) => beginPress(e, nodeRef)}
             onPointerMove={movePress}
-            onPointerUp={cancelPress}
-            onPointerCancel={cancelPress}
-            onPointerLeave={cancelPress}
             onContextMenu={(e) => {
-              if (!fileOps) return;
+              if (!fileOps || moving) return;
               e.preventDefault();
               setMenu({ x: e.clientX, y: e.clientY, target: nodeRef });
             }}
@@ -426,6 +625,16 @@ export function LazyTreeInner(props: {
                 </span>
               </span>
             </button>
+            {moving ? (
+              <span
+                className="axv-move-handle"
+                title="按住拖动到目标目录"
+                aria-label="拖动移动"
+                onPointerDown={(e) => beginDrag(e, nodeRef)}
+              >
+                <span className="msr" aria-hidden="true">drag_indicator</span>
+              </span>
+            ) : null}
           </div>
         </li>,
       );
@@ -436,6 +645,21 @@ export function LazyTreeInner(props: {
 
   return (
     <>
+      {moving ? (
+        <div className="axv-move-bar">
+          <span className="axv-move-tip">
+            {moving.target == null
+              ? `拖「${moving.node.name}」到目标目录`
+              : `将移动到：${moving.target || "项目根"}/`}
+          </span>
+          <button className="axv-btn" onClick={() => void confirmMove()} disabled={moving.target == null}>
+            确定
+          </button>
+          <button className="axv-btn axv-ghost" onClick={cancelMove}>
+            取消
+          </button>
+        </div>
+      ) : null}
       <ul className="axv-ws-list axv-proj-tree">{renderRows("", 0)}</ul>
       {busy ? <div className="axv-ws-hint">正在处理…</div> : null}
 
@@ -481,6 +705,18 @@ export function LazyTreeInner(props: {
 
       {dlg?.kind === "msg" ? (
         <MessageDialog title={dlg.title} text={dlg.text} onClose={() => setDlg(null)} />
+      ) : null}
+
+      {dlg?.kind === "conflict" ? (
+        <RenameDialog
+          title={dlg.title}
+          initial={dlg.initial}
+          desc={dlg.desc}
+          submitLabel={dlg.action === "move" ? "移动" : "粘贴"}
+          takenNames={dlg.taken}
+          onSubmit={(n) => void doConflict(n)}
+          onClose={() => setDlg(null)}
+        />
       ) : null}
     </>
   );

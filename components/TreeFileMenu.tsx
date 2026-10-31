@@ -192,21 +192,31 @@ export function NewEntryDialog(p: NewEntryDialogProps) {
 /* ---------------- 重命名弹窗 ---------------- */
 
 export function RenameDialog(p: {
-  target: TreeNodeRef;
+  target?: TreeNodeRef;
+  /** 弹窗标题（默认「重命名」） */
+  title?: string;
+  /** 输入框初始值（默认 = target.name） */
+  initial?: string;
+  /** 说明行（默认显示原名称） */
+  desc?: string;
+  /** 提交按钮文字（默认「确定」） */
+  submitLabel?: string;
   takenNames: Set<string>;
   onSubmit: (newName: string) => void;
   onClose: () => void;
 }) {
-  const [name, setName] = useState(p.target.name);
+  const start = p.initial ?? p.target?.name ?? "";
+  const [name, setName] = useState(start);
   const trimmed = name.trim();
-  const same = trimmed === p.target.name;
+  const same = trimmed === start;
   const dup = !same && p.takenNames.has(trimmed);
   const canSubmit = trimmed.length > 0 && !dup && !/[/\\]/.test(trimmed) && !same;
+  const isDir = p.target?.isDir ?? false;
 
   return (
     <div className="axv-tfm-mask">
-      <div className="axv-dlg" role="dialog" aria-label="重命名">
-        <div className="axv-dlg-title">重命名</div>
+      <div className="axv-dlg" role="dialog" aria-label={p.title || "重命名"}>
+        <div className="axv-dlg-title">{p.title || "重命名"}</div>
         <label className="axv-dlg-row">
           <span className="axv-dlg-label">新名称</span>
           <input
@@ -217,7 +227,7 @@ export function RenameDialog(p: {
             onFocus={(e) => {
               // 选中不含扩展名的部分，方便只改前缀
               const dot = e.target.value.lastIndexOf(".");
-              if (!p.target.isDir && dot > 0) e.target.setSelectionRange(0, dot);
+              if (!isDir && dot > 0) e.target.setSelectionRange(0, dot);
               else e.target.select();
             }}
             onKeyDown={(e) => {
@@ -225,13 +235,15 @@ export function RenameDialog(p: {
             }}
           />
         </label>
-        <div className="axv-dlg-hint">{dup ? `「${trimmed}」已存在，请换个名字` : `原名称：${p.target.name}`}</div>
+        <div className="axv-dlg-hint">
+          {dup ? `「${trimmed}」已存在，请换个名字` : (p.desc ?? `原名称：${start}`)}
+        </div>
         <div className="axv-dlg-actions">
           <button className="axv-btn axv-ghost" onClick={p.onClose}>
             取消
           </button>
           <button className="axv-btn" disabled={!canSubmit} onClick={() => p.onSubmit(trimmed)}>
-            确定
+            {p.submitLabel || "确定"}
           </button>
         </div>
       </div>

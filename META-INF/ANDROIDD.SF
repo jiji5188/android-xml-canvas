@@ -1,0 +1,180 @@
+Signature-Version: 1.0
+Created-By: 1.0 (Android)
+SHA-256-Digest-Manifest: +KXqhaPClRGm9SJ+l/NHUboL3wd15M+wzaogaYR/40M=
+X-Android-APK-Signed: 2, 3
+
+Name: AndroidManifest.xml
+SHA-256-Digest: XkvXEtrEEhQTUhhBh3j5GsPaSzAHZPsRdiCJFvOx/HY=
+
+Name: assets/www/.nojekyll
+SHA-256-Digest: nGLS+V68Ud5Hb1ipJ7kpQVQq6YgMjZVigK1p3f2uyDE=
+
+Name: assets/www/404.html
+SHA-256-Digest: 0ZBQ0079IJ1isobVfe6V4qn1TztccGIT4Qinl+iPj8U=
+
+Name: assets/www/404/index.html
+SHA-256-Digest: OYedYJjC8w8TDypUfHHddaKyTPXSmOsVhkDoK8mU4BM=
+
+Name: assets/www/__next.__PAGE__.txt
+SHA-256-Digest: vVcs3HvwUqh+bi6cQ3lIC1N2ZLIe2QFjr1jiIyajBXQ=
+
+Name: assets/www/__next._full.txt
+SHA-256-Digest: /2jm5ZQOE7g/I8ccpp/vpuiIvPnJB+3DsS0UkIXtqI4=
+
+Name: assets/www/__next._tree.txt
+SHA-256-Digest: adLLWM9OtGFGpOZwwt382CtQkuUQVfyXZ6Rm0yD2cXY=
+
+Name: assets/www/_next/static/HE3IlcgDHWFlvGalsfwUy/_buildManifest.js
+SHA-256-Digest: blFpSfgRBcQZWOEqugWjAqFtVWbuhPqKj81gxwU50K4=
+
+Name: assets/www/_next/static/HE3IlcgDHWFlvGalsfwUy/_clientMiddlewareM
+ anifest.js
+SHA-256-Digest: a+GyVllBorSFzBGPSg/0YwNsEc6mcdunCH+Jl7YR6hw=
+
+Name: assets/www/_next/static/HE3IlcgDHWFlvGalsfwUy/_ssgManifest.js
+SHA-256-Digest: f6TtQFRL90Qv7i7eJAA+o/3jglmvG3JkLHAhCX3EESM=
+
+Name: assets/www/_next/static/chunks/0cz1d0mv5g_q7.js
+SHA-256-Digest: GKWRJkknH0hDiRLfQt1M/vRdFzc7QebKk/bJkuEwCb8=
+
+Name: assets/www/_next/static/chunks/0umf92h1sb77c.js
+SHA-256-Digest: ZCyyFLV2YCvDy1GCL8PKPIt3YVyEqPzassFO/FqQbb0=
+
+Name: assets/www/_next/static/chunks/13m-p47tta5dn.js
+SHA-256-Digest: sCnBb7Q0+03PgD4ygeLoqtwOSqwlgi/TQy9/VSSQ47c=
+
+Name: assets/www/_next/static/chunks/19wg2q9r2_sev.js
+SHA-256-Digest: nKRPENXkrrGsqiB+UmJgAB2M1orRC7Xo6LHojOCarcs=
+
+Name: assets/www/_next/static/chunks/1c0mhc5ebbn3y.js
+SHA-256-Digest: YxWvJVsyWnVRWEuJHSRodAI1FYOdqsqhuHAfgh75ao8=
+
+Name: assets/www/_next/static/chunks/26w0rfem0_m0n.css
+SHA-256-Digest: Dtjv1k9atiGVQFUfBi6M3OxodPlDncJeeNXkJq89esY=
+
+Name: assets/www/_next/static/chunks/2khxl0v1q4i6n.js
+SHA-256-Digest: KUlT0UEdlAo6n6x+cA2B4UP6FayS7B8UO/6OKQVls4E=
+
+Name: assets/www/_next/static/chunks/2le17i3icx5s4.js
+SHA-256-Digest: N9Y4IHzFdYMbbZm5WCfkovsUMzvsPBtW9RmYCXmwU2U=
+
+Name: assets/www/_next/static/chunks/2odrw9bciaeid.css
+SHA-256-Digest: 9kgZ2KhTleFmjrQ0lF3fJVuC0K0OFl75Pdx6RpifHak=
+
+Name: assets/www/_next/static/chunks/3831x1zqu8hf9.js
+SHA-256-Digest: iGeAA5oIyuez78uMPw1ZzMVzRvqVXcVlAhiMjSlz/eg=
+
+Name: assets/www/_next/static/chunks/3fuuprnqquc9m.js
+SHA-256-Digest: ZBU9JgIY+fDAkqu3O0AO3VW7PclIBjjWtzg6qDiCg+8=
+
+Name: assets/www/_next/static/chunks/turbopack-3-ry682tkyiqk.js
+SHA-256-Digest: z6wY/aCBmTcizNUQhJPdahJyLoexrTFXEH881eDVAGI=
+
+Name: assets/www/_next/static/media/apple-icon.31dut5udfppxl.png
+SHA-256-Digest: YCNfOKWI9OfZAkUjkUvCrr4GR5XifqxkdjXG7wQWlXg=
+
+Name: assets/www/_next/static/media/favicon.35-dt9ksi_5in.ico
+SHA-256-Digest: 9+aFmOBEkr33WlVIhVU3N9P4f4po++ac9zzNv4rraeY=
+
+Name: assets/www/_next/static/media/icon.0y-g__g6r5sdd.svg
+SHA-256-Digest: JNmQTN5y7TdOvLUOsu8cUHEGCRe4mbDhQENJeIyQy/I=
+
+Name: assets/www/_not-found/__next._full.txt
+SHA-256-Digest: rQNGH7NrLwKlIwRS+oqBi3r75HGRjL4khRLNLpFpucU=
+
+Name: assets/www/_not-found/__next._not-found/__PAGE__.txt
+SHA-256-Digest: wBsqg+zenlmO57etQ55oS+61IKd+6L2G1R4O+Aq0Zm4=
+
+Name: assets/www/_not-found/__next._tree.txt
+SHA-256-Digest: nqOCS7P0Gv4CxBZ6kKL5dIp0z/xhqwpB7NjRwM7A5Y4=
+
+Name: assets/www/_not-found/index.html
+SHA-256-Digest: 6xkxlTNDY4H2hqPR+Aa6/dizew5l015NuzP2u4ZPQqk=
+
+Name: assets/www/_not-found/index.txt
+SHA-256-Digest: rO7ztkEyT7iHCl6VnMkSrDnfr0950ob3v/LC6e+jApI=
+
+Name: assets/www/agent.md
+SHA-256-Digest: QrrNUfwmPYX5EwHgoeizfPUDfkcqqcUxMf/PFBf4rRU=
+
+Name: assets/www/apple-icon.png
+SHA-256-Digest: yTiiuIVbNVslcvZLwW6Unq+0ct+Cius+S3e7hJ/hCEw=
+
+Name: assets/www/favicon.ico
+SHA-256-Digest: rWT4hRzevew7sJPye1AFBfTpFFBmsQuz8vHFd1VwCjM=
+
+Name: assets/www/icon.svg
+SHA-256-Digest: laOAk7qguON2hYKr7XCMX7OUJq4YcVthX3+osZ5iIJ0=
+
+Name: assets/www/icons/icon-192.png
+SHA-256-Digest: MgZVQQ445Bw32dlkOajTz20IXP++ru3MKUT8U9LeUO8=
+
+Name: assets/www/icons/icon-48.png
+SHA-256-Digest: S2dQO65N2TpueCvaNr6FzZL3xWxu4LpwwpJnh6PVnOE=
+
+Name: assets/www/icons/icon-512.png
+SHA-256-Digest: wx/nehB6I5IA10zEtTovB0OVSTjXXbzx8lZSsp+OrS0=
+
+Name: assets/www/index.html
+SHA-256-Digest: f0ldFmgx/JMBQ03uS3006VuT8YtCzHy8pxP9SKk+UeU=
+
+Name: assets/www/index.txt
+SHA-256-Digest: ngVwUA++sYAthBo+7AOrJ18l1PiuSZ46NejWGyNibSk=
+
+Name: assets/www/logo-preview.png
+SHA-256-Digest: sn50ODgJPW7yCYP2inpdjYBV7DXT+jC7NWQjqQfjL5o=
+
+Name: assets/www/logo.svg
+SHA-256-Digest: EKxzqgcVQ3FCar/u2lREtfI19NlA7OGfZYR/QKjmu7s=
+
+Name: assets/www/logos/claude.svg
+SHA-256-Digest: SJplB4vSCiU7b3hJLS3jVpxUkJE27xNAJPXnib74Cdk=
+
+Name: assets/www/logos/deepseek.svg
+SHA-256-Digest: Yuna7vAPzVvL0CXpQCY/q/uEfUtpSYVnzRsx51gShdk=
+
+Name: assets/www/logos/gemini.svg
+SHA-256-Digest: EAm86YF+ad01aZnaQgF9mezQhubz5qnSuLRy2jAhMaI=
+
+Name: assets/www/logos/openai.svg
+SHA-256-Digest: IYgwLvHJfUxN5zRKh9kM2F0KotTjeqQmk/txh1b1nMk=
+
+Name: assets/www/manifest.webmanifest
+SHA-256-Digest: tHhw1hwOrBGtIqqdREdSXBv7IviLchCiG5AtUXCd2Go=
+
+Name: assets/www/material-symbols-rounded.ttf
+SHA-256-Digest: OMxHCqlB8j8r4QTLbCuWIo8ojdCg/0+GPjukKf2cFu0=
+
+Name: assets/www/material-symbols.json
+SHA-256-Digest: 1RL50mGcsBZe6Gapv3cpcbhv6Pyw3nQv5eg+C3K7ZlI=
+
+Name: assets/www/og.png
+SHA-256-Digest: kLYIWliP8abF8h49+0FcL/ehEQc/g140ByGu9yIlV8Y=
+
+Name: assets/www/samples/all-widgets.xml
+SHA-256-Digest: IqQ3YWaY+eyPy88hq2yUPpu77ARBftqdU3dsIxulPis=
+
+Name: assets/www/xml/__next._full.txt
+SHA-256-Digest: g2eh36SOmnWtGy1LHsb5Gczuzee6Do4XhiSSxWdNrc4=
+
+Name: assets/www/xml/__next._tree.txt
+SHA-256-Digest: 3k2W90oCGVGrCYjAtopv61bRDNBHWqmYwGwKuEOR4gg=
+
+Name: assets/www/xml/__next.xml/__PAGE__.txt
+SHA-256-Digest: FGvrRZvJpd4ws8h7QQUkn3+KaOD7Ue9sQh5vD6b26rc=
+
+Name: assets/www/xml/index.html
+SHA-256-Digest: mkRR6+lJDvZnsiLHq0SH+ROSo+pAwIEi0GoxCm9vwyQ=
+
+Name: assets/www/xml/index.txt
+SHA-256-Digest: UAetVqFTYzemaUDkup/an/HbOdMf803mQk4mfXL9kSk=
+
+Name: classes.dex
+SHA-256-Digest: KSwfdsgZ4ZYYSKT8PHpPsAAo2SMEyl4bFr4i6Pvhzqc=
+
+Name: res/drawable/ic_launcher.xml
+SHA-256-Digest: EhHpcm4PJ1U+p9wA4fztIWFmuEn96xQrI8VaC9bMuS0=
+
+Name: resources.arsc
+SHA-256-Digest: tDtxy6iGZdu5T+d1rNDTfY5dFyjuqXqc4G6TIhq1BSM=
+

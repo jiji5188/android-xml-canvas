@@ -43,6 +43,8 @@ export interface ProjectSource {
   listChildren(rel: string): Promise<BrowseEntry[]>;
   /** 读一个 xml 文件内容 */
   readText(rel: string): Promise<string | null>;
+  /** M31：读项目图标（res/mipmap*|drawable* 里的 ic_launcher* 图片）→ 可直接给 <img src> 的 URL */
+  appIconUrl?(): Promise<string | null>;
 }
 
 type DirLike = {
@@ -90,6 +92,44 @@ async function resolveDir(root: DirLike, rel: string): Promise<DirLike | null> {
   return cur;
 }
 
+/** M31：图标文件名优先级（数字越小越优）——按「ic_launcher 命名」优先，退到 icon/app_icon */
+export function iconRank(name: string): number {
+  const n = name.toLowerCase();
+  // 只认位图；ic_launcher.xml（自适应图标描述）不能当图片用
+  if (!/\.(png|webp|jpe?g)$/.test(n)) return 99;
+  if (n === "ic_launcher.png") return 0;
+  if (n === "ic_launcher.webp") return 1;
+  if (n === "ic_launcher.jpg" || n === "ic_launcher.jpeg") return 2;
+  if (n.startsWith("ic_launcher_round")) return 3;
+  // 自适应图标的前景层是透明底，单独看得调背景，排最后
+  if (n.startsWith("ic_launcher_foreground")) return 8;
+  if (n.startsWith("ic_launcher")) return 4;
+  if (n === "icon.png" || n === "icon.webp") return 5;
+  if (n === "app_icon.png" || n === "app_icon.webp") return 6;
+  return 99;
+}
+
+/** 候选文件名里挑一个最像应用图标的（213 个名字就扫一遍，开销可忽略） */
+export function pickBestIconName(names: string[]): string | null {
+  const hits = names.filter((n) => iconRank(n) < 99);
+  if (!hits.length) return null;
+  hits.sort((a, b) => iconRank(a) - iconRank(b) || a.localeCompare(b));
+  return hits[0];
+}
+
+const IMG_EXT_MIME: Record<string, string> = {
+  png: "image/png",
+  webp: "image/webp",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+};
+
+function mimeOfIcon(name: string): string {
+  const ext = (name.split(".").pop() || "").toLowerCase();
+  return IMG_EXT_MIME[ext] ?? "image/png";
+}
+
 /** web：把一个目录句柄包成 ProjectSource（懒加载：每次只列一层） */
 export function webProjectSource(root: unknown, name: string): ProjectSource {
   const dir = root as DirLike;
@@ -126,7 +166,50 @@ export function webProjectSource(root: unknown, name: string): ProjectSource {
         return null;
       }
     },
+    async appIconUrl() {
+      return await webIconUrl(dir);
+    },
   };
+}
+
+/** web：在 res/mipmap*|drawable* 里找 ic_launcher* 图片，做成 object URL */
+async function webIconUrl(dir: DirLike): Promise<string | null> {
+  if (typeof URL === "undefined" || typeof URL.createObjectURL !== "function") return null;
+  for (const resRel of RES_CANDIDATES) {
+    const res = await resolveDir(dir, resRel).catch(() => null);
+    if (!res) continue;
+    const buckets: DirLike[] = [];
+    try {
+      for await (const e of res.values()) {
+        if (e.kind !== "directory") continue;
+        const l = e.name.toLowerCase();
+        if (l.startsWith("mipmap") || l.startsWith("drawable")) buckets.push(e);
+      }
+    } catch {
+      /* ignore */
+    }
+    // mipmap 优先（系统图标一般放这儿），同组内按名称排序保证稳定
+    buckets.sort((a, b) => (b.name.toLowerCase().startsWith("mipmap") ? 1 : 0) - (a.name.toLowerCase().startsWith("mipmap") ? 1 : 0));
+    for (const b of buckets) {
+      const names: string[] = [];
+      try {
+        for await (const e of b.values()) {
+          if (e.kind === "file") names.push(e.name);
+        }
+      } catch {
+        continue;
+      }
+      const best = pickBestIconName(names);
+      if (!best) continue;
+      try {
+        const fh = await b.getFileHandle(best);
+        return URL.createObjectURL(await fh.getFile());
+      } catch {
+        /* 换下一个桶 */
+      }
+    }
+  }
+  return null;
 }
 
 /** native：APK 里 bridge 一次给出扁平（带 rel）列表，这里按前缀过滤出一层 */
@@ -156,8 +239,128 @@ export function nativeProjectSource(name: string, all: WsProject[]): ProjectSour
         return null;
       }
     },
+    /** M31：从扁平列表里找 ic_launcher* 图片，走 bridge.readBase64 读字节 → data URL */
+    async appIconUrl() {
+      const b = nativeBridge();
+      if (!b?.readBase64) return null;
+      const cands = all
+        .filter((it) => it.kind === "file" && ICON_REL_RE.test(it.rel) && /ic_launcher|app_icon|(^|\/)icon\./i.test(it.name) && !!it.target)
+        .sort((a, b2) => {
+          // mipmap 目录优先（安卓约定），再按文件名优先级
+          const am = a.rel.toLowerCase().includes("/mipmap") ? 0 : 1;
+          const bm = b2.rel.toLowerCase().includes("/mipmap") ? 0 : 1;
+          return am - bm || iconRank(a.name) - iconRank(b2.name) || a.rel.localeCompare(b2.rel);
+        });
+      for (const c of cands) {
+        try {
+          const b64 = b.readBase64(c.target as string);
+          if (b64) return `data:${mimeOfIcon(c.name)};base64,${b64}`;
+        } catch {
+          /* 换下一个 */
+        }
+      }
+      return null;
+    },
   };
 }
+
+/**
+ * M31（native）：APK 里没有 DirHandle，但有项目目录绕对路径 —— 直接按候选路径试读。
+ * 名称：res/values/strings.xml 的 app_name
+ * 图标：res/mipmap-*|drawable* 下的 ic_launcher* 图片（readBase64 → data URL）
+ */
+export const NATIVE_STRINGS_RELS = [
+  "app/src/main/res/values/strings.xml",
+  "src/main/res/values/strings.xml",
+  "res/values/strings.xml",
+];
+
+/** 按密度从高到低排（高密度图更清晰，失败自动换下一个） */
+export const NATIVE_ICON_DIRS = [
+  "app/src/main/res/mipmap-xxxhdpi",
+  "app/src/main/res/mipmap-xxhdpi",
+  "app/src/main/res/mipmap-xhdpi",
+  "app/src/main/res/mipmap-hdpi",
+  "app/src/main/res/mipmap-mdpi",
+  "app/src/main/res/mipmap",
+  "app/src/main/res/drawable-xxhdpi",
+  "app/src/main/res/drawable-xhdpi",
+  "app/src/main/res/drawable-hdpi",
+  "app/src/main/res/drawable",
+  "src/main/res/mipmap-xxhdpi",
+  "src/main/res/mipmap-xhdpi",
+  "src/main/res/mipmap-hdpi",
+  "src/main/res/mipmap",
+  "src/main/res/drawable",
+  "res/mipmap-xxhdpi",
+  "res/mipmap-hdpi",
+  "res/mipmap",
+  "res/drawable",
+];
+
+export const NATIVE_ICON_NAMES = [
+  "ic_launcher.png",
+  "ic_launcher.webp",
+  "ic_launcher.jpg",
+  "ic_launcher_round.png",
+  "ic_launcher_round.webp",
+  "icon.png",
+  "app_icon.png",
+];
+
+const nativeMetaCache = new Map<string, ProjectMeta>();
+
+export async function readProjectMetaNative(
+  name: string,
+  dirPath: string | undefined | null,
+): Promise<ProjectMeta> {
+  const fallback: ProjectMeta = { name };
+  const b = nativeBridge();
+  if (!b || !dirPath) return fallback;
+  const cached = nativeMetaCache.get(dirPath);
+  if (cached) return cached;
+
+  const norm = dirPath.replace(/[\\/]+$/, "");
+  const sep = norm.includes("\\") ? "\\" : "/";
+  const abs = (rel: string) => `${norm}${sep}${rel.split("/").join(sep)}`;
+
+  // 1) 名称
+  for (const rel of NATIVE_STRINGS_RELS) {
+    try {
+      const text = b.readText ? b.readText(abs(rel)) : null;
+      const appName = text ? parseAppName(text) : null;
+      if (appName) {
+        fallback.name = appName;
+        break;
+      }
+    } catch {
+      /* 下一个 */
+    }
+  }
+
+  // 2) 图标
+  if (b.readBase64) {
+    outer: for (const dir of NATIVE_ICON_DIRS) {
+      for (const icon of NATIVE_ICON_NAMES) {
+        try {
+          const b64 = b.readBase64(abs(`${dir}/${icon}`));
+          if (b64) {
+            fallback.iconUrl = `data:${mimeOfIcon(icon)};base64,${b64}`;
+            break outer;
+          }
+        } catch {
+          /* 下一个 */
+        }
+      }
+    }
+  }
+
+  nativeMetaCache.set(dirPath, fallback);
+  return fallback;
+}
+
+/** native 扁平 rel 里的图标文件：.../res/mipmap-xxxhdpi/ic_launcher.png 这类图片 */
+const ICON_REL_RE = /(^|\/)res\/(mipmap|drawable)(-[^\/]*)?\/[^\/]+\.(png|webp|jpe?g)$/i;
 
 /** 工作目录里的一个顶层项（文件夹=项目）→ ProjectSource */
 export async function projectSourceFromWorkspaceItem(item: WsProject): Promise<ProjectSource | null> {
@@ -227,17 +430,42 @@ const STRINGS_CANDIDATES = [
 
 const RES_CANDIDATES = ["app/src/main/res", "src/main/res", "res"];
 
-const ICON_NAMES = [
-  "ic_launcher.png",
-  "ic_launcher.webp",
-  "ic_launcher.jpg",
-  "ic_launcher_round.png",
-  "ic_launcher_round.webp",
-  "icon.png",
-  "app_icon.png",
-];
-
 const metaCache = new WeakMap<object, ProjectMeta>();
+
+/**
+ * M31：从 ProjectSource 读展示名 + 图标（APK / 网页 / 测试都能用，不依赖 DirHandle）。
+ * 名称：res/values/strings.xml 的 app_name（找不到回退目录名）
+ * 图标：res/mipmap*|drawable* 里的 ic_launcher* 图片
+ */
+export async function readProjectMetaFromSource(
+  source: ProjectSource,
+  fallbackName: string,
+): Promise<ProjectMeta> {
+  const meta: ProjectMeta = { name: fallbackName };
+  for (const rel of STRINGS_CANDIDATES) {
+    const text = await source.readText(rel);
+    if (!text) continue;
+    const name = parseAppName(text);
+    if (name) {
+      meta.name = name;
+      break;
+    }
+  }
+  try {
+    const icon = await source.appIconUrl?.();
+    if (icon) meta.iconUrl = icon;
+  } catch {
+    /* 图标读不到就用占位 */
+  }
+  return meta;
+}
+
+/** M31：桶里的候选图标名，按优先级排好；先试最高优先的几个，失败再试其他 ic_launcher* */
+export function iconCandidates(names: string[]): string[] {
+  const picks = names.filter((n) => iconRank(n) < 99);
+  picks.sort((a, b) => iconRank(a) - iconRank(b) || a.localeCompare(b));
+  return picks;
+}
 
 /**
  * 分析项目文件拿名称和图标（只读几个候选路径 + 一轮 mipmap 目录，几十次句柄调用，可接受）。
@@ -268,7 +496,7 @@ export async function readProjectMeta(root: unknown, fallbackName: string): Prom
     }
   }
 
-  // 2) 图标：res/mipmap-*/ic_launcher.* 优先，其次 res/drawable-*
+  // 2) 图标：res/mipmap-* 里的 ic_launcher*，其次 res/drawable-*
   for (const resRel of RES_CANDIDATES) {
     const res = await resolveDir(dir, resRel).catch(() => null);
     if (!res) continue;
@@ -286,7 +514,16 @@ export async function readProjectMeta(root: unknown, fallbackName: string): Prom
     // mipmap 排前面
     buckets.sort((a, b) => (a.name.startsWith("mipmap") ? -1 : 1) - (b.name.startsWith("mipmap") ? -1 : 1));
     for (const b of buckets) {
-      for (const iconName of ICON_NAMES) {
+      // M31：不再写死文件名，把桶里所有文件名扫一遍再挑（ic_launcher_xx 也能命中）
+      const names: string[] = [];
+      try {
+        for await (const e of b.values()) {
+          if (e.kind === "file") names.push(e.name);
+        }
+      } catch {
+        continue;
+      }
+      for (const iconName of iconCandidates(names)) {
         try {
           const fh = await b.getFileHandle(iconName);
           const file = await fh.getFile();

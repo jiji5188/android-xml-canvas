@@ -594,6 +594,19 @@ public class MainActivity extends Activity {
                 return null;
             }
         }
+
+        /** M31：读二进制（图片图标等）→ base64；同样限默认目录 或 content:// */
+        @JavascriptInterface
+        public String readBase64(String target) {
+            try {
+                byte[] bytes = readBytesTarget(target);
+                if (bytes == null) return null;
+                return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+            } catch (Throwable t) {
+                Log.e(TAG, "readBase64", t);
+                return null;
+            }
+        }
     }
 
     /* ================= M16i：工作目录 ================= */
@@ -1044,15 +1057,17 @@ public class MainActivity extends Activity {
     }
 
     private String readTextTarget(String target) throws IOException {
+        byte[] bytes = readBytesTarget(target);
+        return bytes == null ? null : new String(bytes, "UTF-8");
+    }
+
+    /** M31：读任意文件/URI 的字节（大小限 8MB，避免误读大文件卡死 WebView 桥） */
+    private byte[] readBytesTarget(String target) throws IOException {
         if (target == null) return null;
         if (target.startsWith("content://")) {
             try (InputStream in = getContentResolver().openInputStream(Uri.parse(target))) {
                 if (in == null) return null;
-                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
-                byte[] buf = new byte[8192];
-                int n;
-                while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
-                return new String(bo.toByteArray(), "UTF-8");
+                return readAll(in);
             }
         }
         File f = new File(target);
@@ -1060,12 +1075,19 @@ public class MainActivity extends Activity {
         if (!f.getCanonicalPath().startsWith(base)) return null;
         if (!f.isFile()) return null;
         try (InputStream in = new java.io.FileInputStream(f)) {
-            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
-            return new String(bo.toByteArray(), "UTF-8");
+            return readAll(in);
         }
+    }
+
+    private byte[] readAll(InputStream in) throws IOException {
+        java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            bo.write(buf, 0, n);
+            if (bo.size() > 8 * 1024 * 1024) return null;
+        }
+        return bo.toByteArray();
     }
 
     private void toast(String msg) {

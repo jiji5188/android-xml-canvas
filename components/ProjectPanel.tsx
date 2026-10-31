@@ -34,6 +34,8 @@ export interface ProjectPanelProps {
 
   /** 当前项目 */
   projectName: string;
+  /** M31：当前项目图标（ic_launcher 读出来的 URL），空则回退通用图标 */
+  projectIconUrl?: string | null;
   projectSource: ProjectSource | null;
   /** 手动刷新时外部 +1，用来清掉懒加载缓存重新读 */
   projectRev: number;
@@ -363,7 +365,12 @@ export function ProjectPanel(p: ProjectPanelProps) {
           {/* M24：当前项目结构 */}
           <div className="axv-proj-now">
             <div className="axv-proj-now-head">
-              <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>work</span>
+              {/* M31：图标优先用项目自己的 ic_launcher，读不到才回退通用图标 */}
+              {p.projectIconUrl ? (
+                <img className="axv-proj-now-icon" src={p.projectIconUrl} alt="" aria-hidden="true" />
+              ) : (
+                <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>work</span>
+              )}
               <b className="axv-proj-now-name" title={p.projectName}>
                 {p.projectName || tr("proj.untitled", "未命名项目")}
               </b>

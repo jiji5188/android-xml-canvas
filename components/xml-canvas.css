@@ -5260,6 +5260,14 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* M31：项目图标（ic_launcher 图片） */
+.axv-proj-now-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
 .axv-proj-now-sub {
   font-size: 11px;
   opacity: 0.62;

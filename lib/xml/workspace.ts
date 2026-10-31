@@ -31,6 +31,8 @@ export interface WsProject {
   layoutCount: number;
   /** 可直接读的目标：native 是绝对路径 / content URI，web 是目录或文件句柄 */
   target?: string;
+  /** 项目目录的绝对路径（native 才有，用来读 app_name / 图标） */
+  dirPath?: string;
   handle?: unknown;
 }
 
@@ -93,7 +95,7 @@ export async function wsListProjects(): Promise<WsProject[]> {
     try {
       const raw = JSON.parse(b.listProjects() || "{}") as {
         ok?: boolean;
-        items?: { name: string; kind: "dir" | "file"; rel: string; layoutCount?: number; mainPath?: string; docUri?: string }[];
+        items?: { name: string; kind: "dir" | "file"; rel: string; layoutCount?: number; mainPath?: string; docUri?: string; path?: string }[];
       };
       return (raw.items ?? []).map((it) => ({
         name: it.name,
@@ -101,6 +103,7 @@ export async function wsListProjects(): Promise<WsProject[]> {
         rel: it.rel,
         layoutCount: it.layoutCount ?? 0,
         target: it.docUri ?? it.mainPath,
+        dirPath: it.kind === "dir" ? it.path : undefined,
       }));
     } catch {
       return [];
@@ -135,7 +138,7 @@ export async function wsListTopProjects(): Promise<WsProject[]> {
       try {
         const raw = JSON.parse(b.listTopProjects() || "{}") as {
           ok?: boolean;
-          items?: { name: string; kind: "dir" | "file"; rel: string; layoutCount?: number; mainPath?: string; docUri?: string }[];
+          items?: { name: string; kind: "dir" | "file"; rel: string; layoutCount?: number; mainPath?: string; docUri?: string; path?: string }[];
         };
         if (raw.ok !== false && Array.isArray(raw.items)) {
           return raw.items.map((it) => ({
@@ -144,6 +147,7 @@ export async function wsListTopProjects(): Promise<WsProject[]> {
             rel: it.rel,
             layoutCount: it.layoutCount ?? 0,
             target: it.docUri ?? it.mainPath,
+            dirPath: it.kind === "dir" ? it.path : undefined,
           }));
         }
       } catch {

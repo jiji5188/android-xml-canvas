@@ -55,11 +55,16 @@ import {
 import {
   findMainLayout,
   readProjectMeta,
+  readProjectMetaNative,
+  readProjectMetaFromSource,
   type BrowseEntry,
   type ProjectMeta,
   type ProjectSource,
 } from "@/lib/xml/project-browse";
 import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
+
+/** M31：当前打开的项目（name = app 名称；iconUrl = ic_launcher 图标） */
+type ActiveProject = { name: string; source: ProjectSource | null; iconUrl?: string | null };
 import {
   activeFile,
   addFile,
@@ -534,7 +539,7 @@ export function XmlEditor() {
   const [wsState, setWsState] = useState<WsInfo | null>(null);
   const [wsProjects, setWsProjects] = useState<WsProject[]>([]);
   /** M24：当前项目（项目名 + 懒加载浏览源）。M25d 起不再一次性深扫整棵树 */
-  const [activeProject, setActiveProject] = useState<{ name: string; source: ProjectSource | null } | null>(null);
+  const [activeProject, setActiveProject] = useState<ActiveProject | null>(null);
   /** M25d：手动刷新项目结构时 +1，让面板丢掉懒加载缓存重新读根目录 */
   const [projectRev, setProjectRev] = useState(0);
   /** M25d：项目卡片分析结果（app_name / 图标），key = 项目 rel */
@@ -649,14 +654,18 @@ export function XmlEditor() {
   /** M25d：已经分析过名称/图标的项目（rel），避免 4s 轮询重复读文件 */
   const analyzedRef = useRef<Set<string>>(new Set());
 
-  /** M25d：后台分析项目名/图标（串行，读不到就跳过，不影响列表渲染） */
+  /** M25d/M31：后台分析项目名/图标（串行，读不到就跳过，不影响列表渲染）
+   *  web：有 DirHandle 走 readProjectMeta；APK：没有句柄，按项目绝对路径试读 strings.xml + ic_launcher */
   const analyzeProjects = useCallback(async (list: WsProject[]) => {
     for (const it of list) {
-      if (it.kind !== "dir" || !it.handle) continue;
+      if (it.kind !== "dir") continue;
+      if (!it.handle && !it.dirPath) continue;
       if (analyzedRef.current.has(it.rel)) continue;
       analyzedRef.current.add(it.rel);
       try {
-        const meta = await readProjectMeta(it.handle, it.name);
+        const meta = it.handle
+          ? await readProjectMeta(it.handle, it.name)
+          : await readProjectMetaNative(it.name, it.dirPath);
         setProjMeta((prev) => ({ ...prev, [it.rel]: meta }));
       } catch {
         /* 分析失败就当没有，卡片回退到文件夹名 */
@@ -1524,7 +1533,7 @@ export function XmlEditor() {
   );
 
   /** 当前项目的浏览源（用 ref 拿，避免面板回调闭包里拿到旧值） */
-  const activeProjectRef = useRef<{ name: string; source: ProjectSource | null } | null>(null);
+  const activeProjectRef = useRef<ActiveProject | null>(null);
   useEffect(() => {
     activeProjectRef.current = activeProject;
   }, [activeProject]);
@@ -1541,13 +1550,29 @@ export function XmlEditor() {
   /** 激活一个已打开的项目：切到「当前项目」tab，并自动载入主布局（找不到就只显示结构树） */
   const activateProject = useCallback(
     async (opened: OpenedProject) => {
-      setActiveProject(opened);
+      // M31：标题显示 app 名称（读 res/values/strings.xml 的 app_name），并取 ic_launcher 做图标
+      let name = opened.name;
+      let iconUrl: string | null = null;
+      try {
+        const meta = await readProjectMetaFromSource(opened.source, opened.name);
+        name = meta.name;
+        iconUrl = meta.iconUrl ?? null;
+        // M31：APK 里扁平列表只含 xml，图标读不到 → 按项目绝对路径直试 ic_launcher*
+        if (!iconUrl && opened.dirPath) {
+          const nm = await readProjectMetaNative(opened.name, opened.dirPath);
+          if (nm.name && nm.name !== opened.name) name = nm.name;
+          iconUrl = nm.iconUrl ?? null;
+        }
+      } catch {
+        /* 读不到就用目录名 */
+      }
+      setActiveProject({ ...opened, name, iconUrl });
       setProjectRev((n) => n + 1);
       setProjectTab("current");
       setWsActiveName("");
       const main = await findMainLayout(opened.source);
       if (main) await loadEntry(opened.source, main);
-      else setWsMsg(`已打开《${opened.name}》，但里面没找到 layout xml`);
+      else setWsMsg(`已打开《${name}》，但里面没找到 layout xml`);
     },
     [loadEntry],
   );
@@ -1647,9 +1672,24 @@ export function XmlEditor() {
     try {
       const p = await restoreProjectFolder();
       if (p) {
-        setActiveProject(p);
+        // M31：刷新时重读 app_name / 图标
+        let name = p.name;
+        let iconUrl: string | null = null;
+        try {
+          const meta = await readProjectMetaFromSource(p.source, p.name);
+          name = meta.name;
+          iconUrl = meta.iconUrl ?? null;
+          if (!iconUrl && p.dirPath) {
+            const nm = await readProjectMetaNative(p.name, p.dirPath);
+            if (nm.name && nm.name !== p.name) name = nm.name;
+            iconUrl = nm.iconUrl ?? null;
+          }
+        } catch {
+          /* 用目录名 */
+        }
+        setActiveProject({ ...p, name, iconUrl });
         setProjectRev((n) => n + 1);
-        setWsMsg(`已刷新《${p.name}》`);
+        setWsMsg(`已刷新《${name}》`);
       } else {
         setWsMsg("刷新失败：项目目录权限可能已失效，请重新「打开」");
       }
@@ -2681,6 +2721,7 @@ const findResolved = findResolvedNode;
               onOpenDir={() => void openProjectDir()}
               onRequestAllFiles={() => wsRequestAllFiles()}
               projectName={activeProject?.name || project.name || ""}
+            projectIconUrl={activeProject?.iconUrl ?? null}
               projectSource={activeProject?.source ?? null}
               projectRev={projectRev}
               currentFileName={wsActiveName || (currentFile?.name ?? "")}

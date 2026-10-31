@@ -23,6 +23,8 @@ export interface OpenedProject {
   name: string;
   /** 分层浏览源（listChildren 每次只读一层） */
   source: ProjectSource;
+  /** M31：项目目录绕对路径（仅 native，用来直读 strings.xml / ic_launcher） */
+  dirPath?: string;
 }
 
 /** web：选一个「项目目录」（不覆盖工作目录的句柄） */
@@ -49,7 +51,7 @@ async function pickWebProjectDir(): Promise<{ name: string; dir: unknown } | nul
 export async function openProjectFromItem(item: WsProject): Promise<OpenedProject | null> {
   const source = await projectSourceFromWorkspaceItem(item);
   if (!source) return null;
-  return { name: item.name, source };
+  return { name: item.name, source, dirPath: item.dirPath };
 }
 
 /**

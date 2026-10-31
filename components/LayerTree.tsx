@@ -274,6 +274,11 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
                 aria-label={locked ? "解锁" : "锁定"}
                 onClick={(e) => {
                   e.stopPropagation();
+                  // M35c：未选中行只做选中，不执行锁定（防误触）
+                  if (selectedPath !== n.path) {
+                    onSelect(n.path);
+                    return;
+                  }
                   onToggleLock(n.path);
                 }}
               >
@@ -282,7 +287,21 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
                 </span>
               </button>
             ) : null}
-            <button title="删除" aria-label="删除" className="danger" disabled={isRoot} onClick={(e) => { e.stopPropagation(); onRemove(n.path); }}>
+            <button
+              title="删除"
+              aria-label="删除"
+              className="danger"
+              disabled={isRoot}
+              onClick={(e) => {
+                e.stopPropagation();
+                // M35c：未选中行只做选中，绝不直接删（降级指纹误触）
+                if (selectedPath !== n.path) {
+                  onSelect(n.path);
+                  return;
+                }
+                onRemove(n.path);
+              }}
+            >
               <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>delete</span>
             </button>
           </span>

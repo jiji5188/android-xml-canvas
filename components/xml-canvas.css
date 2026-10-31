@@ -1224,7 +1224,7 @@
   align-items: center;
   gap: 2px;
 }
-.axv-lt-row:hover .axv-lt-actions,
+/* M35c：锁定/删除也只在选中行显示（+ JS 侧二次判断），避免手指位置刚好落上去误操作 */
 .axv-lt-row.sel .axv-lt-actions {
   display: inline-flex;
 }

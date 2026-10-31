@@ -168,4 +168,60 @@ describe("M34 图层树拖拽手柄", () => {
     expect(onSelect).not.toHaveBeenCalled();
     document.body.removeChild(host);
   });
+
+  it("未选中行的删除/锁定按钮：只选中，不删不改", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const onSelect = vi.fn();
+    const onRemove = vi.fn();
+    const onToggleLock = vi.fn();
+    const root = createRoot(host);
+    root.render(
+      <LayerTree
+        root={makeRoot()}
+        selectedPath=""
+        onSelect={onSelect}
+        onMove={() => {}}
+        onRemove={onRemove}
+        onDragMove={() => {}}
+        onToggleLock={onToggleLock}
+      />,
+    );
+    await tick();
+    const row2 = host.querySelector('.axv-lt-row[data-path="#2"]') as HTMLElement;
+    (row2.querySelector('button[aria-label="删除"]') as HTMLElement).click();
+    (row2.querySelector('button[aria-label="锁定"]') as HTMLElement).click();
+    await tick();
+    expect(onRemove).not.toHaveBeenCalled();
+    expect(onToggleLock).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledWith("#2");
+    document.body.removeChild(host);
+  });
+
+  it("选中行的删除/锁定按钮正常执行", async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const onRemove = vi.fn();
+    const onToggleLock = vi.fn();
+    const root = createRoot(host);
+    root.render(
+      <LayerTree
+        root={makeRoot()}
+        selectedPath="#2"
+        onSelect={() => {}}
+        onMove={() => {}}
+        onRemove={onRemove}
+        onDragMove={() => {}}
+        onToggleLock={onToggleLock}
+      />,
+    );
+    await tick();
+    const row2 = host.querySelector('.axv-lt-row[data-path="#2"]') as HTMLElement;
+    (row2.querySelector('button[aria-label="删除"]') as HTMLElement).click();
+    (row2.querySelector('button[aria-label="锁定"]') as HTMLElement).click();
+    await tick();
+    expect(onRemove).toHaveBeenCalledWith("#2");
+    expect(onToggleLock).toHaveBeenCalledWith("#2");
+    document.body.removeChild(host);
+  });
 });

@@ -3479,6 +3479,9 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-shape-alpha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--axv-primary, #4f46e5); }
 .axv-shape-alpha > b { font-size: 11px; min-width: 32px; text-align: right; color: #6b6b78; font-variant-numeric: tabular-nums; }
 .axv-shape-color input[type="color"] { flex: 0 0 34px; width: 34px; height: 30px; border: 1px solid rgba(0,0,0,.12); border-radius: 6px; padding: 0; background: #fff; cursor: pointer; }
+/* M63g：形状页取色按钮换成自定义 ColorField → 压到跟旧 input[type=color] 一样大 */
+.axv-shape-color .axv-cf-swatch,
+.axv-shape-row .axv-cf-swatch { flex: 0 0 34px; width: 34px; height: 30px; border-radius: 6px; }
 .axv-shape-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .axv-shape-row input[type="number"] { width: 68px; }
 .axv-shape-row input[type="color"] { width: 34px; height: 30px; border: 1px solid rgba(0,0,0,.12); border-radius: 6px; padding: 0; background: #fff; cursor: pointer; }

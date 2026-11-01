@@ -755,3 +755,147 @@ To fix this, make sure your Cache-Control headers allow revalidation of chunks a
   3162 |                 selectedPath={selectedPath}
   3163 |                 onSelect={setSelectedPath}
 ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] ./components/ShapeEditor.tsx:200:1
+Error: Expected unicode escape
+  198 |                 <div className="axv-shape-color">
+  199 |                   <ColorField
+> 200 | \n="填充色"
+      | ^
+  201 |                     value={spec.solid ?? "#FFFFFF"}
+  202 |                     onChange={(css) => setSolid(cssToShapeColor(css))}
+  203 |                   />
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/ShapeEditor.tsx:200:1
+Error: Expected unicode escape
+  198 |                 <div className="axv-shape-color">
+  199 |                   <ColorField
+> 200 | \n="填充色"
+      | ^
+  201 |                     value={spec.solid ?? "#FFFFFF"}
+  202 |                     onChange={(css) => setSolid(cssToShapeColor(css))}
+  203 |                   />
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/ShapeEditor.tsx:200:1
+Error: Expected unicode escape
+  198 |                 <div className="axv-shape-color">
+  199 |                   <ColorField
+> 200 | \n="填充色"
+      | ^
+  201 |                     value={spec.solid ?? "#FFFFFF"}
+  202 |                     onChange={(css) => setSolid(cssToShapeColor(css))}
+  203 |                   />
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/ShapeEditor.tsx:200:1
+Error: Expected unicode escape
+  198 |                 <div className="axv-shape-color">
+  199 |                   <ColorField
+> 200 | \n="填充色"
+      | ^
+  201 |                     value={spec.solid ?? "#FFFFFF"}
+  202 |                     onChange={(css) => setSolid(cssToShapeColor(css))}
+  203 |                   />
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/ShapeEditor.tsx:200:1
+Error: Expected unicode escape
+  198 |                 <div className="axv-shape-color">
+  199 |                   <ColorField
+> 200 | \n="填充色"
+      | ^
+  201 |                     value={spec.solid ?? "#FFFFFF"}
+  202 |                     onChange={(css) => setSolid(cssToShapeColor(css))}
+  203 |                   />
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/ShapeEditor.tsx:200:1
+Error: Expected unicode escape
+  198 |                 <div className="axv-shape-color">
+  199 |                   <ColorField
+> 200 | \n="填充色"
+      | ^
+  201 |                     value={spec.solid ?? "#FFFFFF"}
+  202 |                     onChange={(css) => setSolid(cssToShapeColor(css))}
+  203 |                   />
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/ShapeEditor.tsx:200:1
+Error: Expected unicode escape
+  198 |                 <div className="axv-shape-color">
+  199 |                   <ColorField
+> 200 | \n="填充色"
+      | ^
+  201 |                     value={spec.solid ?? "#FFFFFF"}
+  202 |                     onChange={(css) => setSolid(cssToShapeColor(css))}
+  203 |                   />
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/ShapeEditor.tsx:200:1
+Error: Expected unicode escape
+  198 |                 <div className="axv-shape-color">
+  199 |                   <ColorField
+> 200 | \n="填充色"
+      | ^
+  201 |                     value={spec.solid ?? "#FFFFFF"}
+  202 |                     onChange={(css) => setSolid(cssToShapeColor(css))}
+  203 |                   />
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 

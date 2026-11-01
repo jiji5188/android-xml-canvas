@@ -16,6 +16,11 @@ import {
   type ShapeSpec,
 } from "@/lib/xml/shape-gen";
 import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
+import { ColorField } from "./ColorField";
+import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
+
+/** 取色器回传的 CSS 串 → 形状规格里存的 Android 写法（#RRGGBB / #AARRGGBB，大写） */
+const cssToShapeColor = (css: string) => toAndroidHex(parseColorOr(css, "#FFFFFF"));
 
 interface Props {
   /** 正在编辑的属性名（background / foreground …） */
@@ -191,10 +196,11 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
               <div className="axv-shape-field">
                 <label>填充色</label>
                 <div className="axv-shape-color">
-                  <input
-                    type="color"
-                    value={toHex6(spec.solid ?? "#FFFFFF")}
-                    onChange={(e) => setSolid(e.target.value.toUpperCase())}
+                  <ColorField
+                    aboveModal
+                    label="填充色"
+                    value={spec.solid ?? "#FFFFFF"}
+                    onChange={(css) => setSolid(cssToShapeColor(css))}
                   />
                   <input
                     className="axv-attr-input"
@@ -283,10 +289,13 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                     else setStroke({ width: w });
                   }}
                 />
-                <input
-                  type="color"
-                  value={toHex6(spec.stroke?.color ?? "#E0E0E0")}
-                  onChange={(e) => setStroke({ color: e.target.value.toUpperCase(), width: spec.stroke?.width ?? 1 })}
+                <ColorField
+                  aboveModal
+                  label="描边色"
+                  value={spec.stroke?.color ?? "#E0E0E0"}
+                  onChange={(css) =>
+                    setStroke({ color: cssToShapeColor(css), width: spec.stroke?.width ?? 1 })
+                  }
                 />
                 <label className="axv-shape-check">
                   <input
@@ -336,10 +345,13 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
               </label>
               {spec.ripple ? (
                 <div className="axv-shape-color">
-                  <input
-                    type="color"
-                    value={toHex6(spec.ripple.color)}
-                    onChange={(e) => setSpec((s) => ({ ...s, ripple: { color: withAlphaHex(e.target.value, s.ripple?.color) } }))}
+                  <ColorField
+                    aboveModal
+                    label="涟漪色"
+                    value={spec.ripple.color}
+                    onChange={(css) =>
+                      setSpec((s) => ({ ...s, ripple: { color: cssToShapeColor(css) } }))
+                    }
                   />
                   <input
                     className="axv-attr-input"
@@ -389,16 +401,22 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
               {spec.states ? (
                 <div className="axv-shape-row" style={{ marginTop: 6 }}>
                   <span className="axv-shape-hint">按下</span>
-                  <input
-                    type="color"
-                    value={toHex6(spec.states.pressed ?? spec.solid ?? "#FFFFFF")}
-                    onChange={(e) => setSpec((s) => ({ ...s, states: { ...s.states, pressed: e.target.value.toUpperCase() } }))}
+                  <ColorField
+                    aboveModal
+                    label="按下态颜色"
+                    value={spec.states.pressed ?? spec.solid ?? "#FFFFFF"}
+                    onChange={(css) =>
+                      setSpec((s) => ({ ...s, states: { ...s.states, pressed: cssToShapeColor(css) } }))
+                    }
                   />
                   <span className="axv-shape-hint">禁用</span>
-                  <input
-                    type="color"
-                    value={toHex6(spec.states.disabled ?? "#EEEEEE")}
-                    onChange={(e) => setSpec((s) => ({ ...s, states: { ...s.states, disabled: e.target.value.toUpperCase() } }))}
+                  <ColorField
+                    aboveModal
+                    label="禁用态颜色"
+                    value={spec.states.disabled ?? "#EEEEEE"}
+                    onChange={(css) =>
+                      setSpec((s) => ({ ...s, states: { ...s.states, disabled: cssToShapeColor(css) } }))
+                    }
                   />
                   <button
                     className="axv-shape-link"
@@ -449,11 +467,12 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                     value={spec.shadow.blur}
                     onChange={(e) => setSpec((s) => ({ ...s, shadow: { ...s.shadow!, blur: Number(e.target.value) } }))}
                   />
-                  <input
-                    type="color"
-                    value={toHex6(spec.shadow.color)}
-                    onChange={(e) =>
-                      setSpec((s) => ({ ...s, shadow: { ...s.shadow!, color: withAlphaHex(e.target.value, s.shadow?.color) } }))
+                  <ColorField
+                    aboveModal
+                    label="阴影色"
+                    value={spec.shadow.color}
+                    onChange={(css) =>
+                      setSpec((s) => ({ ...s, shadow: { ...s.shadow!, color: cssToShapeColor(css) } }))
                     }
                   />
                 </div>
@@ -557,13 +576,24 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                   <div className="axv-shape-field">
                     <label>颜色（起点 / 中间 / 终点）</label>
                     <div className="axv-shape-row">
-                      <input type="color" value={toHex6(grad.start)} onChange={(e) => setGradient({ start: e.target.value.toUpperCase() })} />
-                      <input
-                        type="color"
-                        value={toHex6(grad.center ?? grad.end)}
-                        onChange={(e) => setGradient({ center: e.target.value.toUpperCase() })}
+                      <ColorField
+                        aboveModal
+                        label="渐变起点"
+                        value={grad.start}
+                        onChange={(css) => setGradient({ start: cssToShapeColor(css) })}
                       />
-                      <input type="color" value={toHex6(grad.end)} onChange={(e) => setGradient({ end: e.target.value.toUpperCase() })} />
+                      <ColorField
+                        aboveModal
+                        label="渐变中间色"
+                        value={grad.center ?? grad.end}
+                        onChange={(css) => setGradient({ center: cssToShapeColor(css) })}
+                      />
+                      <ColorField
+                        aboveModal
+                        label="渐变终点"
+                        value={grad.end}
+                        onChange={(css) => setGradient({ end: cssToShapeColor(css) })}
+                      />
                       <button className="axv-shape-link" onClick={() => setGradient({ center: undefined })}>
                         去掉中间色
                       </button>
@@ -620,13 +650,6 @@ function toHex6(v: string): string {
   if (h.length === 8) return `#${h.slice(2)}`; // Android 是 AARRGGBB
   if (h.length === 3) return `#${h.split("").map((c) => c + c).join("")}`;
   return "#FFFFFF";
-}
-
-/** 颜色选择器只给不透明色：保留原 alpha，写回 Android 的 AARRGGBB */
-function withAlphaHex(picked: string, prev?: string): string {
-  const m = /^#([0-9a-f]{8})$/i.exec((prev ?? "").trim());
-  const alpha = m ? m[1].slice(0, 2) : "33";
-  return `#${alpha}${picked.replace("#", "").toUpperCase()}`;
 }
 
 /** M52：当前颜色的 alpha 百分比（0-100），无 alpha → 100 */

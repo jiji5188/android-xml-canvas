@@ -22,6 +22,7 @@ import { createStagingIo, flushStaged, type StagedChange } from "@/lib/xml/ai-st
 import { compactHunks, diffLines, diffSummary } from "@/lib/xml/ai-diff";
 import { aiDocContextOf, buildAiSystemPrompt, docPreamble, quickActionsFor } from "@/lib/xml/ai-doc-context";
 import { aiAllowProtectedGet, aiAllowProtectedSet } from "@/lib/xml/ai-paths";
+import { batchLabel, makeBatch, pushBatch, restoreBatch, type AiHistoryBatch } from "@/lib/xml/ai-history";
 
 /** 工具循环最多几轮（防模型无限读文件） */
 const MAX_TOOL_ROUNDS = 3;
@@ -88,6 +89,9 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   const [staged, setStaged] = useState<StagedChange[]>([]);
   const [diffOpen, setDiffOpen] = useState<Record<string, boolean>>({});
   const [applying, setApplying] = useState(false);
+  // M64g（D4）：最近 20 批 AI 写入，支持整批回滚
+  const [history, setHistory] = useState<AiHistoryBatch[]>([]);
+  const [rollingBack, setRollingBack] = useState<string | null>(null);
   const stageHost = useRef<{ base: AiFileIo; host: ReturnType<typeof createStagingIo> } | null>(null);
 
   const stageFor = useCallback((base: AiFileIo) => {
@@ -357,6 +361,16 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       if (okCount) {
         const hasBackup = r.results.some((x) => x.backup);
         onNote?.(`已落盘 ${okCount} 个文件${hasBackup ? "（原文件备份在 .axv_backup/）" : ""}`);
+        setHistory((list) =>
+          pushBatch(
+            list,
+            makeBatch(
+              r.results
+                .filter((x) => x.ok)
+                .map((x) => ({ rel: x.rel, before: staged.find((s) => s.rel === x.rel)?.before ?? null })),
+            ),
+          ),
+        );
       }
     } finally {
       setApplying(false);
@@ -364,6 +378,35 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   }, [applying, onApplied, onNote, staged]);
 
   const providerHint = AI_PROVIDERS.find((p) => p.id === cfg.provider);
+
+  // M64g（D4）：回滚一整批（回写 after → before）；成功则从历史里移除
+  const rollback = useCallback(
+    async (b: AiHistoryBatch) => {
+      const io = fileIo;
+      if (!io || rollingBack) return;
+      setRollingBack(b.id);
+      setErr("");
+      try {
+        const r = await restoreBatch(io, b);
+        const bad = r.results.filter((x) => !x.ok);
+        for (const it of r.results) {
+          if (it.ok) onApplied?.({ rel: it.rel, text: b.items.find((x) => x.rel === it.rel)?.before ?? "" });
+        }
+        if (bad.length) {
+          setErr(`回滚失败 ${bad.length} 个：${bad[0].rel} — ${bad[0].error || "未知原因"}`);
+        } else {
+          setHistory((list) => list.filter((x) => x.id !== b.id));
+          const blanked = r.results.filter((x) => x.blanked).length;
+          onNote?.(
+            `已回滚 ${r.results.length} 个文件${blanked ? `（${blanked} 个为 AI 新建，已清空内容）` : ""}`,
+          );
+        }
+      } finally {
+        setRollingBack(null);
+      }
+    },
+    [fileIo, onApplied, onNote, rollingBack],
+  );
 
   return (
     <div className="axv-ai">
@@ -637,6 +680,34 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             );
           })}
           <div className="axv-ai-diffcard-foot">应用前会把原文件备份到 .axv_backup/</div>
+        </div>
+      ) : null}
+
+      {/* ===== M64g（D4）：AI 改动历史（整批回滚） ===== */}
+      {history.length ? (
+        <div className="axv-ai-hist">
+          <div className="axv-ai-hist-head">
+            <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
+              history
+            </span>
+            <b>AI 改动历史</b>
+            <span className="axv-ai-diffcard-sub">{history.length} 批（内存，最多 20）</span>
+          </div>
+          {history.map((b) => (
+            <div className="axv-ai-hist-row" key={b.id}>
+              <span className="axv-ai-hist-name" title={b.items.map((x) => x.rel).join("\n")}>
+                {batchLabel(b)}
+              </span>
+              <button
+                className="axv-btn axv-ghost"
+                disabled={rollingBack === b.id}
+                onClick={() => void rollback(b)}
+                title="把这些文件写回 AI 修改前的内容"
+              >
+                {rollingBack === b.id ? "回滚中…" : "回滚"}
+              </button>
+            </div>
+          ))}
         </div>
       ) : null}
 

@@ -174,4 +174,38 @@ describe("M64e B3：改动卡片", () => {
     expect(files["res/layout/a.xml"]).toContain("<TextView />");
     expect(host.querySelector(".axv-ai-diffcard")).toBeNull();
   });
+
+  it("应用后进历史；点回滚 → 文件恢复成修改前的原文", async () => {
+    const ORIG = "<LinearLayout>\n  <TextView />\n</LinearLayout>";
+    const files: Record<string, string> = { "res/layout/a.xml": ORIG };
+    const applied: { rel: string; text: string }[] = [];
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    root = createRoot(host);
+    root.render(
+      <AiPanel
+        xml="<LinearLayout/>"
+        docRel="res/layout/a.xml"
+        fileIo={memIo(files)}
+        onReplaceXml={vi.fn()}
+        onNote={vi.fn()}
+        onApplied={(p) => applied.push(p)}
+      />,
+    );
+    await flush();
+    await run(host);
+    btnByText(host.querySelector(".axv-ai-diffcard") as HTMLElement, "全部应用")!.click();
+    await flush(6);
+    expect(files["res/layout/a.xml"]).toContain('android:text="Hi"');
+
+    const hist = host.querySelector(".axv-ai-hist");
+    expect(hist).not.toBeNull();
+    expect(hist!.querySelectorAll(".axv-ai-hist-row")).toHaveLength(1);
+
+    btnByText(hist as HTMLElement, "回滚")!.click();
+    await flush(8);
+    expect(files["res/layout/a.xml"]).toBe(ORIG);
+    expect(applied.some((a) => a.text === ORIG)).toBe(true);
+    expect(host.querySelector(".axv-ai-hist")).toBeNull();
+  });
 });

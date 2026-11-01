@@ -5775,6 +5775,52 @@ button.axv-ws-caret:hover {
   color: var(--axv-on-surface-variant);
   border-top: 1px solid var(--axv-outline);
 }
+
+/* M64g（D4）：AI 改动历史 */
+.axv-ai-hist {
+  margin: 6px 8px 0;
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  overflow: hidden;
+  flex: 0 0 auto;
+  max-height: 132px;
+  overflow-y: auto;
+}
+.axv-ai-hist-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  background: var(--axv-surface-sunken);
+  border-bottom: 1px solid var(--axv-outline);
+  position: sticky;
+  top: 0;
+}
+.axv-ai-hist-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+}
+.axv-ai-hist-row + .axv-ai-hist-row {
+  border-top: 1px dashed var(--axv-outline);
+}
+.axv-ai-hist-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--axv-on-surface-variant);
+}
+.axv-ai-hist-row .axv-btn {
+  padding: 1px 8px;
+  font-size: 11px;
+  height: 22px;
+  min-height: 0;
+  line-height: 18px;
+}
 .axv-ai-code {
   border: 1px solid var(--axv-outline);
   border-radius: 10px;

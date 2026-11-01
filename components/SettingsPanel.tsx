@@ -16,6 +16,7 @@ import {
   INDENT_MIN,
   type EditorTheme,
 } from "@/lib/xml/editor-theme";
+import { ColorField } from "./ColorField";
 
 export interface SettingsPanelProps {
   tr: (key: string, fallback: string) => string;
@@ -53,21 +54,6 @@ export interface SettingsPanelProps {
 
   // 数据
   onSaveXml: () => void;
-}
-
-/** <input type="color"> 只收 #rrggbb；rgba()/transparent 一律给回退色 */
-function toHex(v: string, fallback: string): string {
-  const s = (v || "").trim();
-  if (/^#[0-9a-f]{6}$/i.test(s)) return s;
-  if (/^#[0-9a-f]{3}$/i.test(s)) {
-    return "#" + s.slice(1).split("").map((c) => c + c).join("");
-  }
-  const m = s.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i);
-  if (m) {
-    const hex = (n: string) => Math.min(255, Number(n)).toString(16).padStart(2, "0");
-    return `#${hex(m[1])}${hex(m[2])}${hex(m[3])}`;
-  }
-  return fallback;
 }
 
 export function SettingsPanel(p: SettingsPanelProps) {
@@ -251,38 +237,36 @@ export function SettingsPanel(p: SettingsPanelProps) {
           ))}
         </select>
 
-        <label className="axv-set-row">
+        <div className="axv-set-row">
           <span>光标颜色</span>
-          <input
-            className="axv-set-color"
-            type="color"
-            aria-label="光标颜色"
-            value={toHex(p.editorTheme.cursor, DEFAULT_EDITOR_THEME.cursor)}
-            onChange={(e) => p.onEditorTheme({ cursor: e.target.value })}
+          <ColorField
+            label="光标颜色"
+            value={p.editorTheme.cursor}
+            fallback={DEFAULT_EDITOR_THEME.cursor}
+            onChange={(v) => p.onEditorTheme({ cursor: v })}
           />
-        </label>
+        </div>
 
-        <label className="axv-set-row">
+        <div className="axv-set-row">
           <span>选中背景色</span>
-          <input
-            className="axv-set-color"
-            type="color"
-            aria-label="选中背景色"
-            value={toHex(p.editorTheme.selBg, "#04409f")}
-            onChange={(e) => p.onEditorTheme({ selBg: e.target.value })}
+          <ColorField
+            label="选中背景色"
+            value={p.editorTheme.selBg}
+            fallback={DEFAULT_EDITOR_THEME.selBg}
+            onChange={(v) => p.onEditorTheme({ selBg: v })}
           />
-        </label>
+        </div>
 
-        <label className="axv-set-row">
+        <div className="axv-set-row">
           <span>选中文字颜色</span>
-          <input
-            className="axv-set-color"
-            type="color"
-            aria-label="选中文字颜色"
-            value={toHex(p.editorTheme.selFg, "#ffffff")}
-            onChange={(e) => p.onEditorTheme({ selFg: e.target.value })}
+          <ColorField
+            label="选中文字颜色"
+            value={p.editorTheme.selFg}
+            fallback={DEFAULT_EDITOR_THEME.selFg}
+            allowTransparent
+            onChange={(v) => p.onEditorTheme({ selFg: v })}
           />
-        </label>
+        </div>
 
         <label className="axv-set-row">
           <span>字号</span>
@@ -325,17 +309,16 @@ export function SettingsPanel(p: SettingsPanelProps) {
           />
         </label>
 
-        <label className="axv-set-row">
+        <div className="axv-set-row">
           <span>当前行背景色</span>
-          <input
-            className="axv-set-color"
-            type="color"
-            aria-label="当前行背景色"
+          <ColorField
+            label="当前行背景色"
+            value={p.editorTheme.curBg}
+            fallback={DEFAULT_EDITOR_THEME.curBg}
             disabled={!p.editorTheme.showCur}
-            value={toHex(p.editorTheme.curBg, "#0b5fa5")}
-            onChange={(e) => p.onEditorTheme({ curBg: e.target.value })}
+            onChange={(v) => p.onEditorTheme({ curBg: v })}
           />
-        </label>
+        </div>
 
         <button className="axv-set-btn" onClick={p.onResetEditorTheme}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>

@@ -2902,6 +2902,129 @@ body.axv-lt-dragging .axv-lt-row {
   color: var(--axv-x-decl, #8250DF);
 } /* XML 声明 */
 
+/* M49：选中背景必须画在「当前行背景」之上。
+   CodeMirror 默认把 .cm-selectionLayer 放在 z-index:-2（在内容之下），
+   而当前行背景是 .cm-activeLine 自己的 background（内容层，z-index:auto）
+   → 行背景会把选区盖住（用户看到的“选中看不出效果”）。
+   这里把整行降到负层（文字跟行背景一起），选区层抬到它们之上：
+   绘制顺序 = 编辑器底 → 行背景/文字(-3) → 选区(-2) → 行号/光标(150)。 */
+.axv-cm .cm-scroller {
+  position: relative;
+  z-index: 0;
+}
+.axv-cm .cm-line {
+  position: relative;
+  z-index: -3;
+}
+
+/* M49：带 alpha 的颜色选择器（ColorField） */
+.axv-cf {
+  display: inline-flex;
+  align-items: center;
+}
+.axv-cf-swatch {
+  position: relative;
+  width: 52px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 7px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #fff;
+}
+.axv-cf-swatch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.axv-cf-checker,
+.axv-cf-layer {
+  position: absolute;
+  inset: 0;
+}
+/* 棋盘格：透明色能在色块上看出来 */
+.axv-cf-checker {
+  background-image: linear-gradient(45deg, #d8d8d8 25%, transparent 25%),
+    linear-gradient(-45deg, #d8d8d8 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d8d8d8 75%),
+    linear-gradient(-45deg, transparent 75%, #d8d8d8 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+  background-color: #fff;
+}
+.axv-cf-pop {
+  position: fixed;
+  z-index: 4000;
+  width: 214px;
+  padding: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border-radius: 12px;
+  background: var(--axv-surface, #fff);
+  color: var(--axv-on-surface, #1c1b1f);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+}
+.axv-cf-preview {
+  position: relative;
+  height: 30px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.axv-cf-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.axv-cf-row > span {
+  flex: 0 0 34px;
+  opacity: 0.72;
+}
+.axv-cf-native {
+  flex: 1;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+.axv-cf-alpha {
+  flex: 1;
+  min-width: 0;
+}
+.axv-cf-pct {
+  flex: 0 0 34px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.axv-cf-hex {
+  width: 100%;
+  height: 27px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 7px;
+  background: var(--axv-surface, #fff);
+  color: inherit;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+}
+.axv-cf-trans {
+  height: 26px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 7px;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 /* 桌面端：代码 tab 也占满画布区（在 tab 条下方） */
 @media (min-width: 841px) {
   .axv-mob-xml {

@@ -286,3 +286,16 @@ Incoming: [res, async (opts)=>{
   763 |       wsBusyRef.current = true;
   764 |       setWsBusy(true);
   765 |     }
+[browser] Uncaught ReferenceError: ColorField is not defined
+    at SettingsPanel (components/SettingsPanel.tsx:256:12)
+    at Set.forEach (<anonymous>)
+    at XmlEditor (components/XmlEditor.tsx:3125:13)
+    at XmlPage (app/xml/page.tsx:8:10)
+  254 |         <div className="axv-set-row">
+  255 |           <span>光标颜色</span>
+> 256 |           <ColorField
+      |            ^
+  257 |             label="光标颜色"
+  258 |             value={p.editorTheme.cursor}
+  259 |             fallback={DEFAULT_EDITOR_THEME.cursor}
+⚠ Fast Refresh had to perform a full reload due to a runtime error.

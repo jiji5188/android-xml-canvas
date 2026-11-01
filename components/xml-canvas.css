@@ -6980,3 +6980,15 @@ button.axv-sb-item:hover {
   border: 1px solid rgba(0, 0, 0, 0.12);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 }
+
+
+/* ===== M63d：values 资源表的取色块换成 ColorField（保持 26px 紧凑） ===== */
+.axv-val-row .axv-cf {
+  flex: 0 0 auto;
+}
+.axv-val-row .axv-cf-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--axv-outline);
+}

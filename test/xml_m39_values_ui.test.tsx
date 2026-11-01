@@ -93,9 +93,9 @@ describe("M39 ValuesEditor 内容", () => {
     expect(html).toContain("尺寸");
     expect(html).toContain("字符串");
     expect(html).toContain("共 3 条资源");
-    // 颜色行带取色器
-    expect(html).toContain('type="color"');
-    expect(html).toContain('value="#112233"');
+    // 颜色行带取色器（M63d 起是自定义 HSV 取色器 ColorField，不再是原生 input[type=color]）
+    expect(html).toContain("axv-cf-swatch");
+    expect(html).toContain("#112233");
   });
 
   it("解析失败时给出说明而不是空白", () => {

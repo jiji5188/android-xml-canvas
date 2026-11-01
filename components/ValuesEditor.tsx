@@ -8,6 +8,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ColorField } from "./ColorField";
+import { parseColorOr, toArgbHex, toRgbHex } from "@/lib/xml/color-argb";
 import {
   KIND_LABEL,
   appendItem,
@@ -29,6 +31,13 @@ export interface ValuesEditorProps {
 }
 
 const KINDS = ["all", "string", "color", "dimen", "integer", "bool", "other"] as const;
+
+/** 取色器回传的是 CSS 颜色串 → 转回 colors.xml 习惯的写法：
+ *  alpha=1 写 #RRGGBB，带透明度写 #AARRGGBB（都是大写，与老行为一致） */
+function cssToAndroidColor(css: string): string {
+  const c = parseColorOr(css, "#000000");
+  return (c.a >= 1 ? toRgbHex(c) : toArgbHex(c)).toUpperCase();
+}
 
 const NEW_TYPES: { tag: string; label: string; hint: string; sample: string }[] = [
   { tag: "string", label: "字符串", hint: "显示文本", sample: "标题" },
@@ -229,12 +238,13 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
                   }}
                 />
                 {swatch ? (
-                  <input
-                    className="axv-val-swatch"
-                    type="color"
-                    aria-label={`${it.name} 取色`}
-                    value={swatch}
-                    onChange={(e) => onChange(setItemValue(xml, it, e.target.value.toUpperCase()))}
+                  <ColorField
+                    label={`${it.name} 取色`}
+                    value={it.value}
+                    fallback={swatch}
+                    onChange={(next) =>
+                      onChange(setItemValue(xml, it, cssToAndroidColor(next)))
+                    }
                   />
                 ) : null}
                 <input

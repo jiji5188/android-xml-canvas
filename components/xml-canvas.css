@@ -2902,19 +2902,24 @@ body.axv-lt-dragging .axv-lt-row {
   color: var(--axv-x-decl, #8250DF);
 } /* XML 声明 */
 
-/* M49：选中背景必须画在「当前行背景」之上。
-   CodeMirror 默认把 .cm-selectionLayer 放在 z-index:-2（在内容之下），
-   而当前行背景是 .cm-activeLine 自己的 background（内容层，z-index:auto）
-   → 行背景会把选区盖住（用户看到的“选中看不出效果”）。
-   这里把整行降到负层（文字跟行背景一起），选区层抬到它们之上：
-   绘制顺序 = 编辑器底 → 行背景/文字(-3) → 选区(-2) → 行号/光标(150)。 */
+/* M37b/M50：当前行背景不再用 .cm-activeLine 自带的 background。
+   原因：那是内容层颜色，会盖住选区（CodeMirror 选区层是 z-index:-2）。
+   改成独立的背景层（.cm-curline-hl，z-index:-4），层级从下到上：
+     当前行背景(-4) → 选区背景(-2) → 正文文字（内容层）→ 光标(150) */
 .axv-cm .cm-scroller {
   position: relative;
   z-index: 0;
 }
-.axv-cm .cm-line {
-  position: relative;
-  z-index: -3;
+.axv-cm .cm-curline-hl {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+  pointer-events: none;
+  background: var(--axv-code-cur-bg, transparent);
+  z-index: -4;
+  will-change: transform;
 }
 
 /* M49：带 alpha 的颜色选择器（ColorField） */
@@ -4291,6 +4296,11 @@ body.axv-lt-dragging .axv-lt-row {
   padding: 6px 8px;
   border-bottom: 1px solid var(--axv-outline);
 }
+/* M50：分组可折叠。默认全部折叠（.open 由组件按点击加上），
+   未展开时把除标题以外的子元素全部藏掉 —— 不改变现有 JSX 结构。 */
+.axv-set-group:not(.open) > *:not(.axv-set-label) {
+  display: none;
+}
 .axv-set-label {
   font-size: 12px;
   font-weight: 700;
@@ -4298,6 +4308,35 @@ body.axv-lt-dragging .axv-lt-row {
   text-transform: uppercase;
   color: var(--axv-on-surface-variant);
   margin-bottom: 8px;
+}
+/* 折叠标题（button）：占满整行，小箭头指示展开状态 */
+.axv-set-group > button.axv-set-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: calc(100% + 12px);
+  margin: 0 -6px 8px;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+.axv-set-group > button.axv-set-label:hover {
+  background: var(--axv-hover);
+}
+.axv-set-group:not(.open) > button.axv-set-label {
+  margin-bottom: 0;
+}
+.axv-set-caret {
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: transform 0.16s ease;
+}
+.axv-set-group.open .axv-set-caret {
+  transform: rotate(90deg);
 }
 .axv-set-seg {
   display: flex;

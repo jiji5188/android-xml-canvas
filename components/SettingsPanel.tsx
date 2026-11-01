@@ -3,6 +3,7 @@
 // 纯展示 + 回调：所有状态仍由 XmlEditor 持有，这里只负责画。
 // 好处：设置项以后加一堆开关也不会再把主文件撑行数。
 
+import { useState } from "react";
 import { THEME_PRESETS, themeTokens, type ThemeMode } from "@/lib/xml/theme-presets";
 import { RENDER_THEMES, type RenderTheme } from "@/lib/xml/theme";
 import { LANG_OPTIONS, type LangPref } from "@/lib/i18n";
@@ -58,11 +59,32 @@ export interface SettingsPanelProps {
 
 export function SettingsPanel(p: SettingsPanelProps) {
   const { tr } = p;
+  // M50：每个分组可折叠，默认全部折叠（设置项现在太多了，一屏扫不完）
+  const [openGroups, setOpenGroups] = useState<Set<number>>(() => new Set());
+  const isOpen = (i: number) => openGroups.has(i);
+  const toggle = (i: number) =>
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  const groupCls = (i: number) => "axv-set-group" + (isOpen(i) ? " open" : "");
   return (
     <div className="axv-rail-scroll">
       {/* ===== 外观：预设配色方案 ===== */}
-      <div className="axv-set-group">
-        <div className="axv-set-label">{tr("set.theme", "配色方案")}</div>
+      <div className={groupCls(0)}>
+        <button
+          type="button"
+          className="axv-set-label"
+          aria-expanded={isOpen(0)}
+          onClick={() => toggle(0)}
+        >
+          <span className="msr axv-set-caret" aria-hidden="true">
+            chevron_right
+          </span>
+          {tr("set.theme", "配色方案")}
+        </button>
         <div className="axv-theme-grid">
           {THEME_PRESETS.map((preset) => {
             const t = themeTokens(preset.id, p.theme);
@@ -114,8 +136,18 @@ export function SettingsPanel(p: SettingsPanelProps) {
       </div>
 
       {/* ===== M23：界面语言 ===== */}
-      <div className="axv-set-group">
-        <div className="axv-set-label">{tr("set.lang", "界面语言")}</div>
+      <div className={groupCls(1)}>
+        <button
+          type="button"
+          className="axv-set-label"
+          aria-expanded={isOpen(1)}
+          onClick={() => toggle(1)}
+        >
+          <span className="msr axv-set-caret" aria-hidden="true">
+            chevron_right
+          </span>
+          {tr("set.lang", "界面语言")}
+        </button>
         <select
           className="axv-tb-select axv-lang-select"
           value={p.langPref}
@@ -134,8 +166,18 @@ export function SettingsPanel(p: SettingsPanelProps) {
       </div>
 
       {/* ===== 工作目录 ===== */}
-      <div className="axv-set-group">
-        <div className="axv-set-label">{tr("set.workspace", "工作目录")}</div>
+      <div className={groupCls(2)}>
+        <button
+          type="button"
+          className="axv-set-label"
+          aria-expanded={isOpen(2)}
+          onClick={() => toggle(2)}
+        >
+          <span className="msr axv-set-caret" aria-hidden="true">
+            chevron_right
+          </span>
+          {tr("set.workspace", "工作目录")}
+        </button>
         <div className="axv-set-kv">
           <span>当前</span>
           <b title={p.wsState?.label || ""}>
@@ -182,8 +224,18 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </div>
       </div>
 
-      <div className="axv-set-group">
-        <div className="axv-set-label">{tr("set.device", "渲染设备")}</div>
+      <div className={groupCls(3)}>
+        <button
+          type="button"
+          className="axv-set-label"
+          aria-expanded={isOpen(3)}
+          onClick={() => toggle(3)}
+        >
+          <span className="msr axv-set-caret" aria-hidden="true">
+            chevron_right
+          </span>
+          {tr("set.device", "渲染设备")}
+        </button>
         <div className="axv-set-seg">
           {RENDER_THEMES.map((t) => (
             <button
@@ -198,8 +250,18 @@ export function SettingsPanel(p: SettingsPanelProps) {
         <div className="axv-set-hint">{RENDER_THEMES.find((t) => t.id === p.renderTheme)?.hint}</div>
       </div>
 
-      <div className="axv-set-group">
-        <div className="axv-set-label">{tr("set.preview", "预览")}</div>
+      <div className={groupCls(4)}>
+        <button
+          type="button"
+          className="axv-set-label"
+          aria-expanded={isOpen(4)}
+          onClick={() => toggle(4)}
+        >
+          <span className="msr axv-set-caret" aria-hidden="true">
+            chevron_right
+          </span>
+          {tr("set.preview", "预览")}
+        </button>
         <label className="axv-set-row">
           <span>显示系统状态栏 / 导航栏</span>
           <input
@@ -218,8 +280,18 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </label>
       </div>
 
-      <div className="axv-set-group">
-        <div className="axv-set-label">{tr("set.editor", "代码编辑器")}</div>
+      <div className={groupCls(5)}>
+        <button
+          type="button"
+          className="axv-set-label"
+          aria-expanded={isOpen(5)}
+          onClick={() => toggle(5)}
+        >
+          <span className="msr axv-set-caret" aria-hidden="true">
+            chevron_right
+          </span>
+          {tr("set.editor", "代码编辑器")}
+        </button>
 
         <div className="axv-set-kv">
           <span>高亮风格</span>
@@ -331,8 +403,18 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </div>
       </div>
 
-      <div className="axv-set-group">
-        <div className="axv-set-label">{tr("set.data", "数据")}</div>
+      <div className={groupCls(6)}>
+        <button
+          type="button"
+          className="axv-set-label"
+          aria-expanded={isOpen(6)}
+          onClick={() => toggle(6)}
+        >
+          <span className="msr axv-set-caret" aria-hidden="true">
+            chevron_right
+          </span>
+          {tr("set.data", "数据")}
+        </button>
         <div className="axv-set-hint">
           布局、资源与生成的图标都自动存在本机浏览器（localStorage），关页面不丢。
         </div>

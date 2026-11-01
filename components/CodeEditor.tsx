@@ -15,6 +15,7 @@ import { Compartment, EditorState, Prec, StateEffect, StateField } from "@codemi
 import {
   Decoration,
   EditorView,
+  ViewPlugin,
   drawSelection,
   dropCursor,
   highlightActiveLine,
@@ -25,6 +26,7 @@ import {
   rectangularSelection,
   crosshairCursor,
   type DecorationSet,
+  type ViewUpdate,
 } from "@codemirror/view";
 import {
   defaultKeymap,
@@ -146,7 +148,10 @@ const cmTheme = EditorView.theme({
     textAlign: "right",
   },
   ".cm-activeLine": {
-    backgroundColor: "var(--axv-code-cur-bg, rgba(11, 95, 165, 0.08))",
+    // M50：背景改由 cmCurLineBg（独立负层）画。
+    // 这里必须留透明：内容层背景会盖住选区层（z-index:-2），
+    // 用户看到的就是「选了文字但看不见选中颜色」。
+    backgroundColor: "transparent",
   },
   ".cm-activeLineGutter": {
     backgroundColor: "var(--axv-code-cur-bg, rgba(11, 95, 165, 0.08))",
@@ -204,6 +209,52 @@ const cmHl = HighlightStyle.define([
 ]);
 
 const fontTheme = EditorView.theme({ "&": { fontSize: "var(--axv-code-font-size, 13px)" } });
+
+/* ===== M50：当前行背景独立成层 =====
+ * 用户要的三层叠放（自下而上）：当前行背景 > 选区背景 > 正文文字。
+ * CM6 的选区层是 z-index:-2，而 .cm-activeLine 的 background 属于**内容层**，
+ * 内容层永远压在负值层之上 → 行背景必定盖住选区。
+ * 解法：行背景不再用行元素的 background，改成 scroller 里的一个绝对定位 div
+ * （z-index:-4），文字留在内容层 → 三层自然成立，不需要牺牲文字可读性。
+ */
+const cmCurLineBg = ViewPlugin.fromClass(
+  class {
+    dom: HTMLElement;
+    view: EditorView;
+    key = {};
+    constructor(view: EditorView) {
+      this.view = view;
+      this.dom = document.createElement("div");
+      this.dom.className = "cm-curline-hl";
+      this.dom.setAttribute("aria-hidden", "true");
+      view.scrollDOM.insertBefore(this.dom, view.scrollDOM.firstChild);
+      this.sync();
+    }
+    update(u: ViewUpdate) {
+      if (u.selectionSet || u.docChanged || u.viewportChanged || u.geometryChanged) this.sync();
+    }
+    /** 用 requestMeasure：行块坐标是异步测量的，直接读会拿到旧值（滚动/换行时跳位） */
+    sync() {
+      this.view.requestMeasure({
+        key: this.key,
+        read: (v) => {
+          const b = v.lineBlockAt(v.state.selection.main.head);
+          // 行块坐标是相对内容盒的，但 .cm-content 自己有 padding-top（本项目 12px），
+          // 我们的层挂在 scroller 上 → 必须补上这段，否则整块背景会往上偏一行。
+          const padTop = parseFloat(getComputedStyle(v.contentDOM).paddingTop) || 0;
+          return { top: b.top + padTop, height: b.height };
+        },
+        write: (m) => {
+          this.dom.style.transform = `translateY(${m.top}px)`;
+          this.dom.style.height = `${m.height}px`;
+        },
+      });
+    }
+    destroy() {
+      this.dom.remove();
+    }
+  },
+);
 
 function langExt(l: EditorLang) {
   return l === "java" ? java() : xml();
@@ -379,6 +430,7 @@ export function CodeEditor({
         rectangularSelection(),
         crosshairCursor(),
         highlightActiveLine(),
+        cmCurLineBg,
         indentOnInput(),
         bracketMatching(),
         indentComp.current.of([

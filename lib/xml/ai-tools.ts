@@ -7,7 +7,14 @@
 
 import { AI_MAX_WRITE_BYTES, checkAiPath, normalizeAiRel } from "./ai-paths";
 
-export type AiToolName = "list_files" | "read_file" | "write_file" | "search_files";
+export type AiToolName = "list_files" | "read_file" | "write_file" | "apply_patch" | "search_files";
+
+export interface AiPatchEdit {
+  /** 要被替换的原片段（必须在文件里唯一出现） */
+  old: string;
+  /** 替换成什么 */
+  new: string;
+}
 
 export interface AiToolCall {
   tool: AiToolName;
@@ -17,6 +24,8 @@ export interface AiToolCall {
   dir?: string;
   /** 要写入的正文 */
   content?: string;
+  /** apply_patch 的局部替换列表 */
+  edits?: AiPatchEdit[];
   /** 搜索关键词 */
   query?: string;
 }
@@ -30,6 +39,8 @@ export interface AiFileEntry {
 export interface AiFileIo {
   /** 根目录人话名，用于提示模型路径怎么写 */
   rootLabel(): string;
+  /** 能力标记：能不能写（UI 角标 + prompt 里是否提 write/patch） */
+  canWrite?: boolean;
   list(rel: string): Promise<{ ok: boolean; items?: AiFileEntry[]; error?: string }>;
   read(rel: string): Promise<{ ok: boolean; text?: string; error?: string }>;
   write(rel: string, text: string): Promise<{ ok: boolean; error?: string }>;
@@ -44,7 +55,8 @@ export const AI_TOOL_PROMPT = [
   "可用工具：",
   '- list_files {dir}：列目录（dir 省略=项目根）',
   '- read_file {path}：读文本文件（路径相对项目根）',
-  '- write_file {path,content}：写文件（整文件覆盖，写前先用 read_file 看清内容）',
+  '- apply_patch {path, edits:[{old,new}]}：局部替换——改已有文件只用这个；old 必须唯一，不唯一就先 read_file 取更长上下文',
+  '- write_file {path, content}：**只能新建文件**；文件已存在会被拒，请改走 apply_patch',
   '- search_files {query,dir}：按文件名/内容关键词搜索',
   "规则：一次回复最多 2 个工具调用；工具结果会以「工具结果」消息回给你，拿到后再回答用户；不要凭空猜文件内容。",
   "限制：路径相对项目根、不能跳出项目；构建类文件（build.gradle、settings.gradle、AndroidManifest.xml、build/、.git/ 等）默认只读，写它们会被拒且不落盘；只能写文本源码/资源。",
@@ -65,12 +77,21 @@ export function extractToolCalls(reply: string): AiToolCall[] {
       const j = JSON.parse(raw) as Partial<AiToolCall>;
       if (!j || typeof j.tool !== "string") continue;
       const tool = j.tool as AiToolName;
-      if (!["list_files", "read_file", "write_file", "search_files"].includes(tool)) continue;
+      if (!["list_files", "read_file", "write_file", "apply_patch", "search_files"].includes(tool)) continue;
+      const edits = Array.isArray((j as { edits?: unknown }).edits)
+        ? ((j as { edits: unknown[] }).edits
+            .filter((e): e is { old: string; new: string } => {
+              const o = e as { old?: unknown; new?: unknown } | null;
+              return !!o && typeof o.old === "string" && typeof o.new === "string";
+            })
+            .map((e) => ({ old: e.old, new: e.new })))
+        : undefined;
       out.push({
         tool,
         path: typeof j.path === "string" ? j.path : undefined,
         dir: typeof j.dir === "string" ? j.dir : undefined,
         content: typeof j.content === "string" ? j.content : undefined,
+        edits: edits && edits.length ? edits : undefined,
         query: typeof j.query === "string" ? j.query : undefined,
       });
       if (out.length >= 2) break;
@@ -121,6 +142,11 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
     const rel = checkAiPath(call.path, { mode: "write" });
     if (!rel.ok) return `错误：${rel.error}`;
     if (typeof call.content !== "string") return "错误：缺 content 字段";
+    // M64d（B6）：write_file 只用于新建，已存在的文件必须走 apply_patch
+    const exists = await io.read(rel.rel);
+    if (exists.ok) {
+      return `错误：${rel.rel} 已存在，write_file 会整份覆盖、可能丢内容。要改已有文件请用 apply_patch {path, edits:[{old,new}]}。`;
+    }
     const bytes = new TextEncoder().encode(call.content).length;
     if (bytes > AI_MAX_WRITE_BYTES) {
       return `错误：内容太大（${Math.round(bytes / 1024)}KB），单次写入上限 ${Math.round(AI_MAX_WRITE_BYTES / 1024)}KB`;
@@ -128,6 +154,36 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
     const r = await io.write(rel.rel, call.content);
     if (!r.ok) return `错误：${r.error || "写入失败"}`;
     return `已写入 ${rel.rel}（${call.content.length} 字符）`;
+  }
+
+  if (call.tool === "apply_patch") {
+    const rel = checkAiPath(call.path, { mode: "write" });
+    if (!rel.ok) return `错误：${rel.error}`;
+    if (!rel.rel) return "错误：apply_patch 需要指定文件路径";
+    const edits = call.edits || [];
+    if (!edits.length) return "错误：edits 为空，给 [{old,new}] 数组（old 必须在文件里唯一出现）";
+    if (edits.length > 20) return "错误：单次最多 20 处修改，分批来";
+    const cur = await io.read(rel.rel);
+    if (!cur.ok) return `错误：读不到 ${rel.rel}（不存在？新建请用 write_file）：${cur.error || ""}`;
+    let text = cur.text ?? "";
+    for (let i = 0; i < edits.length; i++) {
+      const { old, new: neu } = edits[i];
+      if (!old) return `错误：第 ${i + 1} 处 old 为空`;
+      const first = text.indexOf(old);
+      if (first < 0) return `错误：第 ${i + 1} 处没找到要替换的片段——先用 read_file 看清原文（含缩进/换行），old 要逐字对齐`;
+      const second = text.indexOf(old, first + old.length);
+      if (second >= 0) {
+        return `错误：第 ${i + 1} 处 old 匹配到多处（不唯一），请带上更多上下文（整行或前后几行）再试`;
+      }
+      text = text.slice(0, first) + neu + text.slice(first + old.length);
+    }
+    const bytes = new TextEncoder().encode(text).length;
+    if (bytes > AI_MAX_WRITE_BYTES) {
+      return `错误：修改后文件太大（${Math.round(bytes / 1024)}KB），超过 ${Math.round(AI_MAX_WRITE_BYTES / 1024)}KB 上限`;
+    }
+    const w = await io.write(rel.rel, text);
+    if (!w.ok) return `错误：${w.error || "写入失败"}`;
+    return `已修改 ${rel.rel}（${edits.length} 处）`;
   }
 
   // search_files
@@ -182,6 +238,7 @@ export function createNativeIo(projectRootRel?: string): AiFileIo | null {
 
   return {
     rootLabel: () => rootPath,
+    canWrite: typeof b.writeText === "function",
     async list(rel) {
       const json = b.listDir?.(abs(rel));
       if (!json) return { ok: false, error: "listDir 不可用（APK 版本过旧）" };

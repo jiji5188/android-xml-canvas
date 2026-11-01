@@ -8,7 +8,8 @@
 //   1) 当前项目已有 ProjectSource  → 直接用它的 listChildren / readText（web 和 APK 都通）
 //   2) 只有绝对根路径（rootPath / dirPath）→ 走 native bridge
 //   3) 都没有 → 返回 null，AiPanel 会把工具段整段从 prompt 里去掉
-// 写入：只有拿到绝对根路径时才能写（浏览器 FSA 的写能力留给 B1/B3）。
+// 写入：native 有绝对根路径就能写；web 有项目根 DirHandle 也能写（M64d/B1），
+// 都没有则 canWrite=false，AiPanel 只给「读」能力。
 
 import type { AiFileEntry, AiFileIo } from "./ai-tools";
 import type { ProjectSource } from "./project-browse";
@@ -33,11 +34,16 @@ function absOf(root: string, rel: string): string {
 }
 
 /** 包一层 ProjectSource：读/列都用项目自己的实现（自定义目录、SAF、浏览器目录都能走） */
-export function ioFromProjectSource(source: ProjectSource | null | undefined): AiFileIo | null {
+export function ioFromProjectSource(
+  source: ProjectSource | null | undefined,
+  webRoot?: unknown,
+): AiFileIo | null {
   if (!source) return null;
   const root = trimRoot(source.rootPath || "");
+  const writable = !!root || !!webRoot;
   return {
     rootLabel: () => root || source.name || ".",
+    canWrite: writable,
     async list(rel) {
       try {
         const entries = await source.listChildren(rel);
@@ -57,8 +63,9 @@ export function ioFromProjectSource(source: ProjectSource | null | undefined): A
       }
     },
     async write(rel, text) {
-      if (!root) return { ok: false, error: "当前项目没有可写根路径（浏览器目录请用另存为）" };
-      return writeUnder(root, rel, text);
+      if (root) return writeUnder(root, rel, text);
+      if (webRoot) return writeViaHandle(webRoot, rel, text);
+      return { ok: false, error: "当前项目没有可写根路径（浏览器目录请重新授权并允许编辑）" };
     },
   };
 }
@@ -71,6 +78,7 @@ export function ioFromRootPath(rootPath: string | null | undefined, label?: stri
 
   return {
     rootLabel: () => label || root,
+    canWrite: true,
     async list(rel) {
       const dir = absOf(root, rel);
       if (!isUnder(root, dir)) return { ok: false, error: "路径非法：跳出了项目目录" };
@@ -112,10 +120,12 @@ export function ioForProject(p: {
   source?: ProjectSource | null;
   rootPath?: string | null;
   dirPath?: string | null;
+  /** web：项目根 DirHandle（FSA 写能力靠它） */
+  handle?: unknown;
   name?: string | null;
 } | null | undefined): AiFileIo | null {
   if (!p) return null;
-  const bySource = ioFromProjectSource(p.source);
+  const bySource = ioFromProjectSource(p.source, p.handle);
   if (bySource) return bySource;
   return ioFromRootPath(p.rootPath || p.dirPath || null, p.name || undefined);
 }
@@ -145,5 +155,44 @@ function writeUnder(root: string, rel: string, text: string): { ok: boolean; err
     return ok ? { ok: true } : { ok: false, error: "写入失败（没有权限或 APK 版本过旧）" };
   } catch (e) {
     return { ok: false, error: errText(e) };
+  }
+}
+
+/* ===== M64d（B1）：浏览器 File System Access 写能力 ===== */
+
+interface FsaFileHandle {
+  createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>;
+}
+interface FsaDirHandle {
+  getDirectoryHandle(name: string, opts?: { create?: boolean }): Promise<FsaDirHandle>;
+  getFileHandle(name: string, opts?: { create?: boolean }): Promise<FsaFileHandle>;
+}
+
+/** FSA 写入：逐层取目录（不存在就建）→ 取文件（不存在就建）→ 写 → 关 */
+async function writeViaHandle(rootHandle: unknown, rel: string, text: string): Promise<{ ok: boolean; error?: string }> {
+  const root = rootHandle as FsaDirHandle | null;
+  if (!root || typeof root.getFileHandle !== "function") {
+    return { ok: false, error: "当前项目的目录句柄不可写" };
+  }
+  const parts = rel.split("/").filter(Boolean);
+  if (!parts.length) return { ok: false, error: "路径非法：写入必须指定文件" };
+  const name = parts.pop() as string;
+  try {
+    let dir = root;
+    for (const seg of parts) dir = await dir.getDirectoryHandle(seg, { create: true });
+    const fh = await dir.getFileHandle(name, { create: true });
+    const w = await fh.createWritable();
+    await w.write(text);
+    await w.close();
+    return { ok: true };
+  } catch (e) {
+    const msg = errText(e);
+    if (/NotAllowed|denied|permission/i.test(msg)) {
+      return { ok: false, error: "浏览器没给写权限：重新用「打开项目目录」并允许编辑" };
+    }
+    if (/NoModificationAllowed|read-?only/i.test(msg)) {
+      return { ok: false, error: "这个文件是只读的（系统或其它程序占用）" };
+    }
+    return { ok: false, error: msg };
   }
 }

@@ -131,7 +131,12 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       const io = fileIo !== undefined ? fileIo : createNativeIo(projectName || undefined);
       const sys = [
         buildAiSystemPrompt(doc),
-        io ? `${AI_TOOL_PROMPT}\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` : "",
+        io
+          ? `${AI_TOOL_PROMPT}\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` +
+            (io.canWrite === false
+              ? "\n注意：当前项目没拿到写权限，只能 list_files / read_file / search_files，不要尝试写。"
+              : "")
+          : "",
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -321,6 +326,18 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           >
             {useNative ? "原生直连" : "浏览器"}
           </span>
+          {fileIo ? (
+            <span
+              className="axv-ai-badge axv-ai-cap"
+              title={
+                (fileIo.canWrite
+                  ? "AI 可以读也可以改这个项目的文件"
+                  : "AI 只能读这个项目的文件（没拿到写权限）") + "\n根：" + fileIo.rootLabel()
+              }
+            >
+              {fileIo.canWrite ? "读写" : "只读"}
+            </span>
+          ) : null}
           <span className={"msr axv-ai-caret" + (cfgOpen ? " on" : "")} aria-hidden="true">
             expand_more
           </span>

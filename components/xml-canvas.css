@@ -5657,6 +5657,12 @@ button.axv-ws-caret:hover {
   background: var(--axv-surface-sunken);
   white-space: nowrap;
 }
+
+/* M64d（B1）：AI 文件能力角标（读写 / 只读） */
+.axv-ai-cap {
+  border-color: color-mix(in srgb, var(--axv-primary) 45%, transparent);
+  color: var(--axv-primary);
+}
 .axv-ai-code {
   border: 1px solid var(--axv-outline);
   border-radius: 10px;

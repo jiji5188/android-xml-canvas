@@ -3,7 +3,7 @@
 > 用法：这是唯一的待办台账。每解决一项，把它标成 ✅ 并写上 commit；不做完一项不往下开。
 > 配套方案见 `AI助手提示词与文件能力适配方案.md`（设计思路），本文件是**可打勾的清单**。
 > 量级：S ≈ 半天内，M ≈ 1 天，L ≈ 2 天以上。
-> 进度：**A1 ✅ M64a**、**B2 ✅ + D3 ✅ M64b**、**B4 ✅ + C5 ✅ M64c**。
+> 进度：**A1 ✅ M64a**、**B2 ✅ + D3 ✅ M64b**、**B4 ✅ + C5 ✅ M64c**、**B1 ✅ + B6 ✅ M64d**。
 
 ---
 
@@ -25,12 +25,12 @@
 
 | 编号 | 问题（现状） | 改法 | 验收 | 量级 |
 |---|---|---|---|---|
-| **B1** | **浏览器版完全没有 AI 文件能力**：`createNativeIo` 只认 `window.AxvNative`，网页里返回 null；但 prompt 里照样教模型用工具 → 模型试了没反应，开始瞎猜 | 新建 `AiFs` 抽象（web FSA / native bridge 两实现），后端按 `source` → `nativeIo` → 不可用 选路；不可用时 prompt **不出现**工具段 | Chrome 里能 list/read/grep 真项目；面板角标显示当前能力 | L |
+| **B1** ✅ | ~~**浏览器版完全没有 AI 文件能力**~~ **已修（M64d）**：`lib/xml/ai-fs.ts` 已有 web/native 两套实现，本轮补上 web 写：有项目根 `DirHandle` 时 `getDirectoryHandle(create)` + `getFileHandle(create)` + `createWritable`；AiPanel 头部新增能力角标（读写 / 只读）；`canWrite=false` 时 prompt 明说“只能读”（不再教模型写）。 | 新建 `AiFs` 抽象（web FSA / native bridge 两实现），后端按 `source` → `nativeIo` → 不可用 选路；不可用时 prompt **不出现**工具段 | Chrome 里能 list/read/grep 真项目；面板角标显示当前能力 | L |
 | **B2** ✅ | ~~**APK 根路径拼错**~~ **已修（M64b）**：新增 `lib/xml/ai-fs.ts`（`ioFromProjectSource` / `ioFromRootPath` / `ioForProject`），AiPanel 改接 `fileIo`，XmlEditor 传 `ioForProject(activeProject)`；再也不用「默认工作目录 + 项目名」拼路径。 | 不拼名字：直接用 `ProjectSource` / `FileOpsCtx` 的根（`XmlEditor` 里已有 `activeProject.source` 和 `fileOpsCtxOf(activeProject)`） | 自定义目录项目里 AI 能读到自己的 layout | S |
 | **B3** | **写文件没有闸门**：整文件覆盖、不备份、不进撤销栈、写后不刷新编辑器（画布还是旧的，用户再保存把 AI 改动覆盖回去） | staging → diff 卡片（应用/放弃）→ 落盘前备份 → 写后 `invalidateNativeProjectCache()` + 刷新当前文档 + 进撤销栈 | 改打开中的 layout：卡片出 diff → 应用后画布立刻变、Ctrl+Z 可退 | L |
 | **B4** ✅ | ~~路径校验太弱~~ **已修（M64c）**：新增 `lib/xml/ai-paths.ts` —— `normalizeAiRel`（去 ./ 、折叠 // 、收敷 a/../b）、`checkAiPath`（越界/保护区/扩展名闸门）、`isUnder`（拼完绝对路径再验前缀）；runTool 与 ai-fs 全部改走它。 | 规范化后前缀校验：`normalize(join(root, rel)).startsWith(root + sep)`；再叠扩展名白名单、保护区、大小上限 | 构造 10 条越界路径，全部被拒且报人话错误 | S |
 | **B5** | `search_files` 无预算：depth 6、每个文本文件整份 `readText` 再 `includes`，手机上直接卡死；且走**同步** JNI | 访次 600 / 命中 40 / 只搜白名单扩展名 / 内容匹配只读前 4KB；全部走 `native-async` 并串行 | 搜一个 3000 文件的项目 < 2s，UI 不卡 | M |
-| **B6** | 只能整份覆盖，没有 patch → 大文件必然截断丢内容 | 新增 `apply_patch({path, edits:[{old,new}]})`，`old` 必须唯一匹配，否则报错让模型重写；`write_file` 仅限新建 | 1000 行文件改 3 处，diff 干净，token 不爆 | M |
+| **B6** ✅ | ~~只能整份覆盖~~ **已修（M64d）**：`apply_patch({path, edits:[{old,new}]})` —— `old` 必须唯一命中（不唯一/找不到都报错不猜），最多 20 处，改完写回并报【n 处】；`write_file` 只允许新建，文件已存在直接拒绝并指向 apply_patch；prompt 同步改。 | 新增 `apply_patch({path, edits:[{old,new}]})`，`old` 必须唯一匹配，否则报错让模型重写；`write_file` 仅限新建 | 1000 行文件改 3 处，diff 干净，token 不爆 | M |
 
 ---
 

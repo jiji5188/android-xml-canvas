@@ -142,12 +142,20 @@ describe("runTool", () => {
     expect(await runTool({ tool: "read_file", path: "../secret" }, io)).toContain("路径非法");
   });
 
-  it("write_file 真写进去", async () => {
+  it("write_file 真写进去（新文件）", async () => {
+    const files: Record<string, string> = { "a.xml": "old" };
+    const io = fakeIo(files);
+    const out = await runTool({ tool: "write_file", path: "b.xml", content: "new" }, io);
+    expect(out).toContain("已写入");
+    expect(files["b.xml"]).toBe("new");
+  });
+
+  it("write_file 对已存在文件拒绝（M64d 改走 apply_patch）", async () => {
     const files: Record<string, string> = { "a.xml": "old" };
     const io = fakeIo(files);
     const out = await runTool({ tool: "write_file", path: "a.xml", content: "new" }, io);
-    expect(out).toContain("已写入");
-    expect(files["a.xml"]).toBe("new");
+    expect(out).toContain("已存在");
+    expect(files["a.xml"]).toBe("old");
   });
 
   it("write_file 缺 content 报错", async () => {

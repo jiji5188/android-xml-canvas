@@ -6,6 +6,8 @@
 // 5 家厂商行为一致，出错也容易降级成人话。
 
 import { AI_MAX_WRITE_BYTES, checkAiPath, normalizeAiRel } from "./ai-paths";
+import { formatSearchResult, searchProject } from "./ai-search";
+import { hasAsyncIo, listDirQueued, readTextQueued } from "./native-async";
 
 export type AiToolName = "list_files" | "read_file" | "write_file" | "apply_patch" | "search_files";
 
@@ -192,33 +194,13 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
       : `已修改 ${rel.rel}（${edits.length} 处）`;
   }
 
-  // search_files
+  // search_files（M64f/B5：预算 + 跳过产物目录 + 只匹配前 4KB + 每 25 次让出主线程）
   const dir = checkAiPath(call.dir ?? "", { mode: "read" });
   if (!dir.ok) return `错误：${dir.error}`;
-  const q = (call.query || "").toLowerCase().trim();
+  const q = (call.query || "").trim();
   if (!q) return "错误：缺 query";
-
-  const hits: string[] = [];
-  const walk = async (rel: string, depth: number): Promise<void> => {
-    if (depth > 6 || hits.length >= 30) return;
-    const r = await io.list(rel);
-    if (!r.ok) return;
-    for (const it of r.items || []) {
-      if (hits.length >= 30) return;
-      if (it.kind === "dir") {
-        if (it.name.toLowerCase().includes(q)) hits.push(`[目录] ${it.rel}`);
-        await walk(it.rel, depth + 1);
-      } else if (it.name.toLowerCase().includes(q)) {
-        hits.push(`[文件名] ${it.rel}`);
-      } else if (/\.(xml|json|java|kt|gradle|properties|txt|md)$/i.test(it.name)) {
-        const rr = await io.read(it.rel);
-        if (rr.ok && (rr.text || "").toLowerCase().includes(q)) hits.push(`[内容] ${it.rel}`);
-      }
-    }
-  };
-  await walk(dir.rel, 0);
-  if (!hits.length) return `没找到包含「${call.query}」的文件`;
-  return `找到 ${hits.length} 项：\n${hits.join("\n")}`;
+  const res = await searchProject(io, q, { startDir: dir.rel });
+  return formatSearchResult(res, q);
 }
 
 /* ================= 原生实现（APK） ================= */
@@ -246,7 +228,7 @@ export function createNativeIo(projectRootRel?: string): AiFileIo | null {
     rootLabel: () => rootPath,
     canWrite: typeof b.writeText === "function",
     async list(rel) {
-      const json = b.listDir?.(abs(rel));
+      const json = hasAsyncIo() ? await listDirQueued(abs(rel)) : b.listDir?.(abs(rel));
       if (!json) return { ok: false, error: "listDir 不可用（APK 版本过旧）" };
       try {
         const o = JSON.parse(json) as { ok?: boolean; items?: { name: string; kind: string; path: string }[] };
@@ -262,7 +244,7 @@ export function createNativeIo(projectRootRel?: string): AiFileIo | null {
       }
     },
     async read(rel) {
-      const t = b.readText?.(abs(rel));
+      const t = hasAsyncIo() ? await readTextQueued(abs(rel)) : b.readText?.(abs(rel));
       if (t === null || t === undefined) return { ok: false, error: "读不到（不存在或没有权限）" };
       return { ok: true, text: t };
     },

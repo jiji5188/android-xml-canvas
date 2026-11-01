@@ -5664,6 +5664,12 @@ button.axv-ws-caret:hover {
   color: var(--axv-primary);
 }
 
+/* M64i（A6）：项目事实已加载角标 */
+.axv-ai-facts {
+  opacity: 0.75;
+  font-size: 10.5px;
+}
+
 /* ===== M64e（B3）：AI 改动待确认卡片 ===== */
 .axv-ai-diffcard {
   margin: 6px 8px 0;

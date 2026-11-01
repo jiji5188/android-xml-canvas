@@ -23,6 +23,7 @@ import { compactHunks, diffLines, diffSummary } from "@/lib/xml/ai-diff";
 import { aiDocContextOf, buildAiSystemPrompt, docPreamble, quickActionsFor } from "@/lib/xml/ai-doc-context";
 import { aiAllowProtectedGet, aiAllowProtectedSet } from "@/lib/xml/ai-paths";
 import { batchLabel, makeBatch, pushBatch, restoreBatch, type AiHistoryBatch } from "@/lib/xml/ai-history";
+import { collectProjectFacts, formatProjectFacts, type ProjectFacts } from "@/lib/xml/ai-facts";
 
 /** 工具循环最多几轮（防模型无限读文件） */
 const MAX_TOOL_ROUNDS = 3;
@@ -93,6 +94,22 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   const [history, setHistory] = useState<AiHistoryBatch[]>([]);
   const [rollingBack, setRollingBack] = useState<string | null>(null);
   const stageHost = useRef<{ base: AiFileIo; host: ReturnType<typeof createStagingIo> } | null>(null);
+  /** M64i（A6）：项目事实缓存（按根目录 + 当前文件所在 res 缓存，避免每轮重扫） */
+  const factsCache = useRef<{ key: string; facts: ProjectFacts } | null>(null);
+  const [factsInfo, setFactsInfo] = useState<ProjectFacts | null>(null);
+
+  const factsFor = useCallback(async (io: AiFileIo | null, rel?: string | null) => {
+    if (!io) return null;
+    const key = `${io.rootLabel()}|${rel || ""}`;
+    if (factsCache.current?.key === key) {
+      setFactsInfo(factsCache.current.facts);
+      return factsCache.current.facts;
+    }
+    const facts = await collectProjectFacts(io, rel);
+    factsCache.current = { key, facts };
+    setFactsInfo(facts);
+    return facts;
+  }, []);
 
   const stageFor = useCallback((base: AiFileIo) => {
     if (!stageHost.current || stageHost.current.base !== base) {
@@ -151,8 +168,11 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       const io = fileIo !== undefined ? fileIo : createNativeIo(projectName || undefined);
       // M64e（B3）：有写能力的通道包一层暂存，写不直接落盘
       const stage = io ? stageFor(io).host : null;
+      // M64i（A6）：先把「项目里真实有什么」扫出来（同一个项目缓存一份，不每轮重扫）
+      const facts = await factsFor(io, docRel);
       const sys = [
         buildAiSystemPrompt(doc, { intent: wantFullFile ? "xml" : "auto", canWrite: io ? io.canWrite !== false : false }),
+        facts ? formatProjectFacts(facts) : "",
         io
           ? `${AI_TOOL_PROMPT}\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` +
             (io.canWrite === false
@@ -298,7 +318,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
         setBusy(false);
       }
     },
-    [busy, cfg, chat, ctxResources, ctxSelection, doc, docRel, fileIo, projectName, withXml, xml],
+    [busy, cfg, chat, ctxResources, ctxSelection, doc, docRel, factsFor, fileIo, projectName, withXml, xml],
   );
 
   const stop = () => {
@@ -459,6 +479,18 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               }
             >
               {fileIo.canWrite ? "读写" : "只读"}
+            </span>
+          ) : null}
+          {factsInfo ? (
+            <span
+              className="axv-ai-badge axv-ai-facts"
+              title={
+                `已扫描项目事实：drawable ${factsInfo.drawables.length} / color ${factsInfo.colors.length} / string ${factsInfo.strings.length}` +
+                (factsInfo.truncated ? "（达扫描上限，可能不全）" : "") +
+                (factsInfo.lib !== "unknown" ? `\n依赖库：${factsInfo.lib}` : "")
+              }
+            >
+              事实 {factsInfo.drawables.length + factsInfo.colors.length + factsInfo.strings.length}
             </span>
           ) : null}
           <span className={"msr axv-ai-caret" + (cfgOpen ? " on" : "")} aria-hidden="true">

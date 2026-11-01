@@ -50,11 +50,14 @@ async function flush(times = 5): Promise<void> {
 }
 
 let readCalls = 0;
+// M64i：AiPanel 发请求前会扫项目事实（list res / 读 build.gradle），
+// 这里只统计「读 a.xml」这一次，其它路径当不存在
 const io: AiFileIo = {
   rootLabel: () => "/proj",
   canWrite: true,
   list: async () => ({ ok: true, items: [] }),
-  read: async () => {
+  read: async (rel) => {
+    if (rel !== "a.xml") return { ok: false, error: "不存在" };
     readCalls++;
     return { ok: true, text: "<LinearLayout/>" };
   },

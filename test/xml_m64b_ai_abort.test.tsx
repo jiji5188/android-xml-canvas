@@ -87,15 +87,14 @@ afterEach(() => {
 describe("M64b D3：停止要停住整个工具循环", () => {
   it("工具执行中点停止 → 不再请求下一轮，气泡标已停止", async () => {
     let releaseRead: ((v: { ok: boolean; text?: string }) => void) | null = null;
-    let listCalls = 0;
     let readCalls = 0;
+    // M64i 后 AiPanel 会先扫一遍项目事实（list res / 读 build.gradle），
+    // 所以只对「读布局文件」这一动作计数；其它路径立即返回失败（当不存在）
     const io: AiFileIo = {
       rootLabel: () => "/proj",
-      list: async () => {
-        listCalls++;
-        return { ok: true, items: [] };
-      },
-      read: () => {
+      list: async () => ({ ok: true, items: [] }),
+      read: (rel) => {
+        if (rel !== "a.xml") return Promise.resolve({ ok: false, error: "不存在" });
         readCalls++;
         return new Promise((res) => {
           releaseRead = res;
@@ -111,7 +110,8 @@ describe("M64b D3：停止要停住整个工具循环", () => {
     const sendBtn = btnByText(el, "发送");
     expect(sendBtn).not.toBeNull();
     sendBtn!.click();
-    await flush(3);
+    // M64i 后首轮要先扫项目事实（几乎全同步，但跨多个 microtask），多放几拍
+    await flush(20);
 
     // 模型第一轮回来了，正在执行 read_file（卡住）
     expect(streamCalls.length).toBe(1);
@@ -128,7 +128,6 @@ describe("M64b D3：停止要停住整个工具循环", () => {
 
     expect(streamCalls.length).toBe(1);
     expect(readCalls).toBe(1);
-    expect(listCalls).toBe(0);
     expect(el.querySelector(".axv-ai-list")!.textContent || "").toContain("已停止");
     // 停止后不应该再出现「正在生成…」
     expect(el.querySelector(".axv-ai-typing")).toBeNull();

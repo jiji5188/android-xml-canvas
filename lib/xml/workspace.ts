@@ -102,7 +102,7 @@ export async function wsListProjects(): Promise<WsProject[]> {
         kind: it.kind,
         rel: it.rel,
         layoutCount: it.layoutCount ?? 0,
-        target: it.docUri ?? it.mainPath,
+        target: it.docUri ?? it.mainPath ?? it.path,
         dirPath: it.kind === "dir" ? it.path : undefined,
       }));
     } catch {
@@ -146,7 +146,7 @@ export async function wsListTopProjects(): Promise<WsProject[]> {
             kind: it.kind,
             rel: it.rel,
             layoutCount: it.layoutCount ?? 0,
-            target: it.docUri ?? it.mainPath,
+            target: it.docUri ?? it.mainPath ?? it.path,
             dirPath: it.kind === "dir" ? it.path : undefined,
           }));
         }

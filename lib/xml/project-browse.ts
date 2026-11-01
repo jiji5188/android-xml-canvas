@@ -323,8 +323,9 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
     async readText(rel: string) {
       const hit = all.find((it) => it.rel === rel && it.kind === "file");
       // M45b：java/kt 文件不在扁平列表里时，用 rootDir 拼绝对路径直接读
+      // M55：老 APK 的 xml 条目 target 缺失（当时映射只取 docUri/mainPath）→ 任意扩展名都补一条 rootDir 回退
       let target = hit?.target;
-      if (!target && rootDir && /\.(java|kt|kts)$/i.test(rel)) {
+      if (!target && rootDir) {
         target = `${rootDir.replace(/\/+$/, "")}/${rel}`;
       }
       if (!target) return null;

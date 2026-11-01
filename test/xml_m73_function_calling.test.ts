@@ -3,8 +3,8 @@
 // 以前工具调用靠模型在正文里手写 {"tool":…,"args":{…}}，少个引号就得重问一轮。
 // 现在走 OpenAI tools 协议：请求带 tools，模型回结构化 tool_calls，执行后按 role:"tool" 回喂。
 import { describe, expect, it } from "vitest";
-import { DEFAULT_AI_CONFIG } from "@/lib/xml/ai";
-import { AI_TOOL_NAMES } from "@/lib/xml/ai-tools";
+import { DEFAULT_AI_CONFIG, loadAiConfig } from "@/lib/xml/ai";
+import { AI_TOOL_NAMES, AI_TOOL_PROMPT, AI_TOOL_PROMPT_NATIVE } from "@/lib/xml/ai-tools";
 import {
   AI_TOOL_SPECS,
   finishToolCalls,
@@ -82,6 +82,13 @@ describe("M73 流式累加", () => {
     mergeToolCalls('{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"file","arguments":"th\\":\\"a.xml\\"}"}}]}}]}', a);
     const calls = finishToolCalls(a);
     expect(calls).toEqual([{ id: "call_1", name: "read_file", arguments: '{"path":"a.xml"}' }]);
+  });
+
+  it("name 重复分片不会叠加成 read_fileread_file", () => {
+    const a = acc();
+    mergeToolCalls('{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"read_file"}}]}}]}', a);
+    mergeToolCalls('{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"read_file","arguments":"{}"}}]}}]}', a);
+    expect(finishToolCalls(a)[0]).toMatchObject({ name: "read_file", arguments: "{}" });
   });
 
   it("多个调用按 index 分开，顺序稳定", () => {
@@ -223,5 +230,22 @@ describe("M73 streamChat：只有 tool_calls 不算空回复", () => {
     });
     expect(res.ok).toBe(true);
     expect(res.toolCalls?.[0]).toMatchObject({ id: "c1", name: "list_files" });
+  });
+});
+
+describe("M73 提示词与配置", () => {
+  it("原生模式给的是 tools 说明，不再教模型写 axv-tool 块（两套不打架）", () => {
+    expect(AI_TOOL_PROMPT_NATIVE).toContain("tools");
+    expect(AI_TOOL_PROMPT_NATIVE).not.toContain("格式要求（不遵守");
+    expect(AI_TOOL_PROMPT).toContain("格式要求（不遵守");
+    expect(AI_TOOL_PROMPT).toContain("axv-tool");
+  });
+
+  it("nativeTools=false 能存下来；没存过按默认开", () => {
+    const off = loadAiConfig(JSON.stringify({ ...DEFAULT_AI_CONFIG, nativeTools: false }));
+    expect(off.nativeTools).toBe(false);
+    const on = loadAiConfig(JSON.stringify({ ...DEFAULT_AI_CONFIG }));
+    expect(on.nativeTools).toBeUndefined();
+    expect(supportsNativeTools(on)).toBe(true);
   });
 });

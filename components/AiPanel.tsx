@@ -17,8 +17,9 @@ import {
   type AiMessage,
 } from "@/lib/xml/ai";
 import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
-import { AI_TOOL_PROMPT, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
+import { AI_TOOL_PROMPT, AI_TOOL_PROMPT_NATIVE, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
 import { AI_TOOL_SPECS, looksLikeToolsRejected, supportsNativeTools, toAiToolCall, toHistoryToolCalls } from "@/lib/xml/ai-fc";
+import { refreshAiCaches } from "@/lib/xml/ai-tools";
 import { createStagingIo, flushStaged, type StagedChange } from "@/lib/xml/ai-staging";
 import { compactHunks, diffLines, diffSummary } from "@/lib/xml/ai-diff";
 import {
@@ -255,10 +256,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
         buildAiSystemPrompt(doc, { intent, canWrite: io ? io.canWrite !== false : false }),
         facts ? formatProjectFacts(facts) : "",
         io
-          ? `${AI_TOOL_PROMPT}` +
-            (useTools
-              ? "\n本会话已开启原生工具调用：需要工具时直接调用提供的 tools，不要在正文里手写 JSON 工具块。"
-              : "") +
+          ? `${useTools ? AI_TOOL_PROMPT_NATIVE : AI_TOOL_PROMPT}` +
             `\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` +
             (io.canWrite === false
               ? "\n注意：当前项目没拿到写权限，只能 list_files / read_file / search_files，不要尝试写。"
@@ -318,7 +316,12 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
 
           if (!res.ok) {
             // M73（D1）：这个服务端/中转不认 tools —— 静默关掉，本轮改用文本协议重来
-            if (useTools && looksLikeToolsRejected(res.error)) {
+            if (
+              useTools &&
+              (looksLikeToolsRejected(res.error) ||
+                // M74：有的中转只回「400 Bad Request」不提 tool —— 首轮 + 还没跑过工具时也降级重试一次
+                (round === 0 && /(^|\D)(400|422)(\D|$)/.test(res.error || "")))
+            ) {
               useTools = false;
               setChat((c) => c.filter((m) => !m.streaming));
               continue;
@@ -568,6 +571,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       if (okCount) {
         const hasBackup = r.results.some((x) => x.backup);
         onNote?.(`已落盘 ${okCount} 个文件${hasBackup ? "（原文件备份在 .axv_backup/）" : ""}`);
+        refreshAiCaches(fileIo);
         setHistory((list) =>
           pushBatch(
             list,
@@ -763,6 +767,18 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
                 }}
               />
               允许改构建/清单文件
+            </label>
+
+            <label
+              className="axv-ai-check"
+              title="默认开启：工具通过 tools 协议传递（模型直接返回结构化的 tool_calls）。只有服务端报 tools 不支持、或模型乱调工具时才关掉，关掉后改用正文 axv-tool 代码块。"
+            >
+              <input
+                type="checkbox"
+                checked={cfg.nativeTools !== false}
+                onChange={(e) => patch({ nativeTools: e.target.checked })}
+              />
+              原生工具调用（tools）
             </label>
 
             <button className="axv-set-btn" disabled={testing || !!cfgProblem} onClick={() => void testConn()}>

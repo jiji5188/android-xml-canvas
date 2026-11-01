@@ -36,7 +36,6 @@ const NAME_SET = new Set<string>([
 ]);
 
 const str = (desc: string) => ({ type: "string", description: desc });
-const bool = (desc: string) => ({ type: "boolean", description: desc });
 const int = (desc: string) => ({ type: "integer", description: desc });
 
 /** 给 OpenAI 兼容接口的 tools 定义（与 AI_TOOL_PROMPT 里那套参数一一对应） */
@@ -199,7 +198,12 @@ export function mergeToolCalls(raw: string, acc: Map<number, Acc>): boolean {
     if (typeof item.id === "string" && item.id) cur.id = item.id;
     const fn = item.function;
     if (fn) {
-      if (typeof fn.name === "string" && fn.name) cur.name = (cur.name ?? "") + fn.name;
+      if (typeof fn.name === "string" && fn.name) {
+        // M74：有的中转在每个分片都重发完整 name —— 直接拼会变成 read_fileread_file
+        const cur0 = cur.name ?? "";
+        if (!cur0) cur.name = fn.name;
+        else if (fn.name !== cur0) cur.name = fn.name.startsWith(cur0) ? fn.name : cur0 + fn.name;
+      }
       if (typeof fn.arguments === "string") cur.args += fn.arguments;
     }
     acc.set(i, cur);

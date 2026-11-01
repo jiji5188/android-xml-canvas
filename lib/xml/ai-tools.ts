@@ -101,6 +101,15 @@ export const AI_TOOL_PROMPT = [
 // 每次新建，避免 /g 正则的 lastIndex 状态串到下一次调用
 const toolBlockRe = () => /```axv-tool\s*\n([\s\S]*?)```/g;
 
+/** M73（D1）：原生 function calling 生效时的说明 —— 工具已在 tools 里，正文不要再写 JSON 块 */
+export const AI_TOOL_PROMPT_NATIVE = [
+  "你可以读写当前项目文件，工具已经通过 tools 提供（function calling）。",
+  "需要工具时直接调用，不要在正文里写 ```axv-tool 代码块、也不要贴 JSON 参数说明。",
+  "拿到工具结果后再回答我；不要凭空猜文件内容。",
+  "限制：路径相对项目根、不能跳出项目；构建类文件（build.gradle、settings.gradle、AndroidManifest.xml、build/、.git/ 等）默认只读；只能写文本源码/资源。",
+  "连续调用工具时，一步一步来（上一轮结果回来再决定下一步）。",
+].join("\n");
+
 /** 可用工具名（校验用） */
 export const AI_TOOL_NAMES: AiToolName[] = [
   "list_files",
@@ -256,7 +265,7 @@ const MAX_READ = 200 * 1024;
  * M72（C7）：写盘之后统一清缓存 —— 项目列表 / res 索引 / layout id。
  * 不清的话：AI 新建了 layout，项目面板还是旧的；改了 values，跳定义仍指向老行号。
  */
-async function afterWrite(io: AiFileIo): Promise<void> {
+export function refreshAiCaches(io?: AiFileIo | null): void {
   try {
     invalidateNativeProjectCache();
   } catch {
@@ -267,7 +276,11 @@ async function afterWrite(io: AiFileIo): Promise<void> {
   } catch {
     /* 同上 */
   }
-  clearIdCache(io);
+  if (io) clearIdCache(io);
+}
+
+async function afterWrite(io: AiFileIo): Promise<void> {
+  refreshAiCaches(io);
 }
 
 export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {

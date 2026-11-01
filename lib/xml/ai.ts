@@ -32,6 +32,8 @@ export interface AiConfig {
   apiKey: string;
   temperature: number;
   maxTokens: number;
+  /** M73（D1）：是否使用原生 tools 协议；undefined = 用（默认），false = 只走文本 JSON 块 */
+  nativeTools?: boolean;
 }
 
 export const AI_LS_KEY = "axv.ai.v1";
@@ -119,6 +121,8 @@ export function loadAiConfig(raw: string | null): AiConfig {
       model: typeof p.model === "string" ? p.model : DEFAULT_AI_CONFIG.model,
       apiKey: typeof p.apiKey === "string" ? p.apiKey : "",
       temperature: Number.isFinite(p.temperature) ? (p.temperature as number) : DEFAULT_AI_CONFIG.temperature,
+      // M73：只有显式存过 false 才关；没存过按默认（开）
+      ...(typeof p.nativeTools === "boolean" ? { nativeTools: p.nativeTools } : {}),
       // NaN / 0 / 越界值一旦写进 localStorage 会永久卡在校验上，这里直接回落默认
       maxTokens:
         Number.isFinite(p.maxTokens) && (p.maxTokens as number) >= 64 && (p.maxTokens as number) <= 32000

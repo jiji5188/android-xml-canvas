@@ -2926,6 +2926,8 @@ const findResolved = findResolvedNode;
   const jumpToCodeLine = useCallback(
     (line: number) => {
       if (isMobile && mobileTab !== "xml") setMobileTab("xml");
+      // M63j：手机端跳完就收起右侧面板，把屏幕让给代码（桌面端保持面板不关）
+      if (isMobile) setRightOpen(false);
       requestAnimationFrame(() => {
         setFocusLine(line);
         setFocusTick((t) => t + 1);

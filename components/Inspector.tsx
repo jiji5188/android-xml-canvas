@@ -5,7 +5,9 @@
 
 import type { ResolvedNode } from "@/lib/xml/types";
 import type { ResourceExtras } from "@/lib/xml/resdir";
+import type { OutlineItem } from "@/lib/xml/java-outline";
 import { AttrPanel } from "./AttrPanel";
+import { CodeOutline } from "./CodeOutline";
 import { ConstraintPanel, type SibOption } from "./ConstraintPanel";
 
 export interface InspectorProps {
@@ -39,15 +41,22 @@ export interface InspectorProps {
   iconNames: string[];
   onSaveShape?: (attr: string, resourceName: string, xml: string) => void;
   generatedXml: Record<string, string>;
+
+  /* —— M61：Java/Kotlin 文件 → 右侧改成函数列表（不传/undefined 就是原来的属性面板） —— */
+  outline?: OutlineItem[];
+  outlineName?: string;
+  outlineLine?: number;
+  onJumpLine?: (line: number) => void;
 }
 
 export function Inspector(props: InspectorProps) {
   const { open, onClose, node, chain } = props;
+  const isOutline = props.outline !== undefined;
 
   return (
     <aside className={"axv-slide-right" + (open ? " axv-open" : "")}>
       <div className="axv-slide-head">
-        <span>属性</span>
+        <span>{isOutline ? "函数" : "属性"}</span>
         <button className="axv-icon-btn" title="关闭面板" aria-label="关闭面板" onClick={onClose}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 24 }}>
             right_panel_close
@@ -55,7 +64,14 @@ export function Inspector(props: InspectorProps) {
         </button>
       </div>
       <div className="axv-slide-body">
-        {node ? (
+        {isOutline ? (
+          <CodeOutline
+            items={props.outline ?? []}
+            currentLine={props.outlineLine}
+            fileName={props.outlineName}
+            onJump={(line) => props.onJumpLine?.(line)}
+          />
+        ) : node ? (
           <div className="axv-panel-stack">
             {node.sourceFile ? (
               <div

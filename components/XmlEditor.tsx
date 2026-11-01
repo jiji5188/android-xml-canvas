@@ -54,6 +54,7 @@ import { isValuesPath } from "@/lib/xml/doc-kind";
 import { looksLikeValuesDoc } from "@/lib/xml/values-edit";
 import { isManifestPath, looksLikeManifest } from "@/lib/xml/manifest-edit";
 import { pickLang } from "@/lib/xml/editor-lang";
+import { isJavaLikePath, parseOutline } from "@/lib/xml/java-outline";
 import { lineOfPath, shouldResync } from "@/lib/xml/line-sync";
 import {
   THEME_PRESETS,
@@ -1374,6 +1375,20 @@ export function XmlEditor() {
     () => pickLang(openRel || saveOrigin?.name || null),
     [openRel, saveOrigin?.name],
   );
+
+  /* ===== M61：Java/Kotlin 函数列表（右侧面板） =====
+     只在当前文件是 .java/.kt 时算（xml 文档不跑），解析是单趟扫描，几次毫秒级 */
+  const codeFileName = useMemo(
+    () => (openRel || saveOrigin?.name || "").split(/[\\/]/).pop() || "",
+    [openRel, saveOrigin?.name],
+  );
+  const isJavaFile = useMemo(() => isJavaLikePath(codeFileName), [codeFileName]);
+  const javaOutline = useMemo(
+    () => (isJavaFile ? parseOutline(xml, /\.kts?$/i.test(codeFileName)) : undefined),
+    [isJavaFile, xml, codeFileName],
+  );
+  /** 代码编辑器光标行（函数列表里高亮「你在这儿」） */
+  const [codeCursor, setCodeCursor] = useState(0);
   /** M39：values 资源文件 → 代码视图默认走表格（路径优先，其次看内容根节点是不是 <resources>） */
   const isValuesFile = useMemo(
     () =>
@@ -1554,6 +1569,7 @@ export function XmlEditor() {
   /** M2y：代码编辑器光标行 → 选中对应画布节点（反跳，和画布 → 行号正跳对称） */
   const onCodeCursorLine = useCallback(
     (line: number) => {
+      if (line > 0) setCodeCursor(line);
       if (!treeRoot || line < 1) return;
       const n = nodeAtLine(treeRoot, line);
       if (n && n.path !== selectedPath) {
@@ -2904,6 +2920,18 @@ const findResolved = findResolvedNode;
     setFocusTick((t) => t + 1);
   }, []);
 
+  /** M61：函数列表 → 跳行（手机上先切到「代码」页，等一帧编辑器挂载后再跳） */
+  const jumpToCodeLine = useCallback(
+    (line: number) => {
+      if (isMobile && mobileTab !== "xml") setMobileTab("xml");
+      requestAnimationFrame(() => {
+        setFocusLine(line);
+        setFocusTick((t) => t + 1);
+      });
+    },
+    [isMobile, mobileTab],
+  );
+
   return (
     <div
       className="axv-editor"
@@ -3265,6 +3293,10 @@ const findResolved = findResolvedNode;
         iconNames={Object.keys(generatedDrawables)}
         onSaveShape={onSaveShape}
         generatedXml={generatedDrawables}
+        outline={javaOutline}
+        outlineName={codeFileName}
+        outlineLine={codeCursor}
+        onJumpLine={jumpToCodeLine}
       />
 
       {/* 添加属性弹窗 */}

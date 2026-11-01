@@ -914,6 +914,8 @@
 .axv-rail-body {
   flex: 1;
   min-width: 0;
+  /* M60c：min-height:0 让内部列表能自己滚，而不是被撑高后裁掉 */
+  min-height: 0;
   display: flex;
   flex-direction: column;
   /* M20c：半透明白底 */
@@ -6567,4 +6569,122 @@ button.axv-sb-item:hover {
     border-color: var(--axv-primary);
     color: var(--axv-primary);
   }
+}
+
+/* ===== M60c：项目管理列表自己滚（项目多时超出屏幕看不到后面） ===== */
+.axv-ws-panel > .axv-ws-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 10px;
+}
+
+/* ===== M61：Java/Kotlin 函数列表（右侧面板） ===== */
+.axv-outline {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.axv-outline-bar {
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--axv-surface-head);
+  border-bottom: 1px solid var(--axv-outline-variant, #00000012);
+}
+.axv-outline-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid var(--axv-outline-variant, #00000018);
+  background: var(--axv-surface-sunken, #ffffff14);
+  color: var(--axv-on-surface);
+  font-size: 12.5px;
+  outline: none;
+}
+.axv-outline-search:focus { border-color: var(--axv-primary); }
+.axv-outline-count {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--axv-desc);
+}
+.axv-outline-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 6px 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.axv-outline-class,
+.axv-outline-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.axv-outline-class {
+  padding: 7px 8px;
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--axv-primary);
+}
+.axv-outline-class .msr { font-size: 15px; opacity: 0.85; }
+.axv-outline-item {
+  padding: 6px 8px;
+  font-size: 12.5px;
+}
+.axv-outline-item.is-active {
+  background: var(--axv-primary-soft);
+  color: var(--axv-on-surface);
+}
+@media (hover: hover) {
+  .axv-outline-class:hover,
+  .axv-outline-item:hover { background: var(--axv-hover); }
+}
+.axv-outline-name {
+  flex: 0 0 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  max-width: 62%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-outline-sig {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--axv-desc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-outline-line {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--axv-desc);
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
 }

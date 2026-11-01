@@ -68,6 +68,7 @@ interface ChatItem extends AiMessage {
 
 const TOOL_LABEL: Record<string, string> = {
   read_file: "读取",
+  outline: "大纲",
   write_file: "写入",
   apply_patch: "修改",
   list_files: "列出",

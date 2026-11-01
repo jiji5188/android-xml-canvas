@@ -8,8 +8,9 @@
 import { AI_MAX_WRITE_BYTES, checkAiPath, normalizeAiRel } from "./ai-paths";
 import { formatSearchResult, searchProject } from "./ai-search";
 import { hasAsyncIo, listDirQueued, readTextQueued } from "./native-async";
+import { isJavaLikePath, parseOutline } from "./java-outline";
 
-export type AiToolName = "list_files" | "read_file" | "write_file" | "apply_patch" | "search_files";
+export type AiToolName = "list_files" | "read_file" | "outline" | "write_file" | "apply_patch" | "search_files";
 
 export interface AiPatchEdit {
   /** 要被替换的原片段（必须在文件里唯一出现） */
@@ -30,6 +31,10 @@ export interface AiToolCall {
   edits?: AiPatchEdit[];
   /** 搜索关键词 */
   query?: string;
+  /** M67（C4）：read_file 从第几行开始（1 起） */
+  offset?: number;
+  /** M67（C4）：read_file 最多读多少行（默认整份，上限 400） */
+  limit?: number;
 }
 
 export interface AiFileEntry {
@@ -58,7 +63,8 @@ export const AI_TOOL_PROMPT = [
   "```",
   "可用工具（参数都放在 args 里）：",
   '- list_files {dir}：列目录（dir 省略=项目根）',
-  '- read_file {path}：读文本文件（路径相对项目根）',
+  '- read_file {path, offset?, limit?}：读文本文件（路径相对项目根）；大文件先给 offset/limit（1 起，limit≤400）只读目标方法',
+  '- outline {path}：Java/Kotlin 大纲（类 + 方法 + 行号），改大文件前先看它，再 read_file 读那几行',
   '- apply_patch {path, edits:[{old,new}]}：局部替换——改已有文件只用这个；old 必须唯一，不唯一就先 read_file 取更长上下文',
   '- write_file {path, content}：**只能新建文件**；文件已存在会被拒，请改走 apply_patch',
   '- search_files {query, dir}：按文件名/内容关键词搜索',
@@ -75,7 +81,7 @@ export const AI_TOOL_PROMPT = [
 const toolBlockRe = () => /```axv-tool\s*\n([\s\S]*?)```/g;
 
 /** 可用工具名（校验用） */
-export const AI_TOOL_NAMES: AiToolName[] = ["list_files", "read_file", "write_file", "apply_patch", "search_files"];
+export const AI_TOOL_NAMES: AiToolName[] = ["list_files", "read_file", "outline", "write_file", "apply_patch", "search_files"];
 
 export interface ParsedToolReply {
   calls: AiToolCall[];
@@ -86,6 +92,11 @@ export interface ParsedToolReply {
 }
 
 const asStr = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+const asNum = (v: unknown): number | undefined => {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() && Number.isFinite(Number(v))) return Number(v);
+  return undefined;
+};
 
 /** 单个调用是否「可以执行」；返回 null = 合法，否则是缺什么 */
 export function validateToolCall(c: AiToolCall): string | null {
@@ -93,6 +104,12 @@ export function validateToolCall(c: AiToolCall): string | null {
     case "list_files":
       return null;
     case "read_file":
+      if (!c.path) return "缺 args.path";
+      if (c.offset !== undefined && (!Number.isInteger(c.offset) || c.offset < 1)) return "offset 从 1 开始，必须是正整数";
+      if (c.limit !== undefined && (!Number.isInteger(c.limit) || c.limit < 1)) return "limit 必须是正整数";
+      if (c.limit !== undefined && c.limit > 400) return "limit 最多 400 行（大文件请分段读）";
+      return null;
+    case "outline":
       return c.path ? null : "缺 args.path";
     case "search_files":
       return c.query ? null : "缺 args.query";
@@ -154,6 +171,8 @@ export function parseToolReply(reply: string): ParsedToolReply {
       dir: asStr(args.dir),
       content: asStr(args.content),
       query: asStr(args.query),
+      offset: asNum(args.offset),
+      limit: asNum(args.limit),
       edits: Array.isArray(args.edits)
         ? (args.edits as unknown[])
             .filter((e): e is { old: string; new: string } => {
@@ -212,8 +231,44 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
     const r = await io.read(rel.rel);
     if (!r.ok) return `错误：${r.error || "读取失败"}`;
     const text = r.text ?? "";
+
+    // M67（C4）：Java 动辄上千行，整份读既费 token 又看不清结构 —— 支持按行段读，
+    // 返回带行号的片段（行号便于模型接着写 offset/limit，也方便它算位置）。
+    if (call.offset !== undefined || call.limit !== undefined) {
+      const all = text.split("\n");
+      const total = all.length;
+      const start = Math.min(Math.max(1, call.offset ?? 1), Math.max(1, total));
+      const count = Math.min(call.limit ?? 200, 400);
+      const end = Math.min(total, start + count - 1);
+      const slice = all.slice(start - 1, end);
+      let body = slice.map((l, i) => `${start + i}| ${l}`).join("\n");
+      let cut = "";
+      if (body.length > MAX_READ) {
+        body = body.slice(0, MAX_READ);
+        cut = "\n<!-- 已截断 -->";
+      }
+      return `文件 ${rel.rel} 第 ${start}-${end} 行（共 ${total} 行）：\n\`\`\`\n${body}${cut}\n\`\`\`\n续读用 {offset:${end + 1}, limit:${count}}`;
+    }
+
     const clipped = text.length > MAX_READ ? text.slice(0, MAX_READ) + "\n<!-- 已截断 -->" : text;
-    return `文件 ${rel.rel}（${text.length} 字符）：\n\`\`\`\n${clipped}\n\`\`\``;
+    const hint = text.split("\n").length > 400 ? `\n（共 ${text.split("\n").length} 行；建议先用 outline 看结构，再 offset/limit 读目标段落）` : "";
+    return `文件 ${rel.rel}（${text.length} 字符）：\n\`\`\`\n${clipped}\n\`\`\`${hint}`;
+  }
+
+  // M67（C4）：Java/Kotlin 大纲 —— 先看类与方法行号，再定点读
+  if (call.tool === "outline") {
+    const rel = checkAiPath(call.path, { mode: "read" });
+    if (!rel.ok) return `错误：${rel.error}`;
+    if (!rel.rel) return "错误：请指定文件路径";
+    if (!isJavaLikePath(rel.rel)) return `错误：outline 只支持 .java/.kt/.kts（${rel.rel} 不是）`;
+    const r = await io.read(rel.rel);
+    if (!r.ok) return `错误：${r.error || "读取失败"}`;
+    const src = r.text ?? "";
+    const isKt = /\.kts?$/i.test(rel.rel);
+    const items = parseOutline(src, isKt).slice(0, 200);
+    if (!items.length) return `文件 ${rel.rel} 里没解析出类/方法（${src.split("\n").length} 行）`;
+    const lines = items.map((it) => `L${it.line} ${"  ".repeat(it.depth)}${it.kind === "class" ? "class " : ""}${it.name}${it.sig ? it.sig : ""}`);
+    return `文件 ${rel.rel} 大纲（共 ${src.split("\n").length} 行，${items.length} 项）：\n${lines.join("\n")}\n改哪一块就用 read_file {path:"${rel.rel}", offset:行号, limit:该段行数}`;
   }
 
   if (call.tool === "write_file") {

@@ -17,7 +17,7 @@ import {
   type AiMessage,
 } from "@/lib/xml/ai";
 import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
-import { AI_TOOL_PROMPT, createNativeIo, extractToolCalls, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
+import { AI_TOOL_PROMPT, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
 import { createStagingIo, flushStaged, type StagedChange } from "@/lib/xml/ai-staging";
 import { compactHunks, diffLines, diffSummary } from "@/lib/xml/ai-diff";
 import { aiDocContextOf, buildAiSystemPrompt, docPreamble, quickActionsFor } from "@/lib/xml/ai-doc-context";
@@ -131,7 +131,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   const ctxResources = resources ?? null;
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, wantFullFile = false) => {
       const q = text.trim();
       if (!q || busy) return;
       const bad = validateConfig(cfg);
@@ -152,7 +152,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       // M64e（B3）：有写能力的通道包一层暂存，写不直接落盘
       const stage = io ? stageFor(io).host : null;
       const sys = [
-        buildAiSystemPrompt(doc),
+        buildAiSystemPrompt(doc, { intent: wantFullFile ? "xml" : "auto", canWrite: io ? io.canWrite !== false : false }),
         io
           ? `${AI_TOOL_PROMPT}\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` +
             (io.canWrite === false
@@ -174,6 +174,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
         ...history,
         { role: "user", content: userContent },
       ];
+      /** M64h（A4）：一次回复里只给一次修格式的机会 */
+      let repaired = false;
 
       const patchLast = (fn: (item: ChatItem) => ChatItem) =>
         setChat((c) => {
@@ -212,13 +214,30 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             return;
           }
 
-          const calls = io ? extractToolCalls(res.content) : [];
+          const parsed = io ? parseToolReply(res.content) : { calls: [], errors: [], blocks: 0 };
+          const calls = parsed.calls;
           const shown = stripToolBlocks(res.content);
 
+          // M64h（A4）：工具块格式坏了 → 重问一次（把错误原文喂回去），二次失败就降级成普通回答
+          if (parsed.errors.length && !repaired) {
+            repaired = true;
+            setChat((c) => [...c, { role: "assistant", content: `⚠️ 工具调用格式无效（本轮未执行）：${parsed.errors[0]}` }]);
+            msgs = [
+              ...msgs,
+              { role: "assistant", content: res.content },
+              {
+                role: "user",
+                content: `上一条回复里的工具调用不能执行，原因：\n- ${parsed.errors.join("\n- ")}\n\n请重新只输出一行 JSON，格式必须是：{"tool":"工具名","args":{...}}；不要解释、不要注释、不要换行、不要中文引号。如果确实不需要工具，就直接回答我。`,
+              },
+            ];
+            continue;
+          }
+
           if (!calls.length || round >= MAX_TOOL_ROUNDS || !io) {
+            const tail = parsed.errors.length ? `\n\n（工具调用格式无效，本轮未改动文件：${parsed.errors[0]}）` : "";
             patchLast((m) => ({
               ...m,
-              content: shown,
+              content: shown + tail,
               streaming: false,
               code: extractCodeBlock(shown),
               codeTag: doc.codeTag,
@@ -626,7 +645,13 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       {/* ===== 快捷指令 ===== */}
       <div className="axv-ai-chips">
         {actions.map((a) => (
-          <button key={a.id} className="axv-ai-chip" disabled={busy} onClick={() => void send(a.prompt)} title={a.prompt}>
+          <button
+            key={a.id}
+            className="axv-ai-chip"
+            disabled={busy}
+            onClick={() => void send(a.prompt, !!a.wantsXml)}
+            title={a.prompt}
+          >
             {a.label}
           </button>
         ))}

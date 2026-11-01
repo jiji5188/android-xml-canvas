@@ -65,7 +65,7 @@ const BASE_RULE = "回答用中文；不要编造项目里不存在的资源、�
 const CONTRACTS: Record<AiDocKind, string[]> = {
   layout: [
     "输出契约（布局 XML）：",
-    "1. 需要改布局时，用一个 ```xml 代码块输出完整布局，代码块外最多两句说明。",
+    "1. 改布局时按上面的决策规则：能改文件就用 apply_patch；只有我要整份时才输出完整布局代码块。",
     "2. 根节点必须带 xmlns:android；用到 androidx / material 属性时才加 xmlns:app，属性前缀必须与库匹配。",
     "3. 不要使用自定义 View、动画、第三方库；不要引用不存在的 @drawable / @string / @color。",
     "4. 尺寸用 dp，字号用 sp（android:textSize 用 sp）。",
@@ -76,13 +76,13 @@ const CONTRACTS: Record<AiDocKind, string[]> = {
     "1. 保持 <resources> 根节点与原有条目结构，只增改我提到的条目。",
     "2. 名字用 snake_case；不要与已有条目重名，也不要删掉我没提的条目。",
     "3. 只引用项目里真实存在的资源；拿不准就留空并说明。",
-    "4. 需要给代码时用一个 ```xml 代码块输出，代码块外最多两句说明。",
+    "4. 需要给整份文件时才用一个 ```xml 代码块输出；改已有文件优先 apply_patch。",
   ],
   manifest: [
     "输出契约（AndroidManifest.xml）：",
     "1. 只改我明确要求的节点，保留 package、versionCode / versionName、已有权限。",
     "2. 不要新增权限、provider、service，除非我明确要求。",
-    "3. 用一个 ```xml 代码块输出，代码块外最多两句说明。",
+    "3. 需要给整份文件时才用一个 ```xml 代码块输出；改已有文件优先 apply_patch。",
   ],
   java: [
     "输出契约（Java）：",
@@ -194,9 +194,57 @@ export function isLayoutDoc(ctx: AiDocContext): boolean {
   return ctx.kind === "layout";
 }
 
-/** system prompt：角色 + 通用铁律 + 该类型的输出契约 */
-export function buildAiSystemPrompt(ctx: AiDocContext): string {
-  return [ROLE[ctx.kind], BASE_RULE, "", ...ctx.contract].join("\n");
+/** 本次请求想要什么：auto=自己判断（默认）/ xml=用户明确要整份文件 */
+export type AiPromptIntent = "auto" | "xml";
+
+export interface AiPromptOpts {
+  intent?: AiPromptIntent;
+  /** 项目能不能写（不能写就别教它 apply_patch） */
+  canWrite?: boolean;
+}
+
+/** 怎么回答：把「只输出 XML」降级成「只有明确要求才输出整份」——这是 A2 的核心 */
+function decisionBlock(ctx: AiDocContext, intent: AiPromptIntent, canWrite: boolean): string[] {
+  if (intent === "xml") {
+    return [
+      "怎么回答（本次我明确要完整文件）：",
+      `1. 用 \`\`\`${ctx.fence} 代码块输出**完整**内容，代码块外最多两句说明。`,
+      "2. 不要用 axv-tool 改文件，也不要只给片段。",
+    ];
+  }
+  return [
+    "怎么回答（先判断我这句话要什么，别一上来就吐整份文件）：",
+    "A. 我只是问、解释、评审、找问题 → 直接在正文里回答；需要举例时才放代码块，且只放相关片段。",
+    canWrite
+      ? "B. 我要改这个文件 → 用 axv-tool 的 apply_patch 做局部替换（old/new 精确对齐），不要整份重贴，也不要只给我一段让我自己粘。"
+      : "B. 我要改这个文件 → 当前项目没有写权限，只能给片段和建议，并提示我需要「打开项目目录」并允许编辑。",
+    "C. 只有我明确说「给我完整文件 / 整份 XML / 输出全部」时，才输出完整代码块。",
+    "D. 一次回复只做一件事：要么回答，要么改文件，不要既贴全文又贴 patch。",
+  ];
+}
+
+const BANS = [
+  "禁止项：",
+  "1. 不要编造项目里不存在的资源、类名、API。引用 @drawable / @string / @color / R.id 之前，先在给我的上下文里确认它存在；不确定就先 search_files 或 read_file，再不确定就直说不知道。",
+  "2. 不要改我没提到的控件 id、包名、类名、方法签名；不要顺手删除任何条目。",
+  "3. 不要用「以下是代码」「希望能帮到你」这类空话占字数。",
+  "4. 不要输出与当前文件类型无关的格式（见上面的输出契约）。",
+];
+
+/** system prompt：角色 → 决策规则 → 输出契约 → 禁止项（M64h/A2 拆成四段，去掉自相矛盾） */
+export function buildAiSystemPrompt(ctx: AiDocContext, opts: AiPromptOpts = {}): string {
+  const intent = opts.intent ?? "auto";
+  const canWrite = opts.canWrite !== false;
+  return [
+    ROLE[ctx.kind],
+    BASE_RULE,
+    "",
+    ...decisionBlock(ctx, intent, canWrite),
+    "",
+    ...ctx.contract,
+    "",
+    ...BANS,
+  ].join("\n");
 }
 
 export interface DocPreambleOptions {

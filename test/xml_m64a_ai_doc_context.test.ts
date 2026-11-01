@@ -172,7 +172,8 @@ describe("M64a 接线护栏（源码级）", () => {
 
   it("AiPanel 用 doc 上下文拼 prompt，且只有可替换时才给替换按钮", () => {
     const src = read("components/AiPanel.tsx");
-    expect(src).toContain("buildAiSystemPrompt(doc)");
+    // M64h（A2）：改成带 opts 的四段式 prompt（intent/canWrite）
+    expect(src).toMatch(/buildAiSystemPrompt\(doc,\s*\{/);
     expect(src).toContain("docPreamble(doc, xml");
     expect(src).toContain("canReplaceCanvas");
     // 老写法（硬编码「当前布局 XML」）不能再回来

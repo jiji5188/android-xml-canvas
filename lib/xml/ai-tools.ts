@@ -50,20 +50,23 @@ export interface AiFileIo {
   write(rel: string, text: string): Promise<{ ok: boolean; error?: string }>;
 }
 
-/** 追加到 system prompt 的能力说明 */
+/** 追加到 system prompt 的能力说明（M64h/A4：格式收紧成 {tool,args} 一行 JSON） */
 export const AI_TOOL_PROMPT = [
-  "你可以读写当前项目的文件。需要时在回复里单独写一个代码块，语言标记为 axv-tool，内容是一行 JSON：",
+  "你可以读写当前项目的文件。需要时在回复里单独写一个代码块，语言标记为 axv-tool，内容必须是**一行** JSON，格式固定：",
   "```axv-tool",
-  '{"tool":"list_files","dir":"app/src/main/res/layout"}',
+  '{"tool":"read_file","args":{"path":"app/src/main/res/layout/main.xml"}}',
   "```",
-  "可用工具：",
+  "可用工具（参数都放在 args 里）：",
   '- list_files {dir}：列目录（dir 省略=项目根）',
   '- read_file {path}：读文本文件（路径相对项目根）',
   '- apply_patch {path, edits:[{old,new}]}：局部替换——改已有文件只用这个；old 必须唯一，不唯一就先 read_file 取更长上下文',
   '- write_file {path, content}：**只能新建文件**；文件已存在会被拒，请改走 apply_patch',
-  '- search_files {query,dir}：按文件名/内容关键词搜索',
-  "规则：一次回复最多 2 个工具调用；工具结果会以「工具结果」消息回给你，拿到后再回答用户；不要凭空猜文件内容。",
-  "限制：路径相对项目根、不能跳出项目；构建类文件（build.gradle、settings.gradle、AndroidManifest.xml、build/、.git/ 等）默认只读，写它们会被拒且不落盘；只能写文本源码/资源。",
+  '- search_files {query, dir}：按文件名/内容关键词搜索',
+  "格式要求（不遵守会被判为无效调用、直接不执行）：",
+  "1. 整个块只有一行，不要注释、不要尾逗号、不要中文引号、不要 ``` 套娃。",
+  "2. 一次回复最多 2 个 axv-tool 块；参数必须放在 args 对象里。",
+  "3. 工具结果会以「工具结果」消息回给你，拿到后再回答用户；不要凭空猜文件内容。",
+  "限制：路径相对项目根、不能跳出项目；构建类文件（build.gradle、settings.gradle、AndroidManifest.xml、build/、.git/ 等）默认只读；只能写文本源码/资源。",
 ].join("\n");
 
 
@@ -71,39 +74,110 @@ export const AI_TOOL_PROMPT = [
 // 每次新建，避免 /g 正则的 lastIndex 状态串到下一次调用
 const toolBlockRe = () => /```axv-tool\s*\n([\s\S]*?)```/g;
 
-/** 抽出回复里的工具调用块 */
-export function extractToolCalls(reply: string): AiToolCall[] {
-  const out: AiToolCall[] = [];
-  for (const m of reply.matchAll(toolBlockRe())) {
-    const raw = (m[1] || "").trim();
-    if (!raw) continue;
-    try {
-      const j = JSON.parse(raw) as Partial<AiToolCall>;
-      if (!j || typeof j.tool !== "string") continue;
-      const tool = j.tool as AiToolName;
-      if (!["list_files", "read_file", "write_file", "apply_patch", "search_files"].includes(tool)) continue;
-      const edits = Array.isArray((j as { edits?: unknown }).edits)
-        ? ((j as { edits: unknown[] }).edits
-            .filter((e): e is { old: string; new: string } => {
-              const o = e as { old?: unknown; new?: unknown } | null;
-              return !!o && typeof o.old === "string" && typeof o.new === "string";
-            })
-            .map((e) => ({ old: e.old, new: e.new })))
-        : undefined;
-      out.push({
-        tool,
-        path: typeof j.path === "string" ? j.path : undefined,
-        dir: typeof j.dir === "string" ? j.dir : undefined,
-        content: typeof j.content === "string" ? j.content : undefined,
-        edits: edits && edits.length ? edits : undefined,
-        query: typeof j.query === "string" ? j.query : undefined,
-      });
-      if (out.length >= 2) break;
-    } catch {
-      /* 不是合法 JSON，忽略 */
-    }
+/** 可用工具名（校验用） */
+export const AI_TOOL_NAMES: AiToolName[] = ["list_files", "read_file", "write_file", "apply_patch", "search_files"];
+
+export interface ParsedToolReply {
+  calls: AiToolCall[];
+  /** 每个失败块的**人话原因**（原样喂回模型让它改） */
+  errors: string[];
+  /** 出现了几个 axv-tool 块（含失败的） */
+  blocks: number;
+}
+
+const asStr = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+
+/** 单个调用是否「可以执行」；返回 null = 合法，否则是缺什么 */
+export function validateToolCall(c: AiToolCall): string | null {
+  switch (c.tool) {
+    case "list_files":
+      return null;
+    case "read_file":
+      return c.path ? null : "缺 args.path";
+    case "search_files":
+      return c.query ? null : "缺 args.query";
+    case "write_file":
+      if (!c.path) return "缺 args.path";
+      return typeof c.content === "string" ? null : "缺 args.content（要写入的正文）";
+    case "apply_patch":
+      if (!c.path) return "缺 args.path";
+      if (!c.edits || !c.edits.length) return "缺 args.edits（[{old,new}] 数组）";
+      if (c.edits.length > 20) return "edits 最多 20 处";
+      return null;
+    default:
+      return "未知工具";
   }
-  return out;
+}
+
+/**
+ * M64h（A4）：解析工具块。
+ * 以前 JSON.parse 失败就 `catch { /* 忽略 *\/ }`——调用凭空消失，模型以为执行了、用户什么也没看到。
+ * 现在把「哪个块、错在哪」记下来，交给调用方重问一次。
+ * 同时兼容旧的扁平写法 {"tool":"read_file","path":"a.xml"}（模型有时会退回去）。
+ */
+export function parseToolReply(reply: string): ParsedToolReply {
+  const calls: AiToolCall[] = [];
+  const errors: string[] = [];
+  let blocks = 0;
+  for (const m of (reply || "").matchAll(toolBlockRe())) {
+    const raw = (m[1] || "").trim();
+    blocks++;
+    if (!raw) {
+      errors.push(`第 ${blocks} 个 axv-tool 块是空的`);
+      continue;
+    }
+    let j: unknown;
+    try {
+      j = JSON.parse(raw);
+    } catch (e) {
+      const lines = raw.split("\n").filter((l) => l.trim()).length;
+      const why = lines > 1 ? "（块里有多行内容；必须是单行 JSON）" : "";
+      errors.push(`第 ${blocks} 个 axv-tool 块不是合法 JSON${why}：${(e as Error).message}`);
+      continue;
+    }
+    if (!j || typeof j !== "object" || Array.isArray(j)) {
+      errors.push(`第 ${blocks} 个 axv-tool 块不是 JSON 对象`);
+      continue;
+    }
+    const o = j as Record<string, unknown>;
+    const tool = typeof o.tool === "string" ? o.tool : "";
+    if (!AI_TOOL_NAMES.includes(tool as AiToolName)) {
+      errors.push(`第 ${blocks} 个块的 tool「${tool || "缺失"}」不在可用列表（${AI_TOOL_NAMES.join(" / ")}）`);
+      continue;
+    }
+    // 新格式 {tool,args:{...}}；旧格式把参数平铺在顶层
+    const args =
+      o.args && typeof o.args === "object" && !Array.isArray(o.args) ? (o.args as Record<string, unknown>) : o;
+    const call: AiToolCall = {
+      tool: tool as AiToolName,
+      path: asStr(args.path),
+      dir: asStr(args.dir),
+      content: asStr(args.content),
+      query: asStr(args.query),
+      edits: Array.isArray(args.edits)
+        ? (args.edits as unknown[])
+            .filter((e): e is { old: string; new: string } => {
+              const x = e as { old?: unknown; new?: unknown } | null;
+              return !!x && typeof x.old === "string" && typeof x.new === "string";
+            })
+            .map((e) => ({ old: e.old, new: e.new }))
+        : undefined,
+    };
+    if (call.edits && !call.edits.length) call.edits = undefined;
+    const bad = validateToolCall(call);
+    if (bad) {
+      errors.push(`第 ${blocks} 个块（${call.tool}）${bad}`);
+      continue;
+    }
+    calls.push(call);
+    if (calls.length >= 2) break;
+  }
+  return { calls, errors, blocks };
+}
+
+/** 老接口：只取可执行的调用（不关心错误）；新代码请用 parseToolReply */
+export function extractToolCalls(reply: string): AiToolCall[] {
+  return parseToolReply(reply).calls;
 }
 
 /** 把工具块从给用户看的正文里去掉 */

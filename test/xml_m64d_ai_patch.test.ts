@@ -4,7 +4,7 @@
 // 工具结果里也没有 diff，用户看不出改了什么。
 // 现在：改已有文件必须走 apply_patch（old 必须唯一匹配），write_file 只允许新建。
 import { describe, expect, it } from "vitest";
-import { extractToolCalls, runTool, type AiFileIo } from "@/lib/xml/ai-tools";
+import { extractToolCalls, parseToolReply, runTool, type AiFileIo } from "@/lib/xml/ai-tools";
 
 function memIo(files: Record<string, string>): AiFileIo & { files: Record<string, string> } {
   return {
@@ -133,8 +133,11 @@ describe("M64d extractToolCalls 解析 apply_patch", () => {
     expect(calls[0].edits).toEqual([{ old: "a", new: "b" }]);
   });
 
-  it("没有 edits 或格式不对 → edits undefined（runTool 会报缺参数）", () => {
-    const calls = extractToolCalls('```axv-tool\n{"tool":"apply_patch","path":"a.xml","edits":"x"}\n```');
-    expect(calls[0].edits).toBeUndefined();
+  it("没有 edits 或格式不对 → 直接判为无效（M64h/A4 改成报错而不是静默吞）", () => {
+    const r = parseToolReply('```axv-tool\n{"tool":"apply_patch","path":"a.xml","edits":"x"}\n```');
+    expect(r.calls).toEqual([]);
+    expect(r.errors[0]).toContain("args.edits");
+    // 老接口只拿可执行调用，这里应当为空
+    expect(extractToolCalls('```axv-tool\n{"tool":"apply_patch","path":"a.xml"}\n```')).toEqual([]);
   });
 });

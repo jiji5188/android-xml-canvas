@@ -179,3 +179,90 @@ Import trace:
     ./components/XmlEditor.tsx [Client Component Browser]
     ./app/xml/page.tsx [Client Component Browser]
     ./app/xml/page.tsx [Server Component] 
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [res, async (opts)=>{
+            const quiet = !!opts?.quiet;
+            if (quiet && wsTickingRef.current) return;
+            if (quiet) wsTickingRef.current = true;
+            if (!quiet) setWsBusy(true);
+            try {
+                // M30：静默轮询复用上次 info（native 下 getWorkspaceInfo 每次都要走 JNI），
+                // 只有手动刷新才重新问一次。
+                const info = quiet && wsInfoRef.current ? wsInfoRef.current : await (0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$xml$2f$workspace$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["wsInfo"])();
+                wsInfoRef.current = info;
+                const infoSig = `${info.mode}:${info.label}:${info.custom ? 1 : 0}:${info.allFiles ? 1 : 0}`;
+                if (!quiet || infoSig !== wsInfoSigRef.current) {
+                    wsInfoSigRef.current = infoSig;
+                    setWsState(info);
+                }
+                let next = [];
+                if (info.mode === "unsupported") {
+                    next = [];
+                } else if (info.mode === "native" || info.custom) {
+                    // M25d：只读一层（不再深扫整个工作目录）
+                    next = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$xml$2f$workspace$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["wsListTopProjects"])();
+                }
+                // 自动刷新时列表没变就不 setState（否则卡片/树一直重建）
+                const sig = next.map({
+                    "XmlEditor.useCallback[refreshWorkspace].sig": (p)=>`${p.kind}:${p.rel}`
+                }["XmlEditor.useCallback[refreshWorkspace].sig"]).join("|");
+                if (!quiet || sig !== wsSigRef.current) {
+                    wsSigRef.current = sig;
+                    setWsProjects(next);
+                    void analyzeProjects(next);
+                }
+            } catch (e) {
+                if (!quiet) setWsMsg(e instanceof Error ? e.message : String(e));
+            } finally{
+                if (!quiet) setWsBusy(false);
+                wsTickingRef.current = false;
+            }
+        }]
+Incoming: [res, async (opts)=>{
+            const quiet = !!opts?.quiet;
+            if (quiet && wsTickingRef.current) return;
+            if (quiet) wsTickingRef.current = true;
+            if (!quiet) setWsBusy(true);
+            try {
+                // M30：静默轮询复用上次 info（native 下 getWorkspaceInfo 每次都要走 JNI），
+                // 只有手动刷新才重新问一次。
+                const info = quiet && wsInfoRef.current ? wsInfoRef.current : await (0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$xml$2f$workspace$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["wsInfo"])();
+                wsInfoRef.current = info;
+                const infoSig = `${info.mode}:${info.label}:${info.custom ? 1 : 0}:${info.allFiles ? 1 : 0}`;
+                if (!quiet || infoSig !== wsInfoSigRef.current) {
+                    wsInfoSigRef.current = infoSig;
+                    setWsState(info);
+                }
+                let next = [];
+                if (info.mode === "unsupported") {
+                    next = [];
+                } else if (info.mode === "native" || info.custom) {
+                    // M25d：只读一层（不再深扫整个工作目录）
+                    next = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$xml$2f$workspace$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["wsListTopProjects"])();
+                }
+                // 自动刷新时列表没变就不 setState（否则卡片/树一直重建）
+                const sig = next.map({
+                    "XmlEditor.useCallback[refreshWorkspace].sig": (p)=>`${p.kind}:${p.rel}`
+                }["XmlEditor.useCallback[refreshWorkspace].sig"]).join("|");
+                if (!quiet || sig !== wsSigRef.current) {
+                    wsSigRef.current = sig;
+                    setWsProjects(next);
+                    void analyzeProjects(next);
+                }
+            } catch (e) {
+                if (!quiet) setWsMsg(e instanceof Error ? e.message : String(e));
+            } finally{
+                if (!quiet) setWsBusy(false);
+                wsTickingRef.current = false;
+            }
+        }, [object Object]] 
+    at XmlEditor (components/XmlEditor.tsx:774:12)
+    at Set.forEach (<anonymous>)
+  772 |   }, [analyzeProjects]);
+  773 |
+> 774 |   useEffect(() => {
+      |            ^
+  775 |     // M47：项目管理 tab 才刷工作目录；设置 tab 只在从未加载过工作目录信息时补一次
+  776 |     //（旧逻辑两个 tab 都无条件刷 → 手机上每次点「设置」都走一遍同步 JNI）
+  777 |     if (leftView === "res") void refreshWorkspace(); (components/XmlEditor.tsx:774:12)

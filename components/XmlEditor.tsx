@@ -7,7 +7,7 @@
 "use client";
 
 import AiPanel from "@/components/AiPanel";
-import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue, startTransition } from "react";
 import { parseLayoutXml, findNode, serialize, nodeAtLine } from "@/lib/xml/parser";
 import { pathChainOf } from "@/lib/xml/path-chain";
 import { buildRenderModel } from "@/lib/xml/css";
@@ -711,28 +711,47 @@ export function XmlEditor() {
 
   /** M25d/M31：后台分析项目名/图标（串行，读不到就跳过，不影响列表渲染）
    *  web：有 DirHandle 走 readProjectMeta；APK：没有句柄，按项目绝对路径试读 strings.xml + ic_launcher */
-  const analyzeProjects = useCallback(async (list: WsProject[]) => {
-    const patch: Record<string, ProjectMeta> = {};
-    for (const it of list) {
-      if (it.kind !== "dir") continue;
-      if (!it.handle && !it.dirPath) continue;
-      if (analyzedRef.current.has(it.rel)) continue;
-      try {
-        const meta = it.handle
-          ? await readProjectMeta(it.handle, it.name)
-          : await readProjectMetaNative(it.name, it.dirPath);
-        // M31d：成功才记账，失败（权限未授权/目录刚变）下一轮轮询再试
-        analyzedRef.current.add(it.rel);
-        patch[it.rel] = meta;
-      } catch {
-        /* 分析失败就当没有，卡片回退到文件夹名 */
+  const analyzeProjects = useCallback(
+    async (list: WsProject[]) => {
+      // M47：每轮最多分析 4 个，剩下的 200ms 后再来一轮，
+      // 避免一打开面板就一口气读十几个项目把主线程啃完（手机上最重的就是这里）
+      let count = 0;
+      const patch: Record<string, ProjectMeta> = {};
+      for (const it of list) {
+        if (count >= 4) break;
+        if (it.kind !== "dir") continue;
+        if (!it.handle && !it.dirPath) continue;
+        if (analyzedRef.current.has(it.rel)) continue;
+        try {
+          const meta = it.handle
+            ? await readProjectMeta(it.handle, it.name)
+            : await readProjectMetaNative(it.name, it.dirPath);
+          // M31d：成功才记账，失败（权限未授权/目录刚变）下一轮轮询再试
+          analyzedRef.current.add(it.rel);
+          patch[it.rel] = meta;
+          count++;
+        } catch {
+          /* 分析失败就当没有，卡片回退到文件夹名 */
+          count++;
+        }
+        // M33：一个一个来，每个之间让出一帧，列表可以边读边显示（不再整页卡住）
+        await yieldToUi();
       }
-      // M33：一个一个来，每个之间让出一帧，列表可以边读边显示（不再整页卡住）
-      await yieldToUi();
-    }
-    // 一次性合并，避免 N 次 setState 引发 N 轮重渲染
-    if (Object.keys(patch).length) setProjMeta((prev) => ({ ...prev, ...patch }));
-  }, []);
+      // 一次性合并，避免 N 次 setState 引发 N 轮重渲染
+      if (Object.keys(patch).length) setProjMeta((prev) => ({ ...prev, ...patch }));
+      // 还有没分析完的 → 200ms 后再来一轮（页面隐藏时不排）
+      const remaining = list.filter(
+        (it) => it.kind === "dir" && (it.handle || it.dirPath) && !analyzedRef.current.has(it.rel),
+      );
+      if (remaining.length) {
+        window.setTimeout(() => {
+          if (typeof document !== "undefined" && document.hidden) return;
+          void analyzeProjects(list);
+        }, 200);
+      }
+    },
+    [],
+  );
 
   const refreshWorkspace = useCallback(async (opts?: { quiet?: boolean }) => {
     const quiet = !!opts?.quiet;
@@ -740,6 +759,9 @@ export function XmlEditor() {
     if (quiet) wsTickingRef.current = true;
     if (!quiet) setWsBusy(true);
     try {
+      // M47：非静默刷新一开始先让出一帧，让「点 tab」的点击动画先画完，
+      // 后面的同步 JNI（wsInfo / listTopProjects）不再挡在点击帧前面
+      if (!quiet) await yieldToUi();
       // M30：静默轮询复用上次 info（native 下 getWorkspaceInfo 每次都要走 JNI），
       // 只有手动刷新才重新问一次。
       const info: WsInfo = quiet && wsInfoRef.current ? wsInfoRef.current : await wsInfo();
@@ -772,8 +794,11 @@ export function XmlEditor() {
   }, [analyzeProjects]);
 
   useEffect(() => {
-    if (leftView === "res" || leftView === "settings") void refreshWorkspace();
-  }, [leftView, refreshWorkspace]);
+    // M47：项目管理 tab 才刷工作目录；设置 tab 只在从未加载过工作目录信息时补一次
+    //（旧逻辑两个 tab 都无条件刷 → 手机上每次点「设置」都走一遍同步 JNI）
+    if (leftView === "res") void refreshWorkspace();
+    else if (leftView === "settings" && !wsState) void refreshWorkspace();
+  }, [leftView, refreshWorkspace, wsState]);
 
   /* M24/M30：项目列表自动刷新 —— 12s 一次（原来 4s，在手机上频繁走 JNI 会卡）；
      切回页面/窗口获得焦点时立即刷一次。 */
@@ -802,6 +827,8 @@ export function XmlEditor() {
     if (activeProject) return;
     let alive = true;
     void (async () => {
+      // M47：先让出画面，再走 JNI（restoreProjectFolder 内部会同步调 wsInfo/wsListProjects）
+      await yieldToUi();
       try {
         const p = await restoreProjectFolder();
         if (alive && p) setActiveProject(p);
@@ -2976,8 +3003,9 @@ const findResolved = findResolvedNode;
         view={leftView}
         open={leftOpen}
         onPick={(v) => {
-          setLeftView(v);
           setLeftOpen(true);
+          // M47：切 tab 本身是高频操作，把视图切换丢进 transition，让点击帧先画完（手机上不再卡一下）
+          startTransition(() => setLeftView(v));
         }}
         onClose={() => setLeftOpen(false)}
       >

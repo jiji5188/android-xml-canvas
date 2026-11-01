@@ -1453,9 +1453,8 @@ public class MainActivity extends Activity {
                 if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
                 if (f.isDirectory()) {
                     // M60：先 quick（毫秒级）——有 res 或任何 xml 就当项目，卡片立刻能出
+                    // M62b：quick 判不出来时**不能直接跳过**（曾导致 app/src/main/res 结构的项目全部消失），走完整探测兜底
                     int[] quick = probeProjectQuick(f);
-                    boolean quickOk = quick[0] > 0 || quick[1] == 1;
-                    if (!quickOk) continue;
                     Object[] probe = probeProject(f);
                     int cnt = ((Integer) probe[0]).intValue();
                     if (cnt == 0 && quick[0] == 0) continue;
@@ -1672,33 +1671,48 @@ public class MainActivity extends Activity {
 
     private final java.util.HashMap<String, Object[]> probeCache = new java.util.HashMap<>();
 
-    /** M60 quick 探测：只看直接子目录 + res 里第一层 xml，不进深层（每个项目 ~几十 ms 以内）
-     *  返回 [xmlCount:Integer, sawRes:Boolean]；没有 res 的目录快速判非项目（count=0） */
+    /** M60 quick 探测：只看「标准 Android 工程的 res 目录」+ 根层 xml，不递归全树
+     *  （每个项目几次 listFiles，几十 ms 以内）。
+     *  返回 [xmlCount:Integer, sawRes:Boolean]。
+     *  ⚠ M62b 修正：真实工程是 app/src/main/res，旧版只看根层 res → 全部项目被当非项目跳过，列表空白。 */
     private int[] probeProjectQuick(File dir) {
-        File[] fs = dir.listFiles();
         int xml = 0;
         boolean sawRes = false;
-        if (fs != null) {
+        // 常见 res 位置：app/src/main/res（gradle）、src/main/res（旧结构）、res（扁平）
+        String[] candidates = {
+            "app/src/main/res",
+            "src/main/res",
+            "app/src/main",
+            "res",
+            "app/res",
+        };
+        for (String rel : candidates) {
+            File res = new File(dir, rel.replace('/', File.separatorChar));
+            if (!res.isDirectory()) continue;
+            boolean isResDir = rel.endsWith("res");
+            if (isResDir) sawRes = true;
+            File[] fs = res.listFiles();
+            if (fs == null) continue;
             for (File f : fs) {
                 String nm = f.getName().toLowerCase(Locale.ROOT);
-                if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
                 if (f.isDirectory()) {
-                    if (nm.equals("res")) {
-                        sawRes = true;
-                        File[] resFiles = f.listFiles();
-                        if (resFiles != null) {
-                            for (File rf : resFiles) {
-                                if (rf.isDirectory() && rf.getName().toLowerCase(Locale.ROOT).startsWith("layout")) {
-                                    File[] ls = rf.listFiles();
-                                    if (ls != null) xml += ls.length;
-                                } else if (rf != null && rf.getName().toLowerCase(Locale.ROOT).endsWith(".xml")) {
-                                    xml++;
-                                }
-                            }
-                        }
+                    // res/layout* 里的 xml 才是布局；其它子目录（values/drawable）不计数
+                    if (isResDir && nm.startsWith("layout")) {
+                        File[] ls = f.listFiles();
+                        if (ls != null) xml += ls.length;
                     }
                 } else if (nm.endsWith(".xml")) {
                     xml++;
+                }
+            }
+            if (xml > 0) break;
+        }
+        // 根层直接放的 xml 也算（用户把单个布局丢进来的场景）
+        if (xml == 0) {
+            File[] fs = dir.listFiles();
+            if (fs != null) {
+                for (File f : fs) {
+                    if (!f.isDirectory() && f.getName().toLowerCase(Locale.ROOT).endsWith(".xml")) xml++;
                 }
             }
         }

@@ -11,6 +11,8 @@ import { buildVectorXml, parseVectorModel, nextRotation } from "@/lib/xml/vector
 import type { VectorModel } from "@/lib/xml/vector-edit";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { IconPickerPanel } from "./IconPickerPanel";
+import { ColorField } from "./ColorField";
+import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
 
 interface Props {
   name: string;
@@ -234,12 +236,10 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
                   onClick={() => applyColorToAll(c)}
                 />
               ))}
-              <input
-                type="color"
-                className="axv-icon-ed-color"
-                value={toHex(cur?.fill ?? "#1D1B20")}
-                onChange={(e) => patchPath(activePath, { fill: e.target.value })}
-                title="当前 path 颜色"
+              <ColorField
+                label="当前 path 颜色"
+                value={cur?.fill ?? "#1D1B20"}
+                onChange={(css) => patchPath(activePath, { fill: toAndroidHex(parseColorOr(css, "#1D1B20")) })}
               />
             </div>
             <div className="axv-set-hint">

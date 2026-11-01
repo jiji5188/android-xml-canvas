@@ -3514,7 +3514,7 @@ body.axv-lt-dragging .axv-lt-row {
   overflow: auto;
   white-space: pre;
 }
-.axv-shape-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; border-top: 1px solid rgba(0,0,0,.08); font-size: 11.5px; color: #6b6b78; }
+.axv-shape-foot { display: flex; align-items: center; justify-content: space-evenly; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-top: 1px solid rgba(0,0,0,.08); font-size: 11.5px; color: #6b6b78; }
 .axv-shape-foot code { background: #f1f0f6; padding: 1px 4px; border-radius: 4px; }
 .axv-shape-foot-btns { display: flex; gap: 8px; }
 @media (max-width: 720px) {
@@ -3806,7 +3806,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-shape-page {
   position: fixed;
   inset: 0;
-  z-index: 20100;
+  z-index: 3000;
   display: flex;
   flex-direction: column;
   background: var(--axv-surface-sunken);
@@ -4738,6 +4738,8 @@ body.axv-lt-dragging .axv-lt-row {
   background: none;
   cursor: pointer;
 }
+/* M63h：图标编辑器取色也换成自定义 ColorField → 尺寸对齐旧按钮 */
+.axv-icon-ed-swatches .axv-cf-swatch { width: 30px; height: 24px; border-radius: 6px; }
 .axv-icon-ed-btns {
   display: flex;
   gap: 6px;
@@ -4861,7 +4863,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-icon-page {
   position: fixed;
   inset: 0;
-  z-index: 20100;
+  z-index: 3000;
   display: flex;
   flex-direction: column;
   background: var(--axv-surface-sunken, var(--axv-surface-head));

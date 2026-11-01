@@ -3,7 +3,7 @@
 > 用法：这是唯一的待办台账。每解决一项，把它标成 ✅ 并写上 commit；不做完一项不往下开。
 > 配套方案见 `AI助手提示词与文件能力适配方案.md`（设计思路），本文件是**可打勾的清单**。
 > 量级：S ≈ 半天内，M ≈ 1 天，L ≈ 2 天以上。
-> 进度：**A1 ✅ 已完成（M64a，2026-11-01）**——AiPanel 按 `docRel` 判类型（布局 / values / manifest / Java / Kotlin / 其他 XML / 文本），上下文标题、代码块语言、输出契约、快捷指令全跟着换；非布局回复不再给「替换画布」按钮。
+> 进度：**A1 ✅ M64a**（AI 按文件类型切上下文）、**B2 ✅ + D3 ✅ M64b**（文件通道改用项目自身 source；停止真的停住工具循环）。
 
 ---
 
@@ -26,7 +26,7 @@
 | 编号 | 问题（现状） | 改法 | 验收 | 量级 |
 |---|---|---|---|---|
 | **B1** | **浏览器版完全没有 AI 文件能力**：`createNativeIo` 只认 `window.AxvNative`，网页里返回 null；但 prompt 里照样教模型用工具 → 模型试了没反应，开始瞎猜 | 新建 `AiFs` 抽象（web FSA / native bridge 两实现），后端按 `source` → `nativeIo` → 不可用 选路；不可用时 prompt **不出现**工具段 | Chrome 里能 list/read/grep 真项目；面板角标显示当前能力 | L |
-| **B2** | **APK 根路径拼错**：`rootPath = getDefaultWorkspace() + "/" + projectName`。用「打开项目目录」授权的自定义/SAF 目录，这个路径不存在 → list/read 全失败 | 不拼名字：直接用 `ProjectSource` / `FileOpsCtx` 的根（`XmlEditor` 里已有 `activeProject.source` 和 `fileOpsCtxOf(activeProject)`） | 自定义目录项目里 AI 能读到自己的 layout | S |
+| **B2** ✅ | ~~**APK 根路径拼错**~~ **已修（M64b）**：新增 `lib/xml/ai-fs.ts`（`ioFromProjectSource` / `ioFromRootPath` / `ioForProject`），AiPanel 改接 `fileIo`，XmlEditor 传 `ioForProject(activeProject)`；再也不用「默认工作目录 + 项目名」拼路径。 | 不拼名字：直接用 `ProjectSource` / `FileOpsCtx` 的根（`XmlEditor` 里已有 `activeProject.source` 和 `fileOpsCtxOf(activeProject)`） | 自定义目录项目里 AI 能读到自己的 layout | S |
 | **B3** | **写文件没有闸门**：整文件覆盖、不备份、不进撤销栈、写后不刷新编辑器（画布还是旧的，用户再保存把 AI 改动覆盖回去） | staging → diff 卡片（应用/放弃）→ 落盘前备份 → 写后 `invalidateNativeProjectCache()` + 刷新当前文档 + 进撤销栈 | 改打开中的 layout：卡片出 diff → 应用后画布立刻变、Ctrl+Z 可退 | L |
 | **B4** | 路径校验太弱：`safeRel` 只挡 `..` 与绝对路径，`sub/../../x`、`./a/./b`、盘符大小写都能过 | 规范化后前缀校验：`normalize(join(root, rel)).startsWith(root + sep)`；再叠扩展名白名单、保护区、大小上限 | 构造 10 条越界路径，全部被拒且报人话错误 | S |
 | **B5** | `search_files` 无预算：depth 6、每个文本文件整份 `readText` 再 `includes`，手机上直接卡死；且走**同步** JNI | 访次 600 / 命中 40 / 只搜白名单扩展名 / 内容匹配只读前 4KB；全部走 `native-async` 并串行 | 搜一个 3000 文件的项目 < 2s，UI 不卡 | M |
@@ -54,7 +54,7 @@
 |---|---|---|---|---|
 | **D1** | 没有原生 function calling，全靠自定义块 | `streamChat` 加 `tools` 参数 + `tool_calls` delta 累积器；provider 支持时启用，保留自定义块兜底 | DeepSeek/通义/GLM/Kimi 四个 provider 各跑一次工具调用 | L |
 | **D2** | 「⏳ 读取 x.xml… / ✅」刷屏，信息量低 | 折叠成一行小灰字，点开看结果；错误状态单独标红 | 一轮 3 次工具调用，气泡只占 3 行 | S |
-| **D3** | 中断只断流，不断工具循环：点「停止」后仍在跑工具、还会继续发下一轮请求 | 工具循环每步检查 `signal.aborted`，立刻退出并清理 staging | 点停止后 200ms 内不再有任何 bridge 调用 | S |
+| **D3** ✅ | ~~中断只断流，不断工具循环~~ **已修（M64b）**：每轮开头、每个工具前、每个工具后都检查 `signal.aborted`；停止后气泡标「⏹ 已停止」，静默收尾不报超时。 | 工具循环每步检查 `signal.aborted`，立刻退出并清理 staging | 点停止后 200ms 内不再有任何 bridge 调用 | S |
 | **D4** | 没有「AI 改动历史」，写错了只能靠 Ctrl+Z，跨文件改的退不回来 | 内存保留最近 20 次 AI 写入（文件+旧内容），面板里「回滚到本次之前」 | 一次改 3 个文件，一键全部回滚 | M |
 
 ---

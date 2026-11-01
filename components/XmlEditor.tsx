@@ -90,6 +90,7 @@ import {
   type ProjectMeta,
   type ProjectSource,
 } from "@/lib/xml/project-browse";
+import { ioForProject } from "@/lib/xml/ai-fs";
 import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
 
 /** M31：当前打开的项目（name = app 名称；iconUrl = ic_launcher 图标） */
@@ -1413,6 +1414,10 @@ export function XmlEditor() {
   const viewKind: "values" | "manifest" | null = isManifestFile ? "manifest" : isValuesFile ? "values" : null;
   /** M37b/M42：按文件类型定默认页 —— values 文件进「视图」，其他只读代码文件进「代码」 */
   const docKey = openRel || saveOrigin?.name || "";
+
+  // M64b（B2）：AI 的文件通道跟着「当前项目」走，不再拼默认目录 + 项目名
+  const aiFileIo = useMemo(() => ioForProject(activeProject), [activeProject]);
+
   const hasViewTabRef = useRef(hasViewTab);
   hasViewTabRef.current = hasViewTab;
   useEffect(() => {
@@ -3184,6 +3189,7 @@ const findResolved = findResolvedNode;
             <AiPanel
               xml={xml}
               docRel={openRel || saveOrigin?.name || null}
+              fileIo={aiFileIo}
               projectName={activeProject?.name || ""}
               selection={pathChain.length ? pathChain.map((p) => `${p.tag}${p.id ? "#" + String(p.id).replace("@+id/", "") : ""}`).join(" > ") : null}
               onReplaceXml={(next) => setXmlAndTrack(next, "")}

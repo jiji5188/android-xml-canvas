@@ -17,7 +17,7 @@ import {
   type AiMessage,
 } from "@/lib/xml/ai";
 import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
-import { AI_TOOL_PROMPT, createNativeIo, extractToolCalls, runTool, stripToolBlocks } from "@/lib/xml/ai-tools";
+import { AI_TOOL_PROMPT, createNativeIo, extractToolCalls, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
 import { aiDocContextOf, buildAiSystemPrompt, docPreamble, quickActionsFor } from "@/lib/xml/ai-doc-context";
 
 /** 工具循环最多几轮（防模型无限读文件） */
@@ -38,6 +38,12 @@ interface Props {
   onNote?: (text: string) => void;
   /** 当前项目名（相对工作目录），给「读写查文件」定位根目录 */
   projectName?: string;
+  /**
+   * M64b（B2）：当前项目的文件通道。由 XmlEditor 用 `ioForProject(activeProject)` 算好传进来，
+   * 不再拿「默认工作目录 + 项目名」拼路径（自定义/SAF 目录根本不在那儿）。
+   * 显式传 null 表示「这个项目没有可用通道」→ prompt 里不出现工具段。
+   */
+  fileIo?: AiFileIo | null;
 }
 
 interface ChatItem extends AiMessage {
@@ -50,7 +56,7 @@ interface ChatItem extends AiMessage {
   streaming?: boolean;
 }
 
-export default function AiPanel({ xml, docRel, selection, resources, onReplaceXml, onNote, projectName }: Props) {
+export default function AiPanel({ xml, docRel, selection, resources, onReplaceXml, onNote, projectName, fileIo }: Props) {
   const [cfg, setCfg] = useState<AiConfig>(() => {
     try {
       return loadAiConfig(window.localStorage.getItem(AI_LS_KEY));
@@ -118,11 +124,11 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
-      // 本地文件能力只在原生壳里可用（浏览器要么没权限，要么跨域）
-      const io = createNativeIo(projectName || undefined);
+      // M64b：优先用项目自己的通道；只有调用方没传（undefined）时才回退到老的原生实现
+      const io = fileIo !== undefined ? fileIo : createNativeIo(projectName || undefined);
       const sys = [
         buildAiSystemPrompt(doc),
-        io ? `${AI_TOOL_PROMPT}\n项目根目录：${projectName || "."}（项目内的相对路径都从这里算）` : "",
+        io ? `${AI_TOOL_PROMPT}\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` : "",
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -151,6 +157,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
 
       try {
         for (let round = 0; ; round++) {
+          // M64b（D3）：停止后不再开新轮，也不再发请求
+          if (ctrl.signal.aborted) break;
           setChat((c) => [...c, { role: "assistant", content: "", streaming: true }]);
           let acc = "";
           const res = await streamChat(cfg, msgs, {
@@ -161,6 +169,12 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             },
           });
           setUseNative(res.via === "native");
+
+          // 用户点了「停止」：静默收尾，不要报「请求超时/中断」吓人
+          if (ctrl.signal.aborted) {
+            setChat((c) => c.filter((m) => !m.streaming));
+            break;
+          }
 
           if (!res.ok) {
             setChat((c) => c.filter((m) => !m.streaming));
@@ -187,6 +201,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           patchLast((m) => ({ ...m, content: shown, streaming: false }));
           const results: string[] = [];
           for (const call of calls) {
+            // 每步都看一次 abort：停止后不再调 bridge，也不再往下拼下一轮消息
+            if (ctrl.signal.aborted) break;
             const label =
               call.tool === "write_file"
                 ? `写入 ${call.path}`
@@ -197,6 +213,18 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
                     : `搜索 ${call.query}`;
             setChat((c) => [...c, { role: "assistant", content: `⏳ ${label}…`, streaming: false }]);
             const out = await runTool(call, io);
+            if (ctrl.signal.aborted) {
+              // 工具已经跑完了但用户中途停了：把这条标记成已中断，不再请求下一轮
+              setChat((c) => {
+                const n = [...c];
+                const last = n[n.length - 1];
+                if (last && !last.streaming && last.content.startsWith("⏳")) {
+                  n[n.length - 1] = { ...last, content: `⏹ 已停止：${label}` };
+                }
+                return n;
+              });
+              break;
+            }
             results.push(out);
             setChat((c) => {
               const n = [...c];
@@ -207,6 +235,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               return n;
             });
           }
+          if (ctrl.signal.aborted) break;
           msgs = [
             ...msgs,
             { role: "assistant", content: res.content },
@@ -218,13 +247,14 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
         setBusy(false);
       }
     },
-    [busy, cfg, chat, ctxResources, ctxSelection, doc, docRel, projectName, withXml, xml],
+    [busy, cfg, chat, ctxResources, ctxSelection, doc, docRel, fileIo, projectName, withXml, xml],
   );
 
   const stop = () => {
     abortRef.current?.abort();
     abortRef.current = null;
     setBusy(false);
+    onNote?.("已停止");
   };
 
   const testConn = useCallback(async () => {

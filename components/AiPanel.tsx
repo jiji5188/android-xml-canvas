@@ -18,6 +18,7 @@ import {
 } from "@/lib/xml/ai";
 import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
 import { AI_TOOL_PROMPT, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
+import { AI_TOOL_SPECS, looksLikeToolsRejected, supportsNativeTools, toAiToolCall, toHistoryToolCalls } from "@/lib/xml/ai-fc";
 import { createStagingIo, flushStaged, type StagedChange } from "@/lib/xml/ai-staging";
 import { compactHunks, diffLines, diffSummary } from "@/lib/xml/ai-diff";
 import {
@@ -79,6 +80,8 @@ const TOOL_LABEL: Record<string, string> = {
   apply_patch: "修改",
   list_files: "列出",
   search_files: "搜索",
+  find_usages: "查引用",
+  check_java: "自检",
 };
 
 /** M64l（D2）：一行工具日志（默认收起，点开看工具原样输出） */
@@ -237,6 +240,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       const io = fileIo !== undefined ? fileIo : createNativeIo(projectName || undefined);
       // M64e（B3）：有写能力的通道包一层暂存，写不直接落盘
       const stage = io ? stageFor(io).host : null;
+      // M73（D1）：优先原生 function calling；服务端不认 tools 时本轮退回文本协议
+      let useTools = !!io && supportsNativeTools(cfg);
       // M64i（A6）：先把「项目里真实有什么」扫出来（同一个项目缓存一份，不每轮重扫）
       const facts = await factsFor(io, docRel);
       const mem = formatToolMemory(toolMemRef.current);
@@ -250,7 +255,11 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
         buildAiSystemPrompt(doc, { intent, canWrite: io ? io.canWrite !== false : false }),
         facts ? formatProjectFacts(facts) : "",
         io
-          ? `${AI_TOOL_PROMPT}\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` +
+          ? `${AI_TOOL_PROMPT}` +
+            (useTools
+              ? "\n本会话已开启原生工具调用：需要工具时直接调用提供的 tools，不要在正文里手写 JSON 工具块。"
+              : "") +
+            `\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` +
             (io.canWrite === false
               ? "\n注意：当前项目没拿到写权限，只能 list_files / read_file / search_files，不要尝试写。"
               : "")
@@ -293,6 +302,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           let acc = "";
           const res = await streamChat(cfg, msgs, {
             signal: ctrl.signal,
+            tools: useTools ? AI_TOOL_SPECS : undefined,
             onChunk: (t) => {
               acc += t;
               patchLast((m) => ({ ...m, content: acc }));
@@ -307,9 +317,88 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           }
 
           if (!res.ok) {
+            // M73（D1）：这个服务端/中转不认 tools —— 静默关掉，本轮改用文本协议重来
+            if (useTools && looksLikeToolsRejected(res.error)) {
+              useTools = false;
+              setChat((c) => c.filter((m) => !m.streaming));
+              continue;
+            }
             setChat((c) => c.filter((m) => !m.streaming));
             setErr(res.error || "调用失败");
             return;
+          }
+
+          // M73（D1）：原生 function calling —— 结构化 tool_calls，不用再解析正文 JSON 块
+          if (io && res.toolCalls && res.toolCalls.length) {
+            const conv = res.toolCalls.map((fc) => ({ fc, ...toAiToolCall(fc) }));
+            const shownFc = stripToolBlocks(res.content || "");
+            if (round >= MAX_TOOL_ROUNDS) {
+              patchLast((m) => ({
+                ...m,
+                content: shownFc || "（已达工具调用轮数上限，先停在这里）",
+                streaming: false,
+                code: extractCodeBlock(shownFc),
+                codeTag: doc.codeTag,
+                canReplace: doc.canReplaceCanvas,
+              }));
+              break;
+            }
+            patchLast((m) => ({ ...m, content: shownFc, streaming: false }));
+            const results: string[] = [];
+            for (const item of conv) {
+              if (ctrl.signal.aborted) break;
+              const call = item.call;
+              const target = call
+                ? call.tool === "search_files"
+                  ? call.query || ""
+                  : call.tool === "list_files"
+                    ? call.dir || "/"
+                    : call.path || ""
+                : item.fc.name;
+              const started = Date.now();
+              setChat((c) => [
+                ...c,
+                {
+                  role: "assistant",
+                  content: "",
+                  streaming: false,
+                  tool: { name: call ? call.tool : item.fc.name, target, state: "running" },
+                },
+              ]);
+              const out = call ? await runTool(call, stage ?? (io as AiFileIo)) : `错误：${item.error}`;
+              const patchTool = (next: Partial<NonNullable<ChatItem["tool"]>>) =>
+                setChat((c) => {
+                  const n = [...c];
+                  const last = n[n.length - 1];
+                  if (last?.tool) n[n.length - 1] = { ...last, tool: { ...last.tool, ...next } };
+                  return n;
+                });
+              if (ctrl.signal.aborted) {
+                patchTool({ state: "stopped", out, ms: Date.now() - started });
+                break;
+              }
+              results.push(out);
+              if (call) {
+                toolMemRef.current = pushToolMemory(toolMemRef.current, memoryEntryFromTool(call.tool, target, out));
+              }
+              patchTool({
+                state: out.startsWith("错误：") ? "error" : "done",
+                out,
+                ms: Date.now() - started,
+              });
+            }
+            if (ctrl.signal.aborted) break;
+            // 回喂：assistant.tool_calls + 每个 id 一条 tool 消息（缺一条协议就断了）
+            msgs = [
+              ...msgs,
+              { role: "assistant", content: res.content || "", tool_calls: toHistoryToolCalls(res.toolCalls) },
+              ...conv.map((item, i) => ({
+                role: "tool" as const,
+                tool_call_id: item.fc.id,
+                content: results[i] ?? "（未执行）",
+              })),
+            ];
+            continue;
           }
 
           const parsed = io ? parseToolReply(res.content) : { calls: [], errors: [], blocks: 0 };

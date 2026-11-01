@@ -13,6 +13,7 @@ import {
   type AiConfig,
   type AiMessage,
 } from "./ai";
+import { finishToolCalls, mergeToolCalls, type FcToolCall } from "./ai-fc";
 
 /* ---------- 原生通道类型 ---------- */
 
@@ -55,7 +56,7 @@ function bridge(): AiNativeBridge | null {
 let aiPort: MessagePort | null = null;
 
 interface PortEnvelope {
-  t: "chunk" | "done" | "error" | "pong";
+  t: "chunk" | "raw" | "done" | "error" | "pong";
   id: string;
   v?: string;
   status?: number;
@@ -70,7 +71,9 @@ function dispatchPort(raw: unknown): void {
     return;
   }
   if (!o || typeof o.id !== "string") return;
-  if (o.t === "chunk") window.__axvAiChunk?.(o.id, o.v ?? "");
+  // M73（D1）：原生把含 tool_calls 的原始 payload 单独转发过来（Java 侧不解析它）
+  if (o.t === "raw") window.__axvAiRaw?.(o.id, o.v ?? "");
+  else if (o.t === "chunk") window.__axvAiChunk?.(o.id, o.v ?? "");
   else if (o.t === "done") window.__axvAiDone?.(o.id, o.status ?? 0);
   else if (o.t === "error") window.__axvAiError?.(o.id, o.v ?? "未知错误");
   else if (o.t === "pong") window.__axvAiPong?.(o.id);
@@ -166,6 +169,8 @@ let probe: boolean | null = null;
 declare global {
   interface Window {
     __axvAiChunk?: (id: string, text: string) => void;
+    /** M73（D1）：含 tool_calls 的原始 SSE payload */
+    __axvAiRaw?: (id: string, payload: string) => void;
     __axvAiDone?: (id: string, status: number) => void;
     __axvAiError?: (id: string, message: string) => void;
     /** M32c：Java 对 aiPing 的回应 */
@@ -179,8 +184,15 @@ declare global {
  * 从 SSE 文本里抠出增量正文。返回新的缓冲区（未闭合的尾巴）。
  * 兼容：data: {...} / 裸 JSON / [DONE] / 注释行(:) / CRLF
  */
-export function parseSse(buffer: string): { deltas: string[]; rest: string; done: boolean } {
+export function parseSse(buffer: string): {
+  deltas: string[];
+  /** M73（D1）：含 tool_calls 的原始 payload（正文为空，不能当空回复处理） */
+  raws: string[];
+  rest: string;
+  done: boolean;
+} {
   const deltas: string[] = [];
+  const raws: string[] = [];
   let done = false;
   let rest = buffer;
   let idx = rest.indexOf("\n");
@@ -195,11 +207,12 @@ export function parseSse(buffer: string): { deltas: string[]; rest: string; done
       } else if (payload.startsWith("{")) {
         const t = deltaOfJson(payload);
         if (t) deltas.push(t);
+        else if (payload.includes('"tool_calls"')) raws.push(payload);
       }
     }
     idx = rest.indexOf("\n");
   }
-  return { deltas, rest, done };
+  return { deltas, raws, rest, done };
 }
 
 /** 取 choices[0].delta.content，退回到 choices[0].message.content（非流式） */
@@ -241,6 +254,8 @@ export interface StreamOptions {
   onChunk?: (text: string) => void;
   /** 注入 fetch 便于测试 */
   fetchImpl?: typeof fetch;
+  /** M73（D1）：OpenAI tools 定义；给空数组/不传就是老协议 */
+  tools?: readonly unknown[];
 }
 
 export interface StreamResult {
@@ -255,6 +270,8 @@ export interface StreamResult {
   silent?: boolean;
   /** 实际用的通道（诊断用） */
   channel?: string;
+  /** M73（D1）：模型返回的结构化工具调用（有它就不用解析正文里的 JSON 块） */
+  toolCalls?: FcToolCall[];
 }
 
 let seq = 0;
@@ -268,7 +285,7 @@ export async function streamChat(
   if (bad) return { ok: false, content: "", error: bad, via: "fetch" };
 
   const url = endpointOf(cfg.baseUrl);
-  const body = JSON.stringify(buildRequestBody(cfg, messages, true));
+  const body = JSON.stringify(buildRequestBody(cfg, messages, true, opts.tools));
   const timeoutMs = opts.timeoutMs ?? 120_000;
 
   const ch = nativeChannel();
@@ -331,10 +348,14 @@ function streamViaNative(
     const id = `ai${Date.now().toString(36)}${(seq++).toString(36)}`;
     let acc = "";
     let settled = false;
+    // M73（D1）：流式 tool_calls 按 index 累加
+    const fcAcc = new Map<number, { id?: string; name?: string; args: string }>();
+    let hadToolCalls = false;
 
     const prevChunk = window.__axvAiChunk;
     const prevDone = window.__axvAiDone;
     const prevErr = window.__axvAiError;
+    const prevRaw = window.__axvAiRaw;
     let sawAny = false;
 
     // M33：首事件看门狗 —— 非 bridge 通道 8s 内一条事件都没回，就当静默失败（上层换路）
@@ -365,13 +386,24 @@ function streamViaNative(
       window.__axvAiChunk = prevChunk;
       window.__axvAiDone = prevDone;
       window.__axvAiError = prevErr;
+      window.__axvAiRaw = prevRaw;
     }
 
     function finish(ok: boolean, error?: string, bridgeDead = false, silent = false) {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve({ ok, content: acc, error, via: "native", bridgeDead, silent, channel: ch.label });
+      const toolCalls = finishToolCalls(fcAcc);
+      resolve({
+        ok,
+        content: acc,
+        error,
+        via: "native",
+        bridgeDead,
+        silent,
+        channel: ch.label,
+        toolCalls: toolCalls.length ? toolCalls : undefined,
+      });
     }
 
     window.__axvAiChunk = (rid, text) => {
@@ -380,10 +412,15 @@ function streamViaNative(
       acc += text;
       opts.onChunk?.(text);
     };
+    window.__axvAiRaw = (rid, payload) => {
+      if (rid !== id || settled) return;
+      sawAny = true;
+      if (mergeToolCalls(payload, fcAcc)) hadToolCalls = true;
+    };
     window.__axvAiDone = (rid, status) => {
       if (rid !== id || settled) return;
       sawAny = true;
-      if (!acc) {
+      if (!acc && !hadToolCalls) {
         finish(false, `服务端返回空内容（HTTP ${status}，通道 ${ch.label}），换个模型或把最大 token 调大再试。`);
       } else {
         finish(true);
@@ -446,16 +483,29 @@ async function streamViaFetch(
     // 没有流（服务端直接回整包 JSON）
     if (!res.body) {
       const text = await res.text();
+      const fcAccWhole = new Map<number, { id?: string; name?: string; args: string }>();
+      const hasFc = mergeToolCalls(text, fcAccWhole);
       const whole = deltaOfJson(text);
-      if (!whole) return { ok: false, content: "", error: "服务端返回空内容，换个模型试试。", via: "fetch" };
+      const wholeCalls = hasFc ? finishToolCalls(fcAccWhole) : [];
+      if (!whole && !wholeCalls.length) {
+        return { ok: false, content: "", error: "服务端返回空内容，换个模型试试。", via: "fetch" };
+      }
       acc = whole;
-      opts.onChunk?.(whole);
-      return { ok: true, content: acc, via: "fetch" };
+      if (whole) opts.onChunk?.(whole);
+      return {
+        ok: true,
+        content: acc,
+        via: "fetch",
+        toolCalls: wholeCalls.length ? wholeCalls : undefined,
+      };
     }
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
+    // M73（D1）：流式 tool_calls 分片累加
+    const fcAcc = new Map<number, { id?: string; name?: string; args: string }>();
+    let hadToolCalls = false;
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -466,10 +516,16 @@ async function streamViaFetch(
         acc += d;
         opts.onChunk?.(d);
       }
+      for (const raw of r.raws) {
+        if (mergeToolCalls(raw, fcAcc)) hadToolCalls = true;
+      }
       if (r.done) break;
     }
-    if (!acc) return { ok: false, content: "", error: "服务端返回空内容，换个模型或加大 token 上限试试。", via: "fetch" };
-    return { ok: true, content: acc, via: "fetch" };
+    const toolCalls = hadToolCalls ? finishToolCalls(fcAcc) : [];
+    if (!acc && !toolCalls.length) {
+      return { ok: false, content: "", error: "服务端返回空内容，换个模型或加大 token 上限试试。", via: "fetch" };
+    }
+    return { ok: true, content: acc, via: "fetch", toolCalls: toolCalls.length ? toolCalls : undefined };
   } catch (e) {
     return { ok: false, content: acc, error: humanizeError(e), via: "fetch" };
   } finally {

@@ -1143,8 +1143,8 @@ public class MainActivity extends Activity {
                 }
             }
             // 回退：老路（evaluateJavascript 调 window.__axvAi*）
-            String fn = kind.equals("chunk") ? "__axvAiChunk" : kind.equals("done") ? "__axvAiDone" : kind.equals("pong") ? "__axvAiPong" : "__axvAiError";
-            String args = kind.equals("chunk") || kind.equals("error")
+            String fn = kind.equals("chunk") ? "__axvAiChunk" : kind.equals("raw") ? "__axvAiRaw" : kind.equals("done") ? "__axvAiDone" : kind.equals("pong") ? "__axvAiPong" : "__axvAiError";
+            String args = kind.equals("chunk") || kind.equals("raw") || kind.equals("error")
                     ? JSONObject.quote(id) + "," + JSONObject.quote(text == null ? "" : text)
                     : JSONObject.quote(id) + "," + status;
             aiEval("window." + fn + "&&window." + fn + "(" + args + ")");
@@ -1243,6 +1243,10 @@ public class MainActivity extends Activity {
                             if (delta != null && !delta.isEmpty()) {
                                 any = true;
                                 aiEmitChunk(id, delta);
+                            } else if (payload.startsWith("{") && payload.contains("\"tool_calls\"")) {
+                                // M73（D1）：tool_calls 原样转发给 JS，Java 不解析（保持协议中立）
+                                any = true;
+                                aiNotify("raw", id, payload, 0);
                             } else if (payload.startsWith("{") && !any) {
                                 // 非流式（服务端直接回完整 JSON）：把正文当一整块吐出去
                                 String whole = wholeContentOf(payload);

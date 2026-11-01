@@ -7,11 +7,20 @@
 // 3. 消息构造、回复解析、代码块提取都做成纯函数，方便单测（浏览器里跑不到真网络）。
 // 4. 后续做「AI 改布局」时，只要把返回值当 patch 用：当前先用「整段替换 / 插入」两种最小动作。
 
-export type AiRole = "system" | "user" | "assistant";
+export type AiRole = "system" | "user" | "assistant" | "tool";
+
+/** M73（D1）：assistant 消息可以带 tool_calls；tool 消息要回传 tool_call_id */
+export interface AiToolCallOut {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
 
 export interface AiMessage {
   role: AiRole;
   content: string;
+  tool_calls?: AiToolCallOut[];
+  tool_call_id?: string;
 }
 
 export interface AiConfig {
@@ -130,14 +139,26 @@ export function maskKey(key: string): string {
 }
 
 /** 组装请求体 */
-export function buildRequestBody(cfg: AiConfig, messages: AiMessage[], stream = false): Record<string, unknown> {
-  return {
+export function buildRequestBody(
+  cfg: AiConfig,
+  messages: AiMessage[],
+  stream = false,
+  tools?: readonly unknown[],
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
     model: cfg.model.trim(),
     messages,
     temperature: cfg.temperature,
     max_tokens: cfg.maxTokens,
     stream,
   };
+  // M73（D1）：原生 function calling —— 带 tools 时让模型直接回 tool_calls
+  if (tools && tools.length) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+    body.parallel_tool_calls = false;
+  }
+  return body;
 }
 
 /** 从 OpenAI 兼容响应里取 reasoning_content（思考型模型有，普通模型没有） */

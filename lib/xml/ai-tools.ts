@@ -5,6 +5,8 @@
 // 这样和 SSE 流式天然兼容（不需要 provider 的 function-calling 协议），
 // 5 家厂商行为一致，出错也容易降级成人话。
 
+import { AI_MAX_WRITE_BYTES, checkAiPath, normalizeAiRel } from "./ai-paths";
+
 export type AiToolName = "list_files" | "read_file" | "write_file" | "search_files";
 
 export interface AiToolCall {
@@ -45,6 +47,7 @@ export const AI_TOOL_PROMPT = [
   '- write_file {path,content}：写文件（整文件覆盖，写前先用 read_file 看清内容）',
   '- search_files {query,dir}：按文件名/内容关键词搜索',
   "规则：一次回复最多 2 个工具调用；工具结果会以「工具结果」消息回给你，拿到后再回答用户；不要凭空猜文件内容。",
+  "限制：路径相对项目根、不能跳出项目；构建类文件（build.gradle、settings.gradle、AndroidManifest.xml、build/、.git/ 等）默认只读，写它们会被拒且不落盘；只能写文本源码/资源。",
 ].join("\n");
 
 
@@ -83,12 +86,9 @@ export function stripToolBlocks(reply: string): string {
   return reply.replace(toolBlockRe(), "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-/** 防越界：不允许 .. 或绝对路径 */
+/** 防越界：规范化后不允许越出项目根（M64c/B4：统一走 ai-paths） */
 export function safeRel(p: string | undefined): string | null {
-  const s = (p ?? "").replace(/\\/g, "/").trim();
-  if (s.includes("..")) return null;
-  if (s.startsWith("/") || /^[a-zA-Z]:/.test(s)) return null;
-  return s.replace(/^\.\//, "").replace(/^\/+/, "");
+  return normalizeAiRel(p);
 }
 
 const MAX_READ = 200 * 1024;
@@ -96,38 +96,43 @@ const MAX_READ = 200 * 1024;
 /** 执行一个工具调用，返回喂给模型的文本 */
 export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
   if (call.tool === "list_files") {
-    const dir = safeRel(call.dir ?? "");
-    if (dir === null) return "错误：路径非法";
-    const r = await io.list(dir);
+    const dir = checkAiPath(call.dir ?? "", { mode: "read" });
+    if (!dir.ok) return `错误：${dir.error}`;
+    const r = await io.list(dir.rel);
     if (!r.ok) return `错误：${r.error || "列目录失败"}`;
     const items = (r.items || []).slice(0, 200);
-    if (!items.length) return `目录 ${dir || "/"} 是空的`;
+    if (!items.length) return `目录 ${dir.rel || "/"} 是空的`;
     const lines = items.map((it) => `${it.kind === "dir" ? "[目录] " : "      "}${it.rel}`);
-    return `目录 ${dir || "/"} 共 ${items.length} 项：\n${lines.join("\n")}`;
+    return `目录 ${dir.rel || "/"} 共 ${items.length} 项：\n${lines.join("\n")}`;
   }
 
   if (call.tool === "read_file") {
-    const rel = safeRel(call.path);
-    if (!rel) return "错误：路径非法（不能是绝对路径或含 ..）";
-    const r = await io.read(rel);
+    const rel = checkAiPath(call.path, { mode: "read" });
+    if (!rel.ok) return `错误：${rel.error}`;
+    if (!rel.rel) return "错误：请指定要读的文件路径";
+    const r = await io.read(rel.rel);
     if (!r.ok) return `错误：${r.error || "读取失败"}`;
     const text = r.text ?? "";
     const clipped = text.length > MAX_READ ? text.slice(0, MAX_READ) + "\n<!-- 已截断 -->" : text;
-    return `文件 ${rel}（${text.length} 字符）：\n\`\`\`\n${clipped}\n\`\`\``;
+    return `文件 ${rel.rel}（${text.length} 字符）：\n\`\`\`\n${clipped}\n\`\`\``;
   }
 
   if (call.tool === "write_file") {
-    const rel = safeRel(call.path);
-    if (!rel) return "错误：路径非法（不能是绝对路径或含 ..）";
+    const rel = checkAiPath(call.path, { mode: "write" });
+    if (!rel.ok) return `错误：${rel.error}`;
     if (typeof call.content !== "string") return "错误：缺 content 字段";
-    const r = await io.write(rel, call.content);
+    const bytes = new TextEncoder().encode(call.content).length;
+    if (bytes > AI_MAX_WRITE_BYTES) {
+      return `错误：内容太大（${Math.round(bytes / 1024)}KB），单次写入上限 ${Math.round(AI_MAX_WRITE_BYTES / 1024)}KB`;
+    }
+    const r = await io.write(rel.rel, call.content);
     if (!r.ok) return `错误：${r.error || "写入失败"}`;
-    return `已写入 ${rel}（${call.content.length} 字符）`;
+    return `已写入 ${rel.rel}（${call.content.length} 字符）`;
   }
 
   // search_files
-  const dir = safeRel(call.dir ?? "");
-  if (dir === null) return "错误：路径非法";
+  const dir = checkAiPath(call.dir ?? "", { mode: "read" });
+  if (!dir.ok) return `错误：${dir.error}`;
   const q = (call.query || "").toLowerCase().trim();
   if (!q) return "错误：缺 query";
 
@@ -149,7 +154,7 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
       }
     }
   };
-  await walk(dir, 0);
+  await walk(dir.rel, 0);
   if (!hits.length) return `没找到包含「${call.query}」的文件`;
   return `找到 ${hits.length} 项：\n${hits.join("\n")}`;
 }

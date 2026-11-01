@@ -14,6 +14,7 @@ import type { AiFileEntry, AiFileIo } from "./ai-tools";
 import type { ProjectSource } from "./project-browse";
 import { hasAsyncIo, listDirQueued, readTextQueued } from "./native-async";
 import { nativeBridge, writeTextNative } from "./native-save";
+import { isUnder } from "./ai-paths";
 
 interface NativeFsBridge {
   listDir?(path: string): string | null;
@@ -72,6 +73,7 @@ export function ioFromRootPath(rootPath: string | null | undefined, label?: stri
     rootLabel: () => label || root,
     async list(rel) {
       const dir = absOf(root, rel);
+      if (!isUnder(root, dir)) return { ok: false, error: "路径非法：跳出了项目目录" };
       try {
         if (hasAsyncIo()) {
           const json = await listDirQueued(dir);
@@ -85,6 +87,7 @@ export function ioFromRootPath(rootPath: string | null | undefined, label?: stri
     },
     async read(rel) {
       const target = absOf(root, rel);
+      if (!isUnder(root, target)) return { ok: false, error: "路径非法：跳出了项目目录" };
       try {
         if (hasAsyncIo()) {
           const t = await readTextQueued(target);
@@ -135,6 +138,8 @@ function parseDirJson(json: string | null, rel: string): { ok: boolean; items?: 
 
 function writeUnder(root: string, rel: string, text: string): { ok: boolean; error?: string } {
   const target = absOf(root, rel);
+  // M64c（B4）：拼完绝对路径再验一次前缀，防 normalize 与拼接口径不一致
+  if (!isUnder(root, target)) return { ok: false, error: "路径非法：跳出了项目目录" };
   try {
     const ok = writeTextNative(target, text);
     return ok ? { ok: true } : { ok: false, error: "写入失败（没有权限或 APK 版本过旧）" };

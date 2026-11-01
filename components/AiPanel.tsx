@@ -19,6 +19,7 @@ import {
 import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
 import { AI_TOOL_PROMPT, createNativeIo, extractToolCalls, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
 import { aiDocContextOf, buildAiSystemPrompt, docPreamble, quickActionsFor } from "@/lib/xml/ai-doc-context";
+import { aiAllowProtectedGet, aiAllowProtectedSet } from "@/lib/xml/ai-paths";
 
 /** 工具循环最多几轮（防模型无限读文件） */
 const MAX_TOOL_ROUNDS = 3;
@@ -73,6 +74,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   const [withXml, setWithXml] = useState(true);
   const [withSelection, setWithSelection] = useState(true);
   const [testing, setTesting] = useState(false);
+  // M64c（C5）：默认不允许改构建/清单（localStorage 持久化）
+  const [allowProtected, setAllowProtected] = useState(() => aiAllowProtectedGet());
   // 实际生效的通道：原生直连失败会自动回退 fetch，徐标跟着真实结果走
   const [useNative, setUseNative] = useState(() => nativeAiAvailable());
   const abortRef = useRef<AbortController | null>(null);
@@ -408,6 +411,18 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
                   patch({ maxTokens: Number(raw) });
                 }}
               />
+            </label>
+
+            <label className="axv-ai-check" title="默认关闭：AI 不能改 build.gradle / AndroidManifest.xml / build/ / .git/ 等">
+              <input
+                type="checkbox"
+                checked={allowProtected}
+                onChange={(e) => {
+                  setAllowProtected(e.target.checked);
+                  aiAllowProtectedSet(e.target.checked);
+                }}
+              />
+              允许改构建/清单文件
             </label>
 
             <button className="axv-set-btn" disabled={testing || !!cfgProblem} onClick={() => void testConn()}>

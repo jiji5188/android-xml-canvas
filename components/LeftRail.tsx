@@ -5,7 +5,7 @@
 
 import type { ReactNode } from "react";
 
-export type LeftView = "parts" | "layers" | "ai" | "code" | "res" | "assets" | "settings" | "about";
+export type LeftView = "parts" | "layers" | "ai" | "code" | "res" | "assets" | "values" | "settings" | "about";
 
 interface RailItem {
   view: LeftView;
@@ -20,6 +20,7 @@ const TOP_ITEMS: RailItem[] = [
   { view: "layers", icon: "account_tree", titleKey: "rail.layers", fallback: "图层" },
   { view: "ai", icon: "auto_awesome", titleKey: "rail.ai", fallback: "AI 助手" },
   { view: "assets", icon: "category", titleKey: "rail.assets", fallback: "已生成资源" },
+  { view: "values", icon: "palette", titleKey: "rail.values", fallback: "资源值" },
   { view: "res", icon: "folder_open", titleKey: "rail.res", fallback: "项目管理" },
 ];
 
@@ -34,6 +35,7 @@ const TITLES: Record<LeftView, { key: string; fallback: string }> = {
   layers: { key: "rail.layers", fallback: "图层" },
   ai: { key: "rail.ai", fallback: "AI 助手" },
   code: { key: "rail.code", fallback: "XML 代码" },
+  values: { key: "rail.values", fallback: "资源值" },
   res: { key: "rail.res", fallback: "项目管理" },
   assets: { key: "rail.assets", fallback: "已生成资源" },
   settings: { key: "rail.settings", fallback: "设置" },

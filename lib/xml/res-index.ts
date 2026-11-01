@@ -69,6 +69,14 @@ export function clearResIndex(): void {
   cache.clear();
 }
 
+/** 找 res 目录并列出子目录（给「资源值」面板复用；带 60s 缓存） */
+export async function scanResDirs(
+  io: AiFileIo,
+  docRel?: string | null,
+): Promise<{ resRel: string; dirs: string[] }> {
+  return scanRes(io, docRel);
+}
+
 export function createResResolver(io: AiFileIo | null, docRel?: string | null): ResResolver | null {
   if (!io) return null;
   let res: { resRel: string; dirs: string[] } | null = null;

@@ -8,6 +8,7 @@
 
 import AiPanel from "@/components/AiPanel";
 import { createResResolver } from "@/lib/xml/res-index";
+import { ResValuesPanel } from "@/components/ResValuesPanel";
 import { formatResRefHit } from "@/lib/xml/res-refs";
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue, startTransition } from "react";
 import { parseLayoutXml, findNode, serialize, nodeAtLine } from "@/lib/xml/parser";
@@ -3262,6 +3263,34 @@ const findResolved = findResolvedNode;
                 onNote={(text) => {
                   setExportNote(text);
                   window.setTimeout(() => setExportNote(" "), 3200);
+                }}
+              />
+            </div>
+          )}
+          {leftView === "values" && (
+            <div className="axv-rail-scroll">
+              <ResValuesPanel
+                io={aiFileIo}
+                docRel={openRel ?? null}
+                onJump={(rel, line) => {
+                  const src = activeProjectRef.current?.source;
+                  if (!src) {
+                    setWsMsg("先打开一个项目目录，才能跳到资源文件");
+                    return;
+                  }
+                  if (openRel === rel) {
+                    jumpToCodeLine(line);
+                    setWsMsg(`${rel}:${line}`);
+                    return;
+                  }
+                  void loadEntry(src, { kind: "file", name: rel.split("/").pop() || rel, rel }).then(() => {
+                    jumpToCodeLine(line);
+                    setWsMsg(`${rel}:${line}`);
+                  });
+                }}
+                onNote={(text) => {
+                  setWsMsg(text);
+                  window.setTimeout(() => setWsMsg(" "), 3000);
                 }}
               />
             </div>

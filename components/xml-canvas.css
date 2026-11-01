@@ -553,7 +553,7 @@
   font-weight: 600;
   cursor: pointer;
   outline: none;
-  max-width: 120px;
+  max-width: 150px;
   font-family: inherit;
 }
 .axv-zoom {
@@ -2162,7 +2162,7 @@ body.axv-lt-dragging .axv-lt-row {
 /* tab 之间的示例下拉框 */
 .axv-tab-sample {
   height: 24px;
-  padding: 0 8px;
+  padding: 0 16px 0px 8px;
   border: none;
   border-radius: 17px;
   background: var(--axv-surface);
@@ -6055,12 +6055,12 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   width: 100%;
   height: auto;
   margin-top: 2px;
-  padding: 7px 8px;
-  border-radius: 9px;
+  padding: 6px 16px 6px 6px;
+  border-radius: 12px;
   border: 1px solid var(--axv-outline);
   background: var(--axv-surface);
   color: var(--axv-on-surface);
-  font-size: 12.5px;
+  font-size: 12px;
 }
 
 /* ===== M24：当前项目面板（项目结构树） ===== */

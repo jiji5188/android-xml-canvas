@@ -6751,7 +6751,7 @@ button.axv-sb-item:hover {
 .axv-hsv-panel {
   position: relative;
   width: 100%;
-  height: 132px;
+  height: 150px;
   border-radius: 9px;
   overflow: hidden;
   cursor: crosshair;
@@ -6944,4 +6944,39 @@ button.axv-sb-item:hover {
   border-radius: 6px;
   background: none;
   cursor: pointer;
+}
+
+
+/* ===== M63c：颜色取色器改成「蒙版 + 居中弹层」（不再算 x/y） ===== */
+.axv-cf-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.42);
+  /* 弹层里滚动不要带动底下的页面 */
+  overscroll-behavior: contain;
+}
+/* 弹窗（如选择资源）里的取色器：盖过 .axv-modal-backdrop 的 20000 */
+.axv-cf-mask.is-above-modal {
+  z-index: 20100;
+}
+.axv-cf-pop {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 14px;
+  background: var(--axv-surface, #fff);
+  color: var(--axv-on-surface, #1c1b1f);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 }

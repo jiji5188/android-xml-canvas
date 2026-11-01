@@ -12,7 +12,20 @@ import { parseLayoutXml, findNode, serialize, nodeAtLine } from "@/lib/xml/parse
 import { pathChainOf } from "@/lib/xml/path-chain";
 import { buildRenderModel } from "@/lib/xml/css";
 import type { MeasuredMap } from "@/lib/xml/constraints";
-import { commitHistoryState, EMPTY_MARK, type MergeMark } from "@/lib/xml/history";
+import {
+  EMPTY_MARK,
+  MERGE_MS,
+  diffHistoryInit,
+  diffHistoryCommit,
+  diffHistoryUndo,
+  diffHistoryRedo,
+  diffHistoryCanUndo,
+  diffHistoryCanRedo,
+  diffTo,
+  applyDiff,
+  type DiffHistory,
+  type MergeMark,
+} from "@/lib/xml/history";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
 import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
@@ -28,6 +41,7 @@ import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph"
 import { hasIcon } from "@/lib/xml/icon-vectors";
 import { workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative, writeTextNative } from "@/lib/xml/native-save";
 import { yieldToUi } from "@/lib/xml/native-async";
+import { perfMark, perfTimer, heapMB, perfLogPath } from "@/lib/xml/perf-log";
 import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
 // M31i：新建项目时把完整 Android 工程骨架落盘
 import { createAndroidProject, safeProjectName } from "@/lib/xml/new-project";
@@ -1029,35 +1043,35 @@ export function XmlEditor() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [applyZoom]);
-  const [history, setHistory] = useState<string[]>(() => [
-    lsGet(LS_KEY_XML) ?? SAMPLES.list,
-  ]);
-  const [histIdx, setHistIdx] = useState(0);
+  const [histInfo, setHistInfo] = useState({ canUndo: false, canRedo: false });
 
-  /* ===== 撤销 / 重做 =====
-     用 ref 存栈，避开 setState 异步导致连续操作串位置的问题。
+  /* ===== 撤销 / 重做（M59：diff 栈）=====
+     原来存全量快照 ×20 份，250KB 文档就是 5MB。现在存相邻两版的 diff
+     （十几个字符），50 步撤销只占几十 KB。
      结构变更立即入栈；手动敲代码则防抖 500ms 合并成一步。 */
-  const histRef = useRef<{ stack: string[]; idx: number }>({
-    stack: history,
-    idx: histIdx,
-  });
+  const histRef = useRef<DiffHistory>(diffHistoryInit(lsGet(LS_KEY_XML) ?? SAMPLES.list));
   const textTimer = useRef<number | null>(null);
 
   const syncHist = () => {
-    setHistory(histRef.current.stack);
-    setHistIdx(histRef.current.idx);
+    const h = histRef.current;
+    setHistInfo({ canUndo: diffHistoryCanUndo(h), canRedo: diffHistoryCanRedo(h) });
   };
   /** M2u：合并窗口——同一手势 key 在 900ms 内连续提交 → 只覆盖栈顶，不新增撤销点 */
   const lastCommitRef = useRef<MergeMark>(EMPTY_MARK);
   const commitHistory = useCallback((next: string, key = "") => {
-    const res = commitHistoryState(histRef.current, next, {
-      key,
-      now: Date.now(),
-      mark: lastCommitRef.current,
-    });
-    if (res.unchanged) return;
-    histRef.current = res.state;
-    lastCommitRef.current = res.mark;
+    const h = histRef.current;
+    if (next === h.cur) return;
+    const now = Date.now();
+    const mark = lastCommitRef.current;
+    const canMerge = key !== "" && key === mark.key && now - mark.at < MERGE_MS && h.undo.length > 0;
+    if (canMerge) {
+      // 手势进行中：把「上一步 diff」换成「手势起点 → 当前」这一段
+      const prev = applyDiff(h.cur, h.undo[h.undo.length - 1], false);
+      histRef.current = { ...h, undo: [...h.undo.slice(0, -1), diffTo(prev, next)], redo: [], cur: next };
+    } else {
+      histRef.current = diffHistoryCommit(h, next);
+    }
+    lastCommitRef.current = { at: now, key };
     syncHist();
   }, []);
   const flushTextTimer = useCallback(() => {
@@ -1067,28 +1081,28 @@ export function XmlEditor() {
     }
   }, []);
 
-  const canUndo = histIdx > 0;
-  const canRedo = histIdx < history.length - 1;
+  const canUndo = histInfo.canUndo;
+  const canRedo = histInfo.canRedo;
   const undo = () => {
     flushTextTimer();
     flushXml();
     liveXmlRef.current = null;
-    const h = histRef.current;
-    if (h.idx <= 0) return;
-    h.idx -= 1;
+    const r = diffHistoryUndo(histRef.current);
+    if (r.next === histRef.current) return;
+    histRef.current = r.next;
     lastCommitRef.current = EMPTY_MARK; // M2u：撤销后断开合并链，新操作必须新建撤销点
-    setXml(h.stack[h.idx]);
+    setXml(r.doc);
     syncHist();
   };
   const redo = () => {
     flushTextTimer();
     flushXml();
     liveXmlRef.current = null;
-    const h = histRef.current;
-    if (h.idx >= h.stack.length - 1) return;
-    h.idx += 1;
+    const r = diffHistoryRedo(histRef.current);
+    if (r.next === histRef.current) return;
+    histRef.current = r.next;
     lastCommitRef.current = EMPTY_MARK;
-    setXml(h.stack[h.idx]);
+    setXml(r.doc);
     syncHist();
   };
 
@@ -1401,16 +1415,19 @@ export function XmlEditor() {
       // M2q：把上传 res/layout 里的布局传进去，供 <include> 就地展开
       // M2r：屏幕尺寸传入，影响 match_parent 根 / CL 内容区回落值
       // M2t：wrap 实测表传入，CL/RL 求解的 wrap 维度不再靠 estSize 估
+      const tModel = perfTimer("xml.model");
+      const built = buildRenderModel(
+        parsed.root,
+        resources,
+        SCALE,
+        resExtras?.layouts,
+        { w: device.w, h: device.h },
+        measured ?? undefined,
+        renderTheme,
+      );
+      tModel.end("built");
       return {
-        model: buildRenderModel(
-          parsed.root,
-          resources,
-          SCALE,
-          resExtras?.layouts,
-          { w: device.w, h: device.h },
-          measured ?? undefined,
-          renderTheme,
-        ),
+        model: built,
         issues: parsed.issues,
         parseErr: false,
         parseReason: "",
@@ -1429,9 +1446,13 @@ export function XmlEditor() {
   /** M57：共享解析结果 —— 模型 / 图层树 / 结构检查共用一棵语法树，不再各 parse 一次 */
   const parsedDoc = useMemo(() => {
     if (parsedForRender === "") return { root: null, issues: [] as XmlIssue[] };
+    const t = perfTimer("xml.parse", "len=" + parsedForRender.length);
     try {
-      return parseLayoutXml(parsedForRender);
+      const doc = parseLayoutXml(parsedForRender);
+      t.end("issues=" + (doc.issues?.length ?? 0));
+      return doc;
     } catch (e) {
+      t.end("ERR");
       console.error("[axv] 解析失败", e);
       return { root: null, issues: [] as XmlIssue[] };
     }
@@ -1452,6 +1473,7 @@ export function XmlEditor() {
     if (typeof document === "undefined") return;
     const host = document.querySelector(".axv-phone-body");
     if (!host) return;
+    const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     const next: MeasuredMap = new Map();
     host.querySelectorAll<HTMLElement>("[data-path]").forEach((el) => {
       if (el.style.position !== "absolute") return; // 只看 CL/RL 直接子项
@@ -1476,6 +1498,9 @@ export function XmlEditor() {
     if (!changed) return;
     if (measurePass.current >= 4) return; // 收敛护栏：最多重排 4 轮
     measurePass.current += 1;
+    // M59：量「读 DOM 尺寸」花多少（回流次数 × 节点数的直接成本）
+    const ms = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
+    perfMark("xml.measure", `pass=${measurePass.current} nodes=${next.size} ${ms.toFixed(1)}ms`);
     setMeasured(next);
   }, [model, measured]);
 
@@ -1497,7 +1522,10 @@ export function XmlEditor() {
       // M37b：非布局文件不做布局结构校验
       if (codeOnly) return [] as ReturnType<typeof lintXml>;
       if (lintSrc === "") return [] as LintIssue[];
-      return lintXml(lintSrc);
+      const t = perfTimer("xml.lint", "len=" + lintSrc.length);
+      const out = lintXml(lintSrc);
+      t.end("issues=" + out.length);
+      return out;
     } catch (e) {
       console.error("[axv] 结构检查失败", e);
       return [] as LintIssue[];
@@ -2004,7 +2032,7 @@ export function XmlEditor() {
         const target = activeFile(next);
         if (target && target.id !== p.activeId) {
           setXml(target.xml);
-          histRef.current = { stack: [target.xml], idx: 0 };
+          histRef.current = diffHistoryInit(target.xml);
           syncHist();
           setSelectedPath(null);
           // M37b：吓得切到内置文件后，不再算「从工程里打开的文件」
@@ -2033,7 +2061,7 @@ export function XmlEditor() {
       }
       const target = activeFile(next)!;
       setXml(target.xml);
-      histRef.current = { stack: [target.xml], idx: 0 };
+      histRef.current = diffHistoryInit(target.xml);
       syncHist();
       setSelectedPath(null);
       setExportNote(`已新建「${target.name}」`);
@@ -2064,7 +2092,7 @@ export function XmlEditor() {
       const next = removeFile(withSaved, cur.id);
       const target = activeFile(next)!;
       setXml(target.xml);
-      histRef.current = { stack: [target.xml], idx: 0 };
+      histRef.current = diffHistoryInit(target.xml);
       syncHist();
       setSelectedPath(null);
       return next;

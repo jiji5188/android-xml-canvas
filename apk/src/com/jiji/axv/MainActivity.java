@@ -580,17 +580,7 @@ public class MainActivity extends Activity {
         /** 当前生效目录 + 权限状态（JSON） */
         @JavascriptInterface
         public String getWorkspaceInfo() {
-            try {
-                JSONObject o = new JSONObject();
-                o.put("defaultPath", defaultDir().getAbsolutePath());
-                o.put("custom", treeUri != null ? workspaceLabel() : JSONObject.NULL);
-                o.put("effective", effectiveLabel());
-                o.put("allFiles", hasAllFiles());
-                o.put("sdk", Build.VERSION.SDK_INT);
-                return o.toString();
-            } catch (Throwable t) {
-                return "{}";
-            }
+            return workspaceInfoJson();
         }
 
         @JavascriptInterface
@@ -626,6 +616,142 @@ public class MainActivity extends Activity {
             }
         }
 
+        /* ===== M59：性能日志（AndroidUIIDE/log/perf-*.log）=====
+         * 为什么要日志文件而不是只在 logcat：手机上看不了 logcat，用户能直接把文件导出来。
+         * 全部后台线程 + 有界队列，绝不阻塞 JS / UI 线程。 */
+        private static final int LOG_QUEUE_MAX = 2000;
+        private static final long LOG_FILE_MAX = 2L * 1024 * 1024;
+        private final java.util.ArrayDeque<String> logQueue = new java.util.ArrayDeque<>();
+        private volatile boolean logWorkerRunning = false;
+        private volatile int logDropped = 0;
+        private volatile File logDirCache = null;
+
+        /** JS 端埋点入口：asyncLog(tag, msg)，一行一条，自动带时间戳 */
+        @JavascriptInterface
+        public void asyncLog(final String tag, final String msg) {
+            try {
+                String t = new java.text.SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(new java.util.Date());
+                enqueueLog(t + " [" + (tag == null ? "-" : tag) + "] " + (msg == null ? "" : msg));
+            } catch (Throwable ignored) {
+            }
+        }
+
+        /** 立即把内存里 JS 的日志刷出来（导出前调用） */
+        @JavascriptInterface
+        public String logPath() {
+            File f = currentLogFile();
+            return f == null ? "" : f.getAbsolutePath();
+        }
+
+        /** 清空当天日志（调试用） */
+        @JavascriptInterface
+        public void clearLog() {
+            try {
+                File d = logDir();
+                if (d == null) return;
+                File[] fs = d.listFiles();
+                if (fs == null) return;
+                for (File f : fs) {
+                    if (f.getName().startsWith("perf-")) f.delete();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        private File logDir() {
+            if (logDirCache != null) return logDirCache;
+            try {
+                File base = new File(Environment.getExternalStorageDirectory(), "AndroidUIIDE");
+                File d = new File(base, "log");
+                if (!d.exists()) d.mkdirs();
+                logDirCache = d;
+                return d;
+            } catch (Throwable t) {
+                Log.e(TAG, "logDir", t);
+                return null;
+            }
+        }
+
+        private File currentLogFile() {
+            File d = logDir();
+            if (d == null) return null;
+            String day = new java.text.SimpleDateFormat("yyyyMMdd", Locale.US).format(new java.util.Date());
+            for (int i = 1; i <= 99; i++) {
+                String nm = i == 1 ? "perf-" + day + ".log" : "perf-" + day + "-" + i + ".log";
+                File f = new File(d, nm);
+                if (!f.exists() || f.length() < LOG_FILE_MAX) return f;
+            }
+            return new File(d, "perf-" + day + ".log");
+        }
+
+        private void enqueueLog(String line) {
+            if (line == null) return;
+            synchronized (logQueue) {
+                if (logQueue.size() >= LOG_QUEUE_MAX) {
+                    logDropped++;
+                    return;
+                }
+                logQueue.addLast(line);
+            }
+            startLogWorker();
+        }
+
+        private void startLogWorker() {
+            if (logWorkerRunning) return;
+            synchronized (logQueue) {
+                if (logWorkerRunning) return;
+                logWorkerRunning = true;
+            }
+            Thread t = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    StringBuilder sb = new StringBuilder(8192);
+                    int n = 0;
+                    while (true) {
+                        synchronized (logQueue) {
+                            String line = logQueue.pollFirst();
+                            if (line == null) {
+                                logWorkerRunning = false;
+                                break;
+                            }
+                            sb.append(line).append('\n');
+                            n++;
+                            // 攒一批再写，减少 IO 次数
+                            if (n < 64 && logQueue.size() > 0) continue;
+                        }
+                        flushLog(sb, logDropped);
+                        logDropped = 0;
+                        sb.setLength(0);
+                        n = 0;
+                    }
+                }
+            }, "axv-log");
+            t.setDaemon(true);
+            t.start();
+        }
+
+        private void flushLog(StringBuilder sb, int dropped) {
+            if (sb.length() == 0) return;
+            File f = currentLogFile();
+            if (f == null) return;
+            java.io.FileOutputStream out = null;
+            try {
+                out = new java.io.FileOutputStream(f, true);
+                if (dropped > 0) sb.append("(日志队列满，丢弃 ").append(dropped).append(" 条)\n");
+                out.write(sb.toString().getBytes("UTF-8"));
+                out.flush();
+            } catch (Throwable t) {
+                Log.e(TAG, "flushLog", t);
+            } finally {
+                if (out != null) {
+                    try {
+                        out.close();
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }
+        }
+
         /** M56：listProjects 深扫走后台线程（同步版保留给老调用，JS 端有 hasListProjectsAsync 时优先用异步） */
         @JavascriptInterface
         public void listProjectsAsync(final String id) {
@@ -635,6 +761,41 @@ public class MainActivity extends Activity {
                     return listProjectsJson();
                 }
             });
+        }
+
+        /** M59：列顶层项目 / 工作目录信息 转后台线程（原来同步 JNI 会冻界面） */
+        @JavascriptInterface
+        public void listTopProjectsAsync(final String id) {
+            ioAsync(id, new java.util.concurrent.Callable<String>() {
+                @Override
+                public String call() throws Exception {
+                    return listTopProjectsJson();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void getWorkspaceInfoAsync(final String id) {
+            ioAsync(id, new java.util.concurrent.Callable<String>() {
+                @Override
+                public String call() throws Exception {
+                    return workspaceInfoJson();
+                }
+            });
+        }
+
+        private String workspaceInfoJson() {
+            try {
+                JSONObject o = new JSONObject();
+                o.put("defaultPath", defaultDir().getAbsolutePath());
+                o.put("custom", treeUri != null ? workspaceLabel() : JSONObject.NULL);
+                o.put("effective", effectiveLabel());
+                o.put("allFiles", hasAllFiles());
+                o.put("sdk", Build.VERSION.SDK_INT);
+                return o.toString();
+            } catch (Throwable t) {
+                return "{}";
+            }
         }
 
         /** M33：异步读文件（后台线程，不卡 UI 线程/JS）。结果回调：
@@ -667,6 +828,16 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void listDirAsync(final String id, final String path) {
+            ioAsync(id, new java.util.concurrent.Callable<String>() {
+                @Override
+                public String call() throws Exception {
+                    return listDirJson(path);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void listDirAsyncCached(final String id, final String path) {
             ioAsync(id, new java.util.concurrent.Callable<String>() {
                 @Override
                 public String call() throws Exception {
@@ -876,11 +1047,16 @@ public class MainActivity extends Activity {
 
         private String fileOpJson(FileOp op, String path) throws Exception {
             if (path == null) return opError(new Exception("path 为空"));
-            return op.run(path);
+            String out = op.run(path);
+            // M59：结构变更后目录列表必须重读，否则树里看不到新建/删除的项
+            invalidateDirCache();
+            return out;
         }
         private String fileOp2Json(FileOp2 op, String a, String b) throws Exception {
             if (a == null || b == null) return opError(new Exception("参数为空"));
-            return op.run(a, b);
+            String out = op.run(a, b);
+            invalidateDirCache();
+            return out;
         }
 
         private boolean deleteRec(File f) {
@@ -1789,6 +1965,26 @@ public class MainActivity extends Activity {
     }
 
     /** M31h：列一层目录 → {"ok":true,"items":[{name,kind,path}]}；限默认目录，越界或非目录返回 ok:false */
+    /* ===== M59：目录列表缓存（mtime 键 + LRU 256）=====
+     * 结构树每展开一层都要 listFiles + 建 JSON，手机上深工程来回点很容易卡。
+     * 缓存键 = 规范化绝对路径，校验项 = 目录 lastModified（子项增删改名都会变）。
+     * 文件内容修改不影响目录列表，所以不需要更细的失效。 */
+    private final java.util.LinkedHashMap<String, Object[]> dirCache =
+            new java.util.LinkedHashMap<String, Object[]>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(java.util.Map.Entry<String, Object[]> eldest) {
+                    return size() > 256;
+                }
+            };
+
+    private void invalidateDirCache() {
+        synchronized (dirCache) {
+            dirCache.clear();
+        }
+    }
+
+
+
     private String listDirJson(String path) throws Exception {
         if (path == null) return "{\"ok\":false}";
         File d = new File(path);
@@ -1796,6 +1992,11 @@ public class MainActivity extends Activity {
         String canon = d.getCanonicalPath();
         if (!canon.equals(base) && !canon.startsWith(base + File.separator)) return "{\"ok\":false}";
         if (!d.isDirectory()) return "{\"ok\":false}";
+        long mt = d.lastModified();
+        synchronized (dirCache) {
+            Object[] hit = dirCache.get(canon);
+            if (hit != null && ((Long) hit[0]) == mt) return (String) hit[1];
+        }
         JSONObject out = new JSONObject();
         out.put("ok", true);
         JSONArray items = new JSONArray();
@@ -1810,7 +2011,11 @@ public class MainActivity extends Activity {
             }
         }
         out.put("items", items);
-        return out.toString();
+        String json = out.toString();
+        synchronized (dirCache) {
+            dirCache.put(canon, new Object[]{mt, json});
+        }
+        return json;
     }
 
     private void toast(String msg) {

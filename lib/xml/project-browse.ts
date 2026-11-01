@@ -13,6 +13,7 @@
 
 import { nativeBridge } from "./native-save";
 import { hasAsyncIo, listDirQueued, readBase64Queued, readTextQueued } from "./native-async";
+import { perfTimer } from "./perf-log";
 import { type WsProject } from "./workspace";
 import type { FileOpsCtx } from "./file-ops";
 
@@ -147,8 +148,26 @@ export function isIconDirRel(rel: string): boolean {
   return /(^|\/)(drawable|mipmap)(-[^/]*)?(\/|$)/i.test(rel);
 }
 
-/** M31h：读一行文件的缩略图（web：File → objectURL；native：bridge.readBase64 → data URL），同一路径只读一次 */
-const entryImageCache = new Map<string, string | null>();
+/** M31h：读一行文件的缩略图（web：File → objectURL；native：bridge.readBase64 → data URL），
+ *  M59：LRU 上限 40 条 + 淘汰时 revoke（web 分支原来永不释放，base64 无上限 → 内存泄漏） */
+const entryImageCache = new Map<string, string>();
+const ENTRY_IMAGE_CACHE_MAX = 40;
+function entryImageCacheSet(key: string, url: string): void {
+  entryImageCache.delete(key);
+  entryImageCache.set(key, url);
+  while (entryImageCache.size > ENTRY_IMAGE_CACHE_MAX) {
+    const oldest = entryImageCache.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    entryImageCache.delete(oldest);
+    if (oldest.startsWith("blob:")) {
+      try {
+        URL.revokeObjectURL(oldest);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
 export async function readEntryImageUrl(entry: BrowseEntry): Promise<string | null> {
   if (!isImageName(entry.name)) return null;
   const key = entry.target || entry.rel;
@@ -176,7 +195,7 @@ export async function readEntryImageUrl(entry: BrowseEntry): Promise<string | nu
       url = null;
     }
   }
-  if (url) entryImageCache.set(key, url);
+  if (url) entryImageCacheSet(key, url);
   return url;
 }
 
@@ -287,6 +306,7 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
       if (tryListDir) {
         try {
           const abs = rel ? `${rootDir.replace(/\/+$/, "")}/${rel}` : rootDir;
+          const t = perfTimer("tree.listDir", rel || "(root)");
           const raw = hasAsyncIo() ? await listDirQueued(abs) : b && b.listDir ? b.listDir(abs) : null;
           const parsed = raw ? (JSON.parse(raw) as { ok?: boolean; items?: { name: string; kind: string; path?: string }[] }) : null;
           if (parsed?.ok && Array.isArray(parsed.items)) {
@@ -299,11 +319,13 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
                 out.push({ kind: "file", name: it.name, rel: joinRel(rel, it.name), target: it.path });
               }
             }
+            t.end("items=" + out.length + " raw=" + parsed.items.length);
             return [
               ...sortEntries(out.filter((e) => e.kind === "dir")),
               ...sortEntries(out.filter((e) => e.kind === "file")),
             ];
           }
+          t.end("ERR-parse");
         } catch {
           /* 退回下面的扁平列表 */
         }

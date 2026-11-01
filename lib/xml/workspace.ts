@@ -8,7 +8,15 @@
 // 规则（用户确认）：默认目录永远存在、不能为空；用户自选目录失效时回落默认。
 
 import { nativeBridge, nativeAvailable, chooseWorkspace } from "./native-save";
-import { listProjectsQueued, hasListProjectsAsync } from "./native-async";
+import {
+  listProjectsQueued,
+  hasListProjectsAsync,
+  hasListTopAsync,
+  listTopProjectsQueued,
+  hasAsyncIo,
+  readTextQueued,
+} from "./native-async";
+import { perfMark, perfTimer } from "./perf-log";
 import {
   fsAccessSupported,
   listProjects as webListProjects,
@@ -98,6 +106,22 @@ const NATIVE_LIST_TTL = 8000;
 export function invalidateNativeProjectCache(): void {
   nativeListCache.clear();
   topProjCache.clear();
+  sigCache = null;
+}
+
+/** M59：工作目录签名（做缓存 key 用）。原来每个列目录都同步 JNI 取一次，
+ *  现在本地缓存 3 秒；真正的刷新靠 invalidateNativeProjectCache()。 */
+let sigCache: { at: number; sig: string } | null = null;
+function wsSig(b: { getWorkspaceInfo?: () => string }): string {
+  if (sigCache && Date.now() - sigCache.at < 3000) return sigCache.sig;
+  let sig = "";
+  try {
+    sig = b.getWorkspaceInfo ? b.getWorkspaceInfo() : "";
+  } catch {
+    sig = "";
+  }
+  sigCache = { at: Date.now(), sig };
+  return sig;
 }
 
 /** 列工作目录下的项目 */
@@ -105,15 +129,13 @@ export async function wsListProjects(): Promise<WsProject[]> {
   const b = nativeBridge();
   if (b?.listProjects) {
     let raw: string | null = null;
-    const sig = (() => {
-      try {
-        return b.getWorkspaceInfo ? b.getWorkspaceInfo() : "";
-      } catch {
-        return "";
-      }
-    })();
+    const sig = wsSig(b);
     const hit = nativeListCache.get(sig);
-    if (hit && Date.now() - hit.at < NATIVE_LIST_TTL) return hit.items;
+    if (hit && Date.now() - hit.at < NATIVE_LIST_TTL) {
+      perfMark("ws.listProjects", "cache-hit items=" + hit.items.length);
+      return hit.items;
+    }
+    const t = perfTimer("ws.listProjects", "native");
     try {
       // M56：优先异步（后台线程深扫），老 APK 回退同步
       raw = hasListProjectsAsync() ? await listProjectsQueued() : null;
@@ -131,8 +153,10 @@ export async function wsListProjects(): Promise<WsProject[]> {
         dirPath: it.kind === "dir" ? it.path : undefined,
       }));
       nativeListCache.set(sig, { at: Date.now(), items });
+      t.end("items=" + items.length);
       return items;
     } catch {
+      t.end("ERR");
       return [];
     }
   }
@@ -168,16 +192,17 @@ export async function wsListTopProjects(): Promise<WsProject[]> {
     // M30：新版 bridge 直接给顶层列表（不递归），老 APK 没有这个方法就回退合并
     if (b.listTopProjects) {
       try {
-        const key = (() => {
-          try {
-            return (b.getWorkspaceInfo ? b.getWorkspaceInfo() : "") as string;
-          } catch {
-            return "";
-          }
-        })();
+        const key = wsSig(b);
         const cached = topProjCache.get(key);
-        if (cached && Date.now() - cached.at < TOP_PROJ_TTL) return cached.items;
-        const raw = JSON.parse(b.listTopProjects() || "{}") as {
+        if (cached && Date.now() - cached.at < TOP_PROJ_TTL) {
+          perfMark("ws.listTop", "cache-hit items=" + cached.items.length);
+          return cached.items;
+        }
+        // M59：优先异步（老 APK 没 listTopProjectsAsync → 回退同步）
+        const t = perfTimer("ws.listTop", hasListTopAsync() ? "native-async" : "native-sync");
+        let o = hasListTopAsync() ? await listTopProjectsQueued() : null;
+        if (o === null) o = b.listTopProjects() || "{}";
+        const raw = JSON.parse(o || "{}") as {
           ok?: boolean;
           items?: { name: string; kind: "dir" | "file"; rel: string; layoutCount?: number; mainPath?: string; docUri?: string; path?: string }[];
         };
@@ -191,8 +216,10 @@ export async function wsListTopProjects(): Promise<WsProject[]> {
             dirPath: it.kind === "dir" ? it.path : undefined,
           }));
           topProjCache.set(key, { at: Date.now(), items });
+          t.end("items=" + items.length);
           return items;
         }
+        t.end("ERR-empty");
       } catch {
         /* 回退到旧路径 */
       }
@@ -236,7 +263,8 @@ export async function wsOpenProject(p: WsProject): Promise<{ name: string; text:
   const b = nativeBridge();
   if (b?.readText) {
     if (!p.target) return null;
-    const text = b.readText(p.target);
+    // M59：打开项目改异步读（同步 JNI 读大文件会在 JS 线程堵几百毫秒）
+    const text = hasAsyncIo() ? await readTextQueued(p.target) : b.readText(p.target);
     if (!text) return null;
     return { name: p.kind === "dir" ? `${p.name}/layout` : p.name, text };
   }

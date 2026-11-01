@@ -12,12 +12,17 @@
  * 旧 APK 没有这三个方法 → `hasAsyncIo()` 返回 false，调用方自动退回同步读取。
  */
 
+import { perfMark } from "./perf-log";
+
 interface AsyncIoBridge {
   readTextAsync?(id: string, target: string): void;
   readBase64Async?(id: string, target: string): void;
   listDirAsync?(id: string, path: string): void;
   /** M56：全树深扫转后台线程（老 APK 没这个） */
   listProjectsAsync?(id: string): void;
+  /** M59：顶层项目列表 / 工作目录信息转后台线程 */
+  listTopProjectsAsync?(id: string): void;
+  getWorkspaceInfoAsync?(id: string): void;
 }
 
 type Resolver = (value: string | null) => void;
@@ -41,6 +46,18 @@ export function hasAsyncIo(): boolean {
 export function hasListProjectsAsync(): boolean {
   const b = bridge();
   return !!(b && b.listProjectsAsync);
+}
+
+/** M59：老 APK 没有 listTopProjectsAsync → 调用方退回同步 listTopProjects */
+export function hasListTopAsync(): boolean {
+  const b = bridge();
+  return !!(b && b.listTopProjectsAsync);
+}
+
+/** M59：老 APK 没有 getWorkspaceInfoAsync → 调用方退回同步 getWorkspaceInfo */
+export function hasWorkspaceInfoAsync(): boolean {
+  const b = bridge();
+  return !!(b && b.getWorkspaceInfoAsync);
 }
 
 function install(): void {
@@ -72,24 +89,30 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
   return next;
 }
 
-function call(kind: "readTextAsync" | "readBase64Async" | "listDirAsync" | "listProjectsAsync", arg: string | null, timeoutMs = 10_000): Promise<string | null> {
+function call(kind: "readTextAsync" | "readBase64Async" | "listDirAsync" | "listProjectsAsync" | "listTopProjectsAsync" | "getWorkspaceInfoAsync", arg: string | null, timeoutMs = 10_000): Promise<string | null> {
   const b = bridge();
   const fn = b?.[kind];
   if (!b || typeof fn !== "function") return Promise.resolve(null);
   install();
   const id = `io${Date.now().toString(36)}${(seq++).toString(36)}`;
+  const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
   return new Promise<string | null>((resolve) => {
     const timer = setTimeout(() => {
       pending.delete(id);
+      perfMark("io.timeout", `${kind} ${timeoutMs}ms`);
       resolve(null);
     }, timeoutMs);
     pending.set(id, (v) => {
       clearTimeout(timer);
+      // M59：量 JNI 往返（Java 后台线程 + 回传 eval 的总时间）
+      const ms = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
+      perfMark("io." + kind.replace("Async", ""), `${ms.toFixed(1)}ms ${arg ? arg.slice(-48) : ""} len=${v ? v.length : 0}`);
       resolve(v);
     });
     try {
-      // M56：listProjectsAsync 只要 id，没有第二个参数
-      if (kind === "listProjectsAsync") (fn as (id: string) => void).call(b, id);
+      // M56：listProjects 系只要 id，没有第二个参数
+      if (kind === "listProjectsAsync" || kind === "listTopProjectsAsync" || kind === "getWorkspaceInfoAsync")
+        (fn as (id: string) => void).call(b, id);
       else (fn as (id: string, arg: string) => void).call(b, id, arg ?? "");
     } catch {
       clearTimeout(timer);
@@ -118,6 +141,18 @@ export function listDirQueued(path: string): Promise<string | null> {
 export function listProjectsQueued(): Promise<string | null> {
   if (!hasListProjectsAsync()) return Promise.resolve(null);
   return enqueue(() => call("listProjectsAsync", null, 20_000));
+}
+
+/** M59：异步列顶层项目（不递归）——项目面板主路径 */
+export function listTopProjectsQueued(): Promise<string | null> {
+  if (!hasListTopAsync()) return Promise.resolve(null);
+  return enqueue(() => call("listTopProjectsAsync", null, 20_000));
+}
+
+/** M59：异步取工作目录信息（原来是同步 JNI，且一次列项目要被调好几次） */
+export function workspaceInfoQueued(): Promise<string | null> {
+  if (!hasWorkspaceInfoAsync()) return Promise.resolve(null);
+  return enqueue(() => call("getWorkspaceInfoAsync", null));
 }
 
 /** 让出一帧，避免连续 await 把主线程占满（React 有机会渲染） */

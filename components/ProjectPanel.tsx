@@ -803,10 +803,10 @@ export function ProjectPanel(p: ProjectPanelProps) {
             <button
               className="axv-rail-mini-btn"
               onClick={() => void p.onOpenDir()}
-              title="选一个项目文件夹（含 layout/*.xml）作为当前项目"
+              title="打开其他项目文件夹（含 layout/*.xml），作为当前项目"
             >
               <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
-              {tr("proj.open", "打开")}
+              {tr("proj.open", "打开项目")}
             </button>
             <button
               className="axv-rail-mini-btn"
@@ -841,7 +841,7 @@ export function ProjectPanel(p: ProjectPanelProps) {
           ) : null}
           {wsState?.mode === "web" && !wsState.custom ? (
             <div className="axv-ws-hint">
-              点「打开」授权一个项目文件夹，授权会被记住，下次打开不用再选。
+              点「打开项目」授权一个项目文件夹，授权会被记住，下次打开不用再选。
             </div>
           ) : null}
           {wsState?.permission === "prompt" ? (

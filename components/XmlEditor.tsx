@@ -20,7 +20,7 @@ import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild, childLimitOf } from "@/lib/xml/insert";
 import { moveNodeRaw, scanElements } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
-import { lintXml } from "@/lib/xml/lint";
+import { lintXml, type LintIssue } from "@/lib/xml/lint";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { sanitizeResName } from "@/lib/xml/resname";
 import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
@@ -125,7 +125,7 @@ import { GenAssetsPanel } from "./GenAssetsPanel";
 import IconEditor from "./IconEditor";
 import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/paths";
-import { LS_KEY_XML, LS_KEY_HIST, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, lsGet, lsSet } from "@/lib/xml/storage";
+import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, lsGet, lsSet } from "@/lib/xml/storage";
 import { RunPreview } from "./RunPreview";
 import { Toolbar } from "./Toolbar";
 import { LeftRail, type LeftView } from "./LeftRail";
@@ -884,6 +884,12 @@ export function XmlEditor() {
   // M30b：默认落在「XML 代码」tab
   const [mobileTab, setMobileTab] = useState<"preview" | "xml" | "values">("xml");
 
+  /** M56：代码 tab 时不需要渲染模型 —— 只在 preview/values 视图才把解析结果交给渲染管线，
+   *   这样代码 tab 连续打字时 parse/buildRenderModel/实测回路全不跑（代码高亮不受影响，
+   *   那是 CM6 自己的增量解析器，跟这条管线无关）。切回预览/停手后才重新算。 */
+  const previewActive = mobileTab === "preview" || mobileTab === "values";
+  const parsedForRender = previewActive ? parsedXml : "";
+
 
   /** M6g：统一的缩放入口（带钳位 + 锚点）。anchor 传鼠标/双指中心的视口坐标 */
   const ZOOM_MIN = 0.25;
@@ -996,32 +1002,10 @@ export function XmlEditor() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [applyZoom]);
-  const [history, setHistory] = useState<string[]>(() => {
-    const raw = lsGet(LS_KEY_HIST);
-    if (raw) {
-      try {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr) && arr.length > 0 && arr.every((x) => typeof x === "string")) {
-          return arr;
-        }
-      } catch {
-        /* 损坏则用默认 */
-      }
-    }
-    return [lsGet(LS_KEY_XML) ?? SAMPLES.list];
-  });
-  const [histIdx, setHistIdx] = useState(() => {
-    const raw = lsGet(LS_KEY_HIST);
-    if (raw) {
-      try {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr) && arr.length > 0) return Math.max(arr.length - 1, 0);
-      } catch {
-        /* 损坏则用默认 */
-      }
-    }
-    return 0;
-  });
+  const [history, setHistory] = useState<string[]>(() => [
+    lsGet(LS_KEY_XML) ?? SAMPLES.list,
+  ]);
+  const [histIdx, setHistIdx] = useState(0);
 
   /* ===== 撤销 / 重做 =====
      用 ref 存栈，避开 setState 异步导致连续操作串位置的问题。
@@ -1140,12 +1124,10 @@ export function XmlEditor() {
     }, 600);
     return () => window.clearTimeout(t);
   }, [project]);
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      lsSet(LS_KEY_HIST, JSON.stringify(history));
-    }, 600);
-    return () => window.clearTimeout(t);
-  }, [history]);
+  /* ===== M56：历史栈不再持久化到 localStorage =====
+   * 旧实现在每次打字停顿 600ms 后 JSON.stringify(60条×整份文档) ≈ 序列化 12MB 写 localStorage，
+   * 手机上这是真·卡顿源。历史本来就是「会话内」的（关 App 重开没有意义），
+   * 砍掉持久化，保留当前文档 LS_KEY_XML 的持久化（重启恢复当前内容）。 */
   useEffect(() => {
     // resExtras 里 dataURL 可能很大，写前检查配额
     if (!resExtras) return;
@@ -1370,7 +1352,11 @@ export function XmlEditor() {
     try {
       // M37b：非布局文件不走布局管线（否则 manifest 会被报缺 layout_width 之类）
       if (codeOnly) return { model: null, issues: [], parseErr: false, parseReason: "" };
-      const parsed = parseLayoutXml(parsedXml);
+      const parsed = parseLayoutXml(parsedForRender);
+      // M56：代码 tab 不打字解析（parsedForRender=""），高亮由 CM6 自己跑，互不影响
+      if (parsedForRender === "") {
+        return { model: null, issues: [], parseErr: false, parseReason: "" };
+      }
       if (!parsed.root) {
         const first = parsed.issues.find((i) => i.level === "error");
         return {
@@ -1406,13 +1392,13 @@ export function XmlEditor() {
         parseReason: `渲染失败：${e instanceof Error ? e.message : String(e)}`,
       };
     }
-  }, [parsedXml, resources, resExtras?.layouts, device, measured, renderTheme, codeOnly]);
+  }, [previewActive ? parsedForRender : "", resources, resExtras?.layouts, device, measured, renderTheme, codeOnly]);
 
   /** M2t：XML / 设备变了 → 旧 path 可能指向别的节点，实测表作废重测 */
   useEffect(() => {
     measurePass.current = 0;
     setMeasured((m) => (m ? null : m));
-  }, [parsedXml, device]);
+  }, [previewActive ? parsedForRender : "", device]);
 
   /**
    * M2t：wrap_content 真实尺寸回填。
@@ -1453,25 +1439,28 @@ export function XmlEditor() {
   /** 图层树用的原始节点树（不经渲染模型） */
   const treeRoot = useMemo(() => {
     if (parseErr) return null;
+    if (parsedForRender === "") return null;
     try {
-      return parseLayoutXml(parsedXml).root;
+      return parseLayoutXml(parsedForRender).root;
     } catch (e) {
       console.error("[axv] 解析图层树失败", e);
       return null;
     }
-  }, [parsedXml, parseErr]);
+  }, [previewActive ? parsedForRender : "", parseErr]);
 
   /** 代码视图的结构检查（带行号，标红用） */
   const lints = useMemo(() => {
     try {
       // M37b：非布局文件不做布局结构校验
       if (codeOnly) return [] as ReturnType<typeof lintXml>;
-      return lintXml(parsedXml);
+      // M56：代码 tab 暂停重算，切预览/停手后自动补上（高亮不受影响，由 CM6 自己跑）
+      if (parsedForRender === "") return [] as LintIssue[];
+      return lintXml(parsedForRender);
     } catch (e) {
       console.error("[axv] 结构检查失败", e);
-      return [] as ReturnType<typeof lintXml>;
+      return [] as LintIssue[];
     }
-  }, [parsedXml, codeOnly]);
+  }, [previewActive ? parsedForRender : "", codeOnly]);
   /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
   const lintErrCount = useMemo(() => {
     try {
@@ -2971,7 +2960,7 @@ const findResolved = findResolvedNode;
         onDropHint={setDropHint}
         onDrop={onDrop}
         model={model}
-        parsedXml={parsedXml}
+        parsedXml={previewActive ? parsedForRender : ""}
         issues={issues}
         showIssues={showIssues}
         parseErr={parseErr}

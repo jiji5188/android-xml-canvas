@@ -13,7 +13,7 @@ export interface MergeMark {
   key: string;
 }
 
-export const HISTORY_CAP = 60;
+export const HISTORY_CAP = 20;
 export const MERGE_MS = 900;
 
 export interface CommitOptions {

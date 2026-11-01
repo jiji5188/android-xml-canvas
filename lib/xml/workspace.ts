@@ -8,6 +8,7 @@
 // 规则（用户确认）：默认目录永远存在、不能为空；用户自选目录失效时回落默认。
 
 import { nativeBridge, nativeAvailable, chooseWorkspace } from "./native-save";
+import { listProjectsQueued, hasListProjectsAsync } from "./native-async";
 import {
   fsAccessSupported,
   listProjects as webListProjects,
@@ -88,16 +89,39 @@ export async function wsInfo(): Promise<WsInfo> {
   return { mode: "web", label: dir.name || "已选择目录", defaultPath: "", custom: true, allFiles: false, permission };
 }
 
+/** M56：native 深扫结果的短命缓存 —— 打开项目时不再每次重新全树扫
+ *  键是工作目录签名，缓存 8 秒（写操作后调用方会主动 invalidate） */
+const nativeListCache = new Map<string, { at: number; items: WsProject[] }>();
+const NATIVE_LIST_TTL = 8000;
+
+/** M56：文件操作/新建项目后要强制重扫 */
+export function invalidateNativeProjectCache(): void {
+  nativeListCache.clear();
+}
+
 /** 列工作目录下的项目 */
 export async function wsListProjects(): Promise<WsProject[]> {
   const b = nativeBridge();
   if (b?.listProjects) {
+    let raw: string | null = null;
+    const sig = (() => {
+      try {
+        return b.getWorkspaceInfo ? b.getWorkspaceInfo() : "";
+      } catch {
+        return "";
+      }
+    })();
+    const hit = nativeListCache.get(sig);
+    if (hit && Date.now() - hit.at < NATIVE_LIST_TTL) return hit.items;
     try {
-      const raw = JSON.parse(b.listProjects() || "{}") as {
+      // M56：优先异步（后台线程深扫），老 APK 回退同步
+      raw = hasListProjectsAsync() ? await listProjectsQueued() : null;
+      if (raw === null) raw = b.listProjects() || "{}";
+      const parsed = JSON.parse(raw || "{}") as {
         ok?: boolean;
         items?: { name: string; kind: "dir" | "file"; rel: string; layoutCount?: number; mainPath?: string; docUri?: string; path?: string }[];
       };
-      return (raw.items ?? []).map((it) => ({
+      const items = (parsed.items ?? []).map((it) => ({
         name: it.name,
         kind: it.kind,
         rel: it.rel,
@@ -105,6 +129,8 @@ export async function wsListProjects(): Promise<WsProject[]> {
         target: it.docUri ?? it.mainPath ?? it.path,
         dirPath: it.kind === "dir" ? it.path : undefined,
       }));
+      nativeListCache.set(sig, { at: Date.now(), items });
+      return items;
     } catch {
       return [];
     }

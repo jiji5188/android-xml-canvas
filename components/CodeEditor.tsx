@@ -11,7 +11,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Compartment, EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
+import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
   EditorView,

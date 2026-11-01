@@ -18,6 +18,7 @@ import { exportLayoutXml, type ExportMode } from "./export";
 import type { ResourceExtras } from "./resdir";
 import { saveBundleAnywhere, type SaveBundleResult, type SaveFileSpec } from "./save-as";
 import { saveTextNative, writeTextNative } from "./native-save";
+import { invalidateNativeProjectCache } from "./workspace";
 import { writeHandleText } from "./workspace-fs";
 import { downloadBytes, makeZip } from "./zip";
 
@@ -101,6 +102,8 @@ export async function saveBack(
     }
   }
   if (!ok) return { ok: false, depsWritten: 0, depsTotal: deps.length };
+  // M56：文件内容变了 → 清掉项目列表缓存，下次读重新扫
+  invalidateNativeProjectCache();
 
   let depsWritten = 0;
   if (target.kind === "native" && target.target.startsWith("/") && deps.length > 0) {

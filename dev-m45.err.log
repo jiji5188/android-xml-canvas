@@ -299,3 +299,338 @@ Incoming: [res, async (opts)=>{
   258 |             value={p.editorTheme.cursor}
   259 |             fallback={DEFAULT_EDITOR_THEME.cursor}
 ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] ./lib/version.ts:11:1
+Error: Merge conflict marker encountered.
+   9 | =======
+  10 | export const APP_VERSION = "1.14.39";
+> 11 | >>>>>>> parent of 7761d70 (M51: 选择资源弹窗颜色tab改用ARGB颜色选择器（ColorField + asArgb...
+     | ^^^^^^^
+  12 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/version.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/version.ts:11:1
+Error: Merge conflict marker encountered.
+   9 | =======
+  10 | export const APP_VERSION = "1.14.39";
+> 11 | >>>>>>> parent of 7761d70 (M51: 选择资源弹窗颜色tab改用ARGB颜色选择器（ColorField + asArgb...
+     | ^^^^^^^
+  12 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/version.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/version.ts:11:1
+Error: Merge conflict marker encountered.
+   9 | =======
+  10 | export const APP_VERSION = "1.14.39";
+> 11 | >>>>>>> parent of 7761d70 (M51: 选择资源弹窗颜色tab改用ARGB颜色选择器（ColorField + asArgb...
+     | ^^^^^^^
+  12 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/version.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/version.ts:11:1
+Error: Merge conflict marker encountered.
+   9 | =======
+  10 | export const APP_VERSION = "1.14.39";
+> 11 | >>>>>>> parent of 7761d70 (M51: 选择资源弹窗颜色tab改用ARGB颜色选择器（ColorField + asArgb...
+     | ^^^^^^^
+  12 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/version.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/version.ts:11:1
+Error: Merge conflict marker encountered.
+   9 | =======
+  10 | export const APP_VERSION = "1.14.39";
+> 11 | >>>>>>> parent of 7761d70 (M51: 选择资源弹窗颜色tab改用ARGB颜色选择器（ColorField + asArgb...
+     | ^^^^^^^
+  12 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/version.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/version.ts:11:1
+Error: Merge conflict marker encountered.
+   9 | =======
+  10 | export const APP_VERSION = "1.14.39";
+> 11 | >>>>>>> parent of 7761d70 (M51: 选择资源弹窗颜色tab改用ARGB颜色选择器（ColorField + asArgb...
+     | ^^^^^^^
+  12 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/version.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] Unexpected import of module [project]/components/XmlEditor.tsx [app-client] (ecmascript, next/dynamic entry) from module [project]/app/xml/page.tsx [app-client] (ecmascript), which was deleted by an HMR update (.next\dev\static\chunks\components_XmlEditor_tsx_1kug7hoaa0dz4._.js:20:16)
+[browser] ./lib/version.ts:11:1
+Error: Merge conflict marker encountered.
+   9 | =======
+  10 | export const APP_VERSION = "1.14.39";
+> 11 | >>>>>>> parent of 7761d70 (M51: 选择资源弹窗颜色tab改用ARGB颜色选择器（ColorField + asArgb...
+     | ^^^^^^^
+  12 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/version.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/version.ts:11:1
+Error: Merge conflict marker encountered.
+   9 | =======
+  10 | export const APP_VERSION = "1.14.39";
+> 11 | >>>>>>> parent of 7761d70 (M51: 选择资源弹窗颜色tab改用ARGB颜色选择器（ColorField + asArgb...
+     | ^^^^^^^
+  12 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/version.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] [axv] 渲染模型构建失败 ReferenceError: androidColorToCss is not defined
+    at argbToCss (lib/xml/resolve.ts:50:3)
+    at resolveColor (lib/xml/resolve.ts:69:33)
+    at resolveNodeAttrs (lib/xml/resolve.ts:289:43)
+    at resolveAll (lib/xml/css.ts:393:56)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at buildRenderModel (lib/xml/css.ts:1440:20)
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1387:32)
+    at XmlEditor (components/XmlEditor.tsx:1363:59)
+    at Set.forEach (<anonymous>)
+    at XmlPage (app/xml/page.tsx:8:10)
+  48 | // CSS 8 位是 #RRGGBBAA，不转就一定错色）
+  49 | function argbToCss(hex: string): string {
+> 50 |   return androidColorToCss(hex);
+     |   ^
+  51 | }
+  52 |
+  53 | export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[], path: string, prop: string): string { (components/XmlEditor.tsx:1401:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: androidColorToCss is not defined
+    at argbToCss (lib/xml/resolve.ts:50:3)
+    at resolveColor (lib/xml/resolve.ts:69:33)
+    at resolveNodeAttrs (lib/xml/resolve.ts:289:43)
+    at resolveAll (lib/xml/css.ts:393:56)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at buildRenderModel (lib/xml/css.ts:1440:20)
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1387:32)
+    at XmlEditor (components/XmlEditor.tsx:1363:59)
+    at Set.forEach (<anonymous>)
+    at XmlPage (app/xml/page.tsx:8:10)
+  48 | // CSS 8 位是 #RRGGBBAA，不转就一定错色）
+  49 | function argbToCss(hex: string): string {
+> 50 |   return androidColorToCss(hex);
+     |   ^
+  51 | }
+  52 |
+  53 | export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[], path: string, prop: string): string { (components/XmlEditor.tsx:1401:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: androidColorToCss is not defined
+    at argbToCss (lib/xml/resolve.ts:50:3)
+    at resolveColor (lib/xml/resolve.ts:69:33)
+    at resolveNodeAttrs (lib/xml/resolve.ts:289:43)
+    at resolveAll (lib/xml/css.ts:393:56)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at buildRenderModel (lib/xml/css.ts:1440:20)
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1387:32)
+    at XmlEditor (components/XmlEditor.tsx:1363:59)
+    at Set.forEach (<anonymous>)
+    at XmlPage (app/xml/page.tsx:8:10)
+  48 | // CSS 8 位是 #RRGGBBAA，不转就一定错色）
+  49 | function argbToCss(hex: string): string {
+> 50 |   return androidColorToCss(hex);
+     |   ^
+  51 | }
+  52 |
+  53 | export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[], path: string, prop: string): string { (components/XmlEditor.tsx:1401:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: androidColorToCss is not defined
+    at argbToCss (lib/xml/resolve.ts:50:3)
+    at resolveColor (lib/xml/resolve.ts:69:33)
+    at resolveNodeAttrs (lib/xml/resolve.ts:289:43)
+    at resolveAll (lib/xml/css.ts:393:56)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at buildRenderModel (lib/xml/css.ts:1440:20)
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1387:32)
+    at XmlEditor (components/XmlEditor.tsx:1363:59)
+    at Set.forEach (<anonymous>)
+    at XmlPage (app/xml/page.tsx:8:10)
+  48 | // CSS 8 位是 #RRGGBBAA，不转就一定错色）
+  49 | function argbToCss(hex: string): string {
+> 50 |   return androidColorToCss(hex);
+     |   ^
+  51 | }
+  52 |
+  53 | export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[], path: string, prop: string): string { (components/XmlEditor.tsx:1401:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: androidColorToCss is not defined
+    at argbToCss (lib/xml/resolve.ts:50:3)
+    at resolveColor (lib/xml/resolve.ts:69:33)
+    at resolveNodeAttrs (lib/xml/resolve.ts:289:43)
+    at resolveAll (lib/xml/css.ts:393:56)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at buildRenderModel (lib/xml/css.ts:1440:20)
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1387:32)
+    at XmlEditor (components/XmlEditor.tsx:1363:59)
+    at Set.forEach (<anonymous>)
+    at XmlPage (app/xml/page.tsx:8:10)
+  48 | // CSS 8 位是 #RRGGBBAA，不转就一定错色）
+  49 | function argbToCss(hex: string): string {
+> 50 |   return androidColorToCss(hex);
+     |   ^
+  51 | }
+  52 |
+  53 | export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[], path: string, prop: string): string { (components/XmlEditor.tsx:1401:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: androidColorToCss is not defined
+    at argbToCss (lib/xml/resolve.ts:50:3)
+    at resolveColor (lib/xml/resolve.ts:69:33)
+    at resolveNodeAttrs (lib/xml/resolve.ts:289:43)
+    at resolveAll (lib/xml/css.ts:393:56)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at <unknown> (lib/xml/css.ts:1409:20)
+    at Array.map (<anonymous>)
+    at resolveAll (lib/xml/css.ts:1408:31)
+    at buildRenderModel (lib/xml/css.ts:1440:20)
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1387:32)
+    at XmlEditor (components/XmlEditor.tsx:1363:59)
+    at Set.forEach (<anonymous>)
+    at XmlPage (app/xml/page.tsx:8:10)
+  48 | // CSS 8 位是 #RRGGBBAA，不转就一定错色）
+  49 | function argbToCss(hex: string): string {
+> 50 |   return androidColorToCss(hex);
+     |   ^
+  51 | }
+  52 |
+  53 | export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[], path: string, prop: string): string { (components/XmlEditor.tsx:1401:15)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] [axv] 渲染模型构建失败 ReferenceError: androidColorToCss is not defined
+    at argbToCss (lib/xml/resolve.ts:49:1)
+    at resolveColor (lib/xml/resolve.ts:55:21)
+    at resolveNodeAttrs (lib/xml/resolve.ts:246:36)
+    at resolveAll (lib/xml/css.ts:393:56)
+    at buildRenderModel (lib/xml/css.ts:1440:20)
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1387:32)
+    at XmlEditor (components/XmlEditor.tsx:1363:59)
+    at Set.forEach (<anonymous>)
+    at XmlPage (app/xml/page.tsx:8:10)
+  47 | // ===== Android ARGB → CSS 颜色 =====
+  48 | // M53：统一走 color-argb 的 androidColorToCss（Android 8 位是 #AARRGGBB，
+> 49 | // CSS 8 位是 #RRGGBBAA，不转就一定错色）
+     | ^
+  50 | function argbToCss(hex: string): string {
+  51 |   return androidColorToCss(hex);
+  52 | } (components/XmlEditor.tsx:1401:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: androidColorToCss is not defined
+    at argbToCss (lib/xml/resolve.ts:49:1)
+    at resolveColor (lib/xml/resolve.ts:55:21)
+    at resolveNodeAttrs (lib/xml/resolve.ts:246:36)
+    at resolveAll (lib/xml/css.ts:393:56)
+    at buildRenderModel (lib/xml/css.ts:1440:20)
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1387:32)
+    at XmlEditor (components/XmlEditor.tsx:1363:59)
+    at Set.forEach (<anonymous>)
+    at XmlPage (app/xml/page.tsx:8:10)
+  47 | // ===== Android ARGB → CSS 颜色 =====
+  48 | // M53：统一走 color-argb 的 androidColorToCss（Android 8 位是 #AARRGGBB，
+> 49 | // CSS 8 位是 #RRGGBBAA，不转就一定错色）
+     | ^
+  50 | function argbToCss(hex: string): string {
+  51 |   return androidColorToCss(hex);
+  52 | } (components/XmlEditor.tsx:1401:15)
+[browser] Uncaught Error: Module [project]/lib/xml/ai-transport.ts [app-client] (ecmascript) was instantiated because it was required from module [project]/components/AiPanel.tsx [app-client] (ecmascript), but the module factory is not available.
+This is often caused by a stale browser cache, misconfigured Cache-Control headers, or a service worker serving outdated responses.
+To fix this, make sure your Cache-Control headers allow revalidation of chunks and review your service worker configuration. As an immediate workaround, try hard-reloading the page, clearing the browser cache, or unregistering any service workers.
+    at module evaluation (components/AiPanel.tsx:21:1)
+    at module evaluation (components/XmlEditor.tsx:9:1)
+    at module evaluation (components/widget-catalog.ts:1023:33)
+    at <unknown> (.next\dev\static\chunks\components_XmlEditor_tsx_1kug7hoaa0dz4._.js:17:16)
+    at XmlPage (app/xml/page.tsx:8:10)
+  19 |   type AiMessage,
+  20 | } from "@/lib/xml/ai";
+> 21 | import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
+     | ^
+  22 | import { AI_TOOL_PROMPT, createNativeIo, extractToolCalls, runTool, stripToolBlocks } from "@/lib/xml/ai-tools";
+  23 |
+  24 | /** 工具循环最多几轮（防模型无限读文件） */

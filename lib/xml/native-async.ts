@@ -16,6 +16,8 @@ interface AsyncIoBridge {
   readTextAsync?(id: string, target: string): void;
   readBase64Async?(id: string, target: string): void;
   listDirAsync?(id: string, path: string): void;
+  /** M56：全树深扫转后台线程（老 APK 没这个） */
+  listProjectsAsync?(id: string): void;
 }
 
 type Resolver = (value: string | null) => void;
@@ -33,6 +35,12 @@ function bridge(): AsyncIoBridge | null {
 export function hasAsyncIo(): boolean {
   const b = bridge();
   return !!(b && b.readTextAsync && b.readBase64Async && b.listDirAsync);
+}
+
+/** M56：老 APK 没有 listProjectsAsync → 调用方退回同步 listProjects */
+export function hasListProjectsAsync(): boolean {
+  const b = bridge();
+  return !!(b && b.listProjectsAsync);
 }
 
 function install(): void {
@@ -64,7 +72,7 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
   return next;
 }
 
-function call(kind: "readTextAsync" | "readBase64Async" | "listDirAsync", arg: string, timeoutMs = 10_000): Promise<string | null> {
+function call(kind: "readTextAsync" | "readBase64Async" | "listDirAsync" | "listProjectsAsync", arg: string | null, timeoutMs = 10_000): Promise<string | null> {
   const b = bridge();
   const fn = b?.[kind];
   if (!b || typeof fn !== "function") return Promise.resolve(null);
@@ -80,7 +88,9 @@ function call(kind: "readTextAsync" | "readBase64Async" | "listDirAsync", arg: s
       resolve(v);
     });
     try {
-      (fn as (id: string, arg: string) => void).call(b, id, arg);
+      // M56：listProjectsAsync 只要 id，没有第二个参数
+      if (kind === "listProjectsAsync") (fn as (id: string) => void).call(b, id);
+      else (fn as (id: string, arg: string) => void).call(b, id, arg ?? "");
     } catch {
       clearTimeout(timer);
       pending.delete(id);
@@ -102,6 +112,12 @@ export function readBase64Queued(target: string): Promise<string | null> {
 /** 异步列一层目录 → 原始 JSON 字符串（失败返回 null） */
 export function listDirQueued(path: string): Promise<string | null> {
   return enqueue(() => call("listDirAsync", path));
+}
+
+/** M56：异步全树深扫（listProjects）→ 原始 JSON；老 APK 返回 null 让调用方回退同步版 */
+export function listProjectsQueued(): Promise<string | null> {
+  if (!hasListProjectsAsync()) return Promise.resolve(null);
+  return enqueue(() => call("listProjectsAsync", null, 20_000));
 }
 
 /** 让出一帧，避免连续 await 把主线程占满（React 有机会渲染） */

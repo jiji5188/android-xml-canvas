@@ -626,6 +626,17 @@ public class MainActivity extends Activity {
             }
         }
 
+        /** M56：listProjects 深扫走后台线程（同步版保留给老调用，JS 端有 hasListProjectsAsync 时优先用异步） */
+        @JavascriptInterface
+        public void listProjectsAsync(final String id) {
+            ioAsync(id, new java.util.concurrent.Callable<String>() {
+                @Override
+                public String call() throws Exception {
+                    return listProjectsJson();
+                }
+            });
+        }
+
         /** M33：异步读文件（后台线程，不卡 UI 线程/JS）。结果回调：
          *    window.__axvIo(id, textOrNull)    —— 文本
          *    window.__axvIo(id, base64OrNull)  —— base64

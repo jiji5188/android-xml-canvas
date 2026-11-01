@@ -6,6 +6,7 @@
 
 import { nativeBridge } from "./native-save";
 import { hasAsyncIo } from "./native-async";
+import { invalidateNativeProjectCache } from "./workspace";
 
 export type FileOpsBackend = "web" | "native";
 
@@ -103,6 +104,7 @@ export async function createEntry(ctx: FileOpsCtx, opts: CreateEntryOpts): Promi
   const name = opts.name.trim();
   if (!name) return { ok: false, reason: "名称为空" };
   if (name.includes("/") || name.includes("\\")) return { ok: false, reason: "名称不能含 / 或 \\" };
+  invalidateNativeProjectCache();
 
   if (ctx.backend === "web") {
     const root = ctx.root as WebDirLike;
@@ -140,6 +142,7 @@ export async function createEntry(ctx: FileOpsCtx, opts: CreateEntryOpts): Promi
 
 /** 重命名。Web 不支持（FSA 无 rename）→ reason:"web"。Native：bridge.renameEntry。 */
 export async function renameEntry(ctx: FileOpsCtx, rel: string, newName: string): Promise<FileOpsResult> {
+  invalidateNativeProjectCache();
   const name = newName.trim();
   if (!name) return { ok: false, reason: "名称为空" };
   if (name.includes("/") || name.includes("\\")) return { ok: false, reason: "名称不能含 / 或 \\" };
@@ -224,6 +227,7 @@ export async function copyEntry(
 
 /** 删除（目录递归）。Web 不支持 → reason:"web"。Native：bridge.deleteEntry。 */
 export async function deleteEntry(ctx: FileOpsCtx, rel: string, isDir: boolean): Promise<FileOpsResult> {
+  invalidateNativeProjectCache();
   if (ctx.backend === "web") return { ok: false, reason: "web" };
   const b = nativeBridge();
   if (!b || !("deleteEntry" in b)) return { ok: false, reason: "原生不支持" };

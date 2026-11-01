@@ -5614,6 +5614,19 @@ button.axv-ws-caret:hover {
 }
 .axv-ai-mini:hover { background: var(--axv-hover, var(--axv-primary-soft)); color: var(--axv-primary); }
 .axv-ai-hint { font-size: 11px; line-height: 1.55; color: var(--axv-on-surface-variant); }
+.axv-ai-chatbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--axv-on-surface-variant);
+  border-bottom: 1px solid var(--axv-outline-variant, #ffffff1a);
+  flex: 0 0 auto;
+}
+.axv-ai-chatbar-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .axv-ai-list {
   flex: 1;
   min-height: 80px;

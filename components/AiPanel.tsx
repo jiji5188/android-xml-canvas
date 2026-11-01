@@ -20,6 +20,8 @@ import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
 import { AI_TOOL_PROMPT, AI_TOOL_PROMPT_NATIVE, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
 import { AI_TOOL_SPECS, looksLikeToolsRejected, supportsNativeTools, toAiToolCall, toHistoryToolCalls } from "@/lib/xml/ai-fc";
 import { refreshAiCaches } from "@/lib/xml/ai-tools";
+import { clearChatFor, loadChatFor, saveChatFor } from "@/lib/xml/ai-chat-store";
+import type { ChatItemLike } from "@/lib/xml/ai-chat-types";
 import { createStagingIo, flushStaged, type StagedChange } from "@/lib/xml/ai-staging";
 import { compactHunks, diffLines, diffSummary } from "@/lib/xml/ai-diff";
 import {
@@ -139,7 +141,18 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   const [showKey, setShowKey] = useState(false);
   const [cfgOpen, setCfgOpen] = useState(() => !cfg.apiKey);
   const [input, setInput] = useState("");
-  const [chat, setChat] = useState<ChatItem[]>([]);
+  // M75：桶的键 = 项目名 + 文件相对路径（两个项目里的 main.xml 不能共用）
+  const chatRel = docRel ? `${projectName || "-"}/${docRel}` : "";
+  // M75：对话按文件存本地，重新打开接着聊（切文件自动换桶）
+  const [chat, setChat] = useState<ChatItem[]>(() => {
+    try {
+      return loadChatFor(window.localStorage, chatRel) as ChatItem[];
+    } catch {
+      return [];
+    }
+  });
+  const chatRef = useRef<ChatItem[]>(chat);
+  const chatRelRef = useRef(chatRel);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [withXml, setWithXml] = useState(true);
@@ -168,6 +181,39 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   useEffect(() => {
     toolMemRef.current = [];
   }, [docRel, projectName]);
+
+  // M75：chat 的最新值放 ref（存盘 effect 要用，但不能把它写进依赖里）
+  useEffect(() => {
+    chatRef.current = chat;
+  }, [chat]);
+
+  // M75：换文件 —— 旧文件存一次，新文件读回来
+  useEffect(() => {
+    const prev = chatRelRef.current;
+    if (prev === chatRel) return;
+    try {
+      if (prev) saveChatFor(window.localStorage, prev, chatRef.current as ChatItemLike[]);
+    } catch {
+      /* 存不下就算了 */
+    }
+    chatRelRef.current = chatRel;
+    try {
+      setChat(chatRel ? (loadChatFor(window.localStorage, chatRel) as ChatItem[]) : []);
+    } catch {
+      setChat([]);
+    }
+  }, [chatRel]);
+
+  // M75：对话变化 → 700ms 后落盘（流式过程中不存，半截内容没意义）
+  useEffect(() => {
+    const rel = chatRelRef.current;
+    if (!rel) return;
+    if (chat.some((m) => m.streaming)) return;
+    const t = window.setTimeout(() => {
+      saveChatFor(window.localStorage, rel, chat as ChatItemLike[]);
+    }, 700);
+    return () => window.clearTimeout(t);
+  }, [chat]);
 
   const factsFor = useCallback(async (io: AiFileIo | null, rel?: string | null) => {
     if (!io) return null;
@@ -793,6 +839,29 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           </div>
         ) : null}
       </div>
+
+      {chat.length ? (
+        <div className="axv-ai-chatbar">
+          <span className="msr" aria-hidden="true" style={{ fontSize: 15 }}>
+            history
+          </span>
+          <span className="axv-ai-chatbar-txt">{docRel ? "这个文件的对话已自动保存" : "本次对话（未绑定文件）"}</span>
+          <button
+            className="axv-ai-mini"
+            title="清空这个文件的对话"
+            onClick={() => {
+              setChat([]);
+              chatRef.current = [];
+              toolMemRef.current = [];
+              if (chatRel) clearChatFor(window.localStorage, chatRel);
+            }}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
+              delete_sweep
+            </span>
+          </button>
+        </div>
+      ) : null}
 
       {/* ===== 对话区 ===== */}
       <div className="axv-ai-list" ref={listRef}>

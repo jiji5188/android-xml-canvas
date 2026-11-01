@@ -12,7 +12,9 @@ import {
   listProjectsQueued,
   hasListProjectsAsync,
   hasListTopAsync,
+  hasListTopQuick,
   listTopProjectsQueued,
+  listTopProjectsQuickQueued,
   hasAsyncIo,
   readTextQueued,
 } from "./native-async";
@@ -186,6 +188,75 @@ export async function wsListProjects(): Promise<WsProject[]> {
 const topProjCache = new Map<string, { at: number; items: WsProject[] }>();
 const TOP_PROJ_TTL = 12_000;
 
+/* ---------------- M60：渐进式项目列表 ----------------
+ * 背景：冷启动时 11 个项目的完整探测要 1.6s（Java 端一趟扫 res 树），用户盯着空白列表等。
+ * 做法：先用 quick 通道（只数一层 xml，几十毫秒）把卡片画出来，完整探测在后台跑，
+ *       回来后写入缓存 + 通知订阅者，卡片再补上主布局/精确计数/图标名称。 */
+
+const inflightFull = new Map<string, Promise<WsProject[] | null>>();
+const topSubs = new Set<(items: WsProject[]) => void>();
+
+/** 订阅「后台补齐的完整项目列表」；返回退订函数 */
+export function wsSubscribeTopProjects(cb: (items: WsProject[]) => void): () => void {
+  topSubs.add(cb);
+  return () => {
+    topSubs.delete(cb);
+  };
+}
+
+function notifyTopUpdated(items: WsProject[]) {
+  for (const cb of [...topSubs]) {
+    try {
+      cb(items);
+    } catch {
+      /* 单个订阅者出错不影响其它 */
+    }
+  }
+}
+
+/** 解析 bridge 返回的项目列表 JSON（完整/快速两种通道格式一致） */
+function parseTopItems(raw: string | null): WsProject[] | null {
+  if (!raw) return null;
+  try {
+    const o = JSON.parse(raw || "{}") as {
+      ok?: boolean;
+      items?: { name: string; kind: "dir" | "file"; rel: string; layoutCount?: number; mainPath?: string; docUri?: string; path?: string }[];
+    };
+    if (o.ok === false || !Array.isArray(o.items)) return null;
+    return o.items.map((it) => ({
+      name: it.name,
+      kind: it.kind,
+      rel: it.rel,
+      layoutCount: it.layoutCount ?? 0,
+      target: it.docUri ?? it.mainPath ?? it.path,
+      dirPath: it.kind === "dir" ? it.path : undefined,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+/** 后台跑完整探测，结果写缓存 */
+async function loadTopFull(key: string): Promise<WsProject[] | null> {
+  const b = nativeBridge();
+  if (!b?.listTopProjects) return null;
+  const t = perfTimer("ws.listTopFull", "native-async");
+  try {
+    let o = hasListTopAsync() ? await listTopProjectsQueued() : null;
+    if (o === null) o = b.listTopProjects() || "{}";
+    const items = parseTopItems(o);
+    if (items) {
+      topProjCache.set(key, { at: Date.now(), items });
+      t.end("items=" + items.length);
+      return items;
+    }
+    t.end("ERR-empty");
+  } catch {
+    t.end("ERR");
+  }
+  return null;
+}
+
 export async function wsListTopProjects(): Promise<WsProject[]> {
   const b = nativeBridge();
   if (b) {
@@ -198,23 +269,30 @@ export async function wsListTopProjects(): Promise<WsProject[]> {
           perfMark("ws.listTop", "cache-hit items=" + cached.items.length);
           return cached.items;
         }
+        // M60：完整列表还没缓存 → 先要快速列表（毫秒级）出卡片，再后台跑完整探测
+        if (!cached && hasListTopQuick() && !inflightFull.has(key)) {
+          const qt = perfTimer("ws.listTopQuick", "native-async");
+          const qraw = await listTopProjectsQuickQueued();
+          const q = parseTopItems(qraw);
+          qt.end("items=" + (q ? q.length : 0));
+          if (q && q.length) {
+            const p: Promise<WsProject[] | null> = loadTopFull(key)
+              .then((full) => {
+                if (full && full.length) notifyTopUpdated(full);
+                return full;
+              })
+              .catch(() => null)
+              .finally(() => inflightFull.delete(key));
+            inflightFull.set(key, p);
+            return q;
+          }
+        }
         // M59：优先异步（老 APK 没 listTopProjectsAsync → 回退同步）
         const t = perfTimer("ws.listTop", hasListTopAsync() ? "native-async" : "native-sync");
         let o = hasListTopAsync() ? await listTopProjectsQueued() : null;
         if (o === null) o = b.listTopProjects() || "{}";
-        const raw = JSON.parse(o || "{}") as {
-          ok?: boolean;
-          items?: { name: string; kind: "dir" | "file"; rel: string; layoutCount?: number; mainPath?: string; docUri?: string; path?: string }[];
-        };
-        if (raw.ok !== false && Array.isArray(raw.items)) {
-          const items = raw.items.map((it) => ({
-            name: it.name,
-            kind: it.kind,
-            rel: it.rel,
-            layoutCount: it.layoutCount ?? 0,
-            target: it.docUri ?? it.mainPath ?? it.path,
-            dirPath: it.kind === "dir" ? it.path : undefined,
-          }));
+        const items = parseTopItems(o);
+        if (items) {
           topProjCache.set(key, { at: Date.now(), items });
           t.end("items=" + items.length);
           return items;

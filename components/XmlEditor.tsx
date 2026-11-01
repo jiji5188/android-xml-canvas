@@ -64,6 +64,7 @@ import {
 import {
   wsInfo,
   wsListTopProjects,
+  wsSubscribeTopProjects,
   wsOpenProject,
   wsPickCustom,
   wsUseDefault,
@@ -863,6 +864,16 @@ export function XmlEditor() {
     if (leftView === "res") void refreshWorkspace();
     else if (leftView === "settings" && !wsState) void refreshWorkspace();
   }, [leftView, refreshWorkspace, wsState]);
+
+  /* M60：订阅「后台补齐的完整项目列表」——快速列表先出卡片，完整探测回来后
+     自动替换成带 mainPath/精确计数的版本（并继续跑图标/名称分析） */
+  useEffect(() => {
+    const unsub = wsSubscribeTopProjects((full) => {
+      setWsProjects(full);
+      void analyzeProjects(full);
+    });
+    return unsub;
+  }, [analyzeProjects]);
 
   /* M24/M30：项目列表自动刷新 —— 12s 一次（原来 4s，在手机上频繁走 JNI 会卡）；
      切回页面/窗口获得焦点时立即刷一次。 */

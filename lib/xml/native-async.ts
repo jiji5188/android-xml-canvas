@@ -22,6 +22,8 @@ interface AsyncIoBridge {
   listProjectsAsync?(id: string): void;
   /** M59：顶层项目列表 / 工作目录信息转后台线程 */
   listTopProjectsAsync?(id: string): void;
+  /** M60：顶层项目快速列表（只数一层 xml，毫秒级） */
+  listTopProjectsQuickAsync?(id: string): void;
   getWorkspaceInfoAsync?(id: string): void;
 }
 
@@ -60,6 +62,12 @@ export function hasWorkspaceInfoAsync(): boolean {
   return !!(b && b.getWorkspaceInfoAsync);
 }
 
+/** M60：老 APK 没有 listTopProjectsQuickAsync → 直接等完整列表 */
+export function hasListTopQuick(): boolean {
+  const b = bridge();
+  return !!(b && b.listTopProjectsQuickAsync);
+}
+
 function install(): void {
   if (installed || typeof window === "undefined") return;
   installed = true;
@@ -89,7 +97,7 @@ function enqueue<T>(job: () => Promise<T>): Promise<T> {
   return next;
 }
 
-function call(kind: "readTextAsync" | "readBase64Async" | "listDirAsync" | "listProjectsAsync" | "listTopProjectsAsync" | "getWorkspaceInfoAsync", arg: string | null, timeoutMs = 10_000): Promise<string | null> {
+function call(kind: "readTextAsync" | "readBase64Async" | "listDirAsync" | "listProjectsAsync" | "listTopProjectsAsync" | "listTopProjectsQuickAsync" | "getWorkspaceInfoAsync", arg: string | null, timeoutMs = 10_000): Promise<string | null> {
   const b = bridge();
   const fn = b?.[kind];
   if (!b || typeof fn !== "function") return Promise.resolve(null);
@@ -111,7 +119,7 @@ function call(kind: "readTextAsync" | "readBase64Async" | "listDirAsync" | "list
     });
     try {
       // M56：listProjects 系只要 id，没有第二个参数
-      if (kind === "listProjectsAsync" || kind === "listTopProjectsAsync" || kind === "getWorkspaceInfoAsync")
+      if (kind === "listProjectsAsync" || kind === "listTopProjectsAsync" || kind === "listTopProjectsQuickAsync" || kind === "getWorkspaceInfoAsync")
         (fn as (id: string) => void).call(b, id);
       else (fn as (id: string, arg: string) => void).call(b, id, arg ?? "");
     } catch {
@@ -147,6 +155,12 @@ export function listProjectsQueued(): Promise<string | null> {
 export function listTopProjectsQueued(): Promise<string | null> {
   if (!hasListTopAsync()) return Promise.resolve(null);
   return enqueue(() => call("listTopProjectsAsync", null, 20_000));
+}
+
+/** M60：快速列表（毫秒级，先出卡片） */
+export function listTopProjectsQuickQueued(): Promise<string | null> {
+  if (!hasListTopQuick()) return Promise.resolve(null);
+  return enqueue(() => call("listTopProjectsQuickAsync", null, 15_000));
 }
 
 /** M59：异步取工作目录信息（原来是同步 JNI，且一次列项目要被调好几次） */

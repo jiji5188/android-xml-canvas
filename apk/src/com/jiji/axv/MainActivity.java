@@ -774,6 +774,17 @@ public class MainActivity extends Activity {
             });
         }
 
+        /** M60：顶层项目「快速列表」——只列目录 + 数一层 xml，毫秒级，先出卡片 */
+        @JavascriptInterface
+        public void listTopProjectsQuickAsync(final String id) {
+            ioAsync(id, new java.util.concurrent.Callable<String>() {
+                @Override
+                public String call() throws Exception {
+                    return listTopProjectsQuickJson();
+                }
+            });
+        }
+
         @JavascriptInterface
         public void getWorkspaceInfoAsync(final String id) {
             ioAsync(id, new java.util.concurrent.Callable<String>() {
@@ -1441,14 +1452,19 @@ public class MainActivity extends Activity {
                 String nm = f.getName().toLowerCase(Locale.ROOT);
                 if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
                 if (f.isDirectory()) {
+                    // M60：先 quick（毫秒级）——有 res 或任何 xml 就当项目，卡片立刻能出
+                    int[] quick = probeProjectQuick(f);
+                    boolean quickOk = quick[0] > 0 || quick[1] == 1;
+                    if (!quickOk) continue;
                     Object[] probe = probeProject(f);
                     int cnt = ((Integer) probe[0]).intValue();
-                    if (cnt == 0) continue;
+                    if (cnt == 0 && quick[0] == 0) continue;
                     JSONObject it = new JSONObject();
                     it.put("name", f.getName());
                     it.put("kind", "dir");
                     it.put("rel", f.getName());
                     it.put("layoutCount", cnt);
+                    it.put("xmlCount", quick[0]);
                     it.put("depth", 0);
                     it.put("path", f.getAbsolutePath());
                     if (probe[1] != null) it.put("mainPath", (String) probe[1]);
@@ -1463,6 +1479,48 @@ public class MainActivity extends Activity {
                     it.put("path", f.getAbsolutePath());
                     items.put(it);
                 }
+            }
+        }
+        out.put("items", items);
+        return out.toString();
+    }
+
+    /** M60：顶层项目快速列表（只数一层 xml，不深扫；SAF 模式返回空让 JS 走完整路径） */
+    private String listTopProjectsQuickJson() throws Exception {
+        JSONObject out = new JSONObject();
+        JSONArray items = new JSONArray();
+        out.put("ok", true);
+        out.put("quick", true);
+        if (treeUri != null) {
+            out.put("items", items);
+            return out.toString();
+        }
+        File d = defaultDir();
+        out.put("dir", "AndroidUIIDE/Project");
+        out.put("path", d.getAbsolutePath());
+        out.put("kind", "file");
+        File[] fs = d.listFiles();
+        if (fs != null) {
+            java.util.Arrays.sort(fs, (a, b) -> {
+                if (a.isDirectory() != b.isDirectory()) return a.isDirectory() ? -1 : 1;
+                return a.getName().compareToIgnoreCase(b.getName());
+            });
+            for (File f : fs) {
+                String nm = f.getName().toLowerCase(Locale.ROOT);
+                if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
+                if (!f.isDirectory()) continue;
+                int[] quick = probeProjectQuick(f);
+                if (quick[0] == 0 && quick[1] == 0) continue;
+                JSONObject it = new JSONObject();
+                it.put("name", f.getName());
+                it.put("kind", "dir");
+                it.put("rel", f.getName());
+                it.put("layoutCount", quick[0]);
+                it.put("xmlCount", quick[0]);
+                it.put("depth", 0);
+                it.put("path", f.getAbsolutePath());
+                it.put("quick", true);
+                items.put(it);
             }
         }
         out.put("items", items);
@@ -1551,6 +1609,8 @@ public class MainActivity extends Activity {
      *  - 预算法：最多访问 PROBE_MAX_VISITS 个条目，超了就用当前结果返回（够判断“是不是项目”）；
      *  - mtime 缓存：同一目录上次修改时间没变就直接用缓存（轮询/切 tab 都是免费）。 */
     private static final int PROBE_MAX_VISITS = 600;
+    /** M60 quick 阶段：只扫到第一层 xml，预算更小（~40ms/项目） */
+    private static final int PROBE_QUICK_VISITS = 60;
     private static final int PROBE_MAX_DEPTH = 8;
     private static final int PROBE_COUNT_CAP = 99;
 
@@ -1559,6 +1619,9 @@ public class MainActivity extends Activity {
         String mainPath = null;
         int visits = 0;
         boolean budgetOut = false;
+        /** M60：XML 总数（封顶 99），quick 阶段给 JS 先显示 */
+        int xmlCount = 0;
+        boolean sawRes = false;
     }
 
     private static long probeLastMtime(File dir) {
@@ -1593,8 +1656,10 @@ public class MainActivity extends Activity {
             String nm = f.getName().toLowerCase(Locale.ROOT);
             if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
             if (f.isDirectory()) {
+                if (nm.equals("res")) p.sawRes = true;
                 probeDir(f, depth + 1, p);
             } else if (nm.endsWith(".xml")) {
+                if (p.xmlCount < PROBE_COUNT_CAP) p.xmlCount++;
                 if (p.count < PROBE_COUNT_CAP) p.count++;
                 // 主布局优先 activity_main / main，其次第一个遇到的
                 if (p.mainPath == null) p.mainPath = f.getAbsolutePath();
@@ -1606,6 +1671,39 @@ public class MainActivity extends Activity {
     }
 
     private final java.util.HashMap<String, Object[]> probeCache = new java.util.HashMap<>();
+
+    /** M60 quick 探测：只看直接子目录 + res 里第一层 xml，不进深层（每个项目 ~几十 ms 以内）
+     *  返回 [xmlCount:Integer, sawRes:Boolean]；没有 res 的目录快速判非项目（count=0） */
+    private int[] probeProjectQuick(File dir) {
+        File[] fs = dir.listFiles();
+        int xml = 0;
+        boolean sawRes = false;
+        if (fs != null) {
+            for (File f : fs) {
+                String nm = f.getName().toLowerCase(Locale.ROOT);
+                if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
+                if (f.isDirectory()) {
+                    if (nm.equals("res")) {
+                        sawRes = true;
+                        File[] resFiles = f.listFiles();
+                        if (resFiles != null) {
+                            for (File rf : resFiles) {
+                                if (rf.isDirectory() && rf.getName().toLowerCase(Locale.ROOT).startsWith("layout")) {
+                                    File[] ls = rf.listFiles();
+                                    if (ls != null) xml += ls.length;
+                                } else if (rf != null && rf.getName().toLowerCase(Locale.ROOT).endsWith(".xml")) {
+                                    xml++;
+                                }
+                            }
+                        }
+                    }
+                } else if (nm.endsWith(".xml")) {
+                    xml++;
+                }
+            }
+        }
+        return new int[] { Math.min(xml, PROBE_COUNT_CAP), sawRes ? 1 : 0 };
+    }
 
     /** 带缓存的探测（返回 [count:Integer, mainPath:String]） */
     private Object[] probeProject(File dir) {

@@ -876,7 +876,9 @@ export function ProjectPanel(p: ProjectPanelProps) {
                           </span>
                           <span className="axv-ws-item-sub">
                             {it.kind === "dir"
-                              ? `${libLabel(meta?.lib)}${meta?.name && meta.name !== it.name ? ` · ${it.name}` : ""}`
+                              ? meta
+                                ? `${libLabel(meta.lib)}${meta.name && meta.name !== it.name ? ` · ${it.name}` : ""}`
+                                : `~${it.layoutCount || 1} 个布局 · ${it.name}`
                               : `单个布局 · ${it.name}`}
                           </span>
                         </span>

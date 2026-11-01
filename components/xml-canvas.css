@@ -6732,3 +6732,216 @@ button.axv-sb-item:hover {
   padding: 0;
 }
 .axv-proj-filter-clear .msr { font-size: 14px; }
+
+
+/* ===== M63：HSV 取色器（替换原生 input[type=color]） ===== */
+.axv-cf-pop {
+  /* 比旧版宽一点，装得下 HSV 面板 */
+  width: 236px;
+  padding: 10px;
+  gap: 8px;
+}
+.axv-hsv {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+/* 饱和度/明度面板：三层 CSS 渐变（hsl 底 + 横白 + 纵黑），拖动时零重算 */
+.axv-hsv-panel {
+  position: relative;
+  width: 100%;
+  height: 132px;
+  border-radius: 9px;
+  overflow: hidden;
+  cursor: crosshair;
+  /* 关键：别让浏览器把手势抢去做滚动 */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.axv-hsv-dot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.axv-hsv-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+.axv-hsv-lab {
+  flex: 0 0 28px;
+  opacity: 0.7;
+}
+.axv-hsv-num {
+  flex: 0 0 38px;
+  text-align: right;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+/* 色相条 */
+.axv-hsv-hue {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 14px;
+  border-radius: 7px;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  background: linear-gradient(90deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.axv-hsv-hue::-webkit-slider-thumb,
+.axv-hsv-alpha::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.axv-hsv-hue::-moz-range-thumb,
+.axv-hsv-alpha::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+/* 透明度：棋盘格底层 + 渐变层 + 透明轨道 */
+.axv-hsv-alpha-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.axv-hsv-checker {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(45deg, #d0d0d0 25%, transparent 25%),
+    linear-gradient(-45deg, #d0d0d0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d0d0d0 75%),
+    linear-gradient(-45deg, transparent 75%, #d0d0d0 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  background-color: #fff;
+}
+.axv-hsv-alpha-bar {
+  position: absolute;
+  inset: 0;
+}
+.axv-hsv-alpha {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 14px;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  background: transparent;
+}
+.axv-hsv-alpha::-webkit-slider-runnable-track,
+.axv-hsv-hue::-webkit-slider-runnable-track {
+  height: 14px;
+  border-radius: 7px;
+  background: transparent;
+}
+/* 预览 + ARGB 输入 */
+.axv-hsv-prev-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.axv-hsv-preview {
+  position: relative;
+  flex: 0 0 46px;
+  height: 28px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+.axv-hsv-prev-layer {
+  position: absolute;
+  inset: 0;
+}
+.axv-hsv-hex {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 7px;
+  background: var(--axv-surface, #fff);
+  color: inherit;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+}
+.axv-hsv-sub {
+  font-size: 10.5px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  margin-top: -4px;
+}
+.axv-hsv-presets {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 5px;
+}
+.axv-hsv-preset {
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  padding: 0;
+}
+.axv-hsv-actions {
+  display: flex;
+  gap: 7px;
+}
+.axv-hsv-btn {
+  flex: 1;
+  height: 28px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-hsv-ok {
+  border-color: transparent;
+  background: var(--axv-primary, #3498db);
+  color: #fff;
+  font-weight: 600;
+}
+.axv-hsv-native-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  opacity: 0.75;
+}
+.axv-hsv-native {
+  width: 62px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}

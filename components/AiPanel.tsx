@@ -18,6 +18,8 @@ import {
 } from "@/lib/xml/ai";
 import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
 import { AI_TOOL_PROMPT, createNativeIo, extractToolCalls, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
+import { createStagingIo, flushStaged, type StagedChange } from "@/lib/xml/ai-staging";
+import { compactHunks, diffLines, diffSummary } from "@/lib/xml/ai-diff";
 import { aiDocContextOf, buildAiSystemPrompt, docPreamble, quickActionsFor } from "@/lib/xml/ai-doc-context";
 import { aiAllowProtectedGet, aiAllowProtectedSet } from "@/lib/xml/ai-paths";
 
@@ -45,6 +47,8 @@ interface Props {
    * 显式传 null 表示「这个项目没有可用通道」→ prompt 里不出现工具段。
    */
   fileIo?: AiFileIo | null;
+  /** M64e（B3）：AI 改动落盘后按文件回调（编辑器刷新当前文档 + 进撤销栈） */
+  onApplied?: (p: { rel: string; text: string }) => void;
 }
 
 interface ChatItem extends AiMessage {
@@ -57,7 +61,7 @@ interface ChatItem extends AiMessage {
   streaming?: boolean;
 }
 
-export default function AiPanel({ xml, docRel, selection, resources, onReplaceXml, onNote, projectName, fileIo }: Props) {
+export default function AiPanel({ xml, docRel, selection, resources, onReplaceXml, onNote, projectName, fileIo, onApplied }: Props) {
   const [cfg, setCfg] = useState<AiConfig>(() => {
     try {
       return loadAiConfig(window.localStorage.getItem(AI_LS_KEY));
@@ -80,6 +84,18 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   const [useNative, setUseNative] = useState(() => nativeAiAvailable());
   const abortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  // M64e（B3）：AI 写操作先暂存，用户点「应用」才落盘
+  const [staged, setStaged] = useState<StagedChange[]>([]);
+  const [diffOpen, setDiffOpen] = useState<Record<string, boolean>>({});
+  const [applying, setApplying] = useState(false);
+  const stageHost = useRef<{ base: AiFileIo; host: ReturnType<typeof createStagingIo> } | null>(null);
+
+  const stageFor = useCallback((base: AiFileIo) => {
+    if (!stageHost.current || stageHost.current.base !== base) {
+      stageHost.current = { base, host: createStagingIo(base, (cs) => setStaged(cs)) };
+    }
+    return stageHost.current;
+  }, []);
 
   // 配置落盘
   useEffect(() => {
@@ -129,6 +145,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
 
       // M64b：优先用项目自己的通道；只有调用方没传（undefined）时才回退到老的原生实现
       const io = fileIo !== undefined ? fileIo : createNativeIo(projectName || undefined);
+      // M64e（B3）：有写能力的通道包一层暂存，写不直接落盘
+      const stage = io ? stageFor(io).host : null;
       const sys = [
         buildAiSystemPrompt(doc),
         io
@@ -214,13 +232,15 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             const label =
               call.tool === "write_file"
                 ? `写入 ${call.path}`
-                : call.tool === "read_file"
-                  ? `读取 ${call.path}`
-                  : call.tool === "list_files"
-                    ? `列出 ${call.dir || "/"}`
-                    : `搜索 ${call.query}`;
+                : call.tool === "apply_patch"
+                  ? `修改 ${call.path}`
+                  : call.tool === "read_file"
+                    ? `读取 ${call.path}`
+                    : call.tool === "list_files"
+                      ? `列出 ${call.dir || "/"}`
+                      : `搜索 ${call.query}`;
             setChat((c) => [...c, { role: "assistant", content: `⏳ ${label}…`, streaming: false }]);
-            const out = await runTool(call, io);
+            const out = await runTool(call, stage ?? (io as AiFileIo));
             if (ctrl.signal.aborted) {
               // 工具已经跑完了但用户中途停了：把这条标记成已中断，不再请求下一轮
               setChat((c) => {
@@ -301,6 +321,47 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       onNote?.("复制失败，请手动选中");
     }
   };
+
+  // M64e（B3）：放弃暂存 → 什么都不写
+  const discardStaged = useCallback(() => {
+    stageHost.current?.host.clear();
+    setStaged([]);
+    setDiffOpen({});
+    onNote?.("已放弃 AI 改动");
+  }, [onNote]);
+
+  // M64e（B3）：应用暂存 → 先备份原文再落盘；成功的文件回调给编辑器刷新/进撤销栈
+  const applyStaged = useCallback(async () => {
+    const host = stageHost.current;
+    if (!host || !staged.length || applying) return;
+    setApplying(true);
+    setErr("");
+    try {
+      const r = await flushStaged(host.base, staged);
+      let okCount = 0;
+      for (const it of r.results) {
+        if (!it.ok) continue;
+        okCount++;
+        const ch = staged.find((s) => s.rel === it.rel);
+        if (ch) onApplied?.({ rel: it.rel, text: ch.after });
+      }
+      const bad = r.results.filter((x) => !x.ok);
+      if (bad.length) {
+        setErr(`有 ${bad.length} 个文件没写成：${bad[0].rel} — ${bad[0].error || "未知原因"}`);
+        setStaged((cur) => cur.filter((c) => bad.some((b) => b.rel === c.rel)));
+      } else {
+        host.host.clear();
+        setStaged([]);
+        setDiffOpen({});
+      }
+      if (okCount) {
+        const hasBackup = r.results.some((x) => x.backup);
+        onNote?.(`已落盘 ${okCount} 个文件${hasBackup ? "（原文件备份在 .axv_backup/）" : ""}`);
+      }
+    } finally {
+      setApplying(false);
+    }
+  }, [applying, onApplied, onNote, staged]);
 
   const providerHint = AI_PROVIDERS.find((p) => p.id === cfg.provider);
 
@@ -527,6 +588,57 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           </button>
         ))}
       </div>
+
+      {/* ===== M64e（B3）：AI 改动待确认 ===== */}
+      {staged.length ? (
+        <div className="axv-ai-diffcard">
+          <div className="axv-ai-diffcard-head">
+            <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>difference</span>
+            <b>待应用的改动</b>
+            <span className="axv-ai-diffcard-sub">{staged.length} 个文件</span>
+            <span className="axv-ai-spacer" />
+            <button className="axv-btn axv-ghost" disabled={applying} onClick={discardStaged}>
+              放弃
+            </button>
+            <button className="axv-btn" disabled={applying} onClick={() => void applyStaged()}>
+              {applying ? "写入中…" : "全部应用"}
+            </button>
+          </div>
+          {staged.map((c) => {
+            const d = diffLines(c.before ?? "", c.after);
+            const open = !!diffOpen[c.rel];
+            return (
+              <div className="axv-ai-diffcard-file" key={c.rel}>
+                <button className="axv-ai-diffcard-row" onClick={() => setDiffOpen((m) => ({ ...m, [c.rel]: !m[c.rel] }))}>
+                  <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>{open ? "expand_less" : "expand_more"}</span>
+                  <span className="axv-ai-diffcard-name">
+                    {c.rel}
+                    {c.before === null ? <em>（新建）</em> : null}
+                  </span>
+                  <span className="axv-ai-diffcard-stat">
+                    <span className="add">+{d.added}</span>
+                    <span className="del">-{d.removed}</span>
+                  </span>
+                </button>
+                {open ? (
+                  <pre className="axv-ai-diff">
+                    {compactHunks(d.lines, 2)
+                      .slice(0, 200)
+                      .map((l, i) => (
+                        <div key={i} className={`axv-ai-diff-line op-${l.op === " " ? "ctx" : l.op === "+" ? "add" : "del"}`}>
+                          <span className="axv-ai-diff-op">{l.op}</span>
+                          {l.text}
+                        </div>
+                      ))}
+                    {d.truncated ? <div className="axv-ai-diff-line op-ctx">… 文件较大，仅预览前 200 行</div> : null}
+                  </pre>
+                ) : null}
+              </div>
+            );
+          })}
+          <div className="axv-ai-diffcard-foot">应用前会把原文件备份到 .axv_backup/</div>
+        </div>
+      ) : null}
 
       {/* ===== 输入 ===== */}
       <div className="axv-ai-input">

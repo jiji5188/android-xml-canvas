@@ -5663,6 +5663,118 @@ button.axv-ws-caret:hover {
   border-color: color-mix(in srgb, var(--axv-primary) 45%, transparent);
   color: var(--axv-primary);
 }
+
+/* ===== M64e（B3）：AI 改动待确认卡片 ===== */
+.axv-ai-diffcard {
+  margin: 6px 8px 0;
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  background: var(--axv-surface-sunken);
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.axv-ai-diffcard-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--axv-outline);
+}
+.axv-ai-diffcard-sub {
+  color: var(--axv-on-surface-variant);
+  font-size: 11px;
+}
+.axv-ai-spacer {
+  flex: 1 1 auto;
+}
+.axv-ai-diffcard-head .axv-btn {
+  padding: 2px 8px;
+  font-size: 11.5px;
+  line-height: 18px;
+  min-height: 0;
+  height: 24px;
+}
+.axv-ai-diffcard-file + .axv-ai-diffcard-file {
+  border-top: 1px dashed var(--axv-outline);
+}
+.axv-ai-diffcard-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 8px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.axv-ai-diffcard-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+.axv-ai-diffcard-name em {
+  font-style: normal;
+  color: var(--axv-primary);
+  margin-left: 4px;
+}
+.axv-ai-diffcard-stat {
+  flex: 0 0 auto;
+  font-family: var(--axv-mono, monospace);
+  font-size: 10.5px;
+  display: flex;
+  gap: 4px;
+}
+.axv-ai-diffcard-stat .add {
+  color: #2e7d32;
+}
+.axv-ai-diffcard-stat .del {
+  color: #c62828;
+}
+.axv-ai-diff {
+  margin: 0;
+  padding: 4px 0;
+  max-height: 220px;
+  overflow: auto;
+  background: var(--axv-surface);
+  font-family: var(--axv-mono, monospace);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+.axv-ai-diff-line {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px;
+  white-space: pre;
+}
+.axv-ai-diff-op {
+  flex: 0 0 10px;
+  opacity: 0.6;
+}
+.axv-ai-diff-line.op-add {
+  background: rgba(46, 125, 50, 0.12);
+  color: #2e7d32;
+}
+.axv-ai-diff-line.op-del {
+  background: rgba(198, 40, 40, 0.12);
+  color: #c62828;
+}
+.axv-ai-diff-line.op-ctx {
+  color: var(--axv-on-surface-variant);
+}
+.axv-ai-diffcard-foot {
+  padding: 4px 8px 6px;
+  font-size: 10.5px;
+  color: var(--axv-on-surface-variant);
+  border-top: 1px solid var(--axv-outline);
+}
 .axv-ai-code {
   border: 1px solid var(--axv-outline);
   border-radius: 10px;

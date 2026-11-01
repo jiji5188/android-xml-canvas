@@ -41,6 +41,8 @@ export interface AiFileIo {
   rootLabel(): string;
   /** 能力标记：能不能写（UI 角标 + prompt 里是否提 write/patch） */
   canWrite?: boolean;
+  /** 暂存模式（B3）：write 只登记不落盘，工具结果文案改成「已暂存」 */
+  staging?: boolean;
   list(rel: string): Promise<{ ok: boolean; items?: AiFileEntry[]; error?: string }>;
   read(rel: string): Promise<{ ok: boolean; text?: string; error?: string }>;
   write(rel: string, text: string): Promise<{ ok: boolean; error?: string }>;
@@ -153,7 +155,9 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
     }
     const r = await io.write(rel.rel, call.content);
     if (!r.ok) return `错误：${r.error || "写入失败"}`;
-    return `已写入 ${rel.rel}（${call.content.length} 字符）`;
+    return io.staging
+      ? `已暂存新建 ${rel.rel}（${call.content.length} 字符，等用户点「应用」才落盘）`
+      : `已写入 ${rel.rel}（${call.content.length} 字符）`;
   }
 
   if (call.tool === "apply_patch") {
@@ -183,7 +187,9 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
     }
     const w = await io.write(rel.rel, text);
     if (!w.ok) return `错误：${w.error || "写入失败"}`;
-    return `已修改 ${rel.rel}（${edits.length} 处）`;
+    return io.staging
+      ? `已暂存修改 ${rel.rel}（${edits.length} 处，等用户点「应用」才落盘）`
+      : `已修改 ${rel.rel}（${edits.length} 处）`;
   }
 
   // search_files

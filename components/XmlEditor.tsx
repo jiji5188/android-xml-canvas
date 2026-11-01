@@ -70,6 +70,7 @@ import {
   wsPickCustom,
   wsUseDefault,
   wsRequestAllFiles,
+  invalidateNativeProjectCache,
   type WsInfo,
   type WsProject,
 } from "@/lib/xml/workspace";
@@ -3193,6 +3194,14 @@ const findResolved = findResolvedNode;
               projectName={activeProject?.name || ""}
               selection={pathChain.length ? pathChain.map((p) => `${p.tag}${p.id ? "#" + String(p.id).replace("@+id/", "") : ""}`).join(" > ") : null}
               onReplaceXml={(next) => setXmlAndTrack(next, "")}
+              onApplied={({ rel, text }) => {
+                // M64e（B3）：落盘成功后刷新缓存；若改的正好是当前文档，直接进画布 + 撤销栈
+                invalidateNativeProjectCache();
+                const key = openRel || saveOrigin?.name || "";
+                if (key && rel === key) setXmlAndTrack(text, `ai:${rel}`);
+                setExportNote(`AI 已更新 ${rel}`);
+                window.setTimeout(() => setExportNote(" "), 3000);
+              }}
               onNote={(text) => {
                 setExportNote(text);
                 window.setTimeout(() => setExportNote(" "), 3000);

@@ -67,7 +67,8 @@ apk/build/
 apk/assets/
 apk/debug.keystore
 
-# 本地日志
+# 锟斤拷锟斤拷锟斤拷志
 _dev.log
 
 dev-m45.log
+app.apk.idsig

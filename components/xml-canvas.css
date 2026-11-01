@@ -1845,6 +1845,27 @@ body.axv-lt-dragging .axv-lt-row {
   color: var(--axv-danger);
 }
 
+/* M65：资源引用 → 跳到定义行 */
+.axv-attr-jump {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: color-mix(in srgb, var(--axv-primary) 12%, transparent);
+  color: var(--axv-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+}
+.axv-attr-jump .msr {
+  font-size: 15px;
+}
+.axv-attr-jump:hover {
+  background: color-mix(in srgb, var(--axv-primary) 24%, transparent);
+}
+
 .axv-attr-empty {
   color: var(--axv-on-surface-variant);
   font-size: 12px;

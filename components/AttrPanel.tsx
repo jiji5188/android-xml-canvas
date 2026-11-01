@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { parseResRef } from "@/lib/xml/res-refs";
 import type { ResolvedNode } from "@/lib/xml/types";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import { editorFor, defaultFor, type AttrEditor } from "./attr-catalog";
@@ -32,6 +33,8 @@ export interface AttrPanelProps {
   onRemove: (name: string) => void;
   /** 删除当前选中的节点（控件） */
   onDeleteNode?: () => void;
+  /** M65：属性值是 @string/@color/@dimen 这类资源引用时，点「跳」去定义行 */
+  onOpenRef?: (value: string) => void;
   /** 打开「添加属性」弹窗 */
   onAddAttr: () => void;
   /** 已上传 res 资源（可选；提供后 background/src 可弹 drawable 列表） */
@@ -122,6 +125,7 @@ export function AttrPanel({
   onAddAttr,
   resExtras,
   onDeleteNode,
+  onOpenRef,
   onPickIcon,
   onEditIconResource,
   iconNames,
@@ -566,6 +570,16 @@ export function AttrPanel({
               <div className="axv-attr-row">
                 <label className="axv-attr-name" title={name}>{name}</label>
                 <div className="axv-attr-value">{renderEditor(name, vstr)}</div>
+                {onOpenRef && parseResRef(vstr) ? (
+                  <button
+                    className="axv-attr-jump"
+                    title={`跳到定义：${vstr}`}
+                    aria-label={`跳到 ${vstr} 的定义`}
+                    onClick={() => onOpenRef(vstr)}
+                  >
+                    <span className="msr" aria-hidden="true">arrow_outward</span>
+                  </button>
+                ) : null}
                 {hint ? (
                   <button
                     className="axv-attr-info"

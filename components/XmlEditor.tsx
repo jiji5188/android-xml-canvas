@@ -7,6 +7,8 @@
 "use client";
 
 import AiPanel from "@/components/AiPanel";
+import { createResResolver } from "@/lib/xml/res-index";
+import { formatResRefHit } from "@/lib/xml/res-refs";
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue, startTransition } from "react";
 import { parseLayoutXml, findNode, serialize, nodeAtLine } from "@/lib/xml/parser";
 import { pathChainOf } from "@/lib/xml/path-chain";
@@ -2949,6 +2951,42 @@ const findResolved = findResolvedNode;
     [isMobile, mobileTab],
   );
 
+  /**
+   * M65：属性值是 `@string/app_name` 这类资源引用时 → 找定义文件并跳到那一行。
+   * 已经打开的就是这个文件时只跳行，不重新读盘。
+   */
+  const openResRef = useCallback(
+    async (value: string) => {
+      const resolver = createResResolver(aiFileIo, openRel ?? null);
+      if (!resolver) {
+        setWsMsg("先打开一个项目目录，才能跳到资源定义（当前是单个文件）");
+        return;
+      }
+      setWsMsg(`正在找 ${value} 的定义…`);
+      const hit = await resolver.resolve(value);
+      if (!hit) {
+        setWsMsg(`项目里没找到 ${value}（可能只在别的模块/依赖库里）`);
+        return;
+      }
+      const going = formatResRefHit(hit.ref, hit.rel, hit.line);
+      if (openRel && openRel === hit.rel) {
+        jumpToCodeLine(hit.line);
+        setWsMsg(going);
+        return;
+      }
+      const src = activeProjectRef.current?.source;
+      if (!src) {
+        setWsMsg(`找到了：${going}，但当前没有可切换的项目源`);
+        return;
+      }
+      const name = hit.rel.split("/").pop() || hit.rel;
+      await loadEntry(src, { kind: "file", name, rel: hit.rel });
+      jumpToCodeLine(hit.line);
+      setWsMsg(going);
+    },
+    [aiFileIo, jumpToCodeLine, loadEntry, openRel],
+  );
+
   return (
     <div
       className="axv-editor"
@@ -3311,6 +3349,7 @@ const findResolved = findResolvedNode;
         onCommitAttr={commitAttr}
         onRemoveAttr={removeAttr}
         onAddAttr={() => setAddModalOpen(true)}
+        onOpenRef={(v) => void openResRef(v)}
         onDeleteNode={onRemoveNode}
         resExtras={resExtras}
         onPickIcon={onPickIcon}

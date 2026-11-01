@@ -812,6 +812,9 @@ export function XmlEditor() {
 
   const refreshWorkspace = useCallback(async (opts?: { quiet?: boolean }) => {
     const quiet = !!opts?.quiet;
+    // M63k：浏览器不支持选目录时，刷新毫无意义——直接不进循环，
+    // 否则非静默刷新会把 wsBusy 抬一下，「正在读取…」就一直闪
+    if (!quiet && wsInfoRef.current?.mode === "unsupported") return;
     if (quiet && wsTickingRef.current) return;
     if (quiet) wsTickingRef.current = true;
     if (!quiet) {
@@ -860,7 +863,9 @@ export function XmlEditor() {
   }, [analyzeProjects]);
 
   useEffect(() => {
-    // M47：项目管理 tab 才刷工作目录；设置 tab 只在从未加载过工作目录信息时补一次
+    // M63k：不支持选目录的环境（比如非 Chromium 浏览器）就别再刷了
+    if (wsState?.mode === "unsupported") return;
+    // M47：项目管理 tab 才刷工作目录；设置 tab 只往从未加载过工作目录信息时补一次
     //（旧逻辑两个 tab 都无条件刷 → 手机上每次点「设置」都走一遍同步 JNI）
     if (leftView === "res") void refreshWorkspace();
     else if (leftView === "settings" && !wsState) void refreshWorkspace();
@@ -880,6 +885,8 @@ export function XmlEditor() {
      切回页面/窗口获得焦点时立即刷一次。 */
   useEffect(() => {
     if (leftView !== "res") return;
+    // M63k：不支持选目录 → 不起轮询（否则「正在读取…」每 12s 闪一次）
+    if (wsState?.mode === "unsupported") return;
     const tick = () => {
       if (typeof document !== "undefined" && document.hidden) return;
       void refreshWorkspace({ quiet: true });
@@ -895,7 +902,7 @@ export function XmlEditor() {
       window.removeEventListener("focus", onVisible);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [leftView, refreshWorkspace]);
+  }, [leftView, refreshWorkspace, wsState?.mode]);
 
   /** M24：打开项目面板时恢复上次的项目结构（不弹窗，权限失效就当没有） */
   useEffect(() => {

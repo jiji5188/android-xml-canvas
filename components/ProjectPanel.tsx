@@ -847,7 +847,9 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
               </div>
             ) : null}
     
-            {wsBusy && projects.length === 0 ? <div className="axv-ws-hint">正在读取…</div> : null}
+            {wsBusy && projects.length === 0 && wsState?.mode !== "unsupported" ? (
+              <div className="axv-ws-hint">正在读取…</div>
+            ) : null}
     
             {/* M62：项目列表筛选（项目一多翻起来费劲） */}
             {projects.length > 1 ? (

@@ -22,6 +22,22 @@ export function Overlay({ children }: { children: ReactNode }) {
 
 export type MenuAction = "new" | "rename" | "move" | "copy" | "paste" | "delete";
 
+/** M46d：路径太长时只留尾部 —— `app/src/main/java/com/returngoods/app` → `.../app/`
+ *  规则：从尾部往前拼，整段超过 max 就停（保证至少留最后一级）。 */
+export function shortPath(p: string, max = 14): string {
+  const segs = p.split("/").filter(Boolean);
+  if (!segs.length) return "";
+  const whole = segs.join("/");
+  if (whole.length <= max) return `${whole}/`;
+  let tail = segs[segs.length - 1];
+  for (let i = segs.length - 2; i >= 0; i--) {
+    const cand = `${segs[i]}/${tail}`;
+    if (cand.length > max) break;
+    tail = cand;
+  }
+  return `.../${tail}/`;
+}
+
 export interface TreeNodeRef {
   /** 长按命中的项目内相对路径（目录时可行） */
   rel: string;
@@ -170,11 +186,11 @@ export function NewEntryDialog(p: NewEntryDialogProps) {
                   checked={!inThisDir}
                   onChange={() => setInThisDir(false)}
                 />
-                <span>同层（{parentOf(p.target.rel) || "项目根"}）</span>
+                <span>同层（{shortPath(parentOf(p.target.rel)) || "项目根"}）</span>
               </label>
               <label className="axv-dlg-radio">
                 <input type="radio" checked={inThisDir} onChange={() => setInThisDir(true)} />
-                <span>{p.target.name}/ 目录内</span>
+                <span>目录内（{shortPath(p.target.rel) || "项目根"}）</span>
               </label>
             </span>
           </label>

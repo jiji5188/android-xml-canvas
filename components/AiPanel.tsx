@@ -62,6 +62,59 @@ interface ChatItem extends AiMessage {
   canReplace?: boolean;
   /** 该条是否还在流式生成中 */
   streaming?: boolean;
+  /** M64l（D2）：工具调用行（折叠成一行小字，点开看结果） */
+  tool?: { name: string; target: string; state: "running" | "done" | "error" | "stopped"; out?: string; ms?: number };
+}
+
+const TOOL_LABEL: Record<string, string> = {
+  read_file: "读取",
+  write_file: "写入",
+  apply_patch: "修改",
+  list_files: "列出",
+  search_files: "搜索",
+};
+
+/** M64l（D2）：一行工具日志（默认收起，点开看工具原样输出） */
+function AiToolRow({ tool }: { tool: NonNullable<ChatItem["tool"]> }) {
+  const [open, setOpen] = useState(false);
+  const hasOut = !!tool.out;
+  const icon =
+    tool.state === "running"
+      ? "progress_activity"
+      : tool.state === "error"
+        ? "error"
+        : tool.state === "stopped"
+          ? "stop_circle"
+          : "check_circle";
+  const meta = [
+    tool.target,
+    tool.ms !== undefined ? `${tool.ms}ms` : "",
+    tool.state === "error" ? "失败" : tool.state === "stopped" ? "已停止" : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <div className={"axv-ai-tool " + tool.state}>
+      <button
+        className="axv-ai-tool-head"
+        onClick={() => setOpen((v) => !v)}
+        disabled={!hasOut}
+        title={hasOut ? (open ? "收起结果" : "展开工具结果") : undefined}
+      >
+        <span className="msr axv-ai-tool-ic" aria-hidden="true">
+          {icon}
+        </span>
+        <span className="axv-ai-tool-label">{TOOL_LABEL[tool.name] ?? tool.name}</span>
+        <span className="axv-ai-tool-meta">{meta}</span>
+        {hasOut ? (
+          <span className="msr axv-ai-tool-caret" aria-hidden="true">
+            {open ? "expand_more" : "chevron_right"}
+          </span>
+        ) : null}
+      </button>
+      {open && hasOut ? <pre className="axv-ai-tool-out">{tool.out}</pre> : null}
+    </div>
+  );
 }
 
 export default function AiPanel({ xml, docRel, selection, resources, onReplaceXml, onNote, projectName, fileIo, onApplied }: Props) {
@@ -283,46 +336,39 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           for (const call of calls) {
             // 每步都看一次 abort：停止后不再调 bridge，也不再往下拼下一轮消息
             if (ctrl.signal.aborted) break;
-            const label =
-              call.tool === "write_file"
-                ? `写入 ${call.path}`
-                : call.tool === "apply_patch"
-                  ? `修改 ${call.path}`
-                  : call.tool === "read_file"
-                    ? `读取 ${call.path}`
-                    : call.tool === "list_files"
-                      ? `列出 ${call.dir || "/"}`
-                      : `搜索 ${call.query}`;
-            setChat((c) => [...c, { role: "assistant", content: `⏳ ${label}…`, streaming: false }]);
-            const out = await runTool(call, stage ?? (io as AiFileIo));
-            if (ctrl.signal.aborted) {
-              // 工具已经跑完了但用户中途停了：把这条标记成已中断，不再请求下一轮
-              setChat((c) => {
-                const n = [...c];
-                const last = n[n.length - 1];
-                if (last && !last.streaming && last.content.startsWith("⏳")) {
-                  n[n.length - 1] = { ...last, content: `⏹ 已停止：${label}` };
-                }
-                return n;
-              });
-              break;
-            }
-            results.push(out);
-            // M64k（A7）：记下来，下一句追问时不必重读
+            // M64l（D2）：目标只存干净路径（文案在渲染时拼）
             const target =
               call.tool === "search_files"
                 ? call.query || ""
                 : call.tool === "list_files"
                   ? call.dir || "/"
                   : call.path || "";
+            const started = Date.now();
+            // 先占一行（running），跑完原地改成 done / error，不再追加第二行
+            setChat((c) => [
+              ...c,
+              { role: "assistant", content: "", streaming: false, tool: { name: call.tool, target, state: "running" } },
+            ]);
+            const out = await runTool(call, stage ?? (io as AiFileIo));
+            const patchTool = (next: Partial<NonNullable<ChatItem["tool"]>>) =>
+              setChat((c) => {
+                const n = [...c];
+                const last = n[n.length - 1];
+                if (last?.tool) n[n.length - 1] = { ...last, tool: { ...last.tool, ...next } };
+                return n;
+              });
+            if (ctrl.signal.aborted) {
+              // 工具已经跑完了但用户中途停了：标记成已中断，不再请求下一轮
+              patchTool({ state: "stopped", out, ms: Date.now() - started });
+              break;
+            }
+            results.push(out);
+            // M64k（A7）：记下来，下一句追问时不必重读
             toolMemRef.current = pushToolMemory(toolMemRef.current, memoryEntryFromTool(call.tool, target, out));
-            setChat((c) => {
-              const n = [...c];
-              const last = n[n.length - 1];
-              if (last && !last.streaming && last.content.startsWith("⏳")) {
-                n[n.length - 1] = { ...last, content: `✅ ${label}` };
-              }
-              return n;
+            patchTool({
+              state: out.startsWith("错误：") ? "error" : "done",
+              out,
+              ms: Date.now() - started,
             });
           }
           if (ctrl.signal.aborted) break;
@@ -645,8 +691,11 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           </div>
         ) : null}
 
-        {chat.map((m, i) => (
-          <div key={i} className={"axv-ai-msg " + m.role}>
+        {chat.map((m, i) =>
+          m.tool ? (
+            <AiToolRow key={i} tool={m.tool} />
+          ) : (
+            <div key={i} className={"axv-ai-msg " + m.role}>
             <div className="axv-ai-bubble">
               {m.content.replace(/```[a-zA-Z0-9_-]*\s*\n[\s\S]*?```/g, "〔代码见下〕")}
               {m.streaming ? <span className="axv-ai-cursor">▍</span> : null}
@@ -677,7 +726,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               </div>
             ) : null}
           </div>
-        ))}
+          ),
+        )}
 
         {busy && !chat.some((m) => m.streaming) ? (
           <div className="axv-ai-msg assistant">

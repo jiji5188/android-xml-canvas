@@ -5670,6 +5670,87 @@ button.axv-ws-caret:hover {
   font-size: 10.5px;
 }
 
+/* ===== M64l（D2）：工具日志行（一行一条，点开看结果） ===== */
+.axv-ai-tool {
+  margin: 2px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--axv-on-surface) 4%, transparent);
+  overflow: hidden;
+}
+.axv-ai-tool-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: var(--axv-on-surface-variant);
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.axv-ai-tool-head:disabled {
+  cursor: default;
+}
+.axv-ai-tool-ic {
+  font-size: 13px;
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+.axv-ai-tool-label {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--axv-on-surface);
+}
+.axv-ai-tool-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+.axv-ai-tool-caret {
+  font-size: 15px;
+  flex: 0 0 auto;
+  opacity: 0.7;
+}
+.axv-ai-tool-out {
+  margin: 0;
+  padding: 6px 8px 8px;
+  max-height: 240px;
+  overflow: auto;
+  font-family: var(--axv-mono, ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--axv-on-surface-variant);
+  border-top: 1px solid color-mix(in srgb, var(--axv-outline) 60%, transparent);
+}
+.axv-ai-tool.running .axv-ai-tool-ic {
+  animation: axv-spin 1.1s linear infinite;
+}
+.axv-ai-tool.error {
+  background: color-mix(in srgb, #d93025 12%, transparent);
+}
+.axv-ai-tool.error .axv-ai-tool-ic,
+.axv-ai-tool.error .axv-ai-tool-label,
+.axv-ai-tool.error .axv-ai-tool-meta {
+  color: #d93025;
+}
+.axv-ai-tool.stopped .axv-ai-tool-ic,
+.axv-ai-tool.stopped .axv-ai-tool-meta {
+  color: #b26a00;
+}
+@keyframes axv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ===== M64e（B3）：AI 改动待确认卡片 ===== */
 .axv-ai-diffcard {
   margin: 6px 8px 0;

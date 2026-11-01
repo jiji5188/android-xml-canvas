@@ -199,6 +199,14 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
           />
+          {newType === "color" ? (
+            <ColorField
+              label="新颜色"
+              value={newValue.trim() || "#0B5FA5"}
+              fallback="#0B5FA5"
+              onChange={(next) => setNewValue(cssToAndroidColor(next))}
+            />
+          ) : null}
           <input
             value={newValue}
             placeholder={(NEW_TYPES.find((t) => t.tag === newType) || NEW_TYPES[0]).hint}

@@ -15,7 +15,7 @@ import { IconPickerPanel } from "./IconPickerPanel";
 import { ShapeEditor } from "./ShapeEditor";
 import { DrawablePicker } from "./DrawablePicker";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
-import { specToCss } from "@/lib/xml/shape-gen";
+import { specToCss, argbColorsForPreview, argbToCssColor } from "@/lib/xml/shape-gen";
 import { parseShapeSpec } from "@/lib/xml/shape-gen";
 
 export interface AttrPanelProps {
@@ -189,12 +189,13 @@ export function AttrPanel({
       const genXml = generatedXml?.[resName];
       const upXml = resExtras?.drawableXml?.[resName];
       /** 按钮背景：优先 shape 预览，其次 vector 缩略，再次位图，最后纯色 */
-      let btnBg: React.CSSProperties = { background: isHex ? value : "transparent" };
+      // M53：hex 色块也要过 ARGB→CSS（Android 8 位是 #AARRGGBB，浏览器当 #RRGGBBAA）
+      let btnBg: React.CSSProperties = { background: isHex ? argbToCssColor(value) : "transparent" };
       let btnLabel = isHex ? "" : isRes ? "🖼" : "＋ 选择";
       if (isRes && genXml && /^<(ripple|selector|layer-list|inset|shape)/.test(genXml)) {
         const spec = parseShapeSpec(genXml);
         if (spec) {
-          const css = specToCss(spec);
+          const css = specToCss(argbColorsForPreview(spec));
           btnBg = {
             background: css.background ?? "transparent",
             borderRadius: css.borderRadius as React.CSSProperties["borderRadius"] ?? undefined,
@@ -207,7 +208,7 @@ export function AttrPanel({
       } else if (isRes && upXml && /^<(ripple|selector|layer-list|inset|shape)/.test(upXml)) {
         const spec = parseShapeSpec(upXml);
         if (spec) {
-          const css = specToCss(spec);
+          const css = specToCss(argbColorsForPreview(spec));
           btnBg = {
             background: css.background ?? "transparent",
             borderRadius: css.borderRadius as React.CSSProperties["borderRadius"] ?? undefined,
@@ -260,7 +261,8 @@ export function AttrPanel({
       );
     }
     const isHex2 = /^#[0-9a-fA-F]{3,8}$/.test(value);
-    const swatchBg = isHex2 ? value : "transparent";
+    // M53：色块背景走 ARGB→CSS（Android 8 位是 #AARRGGBB）
+    const swatchBg = isHex2 ? argbToCssColor(value) : "transparent";
     const pickerVal = isHex2
       ? value.length === 4
         ? "#" + value.slice(1).split("").map((c) => c + c).join("") + "00"

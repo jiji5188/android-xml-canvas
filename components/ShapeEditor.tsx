@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  argbColorsForPreview,
   buildShapeXml,
   parseShapeSpec,
   shapeResourceName,
@@ -103,7 +104,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
   };
 
   const xml = useMemo(() => buildShapeXml(spec), [spec]);
-  const css = useMemo(() => specToCss(spec), [spec]);
+  const css = useMemo(() => specToCss(argbColorsForPreview(spec)), [spec]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

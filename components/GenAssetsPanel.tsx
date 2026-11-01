@@ -15,7 +15,7 @@ import {
   kindLabel,
 } from "@/lib/xml/asset-refs";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
-import { parseShapeSpec, specToCss } from "@/lib/xml/shape-gen";
+import { argbColorsForPreview, parseShapeSpec, specToCss } from "@/lib/xml/shape-gen";
 import { sanitizeResName } from "@/lib/xml/resname";
 import { saveTextNative } from "@/lib/xml/native-save";
 import { saveResFiles, type ProjectSaveRoot } from "@/lib/xml/project-save";
@@ -52,7 +52,7 @@ function thumb(name: string, xml: string): { url?: string; css?: CSSProperties }
   }
   const spec = parseShapeSpec(xml);
   if (spec) {
-    const css = specToCss(spec);
+    const css = specToCss(argbColorsForPreview(spec));
     return { css: css as CSSProperties };
   }
   return { css: { background: "#EDE7F6", border: "1px dashed #9575CD" } };

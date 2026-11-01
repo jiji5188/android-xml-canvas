@@ -5,6 +5,7 @@
 import { parseLayoutXml } from "./parser";
 import type { XmlNode } from "./types";
 import { androidAngleToCss } from "./shape";
+import { androidColorToCss } from "./color-argb";
 
 export type ShapeKind = "rectangle" | "oval" | "line";
 export type GradientType = "linear" | "radial" | "sweep";
@@ -381,6 +382,31 @@ export function shapeResourceName(spec: ShapeSpec, existing: string[] = []): str
   let i = 2;
   while (existing.includes(name)) name = `${base}_${i++}`;
   return name;
+}
+
+/**
+ * 单个颜色值 Android → CSS（M53，具体实现在 color-argb，这里 re-export 方便形状/矢量侧使用）
+ */
+export { androidColorToCss as argbToCssColor } from "./color-argb";
+
+/** 把 spec 里的所有颜色字段过一遍 ARGB→CSS，供预览渲染用 */
+export function argbColorsForPreview(spec: ShapeSpec): ShapeSpec {
+  const opt = (c?: string) => (c === undefined ? undefined : androidColorToCss(c));
+  const g = spec.gradient
+    ? {
+        ...spec.gradient,
+        start: androidColorToCss(spec.gradient.start),
+        center: opt(spec.gradient.center),
+        end: androidColorToCss(spec.gradient.end),
+      }
+    : undefined;
+  const stroke = spec.stroke ? { ...spec.stroke, color: androidColorToCss(spec.stroke.color) } : undefined;
+  const ripple = spec.ripple ? { ...spec.ripple, color: androidColorToCss(spec.ripple.color) } : undefined;
+  const states = spec.states
+    ? { ...spec.states, pressed: opt(spec.states.pressed), disabled: opt(spec.states.disabled) }
+    : undefined;
+  const shadow = spec.shadow ? { ...spec.shadow, color: androidColorToCss(spec.shadow.color) } : undefined;
+  return { ...spec, solid: opt(spec.solid), gradient: g, stroke, ripple, states, shadow };
 }
 
 /** spec → 预览用 CSS（和画布 shape.ts 同一套语义，保证「预览 = 画布」） */

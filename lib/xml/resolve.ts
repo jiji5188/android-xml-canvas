@@ -4,6 +4,7 @@
 import type { XmlNode, XmlIssue, ResourceTable } from "./types";
 import { parseDimenToDp, FRAMEWORK_COLORS, FRAMEWORK_STYLES } from "./resources";
 import { parseShapeDrawable } from "./shape";
+import { androidColorToCss } from "./color-argb";
 import { vectorToDataUrl } from "./vector-svg";
 
 export type ResolvedAttrs = Record<string, string | number | boolean | SizeSpec | null | import("./shape").ShapeStyle>;
@@ -44,20 +45,10 @@ export function resolveSize(raw: string, res: ResourceTable, issues: XmlIssue[],
 
 /** 颜色解析：#hex / @color/xxx / @android:color/xxx / ?attr/xxx / 命名色（白/黑/transparent） */
 // ===== Android ARGB → CSS 颜色 =====
-// Android 8 位 hex 是 #AARRGGBB，CSS 8 位 hex 是 #RRGGBBAA
+// M53：统一走 color-argb 的 androidColorToCss（Android 8 位是 #AARRGGBB，
+// CSS 8 位是 #RRGGBBAA，不转就一定错色）
 function argbToCss(hex: string): string {
-  const m = hex.match(/^#([0-9a-fA-F]{8})$/);
-  if (!m) return hex;
-  const arrgb = m[1];
-  const a = arrgb.slice(0, 2);
-  const rr = arrgb.slice(2, 4);
-  const gg = arrgb.slice(4, 6);
-  const bb = arrgb.slice(6, 8);
-  if (a === "FF") return `#${rr}${gg}${bb}`; // 不透明：丢 alpha
-  if (a === "00") return "transparent";
-  const alpha = Math.round(parseInt(a, 16) / 255 * 100) / 100;
-  const num = parseInt(rr, 16), g = parseInt(gg, 16), b = parseInt(bb, 16);
-  return `rgba(${num}, ${g}, ${b}, ${alpha})`;
+  return androidColorToCss(hex);
 }
 
 export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[], path: string, prop: string): string {

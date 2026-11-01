@@ -118,3 +118,37 @@ export function withAlpha(c: Rgba, a: number): Rgba {
 export function parseColorOr(input: string | null | undefined, fallback?: string): Rgba {
   return parseColor(input) || parseColor(fallback) || { r: 0, g: 0, b: 0, a: 1 };
 }
+
+/**
+ * M53：把**单个 Android 颜色值**转成浏览器能正确渲染的 CSS 颜色。
+ *
+ * 为什么必须转：Android XML / values 里写死的 8 位 hex 是 `#AARRGGBB`，
+ * 而浏览器（CSS / SVG fill）按 `#RRGGBBAA` 解释 —— 直接透传会把 alpha
+ * 当成红色通道，`#80123456` 会渲染成完全不透明的 `#801234`+`56` alpha。
+ * 4 位同理：Android `#ARGB`，CSS `#RGBA`。
+ *
+ * - 不透明（alpha=FF）：输出 6 位 `#rrggbb`
+ * - 带透明度：输出 `rgba(r, g, b, a)`
+ * - 非 `#` 开头（`@color/x` / `?attr/x` / 命名色）：原样返回，交给调用方解析
+ */
+export function androidColorToCss(input: string | null | undefined): string {
+  const s = (input ?? "").trim();
+  if (!s.startsWith("#")) return s;
+  const h = s.slice(1);
+  if (!/^[0-9a-fA-F]+$/.test(h)) return s;
+  const hx = (x: string) => parseInt(x, 16);
+
+  // Android #ARGB（4 位）→ 先展开成 #AARRGGBB，不走 CSS 的 #RGBA 语义
+  if (h.length === 4) {
+    const [a, r, g, b] = h.split("");
+    return androidColorToCss(`#${a}${a}${r}${r}${g}${g}${b}${b}`);
+  }
+  if (h.length === 3) return "#" + h.split("").map((c) => c + c).join("");
+  if (h.length !== 8) return s; // 6 位或其他长度：本来就是 CSS 能吃的写法
+
+  const a = hx(h.slice(0, 2));
+  if (a === 255) return "#" + h.slice(2);
+  if (a === 0) return "transparent";
+  const alpha = Math.round((a / 255) * 100) / 100;
+  return `rgba(${hx(h.slice(2, 4))}, ${hx(h.slice(4, 6))}, ${hx(h.slice(6, 8))}, ${alpha})`;
+}

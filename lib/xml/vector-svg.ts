@@ -2,6 +2,8 @@
 // 只处理 vector 的核心子集：viewportWidth/Height + <path pathData/fillColor/fillAlpha>。
 // 纯文本解析，浏览器/Node 都能跑（没有 DOM 依赖）。
 
+import { androidColorToCss } from "./color-argb";
+
 export interface VectorSpec {
   /** 视口宽高（Android viewport，通常 24） */
   vw: number;
@@ -65,9 +67,9 @@ export function vectorToSvg(xml: string): string | null {
   if (!spec) return null;
   const body = spec.paths
     .map((p) => {
-      const parts = [`d="${esc(p.d)}"`, `fill="${esc(p.fill)}"`];
+      const parts = [`d="${esc(p.d)}"`, `fill="${esc(androidColorToCss(p.fill))}"`];
       if (p.alpha != null) parts.push(`fill-opacity="${p.alpha}"`);
-      if (p.stroke) parts.push(`stroke="${esc(p.stroke)}"`);
+      if (p.stroke) parts.push(`stroke="${esc(androidColorToCss(p.stroke))}"`);
       if (p.strokeWidth != null) parts.push(`stroke-width="${p.strokeWidth}"`);
       return `<path ${parts.join(" ")}/>`;
     })

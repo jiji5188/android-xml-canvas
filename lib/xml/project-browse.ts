@@ -13,7 +13,7 @@
 
 import { nativeBridge } from "./native-save";
 import { hasAsyncIo, listDirQueued, readBase64Queued, readTextQueued } from "./native-async";
-import { wsListProjects, type WsProject } from "./workspace";
+import { type WsProject } from "./workspace";
 import type { FileOpsCtx } from "./file-ops";
 
 /** 列目录时跳过的噪声目录（安卓工程里 build/.gradle 体积大且没布局） */
@@ -564,16 +564,10 @@ export async function projectSourceFromWorkspaceItem(item: WsProject): Promise<P
     // 而 LazyTree 永远拿 rel="" 当项目根。旧实现直接把整个工作目录喂进来，
     // 结果「当前项目」树显示的是跟「项目列表」一样的根目录。现在把 item.rel
     // 剥掉一层：所有 rel 统一映射成「项目内相对路径」再交给 source。
-    const all = await wsListProjects();
-    const rootRel = item.rel;
-    const prefix = rootRel + "/";
-    const scoped = all.filter((it) => it.rel === rootRel || it.rel.startsWith(prefix));
-    // 相对路径重映射：项目内 rel="" → rootRel；"res" → rootRel/res
-    const remapped: WsProject[] = scoped.map((it) => ({
-      ...it,
-      rel: it.rel === rootRel ? "" : it.rel.slice(prefix.length),
-    }));
-    const base = nativeProjectSource(item.name, remapped, item.dirPath);
+    // M58：不再为打开项目跑 wsListProjects()（全树深扫，30 个项目就是几十秒）。
+    // 打开路径 = 0 次扫描：懒加载走 listDir 逐层（M48 已修），读文件走 rootDir+rel（M55），
+    // 扁平列表只在「目录读不了」时作最后兜底（传 [] 即关闭兜底，listDir 本身已够用）。
+    const base = nativeProjectSource(item.name, [], item.dirPath);
     return base;
   }
   if (item.kind === "dir" && item.handle) return webProjectSource(item.handle, item.name);

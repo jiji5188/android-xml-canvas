@@ -1265,7 +1265,8 @@ public class MainActivity extends Activity {
                 String nm = f.getName().toLowerCase(Locale.ROOT);
                 if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
                 if (f.isDirectory()) {
-                    int cnt = countXmlDeep(f, 0);
+                    Object[] probe = probeProject(f);
+                    int cnt = ((Integer) probe[0]).intValue();
                     if (cnt == 0) continue;
                     JSONObject it = new JSONObject();
                     it.put("name", f.getName());
@@ -1274,8 +1275,7 @@ public class MainActivity extends Activity {
                     it.put("layoutCount", cnt);
                     it.put("depth", 0);
                     it.put("path", f.getAbsolutePath());
-                    File main = firstXmlDeep(f, 0);
-                    if (main != null) it.put("mainPath", main.getAbsolutePath());
+                    if (probe[1] != null) it.put("mainPath", (String) probe[1]);
                     items.put(it);
                 } else if (nm.endsWith(".xml")) {
                     JSONObject it = new JSONObject();
@@ -1319,7 +1319,8 @@ public class MainActivity extends Activity {
             if (SKIP_DIRS.contains(lower)) continue;
             boolean isDir = DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
             if (isDir) {
-                int cnt = countXmlDeepTree(id, 0);
+                Object[] probe = probeTreeCached(id);
+                int cnt = ((Integer) probe[0]).intValue();
                 if (cnt == 0) continue;
                 JSONObject it = new JSONObject();
                 it.put("name", name);
@@ -1328,7 +1329,7 @@ public class MainActivity extends Activity {
                 it.put("layoutCount", cnt);
                 it.put("depth", depth);
                 it.put("docId", id);
-                String mainDoc = firstXmlDocIdInTree(id);
+                String mainDoc = (String) probe[1];
                 if (mainDoc != null) {
                     it.put("docUri", DocumentsContract.buildDocumentUriUsingTree(treeUri, mainDoc).toString());
                 }
@@ -1344,6 +1345,7 @@ public class MainActivity extends Activity {
                 it.put("docUri", DocumentsContract.buildDocumentUriUsingTree(treeUri, id).toString());
                 out.put(it);
             }
+            // M58：顶层列表到此结束（原来这里没有 continue，会接着往下走）
         }
     }
     /** 递归扫描时跳过的噪声目录 */
@@ -1364,6 +1366,85 @@ public class MainActivity extends Activity {
             else if (nm.endsWith(".xml")) n++;
         }
         return n;
+    }
+
+    /* ===== M58：项目列表的「轻量探测」=====
+     * 旧做法：列一个项目就 countXmlDeep + firstXmlDeep 各走一遍全树，30 个项目 = 60 次深扫，
+     * 手机上转圈几秒。新做法：
+     *  - 一趟遍历同时拿到「有没有布局 + 主布局路径 + 计数（封顶）」，不再走两遍；
+     *  - 预算法：最多访问 PROBE_MAX_VISITS 个条目，超了就用当前结果返回（够判断“是不是项目”）；
+     *  - mtime 缓存：同一目录上次修改时间没变就直接用缓存（轮询/切 tab 都是免费）。 */
+    private static final int PROBE_MAX_VISITS = 600;
+    private static final int PROBE_MAX_DEPTH = 8;
+    private static final int PROBE_COUNT_CAP = 99;
+
+    private static final class Probe {
+        int count = 0;
+        String mainPath = null;
+        int visits = 0;
+        boolean budgetOut = false;
+    }
+
+    private static long probeLastMtime(File dir) {
+        long m = dir.lastModified();
+        // 只取两层子目录的 mtime（够用了：新建/删除文件会改父目录 mtime）
+        File[] fs = dir.listFiles();
+        if (fs != null) {
+            int seen = 0;
+            for (File f : fs) {
+                if (seen++ > 40) break;
+                if (f.isDirectory()) m = Math.max(m, f.lastModified());
+            }
+        }
+        return m;
+    }
+
+    /** 一趟遍历：计数（封顶）+ 找主布局 + 预算法 */
+    private void probeDir(File dir, int depth, Probe p) {
+        if (depth > PROBE_MAX_DEPTH || p.budgetOut) return;
+        File[] fs = dir.listFiles();
+        if (fs == null) return;
+        java.util.Arrays.sort(fs, (a, b) -> {
+            if (a.isDirectory() != b.isDirectory()) return a.isDirectory() ? -1 : 1;
+            return a.getName().compareToIgnoreCase(b.getName());
+        });
+        for (File f : fs) {
+            if (p.budgetOut) return;
+            if (++p.visits > PROBE_MAX_VISITS) {
+                p.budgetOut = true;
+                return;
+            }
+            String nm = f.getName().toLowerCase(Locale.ROOT);
+            if (f.isHidden() || SKIP_DIRS.contains(nm)) continue;
+            if (f.isDirectory()) {
+                probeDir(f, depth + 1, p);
+            } else if (nm.endsWith(".xml")) {
+                if (p.count < PROBE_COUNT_CAP) p.count++;
+                // 主布局优先 activity_main / main，其次第一个遇到的
+                if (p.mainPath == null) p.mainPath = f.getAbsolutePath();
+                if (nm.equals("activity_main.xml") || nm.equals("main.xml")) {
+                    p.mainPath = f.getAbsolutePath();
+                }
+            }
+        }
+    }
+
+    private final java.util.HashMap<String, Object[]> probeCache = new java.util.HashMap<>();
+
+    /** 带缓存的探测（返回 [count:Integer, mainPath:String]） */
+    private Object[] probeProject(File dir) {
+        String key = dir.getAbsolutePath();
+        long mtime = probeLastMtime(dir);
+        Object[] hit = probeCache.get(key);
+        if (hit != null && ((Long) hit[0]) == mtime) {
+            return new Object[] { hit[1], hit[2] };
+        }
+        Probe p = new Probe();
+        probeDir(dir, 0, p);
+        Object[] val = new Object[] { Integer.valueOf(p.count), p.mainPath };
+        if (probeCache.size() > 200) probeCache.clear();
+        probeCache.put(key, new Object[] { Long.valueOf(mtime), val[0], val[1] });
+        return val;
     }
 
     /** 递归找「最像主布局」的 xml */
@@ -1433,6 +1514,75 @@ public class MainActivity extends Activity {
     }
 
     /** SAF tree 模式：递归数 xml */
+    /* ===== M58：SAF 侧的轻量探测（一趟遍历 + 预算 + 缓存）=====
+     * 旧：countXmlDeepTree 走一遍 + firstXmlDocIdInTree 再走一遍，两层嵌套下每个项目 2 次全树。 */
+    private static final class TreeProbe {
+        int count = 0;
+        String mainDocId = null;
+        String mainName = null;
+        int visits = 0;
+        boolean budgetOut = false;
+    }
+
+    private void probeTree(String dirDocId, int depth, TreeProbe p) {
+        if (depth > PROBE_MAX_DEPTH || p.budgetOut) return;
+        try {
+            Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, dirDocId);
+            java.util.List<String[]> rows = new java.util.ArrayList<>();
+            try (android.database.Cursor c = getContentResolver().query(children,
+                    new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                            DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
+                if (c == null) return;
+                while (c.moveToNext()) rows.add(new String[]{c.getString(0), c.getString(1), c.getString(2)});
+            }
+            for (String[] row : rows) {
+                if (p.budgetOut) return;
+                if (++p.visits > PROBE_MAX_VISITS) {
+                    p.budgetOut = true;
+                    return;
+                }
+                String id = row[0];
+                String name = row[1] == null ? "" : row[1];
+                String mime = row[2];
+                String lower = name.toLowerCase(Locale.ROOT);
+                if (SKIP_DIRS.contains(lower)) continue;
+                if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
+                    probeTree(id, depth + 1, p);
+                } else if (lower.endsWith(".xml")) {
+                    if (p.count < PROBE_COUNT_CAP) p.count++;
+                    if (p.mainName == null) {
+                        p.mainName = lower;
+                        p.mainDocId = id;
+                    }
+                    if (lower.equals("activity_main.xml") || lower.equals("main.xml")) {
+                        p.mainName = lower;
+                        p.mainDocId = id;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+            /* 单个目录读失败不影响整体 */
+        }
+    }
+
+    private final java.util.HashMap<String, Object[]> treeProbeCache = new java.util.HashMap<>();
+
+    /** 带缓存（12 秒）的 SAF 探测 → [count:Integer, mainDocId:String] */
+    private Object[] probeTreeCached(String dirDocId) {
+        Object[] hit = treeProbeCache.get(dirDocId);
+        long now = System.currentTimeMillis();
+        if (hit != null && now - ((Long) hit[0]) < 12000L) {
+            return new Object[] { hit[1], hit[2] };
+        }
+        TreeProbe p = new TreeProbe();
+        probeTree(dirDocId, 0, p);
+        Object[] val = new Object[] { Integer.valueOf(p.count), p.mainDocId };
+        if (treeProbeCache.size() > 200) treeProbeCache.clear();
+        treeProbeCache.put(dirDocId, new Object[] { Long.valueOf(now), val[0], val[1] });
+        return val;
+    }
+
     private int countXmlDeepTree(String dirDocId, int depth) {
         if (depth > MAX_TREE_DEPTH) return 0;
         try {

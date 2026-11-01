@@ -422,6 +422,32 @@ export function XmlEditor() {
     }
   }
   const [xml, setXml] = useState<string>(() => bootRef.current!.xml);
+
+  /* ===== M57：编辑器 → React 的同步改成「常驻 ref + 防抖落状态」 =====
+   * 旧行为：每个按键都 setXml(整份文档) → 这个 3000+ 行的组件整棵树重渲染
+   * （ProjectPanel / AttrPanel / LayerTree / Toolbar 全跟着渲染）→ 大文件必然卡。
+   * 新：最新文本先进 liveXmlRef（同步、零成本），setXml 防抖 250ms；
+   * 保存/格式化/切 tab/撤销前先 flushXml()，保证拿到的是最新内容。
+   * 这也是 VS Code（Monaco）/ CM6 官方 React 包的做法：文档真相在编辑器里，React 只拿快照。 */
+  const docRef = useRef(xml);
+  const liveXmlRef = useRef<string | null>(null);
+  const xmlSyncTimer = useRef<number | null>(null);
+  /** 当前真实文本（优先编辑中的最新值） */
+  const currentXml = useCallback(() => liveXmlRef.current ?? docRef.current, []);
+  const flushXml = useCallback(() => {
+    if (xmlSyncTimer.current !== null) {
+      window.clearTimeout(xmlSyncTimer.current);
+      xmlSyncTimer.current = null;
+    }
+    const v = liveXmlRef.current;
+    if (v === null) return;
+    setXml(v);
+  }, []);
+  useEffect(() => {
+    docRef.current = xml;
+    // 状态追平后清掉 live（留着会让 currentXml 永远走旧分支）
+    if (liveXmlRef.current === xml) liveXmlRef.current = null;
+  }, [xml]);
   /** 多文件项目：文件列表 + 当前激活文件（内容以 xml 为准，切换时回写） */
   const [project, setProject] = useState<Project>(() => bootRef.current!.project);
 
@@ -796,6 +822,7 @@ export function XmlEditor() {
         next = [];
       } else if (info.mode === "native" || info.custom) {
         // M25d：只读一层（不再深扫整个工作目录）
+        // M58：顶层列表走 12s 内存缓存（mtime 没变就不重新探测，轮询/切 tab 都是免费）
         next = await wsListTopProjects();
       }
       // 自动刷新时列表没变就不 setState（否则卡片/树一直重建）
@@ -1044,6 +1071,8 @@ export function XmlEditor() {
   const canRedo = histIdx < history.length - 1;
   const undo = () => {
     flushTextTimer();
+    flushXml();
+    liveXmlRef.current = null;
     const h = histRef.current;
     if (h.idx <= 0) return;
     h.idx -= 1;
@@ -1053,6 +1082,8 @@ export function XmlEditor() {
   };
   const redo = () => {
     flushTextTimer();
+    flushXml();
+    liveXmlRef.current = null;
     const h = histRef.current;
     if (h.idx >= h.stack.length - 1) return;
     h.idx += 1;
@@ -1352,11 +1383,12 @@ export function XmlEditor() {
     try {
       // M37b：非布局文件不走布局管线（否则 manifest 会被报缺 layout_width 之类）
       if (codeOnly) return { model: null, issues: [], parseErr: false, parseReason: "" };
-      const parsed = parseLayoutXml(parsedForRender);
       // M56：代码 tab 不打字解析（parsedForRender=""），高亮由 CM6 自己跑，互不影响
       if (parsedForRender === "") {
         return { model: null, issues: [], parseErr: false, parseReason: "" };
       }
+      // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+      const parsed = parsedDoc;
       if (!parsed.root) {
         const first = parsed.issues.find((i) => i.level === "error");
         return {
@@ -1393,6 +1425,17 @@ export function XmlEditor() {
       };
     }
   }, [previewActive ? parsedForRender : "", resources, resExtras?.layouts, device, measured, renderTheme, codeOnly]);
+
+  /** M57：共享解析结果 —— 模型 / 图层树 / 结构检查共用一棵语法树，不再各 parse 一次 */
+  const parsedDoc = useMemo(() => {
+    if (parsedForRender === "") return { root: null, issues: [] as XmlIssue[] };
+    try {
+      return parseLayoutXml(parsedForRender);
+    } catch (e) {
+      console.error("[axv] 解析失败", e);
+      return { root: null, issues: [] as XmlIssue[] };
+    }
+  }, [parsedForRender]);
 
   /** M2t：XML / 设备变了 → 旧 path 可能指向别的节点，实测表作废重测 */
   useEffect(() => {
@@ -1437,30 +1480,29 @@ export function XmlEditor() {
   }, [model, measured]);
 
   /** 图层树用的原始节点树（不经渲染模型） */
-  const treeRoot = useMemo(() => {
-    if (parseErr) return null;
-    if (parsedForRender === "") return null;
-    try {
-      return parseLayoutXml(parsedForRender).root;
-    } catch (e) {
-      console.error("[axv] 解析图层树失败", e);
-      return null;
-    }
-  }, [previewActive ? parsedForRender : "", parseErr]);
+  const treeRoot = useMemo(() => parsedDoc.root, [parsedDoc]);
+
+  /** M57：lint 改「停手后跑」——代码 tab 仍能标错，但打字期间不跑（lintXml 之前是 O(n²) 已修，
+   *  这里再加一道闸：400ms 内不再输入才计算） */
+  const [lintSrc, setLintSrc] = useState("");
+  useEffect(() => {
+    if (codeOnly) return;
+    const t = window.setTimeout(() => setLintSrc(parsedXml), 400);
+    return () => window.clearTimeout(t);
+  }, [parsedXml, codeOnly]);
 
   /** 代码视图的结构检查（带行号，标红用） */
   const lints = useMemo(() => {
     try {
       // M37b：非布局文件不做布局结构校验
       if (codeOnly) return [] as ReturnType<typeof lintXml>;
-      // M56：代码 tab 暂停重算，切预览/停手后自动补上（高亮不受影响，由 CM6 自己跑）
-      if (parsedForRender === "") return [] as LintIssue[];
-      return lintXml(parsedForRender);
+      if (lintSrc === "") return [] as LintIssue[];
+      return lintXml(lintSrc);
     } catch (e) {
       console.error("[axv] 结构检查失败", e);
       return [] as LintIssue[];
     }
-  }, [previewActive ? parsedForRender : "", codeOnly]);
+  }, [lintSrc, codeOnly]);
   /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
   const lintErrCount = useMemo(() => {
     try {
@@ -1485,8 +1527,10 @@ export function XmlEditor() {
 
   /** 一键格式化：重排缩进，保留注释，可撤销 */
   const doFormat = () => {
-    const next = formatXml(xml, 2);
-    if (next !== xml) setXmlAndTrack(next);
+    flushXml();
+    const cur = currentXml();
+    const next = formatXml(cur, 2);
+    if (next !== cur) setXmlAndTrack(next);
   };
 
   /* ===== ConstraintLayout 约束编辑（一期：表单 + 自动推断） ===== */
@@ -1644,6 +1688,8 @@ export function XmlEditor() {
   const setXmlAndTrack = useCallback(
     (next: string, /** M2u：同一手势 key 在 900ms 内合并成一步撤销 */ mergeKey?: string) => {
       flushTextTimer();
+      // M57：外部改文档（画布/属性面板/格式化）——清掉打字中的 live 值，否则会被它盖住
+      liveXmlRef.current = null;
       setXml(next);
       commitHistory(next, mergeKey ?? "");
     },
@@ -2027,10 +2073,16 @@ export function XmlEditor() {
     window.setTimeout(() => setExportNote(""), 2400);
   }, [flushTextTimer, project, xml]);
 
-  /** 手敲代码：立即上屏，历史防抖 500ms 合并 */
+  /** 手敲代码：最新文本先进 ref（不阻塞输入），状态防抖 250ms 落一次，历史 500ms 合并 */
   const onChangeXmlText = useCallback(
     (next: string) => {
-      setXml(next);
+      liveXmlRef.current = next;
+      if (xmlSyncTimer.current !== null) window.clearTimeout(xmlSyncTimer.current);
+      xmlSyncTimer.current = window.setTimeout(() => {
+        xmlSyncTimer.current = null;
+        const v = liveXmlRef.current;
+        if (v !== null) setXml(v);
+      }, 250);
       flushTextTimer();
       textTimer.current = window.setTimeout(() => {
         textTimer.current = null;
@@ -2558,7 +2610,7 @@ const findResolved = findResolvedNode;
 
   /** 当前 xml → 落盘输入（四条保存路径共用） */
   const currentSaveInput = (name?: string): SaveInput => ({
-    xml,
+    xml: currentXml(),
     mode: exportMode,
     name: name || saveOrigin?.name || activeFile(project)?.name || "activity_main.xml",
     generatedDrawables,
@@ -2730,6 +2782,7 @@ const findResolved = findResolvedNode;
   };
 
   const saveProject = () => {
+    flushXml(); // M57：先把打字中的最新文本落状态，保存读到的才是当前内容
     if (codeOnly) {
       flashNote("当前文件不是布局，不能走「导出检查」；直接「保存」写回原文件即可", 4600);
       return;
@@ -2873,7 +2926,10 @@ const findResolved = findResolvedNode;
             role="tab"
             aria-selected={mobileTab === "xml"}
             className={mobileTab === "xml" ? "on" : ""}
-            onClick={() => setMobileTab("xml")}
+            onClick={() => {
+              flushXml(); // M57：切 tab 前把最新文本落状态，预览/视图才能看到刚输的内容
+              setMobileTab("xml");
+            }}
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code_xml</span>
             代码
@@ -2884,7 +2940,10 @@ const findResolved = findResolvedNode;
               role="tab"
               aria-selected={mobileTab === "values"}
               className={mobileTab === "values" ? "on" : ""}
-              onClick={() => setMobileTab("values")}
+              onClick={() => {
+                flushXml();
+                setMobileTab("values");
+              }}
             >
               <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>table_chart</span>
               视图
@@ -2896,7 +2955,10 @@ const findResolved = findResolvedNode;
               role="tab"
               aria-selected={mobileTab === "preview"}
               className={mobileTab === "preview" ? "on" : ""}
-              onClick={() => setMobileTab("preview")}
+              onClick={() => {
+                flushXml();
+                setMobileTab("preview");
+              }}
             >
               <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>phone_android</span>
               预览

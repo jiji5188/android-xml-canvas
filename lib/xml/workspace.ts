@@ -97,6 +97,7 @@ const NATIVE_LIST_TTL = 8000;
 /** M56：文件操作/新建项目后要强制重扫 */
 export function invalidateNativeProjectCache(): void {
   nativeListCache.clear();
+  topProjCache.clear();
 }
 
 /** 列工作目录下的项目 */
@@ -156,18 +157,32 @@ export async function wsListProjects(): Promise<WsProject[]> {
  * native：bridge 给的仍是深列表，这里把深层项按第一段归并成顶层项目；
  * web：直接 listTopLevel，毫秒级。
  */
+/** M58：顶层项目列表的短命缓存（12s）——项目列表 12s 轮询 + 切 tab 都会命中，
+ *  而 Java 端的 probe 又按 mtime 缓存，两层缓存后轮询几乎零成本 */
+const topProjCache = new Map<string, { at: number; items: WsProject[] }>();
+const TOP_PROJ_TTL = 12_000;
+
 export async function wsListTopProjects(): Promise<WsProject[]> {
   const b = nativeBridge();
   if (b) {
     // M30：新版 bridge 直接给顶层列表（不递归），老 APK 没有这个方法就回退合并
     if (b.listTopProjects) {
       try {
+        const key = (() => {
+          try {
+            return (b.getWorkspaceInfo ? b.getWorkspaceInfo() : "") as string;
+          } catch {
+            return "";
+          }
+        })();
+        const cached = topProjCache.get(key);
+        if (cached && Date.now() - cached.at < TOP_PROJ_TTL) return cached.items;
         const raw = JSON.parse(b.listTopProjects() || "{}") as {
           ok?: boolean;
           items?: { name: string; kind: "dir" | "file"; rel: string; layoutCount?: number; mainPath?: string; docUri?: string; path?: string }[];
         };
         if (raw.ok !== false && Array.isArray(raw.items)) {
-          return raw.items.map((it) => ({
+          const items = raw.items.map((it) => ({
             name: it.name,
             kind: it.kind,
             rel: it.rel,
@@ -175,6 +190,8 @@ export async function wsListTopProjects(): Promise<WsProject[]> {
             target: it.docUri ?? it.mainPath ?? it.path,
             dirPath: it.kind === "dir" ? it.path : undefined,
           }));
+          topProjCache.set(key, { at: Date.now(), items });
+          return items;
         }
       } catch {
         /* 回退到旧路径 */

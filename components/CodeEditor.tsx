@@ -284,6 +284,8 @@ export function CodeEditor({
   const onCursorLineRef = useRef(onCursorLine);
   onChangeRef.current = onChange;
   onCursorLineRef.current = onCursorLine;
+  /** M57：最后一次由编辑器自身发出的文本——父层防抖回灌同一个值时据此跳过，避免“冲掉刚输入的字” */
+  const lastEmittedRef = useRef<string | null>(null);
 
   const [findOpen, setFindOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -502,7 +504,12 @@ export function CodeEditor({
         }),
         langComp.current.of(langExt(lang)),
         EditorView.updateListener.of((u) => {
-          if (u.docChanged) onChangeRef.current(u.state.doc.toString());
+          if (u.docChanged) {
+            const s = u.state.doc.toString();
+            // M57：记下「本次变更是我自己发出的」，父层回灌同一个 value 时不要回写
+            lastEmittedRef.current = s;
+            onChangeRef.current(s);
+          }
           if (u.selectionSet || u.docChanged) {
             const head = u.state.selection.main.head;
             onCursorLineRef.current?.(u.state.doc.lineAt(head).number);
@@ -537,6 +544,9 @@ export function CodeEditor({
   useEffect(() => {
     const v = viewRef.current;
     if (!v) return;
+    // M57：父层现在防抖回灌（打字时 value 可能暂时比文档旧）——
+    // 只要是「我自己刚发出去的」就一律跳过，否则会把用户刚输入的字符冲掉
+    if (value === lastEmittedRef.current) return;
     const cur = v.state.doc.toString();
     if (cur === value) return;
     v.dispatch({ changes: { from: 0, to: cur.length, insert: value } });

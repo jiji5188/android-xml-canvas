@@ -634,3 +634,124 @@ To fix this, make sure your Cache-Control headers allow revalidation of chunks a
   22 | import { AI_TOOL_PROMPT, createNativeIo, extractToolCalls, runTool, stripToolBlocks } from "@/lib/xml/ai-tools";
   23 |
   24 | /** 工具循环最多几轮（防模型无限读文件） */
+[browser] [axv] 渲染模型构建失败 ReferenceError: Cannot access 'parsedDoc' before initialization
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1431:22)
+    at XmlEditor (components/XmlEditor.tsx:1416:59)
+    at XmlPage (app/xml/page.tsx:8:10)
+  1429 |       }
+  1430 |       // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+> 1431 |       const parsed = parsedDoc;
+       |                      ^
+  1432 |       if (!parsed.root) {
+  1433 |         const first = parsed.issues.find((i) => i.level === "error");
+  1434 |         return { (components/XmlEditor.tsx:1462:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: Cannot access 'parsedDoc' before initialization
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1431:22)
+    at XmlEditor (components/XmlEditor.tsx:1416:59)
+    at XmlPage (app/xml/page.tsx:8:10)
+  1429 |       }
+  1430 |       // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+> 1431 |       const parsed = parsedDoc;
+       |                      ^
+  1432 |       if (!parsed.root) {
+  1433 |         const first = parsed.issues.find((i) => i.level === "error");
+  1434 |         return { (components/XmlEditor.tsx:1462:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: Cannot access 'parsedDoc' before initialization
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1431:22)
+    at XmlEditor (components/XmlEditor.tsx:1416:59)
+    at XmlPage (app/xml/page.tsx:8:10)
+  1429 |       }
+  1430 |       // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+> 1431 |       const parsed = parsedDoc;
+       |                      ^
+  1432 |       if (!parsed.root) {
+  1433 |         const first = parsed.issues.find((i) => i.level === "error");
+  1434 |         return { (components/XmlEditor.tsx:1462:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: Cannot access 'parsedDoc' before initialization
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1431:22)
+    at XmlEditor (components/XmlEditor.tsx:1416:59)
+    at XmlPage (app/xml/page.tsx:8:10)
+  1429 |       }
+  1430 |       // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+> 1431 |       const parsed = parsedDoc;
+       |                      ^
+  1432 |       if (!parsed.root) {
+  1433 |         const first = parsed.issues.find((i) => i.level === "error");
+  1434 |         return { (components/XmlEditor.tsx:1462:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: Cannot access 'parsedDoc' before initialization
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1431:22)
+    at XmlEditor (components/XmlEditor.tsx:1416:59)
+    at XmlPage (app/xml/page.tsx:8:10)
+  1429 |       }
+  1430 |       // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+> 1431 |       const parsed = parsedDoc;
+       |                      ^
+  1432 |       if (!parsed.root) {
+  1433 |         const first = parsed.issues.find((i) => i.level === "error");
+  1434 |         return { (components/XmlEditor.tsx:1462:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: Cannot access 'parsedDoc' before initialization
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1431:22)
+    at XmlEditor (components/XmlEditor.tsx:1416:59)
+    at XmlPage (app/xml/page.tsx:8:10)
+  1429 |       }
+  1430 |       // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+> 1431 |       const parsed = parsedDoc;
+       |                      ^
+  1432 |       if (!parsed.root) {
+  1433 |         const first = parsed.issues.find((i) => i.level === "error");
+  1434 |         return { (components/XmlEditor.tsx:1462:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: Cannot access 'parsedDoc' before initialization
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1431:22)
+    at XmlEditor (components/XmlEditor.tsx:1416:59)
+    at XmlPage (app/xml/page.tsx:8:10)
+  1429 |       }
+  1430 |       // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+> 1431 |       const parsed = parsedDoc;
+       |                      ^
+  1432 |       if (!parsed.root) {
+  1433 |         const first = parsed.issues.find((i) => i.level === "error");
+  1434 |         return { (components/XmlEditor.tsx:1462:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: Cannot access 'parsedDoc' before initialization
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1431:22)
+    at XmlEditor (components/XmlEditor.tsx:1416:59)
+    at XmlPage (app/xml/page.tsx:8:10)
+  1429 |       }
+  1430 |       // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+> 1431 |       const parsed = parsedDoc;
+       |                      ^
+  1432 |       if (!parsed.root) {
+  1433 |         const first = parsed.issues.find((i) => i.level === "error");
+  1434 |         return { (components/XmlEditor.tsx:1462:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: Cannot access 'parsedDoc' before initialization
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1431:22)
+    at XmlEditor (components/XmlEditor.tsx:1416:59)
+    at XmlPage (app/xml/page.tsx:8:10)
+  1429 |       }
+  1430 |       // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+> 1431 |       const parsed = parsedDoc;
+       |                      ^
+  1432 |       if (!parsed.root) {
+  1433 |         const first = parsed.issues.find((i) => i.level === "error");
+  1434 |         return { (components/XmlEditor.tsx:1462:15)
+[browser] [axv] 渲染模型构建失败 ReferenceError: Cannot access 'parsedDoc' before initialization
+    at XmlEditor.useMemo (components/XmlEditor.tsx:1431:22)
+    at XmlEditor (components/XmlEditor.tsx:1416:59)
+    at XmlPage (app/xml/page.tsx:8:10)
+  1429 |       }
+  1430 |       // M57：复用共享解析结果（原来这里 parse 一次、treeRoot 再一次、lint 再一次 = parse×3）
+> 1431 |       const parsed = parsedDoc;
+       |                      ^
+  1432 |       if (!parsed.root) {
+  1433 |         const first = parsed.issues.find((i) => i.level === "error");
+  1434 |         return { (components/XmlEditor.tsx:1462:15)
+[browser] Uncaught Error: Rendered fewer hooks than expected. This may be caused by an accidental early return statement.
+    at XmlEditor (components/XmlEditor.tsx:3160:15)
+    at XmlPage (app/xml/page.tsx:8:10)
+  3158 |           {leftView === "layers" && (
+  3159 |             <div className="axv-rail-scroll">
+> 3160 |               <LayerTree
+       |               ^
+  3161 |                 root={treeRoot}
+  3162 |                 selectedPath={selectedPath}
+  3163 |                 onSelect={setSelectedPath}
+⚠ Fast Refresh had to perform a full reload due to a runtime error.

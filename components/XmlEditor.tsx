@@ -1413,6 +1413,23 @@ export function XmlEditor() {
     else if (codeOnly) setMobileTab("xml");
   }, [hasViewTab, codeOnly, docKey]);
 
+  /** M57：共享解析结果 —— 模型 / 图层树 / 结构检查共用一棵语法树，不再各 parse 一次
+   *  ⚠ 必须在下面 model 的 useMemo **之前**声明：render 时 memo 主体立即执行，
+   *    若引用后面才声明的 const 会报 "Cannot access 'parsedDoc' before initialization"（TDZ） */
+  const parsedDoc = useMemo(() => {
+    if (parsedForRender === "") return { root: null, issues: [] as XmlIssue[] };
+    const t = perfTimer("xml.parse", "len=" + parsedForRender.length);
+    try {
+      const doc = parseLayoutXml(parsedForRender);
+      t.end("issues=" + (doc.issues?.length ?? 0));
+      return doc;
+    } catch (e) {
+      t.end("ERR");
+      console.error("[axv] 解析失败", e);
+      return { root: null, issues: [] as XmlIssue[] };
+    }
+  }, [parsedForRender]);
+
   const { model, issues, parseErr, parseReason } = useMemo((): {
     model: RenderModel | null;
     issues: XmlIssue[];
@@ -1468,21 +1485,6 @@ export function XmlEditor() {
       };
     }
   }, [previewActive ? parsedForRender : "", resources, resExtras?.layouts, device, measured, renderTheme, codeOnly]);
-
-  /** M57：共享解析结果 —— 模型 / 图层树 / 结构检查共用一棵语法树，不再各 parse 一次 */
-  const parsedDoc = useMemo(() => {
-    if (parsedForRender === "") return { root: null, issues: [] as XmlIssue[] };
-    const t = perfTimer("xml.parse", "len=" + parsedForRender.length);
-    try {
-      const doc = parseLayoutXml(parsedForRender);
-      t.end("issues=" + (doc.issues?.length ?? 0));
-      return doc;
-    } catch (e) {
-      t.end("ERR");
-      console.error("[axv] 解析失败", e);
-      return { root: null, issues: [] as XmlIssue[] };
-    }
-  }, [parsedForRender]);
 
   /** M2t：XML / 设备变了 → 旧 path 可能指向别的节点，实测表作废重测 */
   useEffect(() => {

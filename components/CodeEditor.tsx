@@ -42,8 +42,9 @@ import {
   indentUnit,
   syntaxHighlighting,
 } from "@codemirror/language";
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { tags } from "@lezer/highlight";
-import { xml } from "@codemirror/lang-xml";
+import { autoCloseTags, xml } from "@codemirror/lang-xml";
 import { java } from "@codemirror/lang-java";
 import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
@@ -66,6 +67,22 @@ export interface CodeEditorProps {
   indent?: number;
   /** M45：资源名候选（@drawable/xxx 补全用），不传就只用文档里的 token */
   resNames?: string[];
+}
+
+/** M76：在一份文本里找全部匹配（大小写不敏感，上限 500 条，空 query 返回空） */
+export function findAllIn(doc: string, query: string): { from: number; to: number }[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const low = doc.toLowerCase();
+  const out: { from: number; to: number }[] = [];
+  let i = 0;
+  while (out.length < 500) {
+    const p = low.indexOf(q, i);
+    if (p < 0) break;
+    out.push({ from: p, to: p + q.length });
+    i = p + Math.max(1, q.length);
+  }
+  return out;
 }
 
 /** M45：弹窗当前状态 */
@@ -318,11 +335,18 @@ export function CodeEditor({
     const v = viewRef.current;
     if (!v) return;
     const sel = v.state.selection.main;
-    v.dispatch({ changes: { from: sel.from, to: sel.to, insert } });
     const pos = sel.from + insert.length - back;
-    v.dispatch({ selection: { anchor: pos } });
+    // M76：一次 dispatch 完成（两次会变成两步撤销）
+    v.dispatch({
+      changes: { from: sel.from, to: sel.to, insert },
+      selection: { anchor: pos },
+      userEvent: "input",
+    });
     v.focus();
   }, []);
+
+  /** M76：输入法是否在组合中（此时按键/候选一律让路） */
+  const composing = useCallback(() => !!viewRef.current?.composing, []);
 
   /* ===== M45：算候选 + 算光标坐标 → 定位弹窗 ===== */
   const refreshSuggest = useCallback(() => {
@@ -332,6 +356,11 @@ export function CodeEditor({
     // 刚接受过：不再弹（否则回车确认后马上又弹一个）
     if (Date.now() - lastAcceptRef.current < 160) return;
 
+    // M76：组合中不弹（拼音还没落字，弹出来挡住输入法候选条）
+    if (v.composing) {
+      setSugBoth(null);
+      return;
+    }
     const sel = v.state.selection.main;
     if (!sel.empty) {
       setSugBoth(null);
@@ -435,6 +464,10 @@ export function CodeEditor({
         cmCurLineBg,
         indentOnInput(),
         bracketMatching(),
+        // M76：引号/括号自动配对（之前没有，XML 里写属性得自己敲两遍引号）
+        closeBrackets(),
+        // M76：打 <TextView 回车时自动补 </TextView>（只对 XML 生效，java 文件里是空操作）
+        autoCloseTags,
         indentComp.current.of([
           indentUnit.of(" ".repeat(indent)),
           EditorState.tabSize.of(indent),
@@ -448,15 +481,17 @@ export function CodeEditor({
           keymap.of([
             {
               key: "ArrowDown",
-              run: () => moveSel(1),
+              run: () => (composing() ? false : moveSel(1)),
             },
             {
               key: "ArrowUp",
-              run: () => moveSel(-1),
+              run: () => (composing() ? false : moveSel(-1)),
             },
             {
               key: "Enter",
               run: () => {
+                // M76：中文/日文输入法组合中，回车是「确认候选词」，不能拿来接受建议
+                if (composing()) return false;
                 const s = sugRef.current;
                 if (!s) return false;
                 acceptSuggest(s.sel);
@@ -466,6 +501,7 @@ export function CodeEditor({
             {
               key: "Tab",
               run: () => {
+                if (composing()) return false;
                 const s = sugRef.current;
                 if (!s) return false;
                 acceptSuggest(s.sel);
@@ -475,6 +511,7 @@ export function CodeEditor({
             {
               key: "Escape",
               run: () => {
+                if (composing()) return false;
                 if (!sugRef.current) return false;
                 setSugBoth(null);
                 return true;
@@ -493,6 +530,8 @@ export function CodeEditor({
           },
           // M40：回车 = 换行 + 按语法自动缩进（放在 defaultKeymap 前，保证优先）
           { key: "Enter", run: insertNewlineAndIndent },
+          // 配对的右括号/右引号要能被 Backspace 一次吃掉
+          ...closeBracketsKeymap,
           ...defaultKeymap,
           ...historyKeymap,
           indentWithTab,
@@ -595,36 +634,33 @@ export function CodeEditor({
 
   /* ===== 查找（自带一套，不引 @codemirror/search 面板） ===== */
   const hits = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [] as { from: number; to: number }[];
     const v = viewRef.current;
-    const doc = v ? v.state.doc.toString() : value;
-    const low = doc.toLowerCase();
-    const out: { from: number; to: number }[] = [];
-    let i = 0;
-    while (out.length < 500) {
-      const p = low.indexOf(q, i);
-      if (p < 0) break;
-      out.push({ from: p, to: p + q.length });
-      i = p + Math.max(1, q.length);
-    }
-    return out;
+    // M76：优先用编辑器里的实时文本 —— 父层 value 有 250ms 防抖，
+    // 拿旧文本算出来的偏移去 dispatch，会跳到错的位置（甚至越界）
+    return findAllIn(v ? v.state.doc.toString() : value, query);
   }, [query, value]);
 
   const gotoHit = useCallback(
-    (idx: number) => {
+    (idx: number, focusEditor = false) => {
       const v = viewRef.current;
-      if (!v || hits.length === 0) return;
-      const n = ((idx % hits.length) + hits.length) % hits.length;
+      if (!v) return;
+      const list = findAllIn(v.state.doc.toString(), query);
+      if (list.length === 0) {
+        setHitIdx(0);
+        return;
+      }
+      const n = ((idx % list.length) + list.length) % list.length;
       setHitIdx(n);
-      const h = hits[n];
+      const h = list[n];
       v.dispatch({
         selection: { anchor: h.from, head: h.to },
         effects: EditorView.scrollIntoView(h.from, { y: "center" }),
       });
-      v.focus();
+      // M76：从查找框/按钮点进来时不要把焦点抢回编辑器 ——
+      // 抢了之后焦点离开输入框，再按 Enter 就变成正文里换行，而且手机上会弹键盘
+      if (focusEditor) v.focus();
     },
-    [hits],
+    [query],
   );
 
   const firstErr = useMemo(() => {
@@ -697,7 +733,11 @@ export function CodeEditor({
               }}
             />
             <span className="axv-find-count">
-              {hits.length === 0 ? (query.trim() ? "无匹配" : "") : `${hitIdx + 1}/${hits.length}`}
+              {hits.length === 0
+                ? query.trim()
+                  ? "无匹配"
+                  : ""
+                : `${Math.min(hitIdx + 1, hits.length)}/${hits.length}`}
             </span>
             <button
               type="button"

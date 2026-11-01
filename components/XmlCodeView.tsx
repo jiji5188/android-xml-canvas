@@ -77,6 +77,8 @@ export function XmlCodeView(props: XmlCodeViewProps) {
         />
       ) : (
         <CodeEditor
+          // M76：按文件重挂 —— 不重挂的话 history() 会跨文件，A 文件里 Ctrl+Z 能把 B 文件的内容撤回来
+          key={props.fileKey || "code"}
           className="axv-code-fill"
           value={props.value}
           onChange={props.onChange}

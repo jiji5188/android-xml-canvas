@@ -1,6 +1,6 @@
 // components/AttrPanel.tsx — 右侧滑面板：选中节点的属性编辑器
 // 已知枚举属性 → 下拉选择；size_input → 可编辑输入 + datalist 预设过滤；
-// 颜色属性 → swatch 触发原生 color picker + hex 文本；background 加「选 drawable」按钮。
+// 颜色属性 → 自定义 HSV 取色器（ColorField）+ hex 文本；background 加「选 drawable」按钮。
 
 "use client";
 
@@ -14,6 +14,8 @@ import { officialDocUrl } from "@/lib/xml/widget-links";
 import { IconPickerPanel } from "./IconPickerPanel";
 import { ShapeEditor } from "./ShapeEditor";
 import { DrawablePicker } from "./DrawablePicker";
+import { ColorField } from "./ColorField";
+import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { specToCss, argbColorsForPreview, argbToCssColor } from "@/lib/xml/shape-gen";
 import { parseShapeSpec } from "@/lib/xml/shape-gen";
@@ -261,39 +263,19 @@ export function AttrPanel({
       );
     }
     const isHex2 = /^#[0-9a-fA-F]{3,8}$/.test(value);
-    // M53：色块背景走 ARGB→CSS（Android 8 位是 #AARRGGBB）
-    const swatchBg = isHex2 ? argbToCssColor(value) : "transparent";
-    const pickerVal = isHex2
-      ? value.length === 4
-        ? "#" + value.slice(1).split("").map((c) => c + c).join("") + "00"
-        : value.length === 9
-          ? "#" + value.slice(7) + value.slice(1, 7)
-          : value
-      : "#00000000";
     return (
       <div className="axv-attr-color" style={{ display: "flex", gap: 6, alignItems: "center", width: "100%" }}>
-        <span
-          className="axv-attr-sw"
-          style={{
-            background: swatchBg,
-            position: "relative",
-            flex: "0 0 28px",
-            cursor: "pointer",
-            border: "1px solid rgba(0,0,0,.15)",
-            borderRadius: 4,
-            overflow: "hidden",
-          }}
-          title={isHex2 ? value : "非 hex 颜色值"}
-        >
-          {isHex2 ? (
-            <input
-              type="color"
-              value={pickerVal}
-              onChange={(e) => commit(name, e.target.value.toUpperCase())}
-              style={{ position: "absolute", inset: -6, width: "calc(100% + 12px)", height: "calc(100% + 12px)", opacity: 0, cursor: "pointer", border: "none" }}
-            />
-          ) : null}
-        </span>
+        {isHex2 ? (
+          <ColorField
+            label={`${name} 颜色`}
+            value={value}
+            fallback="#FFFFFF"
+            allowTransparent
+            onChange={(css) => commit(name, toAndroidHex(parseColorOr(css, "#FFFFFF")))}
+          />
+        ) : (
+          <span className="axv-attr-sw" style={{ background: "transparent" }} title="非 hex 颜色值" />
+        )}
         <input
           className="axv-attr-input"
           style={{ flex: 1, minWidth: 0 }}

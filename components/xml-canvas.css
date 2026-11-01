@@ -6952,6 +6952,9 @@ button.axv-sb-item:hover {
 }
 
 
+/* M63i：右侧属性面板的颜色属性也用同一套 ColorField → 尺寸对齐旧色块 */
+.axv-attr-color .axv-cf-swatch { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 4px; }
+
 /* ===== M63c：颜色取色器改成「蒙版 + 居中弹层」（不再算 x/y） ===== */
 .axv-cf-mask {
   position: fixed;

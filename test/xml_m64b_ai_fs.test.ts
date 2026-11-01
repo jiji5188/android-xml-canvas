@@ -122,7 +122,8 @@ describe("M64b 根路径拼接（伪 native bridge）", () => {
     });
     const io = ioForProject({ source: null, rootPath: "/custom/dir/", name: "P" })!;
     const w = await io.write("res/a.xml", "hello");
-    expect(w).toEqual({ ok: true });
+    // M72（C7）：新建文件也会把实际写入文本带回来（note 为空表示风格没改动）
+    expect(w).toMatchObject({ ok: true, text: "hello" });
     expect(written!.path).toBe("/custom/dir/res/a.xml");
     expect(Buffer.from(written!.b64, "base64").toString("utf8")).toBe("hello");
     delete (globalThis as { window?: unknown }).window;

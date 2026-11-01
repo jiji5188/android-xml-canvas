@@ -16,6 +16,7 @@ import type { ProjectSource } from "./project-browse";
 import { hasAsyncIo, listDirQueued, readTextQueued } from "./native-async";
 import { nativeBridge, writeTextNative } from "./native-save";
 import { isUnder } from "./ai-paths";
+import { prepareWriteText, styleNote } from "./text-style";
 
 interface NativeFsBridge {
   listDir?(path: string): string | null;
@@ -146,13 +147,28 @@ function parseDirJson(json: string | null, rel: string): { ok: boolean; items?: 
   }
 }
 
-function writeUnder(root: string, rel: string, text: string): { ok: boolean; error?: string } {
+async function writeUnder(
+  root: string,
+  rel: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string; note?: string; text?: string }> {
   const target = absOf(root, rel);
   // M64c（B4）：拼完绝对路径再验一次前缀，防 normalize 与拼接口径不一致
   if (!isUnder(root, target)) return { ok: false, error: "路径非法：跳出了项目目录" };
   try {
-    const ok = writeTextNative(target, text);
-    return ok ? { ok: true } : { ok: false, error: "写入失败（没有权限或 APK 版本过旧）" };
+    // M72（C7）：先读旧文本，换行/BOM 跟原文件保持一致（否则 git diff 整片变红）
+    const b = nativeBridge();
+    let prev: string | null = null;
+    try {
+      prev = hasAsyncIo() ? await readTextQueued(target) : (b?.readText?.(target) ?? null);
+    } catch {
+      prev = null;
+    }
+    const prepared = prepareWriteText(text, prev);
+    const ok = writeTextNative(target, prepared.text);
+    return ok
+      ? { ok: true, note: styleNote(prepared.style, prepared.converted), text: prepared.text }
+      : { ok: false, error: "写入失败（没有权限或 APK 版本过旧）" };
   } catch (e) {
     return { ok: false, error: errText(e) };
   }
@@ -169,7 +185,11 @@ interface FsaDirHandle {
 }
 
 /** FSA 写入：逐层取目录（不存在就建）→ 取文件（不存在就建）→ 写 → 关 */
-async function writeViaHandle(rootHandle: unknown, rel: string, text: string): Promise<{ ok: boolean; error?: string }> {
+async function writeViaHandle(
+  rootHandle: unknown,
+  rel: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string; note?: string; text?: string }> {
   const root = rootHandle as FsaDirHandle | null;
   if (!root || typeof root.getFileHandle !== "function") {
     return { ok: false, error: "当前项目的目录句柄不可写" };
@@ -181,10 +201,19 @@ async function writeViaHandle(rootHandle: unknown, rel: string, text: string): P
     let dir = root;
     for (const seg of parts) dir = await dir.getDirectoryHandle(seg, { create: true });
     const fh = await dir.getFileHandle(name, { create: true });
+    // M72（C7）：浏览器侧同样对齐原文件的换行/BOM
+    let prev: string | null = null;
+    try {
+      const f = await (fh as unknown as { getFile(): Promise<{ text(): Promise<string> }> }).getFile();
+      prev = await f.text();
+    } catch {
+      prev = null;
+    }
+    const prepared = prepareWriteText(text, prev);
     const w = await fh.createWritable();
-    await w.write(text);
+    await w.write(prepared.text);
     await w.close();
-    return { ok: true };
+    return { ok: true, note: styleNote(prepared.style, prepared.converted), text: prepared.text };
   } catch (e) {
     const msg = errText(e);
     if (/NotAllowed|denied|permission/i.test(msg)) {

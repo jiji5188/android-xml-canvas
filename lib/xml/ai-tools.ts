@@ -9,8 +9,10 @@ import { AI_MAX_WRITE_BYTES, checkAiPath, normalizeAiRel } from "./ai-paths";
 import { formatSearchResult, searchProject } from "./ai-search";
 import { hasAsyncIo, listDirQueued, readTextQueued } from "./native-async";
 import { isJavaLikePath, parseOutline } from "./java-outline";
-import { collectIds, findUsages, formatUsages } from "./ai-usages";
+import { collectIds, clearIdCache, findUsages, formatUsages } from "./ai-usages";
 import { formatJavaLint, lintJava } from "./java-lint";
+import { clearResIndex } from "./res-index";
+import { invalidateNativeProjectCache } from "./workspace";
 
 export type AiToolName =
   | "list_files"
@@ -66,7 +68,10 @@ export interface AiFileIo {
   staging?: boolean;
   list(rel: string): Promise<{ ok: boolean; items?: AiFileEntry[]; error?: string }>;
   read(rel: string): Promise<{ ok: boolean; text?: string; error?: string }>;
-  write(rel: string, text: string): Promise<{ ok: boolean; error?: string }>;
+  write(
+    rel: string,
+    text: string,
+  ): Promise<{ ok: boolean; error?: string; note?: string; text?: string }>;
 }
 
 /** 追加到 system prompt 的能力说明（M64h/A4：格式收紧成 {tool,args} 一行 JSON） */
@@ -247,6 +252,24 @@ export function safeRel(p: string | undefined): string | null {
 const MAX_READ = 200 * 1024;
 
 /** 执行一个工具调用，返回喂给模型的文本 */
+/**
+ * M72（C7）：写盘之后统一清缓存 —— 项目列表 / res 索引 / layout id。
+ * 不清的话：AI 新建了 layout，项目面板还是旧的；改了 values，跳定义仍指向老行号。
+ */
+async function afterWrite(io: AiFileIo): Promise<void> {
+  try {
+    invalidateNativeProjectCache();
+  } catch {
+    /* 浏览器环境没有原生缓存 */
+  }
+  try {
+    clearResIndex();
+  } catch {
+    /* 同上 */
+  }
+  clearIdCache(io);
+}
+
 export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
   if (call.tool === "list_files") {
     const dir = checkAiPath(call.dir ?? "", { mode: "read" });
@@ -336,9 +359,10 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
     }
     const r = await io.write(rel.rel, call.content);
     if (!r.ok) return `错误：${r.error || "写入失败"}`;
+    await afterWrite(io);
     return io.staging
       ? `已暂存新建 ${rel.rel}（${call.content.length} 字符，等用户点「应用」才落盘）`
-      : `已写入 ${rel.rel}（${call.content.length} 字符）`;
+      : `已写入 ${rel.rel}（${call.content.length} 字符）${r.note || ""}`;
   }
 
   if (call.tool === "apply_patch") {
@@ -368,9 +392,10 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
     }
     const w = await io.write(rel.rel, text);
     if (!w.ok) return `错误：${w.error || "写入失败"}`;
+    await afterWrite(io);
     return io.staging
       ? `已暂存修改 ${rel.rel}（${edits.length} 处，等用户点「应用」才落盘）`
-      : `已修改 ${rel.rel}（${edits.length} 处）`;
+      : `已修改 ${rel.rel}（${edits.length} 处）${w.note || ""}`;
   }
 
   // search_files（M64f/B5：预算 + 跳过产物目录 + 只匹配前 4KB + 每 25 次让出主线程）

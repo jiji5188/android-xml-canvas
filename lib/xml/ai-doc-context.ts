@@ -63,6 +63,36 @@ function looksLikeJvmSource(content: string): boolean {
 
 const BASE_RULE = "回答用中文；不要编造项目里不存在的资源、类名或 API；不确定就直说。";
 
+/** M71（C6）：Java 与 Kotlin 的语言规则块 —— 只按文件扩展名注入对应那一套 */
+const LANGUAGE_RULES: Partial<Record<AiDocKind, string[]>> = {
+  java: [
+    "语言规则（Java / Android）：",
+    "1. 不改动的局部变量用 final；字段命名跟随文件现有风格（mFoo 或 foo 择一，别混）。",
+    "2. 点击/长按等单方法监听器用匿名内部类 new View.OnClickListener() { @Override public void onClick(View v) {...} }；不要引入 lambda 之外的新库。",
+    "3. 取控件优先沿用文件已有方式：已用 ViewBinding 就用 binding.xxx，否则 findViewById 并显式强转。",
+    "4. Fragment 里取 Context 用 requireContext()/requireActivity()，不要用 getActivity() 后不做判空。",
+    "5. 集合、Map 声明用接口类型（List/Map），实现放右侧；不要用裸类型。",
+    "6. SharedPreferences 改动一律 apply()，不要 commit()；Cursor/InputStream 必须 try-with-resources 或 finally 关闭。",
+    "7. 常量与枚举取值用 static final 或 @IntDef，不要散落魔法数字。",
+    "8. 回调从子线程回到 UI 时说明线程切换（runOnUiThread / Handler(Looper.getMainLooper())），不要假设已在主线程。",
+    "9. 新增方法放在同类方法附近，保持现有修饰符顺序与缩进（4 空格，不用 Tab）。",
+    "10. 不要改写为 Kotlin、不要引入未在 build.gradle 里声明的依赖；需要新依赖时先说明再给方案。",
+  ],
+  kotlin: [
+    "语言规则（Kotlin / Android）：",
+    "1. 不加分号；不可变用 val、可变用 var；属性初始化优先在声明处完成。",
+    "2. 监听器写 lambda：binding.btn.setOnClickListener { doIt() }；只有需要多个回调时才用 object : View.OnClickListener。",
+    "3. 可空性显式处理：?. / ?: / ?.let；禁止 !!，确需非空用 requireNotNull(x) { \"原因\" }。",
+    "4. ViewBinding 用 binding?.apply { } 或在 onDestroyView 置 null；不要重复 findViewById。",
+    "5. 只初始化一次的成员用 by lazy；单例用 object；纯数据载体用 data class（含 copy/equals 语义）。",
+    "6. 协程用 lifecycleScope.launch + repeatOnLifecycle(Lifecycle.State.STARTED)，不要用 GlobalScope。",
+    "7. 字符串拼接用模板 \"$name\"，多行用 trimIndent() 或 buildString。",
+    "8. 条件分支用 when 表达式；集合用 forEach/map/filter，不写索引循环。",
+    "9. 扩展函数放文件顶层、命名动词开头；不要为了短而滥用 apply/also。",
+    "10. 保持现有 package、类名与函数签名；不要改写成 Java，也不要引入未声明的依赖。",
+  ],
+};
+
 const CONTRACTS: Record<AiDocKind, string[]> = {
   layout: [
     "输出契约（布局 XML）：",
@@ -254,6 +284,7 @@ export function buildAiSystemPrompt(ctx: AiDocContext, opts: AiPromptOpts = {}):
     ...decisionBlock(ctx, intent, canWrite),
     "",
     ...ctx.contract,
+    ...(LANGUAGE_RULES[ctx.kind] ? ["", ...LANGUAGE_RULES[ctx.kind]!] : []),
     "",
     ...BANS,
   ].join("\n");

@@ -9,13 +9,15 @@ import { AI_MAX_WRITE_BYTES, checkAiPath, normalizeAiRel } from "./ai-paths";
 import { formatSearchResult, searchProject } from "./ai-search";
 import { hasAsyncIo, listDirQueued, readTextQueued } from "./native-async";
 import { isJavaLikePath, parseOutline } from "./java-outline";
-import { findUsages, formatUsages } from "./ai-usages";
+import { collectIds, findUsages, formatUsages } from "./ai-usages";
+import { formatJavaLint, lintJava } from "./java-lint";
 
 export type AiToolName =
   | "list_files"
   | "read_file"
   | "outline"
   | "find_usages"
+  | "check_java"
   | "write_file"
   | "apply_patch"
   | "search_files";
@@ -78,6 +80,7 @@ export const AI_TOOL_PROMPT = [
   '- read_file {path, offset?, limit?}：读文本文件（路径相对项目根）；大文件先给 offset/limit（1 起，limit≤400）只读目标方法',
   '- outline {path}：Java/Kotlin 大纲（类 + 方法 + 行号），改大文件前先看它，再 read_file 读那几行',
   '- find_usages {symbol, type?}：查资源引用（symbol 可写 @string/app_name / R.string.app_name / @+id/btn；只写名字时用 type 指定 string/color/dimen/id/layout），改或重命名资源前先用它看影响面',
+  '- check_java {path}：Java/Kotlin 静态自检（括号/引号平衡、R.id 是否存在、缺 import、@Override 位置）。改完代码调一次；它只做静态检查、不是编译',
   '- apply_patch {path, edits:[{old,new}]}：局部替换——改已有文件只用这个；old 必须唯一，不唯一就先 read_file 取更长上下文',
   '- write_file {path, content}：**只能新建文件**；文件已存在会被拒，请改走 apply_patch',
   '- search_files {query, dir}：按文件名/内容关键词搜索',
@@ -99,6 +102,7 @@ export const AI_TOOL_NAMES: AiToolName[] = [
   "read_file",
   "outline",
   "find_usages",
+  "check_java",
   "write_file",
   "apply_patch",
   "search_files",
@@ -137,6 +141,9 @@ export function validateToolCall(c: AiToolCall): string | null {
       if (!c.type && !/^[@R]/.test(c.symbol)) return "只给名字时要带 args.type（string/color/dimen/id/layout…）";
       if (c.type && !/^[a-z_]+$/.test(c.type)) return "args.type 只能是小写字母/下划线";
       return null;
+    case "check_java":
+      if (!c.path) return "缺 args.path";
+      return /\.(java|kt|kts)$/i.test(c.path) ? null : "check_java 只支持 .java/.kt/.kts 文件";
     case "search_files":
       return c.query ? null : "缺 args.query";
     case "write_file":
@@ -299,6 +306,15 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
     return `文件 ${rel.rel} 大纲（共 ${src.split("\n").length} 行，${items.length} 项）：\n${lines.join("\n")}\n改哪一块就用 read_file {path:"${rel.rel}", offset:行号, limit:该段行数}`;
   }
 
+  if (call.tool === "check_java") {
+    const path = (call.path || "").trim();
+    const r = await io.read(path);
+    if (!r.ok || typeof r.text !== "string") return `错误：${r.ok ? "读不到文件正文" : r.error}`;
+    const isKotlin = /\.kts?$/i.test(path);
+    const ids = isKotlin ? undefined : await collectIds(io);
+    const issues = lintJava(r.text, { isKotlin, ids: ids || undefined });
+    return formatJavaLint(issues, `${path} `);
+  }
   // M68（C3）：资源引用 —— 改/改名之前先看会影响谁
   if (call.tool === "find_usages") {
     const res = await findUsages(io, call.symbol || "", call.type);

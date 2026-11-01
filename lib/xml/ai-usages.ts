@@ -185,6 +185,54 @@ export async function findUsages(
   return { symbol: `${sym.type}/${sym.name}`, hits, files, truncated };
 }
 
+/**
+ * M70（C2）：项目里真实存在的 id 名（不含 @+id/ 前缀）。
+ * 给 java-lint 校验 R.id.xxx 用；同一个 io 只扫一次（WeakMap 缓存）。
+ */
+const idCache = new WeakMap<object, Promise<Set<string>>>();
+
+export function collectIds(io: AiFileIo, opts: { maxFiles?: number } = {}): Promise<Set<string>> {
+  const key = io as unknown as object;
+  const hit = idCache.get(key);
+  if (hit) return hit;
+  const job = collectIdsInner(io, opts).catch(() => new Set<string>());
+  idCache.set(key, job);
+  return job;
+}
+
+export function clearIdCache(io: AiFileIo): void {
+  idCache.delete(io as unknown as object);
+}
+
+async function collectIdsInner(io: AiFileIo, opts: { maxFiles?: number }): Promise<Set<string>> {
+  const ids = new Set<string>();
+  const maxFiles = opts.maxFiles ?? 400;
+  const queue: string[] = [""];
+  let files = 0;
+  let visits = 0;
+  while (queue.length && files < maxFiles && visits < USAGE_BUDGET.maxVisits) {
+    const dir = queue.shift() as string;
+    visits++;
+    const res = await io.list(dir);
+    if (!res.ok) continue;
+    for (const it of res.items || []) {
+      if (it.kind === "dir") {
+        if (SKIP_DIR.test(it.name)) continue;
+        queue.push(it.rel);
+        continue;
+      }
+      if (!/\/res\/layout[^/]*\/[^/]+\.xml$/.test(it.rel)) continue;
+      files++;
+      const r = await io.read(it.rel);
+      if (r.ok && typeof r.text === "string") {
+        for (const m of r.text.matchAll(/@\+?id\/([A-Za-z_]\w*)/g)) ids.add(m[1]);
+      }
+      if (files >= maxFiles) break;
+    }
+  }
+  return ids;
+}
+
 /** 喂给 AI 的纯文本结果 */
 export function formatUsages(res: UsageResult): string {
   const head = res.hits.length

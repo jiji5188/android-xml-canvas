@@ -92,7 +92,7 @@ const CONTRACTS: Record<AiDocKind, string[]> = {
     "3. 保持现有 package、类名、已有方法签名与命名风格；不要改写成 Kotlin。",
     "4. 引用资源必须用项目里存在的 R.id / R.string / R.layout；不确定就先说不知道。",
     "5. 不要输出 Android XML 布局——这是 Java 文件，不是布局。",
-    "6. 你无法编译，回复末尾注明「未编译验证」。",
+    "6. 你无法编译，回复末尾注明「未编译验证」；改完代码先调 check_java {path} 做静态自检（括号/引号、R.id 是否存在、缺 import），静态检查通过也不等于编译通过。",
   ],
   kotlin: [
     "输出契约（Kotlin）：",
@@ -101,7 +101,7 @@ const CONTRACTS: Record<AiDocKind, string[]> = {
     "3. 可空性显式处理（?. / ?: / requireNotNull），不要滥用 !!。",
     "4. 保持现有 package、类名与既有函数签名；不要改写成 Java。",
     "5. 不要输出 Android XML 布局——这是 Kotlin 文件，不是布局。",
-    "6. 你无法编译，回复末尾注明「未编译验证」。",
+    "6. 你无法编译，回复末尾注明「未编译验证」；改完代码先调 check_java {path} 做静态自检（括号/引号、R.id 是否存在、缺 import），静态检查通过也不等于编译通过。",
   ],
   xml: [
     "输出契约（XML 资源）：",

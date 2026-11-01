@@ -71,7 +71,7 @@ export function SettingsPanel(p: SettingsPanelProps) {
     });
   const groupCls = (i: number) => "axv-set-group" + (isOpen(i) ? " open" : "");
   return (
-    <div className="axv-rail-scroll">
+    <div className="axv-rail-scroll axv-settings">
       {/* ===== 外观：预设配色方案 ===== */}
       <div className={groupCls(0)}>
         <button

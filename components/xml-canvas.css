@@ -3471,7 +3471,11 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-shape-seg { display: flex; gap: 4px; }
 .axv-shape-seg-btn { flex: 1; height: 30px; border: 1px solid rgba(0,0,0,.12); background: #fff; border-radius: 8px; font-size: 12px; cursor: pointer; color: #34343d; }
 .axv-shape-seg-btn.is-on { background: #4f46e5; border-color: #4f46e5; color: #fff; }
-.axv-shape-color { display: flex; gap: 6px; align-items: center; }
+.axv-shape-color { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+/* M52：填充色 / 涟漪色旁边直接拖透明度 */
+.axv-shape-alpha { flex: 1 1 120px; min-width: 110px; display: flex; align-items: center; gap: 6px; }
+.axv-shape-alpha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--axv-primary, #4f46e5); }
+.axv-shape-alpha > b { font-size: 11px; min-width: 32px; text-align: right; color: #6b6b78; font-variant-numeric: tabular-nums; }
 .axv-shape-color input[type="color"] { flex: 0 0 34px; width: 34px; height: 30px; border: 1px solid rgba(0,0,0,.12); border-radius: 6px; padding: 0; background: #fff; cursor: pointer; }
 .axv-shape-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .axv-shape-row input[type="number"] { width: 68px; }
@@ -3708,8 +3712,14 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-dp-tab.is-on { background: var(--axv-primary-soft); border-color: var(--axv-primary-soft-border); color: var(--axv-primary); }
 .axv-dp-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px 14px; }
-.axv-dp-pickrow { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.axv-dp-pickrow { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .axv-dp-pickrow input[type="color"] { width: 56px; height: 36px; border: none; background: none; cursor: pointer; }
+/* M52：取色器旁边直接拖透明度（不弹浮层） */
+.axv-dp-alpha { flex: 1 1 180px; min-width: 150px; display: flex; align-items: center; gap: 8px; }
+.axv-dp-alpha > span { font-size: 11.5px; color: var(--axv-on-surface-variant); white-space: nowrap; }
+.axv-dp-alpha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--axv-primary, #4f46e5); }
+.axv-dp-alpha > b { font-size: 11.5px; min-width: 34px; text-align: right; color: var(--axv-on-surface); font-variant-numeric: tabular-nums; }
+.axv-dp-alpha input[type="range"]:disabled { opacity: 0.45; }
 .axv-dp-hint { font-size: 11.5px; color: var(--axv-on-surface-variant); }
 .axv-dp-swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 8px; }
 .axv-dp-swatch {
@@ -4298,7 +4308,7 @@ body.axv-lt-dragging .axv-lt-row {
 }
 /* M50：分组可折叠。默认全部折叠（.open 由组件按点击加上），
    未展开时把除标题以外的子元素全部藏掉 —— 不改变现有 JSX 结构。 */
-.axv-set-group:not(.open) > *:not(.axv-set-label) {
+.axv-settings .axv-set-group:not(.open) > *:not(.axv-set-label) {
   display: none;
 }
 .axv-set-label {
@@ -4310,7 +4320,7 @@ body.axv-lt-dragging .axv-lt-row {
   margin-bottom: 8px;
 }
 /* 折叠标题（button）：占满整行，小箭头指示展开状态 */
-.axv-set-group > button.axv-set-label {
+.axv-settings .axv-set-group > button.axv-set-label {
   display: flex;
   align-items: center;
   gap: 3px;
@@ -4323,10 +4333,10 @@ body.axv-lt-dragging .axv-lt-row {
   cursor: pointer;
   text-align: left;
 }
-.axv-set-group > button.axv-set-label:hover {
+.axv-settings .axv-set-group > button.axv-set-label:hover {
   background: var(--axv-hover);
 }
-.axv-set-group:not(.open) > button.axv-set-label {
+.axv-settings .axv-set-group:not(.open) > button.axv-set-label {
   margin-bottom: 0;
 }
 .axv-set-caret {
@@ -4335,7 +4345,7 @@ body.axv-lt-dragging .axv-lt-row {
   opacity: 0.6;
   transition: transform 0.16s ease;
 }
-.axv-set-group.open .axv-set-caret {
+.axv-settings .axv-set-group.open .axv-set-caret {
   transform: rotate(90deg);
 }
 .axv-set-seg {

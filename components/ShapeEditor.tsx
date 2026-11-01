@@ -202,6 +202,20 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                     spellCheck={false}
                     onChange={(e) => setSolid(e.target.value)}
                   />
+                  <label className="axv-shape-alpha" title="拖动调填充透明度">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      aria-label="填充不透明度"
+                      value={alphaPercent(spec.solid)}
+                      onChange={(e) =>
+                        setSolid(withAlphaPercent(spec.solid ?? "#FFFFFF", Number(e.target.value)))
+                      }
+                    />
+                    <b>{alphaPercent(spec.solid)}%</b>
+                  </label>
                 </div>
               </div>
             ) : null}
@@ -332,6 +346,25 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                     spellCheck={false}
                     onChange={(e) => setSpec((s) => ({ ...s, ripple: { color: e.target.value } }))}
                   />
+                  <label className="axv-shape-alpha" title="拖动调涟漪透明度">
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      aria-label="涟漪不透明度"
+                      value={alphaPercent(spec.ripple.color)}
+                      onChange={(e) =>
+                        setSpec((s) => ({
+                          ...s,
+                          ripple: {
+                            color: withAlphaPercent(s.ripple?.color ?? "#FFFFFF", Number(e.target.value)),
+                          },
+                        }))
+                      }
+                    />
+                    <b>{alphaPercent(spec.ripple.color)}%</b>
+                  </label>
                 </div>
               ) : null}
             </div>
@@ -593,6 +626,22 @@ function withAlphaHex(picked: string, prev?: string): string {
   const m = /^#([0-9a-f]{8})$/i.exec((prev ?? "").trim());
   const alpha = m ? m[1].slice(0, 2) : "33";
   return `#${alpha}${picked.replace("#", "").toUpperCase()}`;
+}
+
+/** M52：当前颜色的 alpha 百分比（0-100），无 alpha → 100 */
+function alphaPercent(v?: string): number {
+  const m = /^#([0-9a-f]{8})$/i.exec((v ?? "").trim());
+  if (!m) return 100;
+  return Math.round((parseInt(m[1].slice(0, 2), 16) / 255) * 100);
+}
+
+/** M52：只改 alpha，写回 Android 习惯：#RRGGBB（100%）/ #AARRGGBB */
+function withAlphaPercent(v: string, pct: number): string {
+  const rgb = toHex6(v).slice(1).toUpperCase();
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  if (p >= 100) return "#" + rgb;
+  const a = Math.round((p / 100) * 255).toString(16).padStart(2, "0").toUpperCase();
+  return "#" + a + rgb;
 }
 
 /** 按下色默认值：把常态色往黑/白撑一点（暗色变亮、亮色变暗） */

@@ -658,6 +658,8 @@ export function AttrPanel({
             commit(dpOpen, v);
             setDpOpen(null);
           }}
+          // M52：拖透明度滑杆 / 取色器连续调整 → 只写回，不关弹窗
+          onApply={(v) => commit(dpOpen, v)}
           onClose={() => setDpOpen(null)}
         />,
           document.body

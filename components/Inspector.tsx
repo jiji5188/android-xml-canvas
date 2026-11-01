@@ -35,6 +35,7 @@ export interface InspectorProps {
   onDeleteNode: (path: string) => void;
   /** M65：属性值是资源引用时，点「跳」去定义行（由 XmlEditor 解析并打开文件） */
   onOpenRef?: (value: string) => void;
+  onFindUsages?: (value: string) => void;
   resExtras: ResourceExtras | null;
 
   /* —— 图标 / 形状 —— */
@@ -101,6 +102,7 @@ export function Inspector(props: InspectorProps) {
               onRemove={props.onRemoveAttr}
               onAddAttr={props.onAddAttr}
               onOpenRef={props.onOpenRef}
+              onFindUsages={props.onFindUsages}
               resExtras={props.resExtras}
               onDeleteNode={() => props.onDeleteNode(node.path)}
               onPickIcon={props.onPickIcon}

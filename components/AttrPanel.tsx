@@ -35,6 +35,8 @@ export interface AttrPanelProps {
   onDeleteNode?: () => void;
   /** M65：属性值是 @string/@color/@dimen 这类资源引用时，点「跳」去定义行 */
   onOpenRef?: (value: string) => void;
+  /** M68（C3）：查这条资源在全项目被引用的地方 */
+  onFindUsages?: (value: string) => void;
   /** 打开「添加属性」弹窗 */
   onAddAttr: () => void;
   /** 已上传 res 资源（可选；提供后 background/src 可弹 drawable 列表） */
@@ -126,6 +128,7 @@ export function AttrPanel({
   resExtras,
   onDeleteNode,
   onOpenRef,
+  onFindUsages,
   onPickIcon,
   onEditIconResource,
   iconNames,
@@ -578,6 +581,16 @@ export function AttrPanel({
                     onClick={() => onOpenRef(vstr)}
                   >
                     <span className="msr" aria-hidden="true">arrow_outward</span>
+                  </button>
+                ) : null}
+                {onFindUsages && parseResRef(vstr) ? (
+                  <button
+                    className="axv-attr-uses"
+                    title={`查看 ${vstr} 在哪些地方被引用`}
+                    aria-label={`查看 ${vstr} 的引用`}
+                    onClick={() => onFindUsages(vstr)}
+                  >
+                    <span className="msr" aria-hidden="true">travel_explore</span>
                   </button>
                 ) : null}
                 {hint ? (

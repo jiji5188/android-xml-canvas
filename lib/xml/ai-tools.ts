@@ -9,8 +9,16 @@ import { AI_MAX_WRITE_BYTES, checkAiPath, normalizeAiRel } from "./ai-paths";
 import { formatSearchResult, searchProject } from "./ai-search";
 import { hasAsyncIo, listDirQueued, readTextQueued } from "./native-async";
 import { isJavaLikePath, parseOutline } from "./java-outline";
+import { findUsages, formatUsages } from "./ai-usages";
 
-export type AiToolName = "list_files" | "read_file" | "outline" | "write_file" | "apply_patch" | "search_files";
+export type AiToolName =
+  | "list_files"
+  | "read_file"
+  | "outline"
+  | "find_usages"
+  | "write_file"
+  | "apply_patch"
+  | "search_files";
 
 export interface AiPatchEdit {
   /** 要被替换的原片段（必须在文件里唯一出现） */
@@ -35,6 +43,10 @@ export interface AiToolCall {
   offset?: number;
   /** M67（C4）：read_file 最多读多少行（默认整份，上限 400） */
   limit?: number;
+  /** M68（C3）：find_usages 的资源符号，如 @string/app_name / R.id.btn / item_count */
+  symbol?: string;
+  /** M68（C3）：symbol 只给了名字时的类型提示（string/color/dimen/id/layout…） */
+  type?: string;
 }
 
 export interface AiFileEntry {
@@ -65,6 +77,7 @@ export const AI_TOOL_PROMPT = [
   '- list_files {dir}：列目录（dir 省略=项目根）',
   '- read_file {path, offset?, limit?}：读文本文件（路径相对项目根）；大文件先给 offset/limit（1 起，limit≤400）只读目标方法',
   '- outline {path}：Java/Kotlin 大纲（类 + 方法 + 行号），改大文件前先看它，再 read_file 读那几行',
+  '- find_usages {symbol, type?}：查资源引用（symbol 可写 @string/app_name / R.string.app_name / @+id/btn；只写名字时用 type 指定 string/color/dimen/id/layout），改或重命名资源前先用它看影响面',
   '- apply_patch {path, edits:[{old,new}]}：局部替换——改已有文件只用这个；old 必须唯一，不唯一就先 read_file 取更长上下文',
   '- write_file {path, content}：**只能新建文件**；文件已存在会被拒，请改走 apply_patch',
   '- search_files {query, dir}：按文件名/内容关键词搜索',
@@ -81,7 +94,15 @@ export const AI_TOOL_PROMPT = [
 const toolBlockRe = () => /```axv-tool\s*\n([\s\S]*?)```/g;
 
 /** 可用工具名（校验用） */
-export const AI_TOOL_NAMES: AiToolName[] = ["list_files", "read_file", "outline", "write_file", "apply_patch", "search_files"];
+export const AI_TOOL_NAMES: AiToolName[] = [
+  "list_files",
+  "read_file",
+  "outline",
+  "find_usages",
+  "write_file",
+  "apply_patch",
+  "search_files",
+];
 
 export interface ParsedToolReply {
   calls: AiToolCall[];
@@ -111,6 +132,11 @@ export function validateToolCall(c: AiToolCall): string | null {
       return null;
     case "outline":
       return c.path ? null : "缺 args.path";
+    case "find_usages":
+      if (!c.symbol) return "缺 args.symbol（如 @string/app_name 或 R.id.btn）";
+      if (!c.type && !/^[@R]/.test(c.symbol)) return "只给名字时要带 args.type（string/color/dimen/id/layout…）";
+      if (c.type && !/^[a-z_]+$/.test(c.type)) return "args.type 只能是小写字母/下划线";
+      return null;
     case "search_files":
       return c.query ? null : "缺 args.query";
     case "write_file":
@@ -171,6 +197,8 @@ export function parseToolReply(reply: string): ParsedToolReply {
       dir: asStr(args.dir),
       content: asStr(args.content),
       query: asStr(args.query),
+      symbol: asStr(args.symbol),
+      type: asStr(args.type),
       offset: asNum(args.offset),
       limit: asNum(args.limit),
       edits: Array.isArray(args.edits)
@@ -269,6 +297,12 @@ export async function runTool(call: AiToolCall, io: AiFileIo): Promise<string> {
     if (!items.length) return `文件 ${rel.rel} 里没解析出类/方法（${src.split("\n").length} 行）`;
     const lines = items.map((it) => `L${it.line} ${"  ".repeat(it.depth)}${it.kind === "class" ? "class " : ""}${it.name}${it.sig ? it.sig : ""}`);
     return `文件 ${rel.rel} 大纲（共 ${src.split("\n").length} 行，${items.length} 项）：\n${lines.join("\n")}\n改哪一块就用 read_file {path:"${rel.rel}", offset:行号, limit:该段行数}`;
+  }
+
+  // M68（C3）：资源引用 —— 改/改名之前先看会影响谁
+  if (call.tool === "find_usages") {
+    const res = await findUsages(io, call.symbol || "", call.type);
+    return formatUsages(res);
   }
 
   if (call.tool === "write_file") {

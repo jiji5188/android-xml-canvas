@@ -8,6 +8,7 @@
 
 import AiPanel from "@/components/AiPanel";
 import { createResResolver } from "@/lib/xml/res-index";
+import { findUsages, type UsageHit } from "@/lib/xml/ai-usages";
 import { ResValuesPanel } from "@/components/ResValuesPanel";
 import { formatResRefHit } from "@/lib/xml/res-refs";
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue, startTransition } from "react";
@@ -2952,6 +2953,40 @@ const findResolved = findResolvedNode;
     [isMobile, mobileTab],
   );
 
+  /** M68（C3）：「引用」浮层（查这个资源在项目里被哪些地方用到） */
+  const [usesPanel, setUsesPanel] = useState<{
+    title: string;
+    hits: UsageHit[];
+    files: number;
+    truncated: boolean;
+    loading: boolean;
+  } | null>(null);
+
+  const openUsages = useCallback(
+    async (value: string) => {
+      if (!aiFileIo) {
+        setWsMsg("先打开一个项目目录，才能查引用（当前是单个文件）");
+        return;
+      }
+      const dir = openRel ? openRel.split("/").slice(0, -1).join("/") : undefined;
+      setUsesPanel({ title: value, hits: [], files: 0, truncated: false, loading: true });
+      try {
+        const res = await findUsages(aiFileIo, value, undefined, { firstDir: dir });
+        setUsesPanel({
+          title: value,
+          hits: res.hits,
+          files: res.files,
+          truncated: res.truncated,
+          loading: false,
+        });
+      } catch (e) {
+        setUsesPanel(null);
+        setWsMsg(`查引用失败：${e instanceof Error ? e.message : String(e)}`);
+      }
+    },
+    [aiFileIo, openRel],
+  );
+
   /**
    * M65：属性值是 `@string/app_name` 这类资源引用时 → 找定义文件并跳到那一行。
    * 已经打开的就是这个文件时只跳行，不重新读盘。
@@ -3379,6 +3414,7 @@ const findResolved = findResolvedNode;
         onRemoveAttr={removeAttr}
         onAddAttr={() => setAddModalOpen(true)}
         onOpenRef={(v) => void openResRef(v)}
+        onFindUsages={(v) => void openUsages(v)}
         onDeleteNode={onRemoveNode}
         resExtras={resExtras}
         onPickIcon={onPickIcon}
@@ -3464,6 +3500,66 @@ const findResolved = findResolvedNode;
           device={{ label: device.label, w: device.w, h: device.h, radius: device.radius }}
           onClose={() => setRunOpen(false)}
         />
+      ) : null}
+
+      {/* M68（C3）：资源引用列表 */}
+      {usesPanel ? (
+        <div
+          className="axv-uses-mask"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setUsesPanel(null);
+          }}
+        >
+          <div className="axv-uses-card">
+            <div className="axv-uses-head">
+              <span className="axv-uses-title">{usesPanel.title} 的引用</span>
+              <span className="axv-uses-count">
+                {usesPanel.loading
+                  ? "扫描中…"
+                  : `${usesPanel.hits.length} 处 · 扫了 ${usesPanel.files} 个文件${usesPanel.truncated ? "（已截断）" : ""}`}
+              </span>
+              <span style={{ flex: 1 }} />
+              <button className="axv-uses-x" aria-label="关闭" onClick={() => setUsesPanel(null)}>
+                ✕
+              </button>
+            </div>
+            <div className="axv-uses-list">
+              {!usesPanel.loading && usesPanel.hits.length === 0 ? (
+                <div className="axv-uses-empty">没找到引用（可能只在别的模块或依赖库里）</div>
+              ) : null}
+              {usesPanel.hits.map((h) => (
+                <button
+                  key={`${h.rel}:${h.line}`}
+                  className="axv-uses-row"
+                  title={`${h.rel}:${h.line}`}
+                  onClick={() => {
+                    setUsesPanel(null);
+                    const src = activeProjectRef.current?.source;
+                    if (!src) {
+                      setWsMsg(`${h.rel}:${h.line}`);
+                      return;
+                    }
+                    if (openRel === h.rel) {
+                      jumpToCodeLine(h.line);
+                      return;
+                    }
+                    void loadEntry(src, {
+                      kind: "file",
+                      name: h.rel.split("/").pop() || h.rel,
+                      rel: h.rel,
+                    }).then(() => jumpToCodeLine(h.line));
+                  }}
+                >
+                  <span className="axv-uses-file">{h.rel}</span>
+                  <span className="axv-uses-line">L{h.line}</span>
+                  <span className="axv-uses-snip">{h.text}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {/* M6a：导出预览图（PNG / SVG） */}

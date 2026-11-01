@@ -9,6 +9,7 @@ const FILE = '<LinearLayout android:id="@+id/root"><TextView android:text="你�
 const TOOL_REPLY = '```axv-tool\n{"tool":"read_file","args":{"path":"other.xml"}}\n```';
 
 const systems: string[] = [];
+const users: string[] = [];
 const replies: string[] = [];
 let readCalls = 0;
 let bump = 0;
@@ -18,6 +19,8 @@ vi.mock("@/lib/xml/ai-transport", () => ({
   streamChat: vi.fn(async (_cfg: unknown, msgs: unknown[]) => {
     const arr = msgs as { role: string; content: string }[];
     systems.push(arr[0]?.content || "");
+    const lastUser = [...arr].reverse().find((m) => m.role === "user");
+    users.push(lastUser?.content || "");
     return { ok: true, content: replies.shift() ?? "", via: "fetch", channel: "fetch" };
   }),
 }));
@@ -75,6 +78,7 @@ async function ask(el: HTMLElement, q: string) {
 beforeEach(() => {
   installStorage();
   systems.length = 0;
+  users.length = 0;
   replies.length = 0;
   readCalls = 0;
   bump = 0;
@@ -105,11 +109,13 @@ describe("M64k A7：工具结果进历史", () => {
     expect(readCalls).toBe(1);
 
     await ask(host, "那它的 id 是什么");
-    // 第二轮 system prompt 里带着上一轮读到的正文
-    const last = systems[systems.length - 1];
+    // M69（A3）：工具记忆改放本轮 user 消息（system 只留稳定前缀，否则 prompt cache 不命中）
+    const last = users[users.length - 1];
     expect(last).toContain("本次会话已经读过");
     expect(last).toContain("other.xml");
     expect(last).toContain("@+id/root");
+    // 而且不该再进 system
+    expect(systems[systems.length - 1]).not.toContain("本次会话已经读过");
     // 没有再去读一次
     expect(readCalls).toBe(1);
   });

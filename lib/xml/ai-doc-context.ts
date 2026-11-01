@@ -12,6 +12,7 @@
 // 全是纯数据，方便单测；AiPanel 只负责把它们拼进消息。
 
 import { detectDocKind, isValuesPath } from "./doc-kind";
+import { parseOutline } from "./java-outline";
 import { AI_QUICK_ACTIONS, type QuickActionDef } from "./ai";
 
 export type AiDocKind = "layout" | "values" | "manifest" | "java" | "kotlin" | "xml" | "text";
@@ -282,6 +283,108 @@ export function docPreamble(ctx: AiDocContext, content: string, opts: DocPreambl
     parts.push(`${ctx.title}${where}：\n\`\`\`${ctx.fence}\n${clipped}\n\`\`\``);
   }
   return parts.join("\n\n");
+}
+
+/** M69（A3）：超过这个长度就不整份塞进 prompt，改给结构摘要 */
+export const DOC_INLINE_MAX = 20000;
+
+/** 结构摘要用的轻量统计（纯正则，够模型定位） */
+function tagHistogram(src: string, limit = 12): string {
+  const counts = new Map<string, number>();
+  for (const m of src.matchAll(/<([A-Za-z][\w.]*)[\s/>]/g)) {
+    const t = m[1];
+    counts.set(t, (counts.get(t) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([t, n]) => t + "×" + n)
+    .join("、");
+}
+
+function idList(src: string, limit = 24): string {
+  const ids: string[] = [];
+  for (const m of src.matchAll(/@\+?id\/([A-Za-z_][\w]*)/g)) {
+    if (!ids.includes(m[1])) ids.push(m[1]);
+    if (ids.length >= limit) break;
+  }
+  return ids.join("、");
+}
+
+function valuesSummary(src: string): string {
+  const counts = new Map<string, number>();
+  const names: string[] = [];
+  for (const m of src.matchAll(/<([a-z]+)\s+name="([\w.]+)"/g)) {
+    const tag = m[1];
+    counts.set(tag, (counts.get(tag) || 0) + 1);
+    if (names.length < 20) names.push(m[2]);
+  }
+  const head = [...counts.entries()].map(([t, n]) => t + "×" + n).join("、");
+  return "条目统计：" + (head || "（没解析出来）") + "；前几个名字：" + names.join("、");
+}
+
+function manifestSummary(src: string): string {
+  const perms = [...src.matchAll(/<uses-permission[^>]*android:name="([^"]+)"/g)].map((m) => m[1]);
+  const comps = [...src.matchAll(/<(activity|service|receiver|provider)[^>]*android:name="([^"]+)"/g)].map(
+    (m) => m[1] + ' ' + m[2],
+  );
+  return [
+    perms.length ? "权限：" + perms.join("、") : "权限：无",
+    comps.length ? "组件：" + comps.slice(0, 12).join("；") + (comps.length > 12 ? "…" : "") : "组件：无",
+  ].join("\n");
+}
+
+/**
+ * M69（A3）：给 prompt 的文档块。
+ * 小于 DOC_INLINE_MAX 时整份给（docPreamble）；超过时只给结构摘要 + 用工具读的指引，
+ * 避免每轮把 20K+ 字符重新发一遍（文档随 user 消息走 → 前缀不稳定 → prompt cache 全不命中）。
+ */
+export function docBrief(
+  ctx: AiDocContext,
+  content: string,
+  opts: DocPreambleOptions = {},
+): { text: string; truncated: boolean; chars: number } {
+  const max = opts.maxChars ?? DOC_INLINE_MAX;
+  const body = (content || "").trim();
+  const chars = body.length;
+  if (chars <= max) {
+    return { text: docPreamble(ctx, body, { ...opts, maxChars: max }), truncated: false, chars };
+  }
+
+  const where = opts.relPath ? "（" + opts.relPath + "）" : "";
+  const lines: string[] = [];
+  if (opts.selection && ctx.kind === "layout") lines.push("当前选中控件路径：" + opts.selection);
+  if (opts.resources) lines.push("可用资源：" + opts.resources);
+  lines.push(
+    ctx.title + where + "：共 " + chars + " 字符 / " + body.split("\n").length +
+      " 行，太长没有整份贴出，下面是结构摘要。",
+  );
+
+  if (ctx.kind === "layout" || ctx.kind === "xml") {
+    const root = /<([A-Za-z][\w.]*)/.exec(body)?.[1] || "?";
+    lines.push("根标签：<" + root + ">；控件统计：" + tagHistogram(body));
+    const ids = idList(body);
+    if (ids) lines.push("用到的 id：" + ids);
+    lines.push("要看具体控件时用 read_file {offset,limit} 取那一段；不要凭空猜没看到的属性。");
+  } else if (ctx.kind === "java" || ctx.kind === "kotlin") {
+    const pkg = /^\s*package\s+([\w.]+)/m.exec(body)?.[1];
+    if (pkg) lines.push("package：" + pkg);
+    const items = parseOutline(body, ctx.kind === "kotlin").slice(0, 25);
+    if (items.length) {
+      lines.push("类/方法（行号，定位后再读具体段）：");
+      lines.push(items.map((it) => "L" + it.line + " " + "  ".repeat(it.depth) + it.name + (it.sig || "")).join("\n"));
+    }
+    lines.push("先调 outline 拿行号，再用 read_file {offset,limit} 只读目标方法；禁止整份猜。");
+  } else if (ctx.kind === "values") {
+    lines.push(valuesSummary(body));
+    lines.push("要看具体某条用 find_usages {symbol} 或 read_file {offset,limit}。");
+  } else if (ctx.kind === "manifest") {
+    lines.push(manifestSummary(body));
+  } else {
+    lines.push("开头 1200 字符：\n```\n" + body.slice(0, 1200) + "\n```");
+  }
+
+  return { text: lines.filter(Boolean).join("\n"), truncated: true, chars };
 }
 
 const CODE_ACTIONS: QuickActionDef[] = [

@@ -20,7 +20,13 @@ import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
 import { AI_TOOL_PROMPT, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
 import { createStagingIo, flushStaged, type StagedChange } from "@/lib/xml/ai-staging";
 import { compactHunks, diffLines, diffSummary } from "@/lib/xml/ai-diff";
-import { aiDocContextOf, buildAiSystemPrompt, docPreamble, quickActionsFor, type AiPromptIntent } from "@/lib/xml/ai-doc-context";
+import {
+  aiDocContextOf,
+  buildAiSystemPrompt,
+  docBrief,
+  quickActionsFor,
+  type AiPromptIntent,
+} from "@/lib/xml/ai-doc-context";
 import { aiAllowProtectedGet, aiAllowProtectedSet } from "@/lib/xml/ai-paths";
 import { formatToolMemory, memoryEntryFromTool, pushToolMemory, type ToolMemoryEntry } from "@/lib/xml/ai-tool-memory";
 import { batchLabel, makeBatch, pushBatch, restoreBatch, type AiHistoryBatch } from "@/lib/xml/ai-history";
@@ -234,25 +240,32 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       // M64i（A6）：先把「项目里真实有什么」扫出来（同一个项目缓存一份，不每轮重扫）
       const facts = await factsFor(io, docRel);
       const mem = formatToolMemory(toolMemRef.current);
+      // M69（A3）：prompt cache 要命中，前缀必须稳定 —— 顺序固定成
+      //   [角色+契约] → [项目事实] → [工具说明] → [当前文档]
+      // 文档从 user 消息挪进 system（同一份文档每轮都一样 → 前缀可复用）；
+      // 会变的东西（选中控件、可用资源、工具记忆）全部挪到本轮 user 消息的尾部。
+      // 超过 DOC_INLINE_MAX 的文档只放结构摘要（docBrief），不整份重发。
+      const docBlock = withXml ? docBrief(doc, xml, { relPath: docRel }).text : "";
       const sys = [
         buildAiSystemPrompt(doc, { intent, canWrite: io ? io.canWrite !== false : false }),
         facts ? formatProjectFacts(facts) : "",
-        mem,
         io
           ? `${AI_TOOL_PROMPT}\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` +
             (io.canWrite === false
               ? "\n注意：当前项目没拿到写权限，只能 list_files / read_file / search_files，不要尝试写。"
               : "")
           : "",
+        docBlock,
       ]
         .filter(Boolean)
         .join("\n\n");
 
       const history: AiMessage[] = chat.map((m) => ({ role: m.role, content: m.content }));
-      const preamble = withXml
-        ? docPreamble(doc, xml, { selection: ctxSelection, resources: ctxResources, relPath: docRel })
-        : "";
-      const userContent = [preamble, q].filter(Boolean).join("\n\n");
+      const volatile: string[] = [];
+      if (ctxSelection) volatile.push(`当前选中控件路径：${ctxSelection}`);
+      if (ctxResources) volatile.push(`可用资源：${ctxResources}`);
+      if (mem) volatile.push(mem);
+      const userContent = [...volatile, q].filter(Boolean).join("\n\n");
 
       let msgs: AiMessage[] = [
         { role: "system", content: sys },

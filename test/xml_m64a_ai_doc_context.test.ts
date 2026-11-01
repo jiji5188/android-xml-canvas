@@ -174,7 +174,7 @@ describe("M64a 接线护栏（源码级）", () => {
     const src = read("components/AiPanel.tsx");
     // M64h（A2）：改成带 opts 的四段式 prompt（intent/canWrite）
     expect(src).toMatch(/buildAiSystemPrompt\(doc,\s*\{/);
-    expect(src).toContain("docPreamble(doc, xml");
+    expect(src).toContain("docBrief(doc, xml");
     expect(src).toContain("canReplaceCanvas");
     // 老写法（硬编码「当前布局 XML」）不能再回来
     expect(src).not.toContain("`当前布局 XML：");

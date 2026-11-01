@@ -28,6 +28,7 @@ import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph"
 import { hasIcon } from "@/lib/xml/icon-vectors";
 import { workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative, writeTextNative } from "@/lib/xml/native-save";
 import { yieldToUi } from "@/lib/xml/native-async";
+import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
 // M31i：新建项目时把完整 Android 工程骨架落盘
 import { createAndroidProject, safeProjectName } from "@/lib/xml/new-project";
 import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/xml/new-project-io";
@@ -706,16 +707,24 @@ export function XmlEditor() {
   const wsInfoRef = useRef<WsInfo | null>(null);
   /** M30：轮询重入锁（上一次还在读文件就不再发新的） */
   const wsTickingRef = useRef(false);
+  /** M48：手动刷新防重入 */
+  const wsBusyRef = useRef(false);
   /** M25d：已经分析过名称/图标的项目（rel），避免 4s 轮询重复读文件 */
   const analyzedRef = useRef<Set<string>>(new Set());
+  /** M48：分析链重入锁 */
+  const analyzingRef = useRef(false);
 
   /** M25d/M31：后台分析项目名/图标（串行，读不到就跳过，不影响列表渲染）
    *  web：有 DirHandle 走 readProjectMeta；APK：没有句柄，按项目绝对路径试读 strings.xml + ic_launcher */
   const analyzeProjects = useCallback(
     async (list: WsProject[]) => {
+      // M48：同一个项目列表只允许一条分析链在跑（轮询和重试可能撞车）
+      if (analyzingRef.current) return;
+      analyzingRef.current = true;
       // M47：每轮最多分析 4 个，剩下的 200ms 后再来一轮，
       // 避免一打开面板就一口气读十几个项目把主线程啃完（手机上最重的就是这里）
       let count = 0;
+      let ok = 0;
       const patch: Record<string, ProjectMeta> = {};
       for (const it of list) {
         if (count >= 4) break;
@@ -730,6 +739,7 @@ export function XmlEditor() {
           analyzedRef.current.add(it.rel);
           patch[it.rel] = meta;
           count++;
+          ok++;
         } catch {
           /* 分析失败就当没有，卡片回退到文件夹名 */
           count++;
@@ -739,10 +749,15 @@ export function XmlEditor() {
       }
       // 一次性合并，避免 N 次 setState 引发 N 轮重渲染
       if (Object.keys(patch).length) setProjMeta((prev) => ({ ...prev, ...patch }));
+      analyzingRef.current = false;
       // 还有没分析完的 → 200ms 后再来一轮（页面隐藏时不排）
-      const remaining = list.filter(
-        (it) => it.kind === "dir" && (it.handle || it.dirPath) && !analyzedRef.current.has(it.rel),
-      );
+      // M48：一轮里一个都没成功（比如没权限）就不重试，否则会 200ms 一次死循环空转
+      const remaining =
+        ok > 0
+          ? list.filter(
+              (it) => it.kind === "dir" && (it.handle || it.dirPath) && !analyzedRef.current.has(it.rel),
+            )
+          : [];
       if (remaining.length) {
         window.setTimeout(() => {
           if (typeof document !== "undefined" && document.hidden) return;
@@ -757,7 +772,12 @@ export function XmlEditor() {
     const quiet = !!opts?.quiet;
     if (quiet && wsTickingRef.current) return;
     if (quiet) wsTickingRef.current = true;
-    if (!quiet) setWsBusy(true);
+    if (!quiet) {
+      // M48：手点刷新时防重入（连续点两下不再排队跑两次 JNI）
+      if (wsBusyRef.current) return;
+      wsBusyRef.current = true;
+      setWsBusy(true);
+    }
     try {
       // M47：非静默刷新一开始先让出一帧，让「点 tab」的点击动画先画完，
       // 后面的同步 JNI（wsInfo / listTopProjects）不再挡在点击帧前面
@@ -788,7 +808,10 @@ export function XmlEditor() {
     } catch (e) {
       if (!quiet) setWsMsg(e instanceof Error ? e.message : String(e));
     } finally {
-      if (!quiet) setWsBusy(false);
+      if (!quiet) {
+        wsBusyRef.current = false;
+        setWsBusy(false);
+      }
       wsTickingRef.current = false;
     }
   }, [analyzeProjects]);
@@ -3309,7 +3332,11 @@ const findResolved = findResolvedNode;
               <span>{tr("proj.newIcon", "项目图标")}</span>
               <div className="axv-newproj-iconbox">
                 <span className="axv-newproj-iconprev" aria-hidden="true">
-                  {newProjIcon ? <img src={newProjIcon.dataUrl} alt="" /> : <span className="msr">apps</span>}
+                  {newProjIcon ? (
+                    <img src={newProjIcon.dataUrl} alt="" />
+                  ) : (
+                    <img src={DEFAULT_ICON_URL} alt="" />
+                  )}
                 </span>
                 <label className="axv-set-btn axv-newproj-iconpick">
                   {tr("proj.newPickIcon", "选图片…")}
@@ -3346,7 +3373,7 @@ const findResolved = findResolvedNode;
                     {tr("proj.newIconReset", "用默认")}
                   </button>
                 ) : (
-                  <span className="axv-newproj-icontip">{tr("proj.newIconTip", "默认自适应图标")}</span>
+                  <span className="axv-newproj-icontip">{tr("proj.newIconTip", "默认图标")}</span>
                 )}
               </div>
             </div>

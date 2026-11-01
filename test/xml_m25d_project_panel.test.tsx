@@ -87,9 +87,12 @@ describe("项目列表（扁平卡片）", () => {
     const names = els.filter((e) => cls(e).includes("axv-ws-item-name")).map(text);
     expect(names).toContain("商城客户端");
     expect(names).toContain("待办清单");
-    // 有 iconUrl 的渲染 img
+    // M48：有 iconUrl 用自己的图，没读到的用内建默认图标（不再退化成字体图标）
     const imgs = els.filter((e) => e.type === "img");
-    expect(imgs).toHaveLength(1);
+    expect(imgs).toHaveLength(2);
+    const srcs = imgs.map((e) => String((e.props as { src?: string }).src || ""));
+    expect(srcs).toContain("blob:x");
+    expect(srcs.some((s) => s.startsWith("data:image/svg+xml"))).toBe(true);
   });
 
   it("没分析结果时回落到目录名", () => {

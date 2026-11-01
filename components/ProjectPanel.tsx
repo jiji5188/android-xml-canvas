@@ -7,7 +7,8 @@
 // 树的展开状态、已加载的子项都放在组件内部：它们是纯 UI 状态，没必要塞回 XmlEditor。
 
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import type { BrowseEntry, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
+import type { BrowseEntry, LibKind, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
+import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
 import { isIconDirRel, isImageName, readEntryImageUrl, resDirDescription } from "@/lib/xml/project-browse";
 import type { WsInfo, WsProject } from "@/lib/xml/workspace";
 import type { ResourceExtras } from "@/lib/xml/resdir";
@@ -84,6 +85,13 @@ export interface ProjectPanelProps {
 
 type LoadState = BrowseEntry[] | "loading";
 
+/** M48：项目列表副标题文案（库类型） */
+function libLabel(lib: LibKind | undefined): string {
+  if (lib === "androidx") return "AndroidX 项目";
+  if (lib === "support") return "Android Support 项目";
+  if (lib === "android") return "Android 项目";
+  return "项目";
+}
 /** M31h：文件行图标 —— res/drawable*|mipmap* 里的图片读文件当缩略图，其余用通用图标 */
 function TreeRowIcon(props: { entry: BrowseEntry; isDir: boolean; isOpen: boolean; iconDir: boolean }) {
   const { entry, isDir, isOpen, iconDir } = props;
@@ -168,23 +176,30 @@ export function LazyTreeInner(props: {
   const [dropHover, setDropHover] = useState<string | null>(null);
   const dragRef = useRef<{ id: number; node: TreeNodeRef; moved: boolean } | null>(null);
 
-  /** 读某一层（已读过就不重复读） */
+  /** 读某一层（已读过就不重复读，也不回退成 loading，避免刷新时闪一下） */
   const load = useCallback(
     async (rel: string) => {
-      setKids((prev) => (prev[rel] === "loading" ? prev : { ...prev, [rel]: "loading" }));
+      // M48：只有从没读过才放 loading；重读时保留旧内容直到新结果回来
+      setKids((prev) => (prev[rel] === undefined ? { ...prev, [rel]: "loading" } : prev));
       const items = await source.listChildren(rel);
       setKids((prev) => ({ ...prev, [rel]: items }));
     },
     [source],
   );
 
-  // 换项目 / 手动刷新：清缓存，只读根这一层
+  // M48：ref 记一下当前项目源，只有真的换了项目才清空缓存；
+  // 后台轮询把 rev 顶高时只安静重读根节点，不清 kids / open ——
+  // 之前这里是列表频闪「正在读取…」的根源。
+  const lastSrcRef = useRef<unknown>(null);
   useEffect(() => {
     let alive = true;
-    setKids({});
-    setOpen(new Set([""]));
+    if (lastSrcRef.current !== source) {
+      lastSrcRef.current = source;
+      setKids({});
+      setOpen(new Set([""]));
+    }
     void source.listChildren("").then((items) => {
-      if (alive) setKids({ "": items });
+      if (alive) setKids((prev) => ({ ...prev, "": items }));
     });
     return () => {
       alive = false;
@@ -838,7 +853,7 @@ export function ProjectPanel(p: ProjectPanelProps) {
             </div>
           ) : null}
 
-          {wsBusy ? <div className="axv-ws-hint">正在读取…</div> : null}
+          {wsBusy && projects.length === 0 ? <div className="axv-ws-hint">正在读取…</div> : null}
 
           {projects.length > 0 ? (
             <ul className="axv-ws-list">
@@ -853,11 +868,7 @@ export function ProjectPanel(p: ProjectPanelProps) {
                         onClick={() => p.onOpenProject(it)}
                       >
                         <span className="axv-proj-card-ico" aria-hidden="true">
-                          {meta?.iconUrl ? (
-                            <img src={meta.iconUrl} alt="" />
-                          ) : (
-                            <span className="msr">{it.kind === "dir" ? "apps" : "description"}</span>
-                          )}
+                          <img src={meta?.iconUrl || DEFAULT_ICON_URL} alt="" />
                         </span>
                         <span className="axv-ws-item-main">
                           <span className="axv-ws-item-name" title={meta?.name || it.name}>
@@ -865,9 +876,7 @@ export function ProjectPanel(p: ProjectPanelProps) {
                           </span>
                           <span className="axv-ws-item-sub">
                             {it.kind === "dir"
-                              ? meta?.name && meta.name !== it.name
-                                ? `项目 · ${it.name}`
-                                : "项目"
+                              ? `${libLabel(meta?.lib)}${meta?.name && meta.name !== it.name ? ` · ${it.name}` : ""}`
                               : `单个布局 · ${it.name}`}
                           </span>
                         </span>
@@ -905,7 +914,7 @@ export function ProjectPanel(p: ProjectPanelProps) {
               {p.projectIconUrl ? (
                 <img className="axv-proj-now-icon" src={p.projectIconUrl} alt="" aria-hidden="true" />
               ) : (
-                <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>work</span>
+                <img className="axv-proj-now-icon" src={DEFAULT_ICON_URL} alt="" aria-hidden="true" />
               )}
               <b className="axv-proj-now-name" title={p.projectName}>
                 {p.projectName || tr("proj.untitled", "未命名项目")}

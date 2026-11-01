@@ -266,3 +266,23 @@ Incoming: [res, async (opts)=>{
   775 |     // M47：项目管理 tab 才刷工作目录；设置 tab 只在从未加载过工作目录信息时补一次
   776 |     //（旧逻辑两个 tab 都无条件刷 → 手机上每次点「设置」都走一遍同步 JNI）
   777 |     if (leftView === "res") void refreshWorkspace(); (components/XmlEditor.tsx:774:12)
+[browser] ⨯ unhandledRejection: ReferenceError: wsBusyRef is not defined
+    at XmlEditor.useCallback[refreshWorkspace] (components/XmlEditor.tsx:762:7)
+    at XmlEditor.useEffect (components/XmlEditor.tsx:807:34)
+  760 |     if (!quiet) {
+  761 |       // M48：手点刷新时防重入（连续点两下不再排队跑两次 JNI）
+> 762 |       if (wsBusyRef.current) return;
+      |       ^
+  763 |       wsBusyRef.current = true;
+  764 |       setWsBusy(true);
+  765 |     }
+[browser] ⨯ unhandledRejection: ReferenceError: wsBusyRef is not defined
+    at XmlEditor.useCallback[refreshWorkspace] (components/XmlEditor.tsx:762:7)
+    at XmlEditor.useEffect (components/XmlEditor.tsx:807:34)
+  760 |     if (!quiet) {
+  761 |       // M48：手点刷新时防重入（连续点两下不再排队跑两次 JNI）
+> 762 |       if (wsBusyRef.current) return;
+      |       ^
+  763 |       wsBusyRef.current = true;
+  764 |       setWsBusy(true);
+  765 |     }

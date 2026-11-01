@@ -488,6 +488,26 @@ export async function readProjectMetaNative(
     }
   }
 
+  // 3) M48：判断项目用的是 AndroidX 还是老 support 库（读 gradle 配置，只读少量文件）
+  //    顺序：gradle.properties 里 useAndroidX=true 最权威；否则看 app/build.gradle(.kts) 的依赖前缀。
+  try {
+    const readOne = async (rel: string): Promise<string | null> => {
+      try {
+        return io ? await readTextQueued(abs(rel)) : b.readText ? b.readText(abs(rel)) : null;
+      } catch {
+        return null;
+      }
+    };
+    const props = await readOne("gradle.properties");
+    let appGradle: string | null = null;
+    if (!/android\.useandroidx\s*=\s*true/i.test(props || "")) {
+      appGradle = (await readOne("app/build.gradle.kts")) || (await readOne("app/build.gradle"));
+    }
+    fallback.lib = parseLibKind(props, appGradle, null);
+  } catch {
+    /* 读不到就当普通 Android 工程 */
+  }
+
   nativeMetaCache.set(dirPath, fallback);
   return fallback;
 }
@@ -621,8 +641,29 @@ export function parseAppName(xml: string): string | null {
 export interface ProjectMeta {
   /** 展示名：app_name > 文件夹名 */
   name: string;
-  /** 应用图标（object URL），找不到就是 undefined */
+  /** 应用图标（object URL / data URL），找不到就是 undefined */
   iconUrl?: string;
+  /** M48：项目库类型（AndroidX / 老 support / 普通 Android） */
+  lib?: LibKind;
+}
+
+export type LibKind = "androidx" | "support" | "android";
+
+/** M48：从 gradle 配置判断项目库类型
+ *  · gradle.properties 里 android.useAndroidX=true → androidx（最权威）
+ *  · 依赖里出现 androidx. → androidx；出现 com.android.support → support
+ *  · 都没有 → 当普通 Android 工程 */
+export function parseLibKind(
+  gradleProps?: string | null,
+  appGradle?: string | null,
+  rootGradle?: string | null,
+): LibKind {
+  const props = (gradleProps || "").toLowerCase();
+  if (/android\.useandroidx\s*=\s*true/.test(props)) return "androidx";
+  const all = `${appGradle || ""}\n${rootGradle || ""}`.toLowerCase();
+  if (all.includes("androidx.")) return "androidx";
+  if (all.includes("com.android.support")) return "support";
+  return "android";
 }
 
 const STRINGS_CANDIDATES = [
@@ -699,6 +740,28 @@ export async function readProjectMeta(root: unknown, fallbackName: string): Prom
     } catch {
       /* 文件不存在，继续下一个候选 */
     }
+  }
+
+  // 1.5) M48：库类型（AndroidX / support / android）—— 只读 gradle 配置，最坏 3 次读写
+  try {
+    const readRoot = async (rel: string): Promise<string | null> => {
+      try {
+        const parent = rel.includes("/") ? await resolveDir(dir, parentOf(rel)) : dir;
+        if (!parent) return null;
+        const fh = await parent.getFileHandle(nameOf(rel));
+        return await (await fh.getFile()).text();
+      } catch {
+        return null;
+      }
+    };
+    const props = await readRoot("gradle.properties");
+    let appGradle: string | null = null;
+    if (!/android\.useandroidx\s*=\s*true/i.test(props || "")) {
+      appGradle = (await readRoot("app/build.gradle.kts")) || (await readRoot("app/build.gradle"));
+    }
+    meta.lib = parseLibKind(props, appGradle, null);
+  } catch {
+    /* 读不到就当普通 Android 工程 */
   }
 
   // 2) 图标：res/mipmap-* 里的 ic_launcher*，其次 res/drawable-*

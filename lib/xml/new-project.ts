@@ -48,7 +48,7 @@ function adaptiveLauncher(): string {
   ].join("\n");
 }
 
-/** 默认自适应图标的前景（一片白色圆角方块 + 简单图形，够用且不含版权素材） */
+/** M48：默认自适应图标前景 —— 白色安卓机器人头（与 lib/xml/default-icon.ts 一致） */
 function launcherForeground(): string {
   return [
     XML_HEAD,
@@ -57,14 +57,31 @@ function launcherForeground(): string {
     '    android:height="108dp"',
     '    android:viewportWidth="108"',
     '    android:viewportHeight="108">',
-    '    <path',
+    "    <path",
     '        android:fillColor="#FFFFFF"',
-    '        android:pathData="M34,40h40v4H34zM34,54h40v4H34zM34,68h26v4H34z" />',
+    '        android:pathData="M30,66a24,24 0 0 1 48,0z" />',
+    "    <path",
+    '        android:fillColor="#3FBFA0"',
+    '        android:pathData="M41,58a4,4 0 0 1 8,0a4,4 0 0 1 -8,0z" />',
+    "    <path",
+    '        android:fillColor="#3FBFA0"',
+    '        android:pathData="M59,58a4,4 0 0 1 8,0a4,4 0 0 1 -8,0z" />',
+    "    <path",
+    '        android:strokeColor="#FFFFFF"',
+    '        android:strokeWidth="5"',
+    '        android:strokeLineCap="round"',
+    '        android:pathData="M41,49L35.5,40" />',
+    "    <path",
+    '        android:strokeColor="#FFFFFF"',
+    '        android:strokeWidth="5"',
+    '        android:strokeLineCap="round"',
+    '        android:pathData="M67,49L72.5,40" />',
     "</vector>",
     "",
   ].join("\n");
 }
 
+/** M48：默认图标背景是青绿色方底（#3FBFA0，对齐内建默认图标） */
 function launcherBackground(): string {
   return [
     XML_HEAD,
@@ -73,7 +90,7 @@ function launcherBackground(): string {
     '    android:height="108dp"',
     '    android:viewportWidth="108"',
     '    android:viewportHeight="108">',
-    '    <path android:fillColor="#3F51B5" android:pathData="M0,0h108v108H0z" />',
+    '    <path android:fillColor="#3FBFA0" android:pathData="M0,0h108v108H0z" />',
     "</vector>",
     "",
   ].join("\n");

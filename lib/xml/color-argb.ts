@@ -103,6 +103,13 @@ export function toRgbHex(c: Rgba): string {
   return `#${hex2(c.r)}${hex2(c.g)}${hex2(c.b)}`;
 }
 
+/** 写回 XML 的 Android 颜色写法：alpha=1 用 #RRGGBB，否则 #AARRGGBB（默认大写）
+ *  —— 取色器输出的是 CSS 串，写进 android:background / colors.xml 前必须过这里 */
+export function toAndroidHex(c: Rgba, upper = true): string {
+  const hex = c.a >= 1 ? toRgbHex(c) : toArgbHex(c, false);
+  return upper ? hex.toUpperCase() : hex.toLowerCase();
+}
+
 /** 统一的 CSS 输出：alpha=1 用 #rrggbb，否则 rgba() */
 export function toCssColor(c: Rgba): string {
   if (c.a >= 1) return toRgbHex(c);

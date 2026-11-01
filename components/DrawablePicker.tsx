@@ -9,6 +9,8 @@
 //   📦 图标：弹 IconPickerPanel（Material Symbols → 生成 vector drawable）
 
 import { useEffect, useMemo, useState } from "react";
+import { HsvPicker } from "./HsvPicker";
+import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { isValidResName } from "@/lib/xml/resname";
 
@@ -117,8 +119,7 @@ export function DrawablePicker({
   };
 
   const isHex = /^#[0-9a-fA-F]{3,8}$/.test(value);
-  const colorVal = toHex6(value);
-  /** M52：透明度百分比 + 即时写回（不关弹窗）通道 */
+  /** 透明度百分比（仅提示/无障碍用，真实调整走 HSV 取色器的透明条） */
   const alphaPct = alphaPercent(value);
   const apply = onApply ?? onCommit;
   /** 只有「形状类」xml 才能进形状编辑器（vector 是画出来的一次性资源） */
@@ -198,32 +199,18 @@ export function DrawablePicker({
         <div className="axv-dp-body">
           {effTab === "color" ? (
             <div className="axv-dp-color">
-              <div className="axv-dp-pickrow">
-                <input
-                  type="color"
-                  aria-label="颜色"
-                  value={colorVal}
-                  onChange={(e) => apply(withAlphaLike(e.target.value, value))}
-                />
-                <label className="axv-dp-alpha">
-                  <span>透明度</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={1}
-                    aria-label="不透明度"
-                    disabled={!isHex}
-                    value={alphaPct}
-                    onChange={(e) => apply(withAlphaPercent(value, Number(e.target.value)))}
-                  />
-                  <b>{alphaPct}%</b>
-                </label>
-              </div>
+              {/* M63f：把自定义 HSV 取色器直接嵌进来（不再用原生 input[type=color] + 单独滑杆）
+                  取色器输出 CSS 串，写回前转成 Android 写法：alpha=1 → #RRGGBB，否则 #AARRGGBB */}
+              <HsvPicker
+                label={`${attrName} 颜色`}
+                rgba={parseColorOr(value, "#FFFFFF")}
+                showPresets={false}
+                onChange={(next) => apply(toAndroidHex(next))}
+              />
               <div className="axv-dp-hint" style={{ marginBottom: 10 }}>
                 {isHex
-                  ? `拖滑杆调透明度，当前 ${alphaPct}% → ${argbOf(value, alphaPct)}`
-                  : "选完直接写回；带透明度的值会保留原 alpha"}
+                  ? `当前 ${value.toUpperCase()}（透明度 ${alphaPct}%，拖动即时生效）`
+                  : "当前值不是纯色：选一个颜色会覆盖它"}
               </div>
               <div className="axv-dp-swatch-grid">
                 {SWATCHES.map((c) => (
@@ -313,41 +300,9 @@ function validateAttrValue(v: string): string | null {
   return kind === "drawable" || kind === "mipmap" || kind === "color" ? null : null;
 }
 
-/** #AARRGGBB / #RRGGBB / #RGB → input[type=color] 需要的 #RRGGBB */
-function toHex6(v: string): string {
-  const m = /^#([0-9a-f]{3,8})$/i.exec(v.trim());
-  if (!m) return "#FFFFFF";
-  const h = m[1];
-  if (h.length === 6) return "#" + h;
-  if (h.length === 8) return "#" + h.slice(2); // Android 是 AARRGGBB
-  if (h.length === 3) return "#" + h.split("").map((c) => c + c).join("");
-  return "#FFFFFF";
-}
-
-/** 取色器只给不透明色：若原值是 AARRGGBB 就保留原 alpha */
-function withAlphaLike(picked: string, prev: string): string {
-  const m = /^#([0-9a-f]{8})$/i.exec((prev || "").trim());
-  const rgb = picked.replace("#", "").toUpperCase();
-  return m ? "#" + m[1].slice(0, 2) + rgb : "#" + rgb;
-}
-
 /** M52：当前值的 alpha 百分比（0-100）；解析不出 / 无 alpha 当 100 */
 function alphaPercent(v: string): number {
   const m = /^#([0-9a-f]{8})$/i.exec((v || "").trim());
   if (!m) return 100;
   return Math.round((parseInt(m[1].slice(0, 2), 16) / 255) * 100);
-}
-
-/** M52：只改 alpha，写回 Android 习惯：#RRGGBB（100%）/ #AARRGGBB */
-function withAlphaPercent(v: string, pct: number): string {
-  const rgb = toHex6(v).slice(1).toUpperCase();
-  const p = Math.max(0, Math.min(100, Math.round(pct)));
-  if (p >= 100) return "#" + rgb;
-  const a = Math.round((p / 100) * 255).toString(16).padStart(2, "0").toUpperCase();
-  return "#" + a + rgb;
-}
-
-/** 提示里展示写回后的值 */
-function argbOf(v: string, pct: number): string {
-  return withAlphaPercent(v, pct);
 }

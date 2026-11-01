@@ -33,6 +33,8 @@ export interface HsvPickerProps {
   /** 允许「透明」档 */
   allowTransparent?: boolean;
   label: string;
+  /** 是否自带预设色板（调用方自己有色板时传 false） */
+  showPresets?: boolean;
 }
 
 const PRESETS = [
@@ -46,7 +48,14 @@ const PRESETS = [
   "#9B59B6",
 ];
 
-export function HsvPicker({ rgba, onChange, onDone, allowTransparent, label }: HsvPickerProps) {
+export function HsvPicker({
+  rgba,
+  onChange,
+  onDone,
+  allowTransparent,
+  label,
+  showPresets = true,
+}: HsvPickerProps) {
   // HSV 内部状态：色相要自己hold住（灰色时 rgb→hsv 丢色相）
   const [hsv, setHsv] = useState<Hsv>(() => rgbToHsvKeepHue(rgba.r, rgba.g, rgba.b, 200));
   const [draft, setDraft] = useState<string | null>(null);
@@ -232,19 +241,21 @@ export function HsvPicker({ rgba, onChange, onDone, allowTransparent, label }: H
       <div className="axv-hsv-sub">{rgbaText}</div>
 
       {/* 预设 */}
-      <div className="axv-hsv-presets">
-        {PRESETS.map((p) => (
-          <button
-            key={p}
-            type="button"
-            className="axv-hsv-preset"
-            style={{ background: p }}
-            title={p}
-            aria-label={`预设 ${p}`}
-            onClick={() => applyText(p)}
-          />
-        ))}
-      </div>
+      {showPresets ? (
+        <div className="axv-hsv-presets">
+          {PRESETS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              className="axv-hsv-preset"
+              style={{ background: p }}
+              title={p}
+              aria-label={`预设 ${p}`}
+              onClick={() => applyText(p)}
+            />
+          ))}
+        </div>
+      ) : null}
 
       <div className="axv-hsv-actions">
         {allowTransparent ? (

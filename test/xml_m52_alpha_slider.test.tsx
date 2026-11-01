@@ -48,15 +48,25 @@ const picker = (props: Partial<React.ComponentProps<typeof DrawablePicker>> = {}
   <DrawablePicker attrName="background" value="#FF0000" onEditShape={noop} onCommit={noop} onClose={noop} {...props} />
 );
 
-describe("M52 选择资源弹窗：透明度滑杆", () => {
-  it("滑杆默认值 = 当前颜色的 alpha（#80FF0000 → 50%）", async () => {
+describe("M63f 选择资源弹窗：颜色 tab 用自定义 HSV 取色器", () => {
+  const alphaRange = () => rangeByLabel("background 颜色 透明度");
+
+  it("颜色 tab 里是 HSV 面板，不再有原生 input[type=color]", async () => {
+    await mount(picker());
+    expect(document.querySelector(".axv-hsv-panel")).not.toBeNull();
+    // 旧的「原生取色 input + 单独透明滑杆」那一行已经移除（面板自带透明条）
+    expect(document.querySelector(".axv-dp-pickrow")).toBeNull();
+    expect(document.querySelector(".axv-dp-alpha")).toBeNull();
+  });
+
+  it("透明度初值 = 当前颜色的 alpha（#80FF0000 → 50%）", async () => {
     await mount(picker({ value: "#80FF0000" }));
-    expect(rangeByLabel("不透明度").value).toBe("50");
+    expect(alphaRange().value).toBe("50");
   });
 
   it("不透明色当 100%", async () => {
     await mount(picker({ value: "#FF0000" }));
-    expect(rangeByLabel("不透明度").value).toBe("100");
+    expect(alphaRange().value).toBe("100");
   });
 
   it("拖到 50% → onApply 写回 #80RRGGBB，且不调用 onCommit（弹窗不关）", async () => {
@@ -65,7 +75,7 @@ describe("M52 选择资源弹窗：透明度滑杆", () => {
     await mount(
       picker({ onApply: (v) => applied.push(v), onCommit: (v) => committed.push(v) }),
     );
-    setInputValue(rangeByLabel("不透明度"), "50");
+    setInputValue(alphaRange(), "50");
     await flush();
     expect(applied).toEqual(["#80FF0000"]);
     expect(committed).toEqual([]);
@@ -74,16 +84,28 @@ describe("M52 选择资源弹窗：透明度滑杆", () => {
   it("拖回 100% → 省掉 FF，写 #RRGGBB", async () => {
     const applied: string[] = [];
     await mount(picker({ value: "#80FF0000", onApply: (v) => applied.push(v) }));
-    setInputValue(rangeByLabel("不透明度"), "100");
+    setInputValue(alphaRange(), "100");
     await flush();
     expect(applied).toEqual(["#FF0000"]);
   });
 
-  it("非颜色值（@drawable/x）滑杆置灰，不改值", async () => {
+  it("取色器不自带预设色板（弹窗自己有 18 色板）", async () => {
+    await mount(picker());
+    expect(document.querySelector(".axv-hsv-presets")).toBeNull();
+  });
+
+  it("色相滑杆也能改色（拖到 120° → 绿色）", async () => {
     const applied: string[] = [];
-    await mount(picker({ value: "@drawable/x", onApply: (v) => applied.push(v) }));
-    expect(rangeByLabel("不透明度").disabled).toBe(true);
-    expect(applied).toEqual([]);
+    await mount(picker({ value: "#FF0000", onApply: (v) => applied.push(v) }));
+    setInputValue(rangeByLabel("background 颜色 色相"), "120");
+    await flush();
+    expect(applied.at(-1)?.toUpperCase()).toBe("#00FF00");
+  });
+
+  it("非颜色值（@drawable/x）也给取色器，但提示会被覆盖", async () => {
+    await mount(picker({ value: "@drawable/x" }));
+    expect(document.querySelector(".axv-hsv-panel")).not.toBeNull();
+    expect(document.querySelector(".axv-dp-hint")?.textContent).toContain("不是纯色");
   });
 
   it("点色板仍然写回并关闭（走 onCommit）", async () => {

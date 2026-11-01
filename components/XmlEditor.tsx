@@ -3183,6 +3183,7 @@ const findResolved = findResolvedNode;
           {leftView === "ai" && (
             <AiPanel
               xml={xml}
+              docRel={openRel || saveOrigin?.name || null}
               projectName={activeProject?.name || ""}
               selection={pathChain.length ? pathChain.map((p) => `${p.tag}${p.id ? "#" + String(p.id).replace("@+id/", "") : ""}`).join(" > ") : null}
               onReplaceXml={(next) => setXmlAndTrack(next, "")}

@@ -3,6 +3,7 @@
 > 用法：这是唯一的待办台账。每解决一项，把它标成 ✅ 并写上 commit；不做完一项不往下开。
 > 配套方案见 `AI助手提示词与文件能力适配方案.md`（设计思路），本文件是**可打勾的清单**。
 > 量级：S ≈ 半天内，M ≈ 1 天，L ≈ 2 天以上。
+> 进度：**A1 ✅ 已完成（M64a，2026-11-01）**——AiPanel 按 `docRel` 判类型（布局 / values / manifest / Java / Kotlin / 其他 XML / 文本），上下文标题、代码块语言、输出契约、快捷指令全跟着换；非布局回复不再给「替换画布」按钮。
 
 ---
 
@@ -10,7 +11,7 @@
 
 | 编号 | 问题（现状） | 改法 | 验收 | 量级 |
 |---|---|---|---|---|
-| **A1** | **当前文件身份错乱（真 bug）**：`xml` 这个 state 里装的其实是「当前打开的任意文档」——打开 `.java/.kt` 时，AiPanel 仍按「当前布局 XML」发出去，system prompt 还要求「只输出 Android XML 布局」。问 Java 问题，模型给你吐一段布局。 | 让 AiPanel 知道 `openRel` + `editorLang`；上下文块按类型换标题与说明（布局 XML / Java 源码 / values 资源）；system prompt 里「输出契约」按类型切换 | 打开 MainActivity.java 问「这个方法干什么」→ 回复不出现布局 XML；打开 layout 问同样问题仍是布局逻辑 | S |
+| **A1** ✅ | ~~**当前文件身份错乱（真 bug）**~~ **已修（M64a）**：新增 `lib/xml/ai-doc-context.ts`（resolveAiDocKind / aiDocContextOf / buildAiSystemPrompt / docPreamble / quickActionsFor），AiPanel 接 `docRel`；Java 文件不再收到「只输出布局 XML」的契约，代码块也不再能一键写进画布。 | 让 AiPanel 知道 `openRel` + `editorLang`；上下文块按类型换标题与说明（布局 XML / Java 源码 / values 资源）；system prompt 里「输出契约」按类型切换 | 打开 MainActivity.java 问「这个方法干什么」→ 回复不出现布局 XML；打开 layout 问同样问题仍是布局逻辑 | S |
 | **A2** | system 自相矛盾：「只输出一个 xml 代码块」vs「你可以先调 read_file」 | 拆成「角色/契约/禁止项」三段；「只输出 XML」降级为**仅当用户明确要 XML 时**；改文件一律走 patch | 让它「给标题加 4dp 上边距」→ 走 apply_patch，不吐整份 XML | S |
 | **A3** | 每轮都把整份文档塞进 user 消息，且前缀不稳定 → prompt cache 一次不命中，费用/首字延迟双高 | 当前文档挪到消息**最后**；system 只放不变事实；大文件（>20K 字符）换成结构摘要 | 同一会话第二轮起 usage 里 cached tokens > 0（DeepSeek 有返回）；800 控件文件不超预算 | M |
 | **A4** | 工具协议靠自然语言约束：≥2 行的 JSON / 带注释 / 混中文 → `JSON.parse` 静默丢弃，调用凭空消失 | 改成 `{tool, args}` 单行 JSON；严格 schema 校验；解析失败**重问一次**并把错误原文喂回去；二次失败降级为「直接回答 + 提示能力不可用」 | 构造 5 种坏格式，4 种能被重问救回，1 种走降级不崩 | S |

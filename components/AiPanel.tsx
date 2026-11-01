@@ -8,8 +8,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AI_LS_KEY,
   AI_PROVIDERS,
-  AI_QUICK_ACTIONS,
-  AI_SYSTEM_PROMPT,
   applyProvider,
   extractCodeBlock,
   loadAiConfig,
@@ -20,13 +18,16 @@ import {
 } from "@/lib/xml/ai";
 import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
 import { AI_TOOL_PROMPT, createNativeIo, extractToolCalls, runTool, stripToolBlocks } from "@/lib/xml/ai-tools";
+import { aiDocContextOf, buildAiSystemPrompt, docPreamble, quickActionsFor } from "@/lib/xml/ai-doc-context";
 
 /** 工具循环最多几轮（防模型无限读文件） */
 const MAX_TOOL_ROUNDS = 3;
 
 interface Props {
-  /** 当前布局 XML（发送时作为上下文） */
+  /** 当前打开的文档内容（布局 XML / Java 源码 / values 资源…都可能是） */
   xml: string;
+  /** 当前文档的相对路径或文件名：AI 靠它判断「这是什么文件」（M64a/A1） */
+  docRel?: string | null;
   /** 选中节点路径文字，如 LinearLayout > Button#ok */
   selection?: string | null;
   /** 可用资源摘要（可选） */
@@ -42,11 +43,14 @@ interface Props {
 interface ChatItem extends AiMessage {
   /** 该条回复里抠出来的代码块（助手消息才有） */
   code?: string | null;
+  /** 代码块的语言标记与能否替换画布（按回复当时的文件类型定格） */
+  codeTag?: string;
+  canReplace?: boolean;
   /** 该条是否还在流式生成中 */
   streaming?: boolean;
 }
 
-export default function AiPanel({ xml, selection, resources, onReplaceXml, onNote, projectName }: Props) {
+export default function AiPanel({ xml, docRel, selection, resources, onReplaceXml, onNote, projectName }: Props) {
   const [cfg, setCfg] = useState<AiConfig>(() => {
     try {
       return loadAiConfig(window.localStorage.getItem(AI_LS_KEY));
@@ -90,6 +94,10 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
 
   const patch = (p: Partial<AiConfig>) => setCfg((c) => ({ ...c, ...p }));
 
+  // 文件身份：决定上下文标题、代码块语言、输出契约、能否替换画布（M64a/A1）
+  const doc = useMemo(() => aiDocContextOf(docRel, docRel ? "" : xml), [docRel, xml]);
+  const actions = useMemo(() => quickActionsFor(doc), [doc]);
+
   const ctxSelection = withSelection ? selection ?? null : null;
   const ctxResources = resources ?? null;
 
@@ -112,15 +120,18 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
 
       // 本地文件能力只在原生壳里可用（浏览器要么没权限，要么跨域）
       const io = createNativeIo(projectName || undefined);
-      const sys = io
-        ? `${AI_SYSTEM_PROMPT}\n\n${AI_TOOL_PROMPT}\n项目根目录：${projectName || "."}（项目内的相对路径都从这里算）`
-        : AI_SYSTEM_PROMPT;
+      const sys = [
+        buildAiSystemPrompt(doc),
+        io ? `${AI_TOOL_PROMPT}\n项目根目录：${projectName || "."}（项目内的相对路径都从这里算）` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
 
       const history: AiMessage[] = chat.map((m) => ({ role: m.role, content: m.content }));
-      const preamble = withXml && xml.trim() ? `当前布局 XML：\n\`\`\`xml\n${xml.trim()}\n\`\`\`` : "";
-      const selLine = ctxSelection ? `当前选中控件路径：${ctxSelection}` : "";
-      const resLine = ctxResources ? `可用资源：${ctxResources}` : "";
-      const userContent = [selLine, resLine, preamble, q].filter(Boolean).join("\n\n");
+      const preamble = withXml
+        ? docPreamble(doc, xml, { selection: ctxSelection, resources: ctxResources, relPath: docRel })
+        : "";
+      const userContent = [preamble, q].filter(Boolean).join("\n\n");
 
       let msgs: AiMessage[] = [
         { role: "system", content: sys },
@@ -166,6 +177,8 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
               content: shown,
               streaming: false,
               code: extractCodeBlock(shown),
+              codeTag: doc.codeTag,
+              canReplace: doc.canReplaceCanvas,
             }));
             break;
           }
@@ -205,7 +218,7 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
         setBusy(false);
       }
     },
-    [busy, cfg, chat, ctxResources, ctxSelection, projectName, withXml, xml],
+    [busy, cfg, chat, ctxResources, ctxSelection, doc, docRel, projectName, withXml, xml],
   );
 
   const stop = () => {
@@ -387,8 +400,12 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
             <span className="msr" aria-hidden="true" style={{ fontSize: 30 }}>
               auto_awesome
             </span>
-            <div>让 AI 看懂当前布局：解释结构、改成 ConstraintLayout、修 lint 告警、加控件。</div>
-            <div className="axv-ai-hint">回复里的 XML 代码块可以一键替换回画布（走撤销栈，Ctrl+Z 能退）。</div>
+            <div>{doc.emptyHint}</div>
+            <div className="axv-ai-hint">
+              {doc.canReplaceCanvas
+                ? "回复里的 XML 代码块可以一键替换回画布（走撤销栈，Ctrl+Z 能退）。"
+                : "回复里的代码块可以复制；当前不是布局文件，不会往画布写。"}
+            </div>
           </div>
         ) : null}
 
@@ -401,20 +418,24 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
             {m.code ? (
               <div className="axv-ai-code">
                 <div className="axv-ai-code-bar">
-                  <span className="axv-ai-code-tag">XML · {m.code.split("\n").length} 行</span>
+                  <span className="axv-ai-code-tag">
+                    {m.codeTag ?? doc.codeTag} · {m.code.split("\n").length} 行
+                  </span>
                   <button className="axv-ai-mini" title="复制" onClick={() => void copy(m.code!)}>
                     <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>content_copy</span>
                   </button>
-                  <button
-                    className="axv-ai-mini"
-                    title="替换画布（可撤销）"
-                    onClick={() => {
-                      onReplaceXml(m.code!);
-                      onNote?.("已替换画布内容，可 Ctrl+Z 撤销");
-                    }}
-                  >
-                    <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>input</span>
-                  </button>
+                  {m.canReplace ?? doc.canReplaceCanvas ? (
+                    <button
+                      className="axv-ai-mini"
+                      title="替换画布（可撤销）"
+                      onClick={() => {
+                        onReplaceXml(m.code!);
+                        onNote?.("已替换画布内容，可 Ctrl+Z 撤销");
+                      }}
+                    >
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>input</span>
+                    </button>
+                  ) : null}
                 </div>
                 <pre className="axv-ai-pre">{m.code}</pre>
               </div>
@@ -438,7 +459,7 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
 
       {/* ===== 快捷指令 ===== */}
       <div className="axv-ai-chips">
-        {AI_QUICK_ACTIONS.map((a) => (
+        {actions.map((a) => (
           <button key={a.id} className="axv-ai-chip" disabled={busy} onClick={() => void send(a.prompt)} title={a.prompt}>
             {a.label}
           </button>
@@ -460,14 +481,16 @@ export default function AiPanel({ xml, selection, resources, onReplaceXml, onNot
           }}
         />
         <div className="axv-ai-input-bar">
-          <label className="axv-ai-check" title="把当前布局 XML 一起发给模型">
+          <label className="axv-ai-check" title={`把${doc.title}一起发给模型`}>
             <input type="checkbox" checked={withXml} onChange={(e) => setWithXml(e.target.checked)} />
-            带布局
+            {doc.attachLabel}
           </label>
-          <label className="axv-ai-check" title="把选中控件路径一起发给模型">
-            <input type="checkbox" checked={withSelection} onChange={(e) => setWithSelection(e.target.checked)} />
-            带选中
-          </label>
+          {doc.kind === "layout" ? (
+            <label className="axv-ai-check" title="把选中控件路径一起发给模型">
+              <input type="checkbox" checked={withSelection} onChange={(e) => setWithSelection(e.target.checked)} />
+              带选中
+            </label>
+          ) : null}
           <span className="axv-ai-keys">Ctrl+Enter</span>
           {busy ? (
             <button className="axv-set-btn axv-ai-send" onClick={stop}>

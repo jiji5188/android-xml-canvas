@@ -6688,3 +6688,47 @@ button.axv-sb-item:hover {
   opacity: 0.85;
   font-variant-numeric: tabular-nums;
 }
+
+
+/* ===== M62：项目列表筛选框 ===== */
+.axv-proj-filter {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 0 8px;
+  height: 30px;
+  border-radius: 10px;
+  background: var(--axv-surface-sunken, #ffffff14);
+  border: 1px solid var(--axv-outline-variant, #00000012);
+}
+.axv-proj-filter .msr {
+  font-size: 16px;
+  color: var(--axv-desc);
+}
+.axv-proj-filter-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--axv-on-surface);
+  font-size: 12.5px;
+  outline: none;
+}
+.axv-proj-filter-clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: var(--axv-hover, #00000010);
+  color: var(--axv-desc);
+  cursor: pointer;
+  padding: 0;
+}
+.axv-proj-filter-clear .msr { font-size: 14px; }

@@ -6,7 +6,7 @@
 //
 // 树的展开状态、已加载的子项都放在组件内部：它们是纯 UI 状态，没必要塞回 XmlEditor。
 
-import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { BrowseEntry, LibKind, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
 import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
 import { isIconDirRel, isImageName, readEntryImageUrl, resDirDescription } from "@/lib/xml/project-browse";
@@ -773,6 +773,155 @@ const LazyTree = memo(LazyTreeInner, (a, b) =>
 
 /* ---------------- 面板 ---------------- */
 
+/** M62：项目列表 tab（自带筛选状态；单独成组件是为了让 ProjectPanel 保持无 hooks，
+ *  已有单测是直接调 ProjectPanel(props) 拿元素树的） */
+function ProjectsTab({ p }: { p: ProjectPanelProps }) {
+  const { tr, wsState, wsBusy, wsMsg, projects, metaOf } = p;
+  const [projQuery, setProjQuery] = useState("");
+  const shownProjects = useMemo(() => {
+    const k = projQuery.trim().toLowerCase();
+    if (!k) return projects;
+    return projects.filter((it) => {
+      const nm = metaOf(it)?.name || "";
+      return (
+        nm.toLowerCase().includes(k) ||
+        it.name.toLowerCase().includes(k) ||
+        it.rel.toLowerCase().includes(k)
+      );
+    });
+  }, [projects, projQuery, metaOf]);
+
+  return (
+          <div className="axv-ws-panel">
+            <div className="axv-ws-path">
+              <button
+                className="axv-rail-mini-btn"
+                onClick={() => void p.onOpenDir()}
+                title="打开其他项目文件夹（含 layout/*.xml），作为当前项目"
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
+                {tr("proj.open", "打开项目")}
+              </button>
+              <button
+                className="axv-rail-mini-btn"
+                onClick={() => p.onNewProject(p.projectName || "MyApp")}
+                title="新建一个带 activity_main.xml 的空项目"
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
+                {tr("proj.new", "新建项目")}
+              </button>
+    
+              <button
+                className="axv-ws-mini"
+                title="刷新列表"
+                onClick={() => void p.onRefresh()}
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
+              </button>
+            </div>
+    
+            {wsState?.mode === "native" && wsState.allFiles === false ? (
+              <div className="axv-ws-warn">
+                默认目录在存储根下，需要「所有文件访问」权限才能读取。
+                <button className="axv-ws-link" onClick={p.onRequestAllFiles}>
+                  去开启
+                </button>
+              </div>
+            ) : null}
+            {wsState?.mode === "unsupported" ? (
+              <div className="axv-ws-warn">
+                请用 Chrome / Edge 打开网页版，或安装 APK（APK 默认目录：/AndroidUIIDE/Project）。
+              </div>
+            ) : null}
+            {wsState?.mode === "web" && !wsState.custom ? (
+              <div className="axv-ws-hint">
+                点「打开项目」授权一个项目文件夹，授权会被记住，下次打开不用再选。
+              </div>
+            ) : null}
+            {wsState?.permission === "prompt" ? (
+              <div className="axv-ws-warn">
+                目录权限需要重新确认（浏览器安全策略）。
+                <button className="axv-ws-link" onClick={() => void p.onRefresh()}>
+                  重新授权
+                </button>
+              </div>
+            ) : null}
+    
+            {wsBusy && projects.length === 0 ? <div className="axv-ws-hint">正在读取…</div> : null}
+    
+            {/* M62：项目列表筛选（项目一多翻起来费劲） */}
+            {projects.length > 1 ? (
+              <div className="axv-proj-filter">
+                <span className="msr" aria-hidden="true">search</span>
+                <input
+                  className="axv-proj-filter-input"
+                  value={projQuery}
+                  placeholder={`筛选项目（共 ${projects.length} 个）`}
+                  onChange={(e) => setProjQuery(e.target.value)}
+                />
+                {projQuery ? (
+                  <button
+                    type="button"
+                    className="axv-proj-filter-clear"
+                    title="清除筛选"
+                    aria-label="清除筛选"
+                    onClick={() => setProjQuery("")}
+                  >
+                    <span className="msr" aria-hidden="true">close</span>
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+    
+            {projects.length > 0 ? (
+              <ul className="axv-ws-list">
+                {shownProjects.map((it) => {
+                  const meta = metaOf(it);
+                  return (
+                    <li key={it.rel + ":" + it.kind}>
+                      <div className="axv-proj-card">
+                        <button
+                          className="axv-proj-card-btn"
+                          title={it.rel}
+                          onClick={() => p.onOpenProject(it)}
+                        >
+                          <span className="axv-proj-card-ico" aria-hidden="true">
+                            <img src={meta?.iconUrl || DEFAULT_ICON_URL} alt="" />
+                          </span>
+                          <span className="axv-ws-item-main">
+                            <span className="axv-ws-item-name" title={meta?.name || it.name}>
+                              {meta?.name || it.name}
+                            </span>
+                            <span className="axv-ws-item-sub">
+                              {it.kind === "dir"
+                                ? meta
+                                  ? `${libLabel(meta.lib)}${meta.name && meta.name !== it.name ? ` · ${it.name}` : ""}`
+                                  : `~${it.layoutCount || 1} 个布局 · ${it.name}`
+                                : `单个布局 · ${it.name}`}
+                            </span>
+                          </span>
+                          <span className="msr axv-proj-card-go" aria-hidden="true">chevron_right</span>
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : !wsBusy && (wsState?.mode === "native" || wsState?.custom) ? (
+              <div className="axv-ws-hint">
+                目录里还没有项目。把项目文件夹（内含 layout/*.xml）放到这个目录下，点刷新即可。
+              </div>
+            ) : null}
+    
+            {projects.length > 0 && shownProjects.length === 0 ? (
+              <div className="axv-ws-hint">没找到匹配「{projQuery}」的项目</div>
+            ) : null}
+    
+            {wsMsg ? <div className="axv-ws-hint">{wsMsg}</div> : null}
+          </div>
+  );
+}
+
 export function ProjectPanel(p: ProjectPanelProps) {
   const { tr, tab, onTab, wsState, wsBusy, wsMsg, projects, metaOf, projectSource } = p;
 
@@ -797,107 +946,7 @@ export function ProjectPanel(p: ProjectPanelProps) {
         </button>
       </div>
 
-      {tab === "projects" ? (
-        <div className="axv-ws-panel">
-          <div className="axv-ws-path">
-            <button
-              className="axv-rail-mini-btn"
-              onClick={() => void p.onOpenDir()}
-              title="打开其他项目文件夹（含 layout/*.xml），作为当前项目"
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
-              {tr("proj.open", "打开项目")}
-            </button>
-            <button
-              className="axv-rail-mini-btn"
-              onClick={() => p.onNewProject(p.projectName || "MyApp")}
-              title="新建一个带 activity_main.xml 的空项目"
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
-              {tr("proj.new", "新建项目")}
-            </button>
-
-            <button
-              className="axv-ws-mini"
-              title="刷新列表"
-              onClick={() => void p.onRefresh()}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
-            </button>
-          </div>
-
-          {wsState?.mode === "native" && wsState.allFiles === false ? (
-            <div className="axv-ws-warn">
-              默认目录在存储根下，需要「所有文件访问」权限才能读取。
-              <button className="axv-ws-link" onClick={p.onRequestAllFiles}>
-                去开启
-              </button>
-            </div>
-          ) : null}
-          {wsState?.mode === "unsupported" ? (
-            <div className="axv-ws-warn">
-              请用 Chrome / Edge 打开网页版，或安装 APK（APK 默认目录：/AndroidUIIDE/Project）。
-            </div>
-          ) : null}
-          {wsState?.mode === "web" && !wsState.custom ? (
-            <div className="axv-ws-hint">
-              点「打开项目」授权一个项目文件夹，授权会被记住，下次打开不用再选。
-            </div>
-          ) : null}
-          {wsState?.permission === "prompt" ? (
-            <div className="axv-ws-warn">
-              目录权限需要重新确认（浏览器安全策略）。
-              <button className="axv-ws-link" onClick={() => void p.onRefresh()}>
-                重新授权
-              </button>
-            </div>
-          ) : null}
-
-          {wsBusy && projects.length === 0 ? <div className="axv-ws-hint">正在读取…</div> : null}
-
-          {projects.length > 0 ? (
-            <ul className="axv-ws-list">
-              {projects.map((it) => {
-                const meta = metaOf(it);
-                return (
-                  <li key={it.rel + ":" + it.kind}>
-                    <div className="axv-proj-card">
-                      <button
-                        className="axv-proj-card-btn"
-                        title={it.rel}
-                        onClick={() => p.onOpenProject(it)}
-                      >
-                        <span className="axv-proj-card-ico" aria-hidden="true">
-                          <img src={meta?.iconUrl || DEFAULT_ICON_URL} alt="" />
-                        </span>
-                        <span className="axv-ws-item-main">
-                          <span className="axv-ws-item-name" title={meta?.name || it.name}>
-                            {meta?.name || it.name}
-                          </span>
-                          <span className="axv-ws-item-sub">
-                            {it.kind === "dir"
-                              ? meta
-                                ? `${libLabel(meta.lib)}${meta.name && meta.name !== it.name ? ` · ${it.name}` : ""}`
-                                : `~${it.layoutCount || 1} 个布局 · ${it.name}`
-                              : `单个布局 · ${it.name}`}
-                          </span>
-                        </span>
-                        <span className="msr axv-proj-card-go" aria-hidden="true">chevron_right</span>
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : !wsBusy && (wsState?.mode === "native" || wsState?.custom) ? (
-            <div className="axv-ws-hint">
-              目录里还没有项目。把项目文件夹（内含 layout/*.xml）放到这个目录下，点刷新即可。
-            </div>
-          ) : null}
-
-          {wsMsg ? <div className="axv-ws-hint">{wsMsg}</div> : null}
-        </div>
-      ) : (
+      {tab === "projects" ? <ProjectsTab p={p} /> : (
         <>
           {/* M30c：foot 放到 axv-proj-now 的前面 */}
           <div className="axv-proj-now-foot">

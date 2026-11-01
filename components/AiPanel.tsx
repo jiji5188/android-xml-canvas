@@ -20,8 +20,9 @@ import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
 import { AI_TOOL_PROMPT, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
 import { createStagingIo, flushStaged, type StagedChange } from "@/lib/xml/ai-staging";
 import { compactHunks, diffLines, diffSummary } from "@/lib/xml/ai-diff";
-import { aiDocContextOf, buildAiSystemPrompt, docPreamble, quickActionsFor } from "@/lib/xml/ai-doc-context";
+import { aiDocContextOf, buildAiSystemPrompt, docPreamble, quickActionsFor, type AiPromptIntent } from "@/lib/xml/ai-doc-context";
 import { aiAllowProtectedGet, aiAllowProtectedSet } from "@/lib/xml/ai-paths";
+import { formatToolMemory, memoryEntryFromTool, pushToolMemory, type ToolMemoryEntry } from "@/lib/xml/ai-tool-memory";
 import { batchLabel, makeBatch, pushBatch, restoreBatch, type AiHistoryBatch } from "@/lib/xml/ai-history";
 import { collectProjectFacts, formatProjectFacts, type ProjectFacts } from "@/lib/xml/ai-facts";
 
@@ -97,6 +98,12 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   /** M64i（A6）：项目事实缓存（按根目录 + 当前文件所在 res 缓存，避免每轮重扫） */
   const factsCache = useRef<{ key: string; facts: ProjectFacts } | null>(null);
   const [factsInfo, setFactsInfo] = useState<ProjectFacts | null>(null);
+  /** M64k（A7）：会话内「读过什么」的摘要记忆（换文件就清空，否则旧文件内容会串到新文档里） */
+  const toolMemRef = useRef<ToolMemoryEntry[]>([]);
+
+  useEffect(() => {
+    toolMemRef.current = [];
+  }, [docRel, projectName]);
 
   const factsFor = useCallback(async (io: AiFileIo | null, rel?: string | null) => {
     if (!io) return null;
@@ -148,7 +155,9 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   const ctxResources = resources ?? null;
 
   const send = useCallback(
-    async (text: string, wantFullFile = false) => {
+    async (text: string, intentOrFull: AiPromptIntent | boolean = "auto") => {
+      // 兼容老调用：第二个参数传 boolean 时按 xml / auto 处理
+      const intent: AiPromptIntent = typeof intentOrFull === "boolean" ? (intentOrFull ? "xml" : "auto") : intentOrFull;
       const q = text.trim();
       if (!q || busy) return;
       const bad = validateConfig(cfg);
@@ -170,9 +179,11 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       const stage = io ? stageFor(io).host : null;
       // M64i（A6）：先把「项目里真实有什么」扫出来（同一个项目缓存一份，不每轮重扫）
       const facts = await factsFor(io, docRel);
+      const mem = formatToolMemory(toolMemRef.current);
       const sys = [
-        buildAiSystemPrompt(doc, { intent: wantFullFile ? "xml" : "auto", canWrite: io ? io.canWrite !== false : false }),
+        buildAiSystemPrompt(doc, { intent, canWrite: io ? io.canWrite !== false : false }),
         facts ? formatProjectFacts(facts) : "",
+        mem,
         io
           ? `${AI_TOOL_PROMPT}\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` +
             (io.canWrite === false
@@ -297,6 +308,14 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               break;
             }
             results.push(out);
+            // M64k（A7）：记下来，下一句追问时不必重读
+            const target =
+              call.tool === "search_files"
+                ? call.query || ""
+                : call.tool === "list_files"
+                  ? call.dir || "/"
+                  : call.path || "";
+            toolMemRef.current = pushToolMemory(toolMemRef.current, memoryEntryFromTool(call.tool, target, out));
             setChat((c) => {
               const n = [...c];
               const last = n[n.length - 1];
@@ -681,7 +700,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             key={a.id}
             className="axv-ai-chip"
             disabled={busy}
-            onClick={() => void send(a.prompt, !!a.wantsXml)}
+            onClick={() => void send(a.prompt, a.intent ?? (a.wantsXml ? "xml" : "auto"))}
             title={a.prompt}
           >
             {a.label}

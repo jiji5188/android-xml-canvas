@@ -285,6 +285,9 @@ export function contextPreamble(ctx: AiContext, maxXmlChars = 12000): string {
 
 export type AiQuickAction = "explain" | "optimize" | "fix" | "add";
 
+/** 这次快捷指令想让 AI 干什么：auto=自己判 / xml=整份重写 / edit=走 patch 局部改（M64j/A5） */
+export type AiQuickIntent = "auto" | "xml" | "edit";
+
 export interface QuickActionDef {
   id: AiQuickAction;
   label: string;
@@ -292,6 +295,8 @@ export interface QuickActionDef {
   prompt: string;
   /** 期望回复是整段 XML（用于显示「替换 XML」按钮） */
   wantsXml: boolean;
+  /** 意图（不写就按 wantsXml 推导） */
+  intent?: AiQuickIntent;
 }
 
 export const AI_QUICK_ACTIONS: QuickActionDef[] = [
@@ -300,6 +305,7 @@ export const AI_QUICK_ACTIONS: QuickActionDef[] = [
     label: "解释这个界面",
     prompt: "用不超过 5 条要点说明这个布局的结构、可能存在的外观问题（对齐、间距、文字截断）。不要输出 XML。",
     wantsXml: false,
+    intent: "auto",
   },
   {
     id: "optimize",
@@ -307,18 +313,25 @@ export const AI_QUICK_ACTIONS: QuickActionDef[] = [
     prompt:
       "把这份布局重写成 ConstraintLayout：根节点 keep 原来的 id，所有控件保持 id 与文案不变，使用 0dp + 约束实现等分/居中，\n     margin 用 8/12/16dp，避免嵌套过深。只输出完整 XML 代码块。",
     wantsXml: true,
+    intent: "xml",
   },
   {
     id: "fix",
     label: "修掉告警",
-    prompt: "按 Android Lint 常见问题修这份布局：缺 contentDescription、硬编码字符串改用 @string、可点击控件补 minHeight/minWidth、\n     检查嵌套过深的 LinearLayout。只输出完整 XML 代码块。",
+    prompt:
+      "按 Android Lint 常见问题修这份布局（缺 contentDescription、硬编码字符串改 @string、可点击控件补 minHeight/minWidth、嵌套过深的 LinearLayout）。" +
+      "只改必要的那几处，用 apply_patch 局部替换，其余行原样保留；不要整份重贴。",
     wantsXml: true,
+    intent: "edit",
   },
   {
     id: "add",
     label: "加一个控件",
-    prompt: "在这个界面底部加一行：一个输入框（id=et_note，hint 写「备注」）+ 一个「保存」按钮，横向居中对齐、间距 12dp，\n     风格与现有控件一致。只输出完整 XML 代码块。",
+    prompt:
+      "在这个界面底部加一行：一个输入框（id=et_note，hint 写「备注」）+ 一个「保存」按钮，横向居中对齐、间距 12dp，" +
+      "风格与现有控件一致。用 apply_patch 把这几行插到合适的父节点末尾，不要重贴整份文件。",
     wantsXml: true,
+    intent: "edit",
   },
 ];
 

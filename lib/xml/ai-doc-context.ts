@@ -194,8 +194,8 @@ export function isLayoutDoc(ctx: AiDocContext): boolean {
   return ctx.kind === "layout";
 }
 
-/** 本次请求想要什么：auto=自己判断（默认）/ xml=用户明确要整份文件 */
-export type AiPromptIntent = "auto" | "xml";
+/** 本次请求想要什么：auto=自己判断（默认）/ xml=用户明确要整份文件 / edit=直接改文件（M64j/A5） */
+export type AiPromptIntent = "auto" | "xml" | "edit";
 
 export interface AiPromptOpts {
   intent?: AiPromptIntent;
@@ -210,6 +210,17 @@ function decisionBlock(ctx: AiDocContext, intent: AiPromptIntent, canWrite: bool
       "怎么回答（本次我明确要完整文件）：",
       `1. 用 \`\`\`${ctx.fence} 代码块输出**完整**内容，代码块外最多两句说明。`,
       "2. 不要用 axv-tool 改文件，也不要只给片段。",
+    ];
+  }
+  if (intent === "edit") {
+    return [
+      "怎么回答（本次我要求你直接改文件）：",
+      canWrite
+        ? "1. 必须用 axv-tool 的 apply_patch 做局部替换：old 必须与文件现有内容逐字一致且唯一；新建文件才用 write_file。"
+        : "1. 当前项目没有写权限：不要调用写文件的工具，直接给我片段并说清插在哪一行/哪个节点后面。",
+      "2. 不要整份重贴，也不要输出完整代码块（新建文件除外）。",
+      "3. 只改我提到的那几处，其他行原样保留；改完用一句话说明改了哪里。",
+      "4. 如果我的要求其实不需要改文件（只是问问题），就正常回答并说明不用改。",
     ];
   }
   return [
@@ -290,14 +301,16 @@ const CODE_ACTIONS: QuickActionDef[] = [
   {
     id: "fix",
     label: "补中文注释",
-    prompt: "给关键方法和不直观的逻辑补简洁中文注释（Javadoc 或行内），只输出注释相关片段，不要改任何逻辑。",
+    prompt: "给关键方法和不直观的逻辑补简洁中文注释（Javadoc 或行内），用 apply_patch 逐处插入，不要改任何逻辑。",
     wantsXml: false,
+    intent: "edit",
   },
   {
     id: "add",
     label: "重构这个方法",
-    prompt: "把这段代码里最长或最重复的方法拆小、消除重复，保持对外行为不变。只输出重构后的方法及其直接依赖。",
+    prompt: "把这段代码里最长或最重复的方法拆小、消除重复，保持对外行为不变。用 apply_patch 直接修改文件。",
     wantsXml: false,
+    intent: "edit",
   },
 ];
 
@@ -317,8 +330,9 @@ const FILE_ACTIONS: QuickActionDef[] = [
   {
     id: "optimize",
     label: "整理一下",
-    prompt: "在不改变语义的前提下整理这个文件：统一命名风格、按用途分组、去掉冗余条目。只输出整理后的完整内容。",
+    prompt: "在不改变语义的前提下整理这个文件：统一命名风格、按用途分组、去掉冗余条目。用 apply_patch 局部调整，不要重贴整份。",
     wantsXml: false,
+    intent: "edit",
   },
 ];
 

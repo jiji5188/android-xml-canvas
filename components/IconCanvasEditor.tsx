@@ -182,6 +182,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
     if (window.matchMedia("(max-width: 840px)").matches) setSheetOpen(false);
   }, []);
+  /** M88f：移动端右栏默认隐藏，点左缘箭头展开 */
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    if (window.matchMedia("(max-width: 840px)").matches) setFormOpen(false);
+  }, []);
   const dragRef = useRef<
     | null
     | { kind: "draw"; id: string; start: { x: number; y: number } }

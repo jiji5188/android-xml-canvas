@@ -8409,7 +8409,7 @@ button.axv-sb-item:hover {
   display: flex;
   gap: 2px;
   padding: 2px;
-  border-radius: 8px;
+  border-radius: 8px 8px 0px 0px;
   background: rgba(0, 0, 0, 0.05);
 }
 .axv-cv-sheet-tab {
@@ -8502,11 +8502,15 @@ button.axv-sb-item:hover {
     transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   /* 收起：整块滑到视口右侧之外 */
-  /* 收起：整块滑出视口，再多滑 1px 把贴边那条缝彻底藏掉（width 不能写负值） */
+  /* 收起：宽度和内边距都归零（-1px 是非法值），再滑出 1px 把贴边缝藏掉 */
   .axv-cv-body .axv-icon-ed-form.axv-cv-form.is-closed {
-    transform: translateX(calc(100% + 1px));
+    width: 0;
+    max-width: 0;
+    padding: 0;
     border-left-width: 0;
+    overflow: hidden;
     box-shadow: none;
+    transform: translateX(calc(100% + 1px));
     pointer-events: none;
   }
   /* 面板左缘的箭头开关：展开时贴着面板左侧，收起后落到视口右缘 */

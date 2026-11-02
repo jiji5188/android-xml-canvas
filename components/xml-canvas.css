@@ -8319,6 +8319,92 @@ button.axv-sb-item:hover {
   padding-bottom: 132px;
 }
 
+/* ===== M84：移动端资源面板改成右侧滑出 ===== */
+.axv-cv-body { position: relative; }
+
+/* 资源面板标题栏：桌面端隐藏，移动端显示 */
+.axv-cv-res-head { display: none; }
+
+/* 触发按钮：桌面端隐藏 */
+.axv-cv-res-btn { display: none; }
+
+/* 遮罩：仅移动端出现 */
+.axv-cv-res-mask { display: none; }
+
+@media (max-width: 840px) {
+  /* 右栏不再占位，画布吃满整宽 */
+  .axv-cv-body .axv-icon-ed-form.axv-cv-form {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    width: min(86%, 320px);
+    max-width: none;
+    flex: 0 0 auto;
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+    border-top: none;
+    border-radius: 12px 0 0 12px;
+    background: var(--axv-panel-bg, #fff);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.14);
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+    overscroll-behavior: contain;
+  }
+  .axv-cv-form.is-open,
+  .axv-cv-body .axv-icon-ed-form.axv-cv-form.is-open { transform: none; }
+
+  .axv-cv-res-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: -2px 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .axv-cv-res-close {
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0.6;
+  }
+  .axv-cv-res-close:hover { background: rgba(0, 0, 0, 0.06); opacity: 1; }
+
+  .axv-cv-res-btn {
+    display: inline-flex;
+    margin-left: auto;
+    position: sticky;
+    right: 0;
+    background: var(--axv-panel-bg, #fff);
+    border-radius: 8px;
+    box-shadow: -6px 0 8px rgba(255, 255, 255, 0.9);
+  }
+  .axv-cv-res-btn.is-on { background: #1b6ef3; color: #fff; }
+
+  .axv-cv-res-mask {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 39;
+    background: rgba(0, 0, 0, 0.24);
+    animation: axv-cv-fade 0.18s ease;
+  }
+  @keyframes axv-cv-fade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* 抽屉打开时，底部样式表往下让位给遮罩，不再抢层级 */
+  .axv-cv-form.is-open { max-height: 100%; }
+}
+
 @media (max-width: 840px) {
   .axv-cv-sheet { left: 4px; right: 4px; bottom: 4px; max-height: 46vh; }
   .axv-cv-sheet-tab { padding: 0 8px; font-size: 11px; }

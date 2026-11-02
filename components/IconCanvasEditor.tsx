@@ -14,6 +14,7 @@ import { buildVectorXml, parseVectorModel, nextRotation } from "@/lib/xml/vector
 import {
   isRenderableColor,
   modelToShapes,
+  scalePath,
   scaleShape,
   shapeBox,
   shapeD,
@@ -143,6 +144,10 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [err, setErr] = useState("");
   const [showRaw, setShowRaw] = useState(false);
   const [picking, setPicking] = useState(false);
+  /** 插入图标（多图标拼合）：不替换现有图形，而是把选中的图标追加成新图层 */
+  const [inserting, setInserting] = useState(false);
+  /** 移动端：资源面板右侧滑出 */
+  const [resOpen, setResOpen] = useState(false);
   const [colorTarget, setColorTarget] = useState<{ kind: "fill" | "stroke" | "bg" } | null>(null);
   const [zoom, setZoom] = useState(1);
   /** 网格 / 背景（背景会导出成最底层矩形） */
@@ -791,6 +796,26 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     setSel([]);
   };
 
+  /** 把另一个图标的路径追加到当前画布（按视口等比缩放并居中），支持一张图标里拼多个字形 */
+  const insertIcon = (vectorXml: string) => {
+    setInserting(false);
+    const src = parseVectorModel(vectorXml);
+    if (!src || !src.paths.length) return;
+    const scale = Math.min(meta.vw / Math.max(0.001, src.vw), meta.vh / Math.max(0.001, src.vh));
+    const ox = (meta.vw - src.vw * scale) / 2;
+    const oy = (meta.vh - src.vh * scale) / 2;
+    const add = modelToShapes(src).map((s) => {
+      const copy = { ...s, id: nextId() } as DrawShape;
+      if (copy.type === "path") copy.d = scalePath(copy.d, scale, scale, 0, 0);
+      if (copy.type === "path") copy.strokeWidth = (copy.strokeWidth ?? 0) * scale;
+      return translateShape(copy, ox, oy);
+    });
+    pushHistory();
+    setShapes((list) => [...list, ...add]);
+    setSel(add.map((s) => s.id));
+    setResOpen(false);
+  };
+
   const gTransform =
     `translate(${meta.group.pivotX} ${meta.group.pivotY}) ` +
     `rotate(${meta.group.rotation}) ` +
@@ -910,6 +935,15 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             </button>
             <button className="axv-cv-tool" onClick={() => setZoom(fitZoom())} title="复位缩放" aria-label="复位缩放">
               <span className="msr" aria-hidden="true">center_focus_strong</span>
+            </button>
+            {/* 移动端：资源面板从右侧滑出（桌面端 CSS 隐藏） */}
+            <button
+              className={"axv-cv-tool axv-cv-res-btn" + (resOpen ? " is-on" : "")}
+              onClick={() => setResOpen((v) => !v)}
+              title="资源与变换"
+              aria-label="资源与变换"
+            >
+              <span className="msr" aria-hidden="true">tune</span>
             </button>
           </div>
 
@@ -1033,8 +1067,20 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           </div>
         </div>
 
-        {/* 右：参数面板 */}
-        <div className="axv-icon-ed-form axv-cv-form">
+        {/* 右：参数面板（移动端从右侧滑出） */}
+        {resOpen ? <div className="axv-cv-res-mask" onClick={() => setResOpen(false)} /> : null}
+        <div className={"axv-icon-ed-form axv-cv-form" + (resOpen ? " is-open" : "")}>
+          <div className="axv-cv-res-head">
+            <span>资源与变换</span>
+            <button
+              className="axv-cv-res-close msr"
+              onClick={() => setResOpen(false)}
+              aria-label="关闭资源面板"
+              title="关闭"
+            >
+              close
+            </button>
+          </div>
           {!shapes.length ? (
             <div className="axv-icon-ed-warn">
               <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>info</span>
@@ -1058,10 +1104,22 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   setErr("");
                 }}
               />
-              <button className="axv-icon-ed-pick" onClick={() => setPicking(true)} title="从图标库换字形">
+              <button className="axv-icon-ed-pick" onClick={() => setPicking(true)} title="从图标库换字形（替换整个图标）">
                 <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>apps</span>
                 选择图标
               </button>
+            </div>
+            <div className="axv-icon-ed-row">
+              <span>多图标</span>
+              <button
+                className="axv-btn axv-ghost axv-cv-insert"
+                onClick={() => setInserting(true)}
+                title="从图标库再挑一个字形，追加成新图层（不替换现有图形）"
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
+                插入图标
+              </button>
+              <span className="axv-cv-hint">可追加到当前画布</span>
             </div>
             <label className="axv-icon-ed-row">
               <span>尺寸（dp）</span>
@@ -1607,6 +1665,17 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           existing={existingNames}
           onClose={() => setPicking(false)}
           onPick={(_rn, vectorXml) => applyIcon(vectorXml)}
+        />
+      ) : null}
+
+      {/* 插入图标（多图标拼合） */}
+      {inserting ? (
+        <IconPickerPanel
+          value=""
+          attrName="插入图标"
+          existing={existingNames}
+          onClose={() => setInserting(false)}
+          onPick={(_rn, vectorXml) => insertIcon(vectorXml)}
         />
       ) : null}
     </div>

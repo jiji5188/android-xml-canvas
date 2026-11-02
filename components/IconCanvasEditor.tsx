@@ -694,31 +694,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     };
   }, [dragLayerId, pushHistory]);
 
-  const moveLayer = (dir: -1 | 1) => {    if (!sel.length) return;
-    pushHistory();
-    setShapes((list) => {
-      const arr = [...list];
-      const idxs = arr.map((s, i) => (sel.includes(s.id) ? i : -1)).filter((i) => i >= 0);
-      if (!idxs.length) return list;
-      if (dir > 0) {
-        for (let k = idxs.length - 1; k >= 0; k--) {
-          const i = idxs[k];
-          if (i < arr.length - 1 && !sel.includes(arr[i + 1].id)) {
-            [arr[i], arr[i + 1]] = [arr[i + 1], arr[i]];
-          }
-        }
-      } else {
-        for (let k = 0; k < idxs.length; k++) {
-          const i = idxs[k];
-          if (i > 0 && !sel.includes(arr[i - 1].id)) {
-            [arr[i], arr[i - 1]] = [arr[i - 1], arr[i]];
-          }
-        }
-      }
-      return arr;
-    });
-  };
-
   /** 几何图元 → 等价 path（手改 pathData 用） */
   const convertSelToPath = () => {
     if (!sel.length) return;
@@ -1554,7 +1529,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   </div>
                 )}
 
-                <div className="axv-set-group" style={{ marginTop: 14 }}>
+                <div className="axv-set-group" style={{ marginTop: 8 }}>
                   <div className="axv-set-label">
                     整体变换
                     <span className="axv-cv-hint">· 旋转/镜像写进 &lt;group&gt;</span>

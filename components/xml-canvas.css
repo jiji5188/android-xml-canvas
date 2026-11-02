@@ -4447,10 +4447,10 @@ body.axv-lt-dragging .axv-lt-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 3px;
   width: 100%;
-  height: 40px;
-  margin-top: 8px;
+  height: 30px;
+  margin-top: 0px;
   border: 1px solid var(--axv-outline);
   border-radius: 10px;
   background: var(--axv-surface);
@@ -8458,7 +8458,7 @@ button.axv-sb-item:hover {
   margin-bottom: -1px;
   overflow: hidden;
 }
-.axv-cv-sheet-pane { display: flex; flex-direction: column; gap: 8px; }
+.axv-cv-sheet-pane { display: flex; flex-direction: column; gap: 6px; }
 
 /* 抽屉里的 set-group 不再需要外边距/分隔线 */
 .axv-cv-sheet-pane .axv-set-group { margin: 0; padding: 0; border: 0; }

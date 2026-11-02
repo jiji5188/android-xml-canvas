@@ -5,6 +5,7 @@
 // 渐变收在「高级」里，默认只露纯色 + 圆角 + 描边，避免面板一上来就吓人。
 
 import { useEffect, useMemo, useState } from "react";
+import { useOverlayBack } from "@/lib/overlay-back";
 import {
   argbColorsForPreview,
   buildShapeXml,
@@ -128,15 +129,17 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
   };
 
   const grad = spec.gradient;
+  // M78：系统返回键也能关（否则手机上按返回会退出 app）
+  const close = useOverlayBack(true, onClose);
 
   return (
     <div className="axv-shape-page" role="dialog" aria-label="自定义形状">
       <div className="axv-shape-head">
-        <button className="axv-shape-back" onClick={onClose} aria-label="返回编辑器">
+        <button className="axv-shape-back" onClick={close} aria-label="返回编辑器">
           <span className="msr" aria-hidden="true">arrow_back</span>
         </button>
         <span className="axv-shape-title">自定义形状 · {attrName}</span>
-        <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">
+        <button className="axv-icon-btn" onClick={close} aria-label="关闭">
           ✕
         </button>
       </div>

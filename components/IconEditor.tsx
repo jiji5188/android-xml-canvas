@@ -6,6 +6,7 @@
 // 布局与形状编辑器一致：整页全屏（.axv-icon-page），不是小弹窗。
 
 import { useMemo, useState } from "react";
+import { useOverlayBack } from "@/lib/overlay-back";
 import { createPortal } from "react-dom";
 import { buildVectorXml, parseVectorModel, nextRotation } from "@/lib/xml/vector-edit";
 import type { VectorModel } from "@/lib/xml/vector-edit";
@@ -55,6 +56,8 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
   const [showRaw, setShowRaw] = useState(false);
   const [picking, setPicking] = useState(false);
   const [err, setErr] = useState("");
+  // M78：系统返回键也能关（否则手机上按返回会退出 app）；必须放在任何 early return 之前
+  const close = useOverlayBack(true, onClose);
 
   // 解析失败（不是标准 vector）：说清楚原因，并给「改为从图标库选」的退路
   if (!model) {
@@ -65,11 +68,11 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
     const body = (
       <div className="axv-icon-page" role="dialog" aria-label="图标编辑器">
         <div className="axv-shape-head">
-          <button className="axv-icon-back" onClick={onClose} aria-label="返回编辑器" title="返回">
+          <button className="axv-icon-back" onClick={close} aria-label="返回编辑器" title="返回">
             <span className="msr" aria-hidden="true">arrow_back</span>
           </button>
           <span className="axv-shape-title">编辑图标 · {name}</span>
-          <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">
+          <button className="axv-icon-btn" onClick={close} aria-label="关闭">
             ✕
           </button>
         </div>
@@ -89,7 +92,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
               >
                 从图标库选一个
               </button>
-              <button className="axv-btn axv-ghost" onClick={onClose}>
+              <button className="axv-btn axv-ghost" onClick={close}>
                 关闭
               </button>
             </div>
@@ -157,11 +160,11 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
   const body = (
     <div className="axv-icon-page" role="dialog" aria-label="图标编辑器">
       <div className="axv-shape-head">
-        <button className="axv-icon-back" onClick={onClose} aria-label="返回编辑器" title="返回">
+        <button className="axv-icon-back" onClick={close} aria-label="返回编辑器" title="返回">
           <span className="msr" aria-hidden="true">arrow_back</span>
         </button>
         <span className="axv-shape-title">编辑图标 · {name}</span>
-        <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">
+        <button className="axv-icon-btn" onClick={close} aria-label="关闭">
           ✕
         </button>
       </div>
@@ -364,7 +367,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
       <div className="axv-icon-page-foot">
         <span>保存后立即写回 drawable/{resName}.xml，布局里所有引用同步生效。</span>
         <span style={{ display: "flex", gap: 8 }}>
-          <button className="axv-btn axv-ghost" onClick={onClose}>
+          <button className="axv-btn axv-ghost" onClick={close}>
             取消
           </button>
           <button className="axv-btn" onClick={save}>

@@ -50,8 +50,8 @@ describe("图标编辑器返回按钮（M77）", () => {
     expect(editor).toContain('title="返回"');
   });
 
-  it("桌面端 ✕ 仍在（两处），且是 onClose", () => {
+  it("桌面端 ✕ 仍在（两处），且走 M78 的 close（内部 history.back，系统返回键也走同一条路）", () => {
     expect(editor.split('className="axv-icon-btn"').length - 1).toBe(2);
-    expect(editor.split('onClick={onClose} aria-label="关闭"').length - 1).toBe(2);
+    expect(editor.split('onClick={close} aria-label="关闭"').length - 1).toBe(2);
   });
 });

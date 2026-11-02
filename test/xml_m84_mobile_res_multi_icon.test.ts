@@ -32,15 +32,18 @@ describe("M84 多图标插入", () => {
 
   it("插入图标走 IconPickerPanel 且不替换现有图形", () => {
     expect(src).toContain("const [inserting, setInserting]");
-    expect(src).toContain("const insertIcon = (vectorXml: string)");
+    expect(src).toContain("const insertIcon = (next: DrawShape[])");
     expect(src).toMatch(/setShapes\(\(list\) => \[\.\.\.list, \.\.\.add\]\)/);
   });
 
-  it("插入时按视口等比缩放并居中", () => {
+  it("M88：插入时图标库直接给已换算好的 shapes，追加并选中新图层", () => {
     const body = src.slice(src.indexOf("const insertIcon"));
-    expect(body).toContain("Math.min(meta.vw / Math.max(0.001, src.vw)");
-    expect(body).toContain("scalePath(copy.d, scale, scale, 0, 0)");
-    expect(body).toContain("translateShape(copy, ox, oy)");
+    expect(body).toContain("if (!next.length) return");
+    expect(body).toContain("const add = next.map((s) => ({ ...s, id: nextId() }) as DrawShape)");
+    expect(body).toContain("setShapes((list) => [...list, ...add])");
+    expect(body).toContain("setSel(add.map((s) => s.id))");
+    // M88 起不再从 vectorXml 现算缩放（图标库/粘贴已换算好）
+    expect(body.slice(0, 400)).not.toContain("Math.max(0.001, src.vw)");
   });
 });
 

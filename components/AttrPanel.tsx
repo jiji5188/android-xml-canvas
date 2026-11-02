@@ -12,7 +12,7 @@ import type { ResourceExtras } from "@/lib/xml/resdir";
 import { editorFor, defaultFor, type AttrEditor } from "./attr-catalog";
 import { getWidgetDoc, docAttrs, attrHint } from "@/lib/xml/widget-docs";
 import { officialDocUrl } from "@/lib/xml/widget-links";
-import { IconPickerPanel } from "./IconPickerPanel";
+import { IconResPicker } from "./IconResPicker";
 import { ShapeEditor } from "./ShapeEditor";
 import { DrawablePicker } from "./DrawablePicker";
 import { ColorField } from "./ColorField";
@@ -624,7 +624,7 @@ export function AttrPanel({
       )}
 
       {iconPick ? (
-        <IconPickerPanel
+        <IconResPicker
           value={String(node.rawAttrs[iconPick] ?? "")}
           attrName={iconPick}
           existing={iconNames ?? []}

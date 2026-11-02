@@ -1,210 +1,285 @@
 "use client";
+// components/IconPickerPanel.tsx — M88：多图标库选择弹窗（移植自 svg-board iconModal）
+// tab：Material（235 实心）/ Lucide（2015）/ Tabler（5203）/ 几何（16）+ 粘贴 SVG
+// Lucide/Tabler 走 gzip+base64 懒解压（首次 80~250ms），几何永远可用。
+// 单击图标 = 替换整块画布；双击 / 底部按钮 = 追加成新图层。
+import * as React from "react";
+import { ICON_MATERIAL, ICON_BUILTIN, ICON_CATS, decompressIconSet, type IconItem } from "@/lib/xml/icon-libs";
+import { parsePastedSvg } from "@/lib/xml/svg-paste";
+import { scalePath, translateShape, type DrawShape } from "@/lib/xml/canvas-shapes";
+import { iconToShapes } from "@/lib/xml/icon-to-shapes";
 
-// components/IconPickerPanel.tsx — M3g 图标选择器
-// 从 Material Symbols 全集里选图标 → 生成 res/drawable/ic_xxx.xml 矢量文件 → 写入布局属性
-// 关键点：图标不是引用字体，而是真的生成 vector xml 资源，导出时一起打包，避免别处打开找不到图标。
+type TabKey = "material" | "lucide" | "tabler" | "geo" | "paste";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  loadIconFont,
-  getIconVector,
-  iconResourceName,
-  isIconFontLoaded,
-} from "@/lib/xml/icon-vectors";
-import { getIconVectorWysiwyg } from "@/lib/xml/font-glyph";
+const TAB_LABELS: Array<[TabKey, string]> = [
+  ["material", "Material"],
+  ["lucide", "Lucide"],
+  ["tabler", "Tabler"],
+  ["geo", "几何"],
+  ["paste", "粘贴 SVG"],
+];
 
-interface IconMeta {
-  /** 图标名（也是 Material Symbols 的 ligature 文本） */
-  n: string;
-  /** 热度（越大越常用），仅用于排序 */
-  p: number;
-  /** 关键词，用于搜索 */
-  t: string;
-}
+let seq = 0;
+const nextId = () => `ic${Date.now().toString(36)}${(seq++).toString(36)}`;
 
-interface Props {
-  /** 当前属性值，如 @drawable/ic_search */
-  value: string;
-  /** 正在编辑的属性名（用于文案） */
-  attrName: string;
-  /** 已经生成过的图标资源名（显示标记，避免重复生成） */
-  existing: string[];
+/** 24x24 图标 → 当前视口里的 path 图形（等比缩放 + 居中，留 10% 边距） */
+export interface IconPickerPanelProps {
+  /** 替换：整块画布换成这个图标 */
+  onPick: (shapes: DrawShape[]) => void;
+  /** 模式：replace = 单击替换整块画布；insert = 单击追加为新图层 */
+  mode?: "replace" | "insert";
+  /** 取消 */
   onClose: () => void;
-  /** 选中：资源名（ic_search）+ vector xml 原文 */
-  onPick: (resourceName: string, vectorXml: string, iconName: string) => void;
+  /** 当前画布视口（粘贴 SVG 归一化用） */
+  viewport: { vw: number; vh: number };
+  /** 弹窗标题 */
+  title?: string;
 }
 
-const SHOWN = 120;
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库", mode = "replace" }: IconPickerPanelProps) {
+  const [tab, setTab] = React.useState<TabKey>("material");
+  const [cat, setCat] = React.useState("all");
+  const [q, setQ] = React.useState("");
+  const [lazy, setLazy] = React.useState<Partial<Record<"lucide" | "tabler", IconItem[]>>>({});
+  const [err, setErr] = React.useState("");
+  const [paste, setPaste] = React.useState("");
+  const [pasteErr, setPasteErr] = React.useState("");
 
-export function IconPickerPanel({ value, attrName, existing, onClose, onPick }: Props) {
-  const [icons, setIcons] = useState<IconMeta[] | null>(null);
-  const [fontReady, setFontReady] = useState(isIconFontLoaded());
-  const [q, setQ] = useState("");
-  const [err, setErr] = useState<string>("");
-  /** 正在生成的图标名（防重复点击） */
-  const [busy, setBusy] = useState<string | null>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  // 加载图标索引（本地静态 json，离线可用）
-  useEffect(() => {
+  // 切到懒加载库时首次解压（结果缓存，来回切 tab 不再解）
+  React.useEffect(() => {
+    if (tab !== "lucide" && tab !== "tabler") return;
+    if (lazy[tab]) return;
     let alive = true;
-    fetch(`${basePath}/material-symbols.json`)
-      .then((r) => r.json())
-      .then((d: IconMeta[]) => alive && setIcons(d))
-      .catch(() => alive && setErr("图标列表加载失败（material-symbols.json）"));
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  // 按需解析 TTF（1.2MB，本地文件，只解析一次）
-  useEffect(() => {
-    if (isIconFontLoaded()) {
-      setFontReady(true);
+    const p = decompressIconSet(tab);
+    if (!p) {
+      setErr("当前环境不支持 gzip 解压，该图标库不可用");
       return;
     }
-    let alive = true;
-    loadIconFont(`${basePath}/material-symbols-rounded.ttf`)
-      .then(() => alive && setFontReady(true))
-      .catch((e) => {
-        console.error("[axv] icon font load failed", e);
-        alive && setErr("图标字体解析失败（material-symbols-rounded.ttf）");
-      });
+    p.then((arr) => {
+      if (alive) setLazy((prev) => ({ ...prev, [tab]: arr }));
+    }).catch(() => {
+      if (alive) setErr("图标库解压失败（可能是浏览器不支持 DecompressionStream）");
+    });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [tab, lazy]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      onClose();
-    };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  const pool: IconItem[] =
+    tab === "material" ? ICON_MATERIAL : tab === "geo" ? ICON_BUILTIN : lazy[tab as "lucide" | "tabler"] ?? [];
+  const loading = (tab === "lucide" || tab === "tabler") && !lazy[tab] && !err;
 
-  const list = useMemo(() => {
-    if (!icons) return [];
-    const raw = q.trim().toLowerCase();
-    if (!raw) {
-      // 无搜索时按热度排（p 越大越常用）
-      return [...icons].sort((a, b) => b.p - a.p).slice(0, SHOWN);
-    }
-    const key = raw.replace(/\s+/g, "_");
-    const starts: IconMeta[] = [];
-    const rest: IconMeta[] = [];
-    for (const i of icons) {
-      if (i.n.startsWith(key)) starts.push(i);
-      else if (i.n.includes(key) || i.t.includes(raw)) rest.push(i);
-      if (starts.length + rest.length >= SHOWN * 2) break;
-    }
-    return [...starts, ...rest].slice(0, SHOWN);
-  }, [icons, q]);
+  const list = React.useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return pool.filter((it) => {
+      if (cat !== "all" && it.c !== cat) return false;
+      if (s && !it.n.toLowerCase().includes(s)) return false;
+      return true;
+    });
+  }, [pool, cat, q]);
 
-  const pick = async (iconName: string) => {
-    // M4y：用与列表同款渲染的字形轮廓生成 vector（含 FILL 轴），保证「选的 = 生成的」；
-    // 画布不可用（如 SSR）时自动退回 opentype glyf 轮廓
-    setBusy(iconName);
-    try {
-      const xml =
-        (await getIconVectorWysiwyg(iconName)) ?? getIconVector(iconName) ?? "";
-      if (!xml) {
-        setErr(`「${iconName}」没有可用字形，无法生成 vector`);
-        return;
-      }
-      onPick(iconResourceName(iconName), xml, iconName);
-    } finally {
-      setBusy(null);
+  const cats = tab === "geo" ? ICON_CATS.filter(([k]) => k === "all" || k === "geo") : ICON_CATS;
+
+  const pick = (it: IconItem) => onPick(iconToShapes(it, viewport.vw, viewport.vh));
+
+  const parsedPaste = () => {
+    const parts = parsePastedSvg(paste);
+    if (!parts) {
+      setPasteErr("没解析出任何图形（支持 path / circle / ellipse / rect / line / polygon / polyline）");
+      return null;
     }
+    setPasteErr("");
+    // 源 SVG 视口 → 当前画布视口等比缩放
+    const src = parts[0];
+    const k = Math.min(viewport.vw / src.vw, viewport.vh / src.vh) * 0.9;
+    const ox = (viewport.vw - src.vw * k) / 2;
+    const oy = (viewport.vh - src.vh * k) / 2;
+    return parts.map((p) => {
+      const { vw: _vw, vh: _vh, ...rest } = p;
+      const sh = { ...rest, id: nextId() } as DrawShape;
+      const sc =
+        sh.type === "path"
+          ? { ...sh, d: scalePath(sh.d, k, k, 0, 0), strokeWidth: sh.strokeWidth * k }
+          : (scaleShapeLite(sh, k) as DrawShape);
+      return translateShape(sc, ox, oy);
+    });
   };
 
-  const currentName = value.replace(/^@(?:drawable|mipmap)\//, "").replace(/\.xml$/, "");
+  const doPaste = (kind: "replace" | "insert") => {
+    const shapes = parsedPaste();
+    if (!shapes) return;
+    onPick(shapes);
+    void kind;
+    setPaste("");
+  };
 
   return (
     <div
-      className="axv-modal-backdrop"
-      onMouseDown={(e) => {
+      className="axv-cp-mask"
+      onPointerDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="axv-modal axv-icon-modal" role="dialog" aria-label="选择图标">
-        <div className="axv-modal-head">
-          <span>选择图标 · {attrName}</span>
-          <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">
+      <div className="axv-cp axv-iconlib" role="dialog" aria-label={title} aria-modal="true">
+        <div className="cp-header">
+          <div className="cp-title">
+            <span className="msr" aria-hidden>
+              apps
+            </span>
+            {title}
+          </div>
+          <button type="button" className="cp-x" onClick={onClose} title="关闭">
             ✕
           </button>
         </div>
 
-        <div className="axv-icon-search">
-          <span className="msr" aria-hidden style={{ fontSize: 20, opacity: 0.6 }}>
-            search
-          </span>
-          <input
-            autoFocus
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={icons ? "搜索图标名 / 关键词（如 arrow、user、check）" : "加载中…"}
-            spellCheck={false}
-          />
-          {q ? (
-            <button className="axv-icon-btn" onClick={() => setQ("")} title="清空">
-              ✕
+        <div className="axv-iconlib-tabs">
+          {TAB_LABELS.map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              className={"axv-iconlib-tab" + (tab === k ? " on" : "")}
+              onClick={() => {
+                setTab(k);
+                setCat("all");
+                setQ("");
+                setErr("");
+              }}
+            >
+              {label}
             </button>
-          ) : null}
+          ))}
         </div>
 
-        {err ? <div className="axv-icon-err">{err}</div> : null}
-
-        <div className="axv-icon-grid" ref={gridRef}>
-          {!icons || !fontReady ? (
-            <div className="axv-icon-empty">
-              <span className="msr" aria-hidden style={{ fontSize: 22 }}>
-                hourglass_top
-              </span>
-              {icons ? "正在解析图标字体…" : "正在加载图标列表…"}
+        {tab === "paste" ? (
+          <div className="axv-iconlib-paste">
+            <p className="axv-iconlib-hint">
+              粘贴 SVG 源码（支持 path / circle / ellipse / rect / line / polygon / polyline），会转成可编辑图元。
+            </p>
+            <textarea
+              className="axv-iconlib-ta"
+              placeholder={"<svg viewBox='0 0 24 24'><path d='M4 12l5 5L20 6'/></svg>"}
+              value={paste}
+              onChange={(e) => setPaste(e.target.value)}
+            />
+            {pasteErr ? <p className="axv-iconlib-err">{pasteErr}</p> : null}
+            <div className="axv-iconlib-foot">
+              <button type="button" className="cp-btn cp-copy" onClick={onClose}>
+                取消
+              </button>
+              <button type="button" className="cp-btn cp-confirm" onClick={() => doPaste(mode)}>
+                {mode === "insert" ? "插入画布" : "替换画布"}
+              </button>
             </div>
-          ) : list.length === 0 ? (
-            <div className="axv-icon-empty">
-              <span className="msr" aria-hidden style={{ fontSize: 22 }}>
-                search_off
-              </span>
-              没有匹配的图标
-            </div>
-          ) : (
-            list.map((i) => {
-              const rn = iconResourceName(i.n);
-              const isCur = rn === currentName;
-              const isDup = existing.includes(rn);
-              return (
+          </div>
+        ) : (
+          <>
+            <div className="axv-iconlib-chips">
+              {cats.map(([k, label]) => (
                 <button
-                  key={i.n}
-                  className={"axv-icon-cell" + (isCur ? " is-current" : "") + (isDup ? " is-dup" : "")}
-                  title={`${i.n}${isDup ? "（已生成，复用同一个文件）" : ""}`}
-                  onClick={() => void pick(i.n)}
+                  key={k}
+                  type="button"
+                  className={"axv-iconlib-chip" + (cat === k ? " on" : "")}
+                  onClick={() => setCat(k)}
                 >
-                  <span className="msr" aria-hidden>
-                    {i.n}
-                  </span>
-                  <span className="axv-icon-name">{i.n}</span>
-                  {isCur ? <span className="axv-icon-badge">当前</span> : null}
+                  {label}
                 </button>
-              );
-            })
-          )}
-        </div>
-
-        <div className="axv-icon-foot">
-          <span>
-            选中后生成 <code>res/drawable/ic_xxx.xml</code>，属性写成 <code>@drawable/ic_xxx</code>。生成的是「填充」样式图标（与列表一致），Android 里就是实心 vector
-          </span>
-          <button className="axv-btn" onClick={onClose}>
-            取消
-          </button>
-        </div>
+              ))}
+            </div>
+            <div className="axv-iconlib-search">
+              <span className="msr" aria-hidden>
+                search
+              </span>
+              <input placeholder="搜索图标名…" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+            {err ? <p className="axv-iconlib-err">{err}</p> : null}
+            {loading ? (
+              <p className="axv-iconlib-hint">正在解压 {tab} …（首次约 100~250ms）</p>
+            ) : null}
+            {!loading && !err ? (
+              <div className="axv-iconlib-grid">
+                {list.slice(0, 300).map((it, i) => (
+                  <button
+                    key={it.n + i}
+                    type="button"
+                    className="axv-iconlib-cell"
+                    title={it.n}
+                    onClick={() => pick(it)}
+                  >
+                    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
+                      <path
+                        d={it.d}
+                        fill={it.st === 1 ? "none" : "currentColor"}
+                        stroke={it.st === 1 ? "currentColor" : "none"}
+                        strokeWidth={it.st === 1 ? 2 : 0}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <span>{it.n}</span>
+                  </button>
+                ))}
+                {!list.length ? <p className="axv-iconlib-hint">没有匹配「{q}」的图标</p> : null}
+              </div>
+            ) : null}
+            <div className="axv-iconlib-foot">
+              <span className="axv-iconlib-count">
+                共 {list.length} 个 · {mode === "insert" ? "单击插入为图层" : "单击替换画布"}
+              </span>
+              <button type="button" className="cp-btn cp-copy" onClick={onClose}>
+                取消
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
+}
+
+/** 非 path 图元的等比缩放（rect/circle/ellipse/line 各自换算） */
+function scaleShapeLite(s: DrawShape, k: number): DrawShape {
+  const c = { ...s };
+  switch (c.type) {
+    case "rect":
+    case "roundRect":
+      c.x *= k;
+      c.y *= k;
+      c.w *= k;
+      c.h *= k;
+      if (c.round) c.round *= k;
+      break;
+    case "circle":
+      c.cx *= k;
+      c.cy *= k;
+      c.r *= k;
+      break;
+    case "ellipse":
+      c.cx *= k;
+      c.cy *= k;
+      c.rx *= k;
+      c.ry *= k;
+      break;
+    case "line":
+      c.x1 *= k;
+      c.y1 *= k;
+      c.x2 *= k;
+      c.y2 *= k;
+      break;
+    case "polygon":
+    case "star":
+      c.cx *= k;
+      c.cy *= k;
+      c.r *= k;
+      break;
+    case "text":
+      c.x *= k;
+      c.y *= k;
+      c.size *= k;
+      break;
+    default:
+      break;
+  }
+  c.strokeWidth *= k;
+  return c;
 }

@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import { buildVectorXml, parseVectorModel, nextRotation } from "@/lib/xml/vector-edit";
 import type { VectorModel } from "@/lib/xml/vector-edit";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
-import { IconPickerPanel } from "./IconPickerPanel";
+import { IconResPicker, iconToVectorXml } from "./IconResPicker";
 import { ColorPicker } from "./ColorPicker";
 import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
 
@@ -443,12 +443,17 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
 
       {/* 换字形：图标选择器叠在全页之上 */}
       {picking ? (
-        <IconPickerPanel
+        <IconResPicker
           value={`@drawable/${resName}`}
           attrName="编辑图标"
           existing={existingNames}
           onClose={() => setPicking(false)}
-          onPick={(_rn, vectorXml) => applyIcon(vectorXml)}
+          onPick={(_rn, vectorXml, iconName) => {
+            // 旧编辑器仍是 VectorModel 工作流：把 <vector> xml 直接换上
+            void iconName;
+            applyIcon(vectorXml);
+            setPicking(false);
+          }}
         />
       ) : null}
     </div>

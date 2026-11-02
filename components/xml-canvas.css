@@ -7639,6 +7639,135 @@ button.axv-sb-item:hover {
 }
 
 
+
+
+/* M88：多图标库选择弹窗（移植 svg-board iconModal：Material/Lucide/Tabler/几何/粘贴 SVG） */
+.axv-iconlib {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 96px));
+  display: flex;
+  flex-direction: column;
+}
+.axv-iconlib .cp-header { padding: 12px 16px; }
+
+.axv-iconlib-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.axv-iconlib-tabs::-webkit-scrollbar { display: none; }
+.axv-iconlib-tab {
+  flex: 0 0 auto;
+  border: 0;
+  background: #f2f2f2;
+  color: #444;
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.axv-iconlib-tab.on { background: #333; color: #fff; }
+.axv-iconlib-tab:active { transform: scale(0.96); }
+
+.axv-iconlib-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px;
+}
+.axv-iconlib-chip {
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #555;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.axv-iconlib-chip.on { border-color: #333; background: #333; color: #fff; }
+
+.axv-iconlib-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 14px 10px;
+  border: 1px solid #ddd;
+  border-radius: 9px;
+  padding: 7px 10px;
+  background: #fafafa;
+}
+.axv-iconlib-search .msr { font-size: 16px; color: #888; }
+.axv-iconlib-search input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 13px;
+  color: #333;
+}
+
+.axv-iconlib-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  padding: 2px 14px 12px;
+  align-content: start;
+}
+.axv-iconlib-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 4px 8px;
+  border: 1px solid #e3e3e3;
+  border-radius: 10px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  font-size: 11px;
+}
+.axv-iconlib-cell svg { color: #1d1b20; }
+.axv-iconlib-cell span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #666;
+}
+.axv-iconlib-cell:hover { border-color: #333; background: #f7f7f7; }
+.axv-iconlib-cell:active { transform: scale(0.95); }
+
+.axv-iconlib-paste { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; }
+.axv-iconlib-hint { font-size: 12px; color: #777; line-height: 1.6; padding: 0 14px; }
+.axv-iconlib-err { font-size: 12px; color: #c62828; padding: 0 14px; }
+.axv-iconlib-ta {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid #ddd;
+  border-radius: 9px;
+  padding: 8px 10px;
+  font: 12px/1.6 Consolas, "SF Mono", monospace;
+  color: #333;
+  outline: 0;
+  box-sizing: border-box;
+}
+.axv-iconlib-ta:focus { border-color: #333; }
+
+.axv-iconlib-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid #eee;
+}
+.axv-iconlib-count { font-size: 12px; color: #888; }
+
 /* M79：来自 colorpicker.html 的“弹窗式”颜色选择器（Canvas HSV 面板） */
 .axv-cp-mask {
   position: fixed;

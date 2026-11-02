@@ -30,8 +30,8 @@ export interface ColorPickerProps {
   onClose: () => void;
   /** 预设颜色（不传则用默认 8 色） */
   presets?: string[];
-  /** 是否显示「复制色值」按钮 */
-  showCopy?: boolean;
+  /** 是否显示「取消」按钮（M88：原「复制色值」改为「取消」） */
+  showCancel?: boolean;
   /** 弹出层级：在整页编辑器（z 3000）里要用 abovePage */
   abovePage?: boolean;
 }
@@ -47,11 +47,10 @@ function initialPickerColor(value: string): PickerColor {
   return colorToPickerColor(rgba.r, rgba.g, rgba.b, rgba.a);
 }
 
-export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAULT_PRESETS, showCopy = true, abovePage }: ColorPickerProps) {
+export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAULT_PRESETS, showCancel = true, abovePage }: ColorPickerProps) {
   const [picker, setPicker] = useState<PickerColor>(() => initialPickerColor(value));
   const [argbText, setArgbText] = useState("#FF3498DB");
   const [rgbaInput, setRgbaInput] = useState("rgba(52,152,219,1)");
-  const [copied, setCopied] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -194,24 +193,7 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
     setRgbaInput(rgbaText(r, g, b, 1));
   };
 
-  const copyArgb = async () => {
-    try {
-      await navigator.clipboard?.writeText(argbText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = argbText;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand("copy");
-        document.body.removeChild(ta);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1200);
-      } catch { /* 忽略 */ }
-    }
-  };
+;
 
   const confirm = () => {
     onConfirm(toAndroidHex(parseColorOr(argbText, "#FF3498DB")));
@@ -297,9 +279,9 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
           </div>
 
           <div className="cp-actions">
-            {showCopy ? (
-              <button type="button" className="cp-btn cp-copy" onClick={copyArgb}>
-                {copied ? "已复制!" : "复制色值"}
+            {showCancel ? (
+              <button type="button" className="cp-btn cp-copy" onClick={onClose}>
+                取消
               </button>
             ) : null}
             <button type="button" className="cp-btn cp-confirm" onClick={confirm}>

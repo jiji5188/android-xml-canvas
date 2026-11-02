@@ -868,36 +868,20 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     onSave(safe, buildVectorXml(model, safe));
   };
 
-  /* ---------------- 从图标库换字形 ---------------- */
-  const applyIcon = (vectorXml: string) => {
+  /* ---------------- 从图标库换字形（M88：图标库直接给已换算好的 shapes） ---------------- */
+  const applyIcon = (next: DrawShape[]) => {
     setPicking(false);
-    const src = parseVectorModel(vectorXml);
-    if (!src) return;
+    if (!next.length) return;
     pushHistory();
-    setMeta((m) => ({
-      ...m,
-      vw: src.vw,
-      vh: src.vh,
-      group: { ...m.group, pivotX: src.vw / 2, pivotY: src.vh / 2 },
-    }));
-    setShapes(modelToShapes(src));
+    setShapes(next);
     setSel([]);
   };
 
-  /** 把另一个图标的路径追加到当前画布（按视口等比缩放并居中），支持一张图标里拼多个字形 */
-  const insertIcon = (vectorXml: string) => {
+  /** 把图标追加到当前画布（图标库已等比缩放居中），支持一张图标里拼多个字形 */
+  const insertIcon = (next: DrawShape[]) => {
     setInserting(false);
-    const src = parseVectorModel(vectorXml);
-    if (!src || !src.paths.length) return;
-    const scale = Math.min(meta.vw / Math.max(0.001, src.vw), meta.vh / Math.max(0.001, src.vh));
-    const ox = (meta.vw - src.vw * scale) / 2;
-    const oy = (meta.vh - src.vh * scale) / 2;
-    const add = modelToShapes(src).map((s) => {
-      const copy = { ...s, id: nextId() } as DrawShape;
-      if (copy.type === "path") copy.d = scalePath(copy.d, scale, scale, 0, 0);
-      if (copy.type === "path") copy.strokeWidth = (copy.strokeWidth ?? 0) * scale;
-      return translateShape(copy, ox, oy);
-    });
+    if (!next.length) return;
+    const add = next.map((s) => ({ ...s, id: nextId() }) as DrawShape);
     pushHistory();
     setShapes((list) => [...list, ...add]);
     setSel(add.map((s) => s.id));
@@ -1840,22 +1824,21 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       {/* 换字形 */}
       {picking ? (
         <IconPickerPanel
-          value={`@drawable/${resName}`}
-          attrName="编辑图标"
-          existing={existingNames}
+          title="选择图标"
+          viewport={{ vw: meta.vw, vh: meta.vh }}
           onClose={() => setPicking(false)}
-          onPick={(_rn, vectorXml) => applyIcon(vectorXml)}
+          onPick={(shapes) => applyIcon(shapes)}
         />
       ) : null}
 
       {/* 插入图标（多图标拼合） */}
       {inserting ? (
         <IconPickerPanel
-          value=""
-          attrName="插入图标"
-          existing={existingNames}
+          title="插入图标"
+          viewport={{ vw: meta.vw, vh: meta.vh }}
           onClose={() => setInserting(false)}
-          onPick={(_rn, vectorXml) => insertIcon(vectorXml)}
+          mode="insert"
+          onPick={(shapes) => insertIcon(shapes)}
         />
       ) : null}
     </div>

@@ -53,9 +53,8 @@ describe("M86 图层面板移植原页面功能", () => {
     expect(css).toContain(".axv-cv-layer.is-drop");
   });
 
-  it("图层面板有 ➕ 插入图标按钮", () => {
-    expect(src).toContain("＋ 插入");
-    expect(src).toMatch(/className="axv-cv-mini" onClick=\{\(\) => setInserting\(true\)\} title="插入图标（追加成新图层）"/);
+  it("图层面板有 ➕ 插入图标按钮（M88i 起用 add 图标）", () => {
+    expect(src).toMatch(/className="axv-cv-mini" onClick=\{\(\) => setInserting\(true\)\} title="插入图标（追加成新图层）">\s*<span className="msr"[^>]*>add<\/span>/);
   });
 });
 

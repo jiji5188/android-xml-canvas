@@ -1595,11 +1595,16 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   图形（{shapes.length}）
                   <span className="axv-cv-hint">· 点一行选中，Shift 多选</span>
                   <button className="axv-cv-mini" onClick={() => setInserting(true)} title="插入图标（追加成新图层）">
-                    ＋ 插入
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>add</span>
+                    插入
                   </button>
                   <button className="axv-cv-mini" onClick={duplicateOne} title="复制一条（选中优先）">
                     <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>content_copy</span>
                     复制
+                  </button>
+                  <button className="axv-cv-mini" onClick={removeSel} title="删除选中图形 (Delete)">
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>delete</span>
+                    删除
                   </button>
                 </div>
             <div className="axv-cv-layers">
@@ -1717,24 +1722,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 );
               })}
               {!shapes.length ? <div className="axv-cv-empty">画布还是空的：选个工具，在左边拖一下</div> : null}
-            </div>
-            <div className="axv-icon-ed-btns" style={{ marginTop: 8 }}>
-              <button className="axv-set-btn" onClick={duplicateSel} title="复制选中 (Ctrl+D)">
-                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>content_copy</span>
-                复制
-              </button>
-              <button className="axv-set-btn" onClick={() => moveLayer(1)} title="上移一层">
-                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip_to_front</span>
-                上移
-              </button>
-              <button className="axv-set-btn" onClick={() => moveLayer(-1)} title="下移一层">
-                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip_to_back</span>
-                下移
-              </button>
-              <button className="axv-set-btn" onClick={removeSel} title="删除选中 (Delete)">
-                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>delete</span>
-                删除
-              </button>
             </div>
               </div>
             ) : null}

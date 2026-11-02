@@ -614,3 +614,6 @@ Import traces:
  GET /xml/ 200 in 20ms (next.js: 3ms, application-code: 17ms)
  GET /m88test/?v=510 404 in 302ms (next.js: 277ms, application-code: 25ms)
  GET /m88test/?v=510 404 in 181ms (next.js: 15ms, application-code: 165ms)
+ GET /xml/ 200 in 21ms (next.js: 0.4ms, application-code: 20ms)
+✓ Compiled in 159ms
+✓ Compiled in 1456ms

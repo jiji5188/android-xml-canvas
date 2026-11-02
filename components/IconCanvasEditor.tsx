@@ -173,11 +173,14 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const gRef = useRef<SVGGElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  /* 自适应缩放：初始 / 「复位缩放」按钮都用画布区实际高度来 fit，而不是写死 1 */
+  /* 自适应缩放：初始 / 「复位缩放」都按画布区可用宽高取较小者 fit（不是写死 1）
+     宽扣左右 padding 32、高扣上下 padding 40 + gap 10 + 顶部 meta 行，留 96 */
   const fitZoom = useCallback(() => {
     const el = stageRef.current;
     if (!el) return 1;
-    const f = (el.clientHeight - 96) / 300; // 300 = 基准板尺寸(px)@zoom1
+    const availW = el.clientWidth - 32;
+    const availH = el.clientHeight - 96;
+    const f = Math.min(availW, availH) / 300; // 300 = 基准板尺寸(px)@zoom1
     return Math.round(Math.max(0.4, Math.min(2.5, f)) * 10) / 10;
   }, []);
 

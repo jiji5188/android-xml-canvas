@@ -152,7 +152,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [showGrid, setShowGrid] = useState(true);
   const [bg, setBg] = useState("");
   /** 底部样式抽屉（移植 svg-board）：4 个 tab 子页 + 折叠 */
-  const [sheetTab, setSheetTab] = useState<"style" | "align" | "layers" | "board">("style");
+  const [sheetTab, setSheetTab] = useState<"style" | "align" | "layers" | "res" | "board">("style");
   const [sheetOpen, setSheetOpen] = useState(true);
 
   const undoRef = useRef<Snapshot[]>([]);
@@ -1164,57 +1164,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               </span>
             </div>
           ) : null}
-          <div className="axv-set-group">
-            <div className="axv-set-label">资源</div>
-            <div className="axv-icon-ed-row">
-              <span>名称</span>
-              <input
-                className="axv-icon-ed-input"
-                value={resName}
-                onChange={(e) => {
-                  setResName(e.target.value);
-                  setErr("");
-                }}
-              />
-              <button className="axv-icon-ed-pick" onClick={() => setPicking(true)} title="从图标库换字形（替换整个图标）">
-                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>apps</span>
-                选择图标
-              </button>
-            </div>
-            <div className="axv-icon-ed-row">
-              <span>插入</span>
-              <button
-                className="axv-btn axv-ghost axv-cv-insert"
-                onClick={() => setInserting(true)}
-                title="从图标库再挑一个字形，追加成新图层（不替换现有图形）"
-              >
-                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
-                插入图标
-              </button>
-            </div>
-            <div className="axv-cv-hint axv-cv-insert-hint">可把多个图标拼进同一张画布</div>
-            <label className="axv-icon-ed-row">
-              <span>尺寸（dp）</span>
-              <span className="axv-icon-ed-two">
-                <input
-                  className="axv-icon-ed-input"
-                  type="number"
-                  min={1}
-                  value={meta.w}
-                  onChange={(e) => setMeta((m) => ({ ...m, w: Math.max(1, Number(e.target.value) || 1) }))}
-                />
-                <input
-                  className="axv-icon-ed-input"
-                  type="number"
-                  min={1}
-                  value={meta.h}
-                  onChange={(e) => setMeta((m) => ({ ...m, h: Math.max(1, Number(e.target.value) || 1) }))}
-                />
-              </span>
-            </label>
-            {err ? <div className="axv-icon-ed-err">{err}</div> : null}
-          </div>
-
           {/* 路径数据（选中 path 图元时直接手改） */}
           {pathSel ? (
             <div className="axv-set-group">
@@ -1233,40 +1182,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           ) : null}
 
           <div className="axv-set-group">
-            <div className="axv-set-label">
-              整体变换
-              <span className="axv-cv-hint">· 旋转/镜像写进 &lt;group&gt;</span>
-            </div>
-            <div className="axv-icon-ed-btns">
-              <button
-                className="axv-set-btn"
-                onClick={() => setMeta((m) => ({ ...m, group: { ...m.group, rotation: nextRotation(m.group.rotation) } }))}
-              >
-                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>rotate_90_degrees_cw</span>
-                旋转 {meta.group.rotation}°
-              </button>
-              <button
-                className={"axv-set-btn" + (meta.group.scaleX === -1 ? " on" : "")}
-                onClick={() =>
-                  setMeta((m) => ({ ...m, group: { ...m.group, scaleX: m.group.scaleX === -1 ? 1 : -1 } }))
-                }
-              >
-                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip</span>
-                水平镜像
-              </button>
-              <button
-                className={"axv-set-btn" + (meta.group.scaleY === -1 ? " on" : "")}
-                onClick={() =>
-                  setMeta((m) => ({ ...m, group: { ...m.group, scaleY: m.group.scaleY === -1 ? 1 : -1 } }))
-                }
-              >
-                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip</span>
-                垂直镜像
-              </button>
-            </div>
-          </div>
-
-          <div className="axv-set-group">
             <button className="axv-set-btn" onClick={() => setShowRaw((v) => !v)}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
               {showRaw ? "收起 XML" : "查看生成的 XML"}
@@ -1281,7 +1196,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             <span className="axv-cv-grabber" aria-hidden="true" />
             <span className="axv-cv-sheet-title">样式</span>
             <div className="axv-cv-sheet-tabs" onClick={(e) => e.stopPropagation()}>
-              {([["style", "样式"], ["align", "排列"], ["layers", "图层"], ["board", "画布"]] as const).map(([k, label]) => (
+              {([["style", "样式"], ["align", "排列"], ["layers", "图层"], ["res", "资源"], ["board", "画布"]] as const).map(([k, label]) => (
                 <button
                   key={k}
                   className={"axv-cv-sheet-tab" + (sheetTab === k ? " on" : "")}
@@ -1488,6 +1403,67 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             </div>
               </div>
             ) : null}
+            {sheetTab === "res" ? (
+              <div className="axv-cv-sheet-pane">
+                <div className="axv-set-group">
+                  <div className="axv-set-label">
+                    资源
+                    <span className="axv-cv-hint">· 保存写回 drawable/{resName || "…"}.xml</span>
+                  </div>
+                  <div className="axv-icon-ed-row">
+                    <span>名称</span>
+                    <input
+                      className="axv-icon-ed-input"
+                      value={resName}
+                      onChange={(e) => {
+                        setResName(e.target.value);
+                        setErr("");
+                      }}
+                    />
+                    <button
+                      className="axv-icon-ed-pick"
+                      onClick={() => setPicking(true)}
+                      title="从图标库换字形（替换整个图标）"
+                    >
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>apps</span>
+                      选择图标
+                    </button>
+                  </div>
+                  <div className="axv-icon-ed-row">
+                    <span>尺寸（dp）</span>
+                    <span className="axv-icon-ed-two">
+                      <input
+                        className="axv-icon-ed-input"
+                        type="number"
+                        min={1}
+                        value={meta.w}
+                        onChange={(e) => setMeta((m) => ({ ...m, w: Math.max(1, Number(e.target.value) || 1) }))}
+                      />
+                      <input
+                        className="axv-icon-ed-input"
+                        type="number"
+                        min={1}
+                        value={meta.h}
+                        onChange={(e) => setMeta((m) => ({ ...m, h: Math.max(1, Number(e.target.value) || 1) }))}
+                      />
+                    </span>
+                  </div>
+                  <div className="axv-icon-ed-row">
+                    <span>插入</span>
+                    <button
+                      className="axv-btn axv-ghost axv-cv-insert"
+                      onClick={() => setInserting(true)}
+                      title="从图标库再挑一个字形，追加成新图层（不替换现有图形）"
+                    >
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
+                      插入图标
+                    </button>
+                  </div>
+                  <div className="axv-cv-hint axv-cv-insert-hint">可把多个图标拼进同一张画布</div>
+                  {err ? <div className="axv-icon-ed-err">{err}</div> : null}
+                </div>
+              </div>
+            ) : null}
             {sheetTab === "board" ? (
               <div className="axv-cv-sheet-pane">
             <div className="axv-set-group">
@@ -1612,6 +1588,40 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     先在画布上框选或用「图层」多选（Shift 点）两个以上图形。
                   </div>
                 )}
+
+                <div className="axv-set-group" style={{ marginTop: 14 }}>
+                  <div className="axv-set-label">
+                    整体变换
+                    <span className="axv-cv-hint">· 旋转/镜像写进 &lt;group&gt;</span>
+                  </div>
+                  <div className="axv-icon-ed-btns">
+                    <button
+                      className="axv-set-btn"
+                      onClick={() => setMeta((m) => ({ ...m, group: { ...m.group, rotation: nextRotation(m.group.rotation) } }))}
+                    >
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>rotate_90_degrees_cw</span>
+                      旋转 {meta.group.rotation}°
+                    </button>
+                    <button
+                      className={"axv-set-btn" + (meta.group.scaleX === -1 ? " on" : "")}
+                      onClick={() =>
+                        setMeta((m) => ({ ...m, group: { ...m.group, scaleX: m.group.scaleX === -1 ? 1 : -1 } }))
+                      }
+                    >
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip</span>
+                      水平镜像
+                    </button>
+                    <button
+                      className={"axv-set-btn" + (meta.group.scaleY === -1 ? " on" : "")}
+                      onClick={() =>
+                        setMeta((m) => ({ ...m, group: { ...m.group, scaleY: m.group.scaleY === -1 ? 1 : -1 } }))
+                      }
+                    >
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip</span>
+                      垂直镜像
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : null}
             {sheetTab === "layers" ? (

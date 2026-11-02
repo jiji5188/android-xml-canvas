@@ -8332,6 +8332,9 @@ button.axv-sb-item:hover {
 .axv-cv-preset:hover { transform: translateY(-1px); }
 
 .axv-cv-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   margin-left: 8px;
   padding: 0 6px;
   height: 20px;
@@ -8339,7 +8342,7 @@ button.axv-sb-item:hover {
   border-radius: 5px;
   background: rgba(255, 255, 255, 0.5);
   color: inherit;
-  font-size: 10px;
+  font-size: 12px;
   cursor: pointer;
 }
 .axv-cv-mini:hover { border-color: rgba(27, 110, 243, 0.6); color: #1b6ef3; }

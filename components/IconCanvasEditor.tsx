@@ -1598,7 +1598,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     ＋ 插入
                   </button>
                   <button className="axv-cv-mini" onClick={duplicateOne} title="复制一条（选中优先）">
-                    ＋ 复制一条
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>content_copy</span>
+                    复制
                   </button>
                 </div>
             <div className="axv-cv-layers">

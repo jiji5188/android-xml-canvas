@@ -8502,17 +8502,20 @@ button.axv-sb-item:hover {
     transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   /* 收起：整块滑到视口右侧之外 */
+  /* 收起：整块滑出视口，再多滑 1px 把贴边那条缝彻底藏掉（width 不能写负值） */
   .axv-cv-body .axv-icon-ed-form.axv-cv-form.is-closed {
-    transform: translateX(100%);
+    transform: translateX(calc(100% + 1px));
+    border-left-width: 0;
     box-shadow: none;
+    pointer-events: none;
   }
   /* 面板左缘的箭头开关：展开时贴着面板左侧，收起后落到视口右缘 */
   .axv-cv-form-toggle {
     display: grid;
     place-items: center;
     position: absolute;
-    top: 12px;
-    right: 75vw;
+    top: calc(50% - 26px);
+    right: calc(75vw - 1px);
     z-index: 10;
     width: 26px;
     height: 52px;

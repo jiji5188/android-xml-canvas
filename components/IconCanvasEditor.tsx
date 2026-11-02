@@ -1425,37 +1425,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                       选择图标
                     </button>
                   </div>
-                  <div className="axv-icon-ed-row">
-                    <span>尺寸（dp）</span>
-                    <span className="axv-icon-ed-two">
-                      <input
-                        className="axv-icon-ed-input"
-                        type="number"
-                        min={1}
-                        value={meta.w}
-                        onChange={(e) => setMeta((m) => ({ ...m, w: Math.max(1, Number(e.target.value) || 1) }))}
-                      />
-                      <input
-                        className="axv-icon-ed-input"
-                        type="number"
-                        min={1}
-                        value={meta.h}
-                        onChange={(e) => setMeta((m) => ({ ...m, h: Math.max(1, Number(e.target.value) || 1) }))}
-                      />
-                    </span>
-                  </div>
-                  <div className="axv-icon-ed-row">
-                    <span>插入</span>
-                    <button
-                      className="axv-btn axv-ghost axv-cv-insert"
-                      onClick={() => setInserting(true)}
-                      title="从图标库再挑一个字形，追加成新图层（不替换现有图形）"
-                    >
-                      <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
-                      插入图标
-                    </button>
-                  </div>
-                  <div className="axv-cv-hint axv-cv-insert-hint">可把多个图标拼进同一张画布</div>
                   {err ? <div className="axv-icon-ed-err">{err}</div> : null}
                 </div>
               </div>

@@ -21,12 +21,13 @@ describe("M87 抽屉加入资源 tab + 整体变换挪到排列", () => {
     expect(align).toContain("垂直镜像");
   });
 
-  it("资源页含 名称 / 尺寸（dp）/ 插入图标 / 选择图标", () => {
+  it("资源页只留 名称 / 选择图标（M88g 起尺寸行与插入行已删除）", () => {
     const res = src.slice(src.indexOf('sheetTab === "res"'), src.indexOf('sheetTab === "board"'));
     expect(res).toContain("名称");
-    expect(res).toContain("尺寸（dp）");
-    expect(res).toContain("插入图标");
     expect(res).toContain("选择图标");
+    expect(res).not.toContain("尺寸（dp）");
+    expect(res).not.toContain("插入图标");
+    expect(res).not.toContain("axv-cv-insert-hint");
     expect(res).toContain('className="axv-icon-ed-err"');
   });
 

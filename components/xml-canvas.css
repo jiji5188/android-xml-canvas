@@ -7899,7 +7899,7 @@ button.axv-sb-item:hover {
   position: absolute;
   inset: 0;
 }
-.cp-alpha { position: relative; z-index: 2; }
+.cp-alpha { position: relative; z-index: 2; bottom: 2px; }
 
 .cp-preview-row {
   display: flex;
@@ -8381,7 +8381,7 @@ button.axv-sb-item:hover {
   flex: 0 0 auto;
   height: 40px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   padding: 0 10px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
@@ -8408,7 +8408,7 @@ button.axv-sb-item:hover {
   margin-left: auto;
   display: flex;
   gap: 2px;
-  padding: 2px;
+  padding: 2px 2px 0px 2px;
   border-radius: 8px 8px 0px 0px;
   background: rgba(0, 0, 0, 0.05);
 }
@@ -8433,6 +8433,7 @@ button.axv-sb-item:hover {
 .axv-cv-sheet-chev {
   font-size: 18px;
   opacity: 0.55;
+  margin-bottom: 6px;
   transition: transform 0.2s;
 }
 .axv-cv-sheet.is-collapsed .axv-cv-sheet-chev { transform: rotate(180deg); }

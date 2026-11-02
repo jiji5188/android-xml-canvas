@@ -55,6 +55,8 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef(false);
+  /** ARGB 输入框被手改过：确认时以输入框为准，否则以 HSV 状态为准（避免读到过期 state） */
+  const argbDirty = useRef(false);
 
   // 外部 value 变化时，若用户没有正在输入框里编辑，则同步
   useEffect(() => {
@@ -132,6 +134,7 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
     const v = 1 - y / rect.height;
     setPicker((cur) => {
       const next = { ...cur, s, v };
+      argbDirty.current = false;
       syncUi(next);
       return next;
     });
@@ -151,6 +154,7 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
   const setHue = (h: number) => {
     setPicker((cur) => {
       const next = { ...cur, h };
+      argbDirty.current = false;
       syncUi(next);
       return next;
     });
@@ -158,12 +162,14 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
   const setAlpha = (a: number) => {
     setPicker((cur) => {
       const next = { ...cur, a };
+      argbDirty.current = false;
       syncUi(next);
       return next;
     });
   };
 
   const applyArgbText = (raw: string) => {
+    argbDirty.current = true;
     setArgbText(raw);
     const next = parsePickerInputToColor("argb", raw, picker);
     if (next) {
@@ -187,16 +193,23 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
     if (!rgb) return;
     const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
     const next = { ...hsv, a: 1 };
+    argbDirty.current = false;
     setPicker(next);
     const { r, g, b } = hsvToRgb(next.h, next.s, next.v);
     setArgbText(rgbaToArgbHex(r, g, b, 1));
     setRgbaInput(rgbaText(r, g, b, 1));
   };
 
-;
+
 
   const confirm = () => {
-    onConfirm(toAndroidHex(parseColorOr(argbText, "#FF3498DB")));
+    if (argbDirty.current) {
+      onConfirm(toAndroidHex(parseColorOr(argbText, "#FF3498DB")));
+      return;
+    }
+    // 以 HSV 状态为准：预设 / 画布 / 滑杆刚改完时 argbText 可能还没同步过来
+    const { r, g, b } = hsvToRgb(picker.h, picker.s, picker.v);
+    onConfirm(toAndroidHex({ r, g, b, a: picker.a }));
   };
 
   const previewRgb = hsvToRgb(picker.h, picker.s, picker.v);

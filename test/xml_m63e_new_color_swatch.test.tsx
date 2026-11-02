@@ -68,10 +68,12 @@ describe("新建资源：颜色的取色按钮", () => {
     (row.querySelector(".axv-cf-swatch") as HTMLButtonElement).click();
     await flush();
     await flush();
-    expect(document.querySelector(".axv-cf-mask")).not.toBeNull();
+    expect(document.querySelector(".axv-cp-mask")).not.toBeNull();
 
     // 第 3 个预设 = #E74C3C
-    (document.querySelectorAll(".axv-hsv-preset")[2] as HTMLButtonElement).click();
+    (document.querySelectorAll(".cp-preset")[2] as HTMLDivElement).click();
+    await flush();
+    (document.querySelector(".cp-confirm") as HTMLButtonElement).click();
     await flush();
     const valueInput = row.querySelector('input[aria-label="新资源值"]') as HTMLInputElement;
     expect(valueInput.value.toUpperCase()).toBe("#E74C3C");

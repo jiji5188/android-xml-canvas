@@ -45,7 +45,7 @@ const shape = (props: Partial<React.ComponentProps<typeof ShapeEditor>> = {}) =>
 async function openPicker(swatch: HTMLElement) {
   swatch.click();
   await flush();
-  return document.querySelector(".axv-cf-mask .axv-hsv-panel");
+  return document.querySelector(".axv-cp-mask .axv-cp");
 }
 
 describe("M63g 自定义形状：取色按钮换成 ColorField", () => {
@@ -65,15 +65,17 @@ describe("M63g 自定义形状：取色按钮换成 ColorField", () => {
     await mount(shape());
     const sw = document.querySelector(".axv-shape-color .axv-cf-swatch") as HTMLElement;
     await openPicker(sw);
-    expect(document.querySelector(".axv-cf-mask.is-above-modal")).not.toBeNull();
+    expect(document.querySelector(".axv-cp-mask.is-above-page")).not.toBeNull();
   });
 
   it("选预设色 → 写回大写 #RRGGBB（形状规格要 Android 写法）", async () => {
     await mount(shape());
     const sw = document.querySelector(".axv-shape-color .axv-cf-swatch") as HTMLElement;
     await openPicker(sw);
-    const preset = document.querySelector(".axv-hsv-preset") as HTMLElement;
+    const preset = document.querySelector(".cp-preset") as HTMLElement;
     preset.click();
+    await flush();
+    (document.querySelector(".cp-confirm") as HTMLButtonElement).click();
     await flush();
     const text = [...document.querySelectorAll("input")].find((i) =>
       (i as HTMLInputElement).value.startsWith("#"),

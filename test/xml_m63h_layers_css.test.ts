@@ -29,7 +29,7 @@ describe("M63h 层级与底栏样式", () => {
     expect(b).toMatch(/gap:\s*8px/);
   });
 
-  it("取色器蒙版（4000）仍然盖得住这两页", () => {
-    expect(block(".axv-cf-mask {")).toMatch(/z-index:\s*4000/);
+  it("取色器弹层盖得住这两页", () => {
+    expect(block(".axv-cp-mask {")).toMatch(/z-index:\s*5000/);
   });
 });

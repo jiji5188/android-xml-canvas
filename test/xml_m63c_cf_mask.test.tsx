@@ -34,9 +34,9 @@ describe("ColorField 居中弹层", () => {
     await flush();
     await flush();
 
-    const mask = document.querySelector(".axv-cf-mask") as HTMLElement;
+    const mask = document.querySelector(".axv-cp-mask") as HTMLElement;
     expect(mask, "浮层必须包一层蒙版").not.toBeNull();
-    const pop = mask.querySelector(".axv-cf-pop") as HTMLElement;
+    const pop = mask.querySelector(".axv-cp") as HTMLElement;
     expect(pop).not.toBeNull();
 
     // 不能再有内联 left/top（旧版按锚点算坐标）
@@ -45,6 +45,6 @@ describe("ColorField 居中弹层", () => {
     // 蒙版点击（点是它本身）关闭
     mask.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
     await flush();
-    expect(document.querySelector(".axv-cf-mask")).toBeNull();
+    expect(document.querySelector(".axv-cp-mask")).toBeNull();
   });
 });

@@ -51,7 +51,7 @@ describe("M63i 属性面板颜色选择器", () => {
     const sw = document.querySelector(".axv-attr-color .axv-cf-swatch") as HTMLElement;
     sw.click();
     await flush();
-    expect(document.querySelector(".axv-cf-mask .axv-hsv-panel")).not.toBeNull();
+    expect(document.querySelector(".axv-cp-mask .axv-cp")).not.toBeNull();
     root.unmount();
   });
 

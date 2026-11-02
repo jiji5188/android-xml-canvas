@@ -45,8 +45,8 @@ describe("values 资源表取色", () => {
     (document.querySelector(".axv-cf-swatch") as HTMLButtonElement).click();
     await flush();
     await flush();
-    expect(document.querySelector(".axv-cf-mask")).not.toBeNull();
-    expect(document.querySelector(".axv-hsv-panel")).not.toBeNull();
+    expect(document.querySelector(".axv-cp-mask")).not.toBeNull();
+    expect(document.querySelector(".axv-cp")).not.toBeNull();
   });
 
   it("把透明度调到 100% → 写回 #RRGGBB（大写、不带 alpha）", async () => {
@@ -55,11 +55,15 @@ describe("values 资源表取色", () => {
     await flush();
     await flush();
 
-    const alpha = document.querySelector(".axv-hsv-alpha") as HTMLInputElement;
+    const alpha = document.querySelector(".cp-alpha") as HTMLInputElement;
     expect(alpha).not.toBeNull();
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     setter?.call(alpha, "100");
     alpha.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+
+    // 新取色器要「确认选择」才提交
+    (document.querySelector(".cp-confirm") as HTMLButtonElement).click();
     await flush();
 
     expect(onChange).toHaveBeenCalled();

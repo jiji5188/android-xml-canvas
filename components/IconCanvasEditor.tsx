@@ -154,6 +154,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   /** 底部样式抽屉（移植 svg-board）：4 个 tab 子页 + 折叠 */
   const [sheetTab, setSheetTab] = useState<"style" | "align" | "layers" | "res" | "board">("style");
   const [sheetOpen, setSheetOpen] = useState(true);
+  /** M88d：移动端右栏滑面板的开关（桌面端不显示这个按钮） */
+  const [formOpen, setFormOpen] = useState(true);
 
   const undoRef = useRef<Snapshot[]>([]);
   const redoRef = useRef<Snapshot[]>([]);
@@ -1129,8 +1131,19 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           </div>
         </div>
 
-        {/* 右：参数面板（移动端堆在画布下方，不做抽屉） */}
-        <div className="axv-icon-ed-form axv-cv-form">
+        {/* 右：参数面板（移动端是靠右滑出的浮层，左侧带箭头开关） */}
+        <button
+          type="button"
+          className={"axv-cv-form-toggle" + (formOpen ? "" : " is-closed")}
+          onClick={() => setFormOpen((v) => !v)}
+          aria-label={formOpen ? "收起参数面板" : "展开参数面板"}
+          title={formOpen ? "收起参数面板" : "展开参数面板"}
+        >
+          <span className="msr" aria-hidden="true">
+            {formOpen ? "chevron_right" : "chevron_left"}
+          </span>
+        </button>
+        <div className={"axv-icon-ed-form axv-cv-form" + (formOpen ? "" : " is-closed")}>
           {!shapes.length ? (
             <div className="axv-icon-ed-warn">
               <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>info</span>

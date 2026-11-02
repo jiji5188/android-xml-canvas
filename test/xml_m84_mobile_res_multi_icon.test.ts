@@ -19,10 +19,11 @@ describe("M84 移动端资源面板（M86 起改为常规流式，不做抽屉�
     expect(css).not.toContain("axv-cv-res-mask");
   });
 
-  it("CSS：移动端右栏留在常规流（不 absolute、不 translateX）", () => {
+  it("CSS：移动端右栏是靠右悬浮滑面板（75vw / 占满高度 / 不用 translateX 隐藏）", () => {
     const mobile = css.slice(css.indexOf("@media (max-width: 840px)"));
     const formRule = mobile.slice(mobile.indexOf(".axv-cv-body .axv-icon-ed-form.axv-cv-form"));
-    expect(formRule.slice(0, 400)).toContain("position: static");
+    expect(formRule.slice(0, 500)).toContain("position: absolute");
+    expect(formRule.slice(0, 500)).toContain("width: 75vw");
     expect(mobile.slice(0, 900)).not.toContain("transform: translateX(100%)");
   });
 });

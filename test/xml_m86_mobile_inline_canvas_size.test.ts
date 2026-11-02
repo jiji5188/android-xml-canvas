@@ -3,16 +3,18 @@ import { test, expect, describe, it } from "vitest";
 
 const read = (p: string) => fs.readFileSync(`D:/android-xml-canvas/repo/${p}`, "utf8");
 
-describe("M86 移动端右栏不做抽屉", () => {
+describe("M86 移动端右栏不做抽屉（M88c 改为右悬浮滑面板）", () => {
   const src = read("components/IconCanvasEditor.tsx");
   const css = read("components/xml-canvas.css");
 
-  it("移动端右栏为常规流式布局，不隐藏 / 不抽屉", () => {
+  it("移动端右栏为靠右浮层，不整块隐藏", () => {
     expect(src).not.toContain("resOpen");
     expect(css).not.toContain("axv-cv-res-mask");
     expect(css).not.toContain("axv-cv-res-btn");
     expect(css).toMatch(/@media \(max-width: 840px\)\s*\{[\s\S]*?\.axv-cv-body \{[\s\S]*?flex-direction: column/);
-    expect(css).toMatch(/\.axv-cv-body \.axv-icon-ed-form\.axv-cv-form \{[\s\S]*?position: static/);
+    // M88c：右栏改成靠右悬浮滑面板（仍不是「整块隐藏的抽屉」，宽度 75vw）
+    expect(css).toMatch(/\.axv-cv-body \.axv-icon-ed-form\.axv-cv-form \{[\s\S]*?position: absolute/);
+    expect(css).toMatch(/\.axv-cv-body \.axv-icon-ed-form\.axv-cv-form \{[\s\S]*?width: 75vw/);
   });
 
   it("移动端底部样式抽屉默认收起", () => {

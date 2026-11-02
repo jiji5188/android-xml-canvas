@@ -8249,6 +8249,7 @@ button.axv-sb-item:hover {
   overflow: hidden;
 }
 .axv-cv-form { min-height: 0; }
+.axv-cv-form-toggle { display: none; }
 /* align-items 被旧规则压住，改用子项 align-self 拉伸（不依赖容器） */
 .axv-cv-left, .axv-cv-form { align-self: stretch; }
 .axv-cv-page .axv-icon-page-foot {
@@ -8360,24 +8361,25 @@ button.axv-sb-item:hover {
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: 8px;
+  bottom: 0px;
   z-index: 8;
   max-height: 42vh;
   display: flex;
   flex-direction: column;
+  padding-top: 4px;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 14px;
+  border-radius: 14px 14px 0px 0px;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(14px) saturate(1.3);
   box-shadow: 0 -2px 18px rgba(16, 24, 40, 0.12);
   transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.axv-cv-sheet.is-collapsed { transform: translateY(calc(100% - 38px)); }
+.axv-cv-sheet.is-collapsed { transform: translateY(calc(100% - 45px)); }
 
 .axv-cv-sheet-head {
   position: relative;
   flex: 0 0 auto;
-  height: 38px;
+  height: 40px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -8417,7 +8419,7 @@ button.axv-sb-item:hover {
   border-radius: 6px;
   background: transparent;
   color: rgba(0, 0, 0, 0.6);
-  font-size: 11.5px;
+  font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -8443,6 +8445,15 @@ button.axv-sb-item:hover {
   gap: 8px;
   overscroll-behavior: contain;
 }
+/* 收起时本体不占高度，再用 -1px 把底边那 1px 缝隙吃掉（height 不能为负） */
+.axv-cv-sheet.is-collapsed .axv-cv-sheet-body {
+  height: 0;
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: -1px;
+  overflow: hidden;
+}
 .axv-cv-sheet-pane { display: flex; flex-direction: column; gap: 8px; }
 
 /* 抽屉里的 set-group 不再需要外边距/分隔线 */
@@ -8465,26 +8476,64 @@ button.axv-sb-item:hover {
     overscroll-behavior: contain;
   }
   .axv-cv-left { flex: 0 0 auto; min-height: 320px; }
+  /* M88c：右栏改成靠右悬浮的滑面板（占满可用高度，宽度 75vw） */
   .axv-cv-body .axv-icon-ed-form.axv-cv-form {
-    position: static;
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    z-index: 9;
     flex: 0 0 auto;
-    width: auto;
-    max-width: none;
+    width: 75vw;
+    max-width: 75vw;
+    height: 100%;
     max-height: none;
     /* 底部样式抽屉浮在上面，留出空间让最后几行也能滚到可点位置 */
-    padding-bottom: 150px;
-    border-left: none;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 0;
-    box-shadow: none;
+    padding: 10px 12px 150px;
+    border-left: 1px solid rgba(0, 0, 0, 0.10);
+    border-top: none;
+    border-radius: 14px 0 0 14px;
+    background: var(--axv-surface, #fff);
+    box-shadow: -8px 0 26px rgba(16, 24, 40, 0.18);
     transform: none;
-    overflow: visible;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
+  /* 收起：整块滑到视口右侧之外 */
+  .axv-cv-body .axv-icon-ed-form.axv-cv-form.is-closed {
+    transform: translateX(100%);
+    box-shadow: none;
+  }
+  /* 面板左缘的箭头开关：展开时贴着面板左侧，收起后落到视口右缘 */
+  .axv-cv-form-toggle {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    top: 12px;
+    right: 75vw;
+    z-index: 10;
+    width: 26px;
+    height: 52px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    border-right: none;
+    border-radius: 10px 0 0 10px;
+    background: var(--axv-surface, #fff);
+    box-shadow: -2px 0 10px rgba(16, 24, 40, 0.10);
+    color: inherit;
+    cursor: pointer;
+    transition: right 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .axv-cv-form-toggle.is-closed { right: 0; }
+  .axv-cv-form-toggle .msr { font-size: 18px; opacity: 0.7; }
+  .axv-cv-form-toggle:active { transform: scale(0.96); }
 }
 
 @media (max-width: 840px) {
-  .axv-cv-sheet { left: 4px; right: 4px; bottom: 4px; max-height: 46vh; }
-  .axv-cv-sheet-tab { padding: 0 8px; font-size: 11px; }
+  .axv-cv-sheet { left: 4px; right: 4px; bottom: 0px; max-height: 46vh; border-radius: 14px 14px 0px 0px; }
+  .axv-cv-sheet-tab { padding: 0 8px; font-size: 12px; }
   .axv-cv-sheet-title { display: none; }
   .axv-cv-sheet-tabs { margin-left: 0; }
   .axv-cv-body:has(.axv-cv-sheet:not(.is-collapsed)) .axv-cv-stage { padding-bottom: 118px; }

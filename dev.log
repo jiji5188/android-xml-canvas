@@ -617,3 +617,17 @@ Import traces:
  GET /xml/ 200 in 21ms (next.js: 0.4ms, application-code: 20ms)
 ✓ Compiled in 159ms
 ✓ Compiled in 1456ms
+ GET /xml/ 200 in 19ms (next.js: 0.6ms, application-code: 18ms)
+✓ Compiled in 131ms
+✓ Compiled in 1254ms
+✓ Compiled in 191ms
+✓ Compiled in 326ms
+ GET /m88test/?v=510 200 in 83ms (next.js: 5ms, application-code: 78ms)
+ GET /xml/ 200 in 255ms (next.js: 4ms, application-code: 251ms)
+ GET /xml/ 200 in 77ms (next.js: 3ms, application-code: 74ms)
+ GET /m88test/?v=510 200 in 243ms (next.js: 3ms, application-code: 240ms)
+ GET /xml/ 200 in 153ms (next.js: 1.0ms, application-code: 152ms)
+ GET /m88test/?v=600 200 in 26ms (next.js: 0.8ms, application-code: 25ms)
+ GET /m88test/?v=600 404 in 1128ms (next.js: 988ms, application-code: 140ms)
+ GET /xml/ 200 in 143ms (next.js: 101ms, application-code: 41ms)
+ GET /m88test/?v=600 404 in 48ms (next.js: 23ms, application-code: 24ms)

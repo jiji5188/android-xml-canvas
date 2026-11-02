@@ -286,13 +286,16 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     [],
   );
 
+  /** M88o：未选中时的「新图形默认样式」（样式 tab 改的就是它，不再是死值） */
+  const [defStyle, setDefStyle] = useState({ fill: "#1D1B20", stroke: "none", strokeWidth: 0, alpha: 1 });
+
   const styleOf = useCallback(() => {
     const base = selected[0];
     if (base) {
       return { fill: base.fill, stroke: base.stroke, strokeWidth: base.strokeWidth, alpha: base.alpha };
     }
-    return { fill: "#1D1B20", stroke: "none", strokeWidth: 0, alpha: 1 };
-  }, [selected]);
+    return { ...defStyle };
+  }, [selected, defStyle]);
 
   const makeShape = useCallback(
     (t: Tool, p: { x: number; y: number }): DrawShape => {
@@ -617,6 +620,24 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     if (!sel.length) return;
     setShapes((list) => list.map((s) => (sel.includes(s.id) ? ({ ...s, ...p } as DrawShape) : s)));
   };
+
+  /** M88o：样式面板的读写目标——选中时是选中图形，未选中时是「新图形默认样式」 */
+  const styleTarget = {
+    fill: selected[0]?.fill ?? defStyle.fill,
+    stroke: selected[0]?.stroke ?? defStyle.stroke,
+    strokeWidth: selected[0]?.strokeWidth ?? defStyle.strokeWidth,
+    alpha: selected[0]?.alpha ?? defStyle.alpha,
+  };
+  const patchStyle = (patch: Partial<typeof defStyle>) => {
+    if (selected.length) {
+      pushHistory();
+      patchSel(patch);
+      return;
+    }
+    setDefStyle((d) => ({ ...d, ...patch }));
+  };
+  /** 描边粗细滑杆上限：随 viewport 走（24 基准 → 6） */
+  const strokeMax = Math.max(2, Math.round(meta.vw / 4));
 
   const removeSel = () => {
     if (!sel.length) return;
@@ -1307,8 +1328,12 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               <div className="axv-cv-sheet-pane">
             <div className="axv-set-group">
               <div className="axv-set-label">
-                外观
-                {cur ? <span className="axv-cv-hint">· 选中 {sel.length} 个</span> : <span className="axv-cv-hint">· 未选中（改的是下一个新图形）</span>}
+                {cur ? "外观" : "新图形默认样式"}
+                {cur ? (
+                  <span className="axv-cv-hint">· 选中 {sel.length} 个</span>
+                ) : (
+                  <span className="axv-cv-hint">· 未选中：这里改的是下一个新图形的初值</span>
+                )}
               </div>
               {/* 预设色块：有选中 → 只改选中；没选中 → 全部上色 */}
               <div className="axv-cv-presets">
@@ -1318,13 +1343,17 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     type="button"
                     className="axv-cv-preset"
                     style={{ background: c }}
-                    title={sel.length ? `选中图形填 ${c}` : `全部图形填 ${c}`}
+                    title={sel.length ? `选中图形填 ${c}` : `新图形默认填充 ${c}`}
                     onClick={() => {
+                      /* 未选中时预设色改的是「新图形默认样式」，不再偷偷给全部图形上色 */
+                      if (!sel.length) {
+                        setDefStyle((d) => ({ ...d, fill: c, alpha: 1 }));
+                        return;
+                      }
                       pushHistory();
-                      const ids = sel.length ? sel : shapes.map((s) => s.id);
                       setShapes((list) =>
                         list.map((s) =>
-                          ids.includes(s.id)
+                          sel.includes(s.id)
                             ? ({ ...s, fill: c, alpha: 1, ...(s.type === "line" ? { stroke: c } : {}) } as typeof s)
                             : s,
                         ),
@@ -1339,20 +1368,16 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   type="button"
                   className="axv-cv-swatch"
                   style={{
-                    background: isRenderableColor(cur?.fill ?? "#1D1B20") ? toCss(cur?.fill ?? "#1D1B20") : "#fff",
+                    background: isRenderableColor(styleTarget.fill) ? toCss(styleTarget.fill) : "#fff",
                   }}
                   onClick={() => setColorTarget({ kind: "fill" })}
                   title="选择填充色"
                 >
-                  <span className="axv-cv-swatch-val">{toHex6(cur?.fill ?? "#1D1B20")}</span>
+                  <span className="axv-cv-swatch-val">{toHex6(styleTarget.fill)}</span>
                 </button>
                 <button
-                  className={"axv-cv-toggle" + ((cur?.fill ?? "#1D1B20") === "none" ? " on" : "")}
-                  onClick={() => {
-                    if (!sel.length) return;
-                    pushHistory();
-                    patchSel({ fill: cur?.fill === "none" ? "#1D1B20" : "none" });
-                  }}
+                  className={"axv-cv-toggle" + (styleTarget.fill === "none" ? " on" : "")}
+                  onClick={() => patchStyle({ fill: styleTarget.fill === "none" ? "#1D1B20" : "none" })}
                   title="无填充"
                 >
                   无
@@ -1364,26 +1389,34 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   type="button"
                   className="axv-cv-swatch"
                   style={{
-                    background: isRenderableColor(cur?.stroke ?? "none") ? toCss(cur?.stroke ?? "none") : "#fff",
+                    background: isRenderableColor(styleTarget.stroke) ? toCss(styleTarget.stroke) : "#fff",
                   }}
                   onClick={() => setColorTarget({ kind: "stroke" })}
                   title="选择描边色"
                 >
-                  <span className="axv-cv-swatch-val">{cur?.stroke === "none" ? "无" : toHex6(cur?.stroke ?? "#1D1B20")}</span>
+                  <span className="axv-cv-swatch-val">{styleTarget.stroke === "none" ? "无" : toHex6(styleTarget.stroke)}</span>
                 </button>
-                <input
-                  className="axv-cv-num"
-                  type="number"
-                  min={0}
-                  step={0.25}
-                  value={cur?.strokeWidth ?? 0}
-                  onChange={(e) => {
-                    if (!sel.length) return;
-                    patchSel({ strokeWidth: Math.max(0, Number(e.target.value) || 0) });
-                  }}
-                  title="描边宽度（viewport 单位）"
-                />
+                <button
+                  className={"axv-cv-toggle" + (styleTarget.stroke === "none" ? " on" : "")}
+                  onClick={() => patchStyle({ stroke: styleTarget.stroke === "none" ? "#1D1B20" : "none" })}
+                  title="无描边"
+                >
+                  无
+                </button>
               </div>
+              <label className="axv-icon-ed-row">
+                <span title="描边粗细（viewport 单位）">粗细</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={strokeMax}
+                  step={0.05}
+                  value={Math.min(strokeMax, styleTarget.strokeWidth || 0)}
+                  onChange={(e) => patchStyle({ strokeWidth: Math.max(0, Number(e.target.value)) })}
+                  title="描边粗细（viewport 单位，0 = 无）"
+                />
+                <b className="axv-icon-ed-val">{Math.round((styleTarget.strokeWidth || 0) * 100) / 100}</b>
+              </label>
               <label className="axv-icon-ed-row">
                 <span>不透明度</span>
                 <input
@@ -1391,13 +1424,10 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   min={0}
                   max={1}
                   step={0.05}
-                  value={cur?.alpha ?? 1}
-                  onChange={(e) => {
-                    if (!sel.length) return;
-                    patchSel({ alpha: Number(e.target.value) });
-                  }}
+                  value={styleTarget.alpha ?? 1}
+                  onChange={(e) => patchStyle({ alpha: Number(e.target.value) })}
                 />
-                <b className="axv-icon-ed-val">{Math.round((cur?.alpha ?? 1) * 100)}%</b>
+                <b className="axv-icon-ed-val">{Math.round((styleTarget.alpha ?? 1) * 100)}%</b>
               </label>
   
               {/* 形状专属参数 */}
@@ -1974,12 +2004,12 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           }
           value={
             colorTarget.kind === "fill"
-              ? cur?.fill && cur.fill !== "none"
-                ? cur.fill
+              ? styleTarget.fill && styleTarget.fill !== "none"
+                ? styleTarget.fill
                 : "#1D1B20"
               : colorTarget.kind === "stroke"
-                ? cur?.stroke && cur.stroke !== "none"
-                  ? cur.stroke
+                ? styleTarget.stroke && styleTarget.stroke !== "none"
+                  ? styleTarget.stroke
                   : "#1D1B20"
                 : bg || "#ffffff"
           }
@@ -1992,16 +2022,15 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               setColorTarget(null);
               return;
             }
-            if (sel.length) {
-              pushHistory();
+            {
               const rgba = parseColorOr(next, "#1D1B20");
               // 透明度用 s.alpha 表达（填充/描边共用），颜色只存 #RRGGBB，避免 alpha 算两遍
               if (colorTarget.kind === "fill") {
-                patchSel({ fill: toHex6(next), alpha: rgba.a });
+                patchStyle({ fill: toHex6(next), alpha: rgba.a });
               } else {
-                patchSel({
+                patchStyle({
                   stroke: toHex6(next),
-                  strokeWidth: (cur?.strokeWidth ?? 0) > 0 ? cur?.strokeWidth : 1,
+                  strokeWidth: (styleTarget.strokeWidth ?? 0) > 0 ? styleTarget.strokeWidth : 1,
                   alpha: rgba.a,
                 });
               }

@@ -1923,7 +1923,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                         value={Math.round(selGroup.rot)}
                         onChange={(e) => patchGroup(selGroup.id, { rot: Number(e.target.value) })}
                       />
-                      <span className="axv-cv-num">{Math.round(selGroup.rot)}°</span>
+                      <span className="axv-cv-val">{Math.round(selGroup.rot)}°</span>
                     </div>
                     <div className="axv-icon-ed-row">
                       <span>缩放</span>
@@ -1938,7 +1938,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                           patchGroup(selGroup.id, { sx: Number(e.target.value), sy: Number(e.target.value) })
                         }
                       />
-                      <span className="axv-cv-num">{Math.round(selGroup.sx * 100)}%</span>
+                      <span className="axv-cv-val">{Math.round(selGroup.sx * 100)}%</span>
                     </div>
                     <div className="axv-icon-ed-row">
                       <span>平移</span>

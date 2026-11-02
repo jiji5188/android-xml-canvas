@@ -21,6 +21,7 @@
   --axv-danger: #b3261e;
   --axv-ok: #1f7a3d;
   /* M16h：外壳配色 token（主题预设会覆盖这些值，见 lib/xml/theme-presets.ts） */
+
   --axv-app-bg: #F5F4F7;
   --axv-toolbar-bg: #F3F3F9;
   --axv-toolbar-soft: #E9E9F0;
@@ -266,7 +267,6 @@
 
 /* 颜色 swatch 触发 color picker */
 .axv-attr-sw { position: relative; display: inline-block; width: 28px; height: 28px; border-radius: 4px; flex: 0 0 28px; }
-
 
 /* 拖拽中的临时连线（fixed 全屏，坐标 = 视口 px） */
 .axv-constraint-drag {
@@ -1424,7 +1424,6 @@ body.axv-lt-dragging .axv-lt-row {
   border: 1px solid color-mix(in srgb, #F5A524 40%, var(--axv-surface));
   border-radius: 8px;
 }
-
 
 /* ===== 右侧属性面板 ===== */
 
@@ -4326,7 +4325,6 @@ body.axv-lt-dragging .axv-lt-row {
   justify-content: flex-end;
 }
 
-
 /* ===== M11：设置 / 关于面板 ===== */
 .axv-set-group {
   padding: 6px 8px;
@@ -4723,14 +4721,15 @@ body.axv-lt-dragging .axv-lt-row {
   font-size: 12px;
 }
 .axv-icon-ed-two {
+  align-items: center;
   flex: 1 1 auto;
   display: flex;
   gap: 8px;
 }
 /* M11k：尺寸输入框收窄到 30px（用户指定） */
 .axv-icon-ed-two .axv-icon-ed-input {
-  flex: 0 0 50px;
-  width: 50px;
+  flex: 0 0 75px;
+  width: 75px;
   padding: 0 2px;
   text-align: center;
 }
@@ -5097,8 +5096,6 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 .axv-node.axv-seek::after {
   background-color: var(--axv-seek-thumb, #757575);
 }
-
-
 
 /* M11w：圆形 ProgressBar（没有 horizontal 样式）= 转圈环，不是细条 */
 .axv-node.axv-progress-ring {
@@ -7344,7 +7341,6 @@ button.axv-sb-item:hover {
   font-variant-numeric: tabular-nums;
 }
 
-
 /* ===== M62：项目列表筛选框 ===== */
 .axv-proj-filter {
   flex: 0 0 auto;
@@ -7387,7 +7383,6 @@ button.axv-sb-item:hover {
   padding: 0;
 }
 .axv-proj-filter-clear .msr { font-size: 14px; }
-
 
 /* ===== M63：HSV 取色器（替换原生 input[type=color]） ===== */
 .axv-cf-pop {
@@ -7601,7 +7596,6 @@ button.axv-sb-item:hover {
   cursor: pointer;
 }
 
-
 /* M63i：右侧属性面板的颜色属性也用同一套 ColorField → 尺寸对齐旧色块 */
 .axv-attr-color .axv-cf-swatch { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 4px; }
 
@@ -7639,7 +7633,6 @@ button.axv-sb-item:hover {
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 }
 
-
 /* ===== M63d：values 资源表的取色块换成 ColorField（保持 26px 紧凑） ===== */
 .axv-val-row .axv-cf {
   flex: 0 0 auto;
@@ -7650,9 +7643,6 @@ button.axv-sb-item:hover {
   border-radius: 7px;
   border: 1px solid var(--axv-outline);
 }
-
-
-
 
 /* M88：多图标库选择弹窗（移植 svg-board iconModal：Material/Lucide/Tabler/几何/粘贴 SVG） */
 .axv-iconlib {
@@ -8018,7 +8008,6 @@ button.axv-sb-item:hover {
 }
 .axv-icon-ed-cp-inline:hover { background: rgba(255,255,255,0.14); }
 
-
 /* ===== M81：画布式图标编辑器（IconCanvasEditor） ===== */
 .axv-cv-page .axv-shape-head {
   gap: 8px;
@@ -8180,7 +8169,7 @@ button.axv-sb-item:hover {
 .axv-cv-toggle.on { background: #1b6ef3; border-color: #1b6ef3; color: #fff; }
 
 .axv-cv-num {
-  width: 62px;
+  width: 75px;
   height: 26px;
   padding: 0 6px;
   border: 1px solid rgba(0, 0, 0, 0.18);
@@ -8188,7 +8177,16 @@ button.axv-sb-item:hover {
   background: rgba(255, 255, 255, 0.6);
   color: inherit;
   font-size: 12px;
-  text-align: right;
+  text-align: center;
+}
+/* 只读数值（分组变换的 30° / 150%）：和输入框同宽同字号，但不画边框 */
+.axv-cv-val {
+  flex: 0 0 75px;
+  width: 75px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  opacity: 0.8;
 }
 
 .axv-cv-extra {
@@ -8261,14 +8259,7 @@ button.axv-sb-item:hover {
   padding: 8px 10px;
   background: rgba(27, 110, 243, 0.05);
 }
-.axv-cv-num {
-  flex: 0 0 auto;
-  min-width: 42px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-size: 12px;
-  opacity: 0.8;
-}
+/* 旧的分组数值标签规则已并入上面的 .axv-cv-val */
 .axv-cv-layer:hover { background: rgba(0, 0, 0, 0.05); }
 .axv-cv-layer.on { background: rgba(27, 110, 243, 0.12); }
 .axv-cv-layer-dot {
@@ -8333,7 +8324,6 @@ button.axv-sb-item:hover {
   min-width: 0;
   line-height: 1.5;
 }
-
 
 /* ===== M82：图标画布补齐 svg-board 能力 ===== */
 .axv-cv-layer-d {
@@ -8674,3 +8664,14 @@ button.axv-sb-item:hover {
 .axv-cv-layer-grip:active { cursor: grabbing; opacity: 0.8; }
 .axv-cv-layer.is-dragging { opacity: 0.55; }
 .axv-cv-layer.is-drop { outline: 2px dashed #1b6ef3; outline-offset: -2px; }
+
+/* ===== M89c：全局输入框统一样式（边框/底色/focus）
+   只作用于文本类 input，checkbox/radio/range/color/file 保持原生外观 ===== */
+input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"], [type="reset"])) {
+  border: 1px solid var(--axv-line, var(--axv-outline));
+  background: var(--axv-on-primary);
+}
+input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"], [type="reset"])):focus {
+  border: 1px solid var(--axv-primary);
+  outline: none;
+}

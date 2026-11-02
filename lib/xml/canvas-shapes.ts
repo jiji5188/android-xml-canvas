@@ -508,9 +508,16 @@ export type AlignMode =
   | "vdist";
 
 /** 对 shapes 里 id ∈ ids 的图形执行对齐/均分；对齐需 ≥2 个，均分需 ≥3 个。返回新数组。 */
-export function alignShapes(list: DrawShape[], ids: string[], mode: AlignMode): DrawShape[] {
+export function alignShapes(
+  list: DrawShape[],
+  ids: string[],
+  mode: AlignMode,
+  /** 选中单个图形时的对齐基准（通常是画布 0,0,vw,vh） */
+  frame?: { x: number; y: number; w: number; h: number },
+): DrawShape[] {
   const picked = list.filter((s) => ids.includes(s.id));
-  if (picked.length < 2) return list;
+  const single = picked.length === 1 && !!frame;
+  if (picked.length < 2 && !single) return list;
   const arr = [...list];
   const at = (id: string) => arr.findIndex((s) => s.id === id);
 
@@ -540,7 +547,7 @@ export function alignShapes(list: DrawShape[], ids: string[], mode: AlignMode): 
     return arr;
   }
 
-  const box = unionBox(picked);
+  const box = single && frame ? frame : unionBox(picked);
   for (const s of picked) {
     const b = shapeBox(s);
     let dx = 0;

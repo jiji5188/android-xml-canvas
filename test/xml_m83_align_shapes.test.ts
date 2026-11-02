@@ -197,3 +197,44 @@ describe("convertShapesToPaths 转路径", () => {
     expect(out[0].type).toBe("path");
   });
 });
+
+describe("alignShapes 单选按画布对齐（M88k）", () => {
+  const frame = { x: 0, y: 0, w: 24, h: 24 };
+  const base = [rect("a", 5, 6, 4, 4), rect("b", 0, 0)];
+
+  it("未传 frame 时单选仍不动（向后兼容）", () => {
+    expect(alignShapes(base, ["a"], "left")).toBe(base);
+  });
+
+  it("左 / 右 / 水平居中都以画布为基准", () => {
+    const l = byId(alignShapes(base, ["a"], "left", frame), "a");
+    expect(shapeBox(l).x).toBeCloseTo(0, 6);
+
+    const r = byId(alignShapes(base, ["a"], "right", frame), "a");
+    expect(shapeBox(r).x + shapeBox(r).w).toBeCloseTo(24, 6);
+
+    const h = byId(alignShapes(base, ["a"], "hcenter", frame), "a");
+    expect(shapeBox(h).x + shapeBox(h).w / 2).toBeCloseTo(12, 6);
+  });
+
+  it("顶 / 底 / 垂直居中都以画布为基准", () => {
+    const t = byId(alignShapes(base, ["a"], "top", frame), "a");
+    expect(shapeBox(t).y).toBeCloseTo(0, 6);
+
+    const b = byId(alignShapes(base, ["a"], "bottom", frame), "a");
+    expect(shapeBox(b).y + shapeBox(b).h).toBeCloseTo(24, 6);
+
+    const v = byId(alignShapes(base, ["a"], "vcenter", frame), "a");
+    expect(shapeBox(v).y + shapeBox(v).h / 2).toBeCloseTo(12, 6);
+  });
+
+  it("单选 + 均分：不处理", () => {
+    expect(alignShapes(base, ["a"], "hdist", frame)).toBe(base);
+    expect(alignShapes(base, ["a"], "vdist", frame)).toBe(base);
+  });
+
+  it("多选时忽略 frame，仍以选中包围盒为准", () => {
+    const out = alignShapes(base, ["a", "b"], "left", frame);
+    expect(shapeBox(byId(out, "a")).x).toBeCloseTo(0, 6);
+  });
+});

@@ -4918,6 +4918,18 @@ body.axv-lt-dragging .axv-lt-row {
 @media (max-width: 840px), (pointer: coarse) and (max-width: 1024px) {
   .axv-icon-page .axv-icon-back { display: grid; }
   .axv-icon-page .axv-shape-head .axv-shape-title { font-size: 15px; }
+  /* 底部「保存后立即写回…」说明：位置不够就截断，最多 2 行（写在内层，避免被 flex 块化） */
+  .axv-icon-page .axv-icon-page-foot-note {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    line-height: 1.45;
+    text-align: center;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
 }
 .axv-icon-page-body {
   flex: 1 1 auto;
@@ -8143,7 +8155,7 @@ button.axv-sb-item:hover {
   background: transparent;
   color: inherit;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .axv-cv-swatch:hover { border-color: rgba(27, 110, 243, 0.6); }
@@ -8419,7 +8431,7 @@ button.axv-sb-item:hover {
   height: 24px;
   padding: 0 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: 6px 6px 0 0;
   background: transparent;
   color: rgba(0, 0, 0, 0.6);
   font-size: 12px;

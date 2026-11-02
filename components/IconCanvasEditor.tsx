@@ -702,10 +702,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   };
 
   /** 对齐 / 均分（需 ≥2 选中；均分需 ≥3） */
+  /** 对齐：选中 1 个时以画布为基准，≥2 个时以选中包围盒为基准 */
   const alignSel = (mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "hdist" | "vdist") => {
-    if (sel.length < 2) return;
+    if (!sel.length) return;
     pushHistory();
-    setShapes((list) => alignShapes(list, sel, mode));
+    setShapes((list) => alignShapes(list, sel, mode, { x: 0, y: 0, w: meta.vw, h: meta.vh }));
   };
 
   /** 层级：提到最前 / 沉到最后 */
@@ -1496,9 +1497,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               <div className="axv-cv-sheet-pane">
                 <div className="axv-cv-set-label">
                   排列
-                  <span className="axv-cv-hint">· 对齐需选中 ≥2 个，均分需 ≥3 个</span>
+                  <span className="axv-cv-hint">· 选中 1 个按画布对齐，≥2 个互相对齐，均分需 ≥3 个</span>
                 </div>
-                {sel.length >= 2 ? (
+                {sel.length >= 1 ? (
                   <div className="axv-cv-align">
                     {([
                       ["left", "align_horizontal_left", "左对齐"],
@@ -1705,7 +1706,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       </div>
 
       <div className="axv-icon-page-foot">
-        <span>保存后立即写回 drawable/{resName || "…"}.xml，布局里所有引用同步生效。</span>
+        <span>
+          <span className="axv-icon-page-foot-note">保存后立即写回 drawable/{resName || "…"}.xml，布局里所有引用同步生效。</span>
+        </span>
         <span style={{ display: "flex", gap: 8 }}>
           <button className="axv-btn axv-ghost" onClick={close}>
             取消

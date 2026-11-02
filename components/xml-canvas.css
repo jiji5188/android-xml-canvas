@@ -7997,6 +7997,12 @@ button.axv-sb-item:hover {
   opacity: 0.55;
 }
 
+.axv-cv-insert {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.axv-cv-insert-hint { margin: -2px 0 0; }
+
 .axv-cv-swatch {
   display: inline-flex;
   align-items: center;
@@ -8380,16 +8386,13 @@ button.axv-sb-item:hover {
   }
   .axv-cv-res-close:hover { background: rgba(0, 0, 0, 0.06); opacity: 1; }
 
-  .axv-cv-res-btn {
-    display: inline-flex;
-    margin-left: auto;
-    position: sticky;
-    right: 0;
-    background: var(--axv-panel-bg, #fff);
-    border-radius: 8px;
-    box-shadow: -6px 0 8px rgba(255, 255, 255, 0.9);
+  /* M77 那条 .axv-icon-page .axv-shape-head .axv-icon-btn{display:none} 会把标题栏所有图标按钮藏掉，这里按更高权重救回资源按钮 */
+  .axv-icon-page .axv-shape-head .axv-cv-res-btn.axv-icon-btn {
+    display: inline-grid;
+    place-items: center;
   }
-  .axv-cv-res-btn.is-on { background: #1b6ef3; color: #fff; }
+  .axv-cv-res-btn.is-on { background: #1b6ef3; color: #fff; border-radius: 8px; }
+  .axv-cv-res-btn:only-of-type { display: inline-grid; }
 
   .axv-cv-res-mask {
     display: block;

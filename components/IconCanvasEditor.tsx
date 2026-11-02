@@ -823,6 +823,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     `translate(${-meta.group.pivotX} ${-meta.group.pivotY})`;
 
   const cur = selected[0];
+  /** 右侧 pathData 面板：选中里第一个 path 图元（多选时只编辑它） */
+  const pathSel = useMemo(
+    () => (selected.find((s) => s.type === "path") as Extract<DrawShape, { type: "path" }> | undefined) ?? null,
+    [selected],
+  );
   const strokeLen = 1 / Math.max(0.4, zoom);
 
   /* ---------------- 解析失败（普通图片 / 非 vector） ---------------- */
@@ -885,6 +890,15 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           <button className="axv-icon-btn" onClick={redo} title="重做 (Ctrl+Shift+Z)" aria-label="重做">
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>redo</span>
           </button>
+          {/* 移动端：资源面板从右侧滑出（桌面端 CSS 隐藏） */}
+          <button
+            className={"axv-icon-btn axv-cv-res-btn" + (resOpen ? " is-on" : "")}
+            onClick={() => setResOpen((v) => !v)}
+            title="资源与变换"
+            aria-label="资源与变换"
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>tune</span>
+          </button>
         </span>
         <button className="axv-icon-btn axv-cv-close" onClick={close} aria-label="关闭">
           ✕
@@ -935,15 +949,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             </button>
             <button className="axv-cv-tool" onClick={() => setZoom(fitZoom())} title="复位缩放" aria-label="复位缩放">
               <span className="msr" aria-hidden="true">center_focus_strong</span>
-            </button>
-            {/* 移动端：资源面板从右侧滑出（桌面端 CSS 隐藏） */}
-            <button
-              className={"axv-cv-tool axv-cv-res-btn" + (resOpen ? " is-on" : "")}
-              onClick={() => setResOpen((v) => !v)}
-              title="资源与变换"
-              aria-label="资源与变换"
-            >
-              <span className="msr" aria-hidden="true">tune</span>
             </button>
           </div>
 
@@ -1110,7 +1115,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               </button>
             </div>
             <div className="axv-icon-ed-row">
-              <span>多图标</span>
+              <span>插入</span>
               <button
                 className="axv-btn axv-ghost axv-cv-insert"
                 onClick={() => setInserting(true)}
@@ -1119,8 +1124,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
                 插入图标
               </button>
-              <span className="axv-cv-hint">可追加到当前画布</span>
             </div>
+            <div className="axv-cv-hint axv-cv-insert-hint">可把多个图标拼进同一张画布</div>
             <label className="axv-icon-ed-row">
               <span>尺寸（dp）</span>
               <span className="axv-icon-ed-two">
@@ -1142,6 +1147,23 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             </label>
             {err ? <div className="axv-icon-ed-err">{err}</div> : null}
           </div>
+
+          {/* 路径数据（选中 path 图元时直接手改） */}
+          {pathSel ? (
+            <div className="axv-set-group">
+              <div className="axv-set-label">
+                pathData
+                <span className="axv-cv-hint">· 可直接手改</span>
+              </div>
+              <textarea
+                className="axv-icon-ed-pathdata"
+                value={pathSel.d}
+                spellCheck={false}
+                onChange={(e) => patchSel({ d: e.target.value })}
+                placeholder="M12 2 L22 20 H2 Z"
+              />
+            </div>
+          ) : null}
 
           <div className="axv-set-group">
             <div className="axv-set-label">
@@ -1387,19 +1409,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 </div>
               ) : null}
   
-              {/* pathData 直接编辑（path 图元） */}
-              {cur && cur.type === "path" ? (
-                <div className="axv-cv-extra">
-                  <div className="axv-cv-sublabel">pathData（可直接手改）</div>
-                  <textarea
-                    className="axv-icon-ed-pathdata"
-                    value={cur.d}
-                    spellCheck={false}
-                    onChange={(e) => patchSel({ d: e.target.value })}
-                    placeholder="M12 2 L22 20 H2 Z"
-                  />
-                </div>
-              ) : null}
               {cur && cur.type !== "path" && cur.type !== "text" ? (
                 <div className="axv-cv-textnote">
                   <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>info</span>

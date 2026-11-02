@@ -11,11 +11,15 @@ describe("M84 移动端资源面板", () => {
   const src = read("components/IconCanvasEditor.tsx");
   const css = read("components/xml-canvas.css");
 
-  it("有抽屉开关状态与触发按钮", () => {
+  it("有抽屉开关状态与标题栏按钮", () => {
     expect(src).toContain("const [resOpen, setResOpen]");
     expect(src).toContain("axv-cv-res-btn");
     expect(src).toContain("axv-cv-res-mask");
     expect(src).toContain("axv-cv-res-head");
+    // 展开按钮在标题栏右侧，不再放工具栏
+    const head = src.slice(src.indexOf("axv-cv-head-tools"), src.indexOf("axv-cv-body"));
+    expect(head).toContain("axv-cv-res-btn");
+    expect(src).not.toContain('className="axv-cv-tool axv-cv-res-btn"');
   });
 
   it("右栏按 resOpen 加 is-open，并有遮罩层", () => {
@@ -48,6 +52,20 @@ describe("M84 多图标插入", () => {
     expect(body).toContain("Math.min(meta.vw / Math.max(0.001, src.vw)");
     expect(body).toContain("scalePath(copy.d, scale, scale, 0, 0)");
     expect(body).toContain("translateShape(copy, ox, oy)");
+  });
+});
+
+describe("M84 pathData 右栏", () => {
+  const src = read("components/IconCanvasEditor.tsx");
+
+  it("pathData 只在右侧边栏出现，底部样式表不再有", () => {
+    expect(src).toContain("const pathSel = useMemo");
+    const formStart = src.indexOf("axv-cv-form");
+    const sheetStart = src.indexOf("axv-cv-sheet-body");
+    const formPart = src.slice(formStart, sheetStart);
+    const sheetPart = src.slice(sheetStart);
+    expect(formPart).toContain("axv-icon-ed-pathdata");
+    expect(sheetPart).not.toContain("axv-icon-ed-pathdata");
   });
 });
 

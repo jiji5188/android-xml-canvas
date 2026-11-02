@@ -8422,7 +8422,8 @@ button.axv-sb-item:hover {
   opacity: 0.8;
 }
 .axv-cv-sheet-tabs {
-  margin-left: auto;
+  /* M88m：tabs 紧跟标题，chev 独占右侧（不再和 tab 贴在一起） */
+  margin-left: 8px;
   display: flex;
   gap: 2px;
   padding: 2px 2px 0px 2px;
@@ -8455,6 +8456,8 @@ button.axv-sb-item:hover {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
 }
 .axv-cv-sheet-chev {
+  margin-left: auto;
+  flex: 0 0 auto;
   font-size: 18px;
   opacity: 0.55;
   margin-bottom: 6px;

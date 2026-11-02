@@ -198,7 +198,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const dragRef = useRef<
     | null
     | { kind: "draw"; id: string; start: { x: number; y: number } }
-    | { kind: "move"; start: { x: number; y: number }; orig: { id: string; box: Box }[] }
+    | {
+        kind: "move";
+        start: { x: number; y: number };
+        orig: { id: string; box: Box; shape: DrawShape }[];
+      }
     | { kind: "resize"; box0: Box; corner: number; orig: DrawShape[] }
     | { kind: "pen"; pts: { x: number; y: number }[] }
     | { kind: "marquee"; x0: number; y0: number }
@@ -431,9 +435,12 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
         orig: nextSel
           .map((id) => {
             const sh = shapes.find((x) => x.id === id);
-            return sh ? { id, box: shapeBox(sh) } : null;
+            /* 存整份原始图形：每帧都从「原始 + 总位移」重算，避免逐帧增量累积误差/变形 */
+            return sh
+              ? { id, box: shapeBox(sh), shape: JSON.parse(JSON.stringify(sh)) as DrawShape }
+              : null;
           })
-          .filter((x): x is { id: string; box: Box } => !!x),
+          .filter((x): x is { id: string; box: Box; shape: DrawShape } => !!x),
       };
       return;
     }
@@ -501,8 +508,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
         list.map((s) => {
           const o = d.orig.find((x) => x.id === s.id);
           if (!o) return s;
-          const cur = shapeBox(s);
-          return translateShape(s, o.box.x + dx - cur.x, o.box.y + dy - cur.y);
+          /* 永远以原始图形为基准平移，形状本身绝不会被拉伸 */
+          return translateShape(JSON.parse(JSON.stringify(o.shape)) as DrawShape, dx, dy);
         }),
       );
       return;
@@ -727,27 +734,42 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   };
 
   /* ---------------- M88l：属性面板（位置 / 大小 / 旋转微调） ---------------- */
-  /** 把选中图形整体搬到目标包围盒（也可用于改大小） */
-  const setSelBox = (patch: Partial<Box>) => {
-    if (!sel.length || !selBox) return;
-    const to: Box = {
-      x: patch.x ?? selBox.x,
-      y: patch.y ?? selBox.y,
-      w: Math.max(0.2, patch.w ?? selBox.w),
-      h: Math.max(0.2, patch.h ?? selBox.h),
-    };
-    if (to.x === selBox.x && to.y === selBox.y && to.w === selBox.w && to.h === selBox.h) return;
+  /** 选中图层的旋转角（多选时以第一个为准显示） */
+  const selRot = selected[0]?.rot ?? 0;
+
+  /** 整体平移选中图形：用 translate，不碰几何尺寸 → 永远不会变形 */
+  const nudgeSel = (dx: number, dy: number) => {
+    if (!sel.length || (!dx && !dy)) return;
     pushHistory();
-    const from = { ...selBox };
     setShapes((list) =>
       list.map((s) =>
-        sel.includes(s.id) ? scaleShape(JSON.parse(JSON.stringify(s)) as DrawShape, from, to) : s,
+        sel.includes(s.id)
+          ? translateShape(JSON.parse(JSON.stringify(s)) as DrawShape, dx, dy)
+          : s,
       ),
     );
   };
 
-  /** 选中图层的旋转角（多选时以第一个为准显示） */
-  const selRot = selected[0]?.rot ?? 0;
+  /** 整体缩放到目标包围盒（只在提交时调用一次） */
+  const resizeSelTo = (to: Box) => {
+    if (!sel.length || !selBox) return;
+    const from = { ...selBox };
+    const box: Box = {
+      x: to.x,
+      y: to.y,
+      w: Math.max(0.2, to.w),
+      h: Math.max(0.2, to.h),
+    };
+    if (box.w === from.w && box.h === from.h && box.x === from.x && box.y === from.y) return;
+    pushHistory();
+    setShapes((list) =>
+      list.map((s) =>
+        sel.includes(s.id)
+          ? scaleShape(JSON.parse(JSON.stringify(s)) as DrawShape, from, box)
+          : s,
+      ),
+    );
+  };
 
   const setSelRot = (deg: number) => {
     if (!sel.length) return;
@@ -757,6 +779,52 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   };
 
   const nudgeRot = (step: number) => setSelRot((selRot || 0) + step);
+
+  /* 输入框先写草稿，回车/失焦才真正生效：
+     否则边打字边缩放（输入 "12" 时先变成 1）会把图形反复压扁拉长 → 看起来「变形」 */
+  type PropDraft = { x: string; y: string; w: string; h: string; rot: string };
+  const [propDraft, setPropDraft] = useState<PropDraft | null>(null);
+  const [lockAspect, setLockAspect] = useState(true);
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+
+  useEffect(() => {
+    if (!selBox) {
+      setPropDraft(null);
+      return;
+    }
+    setPropDraft({
+      x: String(r2(selBox.x)),
+      y: String(r2(selBox.y)),
+      w: String(r2(selBox.w)),
+      h: String(r2(selBox.h)),
+      rot: String(r2(selRot)),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel.length, selBox?.x, selBox?.y, selBox?.w, selBox?.h, selRot]);
+
+  const commitProp = (key: keyof PropDraft) => {
+    if (!propDraft || !selBox || !sel.length) return;
+    const n = Number(propDraft[key]);
+    if (!Number.isFinite(n)) {
+      setPropDraft({ ...propDraft });
+      return;
+    }
+    if (key === "x") {
+      nudgeSel(n - selBox.x, 0);
+    } else if (key === "y") {
+      nudgeSel(0, n - selBox.y);
+    } else if (key === "w") {
+      const w = Math.max(0.2, n);
+      const h = lockAspect && selBox.w > 0 ? Math.max(0.2, (selBox.h * w) / selBox.w) : selBox.h;
+      resizeSelTo({ ...selBox, w, h });
+    } else if (key === "h") {
+      const h = Math.max(0.2, n);
+      const w = lockAspect && selBox.h > 0 ? Math.max(0.2, (selBox.w * h) / selBox.h) : selBox.w;
+      resizeSelTo({ ...selBox, w, h });
+    } else if (key === "rot") {
+      setSelRot(n);
+    }
+  };
 
   /** 层级：提到最前 / 沉到最后 */
   const moveSel = (dir: "front" | "back") => {
@@ -1564,17 +1632,21 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                             className="axv-icon-ed-input"
                             type="number"
                             step={0.5}
-                            value={Math.round(selBox.x * 100) / 100}
+                            value={propDraft?.x ?? ""}
                             title="X"
-                            onChange={(e) => setSelBox({ x: Number(e.target.value) })}
+                            onChange={(e) => setPropDraft((d) => (d ? { ...d, x: e.target.value } : d))}
+                            onBlur={() => commitProp("x")}
+                            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                           />
                           <input
                             className="axv-icon-ed-input"
                             type="number"
                             step={0.5}
-                            value={Math.round(selBox.y * 100) / 100}
+                            value={propDraft?.y ?? ""}
                             title="Y"
-                            onChange={(e) => setSelBox({ y: Number(e.target.value) })}
+                            onChange={(e) => setPropDraft((d) => (d ? { ...d, y: e.target.value } : d))}
+                            onBlur={() => commitProp("y")}
+                            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                           />
                         </span>
                       </div>
@@ -1586,20 +1658,35 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                             type="number"
                             step={0.5}
                             min={0.2}
-                            value={Math.round(selBox.w * 100) / 100}
+                            value={propDraft?.w ?? ""}
                             title="宽"
-                            onChange={(e) => setSelBox({ w: Number(e.target.value) })}
+                            onChange={(e) => setPropDraft((d) => (d ? { ...d, w: e.target.value } : d))}
+                            onBlur={() => commitProp("w")}
+                            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                           />
                           <input
                             className="axv-icon-ed-input"
                             type="number"
                             step={0.5}
                             min={0.2}
-                            value={Math.round(selBox.h * 100) / 100}
+                            value={propDraft?.h ?? ""}
                             title="高"
-                            onChange={(e) => setSelBox({ h: Number(e.target.value) })}
+                            onChange={(e) => setPropDraft((d) => (d ? { ...d, h: e.target.value } : d))}
+                            onBlur={() => commitProp("h")}
+                            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                           />
                         </span>
+                      </div>
+                      <div className="axv-icon-ed-row">
+                        <span>比例</span>
+                        <label className="axv-cv-chk">
+                          <input
+                            type="checkbox"
+                            checked={lockAspect}
+                            onChange={(e) => setLockAspect(e.target.checked)}
+                          />
+                          锁定宽高比（取消后会拉伸）
+                        </label>
                       </div>
                       <div className="axv-icon-ed-row">
                         <span>旋转</span>
@@ -1616,9 +1703,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                             className="axv-icon-ed-input"
                             type="number"
                             step={1}
-                            value={Math.round(selRot * 10) / 10}
+                            value={propDraft?.rot ?? ""}
                             title="旋转角度（度）"
-                            onChange={(e) => setSelRot(Number(e.target.value))}
+                            onChange={(e) => setPropDraft((d) => (d ? { ...d, rot: e.target.value } : d))}
+                            onBlur={() => commitProp("rot")}
+                            onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
                           />
                           <button
                             className="axv-cv-mini"

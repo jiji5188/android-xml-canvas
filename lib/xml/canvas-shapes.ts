@@ -368,9 +368,9 @@ export function pathBox(d: string): Box {
   return { x: x0, y: y0, w: Math.max(0.001, x1 - x0), h: Math.max(0.001, y1 - y0) };
 }
 
-/** pathData → 采样点（曲线按控制点/端点粗略取，用于包围盒与命中） */
+/** pathData → 采样点（直线取端点，曲线/圆弧按真实几何采样，用于包围盒与命中） */
 export function pathPoints(d: string): { x: number; y: number }[] {
-  const toks = d.match(/[a-zA-Z]|-?\d*\.?\d+(?:e[-+]?\d+)?/g);
+  const toks = d.match(/[a-zA-Z]|-?\d*\.?\d+(?:e[-+]\d+)?/g);
   if (!toks) return [];
   const out: { x: number; y: number }[] = [];
   let i = 0;
@@ -380,6 +380,86 @@ export function pathPoints(d: string): { x: number; y: number }[] {
   let sy = 0;
   let cmd = "M";
   const num = () => parseFloat(toks[i++]);
+  /** 三次贝塞尔采样（t=0..1，12 段足够精确） */
+  const cubic = (x0: number, y0: number, x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) => {
+    for (let k = 1; k <= 12; k++) {
+      const t = k / 12;
+      const u = 1 - t;
+      out.push({
+        x: u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+        y: u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3,
+      });
+    }
+  };
+  /** 二次贝塞尔采样 */
+  const quad = (x0: number, y0: number, x1: number, y1: number, x2: number, y2: number) => {
+    for (let k = 1; k <= 10; k++) {
+      const t = k / 10;
+      const u = 1 - t;
+      out.push({ x: u * u * x0 + 2 * u * t * x1 + t * t * x2, y: u * u * y0 + 2 * u * t * y1 + t * t * y2 });
+    }
+  };
+  /** SVG 端点式圆弧 → 采样点（含椭圆旋转） */
+  const arc = (
+    x0: number,
+    y0: number,
+    rxIn: number,
+    ryIn: number,
+    phiDeg: number,
+    laf: number,
+    sf: number,
+    x1: number,
+    y1: number,
+  ) => {
+    let rx = Math.abs(rxIn);
+    let ry = Math.abs(ryIn);
+    if (!rx || !ry || (x0 === x1 && y0 === y1)) {
+      out.push({ x: x1, y: y1 });
+      return;
+    }
+    const phi = ((phiDeg % 360) * Math.PI) / 180;
+    const cos = Math.cos(phi);
+    const sin = Math.sin(phi);
+    const dx2 = (x0 - x1) / 2;
+    const dy2 = (y0 - y1) / 2;
+    const x1p = cos * dx2 + sin * dy2;
+    const y1p = -sin * dx2 + cos * dy2;
+    const lam = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+    if (lam > 1) {
+      const k = Math.sqrt(lam);
+      rx *= k;
+      ry *= k;
+    }
+    const num2 = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p;
+    const den2 = rx * rx * y1p * y1p + ry * ry * x1p * x1p;
+    const co = (laf !== sf ? 1 : -1) * Math.sqrt(Math.max(0, den2 === 0 ? 0 : num2 / den2));
+    const cxp = (co * rx * y1p) / ry;
+    const cyp = (-co * ry * x1p) / rx;
+    const ccx = cos * cxp - sin * cyp + (x0 + x1) / 2;
+    const ccy = sin * cxp + cos * cyp + (y0 + y1) / 2;
+    const angle = (ux: number, uy: number, vx: number, vy: number) => {
+      const dot = ux * vx + uy * vy;
+      const len = Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1;
+      const a = Math.acos(Math.min(1, Math.max(-1, dot / len)));
+      return ux * vy - uy * vx < 0 ? -a : a;
+    };
+    const ux = (x1p - cxp) / rx;
+    const uy = (y1p - cyp) / ry;
+    const vx = (-x1p - cxp) / rx;
+    const vy = (-y1p - cyp) / ry;
+    const t1 = angle(1, 0, ux, uy);
+    let dt = angle(ux, uy, vx, vy);
+    if (!sf && dt > 0) dt -= 2 * Math.PI;
+    if (sf && dt < 0) dt += 2 * Math.PI;
+    const N = 24;
+    for (let k = 1; k <= N; k++) {
+      const t = t1 + (dt * k) / N;
+      out.push({
+        x: ccx + rx * Math.cos(t) * cos - ry * Math.sin(t) * sin,
+        y: ccy + rx * Math.cos(t) * sin + ry * Math.sin(t) * cos,
+      });
+    }
+  };
   while (i < toks.length) {
     if (/[a-zA-Z]/.test(toks[i])) {
       cmd = toks[i++];
@@ -418,31 +498,41 @@ export function pathPoints(d: string): { x: number; y: number }[] {
       const y2 = num();
       const x = num();
       const y = num();
-      out.push({ x: rel ? cx + x1 : x1, y: rel ? cy + y1 : y1 });
-      out.push({ x: rel ? cx + x2 : x2, y: rel ? cy + y2 : y2 });
-      cx = rel ? cx + x : x;
-      cy = rel ? cy + y : y;
-      out.push({ x: cx, y: cy });
+      const ax1 = rel ? cx + x1 : x1;
+      const ay1 = rel ? cy + y1 : y1;
+      const ax2 = rel ? cx + x2 : x2;
+      const ay2 = rel ? cy + y2 : y2;
+      const ax3 = rel ? cx + x : x;
+      const ay3 = rel ? cy + y : y;
+      cubic(cx, cy, ax1, ay1, ax2, ay2, ax3, ay3);
+      cx = ax3;
+      cy = ay3;
     } else if (C === "S" || C === "Q") {
       const x1 = num();
       const y1 = num();
       const x = num();
       const y = num();
-      out.push({ x: rel ? cx + x1 : x1, y: rel ? cy + y1 : y1 });
-      cx = rel ? cx + x : x;
-      cy = rel ? cy + y : y;
-      out.push({ x: cx, y: cy });
+      const ax1 = rel ? cx + x1 : x1;
+      const ay1 = rel ? cy + y1 : y1;
+      const ax3 = rel ? cx + x : x;
+      const ay3 = rel ? cy + y : y;
+      if (C === "Q") quad(cx, cy, ax1, ay1, ax3, ay3);
+      else cubic(cx, cy, cx, cy, ax1, ay1, ax3, ay3);
+      cx = ax3;
+      cy = ay3;
     } else if (C === "A") {
-      num();
-      num();
-      num();
-      num();
-      num();
+      const rx = num();
+      const ry = num();
+      const rot = num();
+      const laf = num();
+      const sf = num();
       const x = num();
       const y = num();
-      cx = rel ? cx + x : x;
-      cy = rel ? cy + y : y;
-      out.push({ x: cx, y: cy });
+      const ax = rel ? cx + x : x;
+      const ay = rel ? cy + y : y;
+      arc(cx, cy, rx, ry, rot, laf ? 1 : 0, sf ? 1 : 0, ax, ay);
+      cx = ax;
+      cy = ay;
     } else {
       i++;
     }

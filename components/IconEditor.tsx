@@ -73,9 +73,6 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
             <span className="msr" aria-hidden="true">arrow_back</span>
           </button>
           <span className="axv-shape-title">编辑图标 · {name}</span>
-          <button className="axv-icon-btn" onClick={close} aria-label="关闭">
-            ✕
-          </button>
         </div>
         <div className="axv-icon-page-body">
           <div className="axv-icon-ed-form">
@@ -165,9 +162,6 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
           <span className="msr" aria-hidden="true">arrow_back</span>
         </button>
         <span className="axv-shape-title">编辑图标 · {name}</span>
-        <button className="axv-icon-btn" onClick={close} aria-label="关闭">
-          ✕
-        </button>
       </div>
 
       <div className="axv-icon-page-body">

@@ -353,3 +353,26 @@ Import traces:
  GET /cvtest/?v=46 404 in 2.8s (next.js: 2.7s, application-code: 101ms)
  GET /cvtest/?v=46 404 in 77ms (next.js: 8ms, application-code: 69ms)
  GET /m88test/?v=1 404 in 49ms (next.js: 10ms, application-code: 40ms)
+ GET /m88test/?v=1 404 in 3.8s (next.js: 3.7s, application-code: 85ms)
+ GET /xml/ 200 in 92ms (next.js: 1.3ms, application-code: 91ms)
+ GET /xml/ 200 in 33ms (next.js: 0.5ms, application-code: 33ms)
+✓ Compiled in 7.9s
+✓ Compiled in 200ms
+ GET /xml/ 200 in 103ms (next.js: 1.4ms, application-code: 102ms)
+ GET /xml/ 200 in 108ms (next.js: 78ms, application-code: 30ms)
+ GET /xml/ 200 in 33ms (next.js: 2ms, application-code: 31ms)
+ GET /m88test/?v=9 200 in 103ms (next.js: 20ms, application-code: 83ms)
+[browser] Received NaN for the `y` attribute. If this is expected, cast the value to a string. 
+[browser] Received NaN for the `height` attribute. If this is expected, cast the value to a string. 
+[browser] Received NaN for the `cy` attribute. If this is expected, cast the value to a string. 
+✓ Compiled in 250ms
+ GET /m88test/?v=10 200 in 125ms (next.js: 0.9ms, application-code: 124ms)
+ GET /xml/ 200 in 276ms (next.js: 1.9ms, application-code: 274ms)
+ GET /m88test/?v=10 404 in 819ms (next.js: 561ms, application-code: 258ms)
+ GET /xml/ 200 in 284ms (next.js: 183ms, application-code: 101ms)
+ GET /xml/ 200 in 238ms (next.js: 12ms, application-code: 226ms)
+ GET /m88test/?v=10 404 in 243ms (next.js: 63ms, application-code: 180ms)
+ GET /m88test/?v=10 404 in 34ms (next.js: 8ms, application-code: 27ms)
+ GET /m88test/?v=10 404 in 36ms (next.js: 6ms, application-code: 30ms)
+ GET /m88test/?v=10 404 in 30ms (next.js: 7ms, application-code: 23ms)
+ GET /m88test/?v=10 404 in 34ms (next.js: 9ms, application-code: 25ms)

@@ -4889,11 +4889,11 @@ body.axv-lt-dragging .axv-lt-row {
   flex-direction: column;
   background: var(--axv-surface-sunken, var(--axv-surface-head));
 }
-/* M77：返回按钮只在移动端出现（左上），桌面端用右上 ✕ —— 与 svg-board 的方块按钮同款 */
+/* M88：返回按钮桌面端 + 移动端都显示（左上），不再有右上 ✕ —— 与 svg-board 的方块按钮同款 */
 .axv-icon-back {
   position: relative;
   flex: none;
-  display: none;
+  display: grid;
   width: 36px;
   height: 36px;
   place-items: center;
@@ -4914,9 +4914,10 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-icon-back:hover { background: #ffffff54; }
 .axv-icon-back:active { transform: scale(0.94); }
 .axv-icon-back .msr { font-size: 22px; }
+/* 移动端：头部只留返回按钮 + 标题，撤销/重做仍在（工具条里也有） */
 @media (max-width: 840px), (pointer: coarse) and (max-width: 1024px) {
   .axv-icon-page .axv-icon-back { display: grid; }
-  .axv-icon-page .axv-shape-head .axv-icon-btn { display: none; }
+  .axv-icon-page .axv-shape-head .axv-shape-title { font-size: 15px; }
 }
 .axv-icon-page-body {
   flex: 1 1 auto;
@@ -8017,7 +8018,6 @@ button.axv-sb-item:hover {
   margin-left: auto;
   margin-right: 4px;
 }
-.axv-cv-close { margin-left: 0 !important; }
 
 .axv-cv-body {
   display: flex;

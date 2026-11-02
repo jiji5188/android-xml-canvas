@@ -914,9 +914,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             <span className="msr" aria-hidden="true">arrow_back</span>
           </button>
           <span className="axv-shape-title">编辑图标 · {name}</span>
-          <button className="axv-icon-btn" onClick={close} aria-label="关闭">
-            ✕
-          </button>
         </div>
         <div className="axv-icon-page-body">
           <div className="axv-icon-ed-form">
@@ -962,9 +959,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>redo</span>
           </button>
         </span>
-        <button className="axv-icon-btn axv-cv-close" onClick={close} aria-label="关闭">
-          ✕
-        </button>
       </div>
 
       <div className="axv-icon-page-body axv-cv-body">

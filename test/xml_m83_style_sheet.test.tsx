@@ -33,12 +33,13 @@ describe("M83 底部样式抽屉", () => {
     await mount();
   });
 
-  it("抽屉默认展开，四个 tab 齐全", () => {
+  it("抽屉默认展开，六个 tab 齐全", () => {
     const sheet = document.querySelector(".axv-cv-sheet");
     expect(sheet).not.toBeNull();
     expect(sheet!.classList.contains("is-collapsed")).toBe(false);
     expect([...document.querySelectorAll(".axv-cv-sheet-tab")].map((b) => b.textContent?.trim())).toEqual([
       "样式",
+      "属性",
       "排列",
       "图层",
       "资源",

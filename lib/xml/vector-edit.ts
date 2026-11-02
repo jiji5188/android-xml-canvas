@@ -12,6 +12,10 @@ export interface VectorPath {
   strokeWidth?: number;
   /** 描边不透明度 0~1（M81：画布编辑器用；旧数据没有则视为 1） */
   strokeAlpha?: number;
+  /** 单条 path 的旋转（度）与其旋转中心；M88l：非 0 时导出为独立 <group> */
+  rotation?: number;
+  pivotX?: number;
+  pivotY?: number;
 }
 
 export interface VectorGroup {
@@ -118,13 +122,26 @@ export function buildVectorXml(m: VectorModel, name = "ic_icon"): string {
   }
   const pad = withGroup ? "        " : "    ";
   for (const p of m.paths) {
-    lines.push(`${pad}<path`);
-    lines.push(`${pad}    android:fillColor="${p.fill}"`);
-    if (p.alpha != null && p.alpha !== 1) lines.push(`${pad}    android:fillAlpha="${round(p.alpha)}"`);
-    if (p.stroke) lines.push(`${pad}    android:strokeColor="${p.stroke}"`);
-    if (p.strokeWidth != null) lines.push(`${pad}    android:strokeWidth="${round(p.strokeWidth)}"`);
-    if (p.strokeAlpha != null && p.strokeAlpha !== 1) lines.push(`${pad}    android:strokeAlpha="${round(p.strokeAlpha)}"`);
-    lines.push(`${pad}    android:pathData="${p.d}"/>`);
+    /* M88l：单条 path 自己带旋转 → 再包一层 <group> */
+    const rotated = p.rotation != null && Math.abs(p.rotation) > 0.001;
+    const q = rotated ? pad + "    " : pad;
+    if (rotated) {
+      const attrs = [`android:rotation="${round(p.rotation!)}"`];
+      if (p.pivotX != null) attrs.push(`android:pivotX="${round(p.pivotX)}"`);
+      if (p.pivotY != null) attrs.push(`android:pivotY="${round(p.pivotY)}"`);
+      lines.push(`${pad}<group`);
+      attrs.forEach((a, i) => {
+        lines.push(`${pad}    ${a}${i === attrs.length - 1 ? ">" : ""}`);
+      });
+    }
+    lines.push(`${q}<path`);
+    lines.push(`${q}    android:fillColor="${p.fill}"`);
+    if (p.alpha != null && p.alpha !== 1) lines.push(`${q}    android:fillAlpha="${round(p.alpha)}"`);
+    if (p.stroke) lines.push(`${q}    android:strokeColor="${p.stroke}"`);
+    if (p.strokeWidth != null) lines.push(`${q}    android:strokeWidth="${round(p.strokeWidth)}"`);
+    if (p.strokeAlpha != null && p.strokeAlpha !== 1) lines.push(`${q}    android:strokeAlpha="${round(p.strokeAlpha)}"`);
+    lines.push(`${q}    android:pathData="${p.d}"/>`);
+    if (rotated) lines.push(`${pad}</group>`);
   }
   if (withGroup) lines.push(`    </group>`);
   lines.push(`</vector>`);

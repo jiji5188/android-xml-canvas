@@ -92,6 +92,14 @@ const BLANK: Snapshot = {
 
 type Snapshot = { meta: CanvasMeta; shapes: DrawShape[] };
 
+/** M88l：图层的旋转 transform（绕自身包围盒中心） */
+function shapeRot(s: DrawShape): string | undefined {
+  if (!s.rot || Math.abs(s.rot) < 0.001) return undefined;
+  const b = shapeBox(s);
+  const n = (v: number) => Math.round(v * 100) / 100;
+  return `rotate(${n(s.rot)} ${n(b.x + b.w / 2)} ${n(b.y + b.h / 2)})`;
+}
+
 /** 选中框四角（左上、右上、右下、左下） */
 function handlePositions(b: Box) {
   return [
@@ -152,7 +160,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [showGrid, setShowGrid] = useState(true);
   const [bg, setBg] = useState("");
   /** 底部样式抽屉（移植 svg-board）：4 个 tab 子页 + 折叠 */
-  const [sheetTab, setSheetTab] = useState<"style" | "align" | "layers" | "res" | "board">("style");
+  const [sheetTab, setSheetTab] = useState<"style" | "props" | "align" | "layers" | "res" | "board">("style");
   const [sheetOpen, setSheetOpen] = useState(true);
   /** M88d：移动端右栏滑面板的开关（桌面端不显示这个按钮） */
   const [formOpen, setFormOpen] = useState(true);
@@ -242,9 +250,16 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     return { x: pt.x, y: pt.y };
   }, []);
 
+  /** 1 viewport 单位 = 多少屏幕像素（getScreenCTM 的真实缩放） */
+  const pxPerUnit = useCallback(() => {
+    const m = gRef.current?.getScreenCTM?.();
+    const a = m ? Math.hypot(m.a, m.b) : 0;
+    return a > 0.01 ? a : 1;
+  }, []);
+
   const hitTest = useCallback(
     (p: { x: number; y: number }): DrawShape | null => {
-      const pad = 1.5 / Math.max(0.4, zoom);
+      const pad = 3 / pxPerUnit();
       for (let i = shapes.length - 1; i >= 0; i--) {
         const s = shapes[i];
         if (s.hidden || s.locked) continue;
@@ -255,7 +270,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       }
       return null;
     },
-    [shapes, zoom],
+    [shapes, pxPerUnit],
   );
 
   /* ---------------- 新建图元 ---------------- */
@@ -382,7 +397,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     // 先判选中框的角手柄
     if (selBox && selected.length) {
       const hs = handlePositions(selBox);
-      const tol = 3 / Math.max(0.4, zoom);
+      /* 真·屏幕像素容差：鼠标 8px / 触摸 18px（原来按 zoom 折算，图标上角点会放大到 ~30px，
+         鼠标一按在图形边缘就被判成拉伸手柄 → 拖动时图形被拉变形） */
+      const tol = (e.pointerType === "touch" ? 18 : 8) / pxPerUnit();
       for (let i = 0; i < hs.length; i++) {
         if (Math.hypot(p.x - hs[i].x, p.y - hs[i].y) <= tol) {
           pushHistory();
@@ -709,6 +726,38 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     setShapes((list) => alignShapes(list, sel, mode, { x: 0, y: 0, w: meta.vw, h: meta.vh }));
   };
 
+  /* ---------------- M88l：属性面板（位置 / 大小 / 旋转微调） ---------------- */
+  /** 把选中图形整体搬到目标包围盒（也可用于改大小） */
+  const setSelBox = (patch: Partial<Box>) => {
+    if (!sel.length || !selBox) return;
+    const to: Box = {
+      x: patch.x ?? selBox.x,
+      y: patch.y ?? selBox.y,
+      w: Math.max(0.2, patch.w ?? selBox.w),
+      h: Math.max(0.2, patch.h ?? selBox.h),
+    };
+    if (to.x === selBox.x && to.y === selBox.y && to.w === selBox.w && to.h === selBox.h) return;
+    pushHistory();
+    const from = { ...selBox };
+    setShapes((list) =>
+      list.map((s) =>
+        sel.includes(s.id) ? scaleShape(JSON.parse(JSON.stringify(s)) as DrawShape, from, to) : s,
+      ),
+    );
+  };
+
+  /** 选中图层的旋转角（多选时以第一个为准显示） */
+  const selRot = selected[0]?.rot ?? 0;
+
+  const setSelRot = (deg: number) => {
+    if (!sel.length) return;
+    const v = Math.max(-180, Math.min(180, Math.round(deg * 10) / 10));
+    pushHistory();
+    setShapes((list) => list.map((s) => (sel.includes(s.id) ? { ...s, rot: v } : s)));
+  };
+
+  const nudgeRot = (step: number) => setSelRot((selRot || 0) + step);
+
   /** 层级：提到最前 / 沉到最后 */
   const moveSel = (dir: "front" | "back") => {
     if (!sel.length) return;
@@ -1027,6 +1076,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                         strokeLinejoin="round"
                         paintOrder="stroke"
                         opacity={s.hidden ? 0.25 : 1}
+                        transform={shapeRot(s)}
                         style={{ pointerEvents: "none", userSelect: "none" }}
                       >
                         {s.text}
@@ -1043,6 +1093,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         opacity={s.hidden ? 0.25 : 1}
+                        transform={shapeRot(s)}
                         style={{ pointerEvents: "none" }}
                       />
                     ),
@@ -1168,7 +1219,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             <span className="axv-cv-grabber" aria-hidden="true" />
             <span className="axv-cv-sheet-title">样式</span>
             <div className="axv-cv-sheet-tabs" onClick={(e) => e.stopPropagation()}>
-              {([["style", "样式"], ["align", "排列"], ["layers", "图层"], ["res", "资源"], ["board", "画布"]] as const).map(([k, label]) => (
+              {([["style", "样式"], ["props", "属性"], ["align", "排列"], ["layers", "图层"], ["res", "资源"], ["board", "画布"]] as const).map(([k, label]) => (
                 <button
                   key={k}
                   className={"axv-cv-sheet-tab" + (sheetTab === k ? " on" : "")}
@@ -1491,6 +1542,106 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 </label>
               </div>
             </div>
+              </div>
+            ) : null}
+            {sheetTab === "props" ? (
+              <div className="axv-cv-sheet-pane">
+                <div className="axv-set-group">
+                  <div className="axv-set-label">
+                    图层属性
+                    {cur && selBox ? (
+                      <span className="axv-cv-hint">· 选中 {sel.length} 个，单位 viewport</span>
+                    ) : (
+                      <span className="axv-cv-hint">· 先在画布或图层页选一个图形</span>
+                    )}
+                  </div>
+                  {cur && selBox ? (
+                    <>
+                      <div className="axv-icon-ed-row">
+                        <span>位置</span>
+                        <span className="axv-icon-ed-two">
+                          <input
+                            className="axv-icon-ed-input"
+                            type="number"
+                            step={0.5}
+                            value={Math.round(selBox.x * 100) / 100}
+                            title="X"
+                            onChange={(e) => setSelBox({ x: Number(e.target.value) })}
+                          />
+                          <input
+                            className="axv-icon-ed-input"
+                            type="number"
+                            step={0.5}
+                            value={Math.round(selBox.y * 100) / 100}
+                            title="Y"
+                            onChange={(e) => setSelBox({ y: Number(e.target.value) })}
+                          />
+                        </span>
+                      </div>
+                      <div className="axv-icon-ed-row">
+                        <span>大小</span>
+                        <span className="axv-icon-ed-two">
+                          <input
+                            className="axv-icon-ed-input"
+                            type="number"
+                            step={0.5}
+                            min={0.2}
+                            value={Math.round(selBox.w * 100) / 100}
+                            title="宽"
+                            onChange={(e) => setSelBox({ w: Number(e.target.value) })}
+                          />
+                          <input
+                            className="axv-icon-ed-input"
+                            type="number"
+                            step={0.5}
+                            min={0.2}
+                            value={Math.round(selBox.h * 100) / 100}
+                            title="高"
+                            onChange={(e) => setSelBox({ h: Number(e.target.value) })}
+                          />
+                        </span>
+                      </div>
+                      <div className="axv-icon-ed-row">
+                        <span>旋转</span>
+                        <span className="axv-icon-ed-two">
+                          <button
+                            className="axv-cv-mini"
+                            onClick={() => nudgeRot(-1)}
+                            title="逆时针 1°"
+                            aria-label="逆时针 1 度"
+                          >
+                            −1°
+                          </button>
+                          <input
+                            className="axv-icon-ed-input"
+                            type="number"
+                            step={1}
+                            value={Math.round(selRot * 10) / 10}
+                            title="旋转角度（度）"
+                            onChange={(e) => setSelRot(Number(e.target.value))}
+                          />
+                          <button
+                            className="axv-cv-mini"
+                            onClick={() => nudgeRot(1)}
+                            title="顺时针 1°"
+                            aria-label="顺时针 1 度"
+                          >
+                            +1°
+                          </button>
+                          <button
+                            className="axv-cv-mini"
+                            onClick={() => setSelRot(0)}
+                            title="角度归零"
+                          >
+                            归零
+                          </button>
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="axv-cv-empty">选一个图形后可精确调 X / Y、宽 / 高和旋转角度。</div>
+                  )}
+                </div>
               </div>
             ) : null}
             {sheetTab === "align" ? (

@@ -7,11 +7,11 @@ const read = (p: string) => fs.readFileSync(`${root}/${p}`, "utf8");
 describe("M87 抽屉加入资源 tab + 整体变换挪到排列", () => {
   const src = read("components/IconCanvasEditor.tsx");
 
-  it("抽屉 tab 为 5 个：样式 / 排列 / 图层 / 资源 / 画布", () => {
+  it("抽屉 tab 为 6 个：样式 / 属性 / 排列 / 图层 / 资源 / 画布", () => {
     expect(src).toContain(
-      '[["style", "样式"], ["align", "排列"], ["layers", "图层"], ["res", "资源"], ["board", "画布"]]',
+      '[["style", "样式"], ["props", "属性"], ["align", "排列"], ["layers", "图层"], ["res", "资源"], ["board", "画布"]]',
     );
-    expect(src).toContain('useState<"style" | "align" | "layers" | "res" | "board">("style")');
+    expect(src).toContain('useState<"style" | "props" | "align" | "layers" | "res" | "board">("style")');
   });
 
   it("排列页含整体变换（旋转 / 水平镜像 / 垂直镜像）", () => {

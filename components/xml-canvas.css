@@ -8245,6 +8245,8 @@ button.axv-sb-item:hover {
 }
 
 @media (max-width: 720px) {
+  /* M88l：6 个 tab 在 390px 宽下要能放下，收紧横向内边距 */
+  .axv-cv-sheet-tab { padding: 0 6px; }
   .axv-cv-body { flex-direction: column; }
   .axv-cv-form {
     flex: 1 1 auto;
@@ -8426,7 +8428,14 @@ button.axv-sb-item:hover {
   padding: 2px 2px 0px 2px;
   border-radius: 8px 8px 0px 0px;
   background: rgba(0, 0, 0, 0.05);
+  /* M88l：tab 变多了（样式/属性/排列/图层/资源/画布），窄屏横向滚动而不是挤爆 */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
+.axv-cv-sheet-tabs::-webkit-scrollbar { display: none; }
 .axv-cv-sheet-tab {
   height: 24px;
   padding: 0 10px;

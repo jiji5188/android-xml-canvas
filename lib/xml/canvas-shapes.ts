@@ -31,6 +31,8 @@ export interface BaseShape {
   strokeWidth: number;
   /** 整体不透明度 0~1 */
   alpha: number;
+  /** 自身旋转角度（度，顺时针；绕自身包围盒中心）。M88l：属性面板微调用 */
+  rot?: number;
   locked?: boolean;
   hidden?: boolean;
 }
@@ -247,6 +249,13 @@ function toVectorPath(s: DrawShape): VectorPath | null {
     if (s.alpha !== 1) out.strokeAlpha = r3(s.alpha);
   }
   if (!hasFill && !hasStroke) return null;
+  /* M88l：单个图层的旋转，导出成各自的 <group android:rotation> */
+  if (s.rot && Math.abs(s.rot) > 0.001) {
+    const b = shapeBox(s);
+    out.rotation = r3(s.rot);
+    out.pivotX = r3(b.x + b.w / 2);
+    out.pivotY = r3(b.y + b.h / 2);
+  }
   return out;
 }
 
@@ -280,6 +289,7 @@ export function modelToShapes(model: VectorModel): DrawShape[] {
       stroke: p.stroke ?? "none",
       strokeWidth: p.strokeWidth ?? 0,
       alpha,
+      rot: p.rotation ?? 0,
     } satisfies PathShape;
   });
 }

@@ -7,34 +7,23 @@ import path from "node:path";
 const root = process.cwd();
 const read = (p: string) => fs.readFileSync(path.join(root, p), "utf8");
 
-describe("M84 移动端资源面板", () => {
+describe("M84 移动端资源面板（M86 起改为常规流式，不做抽屉）", () => {
   const src = read("components/IconCanvasEditor.tsx");
   const css = read("components/xml-canvas.css");
 
-  it("有抽屉开关状态与标题栏按钮", () => {
-    expect(src).toContain("const [resOpen, setResOpen]");
-    expect(src).toContain("axv-cv-res-btn");
-    expect(src).toContain("axv-cv-res-mask");
-    expect(src).toContain("axv-cv-res-head");
-    // 展开按钮在标题栏右侧，不再放工具栏
-    const head = src.slice(src.indexOf("axv-cv-head-tools"), src.indexOf("axv-cv-body"));
-    expect(head).toContain("axv-cv-res-btn");
-    expect(src).not.toContain('className="axv-cv-tool axv-cv-res-btn"');
+  it("不再有抽屉开关 / 遮罩 / 标题栏按钮", () => {
+    expect(src).not.toContain("resOpen");
+    expect(src).not.toContain("axv-cv-res-btn");
+    expect(src).not.toContain("axv-cv-res-mask");
+    expect(css).not.toContain("axv-cv-res-btn");
+    expect(css).not.toContain("axv-cv-res-mask");
   });
 
-  it("右栏按 resOpen 加 is-open，并有遮罩层", () => {
-    expect(src).toMatch(/axv-cv-form[\s\S]*is-open/);
-    expect(src).toContain('className="axv-cv-res-mask"');
-  });
-
-  it("CSS：移动端右栏 absolute + 滑出，桌面端按钮隐藏", () => {
-    expect(css).toMatch(/\.axv-cv-res-btn\s*\{\s*display:\s*none/);
+  it("CSS：移动端右栏留在常规流（不 absolute、不 translateX）", () => {
     const mobile = css.slice(css.indexOf("@media (max-width: 840px)"));
     const formRule = mobile.slice(mobile.indexOf(".axv-cv-body .axv-icon-ed-form.axv-cv-form"));
-    expect(formRule.slice(0, 400)).toContain("position: absolute");
-    expect(mobile).toContain("transform: translateX(100%)");
-    // is-open 的权重必须压过上面的定位规则，否则展开无效
-    expect(css).toContain(".axv-cv-body .axv-icon-ed-form.axv-cv-form.is-open { transform: none; }");
+    expect(formRule.slice(0, 400)).toContain("position: static");
+    expect(mobile.slice(0, 900)).not.toContain("transform: translateX(100%)");
   });
 });
 

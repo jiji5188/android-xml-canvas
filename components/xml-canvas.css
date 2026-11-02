@@ -8328,84 +8328,29 @@ button.axv-sb-item:hover {
 /* ===== M84：移动端资源面板改成右侧滑出 ===== */
 .axv-cv-body { position: relative; }
 
-/* 资源面板标题栏：桌面端隐藏，移动端显示 */
-.axv-cv-res-head { display: none; }
-
-/* 触发按钮：桌面端隐藏 */
-.axv-cv-res-btn { display: none; }
-
-/* 遮罩：仅移动端出现 */
-.axv-cv-res-mask { display: none; }
-
 @media (max-width: 840px) {
-  /* 右栏不再占位，画布吃满整宽 */
-  .axv-cv-body .axv-icon-ed-form.axv-cv-form {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 40;
-    width: min(86%, 320px);
-    max-width: none;
-    flex: 0 0 auto;
-    border-left: 1px solid rgba(0, 0, 0, 0.08);
-    border-top: none;
-    border-radius: 12px 0 0 12px;
-    background: var(--axv-panel-bg, #fff);
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.14);
-    transform: translateX(100%);
-    transition: transform 0.22s ease;
+  /* 移动端：右栏不隐藏、不进抽屉，直接堆在画布下方，整块纵向滚动 */
+  .axv-cv-body {
+    flex-direction: column;
+    overflow-y: auto;
     overscroll-behavior: contain;
   }
-  .axv-cv-form.is-open,
-  .axv-cv-body .axv-icon-ed-form.axv-cv-form.is-open { transform: none; }
-
-  .axv-cv-res-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin: -2px 0 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.07);
-    font-size: 12px;
-    font-weight: 600;
+  .axv-cv-left { flex: 0 0 auto; min-height: 320px; }
+  .axv-cv-body .axv-icon-ed-form.axv-cv-form {
+    position: static;
+    flex: 0 0 auto;
+    width: auto;
+    max-width: none;
+    max-height: none;
+    /* 底部样式抽屉浮在上面，留出空间让最后几行也能滚到可点位置 */
+    padding-bottom: 150px;
+    border-left: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0;
+    box-shadow: none;
+    transform: none;
+    overflow: visible;
   }
-  .axv-cv-res-close {
-    width: 28px;
-    height: 28px;
-    display: grid;
-    place-items: center;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: inherit;
-    font-size: 18px;
-    cursor: pointer;
-    opacity: 0.6;
-  }
-  .axv-cv-res-close:hover { background: rgba(0, 0, 0, 0.06); opacity: 1; }
-
-  /* M77 那条 .axv-icon-page .axv-shape-head .axv-icon-btn{display:none} 会把标题栏所有图标按钮藏掉，这里按更高权重救回资源按钮 */
-  .axv-icon-page .axv-shape-head .axv-cv-res-btn.axv-icon-btn {
-    display: inline-grid;
-    place-items: center;
-  }
-  .axv-cv-res-btn.is-on { background: #1b6ef3; color: #fff; border-radius: 8px; }
-  .axv-cv-res-btn:only-of-type { display: inline-grid; }
-
-  .axv-cv-res-mask {
-    display: block;
-    position: absolute;
-    inset: 0;
-    z-index: 39;
-    background: rgba(0, 0, 0, 0.24);
-    animation: axv-cv-fade 0.18s ease;
-  }
-  @keyframes axv-cv-fade { from { opacity: 0; } to { opacity: 1; } }
-
-  /* 抽屉打开时，底部样式表往下让位给遮罩，不再抢层级 */
-  .axv-cv-form.is-open { max-height: 100%; }
 }
 
 @media (max-width: 840px) {
@@ -8415,3 +8360,50 @@ button.axv-sb-item:hover {
   .axv-cv-sheet-tabs { margin-left: 0; }
   .axv-cv-body:has(.axv-cv-sheet:not(.is-collapsed)) .axv-cv-stage { padding-bottom: 118px; }
 }
+
+/* ===== M86：画布尺寸段选 + 图层拖拽排序 ===== */
+.axv-cv-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.axv-cv-size {
+  min-width: 48px;
+  padding: 6px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-cv-size:hover { background: rgba(0, 0, 0, 0.05); }
+.axv-cv-size.on {
+  background: #1b6ef3;
+  border-color: #1b6ef3;
+  color: #fff;
+}
+
+.axv-cv-chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-cv-chk input { accent-color: #1b6ef3; }
+
+.axv-cv-layer-grip {
+  flex: 0 0 auto;
+  width: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  opacity: 0.35;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.axv-cv-layer-grip:active { cursor: grabbing; opacity: 0.8; }
+.axv-cv-layer.is-dragging { opacity: 0.55; }
+.axv-cv-layer.is-drop { outline: 2px dashed #1b6ef3; outline-offset: -2px; }

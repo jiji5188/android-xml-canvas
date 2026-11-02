@@ -146,8 +146,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [picking, setPicking] = useState(false);
   /** 插入图标（多图标拼合）：不替换现有图形，而是把选中的图标追加成新图层 */
   const [inserting, setInserting] = useState(false);
-  /** 移动端：资源面板右侧滑出 */
-  const [resOpen, setResOpen] = useState(false);
   const [colorTarget, setColorTarget] = useState<{ kind: "fill" | "stroke" | "bg" } | null>(null);
   const [zoom, setZoom] = useState(1);
   /** 网格 / 背景（背景会导出成最底层矩形） */
@@ -176,6 +174,12 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   useEffect(() => {
     setZoom(fitZoom());
   }, [fitZoom]);
+
+  /* 移动端：底部样式抽屉默认收起，否则会把下面那块参数面板盖住 */
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    if (window.matchMedia("(max-width: 840px)").matches) setSheetOpen(false);
+  }, []);
   const dragRef = useRef<
     | null
     | { kind: "draw"; id: string; start: { x: number; y: number } }
@@ -599,6 +603,90 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     setSel(copies.map((c) => c.id));
   };
 
+  const moveLayerOne = (id: string, dir: -1 | 1) => {
+    pushHistory();
+    setShapes((list) => {
+      const arr = [...list];
+      const i = arr.findIndex((s) => s.id === id);
+      if (i < 0) return list;
+      const j = i + dir;
+      if (j < 0 || j >= arr.length) return list;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      return arr;
+    });
+  };
+
+  /** 画布尺寸：改 viewport，并把所有图形等比缩放，画面看起来不变 */
+  const resizeViewport = (size: number) => {
+    const n = Math.max(1, Math.min(2048, Math.round(size)));
+    if (n === meta.vw && n === meta.vh) return;
+    pushHistory();
+    const from = { x: 0, y: 0, w: meta.vw, h: meta.vh };
+    const to = { x: 0, y: 0, w: n, h: n };
+    setShapes((list) =>
+      // scaleShape 会就地改对象，先深拷贝：否则 StrictMode 双跑 updater 会缩两次
+      list.map((s) => scaleShape(JSON.parse(JSON.stringify(s)) as DrawShape, from, to)),
+    );
+    setMeta((m) => ({ ...m, vw: n, vh: n }));
+  };
+
+  /** 图层拖拽排序 */
+  const [dragLayerId, setDragLayerId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const layerDragRef = useRef<string | null>(null);
+  const layerOverRef = useRef<string | null>(null);
+
+  const onGripDown = (e: React.PointerEvent, id: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    layerDragRef.current = id;
+    layerOverRef.current = id;
+    setDragLayerId(id);
+    setDragOverId(id);
+  };
+
+  /* 拖拽期间的 move / up 挂在 window 上：指针跑到行外（或 capture 失败）也能收尾 */
+  useEffect(() => {
+    if (!dragLayerId) return;
+    const onMove = (ev: PointerEvent) => {
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest(
+        "[data-layer-id]",
+      ) as HTMLElement | null;
+      const id = el?.dataset.layerId ?? null;
+      if (id !== layerOverRef.current) {
+        layerOverRef.current = id;
+        setDragOverId(id);
+      }
+    };
+    const onUp = () => {
+      const from = layerDragRef.current;
+      const to = layerOverRef.current;
+      layerDragRef.current = null;
+      layerOverRef.current = null;
+      setDragLayerId(null);
+      setDragOverId(null);
+      if (!from || !to || from === to) return;
+      pushHistory();
+      setShapes((list) => {
+        const arr = [...list];
+        const i = arr.findIndex((s) => s.id === from);
+        const j = arr.findIndex((s) => s.id === to);
+        if (i < 0 || j < 0) return list;
+        const [moved] = arr.splice(i, 1);
+        arr.splice(j, 0, moved);
+        return arr;
+      });
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [dragLayerId, pushHistory]);
+
   const moveLayer = (dir: -1 | 1) => {    if (!sel.length) return;
     pushHistory();
     setShapes((list) => {
@@ -813,7 +901,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     pushHistory();
     setShapes((list) => [...list, ...add]);
     setSel(add.map((s) => s.id));
-    setResOpen(false);
   };
 
   const gTransform =
@@ -889,15 +976,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           </button>
           <button className="axv-icon-btn" onClick={redo} title="重做 (Ctrl+Shift+Z)" aria-label="重做">
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>redo</span>
-          </button>
-          {/* 移动端：资源面板从右侧滑出（桌面端 CSS 隐藏） */}
-          <button
-            className={"axv-icon-btn axv-cv-res-btn" + (resOpen ? " is-on" : "")}
-            onClick={() => setResOpen((v) => !v)}
-            title="资源与变换"
-            aria-label="资源与变换"
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>tune</span>
           </button>
         </span>
         <button className="axv-icon-btn axv-cv-close" onClick={close} aria-label="关闭">
@@ -1039,10 +1117,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                           key={i}
                           cx={h.x}
                           cy={h.y}
-                          r={2.6 / Math.max(0.4, zoom)}
+                          r={(meta.vw * 0.017) / Math.max(0.4, zoom)}
                           fill="#fff"
                           stroke="#1b6ef3"
-                          strokeWidth={strokeLen}
+                          strokeWidth={1.4}
+                          vectorEffect="non-scaling-stroke"
                         />
                       ))}
                     </g>
@@ -1072,20 +1151,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           </div>
         </div>
 
-        {/* 右：参数面板（移动端从右侧滑出） */}
-        {resOpen ? <div className="axv-cv-res-mask" onClick={() => setResOpen(false)} /> : null}
-        <div className={"axv-icon-ed-form axv-cv-form" + (resOpen ? " is-open" : "")}>
-          <div className="axv-cv-res-head">
-            <span>资源与变换</span>
-            <button
-              className="axv-cv-res-close msr"
-              onClick={() => setResOpen(false)}
-              aria-label="关闭资源面板"
-              title="关闭"
-            >
-              close
-            </button>
-          </div>
+        {/* 右：参数面板（移动端堆在画布下方，不做抽屉） */}
+        <div className="axv-icon-ed-form axv-cv-form">
           {!shapes.length ? (
             <div className="axv-icon-ed-warn">
               <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>info</span>
@@ -1425,6 +1492,57 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               <div className="axv-cv-sheet-pane">
             <div className="axv-set-group">
               <div className="axv-set-label">
+                画布尺寸
+                <span className="axv-cv-hint">· viewport {meta.vw}×{meta.vh}，改尺寸会等比缩放图形</span>
+              </div>
+              <div className="axv-cv-sizes">
+                {[24, 48, 96, 240, 512].map((n) => (
+                  <button
+                    key={n}
+                    className={"axv-cv-size" + (meta.vw === n && meta.vh === n ? " on" : "")}
+                    onClick={() => resizeViewport(n)}
+                    title={`viewport ${n}×${n}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="axv-icon-ed-row">
+                <span>自定义</span>
+                <span className="axv-icon-ed-two">
+                  <input
+                    className="axv-icon-ed-input"
+                    type="number"
+                    min={1}
+                    max={2048}
+                    value={Math.round(meta.vw)}
+                    onChange={(e) => resizeViewport(Number(e.target.value) || 24)}
+                  />
+                  <input
+                    className="axv-icon-ed-input"
+                    type="number"
+                    min={1}
+                    max={2048}
+                    value={Math.round(meta.vh)}
+                    onChange={(e) => {
+                      const v = Math.max(1, Math.min(2048, Math.round(Number(e.target.value) || 24)));
+                      if (v === meta.vh) return;
+                      pushHistory();
+                      const from = { x: 0, y: 0, w: meta.vw, h: meta.vh };
+                      const to = { x: 0, y: 0, w: meta.vw, h: v };
+                      setShapes((list) =>
+                        list.map((s) =>
+                          scaleShape(JSON.parse(JSON.stringify(s)) as DrawShape, from, to),
+                        ),
+                      );
+                      setMeta((m) => ({ ...m, vh: v }));
+                    }}
+                  />
+                </span>
+              </div>
+            </div>
+            <div className="axv-set-group">
+              <div className="axv-set-label">
                 画布
                 <span className="axv-cv-hint">· 背景会导出成底层矩形</span>
               </div>
@@ -1447,6 +1565,13 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 >
                   透明
                 </button>
+              </div>
+              <div className="axv-icon-ed-row">
+                <span>网格</span>
+                <label className="axv-cv-chk">
+                  <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
+                  显示网格
+                </label>
               </div>
             </div>
               </div>
@@ -1494,6 +1619,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 <div className="axv-cv-set-label">
                   图形（{shapes.length}）
                   <span className="axv-cv-hint">· 点一行选中，Shift 多选</span>
+                  <button className="axv-cv-mini" onClick={() => setInserting(true)} title="插入图标（追加成新图层）">
+                    ＋ 插入
+                  </button>
                   <button className="axv-cv-mini" onClick={duplicateOne} title="复制一条（选中优先）">
                     ＋ 复制一条
                   </button>
@@ -1504,11 +1632,14 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 return (
                   <div
                     key={s.id}
+                    data-layer-id={s.id}
                     className={
                       "axv-cv-layer" +
                       (sel.includes(s.id) ? " on" : "") +
                       (s.hidden ? " is-hidden" : "") +
-                      (s.locked ? " is-locked" : "")
+                      (s.locked ? " is-locked" : "") +
+                      (dragLayerId === s.id ? " is-dragging" : "") +
+                      (dragOverId === s.id && dragLayerId !== s.id ? " is-drop" : "")
                     }
                     onClick={(e) =>
                       setSel((cur2) =>
@@ -1520,6 +1651,14 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                       )
                     }
                   >
+                    <span
+                      className="axv-cv-layer-grip msr"
+                      title="拖动排序"
+                      aria-hidden="true"
+                      onPointerDown={(e) => onGripDown(e, s.id)}
+                    >
+                      drag_indicator
+                    </span>
                     <span
                       className="axv-cv-layer-dot"
                       style={{ background: isRenderableColor(s.fill) ? toCss(s.fill) : "transparent" }}
@@ -1563,6 +1702,28 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                       }}
                     >
                       <span className="msr" aria-hidden="true">{s.locked ? "lock" : "lock_open"}</span>
+                    </button>
+                    <button
+                      className="axv-cv-layer-btn"
+                      title="上移一层"
+                      aria-label="上移一层"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveLayerOne(s.id, 1);
+                      }}
+                    >
+                      <span className="msr" aria-hidden="true">arrow_upward</span>
+                    </button>
+                    <button
+                      className="axv-cv-layer-btn"
+                      title="下移一层"
+                      aria-label="下移一层"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveLayerOne(s.id, -1);
+                      }}
+                    >
+                      <span className="msr" aria-hidden="true">arrow_downward</span>
                     </button>
                     <button
                       className="axv-icon-ed-del"

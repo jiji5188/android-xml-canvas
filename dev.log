@@ -658,3 +658,12 @@ Import traces:
  GET /m88test/?v=701 404 in 290ms (next.js: 238ms, application-code: 52ms)
 ✓ Compiled in 170ms
  GET /m88test/?v=701 404 in 188ms (next.js: 126ms, application-code: 62ms)
+✓ Compiled in 298ms
+✓ Compiled in 101ms
+✓ Compiled in 100ms
+✓ Compiled in 96ms
+✓ Compiled in 106ms
+✓ Compiled in 119ms
+✓ Compiled in 113ms
+✓ Compiled in 1660ms
+✓ Compiled in 163ms

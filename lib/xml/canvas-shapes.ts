@@ -5,7 +5,8 @@
 //
 // 只做纯数据转换，不碰 DOM，方便单测。
 
-import type { VectorModel, VectorPath, VectorGroup } from "./vector-edit";
+import { flattenNodes } from "./vector-edit";
+import type { VectorModel, VectorNode, VectorNodeGroup, VectorPath, VectorGroup } from "./vector-edit";
 
 /** 图元类型（与 svg-board 对齐） */
 export type ShapeType =
@@ -21,6 +22,8 @@ export type ShapeType =
   | "text";
 
 export interface BaseShape {
+  /** M89b：所属分组 id（meta.groups 里的 id；空 = 未分组） */
+  group?: string;
   id: string;
   type: ShapeType;
   /** 填充色（#RRGGBB / #AARRGGBB / "none"） */
@@ -117,6 +120,90 @@ export interface CanvasMeta {
   vh: number;
   /** 整体变换（旋转/镜像），导出为 <group> */
   group: VectorGroup;
+  /** M89b：可编辑分组（每个导出为一个 <group android:name="...">） */
+  groups?: GroupSpec[];
+}
+
+/**
+ * M89b：编辑器里的分组
+ * - 子图形坐标是「组内局部坐标」，与 Android <group> 语义一致
+ * - 变换顺序同 Android：平移 → 绕 pivot 旋转 → 缩放
+ */
+export interface GroupSpec {
+  id: string;
+  /** 导出成 android:name（animated-vector 靠它定位） */
+  name?: string;
+  /** android:translateX / translateY */
+  tx: number;
+  ty: number;
+  /** android:rotation（度） */
+  rot: number;
+  /** android:scaleX / scaleY */
+  sx: number;
+  sy: number;
+  /** android:pivotX / pivotY */
+  px: number;
+  py: number;
+  /** 图层树里折叠了没有（纯 UI 状态） */
+  collapsed?: boolean;
+}
+
+/** 仿射矩阵（SVG 口径：x' = a·x + c·y + e，y' = b·x + d·y + f） */
+export interface Mat {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+}
+
+/** 组局部坐标 → 父坐标 */
+export function groupMatrix(g: GroupSpec): Mat {
+  const r = ((g.rot || 0) * Math.PI) / 180;
+  const cos = Math.cos(r);
+  const sin = Math.sin(r);
+  const a = cos * g.sx;
+  const b = sin * g.sx;
+  const c = -sin * g.sy;
+  const d = cos * g.sy;
+  return {
+    a,
+    b,
+    c,
+    d,
+    e: g.px + g.tx - (a * g.px + c * g.py),
+    f: g.py + g.ty - (b * g.px + d * g.py),
+  };
+}
+
+export function applyMat(m: Mat, p: { x: number; y: number }): { x: number; y: number } {
+  return { x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f };
+}
+
+/** 父坐标 → 组局部坐标（矩阵不可逆时原样返回） */
+export function invertMat(m: Mat, p: { x: number; y: number }): { x: number; y: number } {
+  const det = m.a * m.d - m.b * m.c;
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-9) return { ...p };
+  const a = m.d / det;
+  const b = -m.b / det;
+  const c = -m.c / det;
+  const d = m.a / det;
+  const x = p.x - m.e;
+  const y = p.y - m.f;
+  return { x: a * x + c * y, y: b * x + d * y };
+}
+
+/** SVG transform 字符串（恒等时返回 undefined，不污染 DOM） */
+export function groupTransform(g: GroupSpec): string | undefined {
+  const flat =
+    Math.abs(g.tx) < 1e-6 && Math.abs(g.ty) < 1e-6 && Math.abs(g.rot) < 1e-6 && g.sx === 1 && g.sy === 1;
+  if (flat) return undefined;
+  const parts: string[] = [];
+  if (g.tx || g.ty) parts.push(`translate(${r3(g.tx)} ${r3(g.ty)})`);
+  parts.push(`rotate(${r3(g.rot)} ${r3(g.px)} ${r3(g.py)})`);
+  if (g.sx !== 1 || g.sy !== 1) parts.push(`scale(${r3(g.sx)} ${r3(g.sy)})`);
+  return parts.join(" ");
 }
 
 const TAU = Math.PI * 2;
@@ -259,30 +346,114 @@ function toVectorPath(s: DrawShape): VectorPath | null {
   return out;
 }
 
-/** 图元列表 → VectorModel（供 buildVectorXml 序列化） */
+/**
+ * 图元列表 → VectorModel（供 buildVectorXml 序列化）
+ * M89b：相邻且同组的图元收进一个 <group>；未分组的照旧平铺。
+ */
 export function shapesToModel(shapes: DrawShape[], meta: CanvasMeta): VectorModel {
-  const paths: VectorPath[] = [];
+  const groups = meta.groups ?? [];
+  const specById = new Map(groups.map((g) => [g.id, g]));
+  const nodes: VectorNode[] = [];
+  let curId: string | null = null;
+  let curNode: VectorNodeGroup | null = null;
+
   for (const s of shapes) {
     if (s.hidden) continue;
-    const p = toVectorPath(s);
-    if (p) paths.push(p);
+    const vp = toVectorPath(s);
+    if (!vp) continue;
+    const spec = s.group ? specById.get(s.group) : undefined;
+    if (spec) {
+      if (!curNode || curId !== spec.id) {
+        curNode = {
+          kind: "group",
+          name: spec.name || spec.id,
+          attrs: { rotation: spec.rot, scaleX: spec.sx, scaleY: spec.sy, pivotX: spec.px, pivotY: spec.py },
+          translateX: spec.tx,
+          translateY: spec.ty,
+          children: [],
+        };
+        curId = spec.id;
+        nodes.push(curNode);
+      }
+      curNode.children.push({ kind: "path", path: vp });
+    } else {
+      curId = null;
+      curNode = null;
+      nodes.push({ kind: "path", path: vp });
+    }
   }
+
   return {
     w: meta.w,
     h: meta.h,
     vw: meta.vw,
     vh: meta.vh,
     group: { ...meta.group },
-    paths,
+    paths: flattenNodes(nodes),
+    nodes,
   };
 }
 
-/** VectorModel → 图元列表（每条 path 变成一个可编辑 path 图元） */
+/** 首层 group 是否就是「整体变换」那一层（parse 会把它的 attrs 读进 model.group） */
+function isWrapperGroup(model: VectorModel, n: VectorNodeGroup): boolean {
+  const g = model.group;
+  const a = n.attrs;
+  return (
+    Math.abs(a.rotation - g.rotation) < 1e-6 &&
+    Math.abs(a.scaleX - g.scaleX) < 1e-6 &&
+    Math.abs(a.scaleY - g.scaleY) < 1e-6 &&
+    Math.abs(a.pivotX - g.pivotX) < 1e-6 &&
+    Math.abs(a.pivotY - g.pivotY) < 1e-6
+  );
+}
+
+/**
+ * M89b：从模型里读出可编辑分组（只取顶层；嵌套组的内容并入外层，深层变换暂不还原）
+ * id 固定为 g1…gn，modelToShapes 用同一套编号赋给图元。
+ */
+export function groupsFromModel(model: VectorModel): GroupSpec[] {
+  const out: GroupSpec[] = [];
+  const nodes = model.nodes;
+  if (!nodes || !nodes.length) return out;
+  let idx = 0;
+  const walk = (list: VectorNode[], depth: number) => {
+    list.forEach((n, i) => {
+      if (n.kind !== "group") return;
+      if (depth === 0 && i === 0 && isWrapperGroup(model, n)) {
+        walk(n.children, depth + 1);
+        return;
+      }
+      if (depth > 0) {
+        // 嵌套组：不建编辑器分组，直接递归（内容归到外层/顶层）
+        walk(n.children, depth + 1);
+        return;
+      }
+      idx += 1;
+      const id = `g${idx}`;
+      out.push({
+        id,
+        name: n.name || id,
+        tx: n.translateX,
+        ty: n.translateY,
+        rot: n.attrs.rotation,
+        sx: n.attrs.scaleX,
+        sy: n.attrs.scaleY,
+        px: n.attrs.pivotX,
+        py: n.attrs.pivotY,
+      });
+      walk(n.children, depth + 1);
+    });
+  };
+  walk(nodes, 0);
+  return out;
+}
+
+/** VectorModel → 图元列表（每条 path 变成一个可编辑 path 图元；带所属分组 id） */
 export function modelToShapes(model: VectorModel): DrawShape[] {
-  return model.paths.map((p, i) => {
+  const mk = (p: VectorPath, id: string, group?: string): DrawShape => {
     const alpha = p.alpha ?? 1;
     return {
-      id: `p${i + 1}`,
+      id,
       type: "path" as const,
       d: p.d,
       fill: p.fill,
@@ -290,8 +461,40 @@ export function modelToShapes(model: VectorModel): DrawShape[] {
       strokeWidth: p.strokeWidth ?? 0,
       alpha,
       rot: p.rotation ?? 0,
+      ...(group ? { group } : {}),
     } satisfies PathShape;
-  });
+  };
+
+  const nodes = model.nodes;
+  if (!nodes || !nodes.length) {
+    return model.paths.map((p, i) => mk(p, `p${i + 1}`));
+  }
+
+  const out: DrawShape[] = [];
+  let seq = 0;
+  let gidx = 0;
+  const walk = (list: VectorNode[], group: string | undefined, depth: number) => {
+    list.forEach((n, i) => {
+      if (n.kind === "path") {
+        seq += 1;
+        out.push(mk(n.path, `p${seq}`, group));
+        return;
+      }
+      if (depth === 0 && i === 0 && isWrapperGroup(model, n)) {
+        walk(n.children, group, depth + 1);
+        return;
+      }
+      if (depth === 0) {
+        gidx += 1;
+        walk(n.children, `g${gidx}`, depth + 1);
+        return;
+      }
+      // 嵌套组：内容并入外层（深层变换暂不还原）
+      walk(n.children, group, depth + 1);
+    });
+  };
+  walk(nodes, undefined, 0);
+  return out;
 }
 
 /* ---------------- 颜色小工具 ---------------- */

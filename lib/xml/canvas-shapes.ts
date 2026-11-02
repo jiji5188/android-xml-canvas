@@ -537,7 +537,7 @@ export function pathPoints(d: string): { x: number; y: number }[] {
       i++;
     }
   }
-  return out;
+  return out.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
 }
 
 export function shapeBox(s: DrawShape): Box {
@@ -748,6 +748,8 @@ export function translatePath(d: string, dx: number, dy: number): string {
     }
     const args = toks.slice(i, i + need).map(Number);
     i += need;
+    /* 参数不完整（pathData 本身坏 / 被别处写坏）时别硬算，原样返回，避免 NaN 传染到包围盒 */
+    if (args.length < need || !args.every((v) => Number.isFinite(v))) return d;
     if (!rel) {
       sawAbs = true;
       switch (C) {
@@ -785,7 +787,8 @@ export function translatePath(d: string, dx: number, dy: number): string {
           break;
       }
     }
-    out += args.map((v) => nstr(v)).join(" ");
+    /* 相邻参数组之间必须补空格：否则 "l-8,8 8,8" 会拼成 "-8 88" 直接把路径写坏 */
+    out += (out && !/[a-zA-Z]$/.test(out) ? " " : "") + args.map((v) => nstr(v)).join(" ");
   }
   // 整条路径全是相对命令 → 没有绝对锚点，前面补一个 M 位移
   if (!sawAbs) return `M${nstr(dx)},${nstr(dy)}${out}`;
@@ -868,6 +871,7 @@ export function scalePath(d: string, sx: number, sy: number, ox = 0, oy = 0): st
     }
     const a = toks.slice(i, i + need).map(Number);
     i += need;
+    if (a.length < need || !a.every((v) => Number.isFinite(v))) return d;
     const fmt = (v: number) => nstr(v).replace(/^([^.\d])/, "$1");
     let res: number[];
     if (C === "H") {
@@ -891,7 +895,7 @@ export function scalePath(d: string, sx: number, sy: number, ox = 0, oy = 0): st
         res.push(rel ? r3(a[k + 1] * sy) : ay(a[k + 1]));
       }
     }
-    out += res.map(fmt).join(" ");
+    out += (out && !/[a-zA-Z]$/.test(out) ? " " : "") + res.map(fmt).join(" ");
   }
   return out;
 }

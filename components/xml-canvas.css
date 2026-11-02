@@ -3732,6 +3732,53 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-dp-alpha > b { font-size: 11.5px; min-width: 34px; text-align: right; color: var(--axv-on-surface); font-variant-numeric: tabular-nums; }
 .axv-dp-alpha input[type="range"]:disabled { opacity: 0.45; }
 .axv-dp-hint { font-size: 11.5px; color: var(--axv-on-surface-variant); }
+/* M89e：颜色 tab 的头（大色块 + 当前值 + 选择按钮） */
+.axv-dp-color-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  background: var(--axv-surface-head, #f7f8fa);
+}
+.axv-dp-color-swatch {
+  position: relative;
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+}
+.axv-dp-color-swatch:hover { filter: brightness(0.97); }
+.axv-dp-color-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.axv-dp-color-val {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--axv-on-surface, #1d1b20);
+}
+.axv-dp-color-btn {
+  align-self: flex-start;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-primary);
+  background: var(--axv-primary-soft, #e8f0fe);
+  color: var(--axv-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-dp-color-btn:hover { background: var(--axv-primary); color: var(--axv-on-primary); }
+
 .axv-dp-swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 8px; }
 .axv-dp-swatch {
   height: 34px;
@@ -7859,9 +7906,10 @@ button.axv-sb-item:hover {
   align-items: center;
   margin: 14px 0 10px;
 }
+/* M89e：色值输入框要能放下 rgba(255,255,255,0.50)，预览块收窄一点 */
 .cp-preview-box {
-  width: 80px;
-  height: 56px;
+  width: 64px;
+  height: 52px;
   border-radius: 8px;
   overflow: hidden;
   position: relative;
@@ -7887,10 +7935,11 @@ button.axv-sb-item:hover {
 .cp-input-group label { font-size: 11px; color: #666; }
 .cp-input-group input {
   width: 100%;
-  padding: 7px 8px;
+  min-width: 0;
+  padding: 6px;
   border: 1px solid #ccc;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 11px;
   color: #222;
   background: #fff;
 }

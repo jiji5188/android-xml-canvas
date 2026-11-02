@@ -9,8 +9,7 @@
 //   📦 图标：弹 IconPickerPanel（Material Symbols → 生成 vector drawable）
 
 import { useEffect, useMemo, useState } from "react";
-import { HsvPicker } from "./HsvPicker";
-import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
+import { ColorPicker } from "./ColorPicker";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { isValidResName } from "@/lib/xml/resname";
 
@@ -72,6 +71,8 @@ export function DrawablePicker({
   const [tab, setTab] = useState<"color" | "res">("color");
   const effTab: "color" | "res" = imageOnly && tab === "color" ? "res" : tab;
   const [filter, setFilter] = useState("");
+  /** 弹窗取色器开关 */
+  const [colorOpen, setColorOpen] = useState(false);
   /** 资源 ID 输入框草稿（不与属性实时同步，回车/失焦才写回，避免污染 XML） */
   const [idDraft, setIdDraft] = useState(value);
   useEffect(() => setIdDraft(value), [value]);
@@ -199,17 +200,41 @@ export function DrawablePicker({
         <div className="axv-dp-body">
           {effTab === "color" ? (
             <div className="axv-dp-color">
-              {/* M63f：把自定义 HSV 取色器直接嵌进来（不再用原生 input[type=color] + 单独滑杆）
-                  取色器输出 CSS 串，写回前转成 Android 写法：alpha=1 → #RRGGBB，否则 #AARRGGBB */}
-              <HsvPicker
-                label={`${attrName} 颜色`}
-                rgba={parseColorOr(value, "#FFFFFF")}
-                showPresets={false}
-                onChange={(next) => apply(toAndroidHex(next))}
-              />
+              {/* M89e：颜色也统一成弹窗取色器（ColorPicker），不再内嵌 HSV 面板 */}
+              <div className="axv-dp-color-head">
+                <button
+                  type="button"
+                  className="axv-dp-color-swatch"
+                  aria-label={`${attrName} 颜色`}
+                  title={isHex ? value.toUpperCase() : "选择颜色"}
+                  onClick={() => setColorOpen(true)}
+                >
+                  <span className="axv-cf-checker" aria-hidden="true" />
+                  <span className="axv-cf-layer" style={{ background: isHex ? value : undefined }} aria-hidden="true" />
+                </button>
+                <div className="axv-dp-color-meta">
+                  <div className="axv-dp-color-val">{isHex ? value.toUpperCase() : "未设纯色"}</div>
+                  <button type="button" className="axv-dp-color-btn" onClick={() => setColorOpen(true)}>
+                    选择颜色
+                  </button>
+                </div>
+              </div>
+              {colorOpen ? (
+                <ColorPicker
+                  value={isHex ? value : "#FFFFFF"}
+                  label={`${attrName} 颜色`}
+                  presets={SWATCHES}
+                  abovePage
+                  onConfirm={(next) => {
+                    apply(next);
+                    setColorOpen(false);
+                  }}
+                  onClose={() => setColorOpen(false)}
+                />
+              ) : null}
               <div className="axv-dp-hint" style={{ marginBottom: 10 }}>
                 {isHex
-                  ? `当前 ${value.toUpperCase()}（透明度 ${alphaPct}%，拖动即时生效）`
+                  ? `当前 ${value.toUpperCase()}（透明度 ${alphaPct}%，点色块选颜色，确认后生效）`
                   : "当前值不是纯色：选一个颜色会覆盖它"}
               </div>
               <div className="axv-dp-swatch-grid">

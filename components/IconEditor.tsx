@@ -65,7 +65,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
     const body = (
       <div className="axv-icon-page" role="dialog" aria-label="图标编辑器">
         <div className="axv-shape-head">
-          <button className="axv-shape-back" onClick={onClose} aria-label="返回编辑器">
+          <button className="axv-icon-back" onClick={onClose} aria-label="返回编辑器" title="返回">
             <span className="msr" aria-hidden="true">arrow_back</span>
           </button>
           <span className="axv-shape-title">编辑图标 · {name}</span>
@@ -157,7 +157,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
   const body = (
     <div className="axv-icon-page" role="dialog" aria-label="图标编辑器">
       <div className="axv-shape-head">
-        <button className="axv-shape-back" onClick={onClose} aria-label="返回编辑器">
+        <button className="axv-icon-back" onClick={onClose} aria-label="返回编辑器" title="返回">
           <span className="msr" aria-hidden="true">arrow_back</span>
         </button>
         <span className="axv-shape-title">编辑图标 · {name}</span>

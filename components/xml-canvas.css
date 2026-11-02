@@ -4889,6 +4889,35 @@ body.axv-lt-dragging .axv-lt-row {
   flex-direction: column;
   background: var(--axv-surface-sunken, var(--axv-surface-head));
 }
+/* M77：返回按钮只在移动端出现（左上），桌面端用右上 ✕ —— 与 svg-board 的方块按钮同款 */
+.axv-icon-back {
+  position: relative;
+  flex: none;
+  display: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  border-radius: 10px;
+  background: #ffffff24;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+}
+/* 36px 视觉尺寸，但命中区补到 44px（Android 最小触摸尺寸） */
+.axv-icon-back::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 14px;
+}
+.axv-icon-back:hover { background: #ffffff54; }
+.axv-icon-back:active { transform: scale(0.94); }
+.axv-icon-back .msr { font-size: 22px; }
+@media (max-width: 840px), (pointer: coarse) and (max-width: 1024px) {
+  .axv-icon-page .axv-icon-back { display: grid; }
+  .axv-icon-page .axv-shape-head .axv-icon-btn { display: none; }
+}
 .axv-icon-page-body {
   flex: 1 1 auto;
   min-height: 0;

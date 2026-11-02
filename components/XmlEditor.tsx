@@ -144,7 +144,7 @@ import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } fr
 import { ResImagePreview } from "./ResImagePreview";
 import { ShapeEditor } from "./ShapeEditor";
 import { GenAssetsPanel } from "./GenAssetsPanel";
-import IconEditor from "./IconEditor";
+import IconCanvasEditor from "./IconCanvasEditor";
 import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/paths";
 import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, lsGet, lsSet } from "@/lib/xml/storage";
@@ -3746,7 +3746,7 @@ const findResolved = findResolvedNode;
 
       {/* M11j：生成的图标 → 图标编辑器（颜色 / 尺寸 / 路径 / 旋转） */}
       {resIcon ? (
-        <IconEditor
+        <IconCanvasEditor
           name={resIcon.name}
           xml={resIcon.xml}
           existingNames={Object.keys(generatedDrawables)}

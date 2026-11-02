@@ -16,7 +16,7 @@ import {
   type AiConfig,
   type AiMessage,
 } from "@/lib/xml/ai";
-import { nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
+import { friendlyAiError, nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
 import { AI_TOOL_PROMPT, AI_TOOL_PROMPT_NATIVE, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
 import { AI_TOOL_SPECS, looksLikeToolsRejected, supportsNativeTools, toAiToolCall, toHistoryToolCalls } from "@/lib/xml/ai-fc";
 import { refreshAiCaches } from "@/lib/xml/ai-tools";
@@ -373,7 +373,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               continue;
             }
             setChat((c) => c.filter((m) => !m.streaming));
-            setErr(res.error || "调用失败");
+            setErr(friendlyAiError(res.error || "调用失败"));
             return;
           }
 
@@ -567,9 +567,10 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       onNote?.("连接正常：" + res.content.trim().slice(0, 20));
       setChat((c) => [...c, { role: "assistant", content: `连接测试通过，模型回复：${res.content.trim().slice(0, 60)}` }]);
     } else {
-      // 带上通道名，方便判断是网络/通道问题还是服务端慢
+      // 带上通道名，方便判断是网络/通道问题还是服务端慢；
+      // 再把 Java 侧的 SocketException 原始英文译成可操作的中文说明
       const tail = res.channel ? `（通道 ${res.channel}）` : "";
-      setErr((res.error || "连接失败") + tail);
+      setErr(friendlyAiError(res.error || "连接失败") + tail);
     }
   }, [cfg, onNote]);
 

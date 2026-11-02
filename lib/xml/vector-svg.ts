@@ -8,7 +8,7 @@ export interface VectorSpec {
   /** 视口宽高（Android viewport，通常 24） */
   vw: number;
   vh: number;
-  paths: { d: string; fill: string; alpha?: number; stroke?: string; strokeWidth?: number }[];
+  paths: { d: string; fill: string; alpha?: number; stroke?: string; strokeWidth?: number; strokeAlpha?: number }[];
   /** M11j：<group> 的旋转 / 缩放（镜像）；没有 group 时为 undefined */
   group?: { rotation: number; scaleX: number; scaleY: number; pivotX: number; pivotY: number };
 }
@@ -29,12 +29,14 @@ export function parseVectorXml(xml: string): VectorSpec | null {
     const alphaRaw = num(attrFrom(head, "fillAlpha"));
     const stroke = attrFrom(head, "strokeColor");
     const sw = num(attrFrom(head, "strokeWidth"));
+    const sa = num(attrFrom(head, "strokeAlpha"));
     paths.push({
       d,
       fill,
       alpha: alphaRaw == null ? undefined : alphaRaw,
       stroke: stroke || undefined,
       strokeWidth: sw == null ? undefined : sw,
+      strokeAlpha: sa == null ? undefined : sa,
     });
   }
   if (paths.length === 0) return null;
@@ -71,6 +73,7 @@ export function vectorToSvg(xml: string): string | null {
       if (p.alpha != null) parts.push(`fill-opacity="${p.alpha}"`);
       if (p.stroke) parts.push(`stroke="${esc(androidColorToCss(p.stroke))}"`);
       if (p.strokeWidth != null) parts.push(`stroke-width="${p.strokeWidth}"`);
+      if (p.strokeAlpha != null) parts.push(`stroke-opacity="${p.strokeAlpha}"`);
       return `<path ${parts.join(" ")}/>`;
     })
     .join("");

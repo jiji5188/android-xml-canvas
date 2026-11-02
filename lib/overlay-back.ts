@@ -61,45 +61,36 @@ export function useOverlayBack(active: boolean, onBack: () => void): () => void 
     window.addEventListener("popstate", onPop);
 
     return () => {
+      // 组件卸载本身可能是父层已经通过 close/save 调过 onClose，不能在这里再触发回调，
+      // 也不能主动 history.back()：网页端会额外退一条真实历史，导致“闪一下回到上页/侧边栏”。
+      // 历史清理只保留 sentinel 状态，实际条目由 close() 的 popstate/watchdog 路径负责收敛。
       window.removeEventListener("popstate", onPop);
       clearWatch();
-      // 非 popstate 路径被卸载（比如保存后父层直接 setState 关闭）：
-      // 栈顶还是我们的哨兵就撤掉，别在历史里留一条“按了没反应”的空记录
-      if (pushed.current) {
-        pushed.current = false;
-        if (isMine(window.history.state)) {
-          try {
-            window.history.back();
-          } catch {
-            /* 忽略 */
-          }
-        }
-      }
     };
   }, [active]);
 
   return useCallback(() => {
-    if (!pushed.current || !isMine(window.history.state)) {
-      // 没有哨兵（或已被别的东西顶掉）：直接关，别乱动历史
-      pushed.current = false;
+    // UI close 永远只触发一次：先标记已处理，避免 StrictMode/cleanup/后续误触造成双关。
+    if (!pushed.current) {
       cbRef.current();
       return;
     }
-    // 让 popstate 统一触发 onBack；万一浏览器不给事件（个别 WebView），
-    // 400ms 后兜底自己关一次
-    try {
-      window.history.back();
-    } catch {
-      pushed.current = false;
-      cbRef.current();
-      return;
+    pushed.current = false;
+    if (isMine(window.history.state)) {
+      try {
+        // 让 popstate 统一触发 onBack；万一浏览器不给事件（个别 WebView），
+        // 400ms 后兜底自己关一次
+        window.history.back();
+        clearWatch();
+        watch.current = window.setTimeout(() => {
+          watch.current = null;
+          cbRef.current();
+        }, 400);
+        return;
+      } catch {
+        /* 落到直接回调 */
+      }
     }
-    clearWatch();
-    watch.current = window.setTimeout(() => {
-      watch.current = null;
-      if (!pushed.current) return;
-      pushed.current = false;
-      cbRef.current();
-    }, 400);
+    cbRef.current();
   }, []);
 }

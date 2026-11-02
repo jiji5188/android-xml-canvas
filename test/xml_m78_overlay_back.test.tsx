@@ -57,22 +57,24 @@ describe("整页浮层系统返回键（M78）", () => {
     await flush(120);
   });
 
-  it("点 UI 返回按钮也走同一条路，且只回调一次（不会双关）", async () => {
+  it("点 UI 返回按钮只回调一次（不会双关）", async () => {
     const onBack = vi.fn();
     const { root, host } = await mount(onBack);
     (host.querySelector("#ui-close") as HTMLButtonElement).click();
-    await flush(150);
+    // M78 修复：UI 点击不再额外制造一次浏览器历史回跳，等待 watchdog 收敛即可
+    await flush(600);
     expect(onBack).toHaveBeenCalledTimes(1);
     root.unmount();
     await flush(120);
   });
 
-  it("卸载时把哨兵撤掉，历史里不留空条目", async () => {
+  it("组件卸载时不再主动 history.back()（网页端不再闪退回侧边栏）", async () => {
     const { root } = await mount(() => {});
     expect(marked()).toBe(true);
     root.unmount();
     await flush(150);
-    expect(marked()).toBe(false);
+    // 卸载本身只清监听，不额外改动 history，避免网页端被误退
+    expect(marked()).toBe(true);
   });
 
   it("active=false 不压栈（浮层没开就别动历史）", async () => {

@@ -10,6 +10,8 @@ export interface VectorPath {
   alpha?: number;
   stroke?: string;
   strokeWidth?: number;
+  /** 描边不透明度 0~1（M81：画布编辑器用；旧数据没有则视为 1） */
+  strokeAlpha?: number;
 }
 
 export interface VectorGroup {
@@ -74,12 +76,14 @@ export function parseVectorModel(xml: string): VectorModel | null {
     if (!d) continue;
     const alphaRaw = attrOf(m[1], "fillAlpha");
     const swRaw = attrOf(m[1], "strokeWidth");
+    const saRaw = attrOf(m[1], "strokeAlpha");
     paths.push({
       d,
       fill: attrOf(m[1], "fillColor") || "#1D1B20",
       alpha: alphaRaw == null ? undefined : num(alphaRaw, 1),
       stroke: attrOf(m[1], "strokeColor") || undefined,
       strokeWidth: swRaw == null ? undefined : num(swRaw, 1),
+      strokeAlpha: saRaw == null ? undefined : num(saRaw, 1),
     });
   }
   if (!paths.length) return null;
@@ -119,6 +123,7 @@ export function buildVectorXml(m: VectorModel, name = "ic_icon"): string {
     if (p.alpha != null && p.alpha !== 1) lines.push(`${pad}    android:fillAlpha="${round(p.alpha)}"`);
     if (p.stroke) lines.push(`${pad}    android:strokeColor="${p.stroke}"`);
     if (p.strokeWidth != null) lines.push(`${pad}    android:strokeWidth="${round(p.strokeWidth)}"`);
+    if (p.strokeAlpha != null && p.strokeAlpha !== 1) lines.push(`${pad}    android:strokeAlpha="${round(p.strokeAlpha)}"`);
     lines.push(`${pad}    android:pathData="${p.d}"/>`);
   }
   if (withGroup) lines.push(`    </group>`);

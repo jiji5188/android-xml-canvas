@@ -314,6 +314,25 @@ export async function streamChat(
   return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
 }
 
+/** 把底层（Java/浏览器）原始网络错误译成可操作的中文说明 */
+export function friendlyAiError(err?: string): string {
+  if (!err) return "连接失败";
+  const e = err;
+  if (e.includes("SocketException") || e.includes("Software caused connection abort"))
+    return "网络连接被中断（服务端或运营商提前关闭了通道）。请检查 App 的「联网」开关、当前 Wi‑Fi/移动网络是否可用，必要时把 AI 服务商切到更稳定的地址（比如 腾讯 TokenHub 的 127.0.0.1 本地代理）再试一次";
+  if (e.includes("SSLHandshake") || e.includes("SSLException") || e.includes("CERT"))
+    return "SSL 握手失败：请确认 baseUrl 是 https 且证书有效，或改用 http://127.0.0.1 本地代理";
+  if (e.includes("UnknownHost") || e.includes("ENOTFOUND") || e.includes("ECONNREFUSED") || e.includes("Network unreachable"))
+    return "无法访问该地址：请检查 baseUrl 拼写、是否需要开局域网、或是否还在离线状态";
+  if (e.includes("timeout") || e.includes("Timed out") || e.includes("timed out"))
+    return "请求超时：模型响应太慢或网络抖动，可再试一次；大文档建议用更轻的模型";
+  if (e.includes("401")) return "401：API Key 无效或欠费，请到服务商后台确认";
+  if (e.includes("404")) return "404：baseUrl 或模型名不存在，请核对";
+  if (e.includes("400") || e.includes("422")) return "400/422：请求体被拒，可能是模型名/参数不对，或服务端不支持 tools";
+  if (e.includes("429")) return "429：触发限流，稍后再试或换一家";
+  return e;
+}
+
 /** 只用旧 @JavascriptInterface 桥的通道（port 静默失败时用它重试） */
 function bridgeChannel(): NativeChannel | null {
   const b = bridge();

@@ -12,7 +12,7 @@ import { buildVectorXml, parseVectorModel, nextRotation } from "@/lib/xml/vector
 import type { VectorModel } from "@/lib/xml/vector-edit";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { IconPickerPanel } from "./IconPickerPanel";
-import { ColorField } from "./ColorField";
+import { ColorPicker } from "./ColorPicker";
 import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
 
 interface Props {
@@ -56,6 +56,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
   const [showRaw, setShowRaw] = useState(false);
   const [picking, setPicking] = useState(false);
   const [err, setErr] = useState("");
+  const [colorTarget, setColorTarget] = useState<"all" | number | null>(null);
   // M78：系统返回键也能关（否则手机上按返回会退出 app）；必须放在任何 early return 之前
   const close = useOverlayBack(true, onClose);
 
@@ -239,14 +240,47 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
                   onClick={() => applyColorToAll(c)}
                 />
               ))}
-              <ColorField
-                label="当前 path 颜色"
-                value={cur?.fill ?? "#1D1B20"}
-                onChange={(css) => patchPath(activePath, { fill: toAndroidHex(parseColorOr(css, "#1D1B20")) })}
-              />
+              <button
+                type="button"
+                className="axv-icon-ed-cp"
+                title="选择颜色（当前 path）"
+                onClick={() => setColorTarget(activePath)}
+              >
+                <span className="axv-cp-swatch" style={{ background: toHex(cur?.fill ?? "#1D1B20") }} />
+                取色
+              </button>
+              <button
+                type="button"
+                className="axv-icon-ed-cp"
+                title="选择颜色（全部 path）"
+                onClick={() => setColorTarget("all")}
+              >
+                <span className="axv-cp-swatch" style={{ background: toHex(cur?.fill ?? "#1D1B20") }} />
+                全部取色
+              </button>
             </div>
             <div className="axv-set-hint">
-              点色块 = 全部 path 统一上色；右边取色器只改当前 path（{activePath + 1}/{model.paths.length}）
+              点色块 = 全部 path 统一上色；「取色」改当前 path（{activePath + 1}/{model.paths.length}）；「全部取色」改全部 path
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+              <button
+                type="button"
+                className="axv-icon-ed-cp"
+                title="选择颜色（当前 path）"
+                onClick={() => setColorTarget(activePath)}
+              >
+                <span className="axv-cp-swatch" style={{ background: toHex(cur?.fill ?? "#1D1B20") }} />
+                取色
+              </button>
+              <button
+                type="button"
+                className="axv-icon-ed-cp"
+                title="选择颜色（全部 path）"
+                onClick={() => setColorTarget("all")}
+              >
+                <span className="axv-cp-swatch" style={{ background: toHex(cur?.fill ?? "#1D1B20") }} />
+                全部取色
+              </button>
             </div>
             <label className="axv-icon-ed-row">
               <span>不透明度</span>
@@ -323,6 +357,18 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
                 >
                   <span className="axv-icon-ed-swatch" style={{ background: toHex(p.fill) }} />
                   <span className="axv-icon-ed-d">{p.d.slice(0, 42)}…</span>
+                  <button
+                    type="button"
+                    className="axv-icon-ed-cp-inline"
+                    title={`选择颜色（第 ${i + 1} 条 path）`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActivePath(i);
+                      setColorTarget(i);
+                    }}
+                  >
+                    取色
+                  </button>
                   {model.paths.length > 1 ? (
                     <button
                       className="axv-icon-ed-del"
@@ -375,6 +421,25 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
           </button>
         </span>
       </div>
+
+      {/* M79：统一颜色选择器（来自 colorpicker.html） */}
+      {colorTarget !== null ? (
+        <ColorPicker
+          label={colorTarget === "all" ? "全部 path 颜色" : `第 ${Number(colorTarget) + 1} 条 path 颜色`}
+          value={
+            colorTarget === "all"
+              ? model.paths[0]?.fill ?? "#1D1B20"
+              : (model.paths[colorTarget]?.fill ?? "#1D1B20")
+          }
+          onClose={() => setColorTarget(null)}
+          onConfirm={(next) => {
+            if (colorTarget === "all") applyColorToAll(next);
+            else patchPath(colorTarget, { fill: next });
+            setColorTarget(null);
+          }}
+          presets={PRESET_COLORS}
+        />
+      ) : null}
 
       {/* 换字形：图标选择器叠在全页之上 */}
       {picking ? (

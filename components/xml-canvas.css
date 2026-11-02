@@ -7894,6 +7894,7 @@ button.axv-sb-item:hover {
   display: flex;
   flex-direction: row;
   min-height: 0;
+  position: relative;
 }
 
 /* 左栏：工具条 + 画布 */
@@ -8090,8 +8091,7 @@ button.axv-sb-item:hover {
 }
 .axv-cv-layer:hover .axv-icon-ed-del { opacity: 0.9; }
 
-.axv-cv-empty {
-  padding: 12px 6px;
+.axv-cv-empty {  padding: 12px 6px;
   font-size: 11px;
   line-height: 1.6;
   opacity: 0.5;
@@ -8128,4 +8128,201 @@ button.axv-sb-item:hover {
   flex: 1 1 auto;
   min-width: 0;
   line-height: 1.5;
+}
+
+
+/* ===== M82：图标画布补齐 svg-board 能力 ===== */
+.axv-cv-layer-d {
+  flex: 0 1 auto;
+  max-width: 96px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-cv-layer-btn {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.45;
+}
+.axv-cv-layer-btn:hover { opacity: 0.95; background: rgba(0, 0, 0, 0.06); }
+.axv-cv-layer-btn .msr { font-size: 15px; }
+.axv-cv-layer.is-hidden .axv-cv-layer-name,
+.axv-cv-layer.is-hidden .axv-cv-layer-d { opacity: 0.4; text-decoration: line-through; }
+.axv-cv-layer.is-locked .axv-cv-layer-name::after { content: " 🔒"; font-size: 10px; }
+
+.axv-cv-align {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0 0 6px;
+}
+.axv-cv-align-btn {
+  width: 28px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.5);
+  color: inherit;
+  cursor: pointer;
+}
+.axv-cv-align-btn:hover:not(:disabled) { border-color: rgba(27, 110, 243, 0.6); color: #1b6ef3; }
+.axv-cv-align-btn:disabled { opacity: 0.3; cursor: default; }
+.axv-cv-align-btn .msr { font-size: 16px; }
+
+.axv-cv-presets { display: flex; gap: 6px; margin: 0 0 8px; }
+.axv-cv-preset {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+.axv-cv-preset:hover { transform: translateY(-1px); }
+
+.axv-cv-mini {
+  margin-left: 8px;
+  padding: 0 6px;
+  height: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.5);
+  color: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.axv-cv-mini:hover { border-color: rgba(27, 110, 243, 0.6); color: #1b6ef3; }
+
+.axv-cv-sublabel { font-size: 10px; opacity: 0.55; margin: 2px 0 4px; }
+.axv-cv-textnote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.5;
+  opacity: 0.6;
+}
+
+/* ================= M83 底部样式抽屉（移植 svg-board 的 sheet） ================= */
+.axv-cv-sheet {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 8;
+  max-height: 42vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: 0 -2px 18px rgba(16, 24, 40, 0.12);
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.axv-cv-sheet.is-collapsed { transform: translateY(calc(100% - 38px)); }
+
+.axv-cv-sheet-head {
+  position: relative;
+  flex: 0 0 auto;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  user-select: none;
+}
+.axv-cv-grabber {
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  transform: translateX(-50%);
+  width: 34px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.16);
+}
+.axv-cv-sheet-title {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.2px;
+  opacity: 0.8;
+}
+.axv-cv-sheet-tabs {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
+}
+.axv-cv-sheet-tab {
+  height: 24px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 11.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-cv-sheet-tab:hover { color: #1b6ef3; }
+.axv-cv-sheet-tab.on {
+  background: #fff;
+  color: #1b6ef3;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+.axv-cv-sheet-chev {
+  font-size: 18px;
+  opacity: 0.55;
+  transition: transform 0.2s;
+}
+.axv-cv-sheet.is-collapsed .axv-cv-sheet-chev { transform: rotate(180deg); }
+
+.axv-cv-sheet-body {
+  overflow-y: auto;
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overscroll-behavior: contain;
+}
+.axv-cv-sheet-pane { display: flex; flex-direction: column; gap: 8px; }
+
+/* 抽屉里的 set-group 不再需要外边距/分隔线 */
+.axv-cv-sheet-pane .axv-set-group { margin: 0; padding: 0; border: 0; }
+.axv-cv-sheet-pane .axv-cv-layers { max-height: none; }
+
+/* 抽屉展开时画布上移，避免挡住图标 */
+.axv-cv-body:has(.axv-cv-sheet:not(.is-collapsed)) .axv-cv-stage {
+  padding-bottom: 132px;
+}
+
+@media (max-width: 840px) {
+  .axv-cv-sheet { left: 4px; right: 4px; bottom: 4px; max-height: 46vh; }
+  .axv-cv-sheet-tab { padding: 0 8px; font-size: 11px; }
+  .axv-cv-sheet-title { display: none; }
+  .axv-cv-sheet-tabs { margin-left: 0; }
+  .axv-cv-body:has(.axv-cv-sheet:not(.is-collapsed)) .axv-cv-stage { padding-bottom: 118px; }
 }

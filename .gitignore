@@ -74,3 +74,5 @@ dev-m45.log
 app.apk.idsig
 dev-*.err.log
 dev-*.out.log
+
+dev.log

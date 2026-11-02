@@ -22,6 +22,9 @@ import {
   toCss,
   translateShape,
   unionBox,
+  alignShapes,
+  convertShapesToPaths,
+  moveInList,
   type Box,
   type CanvasMeta,
   type DrawShape,
@@ -49,9 +52,18 @@ type Tool =
   | "ellipse"
   | "line"
   | "polygon"
-  | "star";
+  | "star"
+  | "text";
 
 const PRESET_COLORS = ["#1D1B20", "#04409F", "#B3261E", "#1F7A3D", "#F5A524", "#6B7280"];
+
+/** 字体栈（画布渲染与 SVG 输出一致） */
+const FONT_STACKS: Record<string, string> = {
+  sans: "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+  serif: "Georgia, 'Times New Roman', 'Songti SC', SimSun, serif",
+  mono: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  kai: "'Kaiti SC', KaiTi, STKaiti, serif",
+};
 
 const TOOLS: { t: Tool; icon: string; label: string; key?: string }[] = [
   { t: "select", icon: "arrow_selector_tool", label: "选择", key: "V" },
@@ -63,6 +75,7 @@ const TOOLS: { t: Tool; icon: string; label: string; key?: string }[] = [
   { t: "line", icon: "show_chart", label: "直线", key: "L" },
   { t: "polygon", icon: "pentagon", label: "多边形" },
   { t: "star", icon: "star", label: "星形" },
+  { t: "text", icon: "title", label: "文字", key: "T" },
 ];
 
 const BLANK: Snapshot = {
@@ -130,8 +143,14 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [err, setErr] = useState("");
   const [showRaw, setShowRaw] = useState(false);
   const [picking, setPicking] = useState(false);
-  const [colorTarget, setColorTarget] = useState<{ kind: "fill" | "stroke" } | null>(null);
+  const [colorTarget, setColorTarget] = useState<{ kind: "fill" | "stroke" | "bg" } | null>(null);
   const [zoom, setZoom] = useState(1);
+  /** 网格 / 背景（背景会导出成最底层矩形） */
+  const [showGrid, setShowGrid] = useState(true);
+  const [bg, setBg] = useState("");
+  /** 底部样式抽屉（移植 svg-board）：4 个 tab 子页 + 折叠 */
+  const [sheetTab, setSheetTab] = useState<"style" | "align" | "layers" | "board">("style");
+  const [sheetOpen, setSheetOpen] = useState(true);
 
   const undoRef = useRef<Snapshot[]>([]);
   const redoRef = useRef<Snapshot[]>([]);
@@ -212,7 +231,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       const pad = 1.5 / Math.max(0.4, zoom);
       for (let i = shapes.length - 1; i >= 0; i--) {
         const s = shapes[i];
-        if (s.hidden) continue;
+        if (s.hidden || s.locked) continue;
         const b = shapeBox(s);
         if (p.x >= b.x - pad && p.x <= b.x + b.w + pad && p.y >= b.y - pad && p.y <= b.y + b.h + pad) {
           return s;
@@ -279,6 +298,22 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           return { id, type: "polygon", cx: p.x, cy: p.y, r: 0.01, sides: 6, ...st };
         case "star":
           return { id, type: "star", cx: p.x, cy: p.y, r: 0.01, sides: 5, inner: 0.42, ...st };
+        case "text":
+          return {
+            id,
+            type: "text",
+            x: p.x,
+            y: p.y,
+            text: "文字",
+            size: Math.max(2, meta.vw / 3),
+            font: "sans",
+            bold: false,
+            outline: false,
+            fill: st.fill === "none" ? "#1D1B20" : st.fill,
+            stroke: "none",
+            strokeWidth: 0,
+            alpha: st.alpha,
+          };
         default:
           return {
             id,
@@ -308,6 +343,14 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     if (tool === "pen") {
       dragRef.current = { kind: "pen", pts: [p] };
       setPenPts([p]);
+      return;
+    }
+
+    if (tool === "text") {
+      const s = makeShape("text", p);
+      pushHistory();
+      setShapes((list) => [...list, s]);
+      setSel([s.id]);
       return;
     }
 
@@ -516,7 +559,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       };
       if (box.w > 0.4 || box.h > 0.4) {
         const picked = shapes.filter((s) => {
-          if (s.hidden) return false;
+          if (s.hidden || s.locked) return false;
           const b = shapeBox(s);
           return !(b.x + b.w < box.x || box.x + box.w < b.x || b.y + b.h < box.y || box.y + box.h < b.y);
         });
@@ -551,8 +594,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     setSel(copies.map((c) => c.id));
   };
 
-  const moveLayer = (dir: -1 | 1) => {
-    if (!sel.length) return;
+  const moveLayer = (dir: -1 | 1) => {    if (!sel.length) return;
     pushHistory();
     setShapes((list) => {
       const arr = [...list];
@@ -575,6 +617,57 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       }
       return arr;
     });
+  };
+
+  /** 几何图元 → 等价 path（手改 pathData 用） */
+  const convertSelToPath = () => {
+    if (!sel.length) return;
+    pushHistory();
+    setShapes((list) => convertShapesToPaths(list, sel));
+  };
+
+  /** 对齐 / 均分（需 ≥2 选中；均分需 ≥3） */
+  const alignSel = (mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "hdist" | "vdist") => {
+    if (sel.length < 2) return;
+    pushHistory();
+    setShapes((list) => alignShapes(list, sel, mode));
+  };
+
+  /** 层级：提到最前 / 沉到最后 */
+  const moveSel = (dir: "front" | "back") => {
+    if (!sel.length) return;
+    pushHistory();
+    setShapes((list) => moveInList(list, sel, dir));
+  };
+
+  /** 删除选中 */
+  const deleteSel = () => {
+    if (!sel.length) return;
+    pushHistory();
+    setShapes((list) => list.filter((s) => !sel.includes(s.id)));
+    setSel([]);
+  };
+
+  /** 图层显示 / 锁定 */
+  const toggleFlag = (id: string, key: "hidden" | "locked") => {
+    pushHistory();
+    setShapes((list) =>
+      list.map((s) => (s.id === id ? { ...s, [key]: !s[key] } : s)),
+    );
+    if (key === "hidden") setSel((cur2) => cur2.filter((x) => x !== id));
+  };
+
+  /** 复制一条（选中优先，否则复制最后一个） */
+  const duplicateOne = () => {
+    const base = shapes.find((s) => sel.includes(s.id)) ?? shapes[shapes.length - 1];
+    if (!base) return;
+    pushHistory();
+    const copy = { ...base, id: nextId() } as DrawShape;
+    // 偏移一点，避免完全重叠看不出来
+    const off = Math.max(0.5, meta.vw / 48);
+    translateShape(copy, off, off);
+    setShapes((list) => [...list, copy]);
+    setSel([copy.id]);
   };
 
   /* ---------------- 键盘 ---------------- */
@@ -615,7 +708,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
         removeSel();
         return;
       }
-      const map: Record<string, Tool> = { v: "select", p: "pen", r: "rect", o: "circle", l: "line" };
+      const map: Record<string, Tool> = { v: "select", p: "pen", r: "rect", o: "circle", l: "line", t: "text" };
       if (map[e.key.toLowerCase()]) {
         setTool(map[e.key.toLowerCase()]);
         return;
@@ -625,7 +718,14 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
         const step = e.shiftKey ? 1 : 0.25;
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-        setShapes((list) => list.map((s) => (sel.includes(s.id) ? translateShape(s, dx, dy) : s)));
+        pushHistory();
+        setShapes((list) =>
+          list.map((s) =>
+            sel.includes(s.id) && !s.locked
+              ? translateShape({ ...s } as DrawShape, dx, dy)
+              : s,
+          ),
+        );
       }
     };
     window.addEventListener("keydown", onKey, true);
@@ -633,7 +733,29 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   }, [close, duplicateSel, redo, removeSel, sel, shapes, undo]);
 
   /* ---------------- 输出 ---------------- */
-  const model = useMemo(() => shapesToModel(shapes, meta), [shapes, meta]);
+  const model = useMemo(() => {
+    /* 背景色：导出成铺满视口的底层矩形（vector 没有背景属性） */
+    const withBg: DrawShape[] = bg
+      ? [
+          {
+            id: "__bg",
+            type: "rect",
+            x: 0,
+            y: 0,
+            w: meta.vw,
+            h: meta.vh,
+            fill: bg,
+            stroke: "none",
+            strokeWidth: 0,
+            alpha: 1,
+          },
+          ...shapes,
+        ]
+      : shapes;
+    return shapesToModel(withBg, meta);
+  }, [bg, shapes, meta]);
+  /** 文字图元数量：导出时会被忽略，要提醒 */
+  const textCount = useMemo(() => shapes.filter((s) => s.type === "text" && !s.hidden).length, [shapes]);
   const outXml = useMemo(() => buildVectorXml(model, resName || "ic_icon"), [model, resName]);
 
   const save = () => {
@@ -647,7 +769,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       return;
     }
     if (!model.paths.length) {
-      setErr("画布是空的，先画点东西");
+      setErr(textCount ? "画布里只有文字：Android vector 不支持文字，请先把文字换成图形或路径" : "画布是空的，先画点东西");
       return;
     }
     onSave(safe, buildVectorXml(model, safe));
@@ -762,6 +884,15 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             ))}
             <span className="axv-cv-tool-sep" />
             <button
+              className={"axv-cv-tool" + (showGrid ? " on" : "")}
+              onClick={() => setShowGrid((v) => !v)}
+              title="网格"
+              aria-label="网格"
+              aria-pressed={showGrid}
+            >
+              <span className="msr" aria-hidden="true">grid_on</span>
+            </button>
+            <button
               className="axv-cv-tool"
               onClick={() => setZoom((z) => Math.max(0.4, Math.round((z - 0.1) * 10) / 10))}
               title="缩小"
@@ -783,7 +914,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           </div>
 
           <div className="axv-cv-stage" ref={stageRef}>
-            <div className="axv-cv-board" style={{ width: `${Math.round(300 * zoom)}px` }}>
+            <div className="axv-cv-board" style={{ width: `${Math.round(300 * zoom)}px`, background: bg ? toCss(bg) : "#fff" }}>
               <svg
                 viewBox={`0 0 ${meta.vw} ${meta.vh}`}
                 className={"axv-cv-svg" + (tool === "select" ? " is-select" : "")}
@@ -797,22 +928,47 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     <path d="M2 0H0V2" fill="none" stroke="#00000012" strokeWidth="0.08" />
                   </pattern>
                 </defs>
-                <rect x={0} y={0} width={meta.vw} height={meta.vh} fill="url(#axv-cv-grid)" />
+                <rect x={0} y={0} width={meta.vw} height={meta.vh} fill={bg ? toCss(bg) : "#ffffff"} />
+                {showGrid ? (
+                  <rect x={0} y={0} width={meta.vw} height={meta.vh} fill="url(#axv-cv-grid)" />
+                ) : null}
                 <g ref={gRef} transform={gTransform}>
-                  {shapes.map((s) => (
-                    <path
-                      key={s.id}
-                      d={shapeD(s)}
-                      fill={isRenderableColor(s.fill) ? toCss(s.fill) : "none"}
-                      fillOpacity={s.alpha}
-                      stroke={isRenderableColor(s.stroke) ? toCss(s.stroke) : "none"}
-                      strokeWidth={s.strokeWidth || 0}
-                      strokeOpacity={s.alpha}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{ pointerEvents: "none" }}
-                    />
-                  ))}
+                  {shapes.map((s) =>
+                    s.type === "text" ? (
+                      <text
+                        key={s.id}
+                        x={s.x}
+                        y={s.y}
+                        fontSize={s.size}
+                        fontFamily={FONT_STACKS[s.font ?? "sans"] ?? FONT_STACKS.sans}
+                        fontWeight={s.bold ? 700 : 400}
+                        fill={isRenderableColor(s.fill) ? toCss(s.fill) : "none"}
+                        fillOpacity={s.alpha}
+                        stroke={s.outline && s.strokeWidth > 0 && isRenderableColor(s.stroke) ? toCss(s.stroke) : "none"}
+                        strokeWidth={(s.strokeWidth || 0) * 2}
+                        strokeLinejoin="round"
+                        paintOrder="stroke"
+                        opacity={s.hidden ? 0.25 : 1}
+                        style={{ pointerEvents: "none", userSelect: "none" }}
+                      >
+                        {s.text}
+                      </text>
+                    ) : (
+                      <path
+                        key={s.id}
+                        d={shapeD(s)}
+                        fill={isRenderableColor(s.fill) ? toCss(s.fill) : "none"}
+                        fillOpacity={s.alpha}
+                        stroke={isRenderableColor(s.stroke) ? toCss(s.stroke) : "none"}
+                        strokeWidth={s.strokeWidth || 0}
+                        strokeOpacity={s.alpha}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        opacity={s.hidden ? 0.25 : 1}
+                        style={{ pointerEvents: "none" }}
+                      />
+                    ),
+                  )}
 
                   {/* 画笔实时预览 */}
                   {penPts.length > 1 ? (
@@ -879,6 +1035,17 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
 
         {/* 右：参数面板 */}
         <div className="axv-icon-ed-form axv-cv-form">
+          {!shapes.length ? (
+            <div className="axv-icon-ed-warn">
+              <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>info</span>
+              <span>
+                画布是空的：选左边工具画一个，或从图标库挑一个字形。
+                <button className="axv-btn axv-ghost" style={{ marginLeft: 8 }} onClick={() => setPicking(true)}>
+                  选择图标
+                </button>
+              </span>
+            </div>
+          ) : null}
           <div className="axv-set-group">
             <div className="axv-set-label">资源</div>
             <div className="axv-icon-ed-row">
@@ -920,125 +1087,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
 
           <div className="axv-set-group">
             <div className="axv-set-label">
-              外观
-              {cur ? <span className="axv-cv-hint">· 选中 1 个</span> : <span className="axv-cv-hint">· 未选中（改的是下一个新图形）</span>}
-            </div>
-            <div className="axv-icon-ed-row">
-              <span>填充</span>
-              <button
-                type="button"
-                className="axv-cv-swatch"
-                style={{
-                  background: isRenderableColor(cur?.fill ?? "#1D1B20") ? toCss(cur?.fill ?? "#1D1B20") : "#fff",
-                }}
-                onClick={() => setColorTarget({ kind: "fill" })}
-                title="选择填充色"
-              >
-                <span className="axv-cv-swatch-val">{toHex6(cur?.fill ?? "#1D1B20")}</span>
-              </button>
-              <button
-                className={"axv-cv-toggle" + ((cur?.fill ?? "#1D1B20") === "none" ? " on" : "")}
-                onClick={() => {
-                  if (!sel.length) return;
-                  pushHistory();
-                  patchSel({ fill: cur?.fill === "none" ? "#1D1B20" : "none" });
-                }}
-                title="无填充"
-              >
-                无
-              </button>
-            </div>
-            <div className="axv-icon-ed-row">
-              <span>描边</span>
-              <button
-                type="button"
-                className="axv-cv-swatch"
-                style={{
-                  background: isRenderableColor(cur?.stroke ?? "none") ? toCss(cur?.stroke ?? "none") : "#fff",
-                }}
-                onClick={() => setColorTarget({ kind: "stroke" })}
-                title="选择描边色"
-              >
-                <span className="axv-cv-swatch-val">{cur?.stroke === "none" ? "无" : toHex6(cur?.stroke ?? "#1D1B20")}</span>
-              </button>
-              <input
-                className="axv-cv-num"
-                type="number"
-                min={0}
-                step={0.25}
-                value={cur?.strokeWidth ?? 0}
-                onChange={(e) => {
-                  if (!sel.length) return;
-                  patchSel({ strokeWidth: Math.max(0, Number(e.target.value) || 0) });
-                }}
-                title="描边宽度（viewport 单位）"
-              />
-            </div>
-            <label className="axv-icon-ed-row">
-              <span>不透明度</span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={cur?.alpha ?? 1}
-                onChange={(e) => {
-                  if (!sel.length) return;
-                  patchSel({ alpha: Number(e.target.value) });
-                }}
-              />
-              <b className="axv-icon-ed-val">{Math.round((cur?.alpha ?? 1) * 100)}%</b>
-            </label>
-
-            {/* 形状专属参数 */}
-            {cur && (cur.type === "roundRect" || cur.type === "polygon" || cur.type === "star") ? (
-              <div className="axv-cv-extra">
-                {cur.type === "roundRect" ? (
-                  <label className="axv-icon-ed-row">
-                    <span>圆角</span>
-                    <input
-                      className="axv-cv-num"
-                      type="number"
-                      min={0}
-                      step={0.5}
-                      value={cur.round ?? 0}
-                      onChange={(e) => patchSel({ round: Math.max(0, Number(e.target.value) || 0) })}
-                    />
-                  </label>
-                ) : null}
-                {cur.type === "polygon" || cur.type === "star" ? (
-                  <label className="axv-icon-ed-row">
-                    <span>边数</span>
-                    <input
-                      className="axv-cv-num"
-                      type="number"
-                      min={3}
-                      max={24}
-                      value={cur.sides}
-                      onChange={(e) => patchSel({ sides: Math.max(3, Math.min(24, Math.round(Number(e.target.value) || 3))) })}
-                    />
-                  </label>
-                ) : null}
-                {cur.type === "star" ? (
-                  <label className="axv-icon-ed-row">
-                    <span>内径</span>
-                    <input
-                      type="range"
-                      min={0.05}
-                      max={0.95}
-                      step={0.01}
-                      value={cur.inner ?? 0.42}
-                      onChange={(e) => patchSel({ inner: Number(e.target.value) })}
-                    />
-                    <b className="axv-icon-ed-val">{Math.round((cur.inner ?? 0.42) * 100)}%</b>
-                  </label>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="axv-set-group">
-            <div className="axv-set-label">
               整体变换
               <span className="axv-cv-hint">· 旋转/镜像写进 &lt;group&gt;</span>
             </div>
@@ -1072,17 +1120,329 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           </div>
 
           <div className="axv-set-group">
-            <div className="axv-set-label">
-              图形（{shapes.length}）
-              <span className="axv-cv-hint">· 点一行选中，可多选</span>
+            <button className="axv-set-btn" onClick={() => setShowRaw((v) => !v)}>
+              <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
+              {showRaw ? "收起 XML" : "查看生成的 XML"}
+            </button>
+            {showRaw ? <textarea className="axv-icon-ed-raw" readOnly value={outXml} /> : null}
+          </div>
+        </div>
+
+        {/* 底部样式抽屉（移植 svg-board）：样式 / 排列 / 图层 / 画布 四个子页 */}
+        <div className={"axv-cv-sheet" + (sheetOpen ? "" : " is-collapsed")}>
+          <div className="axv-cv-sheet-head" onClick={() => setSheetOpen((v) => !v)}>
+            <span className="axv-cv-grabber" aria-hidden="true" />
+            <span className="axv-cv-sheet-title">样式</span>
+            <div className="axv-cv-sheet-tabs" onClick={(e) => e.stopPropagation()}>
+              {([["style", "样式"], ["align", "排列"], ["layers", "图层"], ["board", "画布"]] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  className={"axv-cv-sheet-tab" + (sheetTab === k ? " on" : "")}
+                  onClick={() => { setSheetTab(k); setSheetOpen(true); }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
+            <span className="axv-cv-sheet-chev msr" aria-hidden="true">expand_more</span>
+          </div>
+          <div className="axv-cv-sheet-body">
+            {sheetTab === "style" ? (
+              <div className="axv-cv-sheet-pane">
+            <div className="axv-set-group">
+              <div className="axv-set-label">
+                外观
+                {cur ? <span className="axv-cv-hint">· 选中 {sel.length} 个</span> : <span className="axv-cv-hint">· 未选中（改的是下一个新图形）</span>}
+              </div>
+              {/* 预设色块：有选中 → 只改选中；没选中 → 全部上色 */}
+              <div className="axv-cv-presets">
+                {PRESET_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className="axv-cv-preset"
+                    style={{ background: c }}
+                    title={sel.length ? `选中图形填 ${c}` : `全部图形填 ${c}`}
+                    onClick={() => {
+                      pushHistory();
+                      const ids = sel.length ? sel : shapes.map((s) => s.id);
+                      setShapes((list) =>
+                        list.map((s) =>
+                          ids.includes(s.id)
+                            ? ({ ...s, fill: c, alpha: 1, ...(s.type === "line" ? { stroke: c } : {}) } as typeof s)
+                            : s,
+                        ),
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="axv-icon-ed-row">
+                <span>填充</span>
+                <button
+                  type="button"
+                  className="axv-cv-swatch"
+                  style={{
+                    background: isRenderableColor(cur?.fill ?? "#1D1B20") ? toCss(cur?.fill ?? "#1D1B20") : "#fff",
+                  }}
+                  onClick={() => setColorTarget({ kind: "fill" })}
+                  title="选择填充色"
+                >
+                  <span className="axv-cv-swatch-val">{toHex6(cur?.fill ?? "#1D1B20")}</span>
+                </button>
+                <button
+                  className={"axv-cv-toggle" + ((cur?.fill ?? "#1D1B20") === "none" ? " on" : "")}
+                  onClick={() => {
+                    if (!sel.length) return;
+                    pushHistory();
+                    patchSel({ fill: cur?.fill === "none" ? "#1D1B20" : "none" });
+                  }}
+                  title="无填充"
+                >
+                  无
+                </button>
+              </div>
+              <div className="axv-icon-ed-row">
+                <span>描边</span>
+                <button
+                  type="button"
+                  className="axv-cv-swatch"
+                  style={{
+                    background: isRenderableColor(cur?.stroke ?? "none") ? toCss(cur?.stroke ?? "none") : "#fff",
+                  }}
+                  onClick={() => setColorTarget({ kind: "stroke" })}
+                  title="选择描边色"
+                >
+                  <span className="axv-cv-swatch-val">{cur?.stroke === "none" ? "无" : toHex6(cur?.stroke ?? "#1D1B20")}</span>
+                </button>
+                <input
+                  className="axv-cv-num"
+                  type="number"
+                  min={0}
+                  step={0.25}
+                  value={cur?.strokeWidth ?? 0}
+                  onChange={(e) => {
+                    if (!sel.length) return;
+                    patchSel({ strokeWidth: Math.max(0, Number(e.target.value) || 0) });
+                  }}
+                  title="描边宽度（viewport 单位）"
+                />
+              </div>
+              <label className="axv-icon-ed-row">
+                <span>不透明度</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={cur?.alpha ?? 1}
+                  onChange={(e) => {
+                    if (!sel.length) return;
+                    patchSel({ alpha: Number(e.target.value) });
+                  }}
+                />
+                <b className="axv-icon-ed-val">{Math.round((cur?.alpha ?? 1) * 100)}%</b>
+              </label>
+  
+              {/* 形状专属参数 */}
+              {cur && (cur.type === "roundRect" || cur.type === "polygon" || cur.type === "star") ? (
+                <div className="axv-cv-extra">
+                  {cur.type === "roundRect" ? (
+                    <label className="axv-icon-ed-row">
+                      <span>圆角</span>
+                      <input
+                        className="axv-cv-num"
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={cur.round ?? 0}
+                        onChange={(e) => patchSel({ round: Math.max(0, Number(e.target.value) || 0) })}
+                      />
+                    </label>
+                  ) : null}
+                  {cur.type === "polygon" || cur.type === "star" ? (
+                    <label className="axv-icon-ed-row">
+                      <span>边数</span>
+                      <input
+                        className="axv-cv-num"
+                        type="number"
+                        min={3}
+                        max={24}
+                        value={cur.sides}
+                        onChange={(e) => patchSel({ sides: Math.max(3, Math.min(24, Math.round(Number(e.target.value) || 3))) })}
+                      />
+                    </label>
+                  ) : null}
+                  {cur.type === "star" ? (
+                    <label className="axv-icon-ed-row">
+                      <span>内径</span>
+                      <input
+                        type="range"
+                        min={0.05}
+                        max={0.95}
+                        step={0.01}
+                        value={cur.inner ?? 0.42}
+                        onChange={(e) => patchSel({ inner: Number(e.target.value) })}
+                      />
+                      <b className="axv-icon-ed-val">{Math.round((cur.inner ?? 0.42) * 100)}%</b>
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+  
+              {/* 文字参数（vector 不支持文字，导出会跳过） */}
+              {cur && cur.type === "text" ? (
+                <div className="axv-cv-extra">
+                  <label className="axv-icon-ed-row">
+                    <span>内容</span>
+                    <input
+                      className="axv-icon-ed-input"
+                      value={cur.text}
+                      onChange={(e) => patchSel({ text: e.target.value })}
+                    />
+                  </label>
+                  <label className="axv-icon-ed-row">
+                    <span>字号</span>
+                    <input
+                      className="axv-cv-num"
+                      type="number"
+                      min={1}
+                      step={0.5}
+                      value={cur.size}
+                      onChange={(e) => patchSel({ size: Math.max(1, Number(e.target.value) || 1) })}
+                    />
+                    <select
+                      className="sel axv-cv-num"
+                      value={cur.font ?? "sans"}
+                      onChange={(e) => patchSel({ font: e.target.value })}
+                    >
+                      <option value="sans">无衬线</option>
+                      <option value="serif">衬线</option>
+                      <option value="kai">楷体</option>
+                      <option value="mono">等宽</option>
+                    </select>
+                  </label>
+                  <div className="axv-cv-textnote">
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>warning</span>
+                    文字只用于画布查看：Android vector 不支持 &lt;text&gt;，保存时会被忽略。
+                  </div>
+                </div>
+              ) : null}
+  
+              {/* pathData 直接编辑（path 图元） */}
+              {cur && cur.type === "path" ? (
+                <div className="axv-cv-extra">
+                  <div className="axv-cv-sublabel">pathData（可直接手改）</div>
+                  <textarea
+                    className="axv-icon-ed-pathdata"
+                    value={cur.d}
+                    spellCheck={false}
+                    onChange={(e) => patchSel({ d: e.target.value })}
+                    placeholder="M12 2 L22 20 H2 Z"
+                  />
+                </div>
+              ) : null}
+              {cur && cur.type !== "path" && cur.type !== "text" ? (
+                <div className="axv-cv-textnote">
+                  <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>info</span>
+                  几何图形请直接拖拽 / 改上面的参数；想手改路径就先「转为路径」。
+                  <button className="axv-cv-mini" onClick={() => convertSelToPath()}>
+                    转为路径
+                  </button>
+                </div>
+              ) : null}
+            </div>
+              </div>
+            ) : null}
+            {sheetTab === "board" ? (
+              <div className="axv-cv-sheet-pane">
+            <div className="axv-set-group">
+              <div className="axv-set-label">
+                画布
+                <span className="axv-cv-hint">· 背景会导出成底层矩形</span>
+              </div>
+              <div className="axv-icon-ed-row">
+                <span>背景</span>
+                <button
+                  type="button"
+                  className="axv-cv-swatch"
+                  style={{ background: bg ? toCss(bg) : "#fff" }}
+                  onClick={() => setColorTarget({ kind: "bg" })}
+                  title="选择背景色"
+                >
+                  <span className="axv-cv-swatch-val">{bg ? toHex6(bg) : "无"}</span>
+                </button>
+                <button
+                  className="axv-cv-toggle"
+                  onClick={() => setBg("")}
+                  disabled={!bg}
+                  title="透明背景"
+                >
+                  透明
+                </button>
+              </div>
+            </div>
+              </div>
+            ) : null}
+            {sheetTab === "align" ? (
+              <div className="axv-cv-sheet-pane">
+                <div className="axv-cv-set-label">
+                  排列
+                  <span className="axv-cv-hint">· 对齐需选中 ≥2 个，均分需 ≥3 个</span>
+                </div>
+                {sel.length >= 2 ? (
+                  <div className="axv-cv-align">
+                    {([
+                      ["left", "align_horizontal_left", "左对齐"],
+                      ["hcenter", "align_horizontal_center", "水平居中"],
+                      ["right", "align_horizontal_right", "右对齐"],
+                      ["top", "align_vertical_top", "顶对齐"],
+                      ["vcenter", "align_vertical_center", "垂直居中"],
+                      ["bottom", "align_vertical_bottom", "底对齐"],
+                      ["hdist", "horizontal_distribute", "水平均分"],
+                      ["vdist", "vertical_distribute", "垂直均分"],
+                    ] as const).map(([mode, icon, label]) => (
+                      <button
+                        key={mode}
+                        className="axv-cv-align-btn"
+                        onClick={() => alignSel(mode)}
+                        title={label}
+                        aria-label={label}
+                        disabled={(mode === "hdist" || mode === "vdist") && sel.length < 3}
+                      >
+                        <span className="msr" aria-hidden="true">{icon}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="axv-cv-textnote">
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>info</span>
+                    先在画布上框选或用「图层」多选（Shift 点）两个以上图形。
+                  </div>
+                )}
+              </div>
+            ) : null}
+            {sheetTab === "layers" ? (
+              <div className="axv-cv-sheet-pane">
+                <div className="axv-cv-set-label">
+                  图形（{shapes.length}）
+                  <span className="axv-cv-hint">· 点一行选中，Shift 多选</span>
+                  <button className="axv-cv-mini" onClick={duplicateOne} title="复制一条（选中优先）">
+                    ＋ 复制一条
+                  </button>
+                </div>
             <div className="axv-cv-layers">
               {[...shapes].reverse().map((s) => {
                 const idx = shapes.findIndex((x) => x.id === s.id);
                 return (
                   <div
                     key={s.id}
-                    className={"axv-cv-layer" + (sel.includes(s.id) ? " on" : "")}
+                    className={
+                      "axv-cv-layer" +
+                      (sel.includes(s.id) ? " on" : "") +
+                      (s.hidden ? " is-hidden" : "") +
+                      (s.locked ? " is-locked" : "")
+                    }
                     onClick={(e) =>
                       setSel((cur2) =>
                         e.shiftKey
@@ -1100,6 +1460,43 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     <span className="axv-cv-layer-name">
                       {LAYER_LABEL[s.type]} {idx + 1}
                     </span>
+                    <span className="axv-cv-layer-d" title={s.type === "text" ? s.text : s.type === "path" ? s.d : shapeD(s)}>
+                      {s.type === "text" ? s.text : (s.type === "path" ? s.d : shapeD(s)).slice(0, 18)}
+                    </span>
+                    <button
+                      className="axv-cv-layer-btn"
+                      title="取色（这条）"
+                      aria-label="取色"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSel([s.id]);
+                        setColorTarget({ kind: "fill" });
+                      }}
+                    >
+                      <span className="msr" aria-hidden="true">palette</span>
+                    </button>
+                    <button
+                      className="axv-cv-layer-btn"
+                      title={s.hidden ? "显示" : "隐藏"}
+                      aria-label={s.hidden ? "显示" : "隐藏"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFlag(s.id, "hidden");
+                      }}
+                    >
+                      <span className="msr" aria-hidden="true">{s.hidden ? "visibility_off" : "visibility"}</span>
+                    </button>
+                    <button
+                      className="axv-cv-layer-btn"
+                      title={s.locked ? "解锁" : "锁定"}
+                      aria-label={s.locked ? "解锁" : "锁定"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFlag(s.id, "locked");
+                      }}
+                    >
+                      <span className="msr" aria-hidden="true">{s.locked ? "lock" : "lock_open"}</span>
+                    </button>
                     <button
                       className="axv-icon-ed-del"
                       title="删除"
@@ -1135,14 +1532,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 删除
               </button>
             </div>
-          </div>
-
-          <div className="axv-set-group">
-            <button className="axv-set-btn" onClick={() => setShowRaw((v) => !v)}>
-              <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
-              {showRaw ? "收起 XML" : "查看生成的 XML"}
-            </button>
-            {showRaw ? <textarea className="axv-icon-ed-raw" readOnly value={outXml} /> : null}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1162,20 +1553,33 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       {/* M79：统一颜色选择器 */}
       {colorTarget ? (
         <ColorPicker
-          label={colorTarget.kind === "fill" ? "填充颜色" : "描边颜色"}
+          label={
+            colorTarget.kind === "fill"
+              ? "填充颜色"
+              : colorTarget.kind === "stroke"
+                ? "描边颜色"
+                : "画布背景色"
+          }
           value={
             colorTarget.kind === "fill"
               ? cur?.fill && cur.fill !== "none"
                 ? cur.fill
                 : "#1D1B20"
-              : cur?.stroke && cur.stroke !== "none"
-                ? cur.stroke
-                : "#1D1B20"
+              : colorTarget.kind === "stroke"
+                ? cur?.stroke && cur.stroke !== "none"
+                  ? cur.stroke
+                  : "#1D1B20"
+                : bg || "#ffffff"
           }
           presets={PRESET_COLORS}
           abovePage
           onClose={() => setColorTarget(null)}
           onConfirm={(next) => {
+            if (colorTarget.kind === "bg") {
+              setBg(toHex6(next));
+              setColorTarget(null);
+              return;
+            }
             if (sel.length) {
               pushHistory();
               const rgba = parseColorOr(next, "#1D1B20");
@@ -1220,4 +1624,5 @@ const LAYER_LABEL: Record<DrawShape["type"], string> = {
   polygon: "多边形",
   star: "星形",
   path: "路径",
+  text: "文字",
 };

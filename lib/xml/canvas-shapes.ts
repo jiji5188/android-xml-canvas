@@ -16,7 +16,9 @@ export type ShapeType =
   | "line"
   | "polygon"
   | "star"
-  | "path";
+  | "path"
+  /** 文字：只能画布内显示，vector drawable 不支持 <text>，保存时会被忽略 */
+  | "text";
 
 export interface BaseShape {
   id: string;
@@ -81,13 +83,27 @@ export interface PathShape extends BaseShape {
   d: string;
 }
 
+export interface TextShape extends BaseShape {
+  type: "text";
+  /** 基线起点 */
+  x: number;
+  y: number;
+  text: string;
+  /** 字号（viewport 单位） */
+  size: number;
+  font?: string;
+  bold?: boolean;
+  outline?: boolean;
+}
+
 export type DrawShape =
   | RectShape
   | CircleShape
   | EllipseShape
   | LineShape
   | PolygonShape
-  | PathShape;
+  | PathShape
+  | TextShape;
 
 /** 画布尺寸（单位与 viewport 一致：1 = 1 viewport 单位） */
 export interface CanvasMeta {
@@ -198,6 +214,9 @@ export function shapeD(s: DrawShape): string {
       return starPath(s.cx, s.cy, s.r, s.inner ?? 0.42, s.sides);
     case "path":
       return s.d;
+    case "text":
+      /* vector drawable 没有文字概念，导出时跳过 */
+      return "";
   }
   return "";
 }
@@ -447,6 +466,13 @@ export function shapeBox(s: DrawShape): Box {
       return { x: s.cx - s.r, y: s.cy - s.r, w: s.r * 2, h: s.r * 2 };
     case "path":
       return pathBox(s.d);
+    case "text":
+      return {
+        x: s.x,
+        y: s.y - s.size,
+        w: Math.max(0.5, s.text.length * s.size * 0.6),
+        h: s.size * 1.25,
+      };
   }
   return { x: 0, y: 0, w: 0, h: 0 };
 }
@@ -467,7 +493,98 @@ export function unionBox(list: DrawShape[]): Box {
   return { x: x0, y: y0, w: Math.max(0.001, x1 - x0), h: Math.max(0.001, y1 - y0) };
 }
 
-/** 平移图元（就地修改并返回） */
+/* ---------------------------------------------------------------- */
+/* 对齐 / 均分 / 层级 / 转路径（纯函数，画布编辑器 UI 用）               */
+/* ---------------------------------------------------------------- */
+
+export type AlignMode =
+  | "left"
+  | "hcenter"
+  | "right"
+  | "top"
+  | "vcenter"
+  | "bottom"
+  | "hdist"
+  | "vdist";
+
+/** 对 shapes 里 id ∈ ids 的图形执行对齐/均分；对齐需 ≥2 个，均分需 ≥3 个。返回新数组。 */
+export function alignShapes(list: DrawShape[], ids: string[], mode: AlignMode): DrawShape[] {
+  const picked = list.filter((s) => ids.includes(s.id));
+  if (picked.length < 2) return list;
+  const arr = [...list];
+  const at = (id: string) => arr.findIndex((s) => s.id === id);
+
+  if (mode === "hdist" || mode === "vdist") {
+    if (picked.length < 3) return list;
+    const horiz = mode === "hdist";
+    const box = unionBox(picked);
+    const items = [...picked].sort((a, b) => {
+      const ba = shapeBox(a);
+      const bb = shapeBox(b);
+      return horiz ? ba.x - bb.x : ba.y - bb.y;
+    });
+    const total = horiz ? box.w : box.h;
+    const sum = items.reduce((n, s) => {
+      const b = shapeBox(s);
+      return n + (horiz ? b.w : b.h);
+    }, 0);
+    const gap = (total - sum) / (items.length - 1);
+    let cursor = horiz ? box.x : box.y;
+    for (const s of items) {
+      const b = shapeBox(s);
+      const delta = cursor - (horiz ? b.x : b.y);
+      const i = at(s.id);
+      if (i >= 0) arr[i] = translateShape({ ...arr[i] }, horiz ? delta : 0, horiz ? 0 : delta);
+      cursor += (horiz ? b.w : b.h) + gap;
+    }
+    return arr;
+  }
+
+  const box = unionBox(picked);
+  for (const s of picked) {
+    const b = shapeBox(s);
+    let dx = 0;
+    let dy = 0;
+    if (mode === "left") dx = box.x - b.x;
+    else if (mode === "hcenter") dx = box.x + box.w / 2 - (b.x + b.w / 2);
+    else if (mode === "right") dx = box.x + box.w - (b.x + b.w);
+    else if (mode === "top") dy = box.y - b.y;
+    else if (mode === "vcenter") dy = box.y + box.h / 2 - (b.y + b.h / 2);
+    else if (mode === "bottom") dy = box.y + box.h - (b.y + b.h);
+    if (!dx && !dy) continue;
+    const i = at(s.id);
+    if (i >= 0) arr[i] = translateShape({ ...arr[i] }, dx, dy);
+  }
+  return arr;
+}
+
+/** 选中图形提到最前（列表尾 = 视觉最上）/ 沉到最后（列表头 = 视觉最下）。 */
+export function moveInList(list: DrawShape[], ids: string[], dir: "front" | "back"): DrawShape[] {
+  const moving = list.filter((s) => ids.includes(s.id));
+  const rest = list.filter((s) => !ids.includes(s.id));
+  if (!moving.length) return list;
+  return dir === "front" ? [...rest, ...moving] : [...moving, ...rest];
+}
+
+/** 几何图元（rect/roundRect/circle/ellipse/line/polygon/star）→ 等价 path（pathData 可手改）；path/text 原样保留。 */
+export function convertShapesToPaths(list: DrawShape[], ids: string[]): DrawShape[] {
+  return list.map((s) => {
+    if (!ids.includes(s.id) || s.type === "path" || s.type === "text") return s;
+    const d = shapeD(s);
+    if (!d) return s;
+    return {
+      id: s.id,
+      type: "path" as const,
+      d,
+      fill: s.fill,
+      stroke: s.stroke,
+      strokeWidth: s.strokeWidth,
+      alpha: s.alpha,
+      hidden: s.hidden,
+      locked: s.locked,
+    };
+  });
+}
 export function translateShape(s: DrawShape, dx: number, dy: number): DrawShape {
   switch (s.type) {
     case "rect":
@@ -491,18 +608,22 @@ export function translateShape(s: DrawShape, dx: number, dy: number): DrawShape 
     case "path":
       s.d = translatePath(s.d, dx, dy);
       break;
+    case "text":
+      s.x += dx;
+      s.y += dy;
+      break;
   }
   return s;
 }
 
-/** pathData 平移：给每个绝对命令加偏移（相对命令不动，靠首个 M 的偏移带走整条路径） */
+/** pathData 平移：绝对命令（M/L/H/V/C/S/Q/T/A）的坐标全部加偏移；相对命令不动（跟随前面的锚点移动）。 */
 export function translatePath(d: string, dx: number, dy: number): string {
   const toks = d.match(/[a-zA-Z]|-?\d*\.?\d+(?:e[-+]?\d+)?/g);
   if (!toks) return d;
   let out = "";
   let i = 0;
   let cmd = "";
-  let first = true;
+  let sawAbs = false;
   while (i < toks.length) {
     const t = toks[i];
     if (/[a-zA-Z]/.test(t)) {
@@ -520,18 +641,47 @@ export function translatePath(d: string, dx: number, dy: number): string {
     }
     const args = toks.slice(i, i + need).map(Number);
     i += need;
-    if (first && (C === "M" || C === "L") && !rel) {
-      args[0] += dx;
-      args[1] += dy;
-      first = false;
+    if (!rel) {
+      sawAbs = true;
+      switch (C) {
+        case "M":
+        case "L":
+        case "T":
+          args[0] += dx;
+          args[1] += dy;
+          break;
+        case "H":
+          args[0] += dx;
+          break;
+        case "V":
+          args[0] += dy;
+          break;
+        case "C":
+          args[0] += dx;
+          args[1] += dy;
+          args[2] += dx;
+          args[3] += dy;
+          args[4] += dx;
+          args[5] += dy;
+          break;
+        case "S":
+        case "Q":
+          args[0] += dx;
+          args[1] += dy;
+          args[2] += dx;
+          args[3] += dy;
+          break;
+        case "A":
+          // rx ry rot large-arc sweep x y → 只挪最后的终点
+          args[5] += dx;
+          args[6] += dy;
+          break;
+      }
     }
-    // 首点是相对命令时，整条路径没有绝对锚点：前面补一个 M 位移
     out += args.map((v) => nstr(v)).join(" ");
   }
-  if (first) {
-    // 全是相对命令：在最前面插入一个绝对位移
-    return `M${nstr(dx)},${nstr(dy)}${out}`;
-  }
+  // 整条路径全是相对命令 → 没有绝对锚点，前面补一个 M 位移
+  if (!sawAbs) return `M${nstr(dx)},${nstr(dy)}${out}`;
   return out;
 }
 
@@ -691,6 +841,11 @@ export function scaleShape(s: DrawShape, from: Box, to: Box): DrawShape {
       if (dx || dy) s.d = translatePath(nd, dx, dy);
       break;
     }
+    case "text":
+      s.x = mx(s.x);
+      s.y = my(s.y);
+      s.size = r3(s.size * Math.min(Math.abs(sx), Math.abs(sy)));
+      break;
   }
   return s;
 }

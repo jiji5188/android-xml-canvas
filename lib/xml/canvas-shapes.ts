@@ -396,6 +396,8 @@ export function shapesToModel(shapes: DrawShape[], meta: CanvasMeta): VectorMode
 
 /** 首层 group 是否就是「整体变换」那一层（parse 会把它的 attrs 读进 model.group） */
 function isWrapperGroup(model: VectorModel, n: VectorNodeGroup): boolean {
+  /* 有 name 的是真分组，不是整体变换那一层 */
+  if (n.name) return false;
   const g = model.group;
   const a = n.attrs;
   return (
@@ -1104,6 +1106,89 @@ export function scalePath(d: string, sx: number, sy: number, ox = 0, oy = 0): st
 }
 
 /** 按旧包围盒 → 新包围盒缩放图元 */
+/**
+ * M89b：把分组的「平移 + 缩放」直接烘进图形坐标（解组时用，保证画面不变）
+ * 只处理无旋转的组；旋转请先调回 0°（调用方负责提示）。
+ */
+export function bakeGroupTransform<T extends DrawShape>(shape: T, g: GroupSpec): T {
+  const sx = g.sx || 1;
+  const sy = g.sy || 1;
+  const fx = (x: number) => sx * (x - g.px) + g.px + g.tx;
+  const fy = (y: number) => sy * (y - g.py) + g.py + g.ty;
+  const k = Math.sqrt(Math.abs(sx * sy));
+  const out = { ...shape } as DrawShape;
+  switch (out.type) {
+    case "rect":
+    case "roundRect": {
+      const r = shape as Extract<DrawShape, { type: "rect" | "roundRect" }>;
+      const rx = fx(r.x);
+      const ry = fy(r.y);
+      const rw = fx(r.x + r.w);
+      const rh = fy(r.y + r.h);
+      out.x = Math.min(rx, rw);
+      out.y = Math.min(ry, rh);
+      out.w = Math.abs(rw - rx);
+      out.h = Math.abs(rh - ry);
+      if (out.type === "roundRect") out.round = (out.round ?? 0) * k;
+      break;
+    }
+    case "circle": {
+      const cx = fx(out.cx);
+      const cy = fy(out.cy);
+      const r = out.r;
+      if (Math.abs(sx - sy) < 1e-9) {
+        out.cx = cx;
+        out.cy = cy;
+        out.r = Math.abs(r * sx);
+      } else {
+        /* 非等比缩放：圆变椭圆 */
+        const e = out as unknown as { type: string; cx: number; cy: number; rx: number; ry: number };
+        e.type = "ellipse";
+        e.cx = cx;
+        e.cy = cy;
+        e.rx = Math.abs(r * sx);
+        e.ry = Math.abs(r * sy);
+      }
+      break;
+    }
+    case "ellipse":
+      out.cx = fx(out.cx);
+      out.cy = fy(out.cy);
+      out.rx = Math.abs(out.rx * sx);
+      out.ry = Math.abs(out.ry * sy);
+      break;
+    case "line":
+      out.x1 = fx(out.x1);
+      out.y1 = fy(out.y1);
+      out.x2 = fx(out.x2);
+      out.y2 = fy(out.y2);
+      break;
+    case "polygon":
+    case "star":
+      out.cx = fx(out.cx);
+      out.cy = fy(out.cy);
+      out.r = Math.abs(out.r * k);
+      break;
+    case "path": {
+      /* scalePath 以 (ox,oy) 为原点；先绕 pivot 缩放，再平移 */
+      let d = out.d;
+      if (Math.abs(sx - 1) > 1e-9 || Math.abs(sy - 1) > 1e-9) d = scalePath(d, sx, sy, g.px, g.py);
+      /* 缩放会把 pivot 之外的部分按比例拉开，平移量要按同一比例看（pivot 相对原点的位移） */
+      if (g.tx || g.ty) d = translatePath(d, g.tx, g.ty);
+      out.d = d;
+      break;
+    }
+    case "text":
+      out.x = fx(out.x);
+      out.y = fy(out.y);
+      out.size = Math.abs(out.size * k);
+      break;
+    default:
+      break;
+  }
+  return out as T;
+}
+
 export function scaleShape(s: DrawShape, from: Box, to: Box): DrawShape {
   const sx = from.w === 0 ? 1 : to.w / from.w;
   const sy = from.h === 0 ? 1 : to.h / from.h;

@@ -7,11 +7,16 @@
 //   shapes ──shapesToModel──> VectorModel ──buildVectorXml──> drawable xml
 // 打开已有图标时反向：xml ──parseVectorModel──> VectorModel ──modelToShapes──> 每条 path 一个可编辑图元。
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOverlayBack } from "@/lib/overlay-back";
 import { buildVectorXml, parseVectorModel, nextRotation } from "@/lib/xml/vector-edit";
 import {
+  bakeGroupTransform,
+  groupMatrix,
+  groupTransform,
+  groupsFromModel,
+  invertMat,
   isRenderableColor,
   modelToShapes,
   scalePath,
@@ -29,6 +34,8 @@ import {
   type Box,
   type CanvasMeta,
   type DrawShape,
+  type GroupSpec,
+  type Mat,
 } from "@/lib/xml/canvas-shapes";
 import { IconPickerPanel } from "./IconPickerPanel";
 import { ColorPicker } from "./ColorPicker";
@@ -139,7 +146,14 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     const model = parseVectorModel(xml ?? "");
     if (!model) return JSON.parse(JSON.stringify(BLANK)) as Snapshot;
     return {
-      meta: { w: model.w, h: model.h, vw: model.vw, vh: model.vh, group: { ...model.group } },
+      meta: {
+        w: model.w,
+        h: model.h,
+        vw: model.vw,
+        vh: model.vh,
+        group: { ...model.group },
+        groups: groupsFromModel(model),
+      },
       shapes: modelToShapes(model),
     };
   }, [xml]);
@@ -206,7 +220,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
         start: { x: number; y: number };
         orig: { id: string; box: Box; shape: DrawShape }[];
       }
-    | { kind: "resize"; box0: Box; corner: number; orig: DrawShape[] }
+    | { kind: "resize"; box0: Box; corner: number; mat: Mat | null; orig: DrawShape[] }
     | { kind: "pen"; pts: { x: number; y: number }[] }
     | { kind: "marquee"; x0: number; y0: number }
   >(null);
@@ -246,7 +260,72 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
 
   /* ---------------- 选中 ---------------- */
   const selected = useMemo(() => shapes.filter((s) => sel.includes(s.id)), [shapes, sel]);
+  /* ---------------- 分组（M89b） ---------------- */
+  const groups = useMemo<GroupSpec[]>(() => meta.groups ?? [], [meta.groups]);
+  const groupById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups]);
+  const specOf = useCallback(
+    (s: DrawShape): GroupSpec | undefined => (s.group ? groupById.get(s.group) : undefined),
+    [groupById],
+  );
+  const matOf = useCallback(
+    (s: DrawShape): Mat | null => {
+      const g = specOf(s);
+      return g ? groupMatrix(g) : null;
+    },
+    [specOf],
+  );
+  /** 指针（视口坐标）→ 该图形所在组的局部坐标 */
+  const toLocal = useCallback(
+    (s: DrawShape | undefined, p: { x: number; y: number }) => {
+      const m = s ? matOf(s) : null;
+      return m ? invertMat(m, p) : p;
+    },
+    [matOf],
+  );
+  /** 选中项若全在同一组 → 返回那个组（选中框/手柄按局部坐标处理） */
+  const selGroup = useMemo<GroupSpec | null>(() => {
+    if (!selected.length) return null;
+    const first = selected[0].group;
+    if (!first) return null;
+    if (!selected.every((s) => s.group === first)) return null;
+    return groupById.get(first) ?? null;
+  }, [selected, groupById]);
+  const selGroupMat = useMemo(() => (selGroup ? groupMatrix(selGroup) : null), [selGroup]);
+
   const selBox = useMemo<Box | null>(() => (selected.length ? unionBox(selected) : null), [selected]);
+  /** 选中框在「视口坐标」里的包围盒（组内图形要把四角变换出去） */
+  const selBoxView = useMemo<Box | null>(() => {
+    if (!selected.length) return null;
+    if (selGroup || !shapes.some((s) => sel.includes(s.id) && s.group)) return selBox;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const s of selected) {
+      const b = shapeBox(s);
+      const m = matOf(s);
+      const pts = m
+        ? [
+            { x: b.x, y: b.y },
+            { x: b.x + b.w, y: b.y },
+            { x: b.x + b.w, y: b.y + b.h },
+            { x: b.x, y: b.y + b.h },
+          ].map((q) => ({ x: m.a * q.x + m.c * q.y + m.e, y: m.b * q.x + m.d * q.y + m.f }))
+        : [
+            { x: b.x, y: b.y },
+            { x: b.x + b.w, y: b.y },
+            { x: b.x + b.w, y: b.y + b.h },
+            { x: b.x, y: b.y + b.h },
+          ];
+      for (const q of pts) {
+        x0 = Math.min(x0, q.x);
+        y0 = Math.min(y0, q.y);
+        x1 = Math.max(x1, q.x);
+        y1 = Math.max(y1, q.y);
+      }
+    }
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }, [selected, selBox, selGroup, sel, shapes, matOf]);
 
   const localPoint = useCallback((e: { clientX: number; clientY: number }) => {
     const g = gRef.current;
@@ -264,12 +343,37 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     return a > 0.01 ? a : 1;
   }, []);
 
+  /** 图形在视口坐标里的包围盒（组内图形要过一遍组变换） */
+  const boxView = useCallback(
+    (s: DrawShape): Box => {
+      const b = shapeBox(s);
+      const m = matOf(s);
+      if (!m) return b;
+      const pts = [
+        { x: b.x, y: b.y },
+        { x: b.x + b.w, y: b.y },
+        { x: b.x + b.w, y: b.y + b.h },
+        { x: b.x, y: b.y + b.h },
+      ].map((q) => ({ x: m.a * q.x + m.c * q.y + m.e, y: m.b * q.x + m.d * q.y + m.f }));
+      const xs = pts.map((q) => q.x);
+      const ys = pts.map((q) => q.y);
+      const x0 = Math.min(...xs);
+      const y0 = Math.min(...ys);
+      return { x: x0, y: y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0 };
+    },
+    [matOf],
+  );
+
   const hitTest = useCallback(
-    (p: { x: number; y: number }): DrawShape | null => {
-      const pad = 3 / pxPerUnit();
+    (pView: { x: number; y: number }): DrawShape | null => {
       for (let i = shapes.length - 1; i >= 0; i--) {
         const s = shapes[i];
         if (s.hidden || s.locked) continue;
+        const m = matOf(s);
+        const p = m ? invertMat(m, pView) : pView;
+        /* 3 屏幕像素的容差，按「屏幕→局部」双重换算（组缩放也要算进去） */
+        const sc = m ? Math.max(0.05, Math.hypot(m.a, m.b)) : 1;
+        const pad = 3 / pxPerUnit() / sc;
         const b = shapeBox(s);
         if (p.x >= b.x - pad && p.x <= b.x + b.w + pad && p.y >= b.y - pad && p.y <= b.y + b.h + pad) {
           return s;
@@ -277,7 +381,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       }
       return null;
     },
-    [shapes, pxPerUnit],
+    [shapes, pxPerUnit, matOf],
   );
 
   /* ---------------- 新建图元 ---------------- */
@@ -404,19 +508,22 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       return;
     }
 
-    // 先判选中框的角手柄
+    // 先判选中框的角手柄（选中项在同一组里时，pg 是组局部坐标）
     if (selBox && selected.length) {
+      const pg = selGroupMat ? invertMat(selGroupMat, p) : p;
       const hs = handlePositions(selBox);
       /* 真·屏幕像素容差：鼠标 8px / 触摸 18px（原来按 zoom 折算，图标上角点会放大到 ~30px，
          鼠标一按在图形边缘就被判成拉伸手柄 → 拖动时图形被拉变形） */
-      const tol = (e.pointerType === "touch" ? 18 : 8) / pxPerUnit();
+      const gsc = selGroupMat ? Math.max(0.05, Math.hypot(selGroupMat.a, selGroupMat.b)) : 1;
+      const tol = (e.pointerType === "touch" ? 18 : 8) / pxPerUnit() / gsc;
       for (let i = 0; i < hs.length; i++) {
-        if (Math.hypot(p.x - hs[i].x, p.y - hs[i].y) <= tol) {
+        if (Math.hypot(pg.x - hs[i].x, pg.y - hs[i].y) <= tol) {
           pushHistory();
           dragRef.current = {
             kind: "resize",
             box0: { ...selBox },
             corner: i,
+            mat: selGroupMat,
             orig: JSON.parse(JSON.stringify(selected)) as DrawShape[],
           };
           return;
@@ -508,12 +615,20 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     }
 
     if (d.kind === "move") {
-      const dx = p.x - d.start.x;
-      const dy = p.y - d.start.y;
       setShapes((list) =>
         list.map((s) => {
           const o = d.orig.find((x) => x.id === s.id);
           if (!o) return s;
+          /* 组内图形：把视口位移换算成组内位移（旋转/缩放后方向也跟着对） */
+          const m = matOf(s);
+          let dx = p.x - d.start.x;
+          let dy = p.y - d.start.y;
+          if (m) {
+            const a = invertMat(m, d.start);
+            const b = invertMat(m, p);
+            dx = b.x - a.x;
+            dy = b.y - a.y;
+          }
           /* 永远以原始图形为基准平移，形状本身绝不会被拉伸 */
           return translateShape(JSON.parse(JSON.stringify(o.shape)) as DrawShape, dx, dy);
         }),
@@ -522,13 +637,14 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     }
 
     if (d.kind === "resize") {
+      const pr = d.mat ? invertMat(d.mat, p) : p;
       const hs = handlePositions(d.box0);
       const fixed = hs[(d.corner + 2) % 4];
       const box1: Box = {
-        x: Math.min(fixed.x, p.x),
-        y: Math.min(fixed.y, p.y),
-        w: Math.max(0.15, Math.abs(p.x - fixed.x)),
-        h: Math.max(0.15, Math.abs(p.y - fixed.y)),
+        x: Math.min(fixed.x, pr.x),
+        y: Math.min(fixed.y, pr.y),
+        w: Math.max(0.15, Math.abs(pr.x - fixed.x)),
+        h: Math.max(0.15, Math.abs(pr.y - fixed.y)),
       };
       setShapes((list) =>
         list.map((s) => {
@@ -606,7 +722,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       if (box.w > 0.4 || box.h > 0.4) {
         const picked = shapes.filter((s) => {
           if (s.hidden || s.locked) return false;
-          const b = shapeBox(s);
+          const b = boxView(s);
           return !(b.x + b.w < box.x || box.x + box.w < b.x || b.y + b.h < box.y || box.y + box.h < b.y);
         });
         setSel(picked.map((s) => s.id));
@@ -642,9 +758,87 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const removeSel = () => {
     if (!sel.length) return;
     pushHistory();
-    setShapes((list) => list.filter((s) => !sel.includes(s.id)));
+    const left = shapes.filter((s) => !sel.includes(s.id));
+    setShapes(left);
+    /* 删空的组一起清掉，别在图层里留一个空文件夹 */
+    const alive = new Set(left.map((s) => s.group).filter(Boolean));
+    setMeta((m) => ({ ...m, groups: (m.groups ?? []).filter((g) => alive.has(g.id)) }));
     setSel([]);
   };
+
+  /* ---------------- 分组操作（M89b） ---------------- */
+  const nextGroupName = useCallback(() => {
+    const used = new Set(groups.map((g) => g.name ?? g.id));
+    let i = groups.length + 1;
+    while (used.has(`g${i}`)) i += 1;
+    return `g${i}`;
+  }, [groups]);
+
+  const groupSel = useCallback(() => {
+    if (!sel.length) return;
+    if (sel.length === 1 && selected[0]?.group) return;
+    pushHistory();
+    const box = unionBox(selected);
+    const gid = `g${Date.now().toString(36)}`;
+    const spec: GroupSpec = {
+      id: gid,
+      name: nextGroupName(),
+      tx: 0,
+      ty: 0,
+      rot: 0,
+      sx: 1,
+      sy: 1,
+      px: box.x + box.w / 2,
+      py: box.y + box.h / 2,
+    };
+    setMeta((m) => ({ ...m, groups: [...(m.groups ?? []), spec] }));
+    setShapes((list) => {
+      const ids = new Set(sel);
+      const idxs = list.map((x, i) => (ids.has(x.id) ? i : -1)).filter((i) => i >= 0);
+      const contiguous = idxs.length > 0 && idxs[idxs.length - 1] - idxs[0] === idxs.length - 1;
+      if (contiguous) return list.map((x) => (ids.has(x.id) ? { ...x, group: gid } : x));
+      /* 不连续：把成员搬到最上面，保证组内相邻（导出才能包进同一个 <group>） */
+      const members = list.filter((x) => ids.has(x.id)).map((x) => ({ ...x, group: gid }));
+      const rest = list.filter((x) => !ids.has(x.id));
+      return [...rest, ...members];
+    });
+  }, [sel, selected, nextGroupName]);
+
+  const ungroupIds = useCallback((ids: string[]) => {
+    const gids = new Set(ids);
+    if (!gids.size) return;
+    const hasRot = [...gids].some((id) => Math.abs(groupById.get(id)?.rot ?? 0) > 0.001);
+    if (hasRot) {
+      setErr("组里有旋转：解组没法把旋转烘回图形，请先把「旋转」调回 0°");
+      return;
+    }
+    pushHistory();
+    setShapes((list) =>
+      list.map((x) => {
+        if (!x.group || !gids.has(x.group)) return x;
+        const g = groupById.get(x.group);
+        if (!g) return { ...x, group: undefined };
+        const baked = bakeGroupTransform(JSON.parse(JSON.stringify(x)) as DrawShape, g);
+        const { group: _drop, ...rest } = baked;
+        return rest as DrawShape;
+      }),
+    );
+    setMeta((m) => ({ ...m, groups: (m.groups ?? []).filter((g) => !gids.has(g.id)) }));
+  }, [groupById]);
+
+  const ungroupSel = useCallback(() => {
+    ungroupIds(selected.map((x) => x.group).filter(Boolean) as string[]);
+  }, [selected, ungroupIds]);
+
+  const patchGroup = (id: string, patch: Partial<GroupSpec>) => {
+    pushHistory();
+    setMeta((m) => ({
+      ...m,
+      groups: (m.groups ?? []).map((g) => (g.id === id ? { ...g, ...patch } : g)),
+    }));
+  };
+
+  const selectGroup = (id: string) => setSel(shapes.filter((s) => s.group === id).map((s) => s.id));
 
   const duplicateSel = () => {
     if (!sel.length) return;
@@ -652,6 +846,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     const copies = selected.map((s) => {
       const c = JSON.parse(JSON.stringify(s)) as DrawShape;
       c.id = nextId();
+      /* 复制出来的图元不再属于原组，否则同名 <group> 会被拆成两段 */
+      delete c.group;
       return translateShape(c, meta.vw * 0.04, meta.vh * 0.04);
     });
     setShapes((list) => [...list, ...copies]);
@@ -915,6 +1111,12 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
         duplicateSel();
         return;
       }
+      if (mod && e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        if (e.shiftKey) ungroupSel();
+        else groupSel();
+        return;
+      }
       if (mod && e.key.toLowerCase() === "a") {
         e.preventDefault();
         setSel(shapes.map((s) => s.id));
@@ -947,7 +1149,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [close, duplicateSel, redo, removeSel, sel, shapes, undo]);
+  }, [close, duplicateSel, groupSel, redo, removeSel, sel, shapes, undo, ungroupSel]);
 
   /* ---------------- 输出 ---------------- */
   const model = useMemo(() => {
@@ -1010,6 +1212,82 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     setShapes((list) => [...list, ...add]);
     setSel(add.map((s) => s.id));
   };
+
+  /** 按分组把图形切成连续的块（组内图形必须相邻才能包进同一个 <g>） */
+  const shapeRuns = useMemo(() => {
+    const runs: { key: string; g?: GroupSpec; shapes: DrawShape[] }[] = [];
+    for (const s of shapes) {
+      const spec = s.group ? groupById.get(s.group) : undefined;
+      const last = runs[runs.length - 1];
+      if (spec && last?.g?.id === spec.id) last.shapes.push(s);
+      else if (spec) runs.push({ key: `g-${spec.id}-${runs.length}`, g: spec, shapes: [s] });
+      else runs.push({ key: `s-${s.id}`, shapes: [s] });
+    }
+    return runs;
+  }, [shapes, groupById]);
+
+  /** 单个图形 → SVG（组变换由外层 <g> 负责，这里只管本地坐标） */
+  const drawShapeEl = (s: DrawShape) =>
+    s.type === "text" ? (
+      <text
+        key={s.id}
+        x={s.x}
+        y={s.y}
+        fontSize={s.size}
+        fontFamily={FONT_STACKS[s.font ?? "sans"] ?? FONT_STACKS.sans}
+        fontWeight={s.bold ? 700 : 400}
+        fill={isRenderableColor(s.fill) ? toCss(s.fill) : "none"}
+        fillOpacity={s.alpha}
+        stroke={s.outline && s.strokeWidth > 0 && isRenderableColor(s.stroke) ? toCss(s.stroke) : "none"}
+        strokeWidth={(s.strokeWidth || 0) * 2}
+        strokeLinejoin="round"
+        paintOrder="stroke"
+        opacity={s.hidden ? 0.25 : 1}
+        transform={shapeRot(s)}
+        style={{ pointerEvents: "none", userSelect: "none" }}
+      >
+        {s.text}
+      </text>
+    ) : (
+      <path
+        key={s.id}
+        d={shapeD(s)}
+        fill={isRenderableColor(s.fill) ? toCss(s.fill) : "none"}
+        fillOpacity={s.alpha}
+        stroke={isRenderableColor(s.stroke) ? toCss(s.stroke) : "none"}
+        strokeWidth={s.strokeWidth || 0}
+        strokeOpacity={s.alpha}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={s.hidden ? 0.25 : 1}
+        transform={shapeRot(s)}
+        style={{ pointerEvents: "none" }}
+      />
+    );
+
+  /** 选中项能否用四角手柄缩放（跨组多选时禁用，避免坐标系混乱） */
+  const canResize = useMemo(() => {
+    if (!selected.length) return false;
+    const gids = new Set(selected.map((s) => s.group ?? ""));
+    return gids.size === 1;
+  }, [selected]);
+
+  /** 图层列表行（倒序 = 上面的在最上层；组头放在它成员上方） */
+  const layerRows = useMemo(() => {
+    const rows: { key: string; g?: GroupSpec; s?: DrawShape }[] = [];
+    for (let i = shapeRuns.length - 1; i >= 0; i--) {
+      const run = shapeRuns[i];
+      if (run.g) {
+        rows.push({ key: `gh-${run.g.id}`, g: run.g });
+        if (!run.g.collapsed) {
+          for (let j = run.shapes.length - 1; j >= 0; j--) rows.push({ key: run.shapes[j].id, s: run.shapes[j] });
+        }
+      } else {
+        for (let j = run.shapes.length - 1; j >= 0; j--) rows.push({ key: run.shapes[j].id, s: run.shapes[j] });
+      }
+    }
+    return rows;
+  }, [shapeRuns]);
 
   const gTransform =
     `translate(${meta.group.pivotX} ${meta.group.pivotY}) ` +
@@ -1152,42 +1430,13 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   <rect x={0} y={0} width={meta.vw} height={meta.vh} fill="url(#axv-cv-grid)" />
                 ) : null}
                 <g ref={gRef} transform={gTransform}>
-                  {shapes.map((s) =>
-                    s.type === "text" ? (
-                      <text
-                        key={s.id}
-                        x={s.x}
-                        y={s.y}
-                        fontSize={s.size}
-                        fontFamily={FONT_STACKS[s.font ?? "sans"] ?? FONT_STACKS.sans}
-                        fontWeight={s.bold ? 700 : 400}
-                        fill={isRenderableColor(s.fill) ? toCss(s.fill) : "none"}
-                        fillOpacity={s.alpha}
-                        stroke={s.outline && s.strokeWidth > 0 && isRenderableColor(s.stroke) ? toCss(s.stroke) : "none"}
-                        strokeWidth={(s.strokeWidth || 0) * 2}
-                        strokeLinejoin="round"
-                        paintOrder="stroke"
-                        opacity={s.hidden ? 0.25 : 1}
-                        transform={shapeRot(s)}
-                        style={{ pointerEvents: "none", userSelect: "none" }}
-                      >
-                        {s.text}
-                      </text>
+                  {shapeRuns.map((run) =>
+                    run.g ? (
+                      <g key={run.key} data-group={run.g.id} transform={groupTransform(run.g)}>
+                        {run.shapes.map((s) => drawShapeEl(s))}
+                      </g>
                     ) : (
-                      <path
-                        key={s.id}
-                        d={shapeD(s)}
-                        fill={isRenderableColor(s.fill) ? toCss(s.fill) : "none"}
-                        fillOpacity={s.alpha}
-                        stroke={isRenderableColor(s.stroke) ? toCss(s.stroke) : "none"}
-                        strokeWidth={s.strokeWidth || 0}
-                        strokeOpacity={s.alpha}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        opacity={s.hidden ? 0.25 : 1}
-                        transform={shapeRot(s)}
-                        style={{ pointerEvents: "none" }}
-                      />
+                      <Fragment key={run.key}>{run.shapes.map((s) => drawShapeEl(s))}</Fragment>
                     ),
                   )}
 
@@ -1204,30 +1453,40 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   ) : null}
 
                   {/* 选中框 + 四角手柄 */}
-                  {selBox ? (
-                    <g style={{ pointerEvents: "none" }}>
+                  {selBox && selBoxView ? (
+                    <g
+                      style={{ pointerEvents: "none" }}
+                      transform={selGroup ? groupTransform(selGroup) : undefined}
+                      data-sel-frame={selGroup ? "group" : "canvas"}
+                    >
                       <rect
-                        x={selBox.x}
-                        y={selBox.y}
-                        width={selBox.w}
-                        height={selBox.h}
+                        x={selGroup ? selBox.x : selBoxView.x}
+                        y={selGroup ? selBox.y : selBoxView.y}
+                        width={selGroup ? selBox.w : selBoxView.w}
+                        height={selGroup ? selBox.h : selBoxView.h}
                         fill="none"
                         stroke="#1b6ef3"
                         strokeWidth={strokeLen}
                         vectorEffect="non-scaling-stroke"
                       />
-                      {handlePositions(selBox).map((h, i) => (
-                        <circle
-                          key={i}
-                          cx={h.x}
-                          cy={h.y}
-                          r={(meta.vw * 0.017) / Math.max(0.4, zoom)}
-                          fill="#fff"
-                          stroke="#1b6ef3"
-                          strokeWidth={1.4}
-                          vectorEffect="non-scaling-stroke"
-                        />
-                      ))}
+                      {canResize
+                        ? handlePositions(selGroup ? selBox : selBoxView).map((h, i) => (
+                            <circle
+                              key={i}
+                              cx={h.x}
+                              cy={h.y}
+                              r={
+                                (meta.vw * 0.017) /
+                                Math.max(0.4, zoom) /
+                                (selGroupMat ? Math.max(0.05, Math.hypot(selGroupMat.a, selGroupMat.b)) : 1)
+                              }
+                              fill="#fff"
+                              stroke="#1b6ef3"
+                              strokeWidth={1.4}
+                              vectorEffect="non-scaling-stroke"
+                            />
+                          ))
+                        : null}
                     </g>
                   ) : null}
 
@@ -1647,6 +1906,63 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             ) : null}
             {sheetTab === "props" ? (
               <div className="axv-cv-sheet-pane">
+                {selGroup ? (
+                  <div className="axv-set-group axv-cv-grp-panel" data-group-panel={selGroup.id}>
+                    <div className="axv-set-label">
+                      分组变换
+                      <span className="axv-cv-hint">· {selGroup.name || selGroup.id}（导出为 &lt;group&gt;）</span>
+                    </div>
+                    <div className="axv-icon-ed-row">
+                      <span>旋转</span>
+                      <input
+                        className="axv-cv-slider"
+                        type="range"
+                        min={-180}
+                        max={180}
+                        step={1}
+                        value={Math.round(selGroup.rot)}
+                        onChange={(e) => patchGroup(selGroup.id, { rot: Number(e.target.value) })}
+                      />
+                      <span className="axv-cv-num">{Math.round(selGroup.rot)}°</span>
+                    </div>
+                    <div className="axv-icon-ed-row">
+                      <span>缩放</span>
+                      <input
+                        className="axv-cv-slider"
+                        type="range"
+                        min={0.1}
+                        max={3}
+                        step={0.05}
+                        value={selGroup.sx}
+                        onChange={(e) =>
+                          patchGroup(selGroup.id, { sx: Number(e.target.value), sy: Number(e.target.value) })
+                        }
+                      />
+                      <span className="axv-cv-num">{Math.round(selGroup.sx * 100)}%</span>
+                    </div>
+                    <div className="axv-icon-ed-row">
+                      <span>平移</span>
+                      <span className="axv-icon-ed-two">
+                        <input
+                          className="axv-icon-ed-input"
+                          type="number"
+                          step={0.5}
+                          value={Math.round(selGroup.tx * 100) / 100}
+                          title="translateX"
+                          onChange={(e) => patchGroup(selGroup.id, { tx: Number(e.target.value) || 0 })}
+                        />
+                        <input
+                          className="axv-icon-ed-input"
+                          type="number"
+                          step={0.5}
+                          value={Math.round(selGroup.ty * 100) / 100}
+                          title="translateY"
+                          onChange={(e) => patchGroup(selGroup.id, { ty: Number(e.target.value) || 0 })}
+                        />
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="axv-set-group">
                   <div className="axv-set-label">
                     图层属性
@@ -1851,13 +2167,76 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>content_copy</span>
                     复制
                   </button>
+                  <button className="axv-cv-mini" onClick={groupSel} title="编组 (Ctrl+G)">
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>folder_shared</span>
+                    编组
+                  </button>
+                  <button className="axv-cv-mini" onClick={ungroupSel} title="解组 (Ctrl+Shift+G)">
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>folder_off</span>
+                    解组
+                  </button>
                   <button className="axv-cv-mini" onClick={removeSel} title="删除选中图形 (Delete)">
                     <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>delete</span>
                     删除
                   </button>
                 </div>
             <div className="axv-cv-layers">
-              {[...shapes].reverse().map((s) => {
+              {layerRows.map((row) => {
+                if (row.g) {
+                  const g = row.g;
+                  const n = shapes.filter((x) => x.group === g.id).length;
+                  const on = shapes.some((x) => x.group === g.id && sel.includes(x.id));
+                  return (
+                    <div key={row.key} className={"axv-cv-grp" + (on ? " on" : "")} data-group-row={g.id}>
+                      <button
+                        className="axv-cv-layer-btn"
+                        title={g.collapsed ? "展开组" : "折叠组"}
+                        aria-label={g.collapsed ? "展开组" : "折叠组"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          patchGroup(g.id, { collapsed: !g.collapsed });
+                        }}
+                      >
+                        <span className="msr" aria-hidden="true">{g.collapsed ? "chevron_right" : "expand_more"}</span>
+                      </button>
+                      <span className="msr axv-cv-grp-ico" aria-hidden="true">folder</span>
+                      <input
+                        className="axv-cv-grp-name"
+                        value={g.name ?? g.id}
+                        title="组名（导出为 android:name）"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectGroup(g.id);
+                        }}
+                        onChange={(e) => patchGroup(g.id, { name: e.target.value })}
+                      />
+                      <span className="axv-cv-hint">{n}</span>
+                      <button
+                        className="axv-cv-layer-btn"
+                        title="选中整组"
+                        aria-label="选中整组"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          selectGroup(g.id);
+                        }}
+                      >
+                        <span className="msr" aria-hidden="true">select_all</span>
+                      </button>
+                      <button
+                        className="axv-cv-layer-btn"
+                        title="解组"
+                        aria-label="解组"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          ungroupIds([g.id]);
+                        }}
+                      >
+                        <span className="msr" aria-hidden="true">folder_off</span>
+                      </button>
+                    </div>
+                  );
+                }
+                const s = row.s!;
                 const idx = shapes.findIndex((x) => x.id === s.id);
                 return (
                   <div

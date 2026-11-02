@@ -62,7 +62,8 @@ describe("M86 选区锚点缩小", () => {
   const src = read("components/IconCanvasEditor.tsx");
 
   it("锚点半径随视口换算，不再写死 2.6", () => {
-    expect(src).toMatch(/r=\{\(meta\.vw \* 0\.017\) \/ Math\.max\(0\.4, zoom\)\}/);
+    /* M89b：锚点半径再除以组缩放（组内缩放时手柄大小保持屏幕一致） */
+    expect(src).toMatch(/r=\{\s*\(meta\.vw \* 0\.017\) \/\s*Math\.max\(0\.4, zoom\)/);
     expect(src).toContain("vectorEffect=\"non-scaling-stroke\"");
     expect(src).not.toContain("r={2.6 / Math.max(0.4, zoom)}");
   });

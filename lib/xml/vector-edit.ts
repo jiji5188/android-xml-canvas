@@ -82,8 +82,11 @@ export function parseVectorModel(xml: string): VectorModel | null {
   const w = num((attrOf(head, "width") || "").replace(/dp$/, ""), vw);
   const h = num((attrOf(head, "height") || "").replace(/dp$/, ""), vh);
 
+  /* 只有「没有 android:name」的首层 group 才当成整体变换 wrapper；
+     带 name 的是内容分组，归节点树管（M89b） */
   const gm = /<group\b([^>]*)>/.exec(xml);
-  const group: VectorGroup = gm
+  const gmNamed = gm ? !!attrOf(gm[1], "name") : false;
+  const group: VectorGroup = gm && !gmNamed
     ? {
         rotation: num(attrOf(gm[1], "rotation"), 0),
         scaleX: num(attrOf(gm[1], "scaleX"), 1),
@@ -211,10 +214,10 @@ export function buildVectorXml(m: VectorModel, name = "ic_icon"): string {
   return lines.join("\n");
 }
 
-/** 首层节点就是「同参数」的 group → 说明 m.group 是从它读出来的，无需再包一层 */
+/** 首层节点就是「同参数且无 name」的 group → 说明 m.group 是从它读出来的，无需再包一层 */
 function firstGroupIsWrapper(nodes: VectorNode[], g: VectorGroup): boolean {
   const n = nodes[0];
-  if (!n || n.kind !== "group") return false;
+  if (!n || n.kind !== "group" || n.name) return false;
   const a = n.attrs;
   return (
     Math.abs(a.rotation - g.rotation) < 1e-6 &&

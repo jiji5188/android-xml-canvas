@@ -7,6 +7,7 @@
 // 树的展开状态、已加载的子项都放在组件内部：它们是纯 UI 状态，没必要塞回 XmlEditor。
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import type { BrowseEntry, LibKind, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
 import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
 import { isIconDirRel, isImageName, readEntryImageUrl, resDirDescription } from "@/lib/xml/project-browse";
@@ -112,10 +113,10 @@ type LoadState = BrowseEntry[] | "loading";
 
 /** M48：项目列表副标题文案（库类型） */
 function libLabel(lib: LibKind | undefined): string {
-  if (lib === "androidx") return "AndroidX 项目";
-  if (lib === "support") return "Android Support 项目";
-  if (lib === "android") return "Android 项目";
-  return "项目";
+  if (lib === "androidx") return tt("AndroidX 项目");
+  if (lib === "support") return tt("Android Support 项目");
+  if (lib === "android") return tt("Android 项目");
+  return tt("项目");
 }
 /** M31h：文件行图标 —— res/drawable*|mipmap* 里的图片读文件当缩略图，其余用通用图标 */
 function TreeRowIcon(props: { entry: BrowseEntry; isDir: boolean; isOpen: boolean; iconDir: boolean }) {
@@ -378,7 +379,7 @@ export function LazyTreeInner(props: {
     }
     if (a === "copy") {
       setClipboard(target);
-      setDlg({ kind: "msg", title: "已复制", text: `已复制「${target.name}」，到目标位置长按选「粘贴」。` });
+      setDlg({ kind: "msg", title: tt("已复制"), text: tt("已复制「{name}」，到目标位置长按选「粘贴」。", { name: target.name }) });
       return;
     }
     if (a === "move") {
@@ -399,7 +400,7 @@ export function LazyTreeInner(props: {
     const parent = parentTargetOf(target);
     // 防把目录粘到自己内部
     if (clipboard.isDir && (parent === clipboard.rel || parent.startsWith(clipboard.rel + "/"))) {
-      setDlg({ kind: "msg", title: "不能粘贴", text: "目标位置在源目录内部。" });
+      setDlg({ kind: "msg", title: tt("不能粘贴"), text: tt("目标位置在源目录内部。") });
       return;
     }
     setBusy(true);
@@ -410,8 +411,8 @@ export function LazyTreeInner(props: {
       const names = await listNames(fileOps, parent);
       setDlg({
         kind: "conflict",
-        title: "同名冲突",
-        desc: `${parent || "项目根"} 下已有「${clipboard.name}」，请改名后再粘贴`,
+        title: tt("同名冲突"),
+        desc: tt("{parent} 下已有「{name}」，请改名后再粘贴", { parent: parent || tt("项目根"), name: clipboard.name }),
         initial: suggestUniqueName(clipboard.name, new Set(names)),
         taken: new Set(names),
         node: clipboard,
@@ -422,13 +423,13 @@ export function LazyTreeInner(props: {
     }
     const r = await copyEntry(fileOps, clipboard.rel, parent);
     if (!r.ok) {
-      setDlg({ kind: "msg", title: "粘贴失败", text: reasonText(r.reason) });
+      setDlg({ kind: "msg", title: tt("粘贴失败"), text: reasonText(r.reason) });
       return;
     }
     if (parent) setOpen((prev) => new Set(prev).add(parent));
     await refreshDir(parent);
     setClipboard(null); // 用户要求：粘贴完成后清掉复制标记
-    setDlg({ kind: "msg", title: "已粘贴", text: `已复制到 ${parent || "项目根"}/` });
+    setDlg({ kind: "msg", title: tt("已粘贴"), text: tt("已复制到 {parent}/", { parent: parent || tt("项目根") }) });
   };
 
   /** 冲突弹窗确认：按新名字落地（移动或复制） */
@@ -443,7 +444,7 @@ export function LazyTreeInner(props: {
         : await copyEntry(fileOps, d.node.rel, d.parentRel, newName);
     setBusy(false);
     if (!r.ok) {
-      setDlg({ kind: "msg", title: d.action === "move" ? "移动失败" : "粘贴失败", text: reasonText(r.reason) });
+      setDlg({ kind: "msg", title: d.action === "move" ? tt("移动失败") : tt("粘贴失败"), text: reasonText(r.reason) });
       return;
     }
     if (d.parentRel) setOpen((prev) => new Set(prev).add(d.parentRel));
@@ -453,12 +454,12 @@ export function LazyTreeInner(props: {
       setMoving(null);
     } else {
       setClipboard(null); // 改名粘贴成功也清标记
-      setDlg({ kind: "msg", title: "已粘贴", text: `已复制为 ${newName}` });
+      setDlg({ kind: "msg", title: tt("已粘贴"), text: tt("已复制为 {name}", { name: newName }) });
     }
   };
 
   const reasonText = (r?: string) =>
-    r === "web" ? "网页版不支持这个操作，请用 APK。" : r || "未知错误";
+    r === "web" ? tt("网页版不支持这个操作，请用 APK。") : r || tt("未知错误");
 
   /* ================= M46b：移动（拖拽图标 → 选目标 → 确定） ================= */
 
@@ -520,7 +521,7 @@ export function LazyTreeInner(props: {
       return;
     }
     if (node.isDir && (target === node.rel || target.startsWith(node.rel + "/"))) {
-      setDlg({ kind: "msg", title: "不能移动", text: "目标位置在该目录内部。" });
+      setDlg({ kind: "msg", title: tt("不能移动"), text: tt("目标位置在该目录内部。") });
       return;
     }
     setBusy(true);
@@ -530,8 +531,8 @@ export function LazyTreeInner(props: {
       setBusy(false);
       setDlg({
         kind: "conflict",
-        title: "同名冲突",
-        desc: `${target || "项目根"} 下已有「${node.name}」，请改名后再移动`,
+        title: tt("同名冲突"),
+        desc: tt("{parent} 下已有「{name}」，请改名后再移动", { parent: target || tt("项目根"), name: node.name }),
         initial: suggestUniqueName(node.name, new Set(names)),
         taken: new Set(names),
         node,
@@ -543,7 +544,7 @@ export function LazyTreeInner(props: {
     const r = await moveEntry(fileOps, node.rel, target);
     setBusy(false);
     if (!r.ok) {
-      setDlg({ kind: "msg", title: "移动失败", text: reasonText(r.reason) });
+      setDlg({ kind: "msg", title: tt("移动失败"), text: reasonText(r.reason) });
       return;
     }
     setMoving(null);
@@ -567,8 +568,8 @@ export function LazyTreeInner(props: {
     if (!r.ok) {
       setDlg({
         kind: "msg",
-        title: "创建失败",
-        text: r.reason === "web" ? "网页版不支持写操作，请用 APK。" : r.reason || "未知错误",
+        title: tt("创建失败"),
+        text: r.reason === "web" ? tt("网页版不支持写操作，请用 APK。") : r.reason || tt("未知错误"),
       });
       return;
     }
@@ -586,8 +587,8 @@ export function LazyTreeInner(props: {
     if (!r.ok) {
       setDlg({
         kind: "msg",
-        title: "重命名失败",
-        text: r.reason === "web" ? "网页版不支持重命名，请用 APK。" : r.reason || "未知错误",
+        title: tt("重命名失败"),
+        text: r.reason === "web" ? tt("网页版不支持重命名，请用 APK。") : r.reason || tt("未知错误"),
       });
       return;
     }
@@ -605,8 +606,8 @@ export function LazyTreeInner(props: {
     if (!r.ok) {
       setDlg({
         kind: "msg",
-        title: "删除失败",
-        text: r.reason === "web" ? "网页版不支持删除，请用 APK。" : r.reason || "未知错误",
+        title: tt("删除失败"),
+        text: r.reason === "web" ? tt("网页版不支持删除，请用 APK。") : r.reason || tt("未知错误"),
       });
       return;
     }
@@ -621,7 +622,7 @@ export function LazyTreeInner(props: {
         <li key={`${rel}:loading`}>
           <div className="axv-ws-row axv-ws-row-loading" style={{ paddingLeft: depth * 14 + 26 }}>
             <span className="axv-ws-spin" aria-hidden="true" />
-            <span className="axv-ws-item-sub">正在读取…</span>
+            <span className="axv-ws-item-sub">{tt("正在读取…")}</span>
           </div>
         </li>,
       ];
@@ -631,7 +632,7 @@ export function LazyTreeInner(props: {
       return [
         <li key={`${rel}:empty`}>
           <div className="axv-ws-row axv-ws-row-loading" style={{ paddingLeft: depth * 14 + 26 }}>
-            <span className="axv-ws-item-sub">（没有可预览的 xml）</span>
+            <span className="axv-ws-item-sub">{tt("（没有可预览的 xml）")}</span>
           </div>
         </li>,
       ];
@@ -677,8 +678,8 @@ export function LazyTreeInner(props: {
             {isDir ? (
               <button
                 className="axv-ws-caret"
-                title={isOpen ? "折叠" : "展开"}
-                aria-label={isOpen ? "折叠" : "展开"}
+                title={isOpen ? tt("折叠") : tt("展开")}
+                aria-label={isOpen ? tt("折叠") : tt("展开")}
                 onClick={(e) => {
                   e.stopPropagation();
                   toggle(n.rel);
@@ -697,20 +698,20 @@ export function LazyTreeInner(props: {
                 <span className="axv-ws-item-name">{n.name}</span>
                 <span className="axv-ws-item-sub">
                   {isDir
-                    ? resDirDescription(n.rel) ?? "文件夹"
+                    ? resDirDescription(n.rel) ?? tt("文件夹")
                     : editing
-                      ? "正在编辑"
+                      ? tt("正在编辑")
                       : isImageName(n.name)
-                        ? "图片资源"
-                        : "布局文件"}
+                        ? tt("图片资源")
+                        : tt("布局文件")}
                 </span>
               </span>
             </button>
             {moving ? (
               <span
                 className="axv-move-handle"
-                title="按住拖动到目标目录"
-                aria-label="拖动移动"
+                title={tt("按住拖动到目标目录")}
+                aria-label={tt("拖动移动")}
                 onPointerDown={(e) => beginDrag(e, nodeRef)}
                 onClick={(e) => e.stopPropagation()}
               >
@@ -731,19 +732,19 @@ export function LazyTreeInner(props: {
         <div className="axv-move-bar">
           <span className="axv-move-tip">
             {moving.target == null
-              ? `拖「${moving.node.name}」到目标目录`
-              : `将移动到：${moving.target || "项目根"}/`}
+              ? tt("拖「{name}」到目标目录", { name: moving.node.name })
+              : tt("将移动到：{target}/", { target: moving.target || tt("项目根") })}
           </span>
           <button className="axv-btn" onClick={() => void confirmMove()} disabled={moving.target == null}>
-            确定
+            {tt("确定")}
           </button>
           <button className="axv-btn axv-ghost" onClick={cancelMove}>
-            取消
+            {tt("取消")}
           </button>
         </div>
       ) : null}
       <ul className="axv-ws-list axv-proj-tree">{renderRows("", 0)}</ul>
-      {busy ? <div className="axv-ws-hint">正在处理…</div> : null}
+      {busy ? <div className="axv-ws-hint">{tt("正在处理…")}</div> : null}
 
       {/* M46c：菜单与弹窗都挂到 .axv-main 下（用户要求），不再留在树内部 */}
       <Overlay>
@@ -780,16 +781,14 @@ export function LazyTreeInner(props: {
 
       {dlg?.kind === "delete" ? (
         <ConfirmDialog
-          title="删除"
-          text={`确定删除「${dlg.target.name}」？${dlg.target.isDir ? "目录及其内容将被递归删除，" : ""}此操作不可撤销。`}
+          title={tt("删除")}
+          text={tt("确定删除「{name}」？{isDir}此操作不可撤销。", { name: dlg.target.name, isDir: dlg.target.isDir ? tt("目录及其内容将被递归删除，") : "" })}
           detail={
             deleteImpact === null
               ? undefined
               : deleteImpact.count > 0
-                ? `⚠ 被 ${deleteImpact.count} 处引用：${deleteImpact.samples
-                    .map((s) => `${s.rel}${s.line > 1 ? ":" + s.line : ""}`)
-                    .join("、")}${deleteImpact.count > deleteImpact.samples.length ? " …" : ""}`
-                : "（项目里没找到引用）"
+                ? tt("⚠ 被 {n} 处引用：{samples}", { n: deleteImpact.count, samples: deleteImpact.samples.map((s) => s.rel + (s.line > 1 ? ":" + s.line : "")).join("、") + (deleteImpact.count > deleteImpact.samples.length ? " …" : "") })
+                : tt("（项目里没找到引用）")
           }
           danger
           onOk={() => void doDelete()}
@@ -806,7 +805,7 @@ export function LazyTreeInner(props: {
           title={dlg.title}
           initial={dlg.initial}
           desc={dlg.desc}
-          submitLabel={dlg.action === "move" ? "移动" : "粘贴"}
+          submitLabel={dlg.action === "move" ? tt("移动") : tt("粘贴")}
           takenNames={dlg.taken}
           onSubmit={(n) => void doConflict(n)}
           onClose={() => setDlg(null)}
@@ -854,7 +853,7 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
               <button
                 className="axv-rail-mini-btn"
                 onClick={() => void p.onOpenDir()}
-                title="打开其他项目文件夹（含 layout/*.xml），作为当前项目"
+                title={tt("打开其他项目文件夹（含 layout/*.xml），作为当前项目")}
               >
                 <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
                 {tr("proj.open", "打开项目")}
@@ -862,7 +861,7 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
               <button
                 className="axv-rail-mini-btn"
                 onClick={() => p.onNewProject(p.projectName || "MyApp")}
-                title="新建一个带 activity_main.xml 的空项目"
+                title={tt("新建一个带 activity_main.xml 的空项目")}
               >
                 <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>add_box</span>
                 {tr("proj.new", "新建项目")}
@@ -870,7 +869,7 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
     
               <button
                 className="axv-ws-mini"
-                title="刷新列表"
+                title={tt("刷新列表")}
                 onClick={() => void p.onRefresh()}
               >
                 <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
@@ -879,33 +878,33 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
     
             {wsState?.mode === "native" && wsState.allFiles === false ? (
               <div className="axv-ws-warn">
-                默认目录在存储根下，需要「所有文件访问」权限才能读取。
+                {tt("默认目录在存储根下，需要「所有文件访问」权限才能读取。")}
                 <button className="axv-ws-link" onClick={p.onRequestAllFiles}>
-                  去开启
+                  {tt("去开启")}
                 </button>
               </div>
             ) : null}
             {wsState?.mode === "unsupported" ? (
               <div className="axv-ws-warn">
-                请用 Chrome / Edge 打开网页版，或安装 APK（APK 默认目录：/AndroidUIIDE/Project）。
+                {tt("请用 Chrome / Edge 打开网页版，或安装 APK（APK 默认目录：/AndroidUIIDE/Project）。")}
               </div>
             ) : null}
             {wsState?.mode === "web" && !wsState.custom ? (
               <div className="axv-ws-hint">
-                点「打开项目」授权一个项目文件夹，授权会被记住，下次打开不用再选。
+                {tt("点「打开项目」授权一个项目文件夹，授权会被记住，下次打开不用再选。")}
               </div>
             ) : null}
             {wsState?.permission === "prompt" ? (
               <div className="axv-ws-warn">
-                目录权限需要重新确认（浏览器安全策略）。
+                {tt("目录权限需要重新确认（浏览器安全策略）。")}
                 <button className="axv-ws-link" onClick={() => void p.onRefresh()}>
-                  重新授权
+                  {tt("重新授权")}
                 </button>
               </div>
             ) : null}
     
             {wsBusy && projects.length === 0 && wsState?.mode !== "unsupported" ? (
-              <div className="axv-ws-hint">正在读取…</div>
+              <div className="axv-ws-hint">{tt("正在读取…")}</div>
             ) : null}
     
             {/* M62：项目列表筛选（项目一多翻起来费劲） */}
@@ -915,15 +914,15 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
                 <input
                   className="axv-proj-filter-input"
                   value={projQuery}
-                  placeholder={`筛选项目（共 ${projects.length} 个）`}
+                  placeholder={tt("筛选项目（共 {n} 个）", { n: projects.length })}
                   onChange={(e) => setProjQuery(e.target.value)}
                 />
                 {projQuery ? (
                   <button
                     type="button"
                     className="axv-proj-filter-clear"
-                    title="清除筛选"
-                    aria-label="清除筛选"
+                    title={tt("清除筛选")}
+                    aria-label={tt("清除筛选")}
                     onClick={() => setProjQuery("")}
                   >
                     <span className="msr" aria-hidden="true">close</span>
@@ -955,8 +954,8 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
                               {it.kind === "dir"
                                 ? meta
                                   ? `${libLabel(meta.lib)}${meta.name && meta.name !== it.name ? ` · ${it.name}` : ""}`
-                                  : `~${it.layoutCount || 1} 个布局 · ${it.name}`
-                                : `单个布局 · ${it.name}`}
+                                  : tt("~{n} 个布局 · {name}", { n: it.layoutCount || 1, name: it.name })
+                                : tt("单个布局 · {name}", { name: it.name })}
                             </span>
                           </span>
                           <span className="msr axv-proj-card-go" aria-hidden="true">chevron_right</span>
@@ -968,12 +967,12 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
               </ul>
             ) : !wsBusy && (wsState?.mode === "native" || wsState?.custom) ? (
               <div className="axv-ws-hint">
-                目录里还没有项目。把项目文件夹（内含 layout/*.xml）放到这个目录下，点刷新即可。
+                {tt("目录里还没有项目。把项目文件夹（内含 layout/*.xml）放到这个目录下，点刷新即可。")}
               </div>
             ) : null}
     
             {projects.length > 0 && shownProjects.length === 0 ? (
-              <div className="axv-ws-hint">没找到匹配「{projQuery}」的项目</div>
+              <div className="axv-ws-hint">{tt("没找到匹配「{q}」的项目", { q: projQuery })}</div>
             ) : null}
     
             {wsMsg ? <div className="axv-ws-hint">{wsMsg}</div> : null}
@@ -1059,7 +1058,7 @@ export function ProjectPanel(p: ProjectPanelProps) {
                       <span className="msr axv-ws-item-icon" aria-hidden="true">folder_open</span>
                       <span className="axv-ws-item-main">
                         <span className="axv-ws-item-name">layout/</span>
-                        <span className="axv-ws-item-sub">{p.appProject.files.length} 个布局</span>
+                        <span className="axv-ws-item-sub">{tt("{n} 个布局", { n: p.appProject.files.length })}</span>
                       </span>
                     </span>
                   </div>
@@ -1079,7 +1078,7 @@ export function ProjectPanel(p: ProjectPanelProps) {
                             {f.id === p.appProject.activeId ? "● " : ""}
                             {f.name}
                           </span>
-                          <span className="axv-ws-item-sub">布局文件</span>
+                          <span className="axv-ws-item-sub">{tt("布局文件")}</span>
                         </span>
                       </button>
                     </div>
@@ -1092,7 +1091,7 @@ export function ProjectPanel(p: ProjectPanelProps) {
           {/* M30c：资源树（axv-restree）已删除——点击行为合并到上方 axv-ws-list axv-proj-tree 的行里；
               原「选择res目录 / 打开xml」按钮行也删了（工具栏都有） */}
           <div style={{ padding: "8px 12px 4px", fontSize: 12, color: "var(--axv-on-surface-variant)", lineHeight: 1.5 }}>
-            点上方结构树里的文件直接打开（drawable 形状 → 绘制编辑器，vector/图片 → 预览）。
+            {tt("点上方结构树里的文件直接打开（drawable 形状 → 绘制编辑器，vector/图片 → 预览）。")}
           </div>
         </>
       )}

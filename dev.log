@@ -41,3 +41,115 @@
 ✓ Compiled in 176ms
 ✓ Compiled in 88ms
 ✓ Compiled in 101ms
+✓ Compiled in 1049ms
+[browser] Uncaught ReferenceError: tt is not defined
+    at ProjectsTab (components/ProjectPanel.tsx:855:24)
+    at Set.forEach (<anonymous>)
+    at ProjectPanel (components/ProjectPanel.tsx:960:85)
+    at XmlEditor (components/XmlEditor.tsx:3557:13)
+    at XmlPage (app/xml/page.tsx:8:10)
+  853 |                 className="axv-rail-mini-btn"
+  854 |                 onClick={() => void p.onOpenDir()}
+> 855 |                 title={tt("打开其他项目文件夹（含 layout/*.xml），作为当前项目")}
+      |                        ^
+  856 |               >
+  857 |                 <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
+  858 |                 {tr("proj.open", "打开项目")}
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 284ms
+ GET /xml/?r=m101b 200 in 90ms (next.js: 1.2ms, application-code: 88ms)
+✓ Compiled in 152ms
+✓ Compiled in 402ms
+[browser] ./lib/i18n-src.ts:59:61
+Error: Unexpected character '“'
+  57 | ...源目录内部。": "The target location is inside the source folder.",
+  58 | ... "Name conflict",
+> 59 | ...有「{name}」，请改名后再粘贴": “{name}” already exists under {parent} — rename it befor...
+     |                                   ^
+  60 | ... "Paste failed",
+  61 | ...asted",
+  62 | ...parent}/": "Copied to {parent}/",
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/i18n-src.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/i18n-src.ts:59:61
+Error: Unexpected character '“'
+  57 | ...源目录内部。": "The target location is inside the source folder.",
+  58 | ... "Name conflict",
+> 59 | ...有「{name}」，请改名后再粘贴": “{name}” already exists under {parent} — rename it befor...
+     |                                   ^
+  60 | ... "Paste failed",
+  61 | ...asted",
+  62 | ...parent}/": "Copied to {parent}/",
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/i18n-src.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/i18n-src.ts:59:61
+Error: Unexpected character '“'
+  57 | ...源目录内部。": "The target location is inside the source folder.",
+  58 | ... "Name conflict",
+> 59 | ...有「{name}」，请改名后再粘贴": “{name}” already exists under {parent} — rename it befor...
+     |                                   ^
+  60 | ... "Paste failed",
+  61 | ...asted",
+  62 | ...parent}/": "Copied to {parent}/",
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/i18n-src.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/i18n-src.ts:59:61
+Error: Unexpected character '“'
+  57 | ...源目录内部。": "The target location is inside the source folder.",
+  58 | ... "Name conflict",
+> 59 | ...有「{name}」，请改名后再粘贴": “{name}” already exists under {parent} — rename it befor...
+     |                                   ^
+  60 | ... "Paste failed",
+  61 | ...asted",
+  62 | ...parent}/": "Copied to {parent}/",
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/i18n-src.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./lib/i18n-src.ts:59:61
+Error: Unexpected character '“'
+  57 | ...源目录内部。": "The target location is inside the source folder.",
+  58 | ... "Name conflict",
+> 59 | ...有「{name}」，请改名后再粘贴": “{name}” already exists under {parent} — rename it befor...
+     |                                   ^
+  60 | ... "Paste failed",
+  61 | ...asted",
+  62 | ...parent}/": "Copied to {parent}/",
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./lib/i18n-src.ts [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 97ms
+ GET /xml/?r=m101b 200 in 24ms (next.js: 3ms, application-code: 21ms)
+✓ Compiled in 117ms

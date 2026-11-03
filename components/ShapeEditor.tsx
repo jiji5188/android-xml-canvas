@@ -65,7 +65,8 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
       parsed ?? {
         kind: "rectangle",
         solid: "#FFFFFF",
-        radius: 12,
+        // M91d：新建矩形默认无圆角（直角），要圆角自己拉滑杆
+        radius: 0,
       }
     );
   }, [existingXml]);

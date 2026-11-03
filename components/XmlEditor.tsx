@@ -162,6 +162,9 @@ import { StatusBar } from "./StatusBar";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas.css";
+// M100：安卓硬件返回键 → 关闭最上层浮层（而不是直接退出 App）
+import { useBackGuard } from "./useBackGuard";
+import { installBackBridge, resetBackStack } from "@/lib/ui/back-stack";
 import { readableOn, deviceById } from "@/lib/xml/theme";
 import { DEFAULT_RENDER_THEME, type RenderTheme } from "@/lib/xml/theme";
 import {
@@ -750,6 +753,23 @@ export function XmlEditor() {
     }
   });
   const [showIssues, setShowIssues] = useState(true);
+
+  /* ===== M100：安卓返回键 =====
+   * 注册顺序 = 层级从下到上：先左栅面板，再子页面，最后弹窗。
+   * 后注册的优先被返回键消费，所以弹出弹窗时按返回先关弹窗。 */
+  useEffect(() => {
+    installBackBridge();
+    return () => resetBackStack();
+  }, []);
+  useBackGuard(leftOpen, () => setLeftOpen(false), "left-panel");
+  useBackGuard(resShape !== null, () => setResShape(null), "shape-editor");
+  useBackGuard(resIcon !== null, () => setResIcon(null), "icon-editor");
+  useBackGuard(editingTheme !== null, () => setEditingTheme(null), "theme-dialog");
+  useBackGuard(exportOpen, () => setExportOpen(false), "export-dialog");
+  useBackGuard(addModalOpen, () => setAddModalOpen(false), "add-attr");
+  useBackGuard(imgExportOpen, () => setImgExportOpen(false), "img-export");
+  useBackGuard(newProjOpen, () => setNewProjOpen(false), "new-project");
+  useBackGuard(saveAsOpen, () => setSaveAsOpen(false), "save-as");
 
   // M16h：应用配色方案（只影响编辑器外壳，不影响导出/预览）
   // M90：带上当前方案的覆盖值；子页打开时临时预览正在编辑的那套（关闭就回原方案）

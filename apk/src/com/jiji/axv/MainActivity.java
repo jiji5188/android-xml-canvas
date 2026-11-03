@@ -75,6 +75,8 @@ public class MainActivity extends Activity {
     private WebView web;
     /** M32b：桥实例持强引用，防被 GC；onResume 重新注入也用同一个 */
     private Bridge bridge;
+    /** M100：返回键正在等 JS 回调，防连按重复触发 */
+    private boolean backAsking;
     /** M32c：AI 专用 MessagePort（不依赖 JS 桥对象注册表，页面重载后重建） */
     private android.webkit.WebMessagePort aiPort;
     /** M33：port 是否经过 JS 握手确认（未确认就用 evaluateJavascript，避免静默丢消息） */
@@ -2404,11 +2406,37 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (web != null && web.canGoBack()) {
-            web.goBack();
+        if (web == null) {
+            super.onBackPressed();
             return;
         }
-        super.onBackPressed();
+        /* M100：先问 JS 有没有浮层要关（面板/弹窗/图标编辑器），
+         * 以前只判 canGoBack()，而 SPA 浮层不进历史栈 → 面板开着按返回直接退出 App。 */
+        if (backAsking) return; // 防连按：等上一次回调
+        backAsking = true;
+        try {
+            web.evaluateJavascript(
+                "(function(){try{return window.__axvHandleBack?window.__axvHandleBack():'0'}catch(e){return '0'}})()",
+                new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String value) {
+                        backAsking = false;
+                        boolean handled = value != null && value.contains("1");
+                        if (handled) return;
+                        if (web != null && web.canGoBack()) {
+                            web.goBack();
+                            return;
+                        }
+                        finish();
+                    }
+                }
+            );
+        } catch (Throwable t) {
+            backAsking = false;
+            Log.e(TAG, "back via js", t);
+            if (web.canGoBack()) web.goBack();
+            else finish();
+        }
     }
 
     /* ===== M32b：JS 桥自愈 =====

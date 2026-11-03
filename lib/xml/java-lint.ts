@@ -63,44 +63,70 @@ interface Masked {
   code: string;
   /** 逐字符是否落在字符串/字符字面量里 */
   inStr: boolean[];
+  /** M98：文件结束时仍未闭合的字面量起始偏移（null = 都闭合了） */
+  openAt: number | null;
 }
 
-/** 把注释和字面量内容抹成空格，保持偏移量与行号不变 */
-function mask(src: string): Masked {
+/** 把注释和字面量内容抹成空格，保持偏移量与行号不变
+ *
+ * M98：以前只认 `"` / `'` / `//` / `/* *\/`，三种真实写法会被当成代码，
+ * 于是里面的括号被拿去配对 → 误报「括号不配对」：
+ *   1. Java 文本块 `"""…"""`（内容里的 " 会提前结束掩码）
+ *   2. Kotlin 原始字符串 `"""…"""`（`"""{"a":1}"""` 这种 JSON 模板最典型）
+ *   3. Kotlin 字符串模板 `"${map["k"]}"`（内层引号会把外层提前关掉）
+ * 现在用状态栈处理：raw（三引号）、tpl（`${…}` 模板嵌套）。
+ */
+function mask(src: string, isKotlin = false): Masked {
   const out: string[] = [];
   const inStr: boolean[] = [];
   let i = 0;
-  type St = "code" | "line" | "block" | "str" | "char" | "raw";
-  let st: St = "code";
+  type St = "code" | "line" | "block" | "str" | "char" | "raw" | "tpl";
+  const stack: { st: St; quote?: string; depth?: number; at?: number }[] = [];
+  const top = () => stack[stack.length - 1];
+  stack.push({ st: "code" });
+  /** 按原文长度占位：换行保留换行，其余变空格 */
+  const blank = (text: string, isStr: boolean) => {
+    for (const ch of text) {
+      out.push(ch === "\n" ? "\n" : " ");
+      inStr.push(isStr);
+    }
+  };
   while (i < src.length) {
+    const cur = top();
+    const st = cur.st;
     const c = src[i];
     const n = src[i + 1];
+    const n2 = src[i + 2];
+
     if (st === "code") {
       if (c === "/" && n === "/") {
-        st = "line";
-        out.push(" ", " ");
-        inStr.push(false, false);
+        stack.push({ st: "line" });
+        blank("//", false);
         i += 2;
         continue;
       }
       if (c === "/" && n === "*") {
-        st = "block";
-        out.push(" ", " ");
-        inStr.push(false, false);
+        stack.push({ st: "block" });
+        blank("/*", false);
         i += 2;
         continue;
       }
+      // 三引号：Java 文本块 / Kotlin 原始字符串
+      if (c === '"' && n === '"' && n2 === '"') {
+        stack.push({ st: "raw", at: i });
+        blank('"""', true);
+        i += 3;
+        continue;
+      }
       if (c === '"') {
-        st = "str";
-        out.push(" ");
-        inStr.push(true);
+        stack.push({ st: "str", quote: '"', at: i });
+        blank('"', true);
         i++;
         continue;
       }
       if (c === "'") {
-        st = "char";
-        out.push(" ");
-        inStr.push(true);
+        stack.push({ st: "char", quote: "'", at: i });
+        blank("'", true);
         i++;
         continue;
       }
@@ -109,58 +135,112 @@ function mask(src: string): Masked {
       i++;
       continue;
     }
+
     if (st === "line") {
       if (c === "\n") {
-        st = "code";
+        stack.pop();
         out.push("\n");
         inStr.push(false);
       } else {
-        out.push(" ");
-        inStr.push(false);
+        blank(c, false);
       }
       i++;
       continue;
     }
+
     if (st === "block") {
       if (c === "*" && n === "/") {
-        st = "code";
-        out.push(" ", " ");
-        inStr.push(false, false);
+        stack.pop();
+        blank("*/", false);
         i += 2;
         continue;
       }
-      out.push(c === "\n" ? "\n" : " ");
-      inStr.push(false);
+      blank(c, false);
       i++;
       continue;
     }
+
+    if (st === "raw") {
+      // 闭合三引号。Java 文本块里 `\` 仍会转义，Kotlin 原始字符串完全不转义
+      if (c === "\\" && !isKotlin) {
+        blank(src.slice(i, i + 2), true);
+        i += 2;
+        continue;
+      }
+      if (c === '"' && n === '"' && n2 === '"') {
+        stack.pop();
+        blank('"""', true);
+        i += 3;
+        continue;
+      }
+      blank(c, true);
+      i++;
+      continue;
+    }
+
+    // tpl：Kotlin 字符串模板 `${…}`，里面还能再套字符串和花括号
+    if (st === "tpl") {
+      if (c === '"' && n === '"' && n2 === '"') {
+        stack.push({ st: "raw", at: i });
+        blank('"""', true);
+        i += 3;
+        continue;
+      }
+      if (c === '"') {
+        stack.push({ st: "str", quote: '"', at: i });
+        blank('"', true);
+        i++;
+        continue;
+      }
+      if (c === "{") cur.depth = (cur.depth ?? 0) + 1;
+      else if (c === "}") {
+        const d = (cur.depth ?? 0) - 1;
+        if (d <= 0) {
+          // 模板结束，回到外层字符串
+          stack.pop();
+          blank("}", true);
+          i++;
+          continue;
+        }
+        cur.depth = d;
+      }
+      blank(c, c !== "\n");
+      i++;
+      continue;
+    }
+
     // str / char
-    const quote = st === "str" ? '"' : "'";
+    const quote = cur.quote ?? '"';
     if (c === "\\") {
-      out.push(" ", " ");
-      inStr.push(true, true);
+      // 转义：`\"` / `\'` / `\\` 都把后一个字符一起吞掉
+      blank(src.slice(i, i + 2), true);
+      i += 2;
+      continue;
+    }
+    if (st === "str" && isKotlin && c === "$" && n === "{") {
+      stack.push({ st: "tpl", depth: 0, at: i });
+      blank("${", true);
       i += 2;
       continue;
     }
     if (c === quote) {
-      st = "code";
-      out.push(" ");
-      inStr.push(true);
+      stack.pop();
+      blank(quote, true);
       i++;
       continue;
     }
     if (c === "\n" && st === "str") {
-      // Java 不允许裸换行的字符串字面量
-      out.push("\n");
-      inStr.push(true);
+      // Java 不允许裸换行的字符串字面量（Kotlin 原始字符串走 raw，不来这里）
+      blank("\n", true);
       i++;
       continue;
     }
-    out.push(c === "\n" ? "\n" : " ");
-    inStr.push(true);
+    blank(c, true);
     i++;
   }
-  return { code: out.join(""), inStr };
+  // 文件结束时还停在字面量里 → 那个字面量没闭合
+  const open = [...stack].reverse().find((s) => s.st === "str" || s.st === "char" || s.st === "raw" || s.st === "tpl");
+  return { code: out.join(""), inStr, openAt: open ? (open.at ?? 0) : null };
 }
 
 function lineStarts(src: string): number[] {
@@ -186,24 +266,12 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
   const issues: JavaLintIssue[] = [];
   if (!text.trim()) return issues;
 
-  const masked = mask(text);
+  const masked = mask(text, !!opts.isKotlin);
   const starts = lineStarts(text);
 
   // 1) 字面量没闭合（先查，否则后面括号检查全是噪音）
-  const lastQuoteLine = (() => {
-    let inS = false;
-    let line = 1;
-    let startLine = 1;
-    for (let i = 0; i < masked.inStr.length; i++) {
-      if (text[i] === "\n") line++;
-      if (masked.inStr[i] && !inS) {
-        inS = true;
-        startLine = line;
-      }
-      // 字面量闭合处 inStr 会变 false 但仍是同一个位置；用 code 串里的引号位置判断略过
-    }
-    return inS ? startLine : 0;
-  })();
+  //    M98：改成看 mask 的结束状态 —— 以前靠 inStr 扫一遍，遇到文件末尾正好是 "abc" 会误报
+  const lastQuoteLine = masked.openAt === null ? 0 : lineOf(starts, masked.openAt);
   if (lastQuoteLine) {
     issues.push({
       line: lastQuoteLine,
@@ -217,6 +285,8 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
   if (!lastQuoteLine) {
     const stack: { ch: string; at: number }[] = [];
     const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
+    /** M98：已经报过「不配对」就不再补一条「没闭合」—— 同一个错报两次最像误报 */
+    let mismatched = false;
     for (let i = 0; i < masked.code.length; i++) {
       const c = masked.code[i];
       if (c === "(" || c === "[" || c === "{") stack.push({ ch: c, at: i });
@@ -229,6 +299,7 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
             code: "brace",
             msg: `多余的 "${c}"：前面没有对应的开括号`,
           });
+          mismatched = true;
           break;
         }
         if (top.ch !== pairs[c]) {
@@ -238,11 +309,12 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
             code: "brace",
             msg: `括号不配对："${top.ch}"（第 ${lineOf(starts, top.at)} 行）却遇到 "${c}"`,
           });
+          mismatched = true;
           break;
         }
       }
     }
-    if (stack.length) {
+    if (stack.length && !mismatched) {
       const top = stack[stack.length - 1];
       issues.push({
         line: lineOf(starts, top.at),

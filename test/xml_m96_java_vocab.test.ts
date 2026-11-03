@@ -107,7 +107,7 @@ describe("M96 Java 候选计算", () => {
 
   it("候选数量有上限", () => {
     const s = suggest("on");
-    expect(s!.items.length).toBeLessThanOrEqual(12);
+    expect(s!.items.length).toBeLessThanOrEqual(24); // M98：MAX_ITEMS 12→24
   });
 });
 

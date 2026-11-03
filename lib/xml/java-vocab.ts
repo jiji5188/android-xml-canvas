@@ -276,7 +276,7 @@ function inString(doc: string, offset: number): boolean {
   return (lineHead.match(/"/g) || []).length % 2 === 1;
 }
 
-const MAX_ITEMS = 12;
+const MAX_ITEMS = 24; // M98：从 12 提到 24，配合弹窗滚动（320px 高）让常用词尽量都露出来
 
 /**
  * Java 候选：关键字 / 类型 / 方法三组按前缀过滤，保留原顺序（常用优先）。

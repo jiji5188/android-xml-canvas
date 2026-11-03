@@ -330,6 +330,14 @@ export function CodeEditor({
   /** 刚接受过一次（此时不要再弹，否则回车确认后立刻又弹出来） */
   const lastAcceptRef = useRef(0);
   const sugTimer = useRef<number | null>(null);
+  /**
+   * M98：候选弹窗的「按下→抬起」追踪。
+   * 以前 pointerdown 直接确认，结果：
+   *   ① 手机上想滑列表，一按就把第一个词填进去了；
+   *   ② pointerdown 里 preventDefault 把 touch 滚动也一起拦了，列表根本滑不动。
+   * 现在：按下只记位置，抬起时「同一项 + 没怎么动 + 没滚动过」才算点击。
+   */
+  const pressRef = useRef<{ i: number; x: number; y: number; top: number } | null>(null);
   const resNamesRef = useRef<string[] | undefined>(resNames);
   resNamesRef.current = resNames;
 
@@ -458,6 +466,42 @@ export function CodeEditor({
     [setSugBoth],
   );
 
+  /** M98：按下：只记录，不确认
+   *  * 保留焦点：不对指针事件 preventDefault —— 一 preventDefault，触屏滑动就被吃掉了
+   *  * 用 pressRef 告诉 blur 处理器「现在是在弹窗上按，先别关」
+   */
+  const onSugDown = useCallback(
+    (i: number, e: React.PointerEvent<HTMLDivElement>) => {
+      // 鼠标：拦掉默认行为，保住编辑器焦点（鼠标不需要滑列表，滚轮不受影响）
+      // 触屏 / 手写笔：不能拦，一拦手势滑动就被吃掉
+      if (e.pointerType === "mouse") e.preventDefault();
+      const list = (e.currentTarget.parentElement as HTMLElement | null) ?? e.currentTarget;
+      pressRef.current = { i, x: e.clientX, y: e.clientY, top: list.scrollTop };
+      if (sugRef.current && sugRef.current.sel !== i) setSugBoth({ ...sugRef.current, sel: i });
+    },
+    [setSugBoth],
+  );
+
+  /** M98：抬起：同一项 + 位移 < 10px + 没滚动过 → 才算点击 */
+  const onSugUp = useCallback(
+    (i: number, e: React.PointerEvent<HTMLDivElement>) => {
+      const press = pressRef.current;
+      pressRef.current = null;
+      if (!press || press.i !== i) return;
+      const moved = Math.abs(e.clientX - press.x) + Math.abs(e.clientY - press.y);
+      const list = (e.currentTarget.parentElement as HTMLElement | null) ?? e.currentTarget;
+      const scrolled = Math.abs(list.scrollTop - press.top) > 2;
+      if (moved > 10 || scrolled) return; // 是在滑列表，不是选词
+      acceptSuggest(i);
+    },
+    [acceptSuggest],
+  );
+
+  /** M98：取消 / 滑动 / 滚出屏幕 → 丢弃这次按下 */
+  const cancelPress = useCallback(() => {
+    pressRef.current = null;
+  }, []);
+
   /* ===== 建视图（只一次） ===== */
   useEffect(() => {
     const host = hostRef.current;
@@ -570,9 +614,10 @@ export function CodeEditor({
           // M45：光标/内容变了重算候选（防抖）
           if (u.docChanged || u.selectionSet) scheduleSuggest();
         }),
-        // M45：失焦就关（点弹窗内部不会触发，因为那里 preventDefault 了）
+        // M45：失焦就关（M98：在弹窗上按住时不关，等 pointerup 再决定）
         EditorView.domEventHandlers({
           blur: () => {
+            if (pressRef.current) return false;
             setSugBoth(null);
             return false;
           },
@@ -698,6 +743,10 @@ export function CodeEditor({
               maxHeight: sug.placement.maxHeight,
             }}
             data-placement={sug.placement.placement}
+            // M98：列表自己滚动（手指滑列表不能选中）；滚过就不再算点击
+            onScroll={cancelPress}
+            onPointerCancel={cancelPress}
+            onPointerLeave={cancelPress}
           >
             {sug.items.map((it, i) => (
               <div
@@ -706,12 +755,12 @@ export function CodeEditor({
                 role="option"
                 aria-selected={i === sug.sel}
                 title={it}
-                // 按下就拦：不然编辑器先失焦，弹窗先被 blur 关掉
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  acceptSuggest(i);
-                }}
+                onPointerDown={(e) => onSugDown(i, e)}
+                onPointerUp={(e) => onSugUp(i, e)}
+                onPointerCancel={cancelPress}
                 onMouseEnter={() => {
+                  // 触屏按下时也会派 mouseenter，别让它抢掉滚动
+                  if (pressRef.current) return;
                   if (sugRef.current && sugRef.current.sel !== i) {
                     setSugBoth({ ...sugRef.current, sel: i });
                   }

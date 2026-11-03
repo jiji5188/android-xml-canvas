@@ -774,6 +774,9 @@
   min-width: 180px;
   overflow-y: auto;
   overflow-x: hidden;
+  /* M98：列表自己滑（不传给编辑器），并阻止滑到头后连着滚页面 */
+  touch-action: pan-y;
+  overscroll-behavior: contain;
   padding: 4px;
   border-radius: 10px;
   background: var(--axv-surface);

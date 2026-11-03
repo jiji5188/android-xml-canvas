@@ -561,7 +561,7 @@ export function XmlCanvas({
 
       {node.imgSrc ? (
         node.imgSrc.startsWith("builtin:") ? (
-          // @android:drawable/xxx 平台内置图标：中性占位（bi�? 提示，不标错）
+          // @android:drawable/xxx 平台内置图标：中性占位 + 提示，不标错
           <span
             className="axv-img-layer"
             title={node.imgSrc.slice(8)}

@@ -5,6 +5,7 @@
 // 「AI 写代码」的后续能力（局部改写 / diff 预览 / 多轮记忆）都从这个壳里长出来。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import {
   AI_LS_KEY,
   AI_PROVIDERS,
@@ -77,14 +78,14 @@ interface ChatItem extends AiMessage {
 }
 
 const TOOL_LABEL: Record<string, string> = {
-  read_file: "读取",
-  outline: "大纲",
-  write_file: "写入",
-  apply_patch: "修改",
-  list_files: "列出",
-  search_files: "搜索",
-  find_usages: "查引用",
-  check_java: "自检",
+  read_file: tt("读取"),
+  outline: tt("大纲"),
+  write_file: tt("写入"),
+  apply_patch: tt("修改"),
+  list_files: tt("列出"),
+  search_files: tt("搜索"),
+  find_usages: tt("查引用"),
+  check_java: tt("自检"),
 };
 
 /** M64l（D2）：一行工具日志（默认收起，点开看工具原样输出） */
@@ -102,7 +103,7 @@ function AiToolRow({ tool }: { tool: NonNullable<ChatItem["tool"]> }) {
   const meta = [
     tool.target,
     tool.ms !== undefined ? `${tool.ms}ms` : "",
-    tool.state === "error" ? "失败" : tool.state === "stopped" ? "已停止" : "",
+    tool.state === "error" ? tt("失败") : tool.state === "stopped" ? tt("已停止") : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -112,7 +113,7 @@ function AiToolRow({ tool }: { tool: NonNullable<ChatItem["tool"]> }) {
         className="axv-ai-tool-head"
         onClick={() => setOpen((v) => !v)}
         disabled={!hasOut}
-        title={hasOut ? (open ? "收起结果" : "展开工具结果") : undefined}
+        title={hasOut ? (open ? tt("收起结果") : tt("展开工具结果")) : undefined}
       >
         <span className="msr axv-ai-tool-ic" aria-hidden="true">
           {icon}
@@ -303,9 +304,9 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
         facts ? formatProjectFacts(facts) : "",
         io
           ? `${useTools ? AI_TOOL_PROMPT_NATIVE : AI_TOOL_PROMPT}` +
-            `\n项目根目录：${io.rootLabel()}（项目内的相对路径都从这里算）` +
+            tt("\n项目根目录：{root}（项目内的相对路径都从这里算）", { root: io.rootLabel() }) +
             (io.canWrite === false
-              ? "\n注意：当前项目没拿到写权限，只能 list_files / read_file / search_files，不要尝试写。"
+              ? tt("\\n注意：当前项目没拿到写权限，只能 list_files / read_file / search_files，不要尝试写。")
               : "")
           : "",
         docBlock,
@@ -315,8 +316,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
 
       const history: AiMessage[] = chat.map((m) => ({ role: m.role, content: m.content }));
       const volatile: string[] = [];
-      if (ctxSelection) volatile.push(`当前选中控件路径：${ctxSelection}`);
-      if (ctxResources) volatile.push(`可用资源：${ctxResources}`);
+      if (ctxSelection) volatile.push(tt("当前选中控件路径：{sel}", { sel: ctxSelection }));
+      if (ctxResources) volatile.push(tt("可用资源：{res}", { res: ctxResources }));
       if (mem) volatile.push(mem);
       const userContent = [...volatile, q].filter(Boolean).join("\n\n");
 
@@ -373,7 +374,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               continue;
             }
             setChat((c) => c.filter((m) => !m.streaming));
-            setErr(friendlyAiError(res.error || "调用失败"));
+            setErr(friendlyAiError(res.error || tt("调用失败")));
             return;
           }
 
@@ -384,7 +385,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             if (round >= MAX_TOOL_ROUNDS) {
               patchLast((m) => ({
                 ...m,
-                content: shownFc || "（已达工具调用轮数上限，先停在这里）",
+                content: shownFc || tt("（已达工具调用轮数上限，先停在这里）"),
                 streaming: false,
                 code: extractCodeBlock(shownFc),
                 codeTag: doc.codeTag,
@@ -414,7 +415,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
                   tool: { name: call ? call.tool : item.fc.name, target, state: "running" },
                 },
               ]);
-              const out = call ? await runTool(call, stage ?? (io as AiFileIo)) : `错误：${item.error}`;
+              const out = call ? await runTool(call, stage ?? (io as AiFileIo)) : tt("错误：{err}", { err: item.error ?? "" });
               const patchTool = (next: Partial<NonNullable<ChatItem["tool"]>>) =>
                 setChat((c) => {
                   const n = [...c];
@@ -431,7 +432,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
                 toolMemRef.current = pushToolMemory(toolMemRef.current, memoryEntryFromTool(call.tool, target, out));
               }
               patchTool({
-                state: out.startsWith("错误：") ? "error" : "done",
+                state: out.startsWith(tt("错误：")) ? "error" : "done",
                 out,
                 ms: Date.now() - started,
               });
@@ -444,7 +445,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               ...conv.map((item, i) => ({
                 role: "tool" as const,
                 tool_call_id: item.fc.id,
-                content: results[i] ?? "（未执行）",
+                content: results[i] ?? tt("（未执行）"),
               })),
             ];
             continue;
@@ -457,20 +458,20 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           // M64h（A4）：工具块格式坏了 → 重问一次（把错误原文喂回去），二次失败就降级成普通回答
           if (parsed.errors.length && !repaired) {
             repaired = true;
-            setChat((c) => [...c, { role: "assistant", content: `⚠️ 工具调用格式无效（本轮未执行）：${parsed.errors[0]}` }]);
+            setChat((c) => [...c, { role: "assistant", content: tt("⚠️ 工具调用格式无效（本轮未执行）：{err}", { err: parsed.errors[0] }) }]);
             msgs = [
               ...msgs,
               { role: "assistant", content: res.content },
               {
                 role: "user",
-                content: `上一条回复里的工具调用不能执行，原因：\n- ${parsed.errors.join("\n- ")}\n\n请重新只输出一行 JSON，格式必须是：{"tool":"工具名","args":{...}}；不要解释、不要注释、不要换行、不要中文引号。如果确实不需要工具，就直接回答我。`,
+                content: `上一条回复里的工具调用不能执行，原因：\n- ${parsed.errors.join("\n- ")}\n\n请重新只输出一行 JSON，格式必须是：{"tool":"工具名","args":{...}}；不要解释、不要注释、不要换行、不要中文引号。如果确实不需要工具，就直接回答我。`, // i18n-ignore：发给模型的提示词，不翻译
               },
             ];
             continue;
           }
 
           if (!calls.length || round >= MAX_TOOL_ROUNDS || !io) {
-            const tail = parsed.errors.length ? `\n\n（工具调用格式无效，本轮未改动文件：${parsed.errors[0]}）` : "";
+            const tail = parsed.errors.length ? tt("\n\n（工具调用格式无效，本轮未改动文件：{err}）", { err: parsed.errors[0] }) : "";
             patchLast((m) => ({
               ...m,
               content: shown + tail,
@@ -518,7 +519,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             // M64k（A7）：记下来，下一句追问时不必重读
             toolMemRef.current = pushToolMemory(toolMemRef.current, memoryEntryFromTool(call.tool, target, out));
             patchTool({
-              state: out.startsWith("错误：") ? "error" : "done",
+              state: out.startsWith(tt("错误：")) ? "error" : "done",
               out,
               ms: Date.now() - started,
             });
@@ -527,7 +528,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           msgs = [
             ...msgs,
             { role: "assistant", content: res.content },
-            { role: "user", content: `工具结果：\n${results.join("\n\n")}` },
+            { role: "user", content: tt("工具结果：\n{res}", { res: results.join("\n\n") }) },
           ];
         }
       } finally {
@@ -542,7 +543,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
     abortRef.current?.abort();
     abortRef.current = null;
     setBusy(false);
-    onNote?.("已停止");
+    onNote?.(tt("已停止"));
   };
 
   const testConn = useCallback(async () => {
@@ -557,29 +558,29 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
     // token 给太少就只剩 reasoning、正文为空。所以不能用最小值 64，给 1024。
     const res = await streamChat(
       { ...cfg, maxTokens: 1024 },
-      [{ role: "user", content: "只回复两个字：可用" }],
+      [{ role: "user", content: tt("只回复两个字：可用") }],
       // M33：首包可能慢（思考型模型先打 reasoning）+ 手机网络，30s 太紧
       { timeoutMs: 60_000 },
     );
     setTesting(false);
     if (res.ok) {
       setErr("");
-      onNote?.("连接正常：" + res.content.trim().slice(0, 20));
-      setChat((c) => [...c, { role: "assistant", content: `连接测试通过，模型回复：${res.content.trim().slice(0, 60)}` }]);
+      onNote?.(tt("连接正常：") + res.content.trim().slice(0, 20));
+      setChat((c) => [...c, { role: "assistant", content: tt("连接测试通过，模型回复：{r}", { r: res.content.trim().slice(0, 60) }) }]);
     } else {
       // 带上通道名，方便判断是网络/通道问题还是服务端慢；
       // 再把 Java 侧的 SocketException 原始英文译成可操作的中文说明
-      const tail = res.channel ? `（通道 ${res.channel}）` : "";
-      setErr(friendlyAiError(res.error || "连接失败") + tail);
+      const tail = res.channel ? tt("（通道 {ch}）", { ch: res.channel }) : "";
+      setErr(friendlyAiError(res.error || tt("连接失败")) + tail);
     }
   }, [cfg, onNote]);
 
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      onNote?.("已复制");
+      onNote?.(tt("已复制"));
     } catch {
-      onNote?.("复制失败，请手动选中");
+      onNote?.(tt("复制失败，请手动选中"));
     }
   };
 
@@ -588,7 +589,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
     stageHost.current?.host.clear();
     setStaged([]);
     setDiffOpen({});
-    onNote?.("已放弃 AI 改动");
+    onNote?.(tt("已放弃 AI 改动"));
   }, [onNote]);
 
   // M64e（B3）：应用暂存 → 先备份原文再落盘；成功的文件回调给编辑器刷新/进撤销栈
@@ -608,7 +609,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       }
       const bad = r.results.filter((x) => !x.ok);
       if (bad.length) {
-        setErr(`有 ${bad.length} 个文件没写成：${bad[0].rel} — ${bad[0].error || "未知原因"}`);
+        setErr(`有 ${bad.length} 个文件没写成：${bad[0].rel} — ${bad[0].error || tt("未知原因")}`);
         setStaged((cur) => cur.filter((c) => bad.some((b) => b.rel === c.rel)));
       } else {
         host.host.clear();
@@ -617,7 +618,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       }
       if (okCount) {
         const hasBackup = r.results.some((x) => x.backup);
-        onNote?.(`已落盘 ${okCount} 个文件${hasBackup ? "（原文件备份在 .axv_backup/）" : ""}`);
+        onNote?.(`已落盘 ${okCount} 个文件${hasBackup ? tt("（原文件备份在 .axv_backup/）") : ""}`);
         refreshAiCaches(fileIo);
         setHistory((list) =>
           pushBatch(
@@ -651,12 +652,12 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           if (it.ok) onApplied?.({ rel: it.rel, text: b.items.find((x) => x.rel === it.rel)?.before ?? "" });
         }
         if (bad.length) {
-          setErr(`回滚失败 ${bad.length} 个：${bad[0].rel} — ${bad[0].error || "未知原因"}`);
+          setErr(`回滚失败 ${bad.length} 个：${bad[0].rel} — ${bad[0].error || tt("未知原因")}`);
         } else {
           setHistory((list) => list.filter((x) => x.id !== b.id));
           const blanked = r.results.filter((x) => x.blanked).length;
           onNote?.(
-            `已回滚 ${r.results.length} 个文件${blanked ? `（${blanked} 个为 AI 新建，已清空内容）` : ""}`,
+            tt("已回滚 {n} 个文件{t}", { n: r.results.length, t: blanked ? tt("（{n} 个为 AI 新建，已清空内容）", { n: blanked }) : "" }),
           );
         }
       } finally {
@@ -675,41 +676,41 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             {cfg.apiKey ? "key" : "key_off"}
           </span>
           <span className="axv-ai-cfg-title">
-            {cfg.model || "未配置模型"}
-            {cfg.apiKey ? <span className="axv-ai-dot" title="已配置 Key" /> : null}
+            {cfg.model || tt("未配置模型")}
+            {cfg.apiKey ? <span className="axv-ai-dot" title={tt("已配置 Key")} /> : null}
           </span>
           <span
             className="axv-ai-badge"
             title={
               useNative
-                ? "走安卓原生 HTTP，没有跨域限制"
-                : "浏览器直连，部分服务商会被跨域拦（原生通道失效时会自动回退到这里）"
+                ? tt("走安卓原生 HTTP，没有跨域限制")
+                : tt("浏览器直连，部分服务商会被跨域拦（原生通道失效时会自动回退到这里）")
             }
           >
-            {useNative ? "原生直连" : "浏览器"}
+            {useNative ? tt("原生直连") : tt("浏览器")}
           </span>
           {fileIo ? (
             <span
               className="axv-ai-badge axv-ai-cap"
               title={
                 (fileIo.canWrite
-                  ? "AI 可以读也可以改这个项目的文件"
-                  : "AI 只能读这个项目的文件（没拿到写权限）") + "\n根：" + fileIo.rootLabel()
+                  ? tt("AI 可以读也可以改这个项目的文件")
+                  : tt("AI 只能读这个项目的文件（没拿到写权限）")) + tt("\\n根：") + fileIo.rootLabel()
               }
             >
-              {fileIo.canWrite ? "读写" : "只读"}
+              {fileIo.canWrite ? tt("读写") : tt("只读")}
             </span>
           ) : null}
           {factsInfo ? (
             <span
               className="axv-ai-badge axv-ai-facts"
               title={
-                `已扫描项目事实：drawable ${factsInfo.drawables.length} / color ${factsInfo.colors.length} / string ${factsInfo.strings.length}` +
-                (factsInfo.truncated ? "（达扫描上限，可能不全）" : "") +
-                (factsInfo.lib !== "unknown" ? `\n依赖库：${factsInfo.lib}` : "")
+                tt("已扫描项目事实：drawable {d} / color {c} / string {s}", { d: factsInfo.drawables.length, c: factsInfo.colors.length, s: factsInfo.strings.length }) +
+                (factsInfo.truncated ? tt("（达扫描上限，可能不全）") : "") +
+                (factsInfo.lib !== "unknown" ? tt("\n依赖库：{lib}", { lib: factsInfo.lib }) : "")
               }
             >
-              事实 {factsInfo.drawables.length + factsInfo.colors.length + factsInfo.strings.length}
+              {tt("事实 {n}", { n: factsInfo.drawables.length + factsInfo.colors.length + factsInfo.strings.length })}
             </span>
           ) : null}
           <span className={"msr axv-ai-caret" + (cfgOpen ? " on" : "")} aria-hidden="true">
@@ -720,7 +721,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
         {cfgOpen ? (
           <div className="axv-ai-cfg-body">
             <label className="axv-ai-field">
-              <span>服务商</span>
+              <span>{tt("服务商")}</span>
               <select
                 value={cfg.provider}
                 onChange={(e) => setCfg((c) => applyProvider(c, e.target.value))}
@@ -734,7 +735,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             </label>
 
             <label className="axv-ai-field">
-              <span>接口地址</span>
+              <span>{tt("接口地址")}</span>
               <input
                 value={cfg.baseUrl}
                 onChange={(e) => patch({ baseUrl: e.target.value })}
@@ -745,7 +746,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             </label>
 
             <label className="axv-ai-field">
-              <span>模型</span>
+              <span>{tt("模型")}</span>
               <input
                 value={cfg.model}
                 onChange={(e) => patch({ model: e.target.value })}
@@ -765,7 +766,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
                   spellCheck={false}
                   autoComplete="off"
                 />
-                <button className="axv-ai-mini" onClick={() => setShowKey((v) => !v)} title={showKey ? "隐藏" : "显示"}>
+                <button className="axv-ai-mini" onClick={() => setShowKey((v) => !v)} title={showKey ? tt("隐藏") : tt("显示")}>
                   <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
                     {showKey ? "visibility_off" : "visibility"}
                   </span>
@@ -774,7 +775,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             </label>
 
             <label className="axv-ai-field">
-              <span>温度</span>
+              <span>{tt("温度")}</span>
               <input
                 type="number"
                 min={0}
@@ -789,7 +790,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               />
             </label>
             <label className="axv-ai-field">
-              <span>最大 token</span>
+              <span>{tt("最大 token")}</span>
               <input
                 type="number"
                 min={64}
@@ -804,7 +805,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               />
             </label>
 
-            <label className="axv-ai-check" title="默认关闭：AI 不能改 build.gradle / AndroidManifest.xml / build/ / .git/ 等">
+            <label className="axv-ai-check" title={tt("默认关闭：AI 不能改 build.gradle / AndroidManifest.xml / build/ / .git/ 等")}>
               <input
                 type="checkbox"
                 checked={allowProtected}
@@ -812,30 +813,26 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
                   setAllowProtected(e.target.checked);
                   aiAllowProtectedSet(e.target.checked);
                 }}
-              />
-              允许改构建/清单文件
-            </label>
+              />{tt("允许改构建/清单文件")}</label>
 
             <label
               className="axv-ai-check"
-              title="默认开启：工具通过 tools 协议传递（模型直接返回结构化的 tool_calls）。只有服务端报 tools 不支持、或模型乱调工具时才关掉，关掉后改用正文 axv-tool 代码块。"
+              title={tt("默认开启：工具通过 tools 协议传递（模型直接返回结构化的 tool_calls）。只有服务端报 tools 不支持、或模型乱调工具时才关掉，关掉后改用正文 axv-tool 代码块。")}
             >
               <input
                 type="checkbox"
                 checked={cfg.nativeTools !== false}
                 onChange={(e) => patch({ nativeTools: e.target.checked })}
-              />
-              原生工具调用（tools）
-            </label>
+              />{tt("原生工具调用（tools）")}</label>
 
             <button className="axv-set-btn" disabled={testing || !!cfgProblem} onClick={() => void testConn()}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
                 {testing ? "hourglass_top" : "network_check"}
               </span>
-              {testing ? "测试中…" : "测试连接"}
+              {testing ? tt("测试中…") : tt("测试连接")}
             </button>
             <div className="axv-ai-hint">
-              Key 只存在这台设备的浏览器里，不经过任何中转。网页版受浏览器跨域限制：DeepSeek / 通义 / 智谱 / Kimi 支持浏览器直连；腾讯 TokenHub 不响应 CORS 预检（OPTIONS 直接 405），需先跑本地代理 `npm run ai-proxy`，再把接口地址填成 `http://127.0.0.1:8787/v1`。思考型模型（如 glm-5.3-flash）会先把 token 花在 reasoning 上，「最大 token」建议 4096 以上，否则正文可能是空的。
+              {tt("Key 只存在这台设备的浏览器里，不经过任何中转。网页版受浏览器跨域限制：DeepSeek / 通义 / 智谱 / Kimi 支持浏览器直连；腾讯 TokenHub 不响应 CORS 预检（OPTIONS 直接 405），需先跑本地代理 npm run ai-proxy，再把接口地址填成 http://127.0.0.1:8787/v1。思考型模型（如 glm-5.3-flash）会先把 token 花在 reasoning 上，「最大 token」建议 4096 以上，否则正文可能是空的。")}
             </div>
           </div>
         ) : null}
@@ -846,10 +843,10 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           <span className="msr" aria-hidden="true" style={{ fontSize: 15 }}>
             history
           </span>
-          <span className="axv-ai-chatbar-txt">{docRel ? "这个文件的对话已自动保存" : "本次对话（未绑定文件）"}</span>
+          <span className="axv-ai-chatbar-txt">{docRel ? tt("这个文件的对话已自动保存") : tt("本次对话（未绑定文件）")}</span>
           <button
             className="axv-ai-mini"
-            title="清空这个文件的对话"
+            title={tt("清空这个文件的对话")}
             onClick={() => {
               setChat([]);
               chatRef.current = [];
@@ -874,8 +871,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             <div>{doc.emptyHint}</div>
             <div className="axv-ai-hint">
               {doc.canReplaceCanvas
-                ? "回复里的 XML 代码块可以一键替换回画布（走撤销栈，Ctrl+Z 能退）。"
-                : "回复里的代码块可以复制；当前不是布局文件，不会往画布写。"}
+                ? tt("回复里的 XML 代码块可以一键替换回画布（走撤销栈，Ctrl+Z 能退）。")
+                : tt("回复里的代码块可以复制；当前不是布局文件，不会往画布写。")}
             </div>
           </div>
         ) : null}
@@ -886,25 +883,25 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           ) : (
             <div key={i} className={"axv-ai-msg " + m.role}>
             <div className="axv-ai-bubble">
-              {m.content.replace(/```[a-zA-Z0-9_-]*\s*\n[\s\S]*?```/g, "〔代码见下〕")}
+              {m.content.replace(/```[a-zA-Z0-9_-]*\s*\n[\s\S]*?```/g, tt("〔代码见下〕"))}
               {m.streaming ? <span className="axv-ai-cursor">▍</span> : null}
             </div>
             {m.code ? (
               <div className="axv-ai-code">
                 <div className="axv-ai-code-bar">
                   <span className="axv-ai-code-tag">
-                    {m.codeTag ?? doc.codeTag} · {m.code.split("\n").length} 行
+                    {m.codeTag ?? doc.codeTag} · {m.code.split("\n").length} {tt("行")}
                   </span>
-                  <button className="axv-ai-mini" title="复制" onClick={() => void copy(m.code!)}>
+                  <button className="axv-ai-mini" title={tt("复制")} onClick={() => void copy(m.code!)}>
                     <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>content_copy</span>
                   </button>
                   {m.canReplace ?? doc.canReplaceCanvas ? (
                     <button
                       className="axv-ai-mini"
-                      title="替换画布（可撤销）"
+                      title={tt("替换画布（可撤销）")}
                       onClick={() => {
                         onReplaceXml(m.code!);
-                        onNote?.("已替换画布内容，可 Ctrl+Z 撤销");
+                        onNote?.(tt("已替换画布内容，可 Ctrl+Z 撤销"));
                       }}
                     >
                       <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>input</span>
@@ -920,7 +917,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
 
         {busy && !chat.some((m) => m.streaming) ? (
           <div className="axv-ai-msg assistant">
-            <div className="axv-ai-bubble axv-ai-typing">正在生成…</div>
+            <div className="axv-ai-bubble axv-ai-typing">{tt("正在生成…")}</div>
           </div>
         ) : null}
       </div>
@@ -952,14 +949,12 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
         <div className="axv-ai-diffcard">
           <div className="axv-ai-diffcard-head">
             <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>difference</span>
-            <b>待应用的改动</b>
-            <span className="axv-ai-diffcard-sub">{staged.length} 个文件</span>
+            <b>{tt("待应用的改动")}</b>
+            <span className="axv-ai-diffcard-sub">{staged.length} {tt("个文件")}</span>
             <span className="axv-ai-spacer" />
-            <button className="axv-btn axv-ghost" disabled={applying} onClick={discardStaged}>
-              放弃
-            </button>
+            <button className="axv-btn axv-ghost" disabled={applying} onClick={discardStaged}>{tt("放弃")}</button>
             <button className="axv-btn" disabled={applying} onClick={() => void applyStaged()}>
-              {applying ? "写入中…" : "全部应用"}
+              {applying ? tt("写入中…") : tt("全部应用")}
             </button>
           </div>
           {staged.map((c) => {
@@ -971,7 +966,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
                   <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>{open ? "expand_less" : "expand_more"}</span>
                   <span className="axv-ai-diffcard-name">
                     {c.rel}
-                    {c.before === null ? <em>（新建）</em> : null}
+                    {c.before === null ? <em>{tt("（新建）")}</em> : null}
                   </span>
                   <span className="axv-ai-diffcard-stat">
                     <span className="add">+{d.added}</span>
@@ -988,13 +983,13 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
                           {l.text}
                         </div>
                       ))}
-                    {d.truncated ? <div className="axv-ai-diff-line op-ctx">… 文件较大，仅预览前 200 行</div> : null}
+                    {d.truncated ? <div className="axv-ai-diff-line op-ctx">{tt("… 文件较大，仅预览前 200 行")}</div> : null}
                   </pre>
                 ) : null}
               </div>
             );
           })}
-          <div className="axv-ai-diffcard-foot">应用前会把原文件备份到 .axv_backup/</div>
+          <div className="axv-ai-diffcard-foot">{tt("应用前会把原文件备份到 .axv_backup/")}</div>
         </div>
       ) : null}
 
@@ -1005,8 +1000,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
               history
             </span>
-            <b>AI 改动历史</b>
-            <span className="axv-ai-diffcard-sub">{history.length} 批（内存，最多 20）</span>
+            <b>{tt("AI 改动历史")}</b>
+            <span className="axv-ai-diffcard-sub">{history.length} {tt("批（内存，最多 20 条）")}</span>
           </div>
           {history.map((b) => (
             <div className="axv-ai-hist-row" key={b.id}>
@@ -1017,9 +1012,9 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
                 className="axv-btn axv-ghost"
                 disabled={rollingBack === b.id}
                 onClick={() => void rollback(b)}
-                title="把这些文件写回 AI 修改前的内容"
+                title={tt("把这些文件写回 AI 修改前的内容")}
               >
-                {rollingBack === b.id ? "回滚中…" : "回滚"}
+                {rollingBack === b.id ? tt("回滚中…") : tt("回滚")}
               </button>
             </div>
           ))}
@@ -1031,7 +1026,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="问点什么，例如：把标题字号放大到 24sp"
+          placeholder={tt("问点什么，例如：把标题字号放大到 24sp")}
           rows={3}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -1041,26 +1036,20 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           }}
         />
         <div className="axv-ai-input-bar">
-          <label className="axv-ai-check" title={`把${doc.title}一起发给模型`}>
+          <label className="axv-ai-check" title={tt("把 {title} 一起发给模型", { title: doc.title })}>
             <input type="checkbox" checked={withXml} onChange={(e) => setWithXml(e.target.checked)} />
             {doc.attachLabel}
           </label>
           {doc.kind === "layout" ? (
-            <label className="axv-ai-check" title="把选中控件路径一起发给模型">
-              <input type="checkbox" checked={withSelection} onChange={(e) => setWithSelection(e.target.checked)} />
-              带选中
-            </label>
+            <label className="axv-ai-check" title={tt("把选中控件路径一起发给模型")}>
+              <input type="checkbox" checked={withSelection} onChange={(e) => setWithSelection(e.target.checked)} />{tt("带选中")}</label>
           ) : null}
           <span className="axv-ai-keys">Ctrl+Enter</span>
           {busy ? (
-            <button className="axv-set-btn axv-ai-send" onClick={stop}>
-              停止
-            </button>
+            <button className="axv-set-btn axv-ai-send" onClick={stop}>{tt("停止")}</button>
           ) : (
             <button className="axv-set-btn axv-ai-send" disabled={!input.trim()} onClick={() => void send(input)}>
-              <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>send</span>
-              发送
-            </button>
+              <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>send</span>{tt("发送")}</button>
           )}
         </div>
       </div>

@@ -17,7 +17,7 @@ import {
   type AiConfig,
   type AiMessage,
 } from "@/lib/xml/ai";
-import { friendlyAiError, nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
+import { defaultTimeoutMs, friendlyAiError, nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
 import { AI_TOOL_PROMPT, AI_TOOL_PROMPT_NATIVE, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
 import { AI_TOOL_SPECS, looksLikeToolsRejected, supportsNativeTools, toAiToolCall, toHistoryToolCalls } from "@/lib/xml/ai-fc";
 import { refreshAiCaches } from "@/lib/xml/ai-tools";
@@ -73,6 +73,12 @@ interface ChatItem extends AiMessage {
   canReplace?: boolean;
   /** 该条是否还在流式生成中 */
   streaming?: boolean;
+  /** M97：思考过程（推理模型的 reasoning_content，独立滚动框展示） */
+  reasoning?: string;
+  /** M97：这一轮失败了（超时/中断/报错）—— 气泡下面给「重试」 */
+  failed?: boolean;
+  /** M97：思考耗时（ms），显示成「思考了 N 秒」 */
+  thinkMs?: number;
   /** M64l（D2）：工具调用行（折叠成一行小字，点开看结果） */
   tool?: { name: string; target: string; state: "running" | "done" | "error" | "stopped"; out?: string; ms?: number };
 }
@@ -131,6 +137,41 @@ function AiToolRow({ tool }: { tool: NonNullable<ChatItem["tool"]> }) {
   );
 }
 
+/** M97：思考过程独立框（自己滚，不抢正文的流量） */
+function AiThink({ text, live, ms }: { text: string; live: boolean; ms?: number }) {
+  const [open, setOpen] = useState(true);
+  const bodyRef = useRef<HTMLPreElement | null>(null);
+  // 边生成边贴底：只在用户没手动往上翻时跟
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || !open) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    if (near || live) el.scrollTop = el.scrollHeight;
+  }, [text, live, open]);
+  // 正文开始后自动收起，别挡着看结果
+  useEffect(() => {
+    if (!live) setOpen(false);
+  }, [live]);
+  const secs = ms ? Math.max(1, Math.round(ms / 1000)) : 0;
+  return (
+    <div className={"axv-ai-think" + (live ? " is-live" : "") + (open ? " is-open" : "")}>
+      <button className="axv-ai-think-head" onClick={() => setOpen((v) => !v)}>
+        <span className="msr axv-ai-think-ic" aria-hidden="true">
+          {live ? "psychology" : "psychology_alt"}
+        </span>
+        <span className="axv-ai-think-title">
+          {live ? tt("思考中…") : tt("思考过程")}
+          {secs ? <span className="axv-ai-think-sec"> · {secs}s</span> : null}
+        </span>
+        <span className="msr axv-ai-think-caret" aria-hidden="true">
+          {open ? "expand_more" : "chevron_right"}
+        </span>
+      </button>
+      {open ? <pre className="axv-ai-think-body" ref={bodyRef}>{text}</pre> : null}
+    </div>
+  );
+}
+
 export default function AiPanel({ xml, docRel, selection, resources, onReplaceXml, onNote, projectName, fileIo, onApplied }: Props) {
   const [cfg, setCfg] = useState<AiConfig>(() => {
     try {
@@ -164,6 +205,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   // 实际生效的通道：原生直连失败会自动回退 fetch，徐标跟着真实结果走
   const [useNative, setUseNative] = useState(() => nativeAiAvailable());
   const abortRef = useRef<AbortController | null>(null);
+  /** M97：上一轮请求的起点（对话前缀 + 用户原话），「重试 / 重新生成」都从它重跑 */
+  const retryRef = useRef<{ text: string; intent: AiPromptIntent; base: ChatItem[] } | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   // M64e（B3）：AI 写操作先暂存，用户点「应用」才落盘
   const [staged, setStaged] = useState<StagedChange[]>([]);
@@ -266,11 +309,17 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   const ctxResources = resources ?? null;
 
   const send = useCallback(
-    async (text: string, intentOrFull: AiPromptIntent | boolean = "auto") => {
+    async (
+      text: string,
+      intentOrFull: AiPromptIntent | boolean = "auto",
+      // M97：重试 / 重新生成时传入「这一轮之前的对话」，避免历史里出现重复的 user 消息
+      opts0?: { base?: ChatItem[] },
+    ) => {
       // 兼容老调用：第二个参数传 boolean 时按 xml / auto 处理
       const intent: AiPromptIntent = typeof intentOrFull === "boolean" ? (intentOrFull ? "xml" : "auto") : intentOrFull;
       const q = text.trim();
       if (!q || busy) return;
+      const baseChat: ChatItem[] = opts0?.base ?? chat;
       const bad = validateConfig(cfg);
       if (bad) {
         setErr(bad);
@@ -279,7 +328,10 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       }
       setErr("");
       setBusy(true);
-      setChat((c) => [...c, { role: "user", content: q }]);
+      // M97：记住这一轮是从哪个对话前缀开始的（重试用）
+      retryRef.current = { text: q, intent, base: baseChat };
+      if (opts0?.base) setChat([...baseChat, { role: "user", content: q }]);
+      else setChat((c) => [...c, { role: "user", content: q }]);
       setInput("");
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -314,7 +366,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
         .filter(Boolean)
         .join("\n\n");
 
-      const history: AiMessage[] = chat.map((m) => ({ role: m.role, content: m.content }));
+      const history: AiMessage[] = baseChat.map((m) => ({ role: m.role, content: m.content }));
       const volatile: string[] = [];
       if (ctxSelection) volatile.push(tt("当前选中控件路径：{sel}", { sel: ctxSelection }));
       if (ctxResources) volatile.push(tt("可用资源：{res}", { res: ctxResources }));
@@ -345,12 +397,21 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           if (ctrl.signal.aborted) break;
           setChat((c) => [...c, { role: "assistant", content: "", streaming: true }]);
           let acc = "";
+          // M97：思考过程单独累，不进正文；耗时用于「思考了 N 秒」
+          let thought = "";
+          const thinkStart = Date.now();
           const res = await streamChat(cfg, msgs, {
             signal: ctrl.signal,
+            timeoutMs: defaultTimeoutMs(cfg),
             tools: useTools ? AI_TOOL_SPECS : undefined,
             onChunk: (t) => {
               acc += t;
               patchLast((m) => ({ ...m, content: acc }));
+            },
+            onReasoning: (t) => {
+              thought += t;
+              const th = thought;
+              patchLast((m) => ({ ...m, reasoning: th, thinkMs: Date.now() - thinkStart }));
             },
           });
           setUseNative(res.via === "native");
@@ -374,7 +435,16 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               continue;
             }
             setChat((c) => c.filter((m) => !m.streaming));
-            setErr(friendlyAiError(res.error || tt("调用失败")));
+            // M97：失败不删气泡，就地变成一条「失败 + 重试」
+            setChat((c) => [
+              ...c,
+              {
+                role: "assistant",
+                content: friendlyAiError(res.error || tt("调用失败")),
+                failed: true,
+              },
+            ]);
+            setErr("");
             return;
           }
 
@@ -545,6 +615,13 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
     setBusy(false);
     onNote?.(tt("已停止"));
   };
+
+  /** M97：重试 / 重新生成——把上一轮对话从内存里重跑一遍（历史不重复） */
+  const rerun = useCallback(() => {
+    const r = retryRef.current;
+    if (!r || busy) return;
+    void send(r.text, r.intent, { base: r.base });
+  }, [busy, send]);
 
   const testConn = useCallback(async () => {
     const bad = validateConfig(cfg);
@@ -805,6 +882,22 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               />
             </label>
 
+            <label className="axv-ai-field" title={tt("推理模型思考时间长，可调到 600 秒；超过这个时间就算卡住")}>
+              <span>{tt("超时（秒）")}</span>
+              <input
+                type="number"
+                min={10}
+                max={1800}
+                step={30}
+                value={cfg.timeoutSec ?? 300}
+                onChange={(e) => {
+                  const raw = e.target.value.trim();
+                  if (!raw) return; // 同上：空字符串会被 Number() 变成 0，低于下限
+                  patch({ timeoutSec: Number(raw) });
+                }}
+              />
+            </label>
+
             <label className="axv-ai-check" title={tt("默认关闭：AI 不能改 build.gradle / AndroidManifest.xml / build/ / .git/ 等")}>
               <input
                 type="checkbox"
@@ -882,10 +975,29 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
             <AiToolRow key={i} tool={m.tool} />
           ) : (
             <div key={i} className={"axv-ai-msg " + m.role}>
-            <div className="axv-ai-bubble">
+            {m.reasoning ? (
+              <AiThink text={m.reasoning} live={!!m.streaming && !m.content} ms={m.thinkMs} />
+            ) : null}
+            <div className={"axv-ai-bubble" + (m.failed ? " is-failed" : "")}>
               {m.content.replace(/```[a-zA-Z0-9_-]*\s*\n[\s\S]*?```/g, tt("〔代码见下〕"))}
               {m.streaming ? <span className="axv-ai-cursor">▍</span> : null}
             </div>
+            {m.failed ? (
+              <div className="axv-ai-retry">
+                <button className="axv-ai-mini axv-ai-retry-btn" onClick={rerun} disabled={busy}>
+                  <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
+                  {tt("重试")}
+                </button>
+              </div>
+            ) : null}
+            {i === chat.length - 1 && !m.failed && m.role === "assistant" && !m.streaming && !busy ? (
+              <div className="axv-ai-retry">
+                <button className="axv-ai-mini" onClick={rerun} title={tt("重新生成")}>
+                  <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
+                  {tt("重新生成")}
+                </button>
+              </div>
+            ) : null}
             {m.code ? (
               <div className="axv-ai-code">
                 <div className="axv-ai-code-bar">

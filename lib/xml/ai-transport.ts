@@ -186,12 +186,15 @@ declare global {
  */
 export function parseSse(buffer: string): {
   deltas: string[];
+  /** M97：思考过程增量（reasoning_content / reasoning / thinking） */
+  thoughts: string[];
   /** M73（D1）：含 tool_calls 的原始 payload（正文为空，不能当空回复处理） */
   raws: string[];
   rest: string;
   done: boolean;
 } {
   const deltas: string[] = [];
+  const thoughts: string[] = [];
   const raws: string[] = [];
   let done = false;
   let rest = buffer;
@@ -205,6 +208,8 @@ export function parseSse(buffer: string): {
       if (payload === "[DONE]") {
         done = true;
       } else if (payload.startsWith("{")) {
+        const th = reasoningOfJson(payload);
+        if (th) thoughts.push(th);
         const t = deltaOfJson(payload);
         if (t) deltas.push(t);
         else if (payload.includes('"tool_calls"')) raws.push(payload);
@@ -212,7 +217,42 @@ export function parseSse(buffer: string): {
     }
     idx = rest.indexOf("\n");
   }
-  return { deltas, raws, rest, done };
+  return { deltas, thoughts, raws, rest, done };
+}
+
+/** M97：取思考过程增量，兼容 reasoning_content / reasoning / thinking（含数组分片） */
+export function reasoningOfJson(payload: string): string {
+  const pick = (v: unknown): string => {
+    if (typeof v === "string") return v;
+    if (Array.isArray(v)) {
+      return v
+        .map((p) =>
+          typeof p === "string"
+            ? p
+            : typeof (p as { text?: string })?.text === "string"
+              ? (p as { text: string }).text
+              : "",
+        )
+        .join("");
+    }
+    return "";
+  };
+  try {
+    const o = JSON.parse(payload) as {
+      choices?: { delta?: Record<string, unknown>; message?: Record<string, unknown> }[];
+    };
+    const c = o?.choices?.[0];
+    for (const src of [c?.delta, c?.message]) {
+      if (!src) continue;
+      for (const k of ["reasoning_content", "reasoning", "thinking"]) {
+        const s = pick((src as Record<string, unknown>)[k]);
+        if (s) return s;
+      }
+    }
+  } catch {
+    /* 非 JSON 就当没有 */
+  }
+  return "";
 }
 
 /** 取 choices[0].delta.content，退回到 choices[0].message.content（非流式） */
@@ -251,7 +291,15 @@ export interface StreamOptions {
   signal?: AbortSignal;
   /** 总超时；原生侧作为 readTimeout，浏览器侧整体兜底 */
   timeoutMs?: number;
+  /**
+   * M97：首包超时（模型多久没吐第一个字就算卡住）。
+   * 推理模型常见：连接建立了但长时间只算不输出 —— 有它才能区分「慢」和「挂了」。
+   * 默认 60s；传 0 关闭。
+   */
+  firstByteMs?: number;
   onChunk?: (text: string) => void;
+  /** M97：思考过程增量（独立展示，不进正文） */
+  onReasoning?: (text: string) => void;
   /** 注入 fetch 便于测试 */
   fetchImpl?: typeof fetch;
   /** M73（D1）：OpenAI tools 定义；给空数组/不传就是老协议 */
@@ -286,16 +334,66 @@ export async function streamChat(
 
   const url = endpointOf(cfg.baseUrl);
   const body = JSON.stringify(buildRequestBody(cfg, messages, true, opts.tools));
-  const timeoutMs = opts.timeoutMs ?? 120_000;
+  const timeoutMs = opts.timeoutMs ?? defaultTimeoutMs(cfg);
+
+  // M97：首包看门狗。连接建立了但模型一直不吐字（推理中 / 卡死）时，
+  // 总超时可能要等好几分钟，用户只能干等 —— 这里单独计「多久没第一个字」。
+  const firstByteMs = opts.firstByteMs ?? 60_000;
+  const inner = new AbortController();
+  const onOuterAbort = () => inner.abort();
+  opts.signal?.addEventListener("abort", onOuterAbort);
+  let gotFirst = false;
+  let firstByteTimeout = false;
+  const fbTimer =
+    firstByteMs > 0
+      ? setTimeout(() => {
+          if (!gotFirst) {
+            firstByteTimeout = true;
+            inner.abort();
+          }
+        }, firstByteMs)
+      : null;
+
+  const pass: StreamOptions = {
+    ...opts,
+    signal: inner.signal,
+    onChunk: (t) => {
+      if (!gotFirst) {
+        gotFirst = true;
+        if (fbTimer) clearTimeout(fbTimer);
+      }
+      opts.onChunk?.(t);
+    },
+    onReasoning: (t) => {
+      // 思考过程也算「模型活着」
+      if (!gotFirst) {
+        gotFirst = true;
+        if (fbTimer) clearTimeout(fbTimer);
+      }
+      opts.onReasoning?.(t);
+    },
+  };
+
+  const finish = (r: StreamResult): StreamResult => {
+    if (fbTimer) clearTimeout(fbTimer);
+    opts.signal?.removeEventListener("abort", onOuterAbort);
+    if (firstByteTimeout && !r.ok && !opts.signal?.aborted) {
+      return {
+        ...r,
+        error: `模型 ${Math.round(firstByteMs / 1000)} 秒没有任何输出（推理太长或已卡住），已中断。可以「重试」，或把最大 token 调小、换非推理模型。`,
+      };
+    }
+    return r;
+  };
 
   const ch = nativeChannel();
   if (ch) {
-    const r = await streamViaNative(ch, url, cfg.apiKey.trim(), body, timeoutMs, opts);
+    const r = await streamViaNative(ch, url, cfg.apiKey.trim(), body, timeoutMs, pass);
     // 通道掉了：标记并当场改走 fetch，用户无感知
     if (r.bridgeDead) {
       nativeDead = true;
       probe = false;
-      return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
+      return finish(await streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, pass));
     }
     // M33：一条事件都没回（典型：port 静默丢消息）→ 换旧 JS 桥重试一次，再不行走 fetch
     if (r.silent && ch.label !== "bridge") {
@@ -303,15 +401,22 @@ export async function streamChat(
       if (b) {
         const alt = bridgeChannel();
         if (alt) {
-          const r2 = await streamViaNative(alt, url, cfg.apiKey.trim(), body, timeoutMs, opts);
-          if (!r2.silent) return r2;
+          const r2 = await streamViaNative(alt, url, cfg.apiKey.trim(), body, timeoutMs, pass);
+          if (!r2.silent) return finish(r2);
         }
       }
-      return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
+      return finish(await streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, pass));
     }
-    return r;
+    return finish(r);
   }
-  return streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, opts);
+  return finish(await streamViaFetch(url, cfg.apiKey.trim(), body, timeoutMs, pass));
+}
+
+/** M97：总超时默认值（秒）—— 推理模型给 300s，普通模型 120s 够 */
+export function defaultTimeoutMs(cfg: AiConfig): number {
+  const sec = Number(cfg.timeoutSec);
+  if (Number.isFinite(sec) && sec >= 10) return Math.min(Math.round(sec), 1800) * 1000;
+  return 300_000;
 }
 
 /** 把底层（Java/浏览器）原始网络错误译成可操作的中文说明 */
@@ -434,6 +539,9 @@ function streamViaNative(
     window.__axvAiRaw = (rid, payload) => {
       if (rid !== id || settled) return;
       sawAny = true;
+      // M97：原生侧只回正文分片；思考过程从原始 payload 里抓
+      const th = reasoningOfJson(payload);
+      if (th) opts.onReasoning?.(th);
       if (mergeToolCalls(payload, fcAcc)) hadToolCalls = true;
     };
     window.__axvAiDone = (rid, status) => {
@@ -505,6 +613,8 @@ async function streamViaFetch(
       const fcAccWhole = new Map<number, { id?: string; name?: string; args: string }>();
       const hasFc = mergeToolCalls(text, fcAccWhole);
       const whole = deltaOfJson(text);
+      const wholeThought = reasoningOfJson(text);
+      if (wholeThought) opts.onReasoning?.(wholeThought);
       const wholeCalls = hasFc ? finishToolCalls(fcAccWhole) : [];
       if (!whole && !wholeCalls.length) {
         return { ok: false, content: "", error: "服务端返回空内容，换个模型试试。", via: "fetch" };
@@ -531,6 +641,7 @@ async function streamViaFetch(
       buf += decoder.decode(value, { stream: true });
       const r = parseSse(buf);
       buf = r.rest;
+      for (const th of r.thoughts) opts.onReasoning?.(th);
       for (const d of r.deltas) {
         acc += d;
         opts.onChunk?.(d);

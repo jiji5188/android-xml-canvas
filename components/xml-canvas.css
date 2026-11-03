@@ -5731,7 +5731,66 @@ button.axv-ws-caret:hover {
   max-width: 230px;
 }
 .axv-ai-empty > .msr { color: var(--axv-primary); }
-.axv-ai-msg { display: grid; gap: 6px; }
+/* M97：display:block —— 之前是 grid，正文文本会被拆成逐字一行（截图中「重代码见下」竖排） */
+.axv-ai-msg { display: block; }
+.axv-ai-msg > .axv-ai-bubble, .axv-ai-msg > .axv-ai-code, .axv-ai-msg > .axv-ai-retry { margin-top: 6px; }
+.axv-ai-msg > .axv-ai-think { margin-bottom: 6px; }
+
+/* ===== M97：思考过程独立框（自己滚，不抢正文） ===== */
+.axv-ai-think {
+  border: 1px dashed color-mix(in srgb, var(--axv-on-surface) 20%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--axv-on-surface) 4%, transparent);
+  overflow: hidden;
+}
+.axv-ai-think.is-live {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--axv-primary) 45%, transparent);
+}
+.axv-ai-think-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+.axv-ai-think.is-live .axv-ai-think-head { color: var(--axv-primary); }
+.axv-ai-think-ic { font-size: 15px; }
+.axv-ai-think.is-live .axv-ai-think-ic { animation: axv-ai-spin 2.4s linear infinite; }
+@keyframes axv-ai-spin { to { transform: rotate(360deg); } }
+.axv-ai-think-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.axv-ai-think-sec { opacity: 0.75; }
+.axv-ai-think-caret { font-size: 16px; opacity: 0.7; }
+.axv-ai-think-body {
+  margin: 0;
+  max-height: 168px;
+  overflow-y: auto;
+  padding: 6px 10px 8px;
+  border-top: 1px solid color-mix(in srgb, var(--axv-on-surface) 8%, transparent);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--axv-on-surface-variant);
+  white-space: pre-wrap;
+  word-break: break-word;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+/* 气泡：失败态 */
+.axv-ai-bubble.is-failed {
+  border-color: color-mix(in srgb, #e5484d 55%, transparent);
+  background: color-mix(in srgb, #e5484d 10%, transparent);
+  color: var(--axv-on-surface);
+}
+.axv-ai-retry { display: flex; justify-content: flex-start; }
+.axv-ai-retry-btn { color: var(--axv-primary); }
 .axv-ai-msg.user .axv-ai-bubble {
   background: var(--axv-primary-soft);
   color: var(--axv-on-surface);

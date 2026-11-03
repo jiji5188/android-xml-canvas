@@ -13,6 +13,7 @@ const sentMessages: string[][] = [];
 
 vi.mock("@/lib/xml/ai-transport", () => ({
   nativeAiAvailable: () => false,
+  defaultTimeoutMs: () => 300_000,
   streamChat: vi.fn(async (_cfg: unknown, msgs: unknown[]) => {
     sentMessages.push((msgs as { content: string }[]).map((m) => m.content));
     const content = replies.shift() ?? "";

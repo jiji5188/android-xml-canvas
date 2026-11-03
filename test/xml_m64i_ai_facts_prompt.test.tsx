@@ -10,6 +10,7 @@ let listCount = 0;
 
 vi.mock("@/lib/xml/ai-transport", () => ({
   nativeAiAvailable: () => false,
+  defaultTimeoutMs: () => 300_000,
   streamChat: vi.fn(async (_cfg: unknown, msgs: unknown[]) => {
     const arr = msgs as { role: string; content: string }[];
     sentSystems.push(arr[0]?.content || "");

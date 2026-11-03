@@ -20,6 +20,7 @@ const streamCalls: unknown[][] = [];
 
 vi.mock("@/lib/xml/ai-transport", () => ({
   nativeAiAvailable: () => false,
+  defaultTimeoutMs: () => 300_000,
   streamChat: vi.fn(async (...args: unknown[]) => {
     streamCalls.push(args);
     return { ok: true, content: reply, via: "fetch", channel: "fetch" };

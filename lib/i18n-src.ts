@@ -308,6 +308,13 @@ export const SRC_EN: SrcDict = {
   "（未执行）": "(not executed)",
   "（达扫描上限，可能不全）": "(hit scan limit, may be incomplete)",
   "（通道 {ch}）": "(channel {ch})",
+  // ---- AI 面板：超时 / 重试 / 思考过程（M97）----
+  "思考中…": "Thinking…",
+  "思考过程": "Thinking process",
+  "重试": "Retry",
+  "重新生成": "Regenerate",
+  "超时（秒）": "Timeout (s)",
+  "推理模型思考时间长，可调到 600 秒；超过这个时间就算卡住": "Reasoning models can think for a long time — raise this to 600s; past that it counts as stuck",
 };
 
 /** 繁體 —— 只登记与简体不同的；没登记的会先试英文兜底 */

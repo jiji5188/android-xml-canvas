@@ -32,6 +32,11 @@ export interface AiConfig {
   apiKey: string;
   temperature: number;
   maxTokens: number;
+  /**
+   * M97：单次请求总超时（秒）。不填 = 300s。
+   * 推理模型（deepseek-reasoner / glm-5.3-flash 等）思考时间可能很长，可调到 600。
+   */
+  timeoutSec?: number;
   /** M73（D1）：是否使用原生 tools 协议；undefined = 用（默认），false = 只走文本 JSON 块 */
   nativeTools?: boolean;
 }

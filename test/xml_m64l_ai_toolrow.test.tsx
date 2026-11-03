@@ -18,6 +18,7 @@ const replies: string[] = [];
 
 vi.mock("@/lib/xml/ai-transport", () => ({
   nativeAiAvailable: () => false,
+  defaultTimeoutMs: () => 300_000,
   streamChat: vi.fn(async (_cfg: unknown, _msgs: unknown[]) => ({
     ok: true,
     content: replies.shift() ?? "",

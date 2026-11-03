@@ -38,23 +38,24 @@ export function assetKind(xml: string): string {
   return "other";
 }
 
-/** 类型徽标文案 */
+/** 类型徽标文案（i18n：中文原文当 key） */
+import { t } from "../i18n-src";
 export function kindLabel(kind: string): string {
   switch (kind) {
     case "vector":
-      return "矢量图";
+      return t("矢量图");
     case "shape":
-      return "形状";
+      return t("形状");
     case "selector":
-      return "状态选择";
+      return t("状态选择");
     case "layer-list":
-      return "图层";
+      return t("图层");
     case "ripple":
-      return "水波纹";
+      return t("水波纹");
     case "inset":
-      return "内嵌";
+      return t("内嵌");
     default:
-      return "其它";
+      return t("其它");
   }
 }
 

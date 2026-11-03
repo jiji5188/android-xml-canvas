@@ -665,6 +665,12 @@ export function buildRenderModel(
       style.backgroundRepeat = "no-repeat";
       style.backgroundColor = style.backgroundColor ?? "transparent";
     }
+    // M91c：View/Space 带真实背景时，去掉占位框的「虚线边框 + 2px 圆角」
+    // （`.axv-view` 那套样式只为「没背景的空 View 也能被看见」；带背景时 Android 画的就是直角矩形）
+    if ((tag === "View" || tag === "Space") && (style.backgroundColor || style.backgroundImage)) {
+      if (!style.border) style.border = "none";
+      if (!style.borderRadius) style.borderRadius = "0px";
+    }
     // ===== M3e：elevation / translationZ =====
     // Android 里 Z = elevation + translationZ，它不仅决定阴影大小，
     // **更决定绘制层级**：Z 高的控件会盖住 Z 低的兄弟（即使 XML 里写在前面）。

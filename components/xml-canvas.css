@@ -4219,7 +4219,8 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-assets-swatch {
   width: 26px;
   height: 26px;
-  border-radius: 6px;
+  /* M91c：不要强加圆角——形状自己的 borderRadius 从 specToCss 内联进来，直角矩形就该是直角 */
+  border-radius: 0;
   display: block;
 }
 .axv-assets-main {

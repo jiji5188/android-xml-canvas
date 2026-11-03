@@ -175,6 +175,12 @@ describe("M52 自定义形状：透明度滑杆", () => {
 
   it("涟漪色也有滑杆（#33FFFFFF → 20%）", async () => {
     await mount(shape());
+    // M89n：涟漪开关挪到抽屉「效果」页，先切过去
+    const tab = [...document.querySelectorAll(".axv-cv-sheet-tab")].find(
+      (b) => b.textContent?.trim() === "效果",
+    ) as HTMLElement;
+    tab.click();
+    await flush();
     const boxes = [...document.querySelectorAll('input[type="checkbox"]')] as HTMLInputElement[];
     const ripple = boxes.find((b) => b.parentElement?.textContent?.includes("水波纹"));
     if (ripple && !ripple.checked) {

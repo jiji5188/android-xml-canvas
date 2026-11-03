@@ -8379,6 +8379,9 @@ button.axv-sb-item:hover {
   min-width: 0;
   line-height: 1.5;
 }
+/* 按钮不许被说明文字挤成竖排（窄屏下会变成三个字一行） */
+.axv-cv-page .axv-icon-page-foot > span:last-child { flex: 0 0 auto; }
+.axv-cv-page .axv-icon-page-foot .axv-btn { white-space: nowrap; }
 
 /* ===== M82：图标画布补齐 svg-board 能力 ===== */
 .axv-cv-layer-d {
@@ -8671,6 +8674,9 @@ button.axv-sb-item:hover {
   .axv-cv-sheet-title { display: none; }
   .axv-cv-sheet-tabs { margin-left: 0; }
   .axv-cv-body:has(.axv-cv-sheet:not(.is-collapsed)) .axv-cv-stage { padding-bottom: 118px; }
+  /* 窄屏底栏位置紧：说明整段让给按钮 */
+  .axv-cv-page .axv-icon-page-foot-note { display: none; }
+  .axv-cv-page .axv-icon-page-foot { padding: 10px 12px; }
 }
 
 /* ===== M86：画布尺寸段选 + 图层拖拽排序 ===== */

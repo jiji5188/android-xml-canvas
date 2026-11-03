@@ -8,6 +8,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { ColorField } from "./ColorField";
 import { parseColorOr, toArgbHex, toRgbHex } from "@/lib/xml/color-argb";
 import {
@@ -40,11 +41,11 @@ function cssToAndroidColor(css: string): string {
 }
 
 const NEW_TYPES: { tag: string; label: string; hint: string; sample: string }[] = [
-  { tag: "string", label: "字符串", hint: "显示文本", sample: "标题" },
-  { tag: "color", label: "颜色", hint: "#RRGGBB / @color/x", sample: "#0B5FA5" },
-  { tag: "dimen", label: "尺寸", hint: "8dp / 12sp", sample: "8dp" },
-  { tag: "integer", label: "整数", hint: "纯数字", sample: "1" },
-  { tag: "bool", label: "布尔", hint: "true / false", sample: "true" },
+  { tag: "string", label: "字符串", hint: "显示文本", sample: "标题" }, // i18n-ignore
+  { tag: "color", label: "颜色", hint: "#RRGGBB / @color/x", sample: "#0B5FA5" }, // i18n-ignore
+  { tag: "dimen", label: "尺寸", hint: "8dp / 12sp", sample: "8dp" }, // i18n-ignore
+  { tag: "integer", label: "整数", hint: "纯数字", sample: "1" }, // i18n-ignore
+  { tag: "bool", label: "布尔", hint: "true / false", sample: "true" }, // i18n-ignore
 ];
 
 export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorProps) {
@@ -83,12 +84,12 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
   const commitValue = (it: ValueItem, raw: string, el?: HTMLInputElement) => {
     if (raw === it.value) return;
     if (it.kind === "color" && raw.trim() && !isColorValue(raw)) {
-      note("颜色值要写 #RRGGBB / #AARRGGBB 或 @color/xxx");
+      note(tt("颜色值要写 #RRGGBB / #AARRGGBB 或 @color/xxx"));
       if (el) el.value = it.value;
       return;
     }
     onChange(setItemValue(xml, it, raw));
-    note(`已改 ${it.name}`);
+    note(tt("已改 {name}", { name: it.name }));
   };
 
   const commitName = (it: ValueItem, raw: string, el?: HTMLInputElement) => {
@@ -98,22 +99,22 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
       return;
     }
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(next)) {
-      note("名称只能用字母/数字/下划线，且不能以数字开头");
+      note(tt("名称只能用字母/数字/下划线，且不能以数字开头"));
       if (el) el.value = it.name;
       return;
     }
     if (doc.items.some((o) => o !== it && o.name === next)) {
-      note(`名称 ${next} 已存在`);
+      note(tt("名称 {name} 已存在", { name: next }));
       if (el) el.value = it.name;
       return;
     }
     onChange(setItemName(xml, it, next));
-    note(`已重命名为 ${next}`);
+    note(tt("已重命名为 {name}", { name: next }));
   };
 
   const del = (it: ValueItem) => {
     onChange(removeItem(xml, it));
-    note(`已删除 ${it.name}`);
+    note(tt("已删除 {name}", { name: it.name }));
   };
 
   const add = () => {
@@ -121,14 +122,14 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
     const name = uniqueName(doc, newName.trim() || `${t.tag}_new`);
     const value = newValue.trim() || t.sample;
     if (t.tag === "color" && !isColorValue(value)) {
-      note("颜色值要写 #RRGGBB / #AARRGGBB 或 @color/xxx");
+      note(tt("颜色值要写 #RRGGBB / #AARRGGBB 或 @color/xxx"));
       return;
     }
     onChange(appendItem(xml, { tag: t.tag, name, value }));
     setNewName("");
     setNewValue("");
     setNewOpen(false);
-    note(`已新建 ${name}`);
+    note(tt("已新建 {name}", { name }));
   };
 
   if (!doc.ok) {
@@ -136,8 +137,8 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
       <div className={"axv-val " + (className || "")}>
         <div className="axv-val-empty">
           <span className="msr" aria-hidden="true">warning</span>
-          <div>{doc.reason || "这个文件不是 values 资源"}</div>
-          <div className="axv-val-hint">切到「代码」还能直接改原文。</div>
+          <div>{doc.reason || tt("这个文件不是 values 资源")}</div>
+          <div className="axv-val-hint">{tt("切到「代码」还能直接改原文。")}</div>
         </div>
       </div>
     );
@@ -146,7 +147,7 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
   return (
     <div className={"axv-val " + (className || "")}>
       <div className="axv-val-top">
-        <div className="axv-val-chips" role="tablist" aria-label="资源类型">
+        <div className="axv-val-chips" role="tablist" aria-label={tt("资源类型")}>
           {KINDS.map((k) => (
             <button
               key={k}
@@ -156,7 +157,7 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
               className={"axv-val-chip" + (kind === k ? " on" : "")}
               onClick={() => setKind(k)}
             >
-              {k === "all" ? "全部" : KIND_LABEL[k] || k}
+              {k === "all" ? tt("全部") : KIND_LABEL[k] || k}
               <b>{counts[k] || 0}</b>
             </button>
           ))}
@@ -165,15 +166,15 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
           <input
             className="axv-val-search"
             value={q}
-            placeholder="搜名称或值"
-            aria-label="搜索资源"
+            placeholder={tt("搜名称或值")}
+            aria-label={tt("搜索资源")}
             onChange={(e) => setQ(e.target.value)}
           />
           <button
             type="button"
             className="axv-val-add"
             onClick={() => setNewOpen((v) => !v)}
-            title="新建一条资源"
+            title={tt("新建一条资源")}
           >
             <span className="msr" aria-hidden="true">add</span>
           </button>
@@ -184,7 +185,7 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
         <div className="axv-val-new">
           <select
             className="axv-tb-select"
-            aria-label="新资源类型"
+            aria-label={tt("新资源类型")}
             value={newType}
             onChange={(e) => setNewType(e.target.value)}
           >
@@ -194,14 +195,14 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
           </select>
           <input
             value={newName}
-            placeholder="名称（留空自动生成）"
-            aria-label="新资源名称"
+            placeholder={tt("名称（留空自动生成）")}
+            aria-label={tt("新资源名称")}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
           />
           {newType === "color" ? (
             <ColorField
-              label="新颜色"
+              label={tt("新颜色")}
               value={newValue.trim() || "#0B5FA5"}
               fallback="#0B5FA5"
               onChange={(next) => setNewValue(cssToAndroidColor(next))}
@@ -210,19 +211,19 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
           <input
             value={newValue}
             placeholder={(NEW_TYPES.find((t) => t.tag === newType) || NEW_TYPES[0]).hint}
-            aria-label="新资源值"
+            aria-label={tt("新资源值")}
             onChange={(e) => setNewValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
           />
-          <button type="button" className="axv-val-ok" onClick={add}>添加</button>
+          <button type="button" className="axv-val-ok" onClick={add}>{tt("添加")}</button>
         </div>
       ) : null}
 
       {rows.length === 0 ? (
         <div className="axv-val-empty">
           <span className="msr" aria-hidden="true">inbox</span>
-          <div>{doc.items.length === 0 ? "这个文件里还没有资源" : "没有匹配的条目"}</div>
-          <div className="axv-val-hint">点右上角 + 新建一条。</div>
+          <div>{doc.items.length === 0 ? tt("这个文件里还没有资源") : tt("没有匹配的条目")}</div>
+          <div className="axv-val-hint">{tt("点右上角 + 新建一条。")}</div>
         </div>
       ) : (
         <div className="axv-val-list" role="list">
@@ -234,7 +235,7 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
                 <input
                   className="axv-val-name"
                   defaultValue={it.name}
-                  aria-label={`${it.name} 名称`}
+                  aria-label={tt("{name} 名称", { name: it.name })}
                   spellCheck={false}
                   onBlur={(e) => commitName(it, e.target.value, e.target)}
                   onKeyDown={(e) => {
@@ -247,7 +248,7 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
                 />
                 {swatch ? (
                   <ColorField
-                    label={`${it.name} 取色`}
+                    label={tt("{name} 取色", { name: it.name })}
                     value={it.value}
                     fallback={swatch}
                     onChange={(next) =>
@@ -258,7 +259,7 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
                 <input
                   className="axv-val-value"
                   defaultValue={it.value}
-                  aria-label={`${it.name} 值`}
+                  aria-label={tt("{name} 值", { name: it.name })}
                   spellCheck={false}
                   onBlur={(e) => commitValue(it, e.target.value, e.target)}
                   onKeyDown={(e) => {
@@ -272,8 +273,8 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
                 <button
                   type="button"
                   className="axv-val-del"
-                  title={`删除 ${it.name}`}
-                  aria-label={`删除 ${it.name}`}
+                  title={tt("删除 {name}", { name: it.name })}
+                  aria-label={tt("删除 {name}", { name: it.name })}
                   onClick={() => del(it)}
                 >
                   <span className="msr" aria-hidden="true">delete</span>
@@ -285,8 +286,8 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
       )}
 
       <div className="axv-val-foot">
-        {msg ? <span className="axv-val-msg">{msg}</span> : <span>共 {doc.items.length} 条资源</span>}
-        <span className="axv-val-tip">改动只动对应那一段，注释和排版保持原样</span>
+        {msg ? <span className="axv-val-msg">{msg}</span> : <span>{tt("共 {n} 条资源", { n: doc.items.length })}</span>}
+        <span className="axv-val-tip">{tt("改动只动对应那一段，注释和排版保持原样")}</span>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@
 //   · 所有弹窗都是受控组件，状态由 ProjectPanel 持有。
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { createPortal } from "react-dom";
 
 /** M46c：所有浮层挂到 .axv-main 下（用户要求），拿不到就回 body */
@@ -95,17 +96,17 @@ export function TreeFileMenu(p: TreeFileMenuProps) {
   }, [p]);
 
   const items: { key: MenuAction; label: string; hint?: string; disabled?: boolean; danger?: boolean }[] = [
-    { key: "new", label: "新建", hint: p.target.isDir ? `在 ${p.target.name} 内` : "同层" },
-    { key: "rename", label: "重命名", disabled: !p.canWrite },
-    { key: "move", label: "移动", disabled: !p.canWrite },
-    { key: "copy", label: "复制" },
+    { key: "new", label: tt("新建"), hint: p.target.isDir ? tt("在 {name} 内", { name: p.target.name }) : tt("同层") },
+    { key: "rename", label: tt("重命名"), disabled: !p.canWrite },
+    { key: "move", label: tt("移动"), disabled: !p.canWrite },
+    { key: "copy", label: tt("复制") },
     {
       key: "paste",
-      label: "粘贴",
+      label: tt("粘贴"),
       disabled: !p.hasClipboard || !p.canWrite,
-      hint: p.hasClipboard ? undefined : "先复制一项",
+      hint: p.hasClipboard ? undefined : tt("先复制一项"),
     },
-    { key: "delete", label: "删除", disabled: !p.canWrite, danger: true },
+    { key: "delete", label: tt("删除"), disabled: !p.canWrite, danger: true },
   ];
 
   return (
@@ -156,29 +157,29 @@ export function NewEntryDialog(p: NewEntryDialogProps) {
 
   return (
     <div className="axv-tfm-mask">
-      <div className="axv-dlg" role="dialog" aria-label="新建">
-        <div className="axv-dlg-title">新建</div>
+      <div className="axv-dlg" role="dialog" aria-label={tt("新建")}>
+        <div className="axv-dlg-title">{tt("新建")}</div>
         <label className="axv-dlg-row">
-          <span className="axv-dlg-label">名称</span>
+          <span className="axv-dlg-label">{tt("名称")}</span>
           <input
             className="axv-dlg-input"
             autoFocus
             value={name}
-            placeholder={isDir ? "新文件夹名" : "新文件名，如 detail.xml"}
+            placeholder={isDir ? tt("新文件夹名") : tt("新文件名，如 detail.xml")}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && canSubmit) p.onSubmit({ name: finalName, isDir, parentRel });
             }}
           />
-          <label className="axv-dlg-check" title="勾选=建文件夹，不勾=建文件">
+          <label className="axv-dlg-check" title={tt("勾选=建文件夹，不勾=建文件")}>
             <input type="checkbox" checked={isDir} onChange={(e) => setIsDir(e.target.checked)} />
-            <span>文件夹</span>
+            <span>{tt("文件夹")}</span>
           </label>
         </label>
 
         {p.target.isDir ? (
           <label className="axv-dlg-row axv-dlg-sub">
-            <span className="axv-dlg-label">位置</span>
+            <span className="axv-dlg-label">{tt("位置")}</span>
             <span className="axv-dlg-radio-group">
               <label className="axv-dlg-radio">
                 <input
@@ -186,30 +187,30 @@ export function NewEntryDialog(p: NewEntryDialogProps) {
                   checked={!inThisDir}
                   onChange={() => setInThisDir(false)}
                 />
-                <span>同层（{shortPath(parentOf(p.target.rel)) || "项目根"}）</span>
+                <span>{tt("同层（{p}）", { p: shortPath(parentOf(p.target.rel)) || tt("项目根") })}</span>
               </label>
               <label className="axv-dlg-radio">
                 <input type="radio" checked={inThisDir} onChange={() => setInThisDir(true)} />
-                <span>目录内（{shortPath(p.target.rel) || "项目根"}）</span>
+                <span>{tt("目录内（{p}）", { p: shortPath(p.target.rel) || tt("项目根") })}</span>
               </label>
             </span>
           </label>
         ) : null}
 
         <div className="axv-dlg-hint">
-          {dup ? `「${finalName}」已存在，请换个名字` : `将创建到：${parentRel || "项目根"}/`}
+          {dup ? tt("「{name}」已存在，请换个名字", { name: finalName }) : tt("将创建到：{p}/", { p: parentRel || tt("项目根") })}
         </div>
 
         <div className="axv-dlg-actions">
           <button className="axv-btn axv-ghost" onClick={p.onClose}>
-            取消
+            {tt("取消")}
           </button>
           <button
             className="axv-btn"
             disabled={!canSubmit}
             onClick={() => p.onSubmit({ name: finalName, isDir, parentRel })}
           >
-            确定
+            {tt("确定")}
           </button>
         </div>
       </div>
@@ -243,10 +244,10 @@ export function RenameDialog(p: {
 
   return (
     <div className="axv-tfm-mask">
-      <div className="axv-dlg" role="dialog" aria-label={p.title || "重命名"}>
-        <div className="axv-dlg-title">{p.title || "重命名"}</div>
+      <div className="axv-dlg" role="dialog" aria-label={p.title || tt("重命名")}>
+        <div className="axv-dlg-title">{p.title || tt("重命名")}</div>
         <label className="axv-dlg-row">
-          <span className="axv-dlg-label">新名称</span>
+          <span className="axv-dlg-label">{tt("新名称")}</span>
           <input
             className="axv-dlg-input"
             autoFocus
@@ -264,14 +265,14 @@ export function RenameDialog(p: {
           />
         </label>
         <div className="axv-dlg-hint">
-          {dup ? `「${trimmed}」已存在，请换个名字` : (p.desc ?? `原名称：${start}`)}
+          {dup ? tt("「{name}」已存在，请换个名字", { name: trimmed }) : (p.desc ?? tt("原名称：{name}", { name: start }))}
         </div>
         <div className="axv-dlg-actions">
           <button className="axv-btn axv-ghost" onClick={p.onClose}>
-            取消
+            {tt("取消")}
           </button>
           <button className="axv-btn" disabled={!canSubmit} onClick={() => p.onSubmit(trimmed)}>
-            {p.submitLabel || "确定"}
+            {p.submitLabel || tt("确定")}
           </button>
         </div>
       </div>
@@ -289,7 +290,7 @@ export function MessageDialog(p: { title: string; text: string; onClose: () => v
         <div className="axv-dlg-hint axv-dlg-multiline">{p.text}</div>
         <div className="axv-dlg-actions">
           <button className="axv-btn" onClick={p.onClose} autoFocus>
-            知道了
+            {tt("知道了")}
           </button>
         </div>
       </div>
@@ -316,10 +317,10 @@ export function ConfirmDialog(p: {
         {p.detail ? <div className="axv-dlg-hint axv-dlg-multiline axv-dlg-detail">{p.detail}</div> : null}
         <div className="axv-dlg-actions">
           <button className="axv-btn axv-ghost" onClick={p.onClose}>
-            取消
+            {tt("取消")}
           </button>
           <button className={"axv-btn" + (p.danger ? " axv-btn-danger" : "")} onClick={p.onOk}>
-            确定
+            {tt("确定")}
           </button>
         </div>
       </div>

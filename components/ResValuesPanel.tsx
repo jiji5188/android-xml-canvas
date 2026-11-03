@@ -9,6 +9,7 @@
 
 "use client";
 
+import { t as tt } from "@/lib/i18n-src";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
 import { scanResDirs } from "@/lib/xml/res-index";
@@ -49,11 +50,11 @@ const CONVENTIONAL: Record<string, string> = {
 };
 
 const NEW_TYPES = [
-  { tag: "string", label: "字符串", sample: "标题" },
-  { tag: "color", label: "颜色", sample: "#0B5FA5" },
-  { tag: "dimen", label: "尺寸", sample: "8dp" },
-  { tag: "integer", label: "整数", sample: "1" },
-  { tag: "bool", label: "布尔", sample: "true" },
+  { tag: "string", label: "字符串", sample: "标题" }, // i18n-ignore
+  { tag: "color", label: "颜色", sample: "#0B5FA5" }, // i18n-ignore
+  { tag: "dimen", label: "尺寸", sample: "8dp" }, // i18n-ignore
+  { tag: "integer", label: "整数", sample: "1" }, // i18n-ignore
+  { tag: "bool", label: "布尔", sample: "true" }, // i18n-ignore
 ];
 
 const EMPTY_FILE = `<?xml version="1.0" encoding="utf-8"?>
@@ -144,10 +145,10 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
       setFileCount(files);
       setTruncated(cut);
       setLoaded(true);
-      if (!info.resRel) note("没找到 res 目录：先打开一个 Android 项目");
-      else if (!valuesDirs.length) note("这个项目里没有 res/values* 目录");
+      if (!info.resRel) note(tt("没找到 res 目录：先打开一个 Android 项目"));
+      else if (!valuesDirs.length) note(tt("这个项目里没有 res/values* 目录"));
     } catch (e) {
-      note(`读取失败：${e instanceof Error ? e.message : String(e)}`);
+      note(tt("读取失败：{err}", { err: e instanceof Error ? e.message : String(e) }));
     } finally {
       setLoading(false);
     }
@@ -177,7 +178,7 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
     if (!io) return false;
     const r = await io.write(rel, nextText);
     if (!r.ok) {
-      note(`写回失败：${r.error || rel}`);
+      note(tt("写回失败：{err}", { err: r.error || rel }));
       return false;
     }
     texts.current.set(rel, nextText);
@@ -190,7 +191,7 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
     if (raw === row.item.value) return;
     const next = setItemValue(cur, row.item, raw);
     if (next === cur) {
-      note("没改动（值相同或区间失效，建议刷新）");
+      note(tt("没改动（值相同或区间失效，建议刷新）"));
       return;
     }
     setBusyRow(key);
@@ -205,7 +206,7 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
           return { ...r, item: fresh, line: lineOf(next, fresh.elemFrom) };
         }),
       );
-      note(`已改 ${row.item.name} = ${raw}`);
+      note(tt("已改 {name} = {val}", { name: row.item.name, val: raw }));
     } finally {
       setBusyRow("");
     }
@@ -215,24 +216,24 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
     const cur = texts.current.get(row.rel) || "";
     const next = removeItem(cur, row.item);
     if (next === cur) {
-      note("删不掉（元素区间失效，刷新后再试）");
+      note(tt("删不掉（元素区间失效，刷新后再试）"));
       return;
     }
     if (!(await writeFile(row.rel, next))) return;
     setRows((all) => all.filter((r) => !(r.rel === row.rel && r.item.name === row.item.name && r.item.kind === row.item.kind)));
-    note(`已删 ${row.item.name}`);
+    note(tt("已删 {name}", { name: row.item.name }));
   };
 
   /** 新建条目：优先落在同名约定文件，其次落在已有同类型条目的文件，最后现建 */
   const addItem = async () => {
     const name = newName.trim();
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-      note("资源名只能用字母/数字/下划线，且不能以数字开头");
+      note(tt("资源名只能用字母/数字/下划线，且不能以数字开头"));
       return;
     }
     const value = newValue.trim();
     if (!value) {
-      note("值不能为空");
+      note(tt("值不能为空"));
       return;
     }
     const def = NEW_TYPES.find((t) => t.tag === newType) ?? NEW_TYPES[0];
@@ -249,7 +250,7 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
       if (!ok) return;
       const doc0 = parseValues(EMPTY_FILE);
       if (doc0.items.some((it) => it.name === name)) {
-        note(`已有 ${name}`);
+        note(tt("已有 {name}", { name }));
         return;
       }
       const created = appendItem(EMPTY_FILE, { tag: def.tag, name, value }, doc0);
@@ -263,13 +264,13 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
       setNewName("");
       setNewValue("");
       setNewOpen(false);
-      note(`已新建 ${name} → ${target.replace(resRel + "/", "")}`);
+      note(tt("已新建 {name} → {path}", { name, path: target.replace(resRel + "/", "") }));
       return;
     }
     const cur = texts.current.get(target) || "";
     const doc0 = parseValues(cur);
     if (doc0.items.some((it) => it.name === name && it.kind === def.tag)) {
-      note(`这个文件里已经有 ${name} 了`);
+      note(tt("这个文件里已经有 {name} 了", { name }));
       return;
     }
     const suggested = uniqueName(doc0, name);
@@ -281,7 +282,7 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
     setNewName("");
     setNewValue("");
     setNewOpen(false);
-    note(`已新建 ${suggested} = ${value}`);
+    note(tt("已新建 {name} = {val}", { name: suggested, val: value }));
   };
 
   const draftOf = (row: Row) => drafts[`${row.rel}#${row.item.name}`];
@@ -289,26 +290,26 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
   return (
     <div className="axv-rv">
       <div className="axv-rv-head">
-        <span className="axv-rv-title">资源值</span>
+        <span className="axv-rv-title">{tt("资源值")}</span>
         <span className="axv-rv-count">
-          {rows.length} 条 · {fileCount} 个文件
-          {truncated ? "（已截断）" : ""}
+          {tt("{a} 条 · {b} 个文件", { a: rows.length, b: fileCount })}
+          {truncated ? tt("（已截断）") : ""}
         </span>
         <span style={{ flex: 1 }} />
-        <button className="axv-rv-btn" title="重新读取" disabled={loading} onClick={() => void load()}>
+        <button className="axv-rv-btn" title={tt("重新读取")} disabled={loading} onClick={() => void load()}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
             refresh
           </span>
         </button>
-        <button className="axv-rv-btn" title="新建资源" onClick={() => setNewOpen((v) => !v)}>
+        <button className="axv-rv-btn" title={tt("新建资源")} onClick={() => setNewOpen((v) => !v)}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
             add
           </span>
         </button>
       </div>
 
-      {!io ? <div className="axv-rv-empty">先打开一个项目目录，才能读写 res/values。</div> : null}
-      {io && loading && !loaded ? <div className="axv-rv-empty">正在读取 values…</div> : null}
+      {!io ? <div className="axv-rv-empty">{tt("先打开一个项目目录，才能读写 res/values。")}</div> : null}
+      {io && loading && !loaded ? <div className="axv-rv-empty">{tt("正在读取 values…")}</div> : null}
 
       {newOpen ? (
         <div className="axv-rv-new">
@@ -321,14 +322,14 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
           </select>
           <input
             className="axv-rv-in"
-            placeholder="名称，如 app_name"
+            placeholder={tt("名称，如 app_name")}
             value={newName}
             spellCheck={false}
             onChange={(e) => setNewName(e.target.value)}
           />
           <input
             className="axv-rv-in"
-            placeholder={NEW_TYPES.find((t) => t.tag === newType)?.sample ?? "值"}
+            placeholder={NEW_TYPES.find((t) => t.tag === newType)?.sample ?? tt("值")}
             value={newValue}
             spellCheck={false}
             onChange={(e) => setNewValue(e.target.value)}
@@ -337,7 +338,7 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
             }}
           />
           <button className="axv-rv-ok" onClick={() => void addItem()}>
-            添加
+            {tt("添加")}
           </button>
         </div>
       ) : null}
@@ -347,7 +348,7 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
           <div className="axv-rv-filter">
             <input
               className="axv-rv-q"
-              placeholder="搜索名称或值"
+              placeholder={tt("搜索名称或值")}
               value={q}
               spellCheck={false}
               onChange={(e) => setQ(e.target.value)}
@@ -360,13 +361,13 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
                 className={"axv-rv-kind" + (kind === k ? " on" : "")}
                 onClick={() => setKind(k)}
               >
-                {k === "all" ? "全部" : KIND_LABEL[k] ?? k}
+                {k === "all" ? tt("全部") : KIND_LABEL[k] ?? k}
                 <span className="axv-rv-n">{counts[k] ?? 0}</span>
               </button>
             ))}
           </div>
           <div className="axv-rv-list">
-            {shown.length === 0 ? <div className="axv-rv-empty">没有匹配的资源</div> : null}
+            {shown.length === 0 ? <div className="axv-rv-empty">{tt("没有匹配的资源")}</div> : null}
             {shown.map((row) => {
               const key = `${row.rel}#${row.item.name}`;
               const draft = draftOf(row);
@@ -403,7 +404,7 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
                   {onJump ? (
                     <button
                       className="axv-rv-ic"
-                      title="跳到这一行"
+                      title={tt("跳到这一行")}
                       onClick={() => onJump(row.rel, row.line)}
                     >
                       <span className="msr" aria-hidden="true" style={{ fontSize: 15 }}>
@@ -411,7 +412,7 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
                       </span>
                     </button>
                   ) : null}
-                  <button className="axv-rv-ic del" title={`删除 ${row.item.name}`} onClick={() => void dropRow(row)}>
+                  <button className="axv-rv-ic del" title={tt("删除 {name}", { name: row.item.name })} onClick={() => void dropRow(row)}>
                     ✕
                   </button>
                 </div>

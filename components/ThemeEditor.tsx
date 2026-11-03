@@ -10,6 +10,7 @@
 // 这 4 个是全局的（EditorTheme），不随亮暗切换 —— 这里直接复用 onEditorTheme。
 
 import { useEffect } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { useOverlayBack } from "@/lib/overlay-back";
 import {
   DARK_EDITOR_COLORS,
@@ -78,14 +79,14 @@ export function ThemeEditor({
   const close = useOverlayBack(true, onClose);
 
   return (
-    <div className="axv-icon-page axv-thm-page" role="dialog" aria-label="编辑配色方案">
+    <div className="axv-icon-page axv-thm-page" role="dialog" aria-label={tt("编辑配色方案")}>
       <div className="axv-shape-head">
-        <button className="axv-icon-back" onClick={close} aria-label="返回设置" title="返回">
+        <button className="axv-icon-back" onClick={close} aria-label={tt("返回设置")} title={tt("返回")}>
           <span className="msr" aria-hidden="true">arrow_back</span>
         </button>
         <span className="axv-shape-title">
-          配色方案 · {preset.name}
-          {touched ? <b className="axv-thm-count">{touched} 项已改</b> : null}
+          {tt("配色方案")} · {preset.name}
+          {touched ? <b className="axv-thm-count">{tt("{n} 项已改", { n: touched })}</b> : null}
         </span>
       </div>
 
@@ -96,19 +97,19 @@ export function ThemeEditor({
               className={"axv-set-seg-btn" + (mode === "light" ? " on" : "")}
               onClick={() => onMode("light")}
             >
-              浅色
+              {tt("浅色")}
             </button>
             <button
               className={"axv-set-seg-btn" + (mode === "dark" ? " on" : "")}
               onClick={() => onMode("dark")}
             >
-              深色
+              {tt("深色")}
             </button>
           </div>
-          <div className="axv-set-hint">浅色和深色分开存，改的是当前这一档。</div>
+          <div className="axv-set-hint">{tt("浅色和深色分开存，改的是当前这一档。")}</div>
         </div>
 
-        <div className="axv-thm-sect">界面颜色</div>
+        <div className="axv-thm-sect">{tt("界面颜色")}</div>
         <div className="axv-thm-list">
           {THEME_TOKEN_ORDER.map((token) => {
             const changed = token in overrides && overrides[token] !== derived[token];
@@ -128,8 +129,8 @@ export function ThemeEditor({
                 <button
                   type="button"
                   className="axv-thm-reset"
-                  title="恢复默认"
-                  aria-label={`恢复${THEME_TOKEN_LABEL[token]}默认值`}
+                  title={tt("恢复默认")}
+                  aria-label={tt("恢复{name}默认值", { name: THEME_TOKEN_LABEL[token] })}
                   disabled={!changed}
                   onClick={() => onResetToken(token)}
                 >
@@ -141,18 +142,18 @@ export function ThemeEditor({
         </div>
 
         <div className="axv-thm-sect">
-          代码编辑器
+          {tt("代码编辑器")}
           <span className="axv-thm-note">
-            {mode === "dark" ? "深色" : "浅色"}一套，切换亮/暗自动跟着换
+            {tt("{mode}一套，切换亮/暗自动跟着换", { mode: mode === "dark" ? tt("深色") : tt("浅色") })}
           </span>
         </div>
         <div className="axv-thm-list">
           <div className="axv-thm-row">
-            <span className="axv-thm-name">选中背景色</span>
+            <span className="axv-thm-name">{tt("选中背景色")}</span>
             <code className="axv-thm-val">{ec.selBg}</code>
             <ColorField
               aboveModal
-              label="选中背景色"
+              label={tt("选中背景色")}
               value={ec.selBg}
               fallback={ecDefault.selBg}
               onChange={(v) => onEditorColor({ selBg: v })}
@@ -160,14 +161,14 @@ export function ThemeEditor({
             <span className="axv-thm-reset is-empty" aria-hidden="true" />
           </div>
           <div className="axv-thm-row">
-            <span className="axv-thm-name">选中文字颜色</span>
+            <span className="axv-thm-name">{tt("选中文字颜色")}</span>
             <code className="axv-thm-val">
-              {ec.selFg === "transparent" ? "跟随高亮" : ec.selFg}
+              {ec.selFg === "transparent" ? tt("跟随高亮") : ec.selFg}
             </code>
             <ColorField
               aboveModal
               allowTransparent
-              label="选中文字颜色"
+              label={tt("选中文字颜色")}
               value={ec.selFg}
               fallback={ecDefault.selFg}
               onChange={(v) => onEditorColor({ selFg: v })}
@@ -175,11 +176,11 @@ export function ThemeEditor({
             <span className="axv-thm-reset is-empty" aria-hidden="true" />
           </div>
           <div className="axv-thm-row">
-            <span className="axv-thm-name">光标颜色</span>
+            <span className="axv-thm-name">{tt("光标颜色")}</span>
             <code className="axv-thm-val">{ec.cursor}</code>
             <ColorField
               aboveModal
-              label="光标颜色"
+              label={tt("光标颜色")}
               value={ec.cursor}
               fallback={ecDefault.cursor}
               onChange={(v) => onEditorColor({ cursor: v })}
@@ -187,11 +188,11 @@ export function ThemeEditor({
             <span className="axv-thm-reset is-empty" aria-hidden="true" />
           </div>
           <div className="axv-thm-row">
-            <span className="axv-thm-name">当前行背景色</span>
+            <span className="axv-thm-name">{tt("当前行背景色")}</span>
             <code className="axv-thm-val">{ec.curBg}</code>
             <ColorField
               aboveModal
-              label="当前行背景色"
+              label={tt("当前行背景色")}
               value={ec.curBg}
               fallback={ecDefault.curBg}
               disabled={!editorTheme.showCur}
@@ -200,7 +201,7 @@ export function ThemeEditor({
             <span className="axv-thm-reset is-empty" aria-hidden="true" />
           </div>
           <label className="axv-thm-row axv-thm-switch">
-            <span className="axv-thm-name">高亮当前行</span>
+            <span className="axv-thm-name">{tt("高亮当前行")}</span>
             <span />
             <input
               type="checkbox"
@@ -212,7 +213,7 @@ export function ThemeEditor({
         </div>
 
         <div className="axv-set-hint" style={{ marginTop: 10 }}>
-          配色只作用于编辑器界面，不影响导出/预览的布局。
+          {tt("配色只作用于编辑器界面，不影响导出/预览的布局。")}
         </div>
       </div>
 
@@ -220,10 +221,10 @@ export function ThemeEditor({
         <span />
         <span style={{ display: "flex", gap: 8 }}>
           <button className="axv-btn axv-ghost" onClick={onResetPreset}>
-            恢复本方案默认
+            {tt("恢复本方案默认")}
           </button>
           <button className="axv-btn axv-btn-primary" onClick={close}>
-            完成
+            {tt("完成")}
           </button>
         </span>
       </div>

@@ -167,3 +167,158 @@ Import trace:
 ✓ Compiled in 136ms
 ✓ Compiled in 91ms
 ✓ Compiled in 114ms
+✓ Compiled in 696ms
+✓ Compiled in 125ms
+✓ Compiled in 232ms
+✓ Compiled in 1075ms
+[browser] ./components/RunPreview.tsx:217:57
+Error: Expected ',', got '{'
+  215 |       }
+  216 |       if (BACK_WORDS.has(action)) {
+> 217 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
+      |                                                         ^
+  218 |         back();
+  219 |         return;
+  220 |       }
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/RunPreview.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/RunPreview.tsx:218:57
+Error: Expected ',', got '{'
+  216 |       }
+  217 |       if (BACK_WORDS.has(action)) {
+> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
+      |                                                         ^
+  219 |         back();
+  220 |         return;
+  221 |       }
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/RunPreview.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 365ms
+[browser] ./components/RunPreview.tsx:218:57
+Error: Expected ',', got '{'
+  216 |       }
+  217 |       if (BACK_WORDS.has(action)) {
+> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
+      |                                                         ^
+  219 |         back();
+  220 |         return;
+  221 |       }
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/RunPreview.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 122ms
+[browser] ./components/RunPreview.tsx:218:57
+Error: Expected ',', got '{'
+  216 |       }
+  217 |       if (BACK_WORDS.has(action)) {
+> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
+      |                                                         ^
+  219 |         back();
+  220 |         return;
+  221 |       }
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/RunPreview.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 90ms
+[browser] ./components/RunPreview.tsx:218:57
+Error: Expected ',', got '{'
+  216 |       }
+  217 |       if (BACK_WORDS.has(action)) {
+> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
+      |                                                         ^
+  219 |         back();
+  220 |         return;
+  221 |       }
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/RunPreview.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/RunPreview.tsx:218:57
+Error: Expected ',', got '{'
+  216 |       }
+  217 |       if (BACK_WORDS.has(action)) {
+> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
+      |                                                         ^
+  219 |         back();
+  220 |         return;
+  221 |       }
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/RunPreview.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 102ms
+[browser] ./components/RunPreview.tsx:218:57
+Error: Expected ',', got '{'
+  216 |       }
+  217 |       if (BACK_WORDS.has(action)) {
+> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
+      |                                                         ^
+  219 |         back();
+  220 |         return;
+  221 |       }
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/RunPreview.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/RunPreview.tsx:218:57
+Error: Expected ',', got '{'
+  216 |       }
+  217 |       if (BACK_WORDS.has(action)) {
+> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
+      |                                                         ^
+  219 |         back();
+  220 |         return;
+  221 |       }
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/RunPreview.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 190ms
+ GET /xml/?r=m101b 200 in 29ms (next.js: 1.3ms, application-code: 27ms)
+✓ Compiled in 142ms

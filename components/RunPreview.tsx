@@ -10,6 +10,7 @@
 // 找不到目标布局时在日志里报 W 级并列出可用布局。
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { parseLayoutXml, findNode } from "@/lib/xml/parser";
 import { buildRenderModel } from "@/lib/xml/css";
 import { readableOn } from "@/lib/xml/theme";
@@ -112,11 +113,11 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
   useEffect(() => {
     if (bootedRef.current) return;
     bootedRef.current = true;
-    log("I", `启动 ${entryName}.xml · ${dev.w}×${dev.h}dp · 可跳转布局 ${Object.keys(layouts).length} 个`);
+    log("I", tt("启动 {name}.xml · {w}×{h}dp · 可跳转布局 {n} 个", { name: entryName, w: dev.w, h: dev.h, n: Object.keys(layouts).length }));
     if (Object.keys(layouts).length === 0) {
-      log("W", "没有其它布局可跳转：先在左侧「资源」上传 res/ 目录");
+      log("W", tt("没有其它布局可跳转：先在左侧「资源」上传 res/ 目录"));
     }
-    log("D", "交互已开启：按钮有涟漪、输入框可直接打字、下拉可展开、列表项可点选、开关/勾选/进度条可操作");
+    log("D", tt("交互已开启：按钮有涟漪、输入框可直接打字、下拉可展开、列表项可点选、开关/勾选/进度条可操作"));
     // 只在挂载时打一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -187,11 +188,11 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
   const back = useCallback(() => {
     setStack((s) => {
       if (s.length <= 1) {
-        log("D", "已在首页，「返回」不再出栈");
+        log("D", tt("已在首页，「返回」不再出栈"));
         return s;
       }
       const prev = s[s.length - 2];
-      log("I", `← 返回 ${prev.name}.xml（栈深 ${s.length - 1}）`);
+      log("I", tt("← 返回 {name}.xml（栈深 {n}）", { name: prev.name, n: s.length - 1 }));
       setDir("back");
       return s.slice(0, -1);
     });
@@ -210,23 +211,23 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
       const action = String(node.attrs["onClick"] ?? "").trim();
 
       if (!action) {
-        log("D", eventText("click", label, "无 onClick"));
+        log("D", eventText("click", label, tt("无 onClick")));
         return;
       }
       if (BACK_WORDS.has(action)) {
-        log("I", eventText("click", label, `onClick="${action}" → 返回`));
+        log("I", eventText("click", label, tt("onClick=\"{action}\" → 返回", { action })));
         back();
         return;
       }
       if (action.startsWith("toast:")) {
-        const msg = action.slice(6).trim() || "(空)";
+        const msg = action.slice(6).trim() || tt("(空)");
         log("I", eventText("click", label, `toast: ${msg}`));
         showToast(msg);
         return;
       }
       const target = findLayout(action);
       if (!target) {
-        log("W", eventText("click", label, `找不到布局 "${action}"（可用：${Object.keys(layouts).join(", ") || "无"}）`));
+        log("W", eventText("click", label, tt("找不到布局 \"{action}\"（可用：{list}）", { action, list: Object.keys(layouts).join(", ") || tt("无") })));
         return;
       }
       log("I", eventText("click", label, `onClick="${action}" → ${target.name}.xml`));
@@ -250,7 +251,7 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
       const r = decorateRunScreen(screen, parsed.root, { log, tap, toast: showToast }, resources);
       cleanup = r.cleanup;
       setInteractive(r.interactive);
-      if (r.interactive > 0) log("D", `本屏可交互控件 ${r.interactive} 个`);
+      if (r.interactive > 0) log("D", tt("本屏可交互控件 {n} 个", { n: r.interactive }));
     }, 0);
     return () => {
       window.clearTimeout(t);
@@ -294,7 +295,7 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
           <span className="msr" aria-hidden="true">
             play_arrow
           </span>
-          运行 · {cur.name}.xml
+          {tt("运行")} · {cur.name}.xml
           <span className="axv-run-dev">{dev.label}</span>
         </span>
         <span className="axv-run-stack">
@@ -305,7 +306,7 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
           ))}
         </span>
         <span className="axv-run-actions">
-          <button className="axv-run-btn" onClick={() => setRotated((r) => !r)} title="横竖屏切换（Ctrl+R）">
+          <button className="axv-run-btn" onClick={() => setRotated((r) => !r)} title={tt("横竖屏切换（Ctrl+R）")}>
             <span className="msr" aria-hidden="true">
               screen_rotation
             </span>
@@ -313,13 +314,13 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
           <button
             className="axv-run-btn"
             onClick={() => setShowLog((v) => !v)}
-            title={showLog ? "隐藏日志" : "显示日志"}
+            title={showLog ? tt("隐藏日志") : tt("显示日志")}
           >
             <span className="msr" aria-hidden="true">
               terminal
             </span>
           </button>
-          <button className="axv-run-btn" onClick={onClose} title="退出运行（Esc）">
+          <button className="axv-run-btn" onClick={onClose} title={tt("退出运行（Esc）")}>
             <span className="msr" aria-hidden="true">
               close
             </span>
@@ -365,7 +366,7 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
                     <StaticCanvas node={model.root} selectedPath={null} onSelect={tap} scale={SCALE} />
                   </div>
                 ) : (
-                  <div className="axv-run-error">XML 解析失败，无法运行</div>
+                  <div className="axv-run-error">{tt("XML 解析失败，无法运行")}</div>
                 )}
                 {toast ? (
                   <div key={toast.id} className="axv-run-toast" role="status">
@@ -375,17 +376,17 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
               </div>
 
               <div className="axv-navbar" style={{ height: NAV_BAR_H }}>
-                <button className="axv-nav-btn" title="返回" onClick={back}>
+                <button className="axv-nav-btn" title={tt("返回")} onClick={back}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M13.5 4.5 L14.5 4.5 L14.5 4.75 L14.75 4.75 L14.75 5 L15 5 L15 5.75 L14.75 5.75 L14.75 6.25 L14.5 6.25 L14.5 6.5 L14.25 6.5 L14.25 6.75 L14 6.75 L14 7 L13.75 7 L13.75 7.25 L13.5 7.25 L13.5 7.5 L13.25 7.5 L13.25 7.75 L13 7.75 L13 8 L12.75 8 L12.75 8.25 L12.5 8.25 L12.5 8.5 L12.25 8.5 L12.25 8.75 L12 8.75 L12 9 L11.75 9 L11.75 9.25 L11.5 9.25 L11.5 9.5 L11.25 9.5 L11.25 9.75 L11 9.75 L11 10.25 L11.25 10.25 L11.25 10.5 L11.5 10.5 L11.5 10.75 L11.75 10.75 L11.75 11 L12 11 L12 11.25 L12.25 11.25 L12.25 11.5 L12.5 11.5 L12.5 11.75 L12.75 11.75 L12.75 12 L13 12 L13 12.25 L13.25 12.25 L13.25 12.5 L13.5 12.5 L13.5 12.75 L13.75 12.75 L13.75 13 L14 13 L14 13.25 L14.25 13.25 L14.25 13.5 L14.5 13.5 L14.5 13.75 L14.75 13.75 L14.75 14.25 L15 14.25 L15 15 L14.75 15 L14.75 15.25 L14.5 15.25 L14.5 15.5 L13.5 15.5 L13.5 15.25 L13.25 15.25 L13.25 15 L13 15 L13 14.75 L12.75 14.75 L12.75 14.5 L12.5 14.5 L12.5 14.25 L12.25 14.25 L12.25 14 L12 14 L12 13.75 L11.75 13.75 L11.75 13.5 L11.5 13.5 L11.5 13.25 L11.25 13.25 L11.25 13 L11 13 L11 12.75 L10.75 12.75 L10.75 12.5 L10.5 12.5 L10.5 12.25 L10.25 12.25 L10.25 12 L10 12 L10 11.75 L9.75 11.75 L9.75 11.5 L9.5 11.5 L9.5 11.25 L9.25 11.25 L9.25 11 L9 11 L9 10.75 L8.75 10.75 L8.75 10.5 L8.5 10.5 L8.5 9.5 L8.75 9.5 L8.75 9.25 L9 9.25 L9 9 L9.25 9 L9.25 8.75 L9.5 8.75 L9.5 8.5 L9.75 8.5 L9.75 8.25 L10 8.25 L10 8 L10.25 8 L10.25 7.75 L10.5 7.75 L10.5 7.5 L10.75 7.5 L10.75 7.25 L11 7.25 L11 7 L11.25 7 L11.25 6.75 L11.5 6.75 L11.5 6.5 L11.75 6.5 L11.75 6.25 L12 6.25 L12 6 L12.25 6 L12.25 5.75 L12.5 5.75 L12.5 5.5 L12.75 5.5 L12.75 5.25 L13 5.25 L13 5 L13.25 5 L13.25 4.75 L13.5 4.75 Z" fill="currentColor"></path>
                   </svg>
                 </button>
-                <button className="axv-nav-btn" title="主页（回首页）" onClick={() => { setDir("back"); setStack((s) => s.slice(0, 1)); log("I", "⌂ 回首页"); }}>
+                <button className="axv-nav-btn" title={tt("主页（回首页）")} onClick={() => { setDir("back"); setStack((s) => s.slice(0, 1)); log("I", tt("⌂ 回首页")); }}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth="2" />
                   </svg>
                 </button>
-                <button className="axv-nav-btn" title="多任务（切换上一屏）" onClick={back}>
+                <button className="axv-nav-btn" title={tt("多任务（切换上一屏）")} onClick={back}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <rect x="5.5" y="5.5" width="13" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
                   </svg>
@@ -400,30 +401,30 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
             <div className="axv-run-log-head">
               <span className="axv-run-log-title">
                 logcat
-                {interactive > 0 ? <em className="axv-run-log-badge">{interactive} 个可交互</em> : null}
+                {interactive > 0 ? <em className="axv-run-log-badge">{tt("{n} 个可交互", { n: interactive })}</em> : null}
               </span>
               <span className="axv-run-log-tools">
                 <button
                   className="axv-run-log-clear"
-                  title="复制全部日志"
+                  title={tt("复制全部日志")}
                   onClick={() => {
                     const text = logs.map((l) => `${l.t} ${l.level} ${l.msg}`).join("\n");
                     void navigator.clipboard.writeText(text).then(
-                      () => log("D", `已复制 ${logs.length} 条日志`),
-                      () => log("W", "复制失败：浏览器拒绝了剪贴板权限"),
+                      () => log("D", tt("已复制 {n} 条日志", { n: logs.length })),
+                      () => log("W", tt("复制失败：浏览器拒绝了剪贴板权限")),
                     );
                   }}
                 >
-                  复制
+                  {tt("复制")}
                 </button>
                 <button className="axv-run-log-clear" onClick={() => setLogs([])}>
-                  清空
+                  {tt("清空")}
                 </button>
               </span>
             </div>
             <div className="axv-run-log-body" ref={logRef}>
               {logs.length === 0 ? (
-                <div className="axv-run-log-empty">（点击界面上的控件试试）</div>
+                <div className="axv-run-log-empty">{tt("（点击界面上的控件试试）")}</div>
               ) : (
                 logs.map((l) => (
                   <div key={l.id} className={"axv-run-line lv-" + l.level}>

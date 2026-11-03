@@ -3480,6 +3480,9 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-shape-seg-btn { flex: 1; height: 30px; border: 1px solid rgba(0,0,0,.12); background: #fff; border-radius: 8px; font-size: 12px; cursor: pointer; color: #34343d; }
 .axv-shape-seg-btn.is-on { background: #4f46e5; border-color: #4f46e5; color: #fff; }
 .axv-shape-color { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+/* M89n：色块 + 色值输入框同一行（input 默认 100% 宽会被挤到下一行） */
+.axv-shape-color .axv-attr-input { flex: 1 1 140px; width: auto; min-width: 0; }
+.axv-shape-color .axv-shape-alpha { flex: 1 1 100%; }
 /* M52：填充色 / 涟漪色旁边直接拖透明度 */
 .axv-shape-alpha { flex: 1 1 120px; min-width: 110px; display: flex; align-items: center; gap: 6px; }
 .axv-shape-alpha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--axv-primary, #4f46e5); }

@@ -412,3 +412,96 @@ Import trace:
 ✓ Compiled in 94ms
 ✓ Compiled in 100ms
 ✓ Compiled in 105ms
+ GET / 200 in 28ms (next.js: 1.1ms, application-code: 27ms)
+ GET /xml/ 200 in 35ms (next.js: 0.9ms, application-code: 34ms)
+✓ Compiled in 1148ms
+ GET /xml/ 200 in 41ms (next.js: 1.4ms, application-code: 39ms)
+[browser] Uncaught ReferenceError: tt is not defined
+    at module evaluation (components/XmlEditor.tsx:184:15)
+    at module evaluation (components/widget-catalog.ts:1023:33)
+    at <unknown> (.next\dev\static\chunks\components_XmlEditor_tsx_1kug7hoaa0dz4._.js:26:16)
+    at XmlPage (app/xml/page.tsx:8:10)
+  182 | const SAMPLES: Record<string, string> = {
+  183 |   /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
+> 184 |   "blank-cl": `<?xml version="1.0" encoding="utf-8"?>
+      |               ^
+  185 | <androidx.constraintlayout.widget.ConstraintLayout
+  186 |     xmlns:android="http://schemas.android.com/apk/res/android"
+  187 |     xmlns:app="http://schemas.android.com/apk/res-auto"
+✓ Compiled in 1832ms
+[browser] ./components/XmlEditor.tsx:3755:16
+Error: Unterminated regexp literal
+  3753 |                   ? tt("扫描中…")
+  3754 |                   : tt("{n} 处 · 扫了 {files} 个文件{mode}", { n: usesPanel.hits.length,...
+> 3755 |               </span>
+       |                ^^^^^^
+  3756 |               <span style={{ flex: 1 }} />
+  3757 |               <button className="axv-uses-x" aria-label={tt("关闭")} onClick={() => setU...
+  3758 |                 ✕
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/XmlEditor.tsx:3755:16
+Error: Unterminated regexp literal
+  3753 |                   ? tt("扫描中…")
+  3754 |                   : tt("{n} 处 · 扫了 {files} 个文件{mode}", { n: usesPanel.hits.length,...
+> 3755 |               </span>
+       |                ^^^^^^
+  3756 |               <span style={{ flex: 1 }} />
+  3757 |               <button className="axv-uses-x" aria-label={tt("关闭")} onClick={() => setU...
+  3758 |                 ✕
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/XmlEditor.tsx:3755:16
+Error: Unterminated regexp literal
+  3753 |                   ? tt("扫描中…")
+  3754 |                   : tt("{n} 处 · 扫了 {files} 个文件{mode}", { n: usesPanel.hits.length,...
+> 3755 |               </span>
+       |                ^^^^^^
+  3756 |               <span style={{ flex: 1 }} />
+  3757 |               <button className="axv-uses-x" aria-label={tt("关闭")} onClick={() => setU...
+  3758 |                 ✕
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 282ms
+ GET /xml/ 200 in 121ms (next.js: 1.8ms, application-code: 119ms)
+[browser] Uncaught ReferenceError: tt is not defined
+    at module evaluation (components/XmlEditor.tsx:184:15)
+    at module evaluation (components/widget-catalog.ts:1023:33)
+    at <unknown> (.next\dev\static\chunks\components_XmlEditor_tsx_1kug7hoaa0dz4._.js:26:16)
+    at XmlPage (app/xml/page.tsx:8:10)
+  182 | const SAMPLES: Record<string, string> = {
+  183 |   /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
+> 184 |   "blank-cl": `<?xml version="1.0" encoding="utf-8"?>
+      |               ^
+  185 | <androidx.constraintlayout.widget.ConstraintLayout
+  186 |     xmlns:android="http://schemas.android.com/apk/res/android"
+  187 |     xmlns:app="http://schemas.android.com/apk/res-auto"
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 209ms
+ GET /xml/ 200 in 61ms (next.js: 0.9ms, application-code: 60ms)
+✓ Compiled in 1165ms
+✓ Compiled in 130ms
+✓ Compiled in 179ms
+✓ Compiled in 480ms
+✓ Compiled in 126ms
+✓ Compiled in 110ms
+✓ Compiled in 663ms

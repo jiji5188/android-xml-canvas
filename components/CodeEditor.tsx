@@ -628,6 +628,12 @@ export function CodeEditor({
         EditorView.domEventHandlers({
           // M101：Ctrl/Cmd + 点击资源引用 → 跳定义 / 查引用（画布以外最快的一条导航路线）
           mousedown: (e, view) => {
+            // M114：刚点过候选词（弹窗已消失）→ 吞掉这次 mousedown，
+            // 否则触屏的兼容鼠标事件会落到下面的代码区，把光标跳到点击位置（表现为「选了 a 却跳到 12 行」）
+            if (Date.now() - lastAcceptRef.current < 350) {
+              e.preventDefault();
+              return true;
+            }
             if (e.button !== 0 || !(e.ctrlKey || e.metaKey)) return false;
             const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
             if (pos == null) return false;
@@ -764,6 +770,11 @@ export function CodeEditor({
               maxHeight: sug.placement.maxHeight,
             }}
             data-placement={sug.placement.placement}
+            // M114：栏住兼容鼠标事件，避免点击透传到下面的代码区
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             // M98：列表自己滚动（手指滑列表不能选中）；滚过就不再算点击
             onScroll={cancelPress}
             onPointerCancel={cancelPress}

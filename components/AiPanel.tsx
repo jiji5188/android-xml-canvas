@@ -38,7 +38,7 @@ import { batchLabel, makeBatch, pushBatch, restoreBatch, type AiHistoryBatch } f
 import { collectProjectFacts, formatProjectFacts, type ProjectFacts } from "@/lib/xml/ai-facts";
 
 /** 工具循环最多几轮（防模型无限读文件） */
-const MAX_TOOL_ROUNDS = 3;
+const MAX_TOOL_ROUNDS = 10;
 
 interface Props {
   /** 当前打开的文档内容（布局 XML / Java 源码 / values 资源…都可能是） */

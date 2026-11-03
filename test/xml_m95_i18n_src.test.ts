@@ -68,7 +68,9 @@ describe("M95 覆盖率护栏", () => {
     "components/CodeEditor.tsx",
     "components/LayerTree.tsx",
     "components/HsvPicker.tsx",
-    "components/IconPickerPanel.tsx"];
+    "components/IconPickerPanel.tsx",
+    "components/LeftRail.tsx",
+    "components/XmlEditor.tsx"];
 
   const root = path.resolve(__dirname, "..");
 

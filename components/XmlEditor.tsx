@@ -140,7 +140,7 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
 import { loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
-import { setI18nLang } from "@/lib/i18n-src";
+import { setI18nLang, t as tt } from "@/lib/i18n-src";
 import { XmlCodeView } from "./XmlCodeView";
 import { AttrPanel } from "./AttrPanel";
 import { AddAttrModal } from "./AddAttrModal";
@@ -188,7 +188,7 @@ const SAMPLES: Record<string, string> = {
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-  <!-- 从左侧「组件」把控件拖进来，或选中后在右侧加约束 -->
+  <!-- ${tt("从左侧「组件」把控件拖进来，或选中后在右侧加约束")} -->
 
 </androidx.constraintlayout.widget.ConstraintLayout>
 `,
@@ -200,7 +200,7 @@ const SAMPLES: Record<string, string> = {
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-  <!-- 从左侧「组件」把控件拖进来 -->
+  <!-- ${tt("从左侧「组件」把控件拖进来")} -->
 
 </LinearLayout>
 `,
@@ -211,7 +211,7 @@ const SAMPLES: Record<string, string> = {
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-  <!-- 从左侧「组件」把控件拖进来 -->
+  <!-- ${tt("从左侧「组件」把控件拖进来")} -->
 
 </FrameLayout>
 `,
@@ -229,7 +229,7 @@ const SAMPLES: Record<string, string> = {
       android:layout_height="wrap_content"
       android:layout_marginStart="16dp"
       android:layout_marginTop="24dp"
-      android:text="约束布局示例"
+      android:text="${tt("约束布局示例")}"
       android:textSize="20sp"
       android:textStyle="bold"
       app:layout_constraintStart_toStartOf="parent"
@@ -241,7 +241,7 @@ const SAMPLES: Record<string, string> = {
       android:layout_height="wrap_content"
       android:layout_marginStart="16dp"
       android:layout_marginTop="8dp"
-      android:text="选中控件后在右侧编辑四条边的约束"
+      android:text="${tt("选中控件后在右侧编辑四条边的约束")}"
       android:textColor="#6B7280"
       android:textSize="13sp"
       app:layout_constraintStart_toStartOf="parent"
@@ -265,14 +265,14 @@ const SAMPLES: Record<string, string> = {
       android:layout_height="wrap_content"
       android:layout_marginEnd="16dp"
       android:layout_marginBottom="24dp"
-      android:text="确定"
+      android:text="${tt("确定")}"
       app:layout_constraintBottom_toBottomOf="parent"
       app:layout_constraintEnd_toEndOf="parent" />
 
   <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="我没约束（选中我点「自动约束」）"
+      android:text="${tt("我没约束（选中我点「自动约束」）")}"
       android:textSize="13sp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>`,
@@ -290,7 +290,7 @@ const SAMPLES: Record<string, string> = {
       android:layout_height="wrap_content"
       android:layout_marginStart="16dp"
       android:layout_marginTop="24dp"
-      android:text="chain 链式排布 + Guideline"
+      android:text="${tt("chain 链式排布 + Guideline")}"
       android:textSize="18sp"
       android:textStyle="bold"
       app:layout_constraintStart_toStartOf="parent"
@@ -307,7 +307,7 @@ const SAMPLES: Record<string, string> = {
       android:id="@+id/b1"
       android:layout_width="0dp"
       android:layout_height="wrap_content"
-      android:text="一"
+      android:text="${tt("一")}"
       app:layout_constraintHorizontal_chainStyle="spread"
       app:layout_constraintStart_toStartOf="parent"
       app:layout_constraintEnd_toStartOf="@+id/b2"
@@ -319,7 +319,7 @@ const SAMPLES: Record<string, string> = {
       android:id="@+id/b2"
       android:layout_width="0dp"
       android:layout_height="wrap_content"
-      android:text="二"
+      android:text="${tt("二")}"
       app:layout_constraintStart_toEndOf="@+id/b1"
       app:layout_constraintEnd_toStartOf="@+id/b3"
       app:layout_constraintTop_toTopOf="@+id/b1"
@@ -330,7 +330,7 @@ const SAMPLES: Record<string, string> = {
       android:id="@+id/b3"
       android:layout_width="0dp"
       android:layout_height="wrap_content"
-      android:text="三"
+      android:text="${tt("三")}"
       app:layout_constraintStart_toEndOf="@+id/b2"
       app:layout_constraintEnd_toEndOf="parent"
       app:layout_constraintTop_toTopOf="@+id/b1"
@@ -342,7 +342,7 @@ const SAMPLES: Record<string, string> = {
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:layout_marginTop="24dp"
-      android:text="三个 0dp 按钮在 spread 链里平分宽度"
+      android:text="${tt("三个 0dp 按钮在 spread 链里平分宽度")}"
       android:textSize="13sp"
       app:layout_constraintStart_toStartOf="parent"
       app:layout_constraintTop_toBottomOf="@+id/b1" />
@@ -362,7 +362,7 @@ const SAMPLES: Record<string, string> = {
       android:layout_height="wrap_content"
       android:layout_marginStart="16dp"
       android:layout_marginTop="24dp"
-      android:text="左边一段较长的说明文字，会把高度撑高"
+      android:text="${tt("左边一段较长的说明文字，会把高度撑高")}"
       android:textSize="14sp"
       app:layout_constraintStart_toStartOf="parent"
       app:layout_constraintTop_toTopOf="parent" />
@@ -373,7 +373,7 @@ const SAMPLES: Record<string, string> = {
       android:layout_height="wrap_content"
       android:layout_marginStart="16dp"
       android:layout_marginTop="24dp"
-      android:text="右边短"
+      android:text="${tt("右边短")}"
       android:textSize="14sp"
       app:layout_constraintStart_toEndOf="@+id/tvL"
       app:layout_constraintTop_toTopOf="parent" />
@@ -390,7 +390,7 @@ const SAMPLES: Record<string, string> = {
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:layout_marginTop="16dp"
-      android:text="我跟着较高的那个往下排"
+      android:text="${tt("我跟着较高的那个往下排")}"
       app:layout_constraintStart_toStartOf="parent"
       app:layout_constraintTop_toBottomOf="@+id/barBottom" />
 
@@ -423,7 +423,7 @@ const SAMPLES: Record<string, string> = {
       android:layout_height="wrap_content"
       android:layout_marginTop="16dp"
       android:padding="12dp"
-      android:text="项目一"/>
+      android:text="${tt("项目一")}"/>
 
   <Button
       android:id="@+id/btnConfirm"
@@ -451,7 +451,7 @@ export function XmlEditor() {
       bootRef.current = { project: saved, xml: f?.xml ?? raw };
     } else {
       bootRef.current = {
-        project: createProject("我的项目", { name: guessFileName(raw), xml: raw }),
+        project: createProject(tt("我的项目"), { name: guessFileName(raw), xml: raw }),
         xml: raw,
       };
     }
@@ -501,7 +501,7 @@ export function XmlEditor() {
   const fileSelect = (
     <select
       className="axv-tb-select axv-tab-sample"
-      title="项目文件（多文件切换）"
+      title={tt("项目文件（多文件切换）")}
       value=""
       onChange={(e) => {
         const v = e.target.value;
@@ -512,18 +512,18 @@ export function XmlEditor() {
         else selectFile(v);
       }}
     >
-      <option value="">{`${currentFile?.name ?? "文件"} ▾`}</option>
-      <optgroup label="项目文件">
+      <option value="">{`${currentFile?.name ?? tt("文件")} ▾`}</option>
+      <optgroup label={tt("项目文件")}>
         {project.files.map((f) => (
           <option key={f.id} value={f.id}>
             {f.id === project.activeId ? "● " : "○ "} {f.name}
           </option>
         ))}
       </optgroup>
-      <optgroup label="文件操作">
-        <option value="action:new">＋ 新建文件…</option>
-        <option value="action:rename">✎ 重命名当前文件…</option>
-        <option value="action:delete">🗑 删除当前文件</option>
+      <optgroup label={tt("文件操作")}>
+        <option value="action:new">{tt("＋ 新建文件…")}</option>
+        <option value="action:rename">{tt("✎ 重命名当前文件…")}</option>
+        <option value="action:delete">{tt("🗑 删除当前文件")}</option>
       </optgroup>
     </select>
   );
@@ -1096,7 +1096,7 @@ export function XmlEditor() {
   const pickCustomDir = useCallback(async () => {
     const ok = await wsPickCustom();
     if (!ok) {
-      setWsMsg(wsState?.mode === "unsupported" ? "当前浏览器不支持，请用 Chrome / Edge 或 APK" : "已取消选择");
+      setWsMsg(wsState?.mode === "unsupported" ? tt("当前浏览器不支持，请用 Chrome / Edge 或 APK") : tt("已取消选择"));
       return;
     }
     setWsMsg("");
@@ -1106,7 +1106,7 @@ export function XmlEditor() {
 
   const useDefaultDir = useCallback(async () => {
     await wsUseDefault();
-    setWsMsg("已恢复默认工作目录");
+    setWsMsg(tt("已恢复默认工作目录"));
     window.setTimeout(() => void refreshWorkspace(), 400);
   }, [refreshWorkspace]);
 
@@ -1441,12 +1441,12 @@ export function XmlEditor() {
           }
           if (n > 0) {
             setGeneratedDrawables(next);
-            setExportNote(`已按选择器同款样式重建 ${n} 个图标`);
+            setExportNote(tt("已按选择器同款样式重建 {n} 个图标", { n }));
             window.setTimeout(() => setExportNote(""), 4200);
           }
         })();
         if (fixed.repaired.length > 0) {
-          setExportNote(`已修正 ${fixed.repaired.length} 个旧图标的坐标（之前预览是空白）`);
+          setExportNote(tt("已修正 {n} 个旧图标的坐标（之前预览是空白）", { n: fixed.repaired.length }));
           window.setTimeout(() => setExportNote(""), 4200);
         }
       }
@@ -1465,7 +1465,7 @@ export function XmlEditor() {
         // 通过 commitAttr 把属性改成 @drawable/<资源名>
         commitAttrRef.current(attrName, `@drawable/${safe}`);
       }
-      setExportNote(`已生成 res/drawable/${safe}.xml，属性指向它（导出 res 包时会自动包含）`);
+      setExportNote(tt("已生成 res/drawable/{file}，属性指向它（导出 res 包时会自动包含）", { file: safe + ".xml" }));
       window.setTimeout(() => setExportNote(""), 3600);
     },
     [selectedPath],
@@ -1477,7 +1477,7 @@ export function XmlEditor() {
       const safe = sanitizeResName(resourceName, "bg");
       setGeneratedDrawables((m) => ({ ...m, [safe]: shapeXml }));
       if (selectedPath) commitAttrRef.current(attrName, `@drawable/${safe}`);
-      setExportNote(`已生成 res/drawable/${safe}.xml（含水波纹？${shapeXml.includes("<ripple") ? "是" : "否"}），属性指向它`);
+      setExportNote(tt("已生成 res/drawable/{file}（含水波纹？{yn}），属性指向它", { file: safe + ".xml", yn: shapeXml.includes("<ripple") ? tt("是") : tt("否") }));
       window.setTimeout(() => setExportNote(""), 3600);
     },
     [selectedPath],
@@ -1610,7 +1610,7 @@ export function XmlEditor() {
       return doc;
     } catch (e) {
       t.end("ERR");
-      console.error("[axv] 解析失败", e);
+      console.error("[axv] 解析失败", e); // i18n-ignore
       return { root: null, issues: [] as XmlIssue[] };
     }
   }, [parsedForRender]);
@@ -1637,7 +1637,7 @@ export function XmlEditor() {
           model: null,
           issues: parsed.issues,
           parseErr: true,
-          parseReason: first ? first.message : "没有可识别的根布局节点",
+          parseReason: first ? first.message : tt("没有可识别的根布局节点"),
         };
       }
       // M2q：把上传 res/layout 里的布局传进去，供 <include> 就地展开
@@ -1661,12 +1661,12 @@ export function XmlEditor() {
         parseReason: "",
       };
     } catch (e) {
-      console.error("[axv] 渲染模型构建失败", e);
+      console.error("[axv] 渲染模型构建失败", e); // i18n-ignore
       return {
         model: null,
         issues: [],
         parseErr: true,
-        parseReason: `渲染失败：${e instanceof Error ? e.message : String(e)}`,
+        parseReason: tt("渲染失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }),
       };
     }
   }, [previewActive ? parsedForRender : "", resources, resExtras?.layouts, device, measured, renderTheme, codeOnly]);
@@ -1740,7 +1740,7 @@ export function XmlEditor() {
       t.end("issues=" + out.length);
       return out;
     } catch (e) {
-      console.error("[axv] 结构检查失败", e);
+      console.error("[axv] 结构检查失败", e); // i18n-ignore
       return [] as LintIssue[];
     }
   }, [lintSrc, codeOnly]);
@@ -1887,7 +1887,7 @@ export function XmlEditor() {
     const box = boxOf(nodeRes);
     const pbox = boxOf(parentRes);
     if (!box || !pbox) {
-      setAutoNotes(["该控件还拿不到布局坐标，先切到预览看一眼再试"]);
+      setAutoNotes([tt("该控件还拿不到布局坐标，先切到预览看一眼再试")]);
       return;
     }
     const attrs = { ...(nodeRes?.rawAttrs ?? {}) };
@@ -1944,7 +1944,7 @@ export function XmlEditor() {
       try {
         const text = await source.readText(entry.rel);
         if (text === null) {
-          setWsMsg(`打不开《${entry.name}》：文件已不存在或目录权限被收回`);
+          setWsMsg(tt("打不开《{name}》：文件已不存在或目录权限被收回", { name: entry.name }));
           return;
         }
         setXmlAndTrack(text);
@@ -1956,9 +1956,9 @@ export function XmlEditor() {
         if (entry.target) setSaveOrigin({ kind: "native", target: entry.target, name: entry.name });
         else if (entry.handle) setSaveOrigin({ kind: "handle", handle: entry.handle, name: entry.name });
         else setSaveOrigin(null);
-        setWsMsg(`已打开 ${entry.name}`);
+        setWsMsg(tt("已打开 {name}", { name: entry.name }));
       } catch (e) {
-        setWsMsg(`打开失败：${e instanceof Error ? e.message : String(e)}`);
+        setWsMsg(tt("打开失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }));
       }
     },
     [setXmlAndTrack],
@@ -2004,7 +2004,7 @@ export function XmlEditor() {
       setWsActiveName("");
       const main = await findMainLayout(opened.source);
       if (main) await loadEntry(opened.source, main);
-      else setWsMsg(`已打开《${name}》，但里面没找到 layout xml`);
+      else setWsMsg(tt("已打开《{name}》，但里面没找到 layout xml", { name }));
     },
     [loadEntry],
   );
@@ -2017,7 +2017,7 @@ export function XmlEditor() {
         if (item.kind === "file") {
           const r = await wsOpenProject(item);
           if (!r) {
-            setWsMsg(`打不开《${item.name}》：文件已不存在或目录权限被收回`);
+            setWsMsg(tt("打不开《{name}》：文件已不存在或目录权限被收回", { name: item.name }));
             return;
           }
           setXmlAndTrack(r.text);
@@ -2025,18 +2025,18 @@ export function XmlEditor() {
           if (item.target) setSaveOrigin({ kind: "native", target: item.target, name: item.name });
           else if (item.handle) setSaveOrigin({ kind: "handle", handle: item.handle, name: item.name });
           else setSaveOrigin(null);
-          setWsMsg(`已打开 ${item.name}`);
+          setWsMsg(tt("已打开 {name}", { name: item.name }));
           return;
         }
         const opened = await openProjectFromItem(item);
         if (!opened) {
-          setWsMsg(`打不开《${item.name}》：目录权限可能已失效，请重新选目录`);
+          setWsMsg(tt("打不开《{name}》：目录权限可能已失效，请重新选目录", { name: item.name }));
           return;
         }
         const shownName = projMeta[item.rel]?.name || item.name;
         await activateProject({ ...opened, name: shownName });
       } catch (e) {
-        setWsMsg(`打开失败：${e instanceof Error ? e.message : String(e)}`);
+        setWsMsg(tt("打开失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }));
       } finally {
         setWsBusy(false);
       }
@@ -2047,17 +2047,17 @@ export function XmlEditor() {
   /** M24：打开一个项目目录（弹系统选择器），成功后切到「当前项目」 */
   const openProjectDir = useCallback(async () => {
     setWsBusy(true);
-    setWsMsg("正在等你选项目文件夹…");
+    setWsMsg(tt("正在等你选项目文件夹…"));
     try {
       const proj = await openProjectFolder();
       if (!proj) {
-        setWsMsg(wsState?.mode === "unsupported" ? "当前环境不支持选目录，请用 Chrome / Edge 或 APK" : "已取消打开");
+        setWsMsg(wsState?.mode === "unsupported" ? tt("当前环境不支持选目录，请用 Chrome / Edge 或 APK") : tt("已取消打开"));
         return;
       }
       await activateProject(proj);
       window.setTimeout(() => void refreshWorkspace({ quiet: true }), 600);
     } catch (e) {
-      setWsMsg(`打开项目失败：${e instanceof Error ? e.message : String(e)}`);
+      setWsMsg(tt("打开项目失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }));
     } finally {
       setWsBusy(false);
     }
@@ -2112,8 +2112,8 @@ export function XmlEditor() {
           io = nativeNewProjectIO(info.defaultPath, name);
           usedNativeDefault = true;
           nativeRoot = info.defaultPath;
-          if (info.custom) customNote = "（你自选过工作目录，但原生桥只能写默认目录，项目建在 AndroidUIIDE/Project 下）";
-          if (!info.allFiles) customNote += " 未拿到「所有文件访问」权限，可能写不进去";
+          if (info.custom) customNote = tt("（你自选过工作目录，但原生桥只能写默认目录，项目建在 AndroidUIIDE/Project 下）");
+          if (!info.allFiles) customNote += tt(" 未拿到「所有文件访问」权限，可能写不进去");
         } else if (info.mode === "web") {
           io = await webNewProjectIO(name);
         } else {
@@ -2121,7 +2121,7 @@ export function XmlEditor() {
         }
 
         if (!io) {
-          setExportNote(`已新建项目《${name}》（仅应用内）${customNote}· 当前目录不支持直接写入，点「保存」可导出文件`);
+          setExportNote(tt("已新建项目《{name}》（仅应用内）{note}· 当前目录不支持直接写入，点「保存」可导出文件", { name, note: customNote }));
           window.setTimeout(() => setExportNote(" "), 5200);
           setNewProjBusy(false);
           return;
@@ -2135,14 +2135,14 @@ export function XmlEditor() {
         if (usedNativeDefault) {
           const dirCount = nativeVerifyProject(nativeRoot, name);
           if (dirCount === 0) {
-            setExportNote(`《${name}》工程已生成但目录里没写进任何文件${customNote}。请确认已授予「所有文件访问」权限`);
+            setExportNote(tt("《{name}》工程已生成但目录里没写进任何文件{note}。请确认已授予「所有文件访问」权限", { name, note: customNote }));
             window.setTimeout(() => setExportNote(" "), 7000);
             setNewProjBusy(false);
             return;
           }
         }
         if (res.ok) {
-          setExportNote(`已创建《${name}》· ${res.written} 个文件已写入 ${name}/app/src/main/${customNote}`);
+          setExportNote(tt("已创建《{name}》· {n} 个文件已写入 {dir}/{note}", { name, n: res.written, dir: name + "/app/src/main/", note: customNote }));
           // M46c：新建项目也要带上目录根，否则结构树写操作（重命名/移动/删除）全被置灰
           if (usedNativeDefault) {
             const projDir = `${nativeRoot.replace(/\/+$/, "")}/${name}`;
@@ -2159,10 +2159,10 @@ export function XmlEditor() {
           }
           window.setTimeout(() => void refreshWorkspace({ quiet: true }), 400);
         } else {
-          setExportNote(`《${name}》已创建，但有 ${res.failed.length} 个文件没写进去（${res.failed[0]} 等）${customNote}`);
+          setExportNote(tt("《{name}》已创建，但有 {n} 个文件没写进去（{first} 等）{note}", { name, n: res.failed.length, first: res.failed[0], note: customNote }));
         }
       } catch (e) {
-        setExportNote(`《${name}》已创建，落盘失败：${e instanceof Error ? e.message : String(e)}`);
+        setExportNote(tt("《{name}》已创建，落盘失败：{msg}", { name, msg: e instanceof Error ? e.message : String(e) }));
       } finally {
         setNewProjBusy(false);
         window.setTimeout(() => setExportNote(" "), 5200);
@@ -2175,7 +2175,7 @@ export function XmlEditor() {
   const refreshActiveProject = useCallback(async () => {
     if (activeProjectRef.current?.source) {
       setProjectRev((n) => n + 1);
-      setWsMsg("已刷新项目结构");
+      setWsMsg(tt("已刷新项目结构"));
       return;
     }
     try {
@@ -2198,9 +2198,9 @@ export function XmlEditor() {
         }
         setActiveProject({ ...p, name, iconUrl });
         setProjectRev((n) => n + 1);
-        setWsMsg(`已刷新《${name}》`);
+        setWsMsg(tt("已刷新《{name}》", { name }));
       } else {
-        setWsMsg("刷新失败：项目目录权限可能已失效，请重新「打开」");
+        setWsMsg(tt("刷新失败：项目目录权限可能已失效，请重新「打开」"));
       }
     } catch (e) {
       setWsMsg(e instanceof Error ? e.message : String(e));
@@ -2219,7 +2219,7 @@ export function XmlEditor() {
       setSampleValues(p.values ?? "");
       setSelectedPath(null);
       setExportNote(
-        `已载入示例项目「${p.name}」· ${p.library}，自带 ${Object.keys(p.drawables).length} 个 drawable`,
+        tt("已载入示例项目「{name}」· {lib}，自带 {n} 个 drawable", { name: p.name, lib: p.library, n: Object.keys(p.drawables).length }),
       );
       window.setTimeout(() => setExportNote(""), 4600);
     },
@@ -2269,7 +2269,7 @@ export function XmlEditor() {
         `<?xml version="1.0" encoding="utf-8"?>\n<LinearLayout\n    xmlns:android="http://schemas.android.com/apk/res/android"\n    android:layout_width="match_parent"\n    android:layout_height="match_parent"\n    android:orientation="vertical">\n\n</LinearLayout>\n`,
       );
       if (!id) {
-        setExportNote(`最多 ${n} 个文件，新建失败`);
+        setExportNote(tt("最多 {n} 个文件，新建失败", { n }));
         window.setTimeout(() => setExportNote(""), 3600);
         return withSaved;
       }
@@ -2278,7 +2278,7 @@ export function XmlEditor() {
       histRef.current = diffHistoryInit(target.xml);
       syncHist();
       setSelectedPath(null);
-      setExportNote(`已新建「${target.name}」`);
+      setExportNote(tt("已新建「{name}」", { name: target.name }));
       window.setTimeout(() => setExportNote(""), 2400);
       return next;
     });
@@ -2287,7 +2287,7 @@ export function XmlEditor() {
   const renameActiveFile = useCallback(() => {
     const cur = activeFile(project);
     if (!cur) return;
-    const input = window.prompt(`重命名「${cur.name}」`, cur.name);
+    const input = window.prompt(tt("重命名「{name}」", { name: cur.name }), cur.name);
     if (!input || input === cur.name) return;
     setProject((p) => renameFile(p, cur.id, input));
   }, [project]);
@@ -2295,11 +2295,11 @@ export function XmlEditor() {
   const deleteActiveFile = useCallback(() => {
     const cur = activeFile(project);
     if (!cur || project.files.length <= 1) {
-      setExportNote("项目里只剩最后一个文件，删不了（先新建一个）");
+      setExportNote(tt("项目里只剩最后一个文件，删不了（先新建一个）"));
       window.setTimeout(() => setExportNote(""), 3600);
       return;
     }
-    if (!window.confirm(`删除「${cur.name}」？该文件内容会丢失。`)) return;
+    if (!window.confirm(tt("删除「{name}」？该文件内容会丢失。", { name: cur.name }))) return;
     flushTextTimer();
     setProject((p) => {
       const withSaved = updateFileXml(p, p.activeId, xml);
@@ -2311,7 +2311,7 @@ export function XmlEditor() {
       setSelectedPath(null);
       return next;
     });
-    setExportNote(`已删除「${cur.name}」`);
+    setExportNote(tt("已删除「{name}」", { name: cur.name }));
     window.setTimeout(() => setExportNote(""), 2400);
   }, [flushTextTimer, project, xml]);
 
@@ -2376,7 +2376,7 @@ export function XmlEditor() {
           return;
         }
         // 插入失败（理论上 chk.ok 时不会，但保险）：提示后退回兄弟插入
-        setExportNote(res.issues[0]?.message || "插入失败");
+        setExportNote(res.issues[0]?.message || tt("插入失败"));
         window.setTimeout(() => setExportNote(""), 3000);
       } else {
         // 选中叶子节点 / 单 child 容器已满 → 作为兄弟插到它后面
@@ -2387,7 +2387,7 @@ export function XmlEditor() {
           if (res.insertedPath) setSelectedPath(res.insertedPath);
           return;
         }
-        setExportNote(res.issues[0]?.message || "插入失败");
+        setExportNote(res.issues[0]?.message || tt("插入失败"));
         window.setTimeout(() => setExportNote(""), 3000);
         return;
       }
@@ -2416,7 +2416,7 @@ export function XmlEditor() {
       if (target) {
         const chk = canAcceptChild(target.tag, target.children.length);
         if (!chk.ok) {
-          setExportNote(chk.reason || "无法插入");
+          setExportNote(chk.reason || tt("无法插入"));
           window.setTimeout(() => setExportNote(""), 3000);
           return;
         }
@@ -2461,7 +2461,7 @@ export function XmlEditor() {
   const structureBroken = (): boolean => {
     const root = scanElements(xml);
     const broken = !root || !!xml.slice(root.end).trim();
-    if (broken) setExportNote("当前 XML 结构不完整（有标签没闭合），层级调整已暂停；请先在代码里补齐闭合标签");
+    if (broken) setExportNote(tt("当前 XML 结构不完整（有标签没闭合），层级调整已暂停；请先在代码里补齐闭合标签"));
     return broken;
   };
 
@@ -2661,13 +2661,13 @@ const findResolved = findResolvedNode;
   const loadXmlFile = (f: File) => {
     // 1) 类型校验：后缀必须 .xml
     if (!/\.xml$/i.test(f.name)) {
-      setExportNote(`「${f.name}」不是 .xml 文件，已忽略`);
+      setExportNote(tt("「{name}」不是 .xml 文件，已忽略", { name: f.name }));
       window.setTimeout(() => setExportNote(""), 3600);
       return;
     }
     // 2) 大小上限（5MB），防止巨型文件卡死浏览器
     if (f.size > 5 * 1024 * 1024) {
-      setExportNote(`「${f.name}」超过 5MB，不加载`);
+      setExportNote(tt("「{name}」超过 5MB，不加载", { name: f.name }));
       window.setTimeout(() => setExportNote(""), 4000);
       return;
     }
@@ -2682,7 +2682,7 @@ const findResolved = findResolvedNode;
           const errs = issues.filter((i) => i.level === "error");
           if (!root) {
             parseOk = false;
-            firstErr = errs[0]?.message || "没有可识别的根布局节点";
+            firstErr = errs[0]?.message || tt("没有可识别的根布局节点");
           } else if (errs.length > 0) {
             firstErr = errs[0].message;
           }
@@ -2702,24 +2702,24 @@ const findResolved = findResolvedNode;
           setLeftOpen(true);
           setFocusLine(1);
           setFocusTick((t) => t + 1);
-          setExportNote(`「${f.name}」有不完整或错误的结构（${firstErr}），已切到代码面板，改好画布会自动恢复`);
+          setExportNote(tt("「{name}」有不完整或错误的结构（{err}），已切到代码面板，改好画布会自动恢复", { name: f.name, err: firstErr }));
           window.setTimeout(() => setExportNote(""), 7000);
           return;
         }
         if (firstErr) {
-          setExportNote(`已载入「${f.name}」，但有结构问题：${firstErr}（可在代码面板修正）`);
+          setExportNote(tt("已载入「{name}」，但有结构问题：{err}（可在代码面板修正）", { name: f.name, err: firstErr }));
           window.setTimeout(() => setExportNote(""), 6000);
         } else if (!res2.id) {
-          setExportNote(`项目文件已达上限（${MAX_FILES} 个），仍已载入「${f.name}」但未入项目`);
+          setExportNote(tt("项目文件已达上限（{max} 个），仍已载入「{name}」但未入项目", { max: MAX_FILES, name: f.name }));
           window.setTimeout(() => setExportNote(""), 4600);
         } else {
-          setExportNote(`已载入「${f.name}」`);
+          setExportNote(tt("已载入「{name}」", { name: f.name }));
           window.setTimeout(() => setExportNote(""), 2400);
         }
       })
       .catch((err) => {
-        console.error("[axv] 读取 xml 文件失败", err);
-        setExportNote(`读取「${f.name}」失败，请重试`);
+        console.error("[axv] 读取 xml 文件失败", err); // i18n-ignore
+        setExportNote(tt("读取「{name}」失败，请重试", { name: f.name }));
           window.setTimeout(() => setExportNote(""), 4000);
       });
   };
@@ -2753,7 +2753,7 @@ const findResolved = findResolvedNode;
    *  带容错：文件数为空、全部不是 res 结构、buildResourceExtras 抛错都有友好提示 */
   const onPickRes = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) {
-      setExportNote("未选择任何文件（目录选择器取消或目录为空）");
+      setExportNote(tt("未选择任何文件（目录选择器取消或目录为空）"));
       window.setTimeout(() => setExportNote(""), 3000);
       return;
     }
@@ -2764,20 +2764,20 @@ const findResolved = findResolvedNode;
     // 提示：选到的是目录吗？（webkitRelativePath 存在 = 目录模式；否则 = 散件模式）
     const isDirMode = items.some((it) => it.path !== it.name);
     if (!isDirMode) {
-      setExportNote("提示：选中的是散文件，建议选整个 res 目录（含 drawable/ values/ layout/）效果最佳");
+      setExportNote(tt("提示：选中的是散文件，建议选整个 res 目录（含 drawable/ values/ layout/）效果最佳"));
     }
     try {
       const extras = await buildResourceExtras(items);
       setResExtras(extras);
       const c = extras.counts;
       setExportNote(
-        `已读取 res：图片 ${c.images} / 矢量 ${c.vectors} / values ${c.values} / 样式 ${c.styles}` +
-          (isDirMode ? "" : "（散件模式，可能不完整）"),
+        tt("已读取 res：图片 {img} / 矢量 {vec} / values {val} / 样式 {sty}", { img: c.images, vec: c.vectors, val: c.values, sty: c.styles }) +
+          (isDirMode ? "" : tt("（散件模式，可能不完整）")),
       );
       window.setTimeout(() => setExportNote(""), 3600);
     } catch (err) {
-      console.error("[axv] 读取 res 失败", err);
-      setExportNote("读取 res 失败，请确认目录结构合法（参考 console）");
+      console.error("[axv] 读取 res 失败", err); // i18n-ignore
+      setExportNote(tt("读取 res 失败，请确认目录结构合法（参考 console）"));
       window.setTimeout(() => setExportNote(""), 4000);
     }
   };
@@ -2788,7 +2788,7 @@ const findResolved = findResolvedNode;
   const doDownloadResZip = () => {
     // M37b：非布局文件没有「res 包」概念，直接阻止
     if (codeOnly) {
-      flashNote("当前文件不是布局，无法导出 res 包；直接「保存」写回原文件即可", 4600);
+      flashNote(tt("当前文件不是布局，无法导出 res 包；直接「保存」写回原文件即可"), 4600);
       return;
     }
     // M36：有打开的项目 → 直接写进它的 res 目录，不再丢一个 res.zip 在工作目录根
@@ -2796,9 +2796,9 @@ const findResolved = findResolvedNode;
       void saveResFiles(projRoot, buildSaveFiles(currentSaveInput())).then((r) => {
         setExportNote(
           r.ok
-            ? `已写入《${activeProject?.name || "项目"}》的 app/src/main/res/：${r.written}/${r.total} 个文件` +
-                (r.failed.length ? `（失败 ${r.failed.length}）` : "")
-            : `写入项目失败：${r.failed[0] || "目录不可写"}`,
+            ? tt("已写入《{name}》的 app/src/main/res/：{n}/{total} 个文件", { name: activeProject?.name || tt("项目"), n: r.written, total: r.total }) +
+                (r.failed.length ? tt("（失败 {n}）", { n: r.failed.length }) : "")
+            : tt("写入项目失败：{reason}", { reason: r.failed[0] || tt("目录不可写") }),
         );
         window.setTimeout(() => setExportNote(""), 4800);
       });
@@ -2806,10 +2806,10 @@ const findResolved = findResolvedNode;
     }
     const { count, missing } = downloadResZip(currentSaveInput());
     setExportNote(
-      `已导出 res.zip（${count} 个文件）` +
+      tt("已导出 res.zip（{n} 个文件）", { n: count }) +
         (missing.length
-          ? `；还有 ${missing.length} 个 @drawable 引用未覆盖：${missing.slice(0, 5).join(", ")}${missing.length > 5 ? " …" : ""}（需上传 res 目录补齐）`
-          : "；布局里引用的图标资源已全部包含"),
+          ? tt("；还有 {n} 个 @drawable 引用未覆盖：{list}{more}（需上传 res 目录补齐）", { n: missing.length, list: missing.slice(0, 5).join(", "), more: missing.length > 5 ? " …" : "" })
+          : tt("；布局里引用的图标资源已全部包含")),
     );
     window.setTimeout(() => setExportNote(""), 4200);
   };
@@ -2823,7 +2823,7 @@ const findResolved = findResolvedNode;
       /* ignore */
     }
     if (resDirRef.current) resDirRef.current.value = "";
-    setExportNote("已清除上传的 res 资源");
+    setExportNote(tt("已清除上传的 res 资源"));
     window.setTimeout(() => setExportNote(""), 2400);
   };
 
@@ -2831,12 +2831,12 @@ const findResolved = findResolvedNode;
    *  M2s：改成可视化检查面板（不再用 alert/confirm） */
   const doDownload = () => {
     if (codeOnly) {
-      flashNote("当前文件不是布局，不能导出为布局 XML；直接「保存」就行", 4600);
+      flashNote(tt("当前文件不是布局，不能导出为布局 XML；直接「保存」就行"), 4600);
       return;
     }
     const r = downloadLayout(currentSaveInput("activity_main.xml"));
     setExportNote(
-      r.native ? `已保存 ${r.name}（${workspaceLabel() || "工作目录"}）` : `已导出 ${r.name}`,
+      r.native ? tt("已保存 {name}（{dir}）", { name: r.name, dir: workspaceLabel() || tt("工作目录") }) : tt("已导出 {name}", { name: r.name }),
     );
     window.setTimeout(() => setExportNote(""), 2400);
   };
@@ -2872,14 +2872,14 @@ const findResolved = findResolvedNode;
     const r = await saveResFiles(projRoot, files);
     if (!r.ok) {
       flashNote(
-        `写入项目失败（${r.failed[0] || "未知原因"}）。请确认「所有文件访问」已开启、项目目录可写`,
+        tt("写入项目失败（{reason}）。请确认「所有文件访问」已开启、项目目录可写", { reason: r.failed[0] || tt("未知原因") }),
         5000,
       );
       return false;
     }
     flashNote(
-      `已保存《${activeProject?.name || "项目"}》：${r.written} 个文件 → app/src/main/res/` +
-        (r.failed.length ? `（${r.failed.length} 个失败）` : ""),
+      tt("已保存《{name}》：{n} 个文件 → app/src/main/res/", { name: activeProject?.name || tt("项目"), n: r.written }) +
+        (r.failed.length ? tt("（{n} 个失败）", { n: r.failed.length }) : ""),
       4200,
     );
     markSaved(xml);
@@ -2895,12 +2895,12 @@ const findResolved = findResolvedNode;
     const r = await saveBackPure(input, saveOrigin);
     if (!r.ok) return false;
     let depNote = "";
-    if (r.depsWritten) depNote = `，依赖资源 ${r.depsWritten} 个`;
+    if (r.depsWritten) depNote = tt("，依赖资源 {n} 个", { n: r.depsWritten });
     else if (r.depsTotal) {
       depNote =
         saveOrigin.kind === "native"
-          ? `（${r.depsTotal} 个依赖资源没写成，请检查目录权限）`
-          : `；另有 ${r.depsTotal} 个依赖资源，可用「另存到文件夹」一起写出`;
+          ? tt("（{n} 个依赖资源没写成，请检查目录权限）", { n: r.depsTotal })
+          : tt("；另有 {n} 个依赖资源，可用「另存到文件夹」一起写出", { n: r.depsTotal });
     }
     flashNote(tr("save.doneBack", "已保存 {name}（原路径）", { name: input.name }) + depNote, 4200);
     markSaved(xml);
@@ -2913,7 +2913,7 @@ const findResolved = findResolvedNode;
     if (r.ok) {
       flashNote(
         tr("save.doneAs", "已保存到「{dir}」：{n} 个文件（含依赖资源）", {
-          dir: r.label || "所选文件夹",
+          dir: r.label || tt("所选文件夹"),
           n: r.count ?? 0,
         }),
         5000,
@@ -2931,26 +2931,26 @@ const findResolved = findResolvedNode;
 
   /** M37b：非布局文件（manifest / values / menu …）—— 整文件原位写回，不生成任何布局/依赖资源 */
   const saveRawFile = async (): Promise<boolean> => {
-    const name = saveOrigin?.name || (openRel ? openRel.split("/").pop() || "" : "") || "文件";
+    const name = saveOrigin?.name || (openRel ? openRel.split("/").pop() || "" : "") || tt("文件");
     // 1) 原生绝对路径 / content URI
     if (saveOrigin?.kind === "native") {
       if (writeTextNative(saveOrigin.target, xml)) {
-        flashNote(`已保存 ${name}（原路径）`, 3200);
+        flashNote(tt("已保存 {name}（原路径）", { name }), 3200);
         markSaved(xml);
         return true;
       }
-      flashNote(`写入失败：${name} —— 请确认「所有文件访问」已开启`, 5000);
+      flashNote(tt("写入失败：{name} —— 请确认「所有文件访问」已开启", { name }), 5000);
       return false;
     }
     // 2) 项目可写根 + 工程内相对路径（native 拼绝对路径 / web 走目录句柄）
     if (projRoot && openRel) {
       const ok = await saveProjectFile(projRoot, openRel, xml);
       if (ok) {
-        flashNote(`已保存 ${name} → ${openRel}`, 3600);
+        flashNote(tt("已保存 {name} → {rel}", { name, rel: openRel }), 3600);
         markSaved(xml);
         return true;
       }
-      flashNote(`写入失败：${openRel}（目录不可写？）`, 5000);
+      flashNote(tt("写入失败：{rel}（目录不可写？）", { rel: openRel }), 5000);
       return false;
     }
     // 3) 浏览器里打开的文件句柄
@@ -2962,14 +2962,14 @@ const findResolved = findResolvedNode;
         ).createWritable();
         await w.write(xml);
         await w.close();
-        flashNote(`已保存 ${name}（原文件）`, 3200);
+        flashNote(tt("已保存 {name}（原文件）", { name }), 3200);
         markSaved(xml);
         return true;
       } catch {
         /* 往下退 */
       }
     }
-    flashNote(`没有可写回的位置：${name} —— 请用项目目录打开，或先「另存到文件夹」`, 5200);
+    flashNote(tt("没有可写回的位置：{name} —— 请用项目目录打开，或先「另存到文件夹」", { name }), 5200);
     return false;
   };
 
@@ -3028,7 +3028,7 @@ const findResolved = findResolvedNode;
   const saveProject = () => {
     flushXml(); // M57：先把打字中的最新文本落状态，保存读到的才是当前内容
     if (codeOnly) {
-      flashNote("当前文件不是布局，不能走「导出检查」；直接「保存」写回原文件即可", 4600);
+      flashNote(tt("当前文件不是布局，不能走「导出检查」；直接「保存」写回原文件即可"), 4600);
       return;
     }
     setExportAction("download");
@@ -3041,17 +3041,17 @@ const findResolved = findResolvedNode;
     const body = exportLayoutXml(xml, { mode: exportMode });
     // 原生壳里先走 ClipboardManager（WebView 的 navigator.clipboard 不可靠）
     if (copyTextNative(body)) {
-      setExportNote("已复制到剪贴板");
+      setExportNote(tt("已复制到剪贴板"));
       window.setTimeout(() => setExportNote(""), 2600);
       return;
     }
     try {
       await navigator.clipboard.writeText(body);
-      setExportNote("已复制到剪贴板");
+      setExportNote(tt("已复制到剪贴板"));
     } catch {
       // 剪贴板 API 不可用（非 https / 旧浏览器）时退化成保存
       doDownload();
-      setExportNote("剪贴板不可用，已改为保存文件");
+      setExportNote(tt("剪贴板不可用，已改为保存文件"));
     }
     window.setTimeout(() => setExportNote(""), 2600);
   };
@@ -3135,7 +3135,7 @@ const findResolved = findResolvedNode;
   const openUsages = useCallback(
     async (value: string) => {
       if (!aiFileIo) {
-        setWsMsg("先打开一个项目目录，才能查引用（当前是单个文件）");
+        setWsMsg(tt("先打开一个项目目录，才能查引用（当前是单个文件）"));
         return;
       }
       const dir = openRel ? openRel.split("/").slice(0, -1).join("/") : undefined;
@@ -3151,7 +3151,7 @@ const findResolved = findResolvedNode;
         });
       } catch (e) {
         setUsesPanel(null);
-        setWsMsg(`查引用失败：${e instanceof Error ? e.message : String(e)}`);
+        setWsMsg(tt("查引用失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }));
       }
     },
     [aiFileIo, openRel],
@@ -3166,12 +3166,12 @@ const findResolved = findResolvedNode;
       const resolver = createResResolver(aiFileIo, openRel ?? null);
       if (!resolver) {
         // M101：改成底部 toast —— wsMsg 只在项目面板里看得到，代码面板上点了“没反应”很难受
-        flashNote("先打开一个项目目录，才能跳到资源定义（当前是单个文件）");
+        flashNote(tt("先打开一个项目目录，才能跳到资源定义（当前是单个文件）"));
         return;
       }
       const hit = await resolver.resolve(value);
       if (!hit) {
-        flashNote(`项目里没找到 ${value}（可能只在别的模块/依赖库里）`);
+        flashNote(tt("项目里没找到 {value}（可能只在别的模块/依赖库里）", { value }));
         return;
       }
       const going = formatResRefHit(hit.ref, hit.rel, hit.line);
@@ -3182,7 +3182,7 @@ const findResolved = findResolvedNode;
       }
       const src = activeProjectRef.current?.source;
       if (!src) {
-        flashNote(`找到了：${going}，但当前没有可切换的项目源`);
+        flashNote(tt("找到了：{target}，但当前没有可切换的项目源", { target: going }));
         return;
       }
       const name = hit.rel.split("/").pop() || hit.rel;
@@ -3222,13 +3222,13 @@ const findResolved = findResolvedNode;
       const a = refAction(t);
       if (a.kind === "none") {
         flashNote(
-          a.reason === "framework" ? "@android: 内置资源，没有可跳的定义" : "这里没有可跳转的引用",
+          a.reason === "framework" ? tt("@android: 内置资源，没有可跳的定义") : tt("这里没有可跳转的引用"),
         );
         return;
       }
       // 没打开项目目录时，静默失败让人其妙（wsMsg 在不看项目面板时看不到）→ 用底部 toast 提示
       if (!aiFileIo) {
-        flashNote("先打开一个项目目录，才能跳转 / 查引用（当前是单个文件）");
+        flashNote(tt("先打开一个项目目录，才能跳转 / 查引用（当前是单个文件）"));
         return;
       }
       if (a.kind === "usages") {
@@ -3295,7 +3295,7 @@ const findResolved = findResolvedNode;
                 }
           }
         >
-          <div className="axv-mob-tabs-inner" role="tablist" aria-label="视图">
+          <div className="axv-mob-tabs-inner" role="tablist" aria-label={tt("视图")}>
           {/* M31e：「XML 代码」改叫「代码」并挪到「预览」前面 —— 以后要在这里接 Java 代码显示 */}
           <button
             role="tab"
@@ -3307,7 +3307,7 @@ const findResolved = findResolvedNode;
             }}
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code_xml</span>
-            代码
+            {tt("代码")}
           </button>
           {/* M42：values 资源才有「视图」—— 键值对表格页（.axv-val），紧跟「代码」后面 */}
           {hasViewTab && (
@@ -3321,7 +3321,7 @@ const findResolved = findResolvedNode;
               }}
             >
               <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>table_chart</span>
-              视图
+              {tt("视图")}
             </button>
           )}
           {/* M42：「预览」只在能画布局的文档上出现（manifest / values / menu 等不显示） */}
@@ -3336,13 +3336,13 @@ const findResolved = findResolvedNode;
               }}
             >
               <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>phone_android</span>
-              预览
+              {tt("预览")}
             </button>
           )}
           {/* M30b：两个下拉框挪到两个 tab 按钮后面 */}
           <select
             className="axv-tb-select axv-tab-sample"
-            title="载入完整示例项目（布局 + 自带图标/背景资源）"
+            title={tt("载入完整示例项目（布局 + 自带图标/背景资源）")}
             value=""
             onChange={(e) => {
               const v = e.target.value;
@@ -3352,15 +3352,15 @@ const findResolved = findResolvedNode;
             }}
             style={{ margin: "0 8px" }}
           >
-            <option value="">示例项目…</option>
-            <optgroup label="完整示例（带资源）">
+            <option value="">{tt("示例项目…")}</option>
+            <optgroup label={tt("完整示例（带资源）")}>
               {SAMPLE_PROJECTS.map((p) => (
                 <option key={p.key} value={p.key}>
                   {p.name} · {p.library.split(" + ")[0]}
                 </option>
               ))}
             </optgroup>
-            <optgroup label="新建（空白）">
+            <optgroup label={tt("新建（空白）")}>
               {SAMPLE_BLANKS.map((b) => (
                 <option key={b.key} value={`blank:${b.key}`}>
                   {b.name}
@@ -3496,7 +3496,7 @@ const findResolved = findResolvedNode;
                 invalidateNativeProjectCache();
                 const key = openRel || saveOrigin?.name || "";
                 if (key && rel === key) setXmlAndTrack(text, `ai:${rel}`);
-                setExportNote(`AI 已更新 ${rel}`);
+                setExportNote(tt("AI 已更新 {rel}", { rel }));
                 window.setTimeout(() => setExportNote(" "), 3000);
               }}
               onNote={(text) => {
@@ -3533,7 +3533,7 @@ const findResolved = findResolvedNode;
                 onJump={(rel, line) => {
                   const src = activeProjectRef.current?.source;
                   if (!src) {
-                    setWsMsg("先打开一个项目目录，才能跳到资源文件");
+                    setWsMsg(tt("先打开一个项目目录，才能跳到资源文件"));
                     return;
                   }
                   if (openRel === rel) {
@@ -3715,7 +3715,7 @@ const findResolved = findResolvedNode;
         workspaceLabel={workspaceLabel()}
         onChangeWorkspace={() => {
           if (chooseWorkspace()) {
-            setExportNote("已更换保存位置（下次保存生效）");
+            setExportNote(tt("已更换保存位置（下次保存生效）"));
             window.setTimeout(() => setExportNote(""), 2400);
           }
         }}
@@ -3747,20 +3747,20 @@ const findResolved = findResolvedNode;
         >
           <div className="axv-uses-card">
             <div className="axv-uses-head">
-              <span className="axv-uses-title">{usesPanel.title} 的引用</span>
+              <span className="axv-uses-title">{tt("{title} 的引用", { title: usesPanel.title })}</span>
               <span className="axv-uses-count">
                 {usesPanel.loading
-                  ? "扫描中…"
-                  : `${usesPanel.hits.length} 处 · 扫了 ${usesPanel.files} 个文件${usesPanel.truncated ? "（已截断）" : ""}`}
+                  ? tt("扫描中…")
+                  : tt("{n} 处 · 扫了 {files} 个文件{mode}", { n: usesPanel.hits.length, files: usesPanel.files, mode: usesPanel.truncated ? tt("（已截断）") : "" })}
               </span>
               <span style={{ flex: 1 }} />
-              <button className="axv-uses-x" aria-label="关闭" onClick={() => setUsesPanel(null)}>
+              <button className="axv-uses-x" aria-label={tt("关闭")} onClick={() => setUsesPanel(null)}>
                 ✕
               </button>
             </div>
             <div className="axv-uses-list">
               {!usesPanel.loading && usesPanel.hits.length === 0 ? (
-                <div className="axv-uses-empty">没找到引用（可能只在别的模块或依赖库里）</div>
+                <div className="axv-uses-empty">{tt("没找到引用（可能只在别的模块或依赖库里）")}</div>
               ) : null}
               {usesPanel.hits.map((h) => (
                 <button
@@ -3811,7 +3811,7 @@ const findResolved = findResolvedNode;
             <div className="axv-saveas-hint">
               {tr(
                 "save.hint",
-                "下一步会让你选择保存位置（系统选择器里可以新建文件夹）。生成的形状、图标等依赖资源会一起写进 drawable/，values 写进 values/。",
+                tt("下一步会让你选择保存位置（系统选择器里可以新建文件夹）。生成的形状、图标等依赖资源会一起写进 drawable/，values 写进 values/。"),
               )}
             </div>
             <label className="axv-saveas-field">
@@ -3855,7 +3855,7 @@ const findResolved = findResolvedNode;
             <div className="axv-saveas-hint">
               {tr(
                 "proj.newHint",
-                "会在工作目录里直接建出完整工程：项目名/app/src/main/{java,res,AndroidManifest.xml} + gradle 文件。不选图标就用默认自适应图标。",
+                tt("会在工作目录里直接建出完整工程：项目名/app/src/main/{java,res,AndroidManifest.xml} + gradle 文件。不选图标就用默认自适应图标。"),
               )}
             </div>
             <label className="axv-saveas-field">
@@ -3895,7 +3895,7 @@ const findResolved = findResolvedNode;
                       e.target.value = "";
                       if (!f) return;
                       if (f.size > 2 * 1024 * 1024) {
-                        setExportNote("图标建议小于 2MB");
+                        setExportNote(tt("图标建议小于 2MB"));
                         window.setTimeout(() => setExportNote(" "), 3000);
                         return;
                       }
@@ -3988,7 +3988,7 @@ const findResolved = findResolvedNode;
             const safe = sanitizeResName(resourceName, "bg");
             setGeneratedDrawables((m) => ({ ...m, [safe]: shapeXml }));
             setResShape(null);
-            setExportNote(`已保存 res/drawable/${safe}.xml`);
+            setExportNote(tt("已保存 res/drawable/{file}", { file: safe + ".xml" }));
             window.setTimeout(() => setExportNote(" "), 3200);
           }}
         />
@@ -4013,7 +4013,7 @@ const findResolved = findResolvedNode;
             // M11p：从属性面板「图标编辑」进来的话，保存后把属性指向这个资源
             if (resIcon.attr) commitAttr(resIcon.attr, "@drawable/" + safeName);
             setResIcon(null);
-            setExportNote("已保存 res/drawable/" + safeName + ".xml");
+            setExportNote(tt("已保存 res/drawable/{file}", { file: safeName + ".xml" }));
             window.setTimeout(() => setExportNote(" "), 3200);
           }}
         />
@@ -4058,7 +4058,7 @@ const findResolved = findResolvedNode;
         onResetZoom={() => applyZoom(1)}
         savedHint={
           savedAt
-            ? `已保存 ${new Date(savedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`
+            ? tt("已保存 {time}", { time: new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })
             : null
         }
       />

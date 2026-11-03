@@ -5716,6 +5716,16 @@ button.axv-ws-caret:hover {
   color: var(--axv-on-surface-variant);
   cursor: pointer;
 }
+/* M114：带文字的按钮（重试 / 重新生成）不能吃 22px 固定宽，否则文字被挤成竖排 */
+.axv-ai-retry .axv-ai-mini,
+.axv-ai-mini.axv-ai-retry-btn {
+  width: auto;
+  min-width: 22px;
+  padding: 0 9px;
+  gap: 4px;
+  white-space: nowrap;
+}
+.axv-ai-retry .axv-ai-mini .msr { flex: 0 0 auto; }
 .axv-ai-mini:hover { background: var(--axv-hover, var(--axv-primary-soft)); color: var(--axv-primary); }
 .axv-ai-hint { font-size: 11px; line-height: 1.55; color: var(--axv-on-surface-variant); }
 .axv-ai-chatbar {

@@ -9,6 +9,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import {
   COMPONENT_LABEL,
   appendComponent,
@@ -68,8 +69,8 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
       <div className={"axv-val " + (className || "")}>
         <div className="axv-val-empty">
           <span className="msr" aria-hidden="true">warning</span>
-          <div>{doc.reason || "这个文件不是 AndroidManifest.xml"}</div>
-          <div className="axv-val-hint">切到「代码」还能直接改原文。</div>
+          <div>{doc.reason || tt("这个文件不是 AndroidManifest.xml")}</div>
+          <div className="axv-val-hint">{tt("切到「代码」还能直接改原文。")}</div>
         </div>
       </div>
     );
@@ -82,36 +83,36 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
     const next = raw.trim();
     if (next === read(manifest, name)) return;
     if (!next) {
-      note("这个字段不能为空");
+      note(tt("这个字段不能为空"));
       if (el) el.value = read(manifest, name);
       return;
     }
     onChange(setElementAttr(xml, manifest, name, next));
-    note(`已改 ${name.replace("android:", "")}`);
+    note(tt("已改 {field}", { field: name.replace("android:", "") }));
   };
 
   const commitNumberAttr = (name: string, raw: string, el?: HTMLInputElement) => {
     const next = raw.trim();
     if (next === read(manifest, name)) return;
     if (!isDigits(next)) {
-      note("版本号要用纯数字");
+      note(tt("版本号要用纯数字"));
       if (el) el.value = read(manifest, name);
       return;
     }
     onChange(setElementAttr(xml, manifest, name, next));
-    note(`已改 ${name.replace("android:", "")}`);
+    note(tt("已改 {field}", { field: name.replace("android:", "") }));
   };
 
   const commitSdkAttr = (name: string, raw: string, el?: HTMLInputElement) => {
     const next = raw.trim();
     if (next === read(doc.usesSdk, name)) return;
     if (!isDigits(next)) {
-      note("SDK 版本要用纯数字");
+      note(tt("SDK 版本要用纯数字"));
       if (el) el.value = read(doc.usesSdk, name);
       return;
     }
     onChange(setUsesSdkAttr(xml, name, next, doc));
-    note(`已改 ${name.replace("android:", "")}`);
+    note(tt("已改 {field}", { field: name.replace("android:", "") }));
   };
 
   const commitAppAttr = (name: string, raw: string, el?: HTMLInputElement) => {
@@ -119,39 +120,39 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
     const next = raw.trim();
     if (next === cur) return;
     if (!doc.application) {
-      note("当前清单没有 <application> 节点，去代码里补");
+      note(tt("当前清单没有 <application> 节点，去代码里补"));
       return;
     }
     if (!next) {
       onChange(removeElementAttr(xml, doc.application, name));
-      note(`已清空 ${name.replace("android:", "")}`);
+      note(tt("已清空 {field}", { field: name.replace("android:", "") }));
       return;
     }
     onChange(setElementAttr(xml, doc.application, name, next));
-    note(`已改 ${name.replace("android:", "")}`);
+    note(tt("已改 {field}", { field: name.replace("android:", "") }));
   };
 
   const commitAllowBackup = (raw: string) => {
     if (!doc.application) return;
     if (!raw) onChange(removeElementAttr(xml, doc.application, "android:allowBackup"));
     else onChange(setElementAttr(xml, doc.application, "android:allowBackup", raw));
-    note("已改 allowBackup");
+    note(tt("已改 allowBackup"));
   };
 
   const addPermission = () => {
     const name = permDraft.trim();
     if (!name) return;
     if (!name.includes(".")) {
-      note("权限名一般形如 android.permission.CAMERA");
+      note(tt("权限名一般形如 android.permission.CAMERA"));
       return;
     }
     if (doc.permissions.some((p) => attrOfElement(xml, p, "android:name") === name)) {
-      note("这个权限已经有了");
+      note(tt("这个权限已经有了"));
       return;
     }
     onChange(appendPermission(xml, name, doc));
     setPermDraft("");
-    note(`已加 ${name.split(".").pop()}`);
+    note(tt("已加 {name}", { name: String(name.split(".").pop()) }));
   };
 
   const commitPermissionName = (el: ManifestItem, raw: string, input?: HTMLInputElement) => {
@@ -159,33 +160,33 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
     const next = raw.trim();
     if (next === cur) return;
     if (!next || !next.includes(".")) {
-      note("权限名不合法");
+      note(tt("权限名不合法"));
       if (input) input.value = cur;
       return;
     }
     if (doc.permissions.some((p) => p !== el && attrOfElement(xml, p, "android:name") === next)) {
-      note("这个权限已经有了");
+      note(tt("这个权限已经有了"));
       if (input) input.value = cur;
       return;
     }
     onChange(setElementAttr(xml, el, "android:name", next));
-    note("已改权限名");
+    note(tt("已改权限名"));
   };
 
   const addComponent = () => {
     const name = compName.trim();
     if (!name) return;
     if (!/^[A-Za-z_][\w.$]*$/.test(name)) {
-      note("组件名只能字母/数字/下划线/点");
+      note(tt("组件名只能字母/数字/下划线/点"));
       return;
     }
     if (doc.components.some((c) => attrOfElement(xml, c, "android:name") === name)) {
-      note("这个组件已经有了");
+      note(tt("这个组件已经有了"));
       return;
     }
     onChange(appendComponent(xml, compType, { "android:name": name }, doc));
     setCompName("");
-    note(`已加 ${COMPONENT_LABEL[compType] || compType}`);
+    note(tt("已加 {name}", { name: COMPONENT_LABEL[compType] || compType }));
   };
 
   const commitComponentAttr = (
@@ -199,7 +200,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
     if (next === cur) return;
     if (!next) {
       if (name === "android:name") {
-        note("组件名不能为空");
+        note(tt("组件名不能为空"));
         if (input) input.value = cur;
         return;
       }
@@ -212,7 +213,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
   const setExported = (el: ManifestItem, raw: string) => {
     if (!raw) onChange(removeElementAttr(xml, el, "android:exported"));
     else onChange(setElementAttr(xml, el, "android:exported", raw));
-    note("已改 exported");
+    note(tt("已改 exported"));
   };
 
   return (
@@ -222,10 +223,10 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
         <section className="axv-mf-sec">
           <div className="axv-mf-head">
             <span className="msr" aria-hidden="true">info</span>
-            <b>应用信息</b>
+            <b>{tt("应用信息")}</b>
           </div>
           <div className="axv-mf-grid">
-            <span className="axv-mf-label">包名</span>
+            <span className="axv-mf-label">{tt("包名")}</span>
             <input
               className="axv-mf-input mono"
               defaultValue={read(manifest, "package")}
@@ -293,7 +294,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
             <b>Application</b>
           </div>
           <div className="axv-mf-grid">
-            <span className="axv-mf-label">名称</span>
+            <span className="axv-mf-label">{tt("名称")}</span>
             <input
               className="axv-mf-input mono"
               defaultValue={read(doc.application, "android:label")}
@@ -304,7 +305,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
               }}
             />
-            <span className="axv-mf-label">图标</span>
+            <span className="axv-mf-label">{tt("图标")}</span>
             <input
               className="axv-mf-input mono"
               defaultValue={read(doc.application, "android:icon")}
@@ -315,7 +316,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
               }}
             />
-            <span className="axv-mf-label">主题</span>
+            <span className="axv-mf-label">{tt("主题")}</span>
             <input
               className="axv-mf-input mono"
               defaultValue={read(doc.application, "android:theme")}
@@ -332,13 +333,13 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
               defaultValue={read(doc.application, "android:allowBackup")}
               onChange={(e) => commitAllowBackup(e.target.value)}
             >
-              <option value="">未设置</option>
+              <option value="">{tt("未设置")}</option>
               <option value="true">true</option>
               <option value="false">false</option>
             </select>
           </div>
           {!doc.application ? (
-            <div className="axv-mf-warn">没有 &lt;application&gt; 节点，上面这些字段不可编辑。</div>
+            <div className="axv-mf-warn">{tt("没有 <application> 节点，上面这些字段不可编辑。")}</div>
           ) : null}
         </section>
 
@@ -346,7 +347,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
         <section className="axv-mf-sec">
           <div className="axv-mf-head">
             <span className="msr" aria-hidden="true">lock</span>
-            <b>权限</b>
+            <b>{tt("权限")}</b>
             <span className="axv-mf-count">{doc.permissions.length}</span>
           </div>
           <div className="axv-mf-list">
@@ -354,12 +355,12 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
               const name = attrOfElement(xml, p, "android:name");
               return (
                 <div className="axv-mf-row" key={`perm:${p.from}`}>
-                  <span className="axv-mf-tag">权限</span>
+                  <span className="axv-mf-tag">{tt("权限")}</span>
                   <input
                     className="axv-mf-input mono wide"
                     defaultValue={name}
                     spellCheck={false}
-                    aria-label={`${name} 权限名`}
+                    aria-label={tt("{name} 权限名", { name })}
                     onBlur={(e) => commitPermissionName(p, e.target.value, e.target)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -372,11 +373,11 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
                   <button
                     type="button"
                     className="axv-val-del"
-                    title={`删除 ${name}`}
-                    aria-label={`删除 ${name}`}
+                    title={tt("删除 {name}", { name })}
+                    aria-label={tt("删除 {name}", { name })}
                     onClick={() => {
                       onChange(removeElement(xml, p));
-                      note(`已删 ${name.split(".").pop()}`);
+                      note(tt("已删 {name}", { name: String(name.split(".").pop()) }));
                     }}
                   >
                     <span className="msr" aria-hidden="true">delete</span>
@@ -385,7 +386,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
               );
             })}
             {doc.permissions.length === 0 ? (
-              <div className="axv-mf-empty">还没有声明权限</div>
+              <div className="axv-mf-empty">{tt("还没有声明权限")}</div>
             ) : null}
           </div>
           <div className="axv-mf-new">
@@ -394,7 +395,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
               list="axv-mf-perm-list"
               value={permDraft}
               placeholder="android.permission.CAMERA"
-              aria-label="新权限名"
+              aria-label={tt("新权限名")}
               onChange={(e) => setPermDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addPermission()}
             />
@@ -403,7 +404,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
                 <option key={p} value={p} />
               ))}
             </datalist>
-            <button type="button" className="axv-val-ok" onClick={addPermission}>加权限</button>
+            <button type="button" className="axv-val-ok" onClick={addPermission}>{tt("加权限")}</button>
           </div>
         </section>
 
@@ -411,7 +412,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
         <section className="axv-mf-sec">
           <div className="axv-mf-head">
             <span className="msr" aria-hidden="true">widgets</span>
-            <b>组件</b>
+            <b>{tt("组件")}</b>
             <span className="axv-mf-count">{doc.components.length}</span>
           </div>
           <div className="axv-mf-list">
@@ -426,7 +427,7 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
                     className="axv-mf-input mono wide"
                     defaultValue={name}
                     spellCheck={false}
-                    aria-label={`${name} 组件名`}
+                    aria-label={tt("{name} 组件名", { name })}
                     onBlur={(e) => commitComponentAttr(c, "android:name", e.target.value, e.target)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -438,9 +439,9 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
                     aria-label={`${name} exported`}
                     onChange={(e) => setExported(c, e.target.value)}
                   >
-                    <option value="">未设置</option>
+                    <option value="">{tt("未设置")}</option>
                     <option value="true">exported</option>
-                    <option value="false">不导出</option>
+                    <option value="false">{tt("不导出")}</option>
                   </select>
                   <input
                     className="axv-mf-input mono label"
@@ -456,11 +457,11 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
                   <button
                     type="button"
                     className="axv-val-del"
-                    title={`删除 ${name}`}
-                    aria-label={`删除 ${name}`}
+                    title={tt("删除 {name}", { name })}
+                    aria-label={tt("删除 {name}", { name })}
                     onClick={() => {
                       onChange(removeElement(xml, c));
-                      note(`已删 ${name}`);
+                      note(tt("已删 {name}", { name }));
                     }}
                   >
                     <span className="msr" aria-hidden="true">delete</span>
@@ -469,13 +470,13 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
               );
             })}
             {doc.components.length === 0 ? (
-              <div className="axv-mf-empty">还没有 activity / service 等组件</div>
+              <div className="axv-mf-empty">{tt("还没有 activity / service 等组件")}</div>
             ) : null}
           </div>
           <div className="axv-mf-new">
             <select
               className="axv-mf-input sel"
-              aria-label="新组件类型"
+              aria-label={tt("新组件类型")}
               value={compType}
               onChange={(e) => setCompType(e.target.value as (typeof COMPONENT_TYPES)[number])}
             >
@@ -487,17 +488,17 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
               className="axv-mf-input mono"
               value={compName}
               placeholder=".DetailActivity"
-              aria-label="新组件名"
+              aria-label={tt("新组件名")}
               onChange={(e) => setCompName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addComponent()}
             />
-            <button type="button" className="axv-val-ok" onClick={addComponent}>加组件</button>
+            <button type="button" className="axv-val-ok" onClick={addComponent}>{tt("加组件")}</button>
           </div>
         </section>
 
         <div className="axv-val-foot">
           <span className="axv-val-tip">
-            intent-filter / meta-data 等复杂结构请切「代码」改
+            {tt("intent-filter / meta-data 等复杂结构请切「代码」改")}
           </span>
           <span className="axv-val-msg">{msg}</span>
         </div>

@@ -4,6 +4,7 @@
 // 好处：设置项以后加一堆开关也不会再把主文件撑行数。
 
 import { useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import {
   THEME_PRESETS,
   themeTokens,
@@ -141,8 +142,8 @@ export function SettingsPanel(p: SettingsPanelProps) {
                   type="button"
                   className="axv-theme-edit"
                   onClick={() => p.onEditTheme(preset.id)}
-                  title={`修改「${preset.name}」的颜色`}
-                  aria-label={`修改「${preset.name}」的颜色`}
+                  title={tt("修改「{name}」的颜色", { name: preset.name })}
+                  aria-label={tt("修改「{name}」的颜色", { name: preset.name })}
                 >
                   <span className="msr" aria-hidden="true">
                     palette
@@ -168,9 +169,11 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </div>
         <div className="axv-set-hint">
           {THEME_PRESETS.find((x) => x.id === p.themePreset)?.note}
-          。配色只作用于编辑器界面，不影响导出的布局。
+          {tt("。配色只作用于编辑器界面，不影响导出的布局。")}
         </div>
-        <div className="axv-set-hint">点卡片右侧的调色板图标，可以逐项改这套方案的颜色（浅色/深色分开存）。</div>
+        <div className="axv-set-hint">
+          {tt("点卡片右侧的调色板图标，可以逐项改这套方案的颜色（浅色/深色分开存）。")}
+        </div>
       </div>
 
       {/* ===== M23：界面语言 ===== */}
@@ -217,20 +220,20 @@ export function SettingsPanel(p: SettingsPanelProps) {
           {tr("set.workspace", "工作目录")}
         </button>
         <div className="axv-set-kv">
-          <span>当前</span>
+          <span>{tt("当前")}</span>
           <b title={p.wsState?.label || ""}>
             {p.wsState?.mode === "native"
               ? p.wsState.label || "AndroidUIIDE/Project"
               : p.wsState?.mode === "unsupported"
-                ? "不支持（请用 Chrome/Edge 或 APK）"
+                ? tt("不支持（请用 Chrome/Edge 或 APK）")
                 : p.wsState?.custom
                   ? p.wsState.label
-                  : "未授权目录"}
+                  : tt("未授权目录")}
           </b>
         </div>
         {p.wsState?.defaultPath ? (
           <div className="axv-set-kv">
-            <span>默认</span>
+            <span>{tt("默认")}</span>
             <b className="axv-set-mono">{p.wsState.defaultPath}</b>
           </div>
         ) : null}
@@ -239,13 +242,13 @@ export function SettingsPanel(p: SettingsPanelProps) {
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
               folder_open
             </span>
-            选择目录
+            {tt("选择目录")}
           </button>
           <button className="axv-set-btn" onClick={p.onUseDefault}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
               settings_backup_restore
             </span>
-            恢复默认
+            {tt("恢复默认")}
           </button>
         </div>
         {p.wsState?.mode === "native" && p.wsState.allFiles === false ? (
@@ -253,12 +256,11 @@ export function SettingsPanel(p: SettingsPanelProps) {
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
               shield
             </span>
-            开启「所有文件访问」（默认目录在存储根下，必须开）
+            {tt("开启「所有文件访问」（默认目录在存储根下，必须开）")}
           </button>
         ) : null}
         <div className="axv-set-hint">
-          默认目录：APK 下 <code>/AndroidUIIDE/Project</code>；网页版由你授权一个文件夹（授权会记住）。
-          自定义目录失效时会自动回落到默认目录，两者都不会留空。
+          {tt("默认目录：APK 下 /AndroidUIIDE/Project；网页版由你授权一个文件夹（授权会记住）。自定义目录失效时会自动回落到默认目录，两者都不会留空。")}
         </div>
       </div>
 
@@ -301,7 +303,7 @@ export function SettingsPanel(p: SettingsPanelProps) {
           {tr("set.preview", "预览")}
         </button>
         <label className="axv-set-row">
-          <span>显示系统状态栏 / 导航栏</span>
+          <span>{tt("显示系统状态栏 / 导航栏")}</span>
           <input
             type="checkbox"
             checked={p.showSystemBars}
@@ -309,7 +311,7 @@ export function SettingsPanel(p: SettingsPanelProps) {
           />
         </label>
         <label className="axv-set-row">
-          <span>控件提示（缺资源红框等）</span>
+          <span>{tt("控件提示（缺资源红框等）")}</span>
           <input
             type="checkbox"
             checked={p.showIssues}
@@ -319,8 +321,8 @@ export function SettingsPanel(p: SettingsPanelProps) {
         {/* M92：真机 values-night —— 登录主题属性与颜色都跟浅色分开 */}
         <label className="axv-set-row">
           <span>
-            深色模式（values-night）
-            {p.hasNightTheme ? <i className="axv-set-tag">已读到夜间主题</i> : null}
+            {tt("深色模式（values-night）")}
+            {p.hasNightTheme ? <i className="axv-set-tag">{tt("已读到夜间主题")}</i> : null}
           </span>
           <input
             type="checkbox"
@@ -330,20 +332,20 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </label>
         <div className="axv-set-hint">
           {p.hasNightTheme
-            ? "按工程 values-night/ 的主题属性与颜色渲染，跟手机开深色模式看到的一致"
-            : "工程里没读到 values-night/，开启后只能用默认深色底盘"}
+            ? tt("按工程 values-night/ 的主题属性与颜色渲染，跟手机开深色模式看到的一致")
+            : tt("工程里没读到 values-night/，开启后只能用默认深色底盘")}
         </div>
         {/* M93：多语言预览 */}
         <div className="axv-set-kv">
-          <span>预览语言（values-*）</span>
+          <span>{tt("预览语言（values-*）")}</span>
         </div>
         <select
           className="axv-tb-select"
-          aria-label="预览语言"
+          aria-label={tt("预览语言")}
           value={p.previewLocale}
           onChange={(e) => p.onPreviewLocale(e.target.value)}
         >
-          <option value="">默认 values</option>
+          <option value="">{tt("默认 values")}</option>
           {p.locales.map((l) => (
             <option key={l} value={l}>
               {l}
@@ -352,8 +354,8 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </select>
         <div className="axv-set-hint">
           {p.locales.length
-            ? "@string 引用会按所选语言取值，用来检查长文案 / 小语种会不会把界面撑坏"
-            : "工程里没读到 values-<语言>/strings.xml（导入 res 目录后会出现）"}
+            ? tt("@string 引用会按所选语言取值，用来检查长文案 / 小语种会不会把界面撑坏")
+            : tt("工程里没读到 values-{lang}/strings.xml（导入 res 目录后会出现）", { lang: "<语言>" })}
         </div>
       </div>
 
@@ -371,11 +373,11 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </button>
 
         <div className="axv-set-kv">
-          <span>高亮风格</span>
+          <span>{tt("高亮风格")}</span>
         </div>
         <select
           className="axv-tb-select"
-          aria-label="高亮风格"
+          aria-label={tt("高亮风格")}
           value={p.editorTheme.hl}
           onChange={(e) => p.onEditorTheme({ hl: e.target.value })}
         >
@@ -388,11 +390,11 @@ export function SettingsPanel(p: SettingsPanelProps) {
 
         <div className="axv-set-row">
           <span>
-            光标颜色
-            <i className="axv-set-tag">{p.theme === "dark" ? "深色" : "浅色"}</i>
+            {tt("光标颜色")}
+            <i className="axv-set-tag">{p.theme === "dark" ? tt("深色") : tt("浅色")}</i>
           </span>
           <ColorField
-            label="光标颜色"
+            label={tt("光标颜色")}
             value={ec.cursor}
             fallback={ecDefault.cursor}
             onChange={(v) => p.onEditorColor({ cursor: v })}
@@ -400,9 +402,9 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </div>
 
         <div className="axv-set-row">
-          <span>选中背景色</span>
+          <span>{tt("选中背景色")}</span>
           <ColorField
-            label="选中背景色"
+            label={tt("选中背景色")}
             value={ec.selBg}
             fallback={ecDefault.selBg}
             onChange={(v) => p.onEditorColor({ selBg: v })}
@@ -410,9 +412,9 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </div>
 
         <div className="axv-set-row">
-          <span>选中文字颜色</span>
+          <span>{tt("选中文字颜色")}</span>
           <ColorField
-            label="选中文字颜色"
+            label={tt("选中文字颜色")}
             value={ec.selFg}
             fallback={ecDefault.selFg}
             allowTransparent
@@ -421,14 +423,14 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </div>
 
         <label className="axv-set-row">
-          <span>字号</span>
+          <span>{tt("字号")}</span>
           <span className="axv-set-range">
             <input
               type="range"
               min={FONT_SIZE_MIN}
               max={FONT_SIZE_MAX}
               step={1}
-              aria-label="代码字号"
+              aria-label={tt("代码字号")}
               value={p.editorTheme.fontSize}
               onChange={(e) => p.onEditorTheme({ fontSize: Number(e.target.value) })}
             />
@@ -437,23 +439,23 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </label>
 
         <label className="axv-set-row">
-          <span>缩进宽度</span>
+          <span>{tt("缩进宽度")}</span>
           <span className="axv-set-range">
             <input
               type="range"
               min={INDENT_MIN}
               max={INDENT_MAX}
               step={1}
-              aria-label="代码缩进宽度"
+              aria-label={tt("代码缩进宽度")}
               value={p.editorTheme.indent}
               onChange={(e) => p.onEditorTheme({ indent: Number(e.target.value) })}
             />
-            <b>{p.editorTheme.indent} 空格</b>
+            <b>{tt("{n} 空格", { n: p.editorTheme.indent })}</b>
           </span>
         </label>
 
         <label className="axv-set-row">
-          <span>高亮当前行</span>
+          <span>{tt("高亮当前行")}</span>
           <input
             type="checkbox"
             checked={p.editorTheme.showCur}
@@ -462,9 +464,9 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </label>
 
         <div className="axv-set-row">
-          <span>当前行背景色</span>
+          <span>{tt("当前行背景色")}</span>
           <ColorField
-            label="当前行背景色"
+            label={tt("当前行背景色")}
             value={ec.curBg}
             fallback={ecDefault.curBg}
             disabled={!p.editorTheme.showCur}
@@ -476,10 +478,10 @@ export function SettingsPanel(p: SettingsPanelProps) {
           <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
             settings_backup_restore
           </span>
-          恢复代码编辑器默认
+          {tt("恢复代码编辑器默认")}
         </button>
         <div className="axv-set-hint">
-          只影响「代码」tab 的显示，不改号出的 XML。选中文字设为不透明背景时才完全盖住底层高亮字。
+          {tt("只影响「代码」tab 的显示，不改导出的 XML。选中文字设为不透明背景时才完全盖住底层高亮字。")}
         </div>
       </div>
 
@@ -496,18 +498,18 @@ export function SettingsPanel(p: SettingsPanelProps) {
           {tr("set.data", "数据")}
         </button>
         <div className="axv-set-hint">
-          布局、资源与生成的图标都自动存在本机浏览器（localStorage），关页面不丢。
+          {tt("布局、资源与生成的图标都自动存在本机浏览器（localStorage），关页面不丢。")}
         </div>
         <button className="axv-set-btn" onClick={p.onSaveXml}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
             save
           </span>
-          立即导出当前 XML
+          {tt("立即导出当前 XML")}
         </button>
         <button
           className="axv-set-btn axv-set-btn-danger"
           onClick={() => {
-            if (!window.confirm("清空本机所有缓存（布局 / 资源 / 生成的图标 / 文件列表）？此操作不可撤销。")) return;
+            if (!window.confirm(tt("清空本机所有缓存（布局 / 资源 / 生成的图标 / 文件列表）？此操作不可撤销。"))) return;
             try {
               Object.keys(window.localStorage)
                 .filter((k) => k.startsWith("axv."))
@@ -521,7 +523,7 @@ export function SettingsPanel(p: SettingsPanelProps) {
           <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
             delete
           </span>
-          清空本机缓存并重启
+          {tt("清空本机缓存并重启")}
         </button>
       </div>
     </div>

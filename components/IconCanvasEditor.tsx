@@ -24,6 +24,7 @@ import {
   shapesToModel,
   smoothPath,
   toCss,
+  translatePath,
   translateShape,
   unionBox,
   alignShapes,
@@ -36,6 +37,7 @@ import {
   type Mat,
 } from "@/lib/xml/canvas-shapes";
 import { IconPickerPanel } from "./IconPickerPanel";
+import { textToPathData } from "@/lib/xml/text-to-path";
 import { ColorPicker } from "./ColorPicker";
 import { parseColorOr } from "@/lib/xml/color-argb";
 
@@ -1127,6 +1129,62 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   }, [close, duplicateSel, groupSel, redo, removeSel, sel, shapes, undo, ungroupSel]);
 
   /* ---------------- 输出 ---------------- */
+  /** 文字图层 → path 图层：用 canvas 追踪字形轮廓（vector 不支持 <text>）；失败返回 null */
+  const textShapeToPath = useCallback(
+    (s: DrawShape): DrawShape | null => {
+      if (s.type !== "text") return null;
+      const r = textToPathData(s.text, FONT_STACKS[s.font ?? "sans"] ?? FONT_STACKS.sans, {
+        size: s.size,
+        bold: s.bold,
+      });
+      if (!r) return null;
+      return {
+        id: s.id,
+        type: "path",
+        d: translatePath(r.d, s.x, s.y),
+        fill: s.fill,
+        stroke: s.outline ? s.stroke : "none",
+        strokeWidth: s.outline ? s.strokeWidth : 0,
+        alpha: s.alpha,
+        rot: s.rot,
+        locked: s.locked,
+        hidden: s.hidden,
+        group: s.group,
+      } as DrawShape;
+    },
+    [],
+  );
+
+  /** 把指定文字图层就地换成 path（保持图层顺序与 id，可撤销） */
+  const convertText = (ids: string[]) => {
+    const target = new Set(ids);
+    let done = 0;
+    let failed = 0;
+    const next: DrawShape[] = [];
+    for (const s of shapes) {
+      if (s.type === "text" && target.has(s.id)) {
+        const p = textShapeToPath(s);
+        if (p) {
+          next.push(p);
+          done += 1;
+        } else {
+          next.push(s);
+          failed += 1;
+        }
+      } else {
+        next.push(s);
+      }
+    }
+    if (!done) {
+      setErr("文字转 path 失败（画布不可用或内容为空）");
+      return;
+    }
+    pushHistory();
+    setShapes(next);
+    setSel((list) => list.filter((id) => next.some((s) => s.id === id)));
+    setErr(failed ? `${done} 个文字已转成 path，${failed} 个转换失败` : "");
+  };
+
   const model = useMemo(() => {
     /* 背景色：导出成铺满视口的底层矩形（vector 没有背景属性） */
     const withBg: DrawShape[] = bg
@@ -1148,8 +1206,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       : shapes;
     return shapesToModel(withBg, meta);
   }, [bg, shapes, meta]);
-  /** 文字图元数量：导出时会被忽略，要提醒 */
-  const textCount = useMemo(() => shapes.filter((s) => s.type === "text" && !s.hidden).length, [shapes]);
   const outXml = useMemo(() => buildVectorXml(model, resName || "ic_icon"), [model, resName]);
 
   const save = () => {
@@ -1162,11 +1218,49 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       setErr(`已存在同名资源 ${safe}`);
       return;
     }
-    if (!model.paths.length) {
-      setErr(textCount ? "画布里只有文字：Android vector 不支持文字，请先把文字换成图形或路径" : "画布是空的，先画点东西");
+
+    /* 文字图层：vector 不支持 <text>，保存前自动追踪成 path */
+    let converted = 0;
+    let textLeft = 0;
+    const finalShapes: DrawShape[] = [];
+    for (const s of shapes) {
+      if (s.type === "text") {
+        const p = textShapeToPath(s);
+        if (p) {
+          finalShapes.push(p);
+          converted += 1;
+          continue;
+        }
+        textLeft += 1;
+      }
+      finalShapes.push(s);
+    }
+    if (converted) setShapes(finalShapes);
+
+    const withBg: DrawShape[] = bg
+      ? [
+          {
+            id: "__bg",
+            type: "rect",
+            x: 0,
+            y: 0,
+            w: meta.vw,
+            h: meta.vh,
+            fill: bg,
+            stroke: "none",
+            strokeWidth: 0,
+            alpha: 1,
+          },
+          ...finalShapes,
+        ]
+      : finalShapes;
+    const finalModel = converted ? shapesToModel(withBg, meta) : model;
+
+    if (!finalModel.paths.length) {
+      setErr(textLeft ? "画布里只有文字，而且转换失败：先改成图形再保存" : "画布是空的，先画点东西");
       return;
     }
-    onSave(safe, buildVectorXml(model, safe));
+    onSave(safe, buildVectorXml(finalModel, safe));
   };
 
   /* ---------------- 从图标库换字形（M88：图标库直接给已换算好的 shapes） ---------------- */
@@ -1743,7 +1837,10 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   </label>
                   <div className="axv-cv-textnote">
                     <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>warning</span>
-                    文字只用于画布查看：Android vector 不支持 &lt;text&gt;，保存时会被忽略。
+                    Android vector 不支持 &lt;text&gt;：保存时会自动把文字追踪成 path（可撤销），也可以现在手动转。
+                    <button className="axv-cv-mini" onClick={() => convertText(sel.length ? sel : [cur.id])}>
+                      文字转 path
+                    </button>
                   </div>
                 </div>
               ) : null}

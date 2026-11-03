@@ -37,6 +37,12 @@ export interface ResourceExtras {
   styles: Record<string, StyleRecord>;
   /** M2x：?attr/xxx 主题属性（从 Theme* 样式收集，名 → 原始值） */
   themeAttrs?: Record<string, string>;
+  /** M92：values-night/ 里的主题属性（深色模式） */
+  themeAttrsNight?: Record<string, string>;
+  /** M92：values-night/colors.xml（名称 → 原始色值） */
+  colorsNight?: Record<string, string>;
+  /** M93：values-<locale>/strings.xml（限定符 → 名 → 值） */
+  stringsByLocale?: Record<string, Record<string, string>>;
   /** 已读入的相对路径（提示用户读了什么） */
   sourceFiles: string[];
   /** 各类计数，给 UI 打提示 */
@@ -66,6 +72,59 @@ function densityScore(dir: string): number {
   return 200; // 无后缀（drawable/）优先于 ldpi/hdpi
 }
 
+/**
+ * M92：values-xxx 目录的限定符 → { night, locale }
+ * - values-night / values-night-v31 → night
+ * - values-en / values-zh-rCN / values-zh-rCN-night → locale
+ * - values-v21 / values-land / values-sw600dp → 都不是（继续忽略，交给屏幕尺寸逻辑）
+ */
+export function parseQualifier(qual: string): { night: boolean; locale: string } {
+  const toks = qual.split("-").filter(Boolean);
+  let night = false;
+  let locale = "";
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (t === "night") {
+      night = true;
+      continue;
+    }
+    if (/^v\d+$/.test(t)) continue;
+    if (/^[a-z]{2,3}$/.test(t)) {
+      let l = t;
+      if (toks[i + 1] && /^r[A-Z]{2}$/.test(toks[i + 1])) {
+        l += "-" + toks[i + 1];
+        i++;
+      }
+      if (!locale) locale = l;
+    }
+  }
+  return { night, locale };
+}
+
+/** 反解 XML 实体（字符串值里的 &amp; 之类） */
+export function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_m, d: string) => String.fromCharCode(Number(d)))
+    .replace(/&amp;/g, "&");
+}
+
+/** 抽 <string>/<color> 到 map（locale + night 两套用，不走 mergeResourceFragment） */
+export function parseValuesInto(
+  xml: string,
+  kind: "string" | "color",
+  out: Record<string, string>,
+): void {
+  const re = new RegExp(`<${kind}\\s+name="([^"]+)"\\s*>([\\s\\S]*?)</${kind}>`, "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml)) !== null) {
+    out[m[1]] = decodeXmlEntities(m[2].trim());
+  }
+}
+
 function relPath(item: ResUploadItem): string {
   const p = item.path && item.path.length > item.name.length ? item.path : item.name;
   return p.replace(/\\/g, "/");
@@ -89,6 +148,12 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
 
   const valuesParts: string[] = [];
   const rawStyles = new Map<string, { parent?: string; attrs: Record<string, string> }>();
+  /** M92：values-night 里的 style/theme（深色模式） */
+  const rawStylesNight = new Map<string, { parent?: string; attrs: Record<string, string> }>();
+  /** M92：values-night/colors.xml —— @color 在深色下的取值 */
+  const colorsNight: Record<string, string> = {};
+  /** M93：values-<locale>/strings.xml —— 限定符 → 名 → 值 */
+  const stringsByLocale: Record<string, Record<string, string>> = {};
   /** 同名图片按密度择优：name → {score, url} */
   const best = new Map<string, { score: number; url: string }>();
 
@@ -102,23 +167,40 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
     const looksDrawable = guessed && !looksValues;
 
     // ---- values/*.xml：string/dimen/color + styles ----
-    const inValues = /\/values(-[a-z]+)?\//.test("/" + rel) || /^values(-[a-z]+)?\//.test(rel);
+    const vq = rel.match(/(?:^|\/)values(-[A-Za-z0-9_-]+)?\//);
+    const inValues = !!vq;
     if (inValues || looksValues) {
       if (!file.endsWith(".xml")) continue;
-      // 只认默认 values/（不带限定符），避免 -night/-v21 覆盖
-      const inDefaultValues = /(^|\/)values\//.test(rel) || looksValues;
-      if (!inDefaultValues) continue;
+      const qual = looksValues && !vq ? "" : vq?.[1] ?? "";
+      const info = parseQualifier(qual);
+      const isDefault = qual === "";
+      // M92/M93：非默认限定符只接「夜间」和「语言」两套，其余（-v21/-land/-sw600dp）仍然忽略
+      if (!isDefault && !info.night && !info.locale) continue;
       const text = await item.file.text();
-      if (/<(string|dimen|color)[\s>]/.test(text)) {
-        valuesParts.push(text);
-        extras.counts.values++;
-      }
-      if (file === "styles.xml" || file === "themes.xml") {
-        parseStylesXml(text, rawStyles);
-        extras.counts.styles = rawStyles.size;
+
+      if (isDefault) {
+        if (/<(string|dimen|color)[\s>]/.test(text)) {
+          valuesParts.push(text);
+          extras.counts.values++;
+        }
+        if (file === "styles.xml" || file === "themes.xml") {
+          parseStylesXml(text, rawStyles);
+          extras.counts.styles = rawStyles.size;
+        }
+      } else if (info.locale) {
+        // M93：values-<locale>/strings.xml → 该语言文案表
+        const bucket = (stringsByLocale[info.locale] ??= {});
+        parseValuesInto(text, "string", bucket);
+        if (file === "styles.xml" || file === "themes.xml") {
+          parseStylesXml(text, rawStyles); // 语言包里的样式极少，合进主线
+        }
+      } else if (info.night) {
+        // M92：values-night —— 主题与颜色单独一套，预览切深色时优先
+        if (file === "styles.xml" || file === "themes.xml") parseStylesXml(text, rawStylesNight);
+        if (file === "colors.xml") parseValuesInto(text, "color", colorsNight);
       }
       extras.sourceFiles.push(rel);
-      upsertTree(tree, rel, item.file);
+      upsertTree(tree, rel, item.file, text);
       continue;
     }
 
@@ -181,19 +263,21 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
 
   // M2x：?attr/xxx 主题属性表——从 Theme* 样式（含 parent 链）里收集 item
   // 后声明的覆盖先声明的（等同于后加载的 styles 覆盖），只留原始值（颜色引用在 resolve 时再解）
-  const themeAttrs: Record<string, string> = {};
-  for (const [name, st] of rawStyles) {
-    const isTheme = /^Theme/i.test(name) || /theme/i.test(name);
-    if (!isTheme) continue;
-    const expanded = extras.styles[name]?.attrs ?? st.attrs;
-    for (const [k, v] of Object.entries(expanded)) {
-      // 只收能当颜色/尺寸用的（跳过后天属性如 windowActionBar=true）
-      if (/^(color|.*Color|textColor|.*Tint)/.test(k) || /^#[0-9a-f]/i.test(v) || /^@color\//.test(v) || /^\?attr\//.test(v)) {
-        themeAttrs[k] = v;
-      }
-    }
-  }
+  const themeAttrs = collectThemeAttrs(rawStyles, extras.styles);
   if (Object.keys(themeAttrs).length > 0) extras.themeAttrs = themeAttrs;
+
+  // M92：深色模式一套（values-night）
+  if (rawStylesNight.size > 0) {
+    const expandedNight = new Map<string, { parent?: string; attrs: Record<string, string> }>();
+    for (const [name, st] of rawStylesNight) {
+      const expanded = expandStyle(name, st, rawStylesNight, new Set());
+      expandedNight.set(name, { parent: expanded.parent, attrs: expanded.attrs });
+    }
+    const nightAttrs = collectThemeAttrs(rawStylesNight, Object.fromEntries(expandedNight));
+    if (Object.keys(nightAttrs).length > 0) extras.themeAttrsNight = nightAttrs;
+  }
+  if (Object.keys(colorsNight).length > 0) extras.colorsNight = colorsNight;
+  if (Object.keys(stringsByLocale).length > 0) extras.stringsByLocale = stringsByLocale;
 
   extras.tree = tree as ResTreeDir;
   return extras;
@@ -247,8 +331,34 @@ interface RawStyle {
 }
 
 /** 解析 styles.xml / themes.xml：<style name parent> + 内部 <item name> */
-function parseStylesXml(xml: string, out: Map<string, RawStyle>) {
-  const styleRe = /<style\s+([^>]*)>([\s\S]*?)<\/style>/g;
+/**
+ * M92：从一批 style（含展开结果）里抽出「能当颜色/尺寸用」的主题属性。
+ * expanded 传已展开的 style 表（夜间模式那边两者不同）；不传则用 raw 的 attrs。
+ */
+function collectThemeAttrs(
+  raw: Map<string, RawStyle>,
+  expanded?: Record<string, { parent?: string; attrs: Record<string, string> }>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [name, st] of raw) {
+    if (!/theme/i.test(name)) continue;
+    const attrs = expanded?.[name]?.attrs ?? st.attrs;
+    for (const [k, v] of Object.entries(attrs)) {
+      // 只收能当颜色/尺寸用的（跳过后天属性如 windowActionBar=true）
+      if (
+        /^(color|.*Color|textColor|.*Tint)/.test(k) ||
+        /^#[0-9a-f]/i.test(v) ||
+        /^@color\//.test(v) ||
+        /^\?attr\//.test(v)
+      ) {
+        out[k] = v;
+      }
+    }
+  }
+  return out;
+}
+
+function parseStylesXml(xml: string, out: Map<string, RawStyle>) {  const styleRe = /<style\s+([^>]*)>([\s\S]*?)<\/style>/g;
   let m: RegExpExecArray | null;
   while ((m = styleRe.exec(xml)) !== null) {
     const head = m[1];

@@ -53,6 +53,16 @@ export interface SettingsPanelProps {
   // 渲染设备（AppCompat / Material3）
   renderTheme: RenderTheme;
   onRenderTheme: (t: RenderTheme) => void;
+  /** M92：深色模式预览（values-night） */
+  previewNight: boolean;
+  onPreviewNight: (v: boolean) => void;
+  /** 工程里是否读到 values-night 的主题 */
+  hasNightTheme: boolean;
+  /** M93：多语言预览 */
+  previewLocale: string;
+  onPreviewLocale: (v: string) => void;
+  /** 工程里读到的语言限定符列表 */
+  locales: string[];
 
   // 预览开关
   showSystemBars: boolean;
@@ -306,6 +316,45 @@ export function SettingsPanel(p: SettingsPanelProps) {
             onChange={(e) => p.onShowIssues(e.target.checked)}
           />
         </label>
+        {/* M92：真机 values-night —— 登录主题属性与颜色都跟浅色分开 */}
+        <label className="axv-set-row">
+          <span>
+            深色模式（values-night）
+            {p.hasNightTheme ? <i className="axv-set-tag">已读到夜间主题</i> : null}
+          </span>
+          <input
+            type="checkbox"
+            checked={p.previewNight}
+            onChange={(e) => p.onPreviewNight(e.target.checked)}
+          />
+        </label>
+        <div className="axv-set-hint">
+          {p.hasNightTheme
+            ? "按工程 values-night/ 的主题属性与颜色渲染，跟手机开深色模式看到的一致"
+            : "工程里没读到 values-night/，开启后只能用默认深色底盘"}
+        </div>
+        {/* M93：多语言预览 */}
+        <div className="axv-set-kv">
+          <span>预览语言（values-*）</span>
+        </div>
+        <select
+          className="axv-tb-select"
+          aria-label="预览语言"
+          value={p.previewLocale}
+          onChange={(e) => p.onPreviewLocale(e.target.value)}
+        >
+          <option value="">默认 values</option>
+          {p.locales.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+        <div className="axv-set-hint">
+          {p.locales.length
+            ? "@string 引用会按所选语言取值，用来检查长文案 / 小语种会不会把界面撑坏"
+            : "工程里没读到 values-<语言>/strings.xml（导入 res 目录后会出现）"}
+        </div>
       </div>
 
       <div className={groupCls(5)}>

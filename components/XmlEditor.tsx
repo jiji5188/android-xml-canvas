@@ -729,6 +729,21 @@ export function XmlEditor() {
     }
   });
   const [showSystemBars, setShowSystemBars] = useState(true);
+  /** M92：预览深色模式（工程 values-night）/ M93：预览语言（values-<locale>） */
+  const [previewNight, setPreviewNight] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem("axv.previewNight") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [previewLocale, setPreviewLocale] = useState<string>(() => {
+    try {
+      return window.localStorage.getItem("axv.previewLocale") || "";
+    } catch {
+      return "";
+    }
+  });
   const [showIssues, setShowIssues] = useState(true);
 
   // M16h：应用配色方案（只影响编辑器外壳，不影响导出/预览）
@@ -829,6 +844,22 @@ export function XmlEditor() {
       /* ignore */
     }
   }, [renderTheme]);
+
+  // M92/M93：深色模式与预览语言持久化
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("axv.previewNight", previewNight ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [previewNight]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("axv.previewLocale", previewLocale);
+    } catch {
+      /* ignore */
+    }
+  }, [previewLocale]);
 
   // M37：代码编辑器外观（CSS 变量 + localStorage 持久化）
   // M90b：光标/选区/当前行 4 个颜色分浅色、深色两套，按当前主题取
@@ -1441,11 +1472,16 @@ export function XmlEditor() {
       base = {
         ...base,
         themeAttrs: resExtras.themeAttrs,
+        themeAttrsNight: resExtras.themeAttrsNight,
+        colorsNight: resExtras.colorsNight,
+        stringsByLocale: resExtras.stringsByLocale,
+        nightMode: previewNight,
+        locale: previewLocale,
         styles: resExtras.styles,
       };
     }
     return base;
-  }, [resourceFragment, sampleValues, resExtras, generatedDataUrls, generatedVectorNames, generatedShapeXml]);
+  }, [resourceFragment, sampleValues, resExtras, generatedDataUrls, generatedVectorNames, generatedShapeXml, previewNight, previewLocale]);
 
   /** M3g/M3h：把已生成资源（图标矢量 + 自定义形状）也并进 resExtras，导出 res 包时能带上 */
   const resExtrasAll = useMemo(() => {
@@ -3489,6 +3525,12 @@ const findResolved = findResolvedNode;
               onRequestAllFiles={() => wsRequestAllFiles()}
               renderTheme={renderTheme}
               onRenderTheme={setRenderTheme}
+              previewNight={previewNight}
+              onPreviewNight={setPreviewNight}
+              hasNightTheme={!!resExtras?.themeAttrsNight && Object.keys(resExtras.themeAttrsNight).length > 0}
+              previewLocale={previewLocale}
+              onPreviewLocale={setPreviewLocale}
+              locales={Object.keys(resExtras?.stringsByLocale ?? {}).sort()}
               showSystemBars={showSystemBars}
               onShowSystemBars={setShowSystemBars}
               showIssues={showIssues}

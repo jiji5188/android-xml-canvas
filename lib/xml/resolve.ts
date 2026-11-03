@@ -64,7 +64,8 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
   }
   if (v.startsWith("@color/")) {
     const name = v.slice("@color/".length);
-    const c = res.colors[name];
+    // M92：深色模式优先用 values-night/colors.xml
+    const c = (res.nightMode ? res.colorsNight?.[name] : undefined) ?? res.colors[name];
     // M4v：颜色表里存的是项目原值（很多项目写 #AARRGGBB）——必须转成 CSS，
     // 否则浏览器把 8 位当 #RRGGBBAA，#FF212121 会变成半透明红
     if (c !== undefined) return argbToCss(c);
@@ -74,7 +75,8 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
   if (v.startsWith("?attr/")) {
     const name = v.slice("?attr/".length);
     // M2x：上传的主题（styles.xml 里 Theme* 的 item）最优先——相当于运行时主题注入
-    const themeV = res.themeAttrs?.[name];
+    // M92：深色模式先看 values-night 那套
+    const themeV = (res.nightMode ? res.themeAttrsNight?.[name] : undefined) ?? res.themeAttrs?.[name];
     if (themeV !== undefined) {
       if (themeV.startsWith("@color/") || themeV.startsWith("#")) return resolveColor(themeV, res, issues, path, prop);
       if (themeV.startsWith("?attr/")) return themeV; // 嵌套引用不再深入，保持原样交给 CSS
@@ -121,13 +123,29 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
   return "#888888";
 }
 
+/** M93：按当前预览语言取文案（未命中回落默认 values） */
+export function localeString(res: ResourceTable, name: string): string | undefined {
+  const loc = res.locale;
+  if (loc) {
+    const bucket = res.stringsByLocale?.[loc];
+    if (bucket && bucket[name] !== undefined) return bucket[name];
+    // zh-rCN 退 zh、en-rUS 退 en
+    const base = loc.split("-")[0];
+    if (base && base !== loc) {
+      const b2 = res.stringsByLocale?.[base];
+      if (b2 && b2[name] !== undefined) return b2[name];
+    }
+  }
+  return res.strings[name];
+}
+
 /** 文本解析：字面量 / @string/xxx / 兜底 */
 export function resolveText(raw: string, res: ResourceTable, issues: XmlIssue[], path: string): string {
   const v = raw.trim();
   if (v === "") return "";
   if (v.startsWith("@string/")) {
     const name = v.slice("@string/".length);
-    const s = res.strings[name];
+    const s = localeString(res, name);
     if (s !== undefined) return s;
     issues.push({ level: "warn", nodePath: path, message: `text 引用 @string/${name} 未定义，原样显示` });
     return v;

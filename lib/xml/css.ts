@@ -10,6 +10,7 @@ import { solveRelativeChildren } from "./relative";
 import { expandIncludes, repath } from "./include";
 import { SCREEN_DP, phoneBodyDp, readableOn } from "./theme";
 import { DEFAULT_RENDER_THEME, type RenderTheme } from "./theme";
+import { buildPalette } from "./theme-palette";
 import { vectorToDataUrl } from "./vector-svg";
 
 const DP = (n: number, scale = 2) => n * scale;
@@ -431,6 +432,10 @@ export function buildRenderModel(
   /** M16d：渲染主题（appcompat 默认，跟真机 AIDE 一致；material3 可选） */
   theme: RenderTheme = DEFAULT_RENDER_THEME,
 ): RenderModel {
+  // M92：预览调色板——工程主题（含 values-night）算出的主色/底色/文字色
+  const palette = res.palette ?? buildPalette(res);
+  /** 工程主题里的主色；没读到主题时保持工具原本的中性灰白 */
+  const themedPrimary = palette.fromProject ? palette.primary : NEUTRAL_FILL;
   const appcompat = theme !== "material3";
   const issues: import("./types").XmlIssue[] = [];
   const screenW = screen?.w ?? SCREEN_DP.w;
@@ -754,7 +759,7 @@ export function buildRenderModel(
       style.boxSizing = "border-box";
       const ts = (attrs["textSize"] as number) || 14;
       style.fontSize = `${DP(ts, scale)}px`;
-      const tc = (attrs["textColor"] as string) || "#1D1B20";
+      const tc = (attrs["textColor"] as string) || palette.onSurface;
       style.color = tc;
       const align = (attrs["textAlignment"] as string) || "";
       const gRaw = (attrs["gravity"] as string) || "";
@@ -810,7 +815,7 @@ export function buildRenderModel(
         style.justifyContent = style.justifyContent ?? "center";
         style.alignItems = style.alignItems ?? "center";
         style.backgroundColor = style.backgroundColor ?? "#E8E8EC";
-        style.color = style.color ?? "#1D1B20";
+        style.color = style.color ?? palette.onSurface;
         style.borderRadius = style.borderRadius ?? `${DP(4, scale)}px`;
         style.cursor = "pointer";
       }
@@ -843,7 +848,7 @@ export function buildRenderModel(
         // 以前是 style.backgroundColor = bg || 主色紫，会把 shape 的 solid 抹成灰色/默认色。
         const tint = (attrs["backgroundTint"] as string) || "";
         if (tint && !bg) style.backgroundColor = tint;
-        if (!style.backgroundColor && !style.backgroundImage) style.backgroundColor = NEUTRAL_FILL;
+        if (!style.backgroundColor && !style.backgroundImage) style.backgroundColor = themedPrimary;
         // 文字色：显式 textColor > 按背景亮度自动反色（tc 有默认值不能直接拿来做判断）
         const tcRaw = (attrs["textColor"] as string) || "";
         const solidBg = typeof style.backgroundColor === "string" ? style.backgroundColor : "";
@@ -865,7 +870,7 @@ export function buildRenderModel(
           if (appcompat) {
             // AppCompat：M3 描边按钮样式无效 → 退化成普通灰色实心按钮（真机就是这样）
             style.backgroundColor = "#E8E8EC";
-            style.color = tcRaw || "#1D1B20";
+            style.color = tcRaw || palette.onSurface;
           } else {
             style.backgroundColor = "transparent";
             style.border = `${DP(sW || 1, scale)}px solid ${sCol}`;
@@ -1110,7 +1115,7 @@ export function buildRenderModel(
       style.boxSizing = "border-box";
       style.minWidth = "0";
       style.minHeight = "0";
-      style.color = style.color || ((attrs["textColor"] as string) || "#1D1B20");
+      style.color = style.color || ((attrs["textColor"] as string) || palette.onSurface);
       style.fontSize = style.fontSize || `${DP((attrs["textSize"] as number) || 14, scale)}px`;
       if (cls === "axv-switch") {
         cs["--axv-ctl-w"] = `${DP(40, scale)}px`;
@@ -1390,7 +1395,7 @@ export function buildRenderModel(
       // M16d：AppCompat 里 Chip 没有 Material 主题支撑 → 退化成纯文字（真机就是「Chip可关闭」一行字）
       style.borderRadius = style.borderRadius ?? `${DP(appcompat ? 0 : 8, scale)}px`;
       style.backgroundColor = style.backgroundColor ?? (appcompat ? "transparent" : attrs["checked"] ? "#D0BCFF" : "#E8DEF8");
-      style.color = style.color ?? (appcompat ? "#1D1B20" : "#1D192B");
+      style.color = style.color ?? palette.onSurface;
       style.fontSize = style.fontSize === "28px" || !style.fontSize ? `${DP(14, scale)}px` : style.fontSize;
       style.flex = "0 0 auto";
     } else if (cls === "axv-chipgroup") {
@@ -1417,9 +1422,9 @@ export function buildRenderModel(
       if (attrs["checkedTab"]) style.boxShadow = `inset 0 -${DP(3, scale)}px 0 ${NEUTRAL_INK}`;
     } else if (cls === "axv-fab" || cls === "axv-fab-ext") {
       // M16d：AppCompat 下 FAB 没有 Material 主题的色/阴影 → 灰底方角块（真机截图就是这样）
-      const fabBg = (attrs["backgroundTint"] as string) || NEUTRAL_FILL;
+      const fabBg = (attrs["backgroundTint"] as string) || themedPrimary;
       style.backgroundColor = style.backgroundColor ?? fabBg;
-      style.color = style.color ?? "#1D1B20";
+      style.color = style.color ?? palette.onSurface;
       style.flex = "0 0 auto";
       style.display = "inline-flex";
       style.alignItems = "center";
@@ -1450,7 +1455,7 @@ export function buildRenderModel(
       style.width = style.width === "auto" || !style.width ? `${DP(120, scale)}px` : style.width;
       style.height = style.height === "auto" || !style.height ? `${DP(120, scale)}px` : style.height;
       style.fontSize = style.fontSize === "28px" || !style.fontSize ? `${DP(16, scale)}px` : style.fontSize;
-      style.color = style.color ?? "#1D1B20";
+      style.color = style.color ?? palette.onSurface;
     } else if (cls === "axv-toolbar") {
       style.display = "flex";
       style.flexDirection = "row";
@@ -1518,6 +1523,11 @@ export function buildRenderModel(
   };
 
   const rootNode = resolveAll(root, true);
+
+  // M92：根布局没写 background 时，用工程主题的窗口底色（Android 默认就是 windowBackground）
+  if (rootNode.style && palette.fromProject && !rootNode.style.backgroundColor && !rootNode.style.backgroundImage) {
+    rootNode.style.backgroundColor = palette.surface;
+  }
 
   // M2b：ConstraintLayout 子项约束定位（后处理：对每个 CL 节点求解直接子项）
   // M11z：算子节点可用宽高 = 本节点盒子尺寸 - 内边距。

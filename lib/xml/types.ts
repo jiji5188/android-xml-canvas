@@ -28,6 +28,19 @@ export interface XmlIssue {
 }
 
 /** 资源表：string/dimen/color 三类 + 上传的 res/ 目录附加资源 */
+export interface ThemePalette {
+  /** 主色（MaterialButton 底色、选中态） */
+  primary: string;
+  /** 主色上的文字/图标色 */
+  onPrimary: string;
+  /** 页面/窗口底色 */
+  surface: string;
+  /** 表面上的默认文字色 */
+  onSurface: string;
+  /** 是否来自工程主题（false = 工具默认中性色，旧观感不变） */
+  fromProject: boolean;
+}
+
 export interface ResourceTable {
   strings: Record<string, string>;
   dimens: Record<string, number>;   // 统一存 dp 数值
@@ -41,6 +54,18 @@ export interface ResourceTable {
   stringArrays?: Record<string, string[]>;
   /** M2x：?attr/xxx 主题属性（主题样式里收集到的 名 → 原始值），颜色引用在 resolve 时再展开 */
   themeAttrs?: Record<string, string>;
+  /** M92：深色模式主题属性（values-night），预览切夜间时优先于 themeAttrs */
+  themeAttrsNight?: Record<string, string>;
+  /** M92：values-night/colors.xml（名称 → 原始色值），深色下优先于 colors */
+  colorsNight?: Record<string, string>;
+  /** M92：预览是否深色模式 */
+  nightMode?: boolean;
+  /** M93：多语言文案表（限定符 → 名 → 值），如 { en: { app_name: "Demo" } } */
+  stringsByLocale?: Record<string, Record<string, string>>;
+  /** M93：当前预览语言限定符（"en" / "zh-rCN"）；空 = 默认 values */
+  locale?: string;
+  /** M92：从工程主题算出的预览调色板（按钮主色/窗口底色/文字色） */
+  palette?: ThemePalette;
   /** M2w：res/drawable/*.xml 里的 <shape> 原文（名 → xml），用来还原渐变/圆角/描边背景 */
   drawableXml?: Record<string, string>;
 }

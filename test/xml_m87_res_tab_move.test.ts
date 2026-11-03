@@ -9,7 +9,7 @@ describe("M87 抽屉加入资源 tab + 整体变换挪到排列", () => {
 
   it("抽屉 tab 为 6 个：样式 / 属性 / 排列 / 图层 / 资源 / 画布", () => {
     expect(src).toContain(
-      '[["style", "样式"], ["props", "属性"], ["align", "排列"], ["layers", "图层"], ["res", "资源"], ["board", "画布"]]',
+      '[["style", tt("样式")], ["props", tt("属性")], ["align", tt("排列")], ["layers", tt("图层")], ["res", tt("资源")], ["board", tt("画布")]]',
     );
     expect(src).toContain('useState<"style" | "props" | "align" | "layers" | "res" | "board">("style")');
   });

@@ -52,18 +52,20 @@ describe("M95 t()：中文原文当 key", () => {
 
 describe("M95 覆盖率护栏", () => {
   /** 已回填的组件：这些文件里不允许再出现未包 t() 的中文字面量 */
-  const CONVERTED = ["components/GenAssetsPanel.tsx"];
+  const CONVERTED = ["components/GenAssetsPanel.tsx", "components/IconCanvasEditor.tsx"];
 
   const root = path.resolve(__dirname, "..");
 
   function unwrapped(f: string): string[] {
-    const src = fs.readFileSync(path.join(root, f), "utf8");
+    const raw = fs.readFileSync(path.join(root, f), "utf8");
+    // 块注释换成等量空行，行号不变
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ""));
     const out: string[] = [];
     src.split("\n").forEach((line, i) => {
-      if (/^\s*(\/\/|\*|\/\*)/.test(line)) return; // 注释
-      if (!/[\u4e00-\u9fa5]/.test(line)) return;
-      if (/\bt\(|\btr\(|t\(`/.test(line)) return; // 已包
-      out.push(`${i + 1}: ${line.trim().slice(0, 80)}`);
+      const l = line.replace(/\/\/.*$/, ""); // 行尾注释
+      if (!/[\u4e00-\u9fa5]/.test(l)) return;
+      if (/\btt?\(|\btr\(|t\(`/.test(l)) return; // 已包
+      out.push(`${i + 1}: ${l.trim().slice(0, 80)}`);
     });
     return out;
   }

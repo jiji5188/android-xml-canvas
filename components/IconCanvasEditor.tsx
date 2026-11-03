@@ -7,6 +7,7 @@
 //   shapes ──shapesToModel──> VectorModel ──buildVectorXml──> drawable xml
 // 打开已有图标时反向：xml ──parseVectorModel──> VectorModel ──modelToShapes──> 每条 path 一个可编辑图元。
 
+import { t as tt } from "@/lib/i18n-src";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOverlayBack } from "@/lib/overlay-back";
@@ -75,16 +76,16 @@ const FONT_STACKS: Record<string, string> = {
 };
 
 const TOOLS: { t: Tool; icon: string; label: string; key?: string }[] = [
-  { t: "select", icon: "arrow_selector_tool", label: "选择", key: "V" },
-  { t: "pen", icon: "stylus_note", label: "画笔", key: "P" },
-  { t: "rect", icon: "crop_square", label: "矩形", key: "R" },
-  { t: "roundRect", icon: "rounded_corner", label: "圆角矩形" },
-  { t: "circle", icon: "circle", label: "圆形", key: "O" },
-  { t: "ellipse", icon: "tonality", label: "椭圆" },
-  { t: "line", icon: "show_chart", label: "直线", key: "L" },
-  { t: "polygon", icon: "pentagon", label: "多边形" },
-  { t: "star", icon: "star", label: "星形" },
-  { t: "text", icon: "title", label: "文字", key: "T" },
+  { t: "select", icon: "arrow_selector_tool", label: tt("选择"), key: "V" },
+  { t: "pen", icon: "stylus_note", label: tt("画笔"), key: "P" },
+  { t: "rect", icon: "crop_square", label: tt("矩形"), key: "R" },
+  { t: "roundRect", icon: "rounded_corner", label: tt("圆角矩形") },
+  { t: "circle", icon: "circle", label: tt("圆形"), key: "O" },
+  { t: "ellipse", icon: "tonality", label: tt("椭圆") },
+  { t: "line", icon: "show_chart", label: tt("直线"), key: "L" },
+  { t: "polygon", icon: "pentagon", label: tt("多边形") },
+  { t: "star", icon: "star", label: tt("星形") },
+  { t: "text", icon: "title", label: tt("文字"), key: "T" },
 ];
 
 const BLANK: Snapshot = {
@@ -444,7 +445,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             type: "text",
             x: p.x,
             y: p.y,
-            text: "文字",
+            text: tt("文字"),
             size: Math.max(2, meta.vw / 3),
             font: "sans",
             bold: false,
@@ -804,7 +805,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     if (!gids.size) return;
     const hasRot = [...gids].some((id) => Math.abs(groupById.get(id)?.rot ?? 0) > 0.001);
     if (hasRot) {
-      setErr("组里有旋转：解组没法把旋转烘回图形，请先把「旋转」调回 0°");
+      setErr(tt("组里有旋转：解组没法把旋转烘回图形，请先把「旋转」调回 0°"));
       return;
     }
     pushHistory();
@@ -1179,13 +1180,13 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       }
     }
     if (!done) {
-      setErr("文字转 path 失败（画布不可用或内容为空）");
+      setErr(tt("文字转 path 失败（画布不可用或内容为空）"));
       return;
     }
     pushHistory();
     setShapes(next);
     setSel((list) => list.filter((id) => next.some((s) => s.id === id)));
-    setErr(failed ? `${done} 个文字已转成 path，${failed} 个转换失败` : "");
+    setErr(failed ? tt("{done} 个文字已转成 path，{failed} 个转换失败", { done, failed }) : "");
   };
 
   const model = useMemo(() => {
@@ -1214,11 +1215,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const save = () => {
     const safe = resName.trim().replace(/[^a-zA-Z0-9_]/g, "_");
     if (!safe) {
-      setErr("资源名不能为空");
+      setErr(tt("资源名不能为空"));
       return;
     }
     if (safe !== name && existingNames.includes(safe)) {
-      setErr(`已存在同名资源 ${safe}`);
+      setErr(tt("已存在同名资源 {name}", { name: safe }));
       return;
     }
 
@@ -1260,7 +1261,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     const finalModel = converted ? shapesToModel(withBg, meta) : model;
 
     if (!finalModel.paths.length) {
-      setErr(textLeft ? "画布里只有文字，而且转换失败：先改成图形再保存" : "画布是空的，先画点东西");
+      setErr(textLeft ? tt("画布里只有文字，而且转换失败：先改成图形再保存") : tt("画布是空的，先画点东西"));
       return;
     }
     onSave(safe, buildVectorXml(finalModel, safe));
@@ -1379,15 +1380,15 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   if (kind === "bitmap" || kind === "other-xml") {
     const msg =
       kind === "bitmap"
-        ? "这是普通图片（png / jpg 等位图），不是矢量图标 —— 图标编辑器只能改 <vector> 资源。位图请直接用图片资源，或点下面的按钮从图标库重新选一个。"
-        : "这个文件不是标准 <vector>，暂时只能原样查看。可以点下面的按钮改用图标库里的字形。";
+        ? tt("这是普通图片（png / jpg 等位图），不是矢量图标 —— 图标编辑器只能改 <vector> 资源。位图请直接用图片资源，或点下面的按钮从图标库重新选一个。")
+        : tt("这个文件不是标准 <vector>，暂时只能原样查看。可以点下面的按钮改用图标库里的字形。");
     const body = (
-      <div className="axv-icon-page" role="dialog" aria-label="图标编辑器">
+      <div className="axv-icon-page" role="dialog" aria-label={tt("图标编辑器")}>
         <div className="axv-shape-head">
-          <button className="axv-icon-back" onClick={close} aria-label="返回编辑器" title="返回">
+          <button className="axv-icon-back" onClick={close} aria-label={tt("返回编辑器")} title={tt("返回")}>
             <span className="msr" aria-hidden="true">arrow_back</span>
           </button>
-          <span className="axv-shape-title">编辑图标 · {name}</span>
+          <span className="axv-shape-title">{tt("编辑图标")} · {name}</span>
         </div>
         <div className="axv-icon-page-body">
           <div className="axv-icon-ed-form">
@@ -1403,12 +1404,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   setShapes([]);
                   setSel([]);
                 }}
-              >
-                从空白画布开始
-              </button>
-              <button className="axv-btn axv-ghost" onClick={close}>
-                关闭
-              </button>
+              >{tt("从空白画布开始")}</button>
+              <button className="axv-btn axv-ghost" onClick={close}>{tt("关闭")}</button>
             </div>
             {xml ? <textarea className="axv-icon-ed-raw" readOnly value={xml} /> : null}
           </div>
@@ -1419,17 +1416,17 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   }
 
   const body = (
-    <div className="axv-icon-page axv-cv-page" role="dialog" aria-label="图标编辑器">
+    <div className="axv-icon-page axv-cv-page" role="dialog" aria-label={tt("图标编辑器")}>
       <div className="axv-shape-head">
-        <button className="axv-icon-back" onClick={close} aria-label="返回编辑器" title="返回">
+        <button className="axv-icon-back" onClick={close} aria-label={tt("返回编辑器")} title={tt("返回")}>
           <span className="msr" aria-hidden="true">arrow_back</span>
         </button>
-        <span className="axv-shape-title">编辑图标 · {name}</span>
+        <span className="axv-shape-title">{tt("编辑图标")} · {name}</span>
         <span className="axv-cv-head-tools">
-          <button className="axv-icon-btn" onClick={undo} title="撤销 (Ctrl+Z)" aria-label="撤销">
+          <button className="axv-icon-btn" onClick={undo} title={tt("撤销 (Ctrl+Z)")} aria-label={tt("撤销")}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>undo</span>
           </button>
-          <button className="axv-icon-btn" onClick={redo} title="重做 (Ctrl+Shift+Z)" aria-label="重做">
+          <button className="axv-icon-btn" onClick={redo} title={tt("重做 (Ctrl+Shift+Z)")} aria-label={tt("重做")}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>redo</span>
           </button>
         </span>
@@ -1438,7 +1435,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       <div className="axv-icon-page-body axv-cv-body">
         {/* 左：工具条 + 画布 */}
         <div className="axv-cv-left">
-          <div className="axv-cv-tools" role="toolbar" aria-label="绘制工具">
+          <div className="axv-cv-tools" role="toolbar" aria-label={tt("绘制工具")}>
             {TOOLS.map((t) => (
               <button
                 key={t.t}
@@ -1455,8 +1452,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             <button
               className={"axv-cv-tool" + (showGrid ? " on" : "")}
               onClick={() => setShowGrid((v) => !v)}
-              title="网格"
-              aria-label="网格"
+              title={tt("网格")}
+              aria-label={tt("网格")}
               aria-pressed={showGrid}
             >
               <span className="msr" aria-hidden="true">grid_on</span>
@@ -1464,20 +1461,20 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             <button
               className="axv-cv-tool"
               onClick={() => setZoom((z) => Math.max(0.4, Math.round((z - 0.1) * 10) / 10))}
-              title="缩小"
-              aria-label="缩小"
+              title={tt("缩小")}
+              aria-label={tt("缩小")}
             >
               <span className="msr" aria-hidden="true">zoom_out</span>
             </button>
             <button
               className="axv-cv-tool"
               onClick={() => setZoom((z) => Math.min(4, Math.round((z + 0.1) * 10) / 10))}
-              title="放大"
-              aria-label="放大"
+              title={tt("放大")}
+              aria-label={tt("放大")}
             >
               <span className="msr" aria-hidden="true">zoom_in</span>
             </button>
-            <button className="axv-cv-tool" onClick={() => setZoom(fitZoom())} title="复位缩放" aria-label="复位缩放">
+            <button className="axv-cv-tool" onClick={() => setZoom(fitZoom())} title={tt("复位缩放")} aria-label={tt("复位缩放")}>
               <span className="msr" aria-hidden="true">center_focus_strong</span>
             </button>
           </div>
@@ -1579,8 +1576,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               </svg>
             </div>
             <div className="axv-cv-meta">
-              {meta.w}×{meta.h}dp · viewport {meta.vw}×{meta.vh} · {shapes.length} 个图形
-              {sel.length ? ` · 选中 ${sel.length}` : ""}
+              {meta.w}×{meta.h}dp · viewport {meta.vw}×{meta.vh} · {shapes.length} {tt("个图形")}
+              {sel.length ? tt(" · 选中 {n}", { n: sel.length }) : ""}
             </div>
           </div>
         </div>
@@ -1590,8 +1587,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           type="button"
           className={"axv-cv-form-toggle" + (formOpen ? "" : " is-closed")}
           onClick={() => setFormOpen((v) => !v)}
-          aria-label={formOpen ? "收起参数面板" : "展开参数面板"}
-          title={formOpen ? "收起参数面板" : "展开参数面板"}
+          aria-label={formOpen ? tt("收起参数面板") : tt("展开参数面板")}
+          title={formOpen ? tt("收起参数面板") : tt("展开参数面板")}
         >
           <span className="msr" aria-hidden="true">
             {formOpen ? "chevron_right" : "chevron_left"}
@@ -1601,11 +1598,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           {!shapes.length ? (
             <div className="axv-icon-ed-warn">
               <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>info</span>
-              <span>
-                画布是空的：选左边工具画一个，或从图标库挑一个字形。
-                <button className="axv-btn axv-ghost" style={{ marginLeft: 8 }} onClick={() => setPicking(true)}>
-                  选择图标
-                </button>
+              <span>{tt("画布是空的：选左边工具画一个，或从图标库挑一个字形。")}<button className="axv-btn axv-ghost" style={{ marginLeft: 8 }} onClick={() => setPicking(true)}>{tt("选择图标")}</button>
               </span>
             </div>
           ) : null}
@@ -1614,7 +1607,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             <div className="axv-set-group">
               <div className="axv-set-label">
                 pathData
-                <span className="axv-cv-hint">· 可直接手改</span>
+                <span className="axv-cv-hint">{tt("· 可直接手改")}</span>
               </div>
               <textarea
                 className="axv-icon-ed-pathdata"
@@ -1629,7 +1622,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           <div className="axv-set-group">
             <button className="axv-set-btn" onClick={() => setShowRaw((v) => !v)}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
-              {showRaw ? "收起 XML" : "查看生成的 XML"}
+              {showRaw ? tt("收起 XML") : tt("查看生成的 XML")}
             </button>
             {showRaw ? <textarea className="axv-icon-ed-raw" readOnly value={outXml} /> : null}
           </div>
@@ -1639,9 +1632,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
         <div className={"axv-cv-sheet" + (sheetOpen ? "" : " is-collapsed")}>
           <div className="axv-cv-sheet-head" onClick={() => setSheetOpen((v) => !v)}>
             <span className="axv-cv-grabber" aria-hidden="true" />
-            <span className="axv-cv-sheet-title">样式</span>
+            <span className="axv-cv-sheet-title">{tt("样式")}</span>
             <div className="axv-cv-sheet-tabs" onClick={(e) => e.stopPropagation()}>
-              {([["style", "样式"], ["props", "属性"], ["align", "排列"], ["layers", "图层"], ["res", "资源"], ["board", "画布"]] as const).map(([k, label]) => (
+              {([["style", tt("样式")], ["props", tt("属性")], ["align", tt("排列")], ["layers", tt("图层")], ["res", tt("资源")], ["board", tt("画布")]] as const).map(([k, label]) => (
                 <button
                   key={k}
                   className={"axv-cv-sheet-tab" + (sheetTab === k ? " on" : "")}
@@ -1658,11 +1651,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               <div className="axv-cv-sheet-pane">
             <div className="axv-set-group">
               <div className="axv-set-label">
-                {cur ? "外观" : "新图形默认样式"}
+                {cur ? tt("外观") : tt("新图形默认样式")}
                 {cur ? (
-                  <span className="axv-cv-hint">· 选中 {sel.length} 个</span>
+                  <span className="axv-cv-hint">{tt("· 选中 {n} 个", { n: sel.length })}</span>
                 ) : (
-                  <span className="axv-cv-hint">· 未选中：这里改的是下一个新图形的初值</span>
+                  <span className="axv-cv-hint">{tt("· 未选中：这里改的是下一个新图形的初值")}</span>
                 )}
               </div>
               {/* 预设色块：有选中 → 只改选中；没选中 → 全部上色 */}
@@ -1673,7 +1666,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     type="button"
                     className="axv-cv-preset"
                     style={{ background: c }}
-                    title={sel.length ? `选中图形填 ${c}` : `新图形默认填充 ${c}`}
+                    title={sel.length ? tt("选中图形填 {c}", { c }) : tt("新图形默认填充 {c}", { c })}
                     onClick={() => {
                       /* 未选中时预设色改的是「新图形默认样式」，不再偷偷给全部图形上色 */
                       if (!sel.length) {
@@ -1693,7 +1686,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 ))}
               </div>
               <div className="axv-icon-ed-row">
-                <span>填充</span>
+                <span>{tt("填充")}</span>
                 <button
                   type="button"
                   className="axv-cv-swatch"
@@ -1701,20 +1694,18 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     background: isRenderableColor(styleTarget.fill) ? toCss(styleTarget.fill) : "#fff",
                   }}
                   onClick={() => setColorTarget({ kind: "fill" })}
-                  title="选择填充色"
+                  title={tt("选择填充色")}
                 >
                   <span className="axv-cv-swatch-val">{toHex6(styleTarget.fill)}</span>
                 </button>
                 <button
                   className={"axv-cv-toggle" + (styleTarget.fill === "none" ? " on" : "")}
                   onClick={() => patchStyle({ fill: styleTarget.fill === "none" ? "#1D1B20" : "none" })}
-                  title="无填充"
-                >
-                  无
-                </button>
+                  title={tt("无填充")}
+                >{tt("无")}</button>
               </div>
               <div className="axv-icon-ed-row">
-                <span>描边</span>
+                <span>{tt("描边")}</span>
                 <button
                   type="button"
                   className="axv-cv-swatch"
@@ -1722,20 +1713,18 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     background: isRenderableColor(styleTarget.stroke) ? toCss(styleTarget.stroke) : "#fff",
                   }}
                   onClick={() => setColorTarget({ kind: "stroke" })}
-                  title="选择描边色"
+                  title={tt("选择描边色")}
                 >
-                  <span className="axv-cv-swatch-val">{styleTarget.stroke === "none" ? "无" : toHex6(styleTarget.stroke)}</span>
+                  <span className="axv-cv-swatch-val">{styleTarget.stroke === "none" ? tt("无") : toHex6(styleTarget.stroke)}</span>
                 </button>
                 <button
                   className={"axv-cv-toggle" + (styleTarget.stroke === "none" ? " on" : "")}
                   onClick={() => patchStyle({ stroke: styleTarget.stroke === "none" ? "#1D1B20" : "none" })}
-                  title="无描边"
-                >
-                  无
-                </button>
+                  title={tt("无描边")}
+                >{tt("无")}</button>
               </div>
               <label className="axv-icon-ed-row">
-                <span title="描边粗细（viewport 单位）">粗细</span>
+                <span title={tt("描边粗细（viewport 单位）")}>{tt("粗细")}</span>
                 <input
                   type="range"
                   min={0}
@@ -1743,12 +1732,12 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   step={0.05}
                   value={Math.min(strokeMax, styleTarget.strokeWidth || 0)}
                   onChange={(e) => patchStyle({ strokeWidth: Math.max(0, Number(e.target.value)) })}
-                  title="描边粗细（viewport 单位，0 = 无）"
+                  title={tt("描边粗细（viewport 单位，0 = 无）")}
                 />
                 <b className="axv-icon-ed-val">{Math.round((styleTarget.strokeWidth || 0) * 100) / 100}</b>
               </label>
               <label className="axv-icon-ed-row">
-                <span>不透明度</span>
+                <span>{tt("不透明度")}</span>
                 <input
                   type="range"
                   min={0}
@@ -1765,7 +1754,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 <div className="axv-cv-extra">
                   {cur.type === "roundRect" ? (
                     <label className="axv-icon-ed-row">
-                      <span>圆角</span>
+                      <span>{tt("圆角")}</span>
                       <input
                         className="axv-cv-num"
                         type="number"
@@ -1778,7 +1767,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   ) : null}
                   {cur.type === "polygon" || cur.type === "star" ? (
                     <label className="axv-icon-ed-row">
-                      <span>边数</span>
+                      <span>{tt("边数")}</span>
                       <input
                         className="axv-cv-num"
                         type="number"
@@ -1791,7 +1780,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   ) : null}
                   {cur.type === "star" ? (
                     <label className="axv-icon-ed-row">
-                      <span>内径</span>
+                      <span>{tt("内径")}</span>
                       <input
                         type="range"
                         min={0.05}
@@ -1810,7 +1799,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               {cur && cur.type === "text" ? (
                 <div className="axv-cv-extra">
                   <label className="axv-icon-ed-row">
-                    <span>内容</span>
+                    <span>{tt("内容")}</span>
                     <input
                       className="axv-icon-ed-input"
                       value={cur.text}
@@ -1818,7 +1807,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     />
                   </label>
                   <label className="axv-icon-ed-row">
-                    <span>字号</span>
+                    <span>{tt("字号")}</span>
                     <input
                       className="axv-cv-num"
                       type="number"
@@ -1832,29 +1821,23 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                       value={cur.font ?? "sans"}
                       onChange={(e) => patchSel({ font: e.target.value })}
                     >
-                      <option value="sans">无衬线</option>
-                      <option value="serif">衬线</option>
-                      <option value="kai">楷体</option>
-                      <option value="mono">等宽</option>
+                      <option value="sans">{tt("无衬线")}</option>
+                      <option value="serif">{tt("衬线")}</option>
+                      <option value="kai">{tt("楷体")}</option>
+                      <option value="mono">{tt("等宽")}</option>
                     </select>
                   </label>
                   <div className="axv-cv-textnote">
                     <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>warning</span>
-                    Android vector 不支持 &lt;text&gt;：保存时会自动把文字追踪成 path（可撤销），也可以现在手动转。
-                    <button className="axv-cv-mini" onClick={() => convertText(sel.length ? sel : [cur.id])}>
-                      文字转 path
-                    </button>
+                    {tt("Android vector 不支持 <text>：保存时会自动把文字追踪成 path（可撤销），也可以现在手动转。")}
+                    <button className="axv-cv-mini" onClick={() => convertText(sel.length ? sel : [cur.id])}>{tt("文字转 path")}</button>
                   </div>
                 </div>
               ) : null}
   
               {cur && cur.type !== "path" && cur.type !== "text" ? (
                 <div className="axv-cv-textnote">
-                  <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>info</span>
-                  几何图形请直接拖拽 / 改上面的参数；想手改路径就先「转为路径」。
-                  <button className="axv-cv-mini" onClick={() => convertSelToPath()}>
-                    转为路径
-                  </button>
+                  <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>info</span>{tt("几何图形请直接拖拽 / 改上面的参数；想手改路径就先「转为路径」。")}<button className="axv-cv-mini" onClick={() => convertSelToPath()}>{tt("转为路径")}</button>
                 </div>
               ) : null}
             </div>
@@ -1863,12 +1846,10 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             {sheetTab === "res" ? (
               <div className="axv-cv-sheet-pane">
                 <div className="axv-set-group">
-                  <div className="axv-set-label">
-                    资源
-                    <span className="axv-cv-hint">· 保存写回 drawable/{resName || "…"}.xml</span>
+                  <div className="axv-set-label">{tt("资源")}<span className="axv-cv-hint">{tt("· 保存写回 drawable/{name}.xml", { name: resName || "…" })}</span>
                   </div>
                   <div className="axv-icon-ed-row">
-                    <span>名称</span>
+                    <span>{tt("名称")}</span>
                     <input
                       className="axv-icon-ed-input"
                       value={resName}
@@ -1880,11 +1861,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     <button
                       className="axv-icon-ed-pick"
                       onClick={() => setPicking(true)}
-                      title="从图标库换字形（替换整个图标）"
+                      title={tt("从图标库换字形（替换整个图标）")}
                     >
-                      <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>apps</span>
-                      选择图标
-                    </button>
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>apps</span>{tt("选择图标")}</button>
                   </div>
                   {err ? <div className="axv-icon-ed-err">{err}</div> : null}
                 </div>
@@ -1893,9 +1872,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             {sheetTab === "board" ? (
               <div className="axv-cv-sheet-pane">
             <div className="axv-set-group">
-              <div className="axv-set-label">
-                画布尺寸
-                <span className="axv-cv-hint">· viewport {meta.vw}×{meta.vh}，改尺寸会等比缩放图形</span>
+              <div className="axv-set-label">{tt("画布尺寸")}<span className="axv-cv-hint">{tt("· viewport {w}×{h}，改尺寸会等比缩放图形", { w: meta.vw, h: meta.vh })}</span>
               </div>
               <div className="axv-cv-sizes">
                 {[24, 48, 96, 240, 512].map((n) => (
@@ -1910,7 +1887,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 ))}
               </div>
               <div className="axv-icon-ed-row">
-                <span>自定义</span>
+                <span>{tt("自定义")}</span>
                 <span className="axv-icon-ed-two">
                   <input
                     className="axv-icon-ed-input"
@@ -1944,36 +1921,30 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               </div>
             </div>
             <div className="axv-set-group">
-              <div className="axv-set-label">
-                画布
-                <span className="axv-cv-hint">· 背景会导出成底层矩形</span>
+              <div className="axv-set-label">{tt("画布")}<span className="axv-cv-hint">{tt("· 背景会导出成底层矩形")}</span>
               </div>
               <div className="axv-icon-ed-row">
-                <span>背景</span>
+                <span>{tt("背景")}</span>
                 <button
                   type="button"
                   className="axv-cv-swatch"
                   style={{ background: bg ? toCss(bg) : "#fff" }}
                   onClick={() => setColorTarget({ kind: "bg" })}
-                  title="选择背景色"
+                  title={tt("选择背景色")}
                 >
-                  <span className="axv-cv-swatch-val">{bg ? toHex6(bg) : "无"}</span>
+                  <span className="axv-cv-swatch-val">{bg ? toHex6(bg) : tt("无")}</span>
                 </button>
                 <button
                   className="axv-cv-toggle"
                   onClick={() => setBg("")}
                   disabled={!bg}
-                  title="透明背景"
-                >
-                  透明
-                </button>
+                  title={tt("透明背景")}
+                >{tt("透明")}</button>
               </div>
               <div className="axv-icon-ed-row">
-                <span>网格</span>
+                <span>{tt("网格")}</span>
                 <label className="axv-cv-chk">
-                  <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
-                  显示网格
-                </label>
+                  <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />{tt("显示网格")}</label>
               </div>
             </div>
               </div>
@@ -1982,12 +1953,10 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               <div className="axv-cv-sheet-pane">
                 {selGroup ? (
                   <div className="axv-set-group axv-cv-grp-panel" data-group-panel={selGroup.id}>
-                    <div className="axv-set-label">
-                      分组变换
-                      <span className="axv-cv-hint">· {selGroup.name || selGroup.id}（导出为 &lt;group&gt;）</span>
+                    <div className="axv-set-label">{tt("分组变换")}<span className="axv-cv-hint">{tt("· {name}（导出为 <group>）", { name: selGroup.name || selGroup.id })}</span>
                     </div>
                     <div className="axv-icon-ed-row">
-                      <span>旋转</span>
+                      <span>{tt("旋转")}</span>
                       <input
                         className="axv-cv-slider"
                         type="range"
@@ -2000,7 +1969,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                       <span className="axv-cv-val">{Math.round(selGroup.rot)}°</span>
                     </div>
                     <div className="axv-icon-ed-row">
-                      <span>缩放</span>
+                      <span>{tt("缩放")}</span>
                       <input
                         className="axv-cv-slider"
                         type="range"
@@ -2015,7 +1984,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                       <span className="axv-cv-val">{Math.round(selGroup.sx * 100)}%</span>
                     </div>
                     <div className="axv-icon-ed-row">
-                      <span>平移</span>
+                      <span>{tt("平移")}</span>
                       <span className="axv-icon-ed-two">
                         <input
                           className="axv-icon-ed-input"
@@ -2039,17 +2008,17 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                 ) : null}
                 <div className="axv-set-group">
                   <div className="axv-set-label">
-                    图层属性
+                    {tt("图层属性")}
                     {cur && selBox ? (
-                      <span className="axv-cv-hint">· 选中 {sel.length} 个，单位 viewport</span>
+                      <span className="axv-cv-hint">{tt("· 选中 {n} 个，单位 viewport", { n: sel.length })}</span>
                     ) : (
-                      <span className="axv-cv-hint">· 先在画布或图层页选一个图形</span>
+                      <span className="axv-cv-hint">{tt("· 先在画布或图层页选一个图形")}</span>
                     )}
                   </div>
                   {cur && selBox ? (
                     <>
                       <div className="axv-icon-ed-row">
-                        <span>位置</span>
+                        <span>{tt("位置")}</span>
                         <span className="axv-icon-ed-two">
                           <input
                             className="axv-icon-ed-input"
@@ -2074,7 +2043,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                         </span>
                       </div>
                       <div className="axv-icon-ed-row">
-                        <span>大小</span>
+                        <span>{tt("大小")}</span>
                         <span className="axv-icon-ed-two">
                           <input
                             className="axv-icon-ed-input"
@@ -2082,7 +2051,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                             step={0.5}
                             min={0.2}
                             value={propDraft?.w ?? ""}
-                            title="宽"
+                            title={tt("宽")}
                             onChange={(e) => setPropDraft((d) => (d ? { ...d, w: e.target.value } : d))}
                             onBlur={() => commitProp("w")}
                             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
@@ -2093,7 +2062,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                             step={0.5}
                             min={0.2}
                             value={propDraft?.h ?? ""}
-                            title="高"
+                            title={tt("高")}
                             onChange={(e) => setPropDraft((d) => (d ? { ...d, h: e.target.value } : d))}
                             onBlur={() => commitProp("h")}
                             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
@@ -2101,24 +2070,22 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                         </span>
                       </div>
                       <div className="axv-icon-ed-row">
-                        <span>比例</span>
+                        <span>{tt("比例")}</span>
                         <label className="axv-cv-chk">
                           <input
                             type="checkbox"
                             checked={lockAspect}
                             onChange={(e) => setLockAspect(e.target.checked)}
-                          />
-                          锁定宽高比（取消后会拉伸）
-                        </label>
+                          />{tt("锁定宽高比（取消后会拉伸）")}</label>
                       </div>
                       <div className="axv-icon-ed-row">
-                        <span>旋转</span>
+                        <span>{tt("旋转")}</span>
                         <span className="axv-icon-ed-two">
                           <button
                             className="axv-cv-mini"
                             onClick={() => nudgeRot(-1)}
-                            title="逆时针 1°"
-                            aria-label="逆时针 1 度"
+                            title={tt("逆时针 1°")}
+                            aria-label={tt("逆时针 1 度")}
                           >
                             −1°
                           </button>
@@ -2127,7 +2094,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                             type="number"
                             step={1}
                             value={propDraft?.rot ?? ""}
-                            title="旋转角度（度）"
+                            title={tt("旋转角度（度）")}
                             onChange={(e) => setPropDraft((d) => (d ? { ...d, rot: e.target.value } : d))}
                             onBlur={() => commitProp("rot")}
                             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
@@ -2135,44 +2102,40 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                           <button
                             className="axv-cv-mini"
                             onClick={() => nudgeRot(1)}
-                            title="顺时针 1°"
-                            aria-label="顺时针 1 度"
+                            title={tt("顺时针 1°")}
+                            aria-label={tt("顺时针 1 度")}
                           >
                             +1°
                           </button>
                           <button
                             className="axv-cv-mini"
                             onClick={() => setSelRot(0)}
-                            title="角度归零"
-                          >
-                            归零
-                          </button>
+                            title={tt("角度归零")}
+                          >{tt("归零")}</button>
                         </span>
                       </div>
                     </>
                   ) : (
-                    <div className="axv-cv-empty">选一个图形后可精确调 X / Y、宽 / 高和旋转角度。</div>
+                    <div className="axv-cv-empty">{tt("选一个图形后可精确调 X / Y、宽 / 高和旋转角度。")}</div>
                   )}
                 </div>
               </div>
             ) : null}
             {sheetTab === "align" ? (
               <div className="axv-cv-sheet-pane">
-                <div className="axv-cv-set-label">
-                  排列
-                  <span className="axv-cv-hint">· 选中 1 个按画布对齐，≥2 个互相对齐，均分需 ≥3 个</span>
+                <div className="axv-cv-set-label">{tt("排列")}<span className="axv-cv-hint">{tt("· 选中 1 个按画布对齐，≥2 个互相对齐，均分需 ≥3 个")}</span>
                 </div>
                 {sel.length >= 1 ? (
                   <div className="axv-cv-align">
                     {([
-                      ["left", "align_horizontal_left", "左对齐"],
-                      ["hcenter", "align_horizontal_center", "水平居中"],
-                      ["right", "align_horizontal_right", "右对齐"],
-                      ["top", "align_vertical_top", "顶对齐"],
-                      ["vcenter", "align_vertical_center", "垂直居中"],
-                      ["bottom", "align_vertical_bottom", "底对齐"],
-                      ["hdist", "horizontal_distribute", "水平均分"],
-                      ["vdist", "vertical_distribute", "垂直均分"],
+                      ["left", "align_horizontal_left", tt("左对齐")],
+                      ["hcenter", "align_horizontal_center", tt("水平居中")],
+                      ["right", "align_horizontal_right", tt("右对齐")],
+                      ["top", "align_vertical_top", tt("顶对齐")],
+                      ["vcenter", "align_vertical_center", tt("垂直居中")],
+                      ["bottom", "align_vertical_bottom", tt("底对齐")],
+                      ["hdist", "horizontal_distribute", tt("水平均分")],
+                      ["vdist", "vertical_distribute", tt("垂直均分")],
                     ] as const).map(([mode, icon, label]) => (
                       <button
                         key={mode}
@@ -2188,15 +2151,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   </div>
                 ) : (
                   <div className="axv-cv-textnote">
-                    <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>info</span>
-                    先在画布上框选或用「图层」多选（Shift 点）两个以上图形。
-                  </div>
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>info</span>{tt("先在画布上框选或用「图层」多选（Shift 点）两个以上图形。")}</div>
                 )}
 
                 <div className="axv-set-group" style={{ marginTop: 8 }}>
-                  <div className="axv-set-label">
-                    整体变换
-                    <span className="axv-cv-hint">· 旋转/镜像写进 &lt;group&gt;</span>
+                  <div className="axv-set-label">{tt("整体变换")}<span className="axv-cv-hint">{tt("· 旋转/镜像写进 &lt;group&gt;")}</span>
                   </div>
                   <div className="axv-icon-ed-btns">
                     <button
@@ -2204,7 +2163,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                       onClick={() => setMeta((m) => ({ ...m, group: { ...m.group, rotation: nextRotation(m.group.rotation) } }))}
                     >
                       <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>rotate_90_degrees_cw</span>
-                      旋转 {meta.group.rotation}°
+                      {tt("旋转 {deg}°", { deg: meta.group.rotation })}
                     </button>
                     <button
                       className={"axv-set-btn" + (meta.group.scaleX === -1 ? " on" : "")}
@@ -2212,18 +2171,14 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                         setMeta((m) => ({ ...m, group: { ...m.group, scaleX: m.group.scaleX === -1 ? 1 : -1 } }))
                       }
                     >
-                      <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip</span>
-                      水平镜像
-                    </button>
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip</span>{tt("水平镜像")}</button>
                     <button
                       className={"axv-set-btn" + (meta.group.scaleY === -1 ? " on" : "")}
                       onClick={() =>
                         setMeta((m) => ({ ...m, group: { ...m.group, scaleY: m.group.scaleY === -1 ? 1 : -1 } }))
                       }
                     >
-                      <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip</span>
-                      垂直镜像
-                    </button>
+                      <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip</span>{tt("垂直镜像")}</button>
                   </div>
                 </div>
               </div>
@@ -2231,28 +2186,18 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             {sheetTab === "layers" ? (
               <div className="axv-cv-sheet-pane">
                 <div className="axv-cv-set-label">
-                  图形（{shapes.length}）
-                  <span className="axv-cv-hint">· 点一行选中，Shift 多选</span>
-                  <button className="axv-cv-mini" onClick={() => setInserting(true)} title="插入图标（追加成新图层）">
-                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>add</span>
-                    插入
-                  </button>
-                  <button className="axv-cv-mini" onClick={duplicateOne} title="复制一条（选中优先）">
-                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>content_copy</span>
-                    复制
-                  </button>
-                  <button className="axv-cv-mini" onClick={groupSel} title="编组 (Ctrl+G)">
-                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>folder_shared</span>
-                    编组
-                  </button>
-                  <button className="axv-cv-mini" onClick={ungroupSel} title="解组 (Ctrl+Shift+G)">
-                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>folder_off</span>
-                    解组
-                  </button>
-                  <button className="axv-cv-mini" onClick={removeSel} title="删除选中图形 (Delete)">
-                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>delete</span>
-                    删除
-                  </button>
+                  {tt("图形（{n}）", { n: shapes.length })}
+                  <span className="axv-cv-hint">{tt("· 点一行选中，Shift 多选")}</span>
+                  <button className="axv-cv-mini" onClick={() => setInserting(true)} title={tt("插入图标（追加成新图层）")}>
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>add</span>{tt("插入")}</button>
+                  <button className="axv-cv-mini" onClick={duplicateOne} title={tt("复制一条（选中优先）")}>
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>content_copy</span>{tt("复制")}</button>
+                  <button className="axv-cv-mini" onClick={groupSel} title={tt("编组 (Ctrl+G)")}>
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>folder_shared</span>{tt("编组")}</button>
+                  <button className="axv-cv-mini" onClick={ungroupSel} title={tt("解组 (Ctrl+Shift+G)")}>
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>folder_off</span>{tt("解组")}</button>
+                  <button className="axv-cv-mini" onClick={removeSel} title={tt("删除选中图形 (Delete)")}>
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 13 }}>delete</span>{tt("删除")}</button>
                 </div>
             <div className="axv-cv-layers">
               {layerRows.map((row) => {
@@ -2264,8 +2209,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     <div key={row.key} className={"axv-cv-grp" + (on ? " on" : "")} data-group-row={g.id}>
                       <button
                         className="axv-cv-layer-btn"
-                        title={g.collapsed ? "展开组" : "折叠组"}
-                        aria-label={g.collapsed ? "展开组" : "折叠组"}
+                        title={g.collapsed ? tt("展开组") : tt("折叠组")}
+                        aria-label={g.collapsed ? tt("展开组") : tt("折叠组")}
                         onClick={(e) => {
                           e.stopPropagation();
                           patchGroup(g.id, { collapsed: !g.collapsed });
@@ -2277,7 +2222,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                       <input
                         className="axv-cv-grp-name"
                         value={g.name ?? g.id}
-                        title="组名（导出为 android:name）"
+                        title={tt("组名（导出为 android:name）")}
                         onClick={(e) => {
                           e.stopPropagation();
                           selectGroup(g.id);
@@ -2287,8 +2232,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                       <span className="axv-cv-hint">{n}</span>
                       <button
                         className="axv-cv-layer-btn"
-                        title="选中整组"
-                        aria-label="选中整组"
+                        title={tt("选中整组")}
+                        aria-label={tt("选中整组")}
                         onClick={(e) => {
                           e.stopPropagation();
                           selectGroup(g.id);
@@ -2298,8 +2243,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                       </button>
                       <button
                         className="axv-cv-layer-btn"
-                        title="解组"
-                        aria-label="解组"
+                        title={tt("解组")}
+                        aria-label={tt("解组")}
                         onClick={(e) => {
                           e.stopPropagation();
                           ungroupIds([g.id]);
@@ -2336,7 +2281,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   >
                     <span
                       className="axv-cv-layer-grip msr"
-                      title="拖动排序"
+                      title={tt("拖动排序")}
                       aria-hidden="true"
                       onPointerDown={(e) => onGripDown(e, s.id)}
                     >
@@ -2354,8 +2299,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     </span>
                     <button
                       className="axv-cv-layer-btn"
-                      title="取色（这条）"
-                      aria-label="取色"
+                      title={tt("取色（这条）")}
+                      aria-label={tt("取色")}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSel([s.id]);
@@ -2366,8 +2311,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     </button>
                     <button
                       className="axv-cv-layer-btn"
-                      title={s.hidden ? "显示" : "隐藏"}
-                      aria-label={s.hidden ? "显示" : "隐藏"}
+                      title={s.hidden ? tt("显示") : tt("隐藏")}
+                      aria-label={s.hidden ? tt("显示") : tt("隐藏")}
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleFlag(s.id, "hidden");
@@ -2377,8 +2322,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     </button>
                     <button
                       className="axv-cv-layer-btn"
-                      title={s.locked ? "解锁" : "锁定"}
-                      aria-label={s.locked ? "解锁" : "锁定"}
+                      title={s.locked ? tt("解锁") : tt("锁定")}
+                      aria-label={s.locked ? tt("解锁") : tt("锁定")}
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleFlag(s.id, "locked");
@@ -2388,8 +2333,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     </button>
                     <button
                       className="axv-cv-layer-btn"
-                      title="上移一层"
-                      aria-label="上移一层"
+                      title={tt("上移一层")}
+                      aria-label={tt("上移一层")}
                       onClick={(e) => {
                         e.stopPropagation();
                         moveLayerOne(s.id, 1);
@@ -2399,8 +2344,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     </button>
                     <button
                       className="axv-cv-layer-btn"
-                      title="下移一层"
-                      aria-label="下移一层"
+                      title={tt("下移一层")}
+                      aria-label={tt("下移一层")}
                       onClick={(e) => {
                         e.stopPropagation();
                         moveLayerOne(s.id, -1);
@@ -2410,7 +2355,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     </button>
                     <button
                       className="axv-icon-ed-del"
-                      title="删除"
+                      title={tt("删除")}
                       onClick={(e) => {
                         e.stopPropagation();
                         pushHistory();
@@ -2423,7 +2368,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                   </div>
                 );
               })}
-              {!shapes.length ? <div className="axv-cv-empty">画布还是空的：选个工具，在左边拖一下</div> : null}
+              {!shapes.length ? <div className="axv-cv-empty">{tt("画布还是空的：选个工具，在左边拖一下")}</div> : null}
             </div>
               </div>
             ) : null}
@@ -2433,15 +2378,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
 
       <div className="axv-icon-page-foot">
         <span>
-          <span className="axv-icon-page-foot-note">保存后立即写回 drawable/{resName || "…"}.xml，布局里所有引用同步生效。</span>
+          <span className="axv-icon-page-foot-note">{tt("保存后立即写回 drawable/{name}.xml，布局里所有引用同步生效。", { name: resName || "…" })}</span>
         </span>
         <span style={{ display: "flex", gap: 8 }}>
-          <button className="axv-btn axv-ghost" onClick={close}>
-            取消
-          </button>
-          <button className="axv-btn axv-btn-primary" onClick={save}>
-            保存
-          </button>
+          <button className="axv-btn axv-ghost" onClick={close}>{tt("取消")}</button>
+          <button className="axv-btn axv-btn-primary" onClick={save}>{tt("保存")}</button>
         </span>
       </div>
 
@@ -2450,10 +2391,10 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
         <ColorPicker
           label={
             colorTarget.kind === "fill"
-              ? "填充颜色"
+              ? tt("填充颜色")
               : colorTarget.kind === "stroke"
-                ? "描边颜色"
-                : "画布背景色"
+                ? tt("描边颜色")
+                : tt("画布背景色")
           }
           value={
             colorTarget.kind === "fill"
@@ -2496,7 +2437,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       {/* 换字形 */}
       {picking ? (
         <IconPickerPanel
-          title="选择图标"
+          title={tt("选择图标")}
           viewport={{ vw: meta.vw, vh: meta.vh }}
           onClose={() => setPicking(false)}
           onPick={(shapes) => applyIcon(shapes)}
@@ -2506,7 +2447,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       {/* 插入图标（多图标拼合） */}
       {inserting ? (
         <IconPickerPanel
-          title="插入图标"
+          title={tt("插入图标")}
           viewport={{ vw: meta.vw, vh: meta.vh }}
           onClose={() => setInserting(false)}
           mode="insert"
@@ -2520,13 +2461,13 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
 }
 
 const LAYER_LABEL: Record<DrawShape["type"], string> = {
-  rect: "矩形",
-  roundRect: "圆角矩形",
-  circle: "圆形",
-  ellipse: "椭圆",
-  line: "直线",
-  polygon: "多边形",
-  star: "星形",
-  path: "路径",
-  text: "文字",
+  rect: tt("矩形"),
+  roundRect: tt("圆角矩形"),
+  circle: tt("圆形"),
+  ellipse: tt("椭圆"),
+  line: tt("直线"),
+  polygon: tt("多边形"),
+  star: tt("星形"),
+  path: tt("路径"),
+  text: tt("文字"),
 };

@@ -49,7 +49,7 @@ export function kindLabel(kind: string): string {
     case "selector":
       return t("状态选择");
     case "layer-list":
-      return t("图层");
+      return t("图层列表");
     case "ripple":
       return t("水波纹");
     case "inset":

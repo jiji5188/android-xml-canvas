@@ -45,8 +45,8 @@ describe("M86 图层面板移植原页面功能", () => {
   const css = read("components/xml-canvas.css");
 
   it("图层行有 上移/下移 按钮与拖拽手柄", () => {
-    expect(src).toContain("title=\"上移一层\"");
-    expect(src).toContain("title=\"下移一层\"");
+    expect(src).toContain('title={tt("上移一层")}');
+    expect(src).toContain('title={tt("下移一层")}');
     expect(src).toContain("axv-cv-layer-grip");
     expect(src).toContain("const moveLayerOne = (id: string");
     expect(css).toContain(".axv-cv-layer-grip");
@@ -54,7 +54,7 @@ describe("M86 图层面板移植原页面功能", () => {
   });
 
   it("图层面板有 ➕ 插入图标按钮（M88i 起用 add 图标）", () => {
-    expect(src).toMatch(/className="axv-cv-mini" onClick=\{\(\) => setInserting\(true\)\} title="插入图标（追加成新图层）">\s*<span className="msr"[^>]*>add<\/span>/);
+    expect(src).toMatch(/className="axv-cv-mini" onClick=\{\(\) => setInserting\(true\)\} title=\{tt\("插入图标（追加成新图层）"\)\}>\s*<span className="msr"[^>]*>add<\/span>/);
   });
 });
 

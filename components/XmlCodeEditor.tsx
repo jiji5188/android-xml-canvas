@@ -5,6 +5,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import type { LintIssue } from "@/lib/xml/lint";
 
 /** 行高（必须与 xml-canvas.css 里 .axv-code-hl/.axv-ln 的 line-height 一致） */
@@ -106,29 +107,59 @@ function lineFromEvent(ta: HTMLTextAreaElement, x: number, y: number): number {
 }
 
 /** M30：常用符号/片段快捷插入（手机上打 < > " @ 和 @drawable/ 太痛苦） */
+// M104：title 是中文 key（供 symbolTitle() 运行时查 tt() 翻译），此处写中文是刻意的，不是遗漏。
+// i18n-ignore:
 export const SYMBOLS: { label: string; insert: string; back?: number; title?: string }[] = [
-  { label: "<", insert: "<", title: "小于号（开标签）" },
-  { label: ">", insert: ">", title: "大于号（闭合标签）" },
-  { label: "</", insert: "</", title: "闭标签开头" },
-  { label: "/>", insert: "/>", title: "自闭合" },
-  { label: "=", insert: "=", title: "等号" },
-  { label: '""', insert: '""', back: 1, title: "双引号（光标落在中间）" },
-  { label: "@", insert: "@", title: "资源引用" },
-  { label: "#", insert: "#", title: "颜色值" },
-  { label: ":", insert: ":", title: "命名空间分隔" },
-  { label: "?attr/", insert: "?attr/", title: "主题属性引用" },
-  { label: "&", insert: "&amp;", title: "转义的 &" },
-  { label: "<!-- -->", insert: "<!--  -->", back: 4, title: "注释" },
-  { label: "@+id/", insert: "@+id/", title: "新建 id" },
-  { label: "@drawable/", insert: "@drawable/", title: "引用 drawable" },
-  { label: "@string/", insert: "@string/", title: "引用字符串" },
-  { label: "@color/", insert: "@color/", title: "引用颜色" },
-  { label: "@dimen/", insert: "@dimen/", title: "引用尺寸" },
-  { label: "match_parent", insert: "match_parent", title: "填满父容器" },
-  { label: "wrap_content", insert: "wrap_content", title: "包裹内容" },
-  { label: "dp", insert: "dp", title: "密度无关像素" },
-  { label: "sp", insert: "sp", title: "字体尺寸单位" },
+  { label: "<", insert: "<", title: "小于号（开标签）" }, // i18n-ignore
+  { label: ">", insert: ">", title: "大于号（闭合标签）" }, // i18n-ignore
+  { label: "</", insert: "</", title: "闭标签开头" }, // i18n-ignore
+  { label: "/>", insert: "/>", title: "自闭合" }, // i18n-ignore
+  { label: "=", insert: "=", title: "等号" }, // i18n-ignore
+  { label: '""', insert: '""', back: 1, title: "双引号（光标落在中间）" }, // i18n-ignore
+  { label: "@", insert: "@", title: "资源引用" }, // i18n-ignore
+  { label: "#", insert: "#", title: "颜色值" }, // i18n-ignore
+  { label: ":", insert: ":", title: "命名空间分隔" }, // i18n-ignore
+  { label: "?attr/", insert: "?attr/", title: "主题属性引用" }, // i18n-ignore
+  { label: "&", insert: "&amp;", title: "转义的 &" }, // i18n-ignore
+  { label: "<!-- -->", insert: "<!--  -->", back: 4, title: "注释" }, // i18n-ignore
+  { label: "@+id/", insert: "@+id/", title: "新建 id" }, // i18n-ignore
+  { label: "@drawable/", insert: "@drawable/", title: "引用 drawable" }, // i18n-ignore
+  { label: "@string/", insert: "@string/", title: "引用字符串" }, // i18n-ignore
+  { label: "@color/", insert: "@color/", title: "引用颜色" }, // i18n-ignore
+  { label: "@dimen/", insert: "@dimen/", title: "引用尺寸" }, // i18n-ignore
+  { label: "match_parent", insert: "match_parent", title: "填满父容器" }, // i18n-ignore
+  { label: "wrap_content", insert: "wrap_content", title: "包裹内容" }, // i18n-ignore
+  { label: "dp", insert: "dp", title: "密度无关像素" }, // i18n-ignore
+  { label: "sp", insert: "sp", title: "字体尺寸单位" }, // i18n-ignore
 ];
+
+/** M104：SYMBOLS 的 title 字段在运行时动态翻译（避免模块级 tt() 固化，支持语言切换） */
+export function symbolTitle(s: { label: string; title?: string }): string {
+  const m: Record<string, string> = {
+    "小于号（开标签）": tt("小于号（开标签）"),
+    "大于号（闭合标签）": tt("大于号（闭合标签）"),
+    "闭标签开头": tt("闭标签开头"),
+    "自闭合": tt("自闭合"),
+    "等号": tt("等号"),
+    "双引号（光标落在中间）": tt("双引号（光标落在中间）"),
+    "资源引用": tt("资源引用"),
+    "颜色值": tt("颜色值"),
+    "命名空间分隔": tt("命名空间分隔"),
+    "主题属性引用": tt("主题属性引用"),
+    "转义的 &": tt("转义的 &"),
+    "注释": tt("注释"),
+    "新建 id": tt("新建 id"),
+    "引用 drawable": tt("引用 drawable"),
+    "引用字符串": tt("引用字符串"),
+    "引用颜色": tt("引用颜色"),
+    "引用尺寸": tt("引用尺寸"),
+    "填满父容器": tt("填满父容器"),
+    "包裹内容": tt("包裹内容"),
+    "密度无关像素": tt("密度无关像素"),
+    "字体尺寸单位": tt("字体尺寸单位"),
+  };
+  return s.title ? m[s.title] ?? s.title : s.label;
+}
 
 export function XmlCodeEditor({ value, onChange, errors, className, focusLine, focusTick, onCursorLine, onFormat }: Props) {
   const taRef = useRef<HTMLTextAreaElement | null>(null);
@@ -176,7 +207,7 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
     try {
       return highlightXml(value);
     } catch (e) {
-      console.error("[axv] XML 高亮失败，退回纯文本", e);
+      console.error("[axv] XML 高亮失败，退回纯文本", e); // i18n-ignore
       return value
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -342,8 +373,8 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
                 ref={findRef}
                 className="axv-find-input"
                 value={query}
-                placeholder="在 XML 里查找"
-                aria-label="查找"
+                placeholder={tt("在 XML 里查找")}
+                aria-label={tt("查找")}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -357,13 +388,13 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
                 }}
               />
               <span className="axv-find-count">
-                {hits.length === 0 ? (query.trim() ? "无匹配" : "") : `${hitIdx + 1}/${hits.length}`}
+                {hits.length === 0 ? (query.trim() ? tt("无匹配") : "") : `${hitIdx + 1}/${hits.length}`}
               </span>
               <button
                 type="button"
                 className="axv-find-btn"
-                title="上一个（Shift+Enter）"
-                aria-label="上一个"
+                title={tt("上一个（Shift+Enter）")}
+                aria-label={tt("上一个")}
                 disabled={hits.length === 0}
                 onClick={() => gotoHit(hitIdx - 1)}
               >
@@ -372,8 +403,8 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
               <button
                 type="button"
                 className="axv-find-btn"
-                title="下一个（Enter）"
-                aria-label="下一个"
+                title={tt("下一个（Enter）")}
+                aria-label={tt("下一个")}
                 disabled={hits.length === 0}
                 onClick={() => gotoHit(hitIdx + 1)}
               >
@@ -382,8 +413,8 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
               <button
                 type="button"
                 className="axv-find-btn"
-                title="关闭（Esc）"
-                aria-label="关闭查找"
+                title={tt("关闭（Esc）")}
+                aria-label={tt("关闭查找")}
                 onClick={() => {
                   setFindOpen(false);
                   taRef.current?.focus();
@@ -399,24 +430,24 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
         <div className="axv-code-errbar">
           <span className="axv-err-dot" aria-hidden="true" />
           <span>
-            第 {firstErr.line} 行 · {firstErr.message}
-            {errors && errors.length > 1 ? `　（共 ${errors.length} 处）` : ""}
+            {tt("第 {line} 行 · {msg}", { line: firstErr.line, msg: firstErr.message })}
+            {errors && errors.length > 1 ? tt("（共 {n} 处）", { n: errors.length }) : ""}
           </span>
         </div>
       )}
       {/* M30：常用符号快捷条（横向滑，不抢编辑器焦点） */}
-      <div className="axv-sym-bar" role="toolbar" aria-label="常用符号">
+      <div className="axv-sym-bar" role="toolbar" aria-label={tt("常用符号")}>
         {/* M30b：格式化提到最前面（原底部工具条已删除） */}
         {onFormat ? (
           <button
             type="button"
             className="axv-sym-btn axv-sym-action"
-            title="重排缩进（保留注释）"
+            title={tt("重排缩进（保留注释）")}
             onMouseDown={(e) => e.preventDefault()}
             onTouchStart={(e) => e.preventDefault()}
             onClick={onFormat}
           >
-            格式化
+            {tt("格式化")}
           </button>
         ) : null}
         {SYMBOLS.map((s) => (
@@ -424,7 +455,7 @@ export function XmlCodeEditor({ value, onChange, errors, className, focusLine, f
             key={s.label}
             type="button"
             className="axv-sym-btn"
-            title={s.title || s.label}
+            title={symbolTitle(s)}
             // 按下事件就拦：否则 textarea 先失焦、光标位置丢了
             onMouseDown={(e) => e.preventDefault()}
             onTouchStart={(e) => e.preventDefault()}

@@ -52,7 +52,7 @@ describe("M95 t()：中文原文当 key", () => {
 
 describe("M95 覆盖率护栏", () => {
   /** 已回填的组件：这些文件里不允许再出现未包 t() 的中文字面量 */
-  const CONVERTED = ["components/GenAssetsPanel.tsx", "components/IconCanvasEditor.tsx", "components/AiPanel.tsx", "components/ShapeEditor.tsx", "components/AttrPanel.tsx"];
+  const CONVERTED = ["components/GenAssetsPanel.tsx", "components/IconCanvasEditor.tsx", "components/AiPanel.tsx", "components/ShapeEditor.tsx", "components/AttrPanel.tsx", "components/XmlCodeEditor.tsx"];
 
   const root = path.resolve(__dirname, "..");
 

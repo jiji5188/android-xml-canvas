@@ -221,17 +221,22 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
       const s = resolveSize(raw, res, issues, path, prop ?? key);
       return s.kind === "zero" ? 0 : s.kind === "dp" ? s.value : s.kind === "px" ? s.value : 0;
     };
-    // 简写值作为每边兜底（没写单独边时用它）
+    // 简写值作为每边兜底（没写单独边时用它）；paddingHorizontal/Vertical（API 26+）优先于简写
     const shallow = toDp(single, key);
-    const pick = (raw: string | undefined, prop: string): number =>
-      raw === undefined || raw === "" ? shallow : toDp(raw, prop);
-    const top = pick(a[key + "Top"], key + "Top");
-    const bottom = pick(a[key + "Bottom"], key + "Bottom");
+    const hRaw = a[key + "Horizontal"];
+    const vRaw = a[key + "Vertical"];
+    const shallowH = hRaw === undefined || hRaw === "" ? undefined : toDp(hRaw, key + "Horizontal");
+    const shallowV = vRaw === undefined || vRaw === "" ? undefined : toDp(vRaw, key + "Vertical");
+    // axis：h = 左右（Start/End/Left/Right），v = 上下（Top/Bottom）
+    const pickSide = (raw: string | undefined, prop: string, axis: "h" | "v"): number =>
+      raw !== undefined && raw !== "" ? toDp(raw, prop) : (axis === "h" ? shallowH : shallowV) ?? shallow;
+    const top = pickSide(a[key + "Top"], key + "Top", "v");
+    const bottom = pickSide(a[key + "Bottom"], key + "Bottom", "v");
     // right = layout_marginRight 或 layout_marginEnd；left = layout_marginLeft 或 layout_marginStart
     const rightRaw = a[key + "Right"] ?? a[key + "End"];
     const leftRaw = a[key + "Left"] ?? a[key + "Start"];
-    const right = pick(rightRaw, key + "Right");
-    const left = pick(leftRaw, key + "Left");
+    const right = pickSide(rightRaw, key + "Right", "h");
+    const left = pickSide(leftRaw, key + "Left", "h");
     return [top, right, bottom, left];
   };
   const pad = expandQuad("padding");
@@ -405,7 +410,9 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   out["minHeight"] = a["minHeight"] !== undefined ? (resolveSize(a["minHeight"], res, issues, path, "minHeight").kind as string === "dp" ? (resolveSize(a["minHeight"], res, issues, path, "minHeight") as { kind: "dp"; value: number }).value : 0) : 0;
 
   // LinearLayout 专用
-  out["orientation"] = a["orientation"] ?? "vertical";
+  // M89h：Android 原生 LinearLayout 的 orientation 默认值是 horizontal（不是 vertical）。
+  // 老实现兜底成 vertical，导致「没写 orientation 的工具栏」预览里被竖着堆成一列。
+  out["orientation"] = a["orientation"] ?? "horizontal";
 
   // M2a：复合控件占位所需
   out["checked"] = a["checked"] === "true";

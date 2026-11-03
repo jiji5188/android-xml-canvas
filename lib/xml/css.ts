@@ -347,15 +347,15 @@ type ParentAxis = "row" | "column" | "auto";
 
 /**
  * 父容器的主轴方向（决定 layout_gravity 的哪个分量对应交叉轴）。
- * LinearLayout 没写 orientation 时按项目既有约定当竖排（Android 原生默认是横排，这里沿用仓库口径）。
+ * LinearLayout 没写 orientation 时按 Android 原生默认当横排（M89h 之前错当竖排）。
  */
 function parentFlexAxis(tag: string, attrs: Record<string, string>): ParentAxis {
   if (tag === "TableRow") return "row";
   if (tag === "TableLayout") return "column";
   if (tag === "LinearLayout") {
-    return String(attrs["orientation"] ?? "vertical").toLowerCase() === "horizontal"
-      ? "row"
-      : "column";
+    return String(attrs["orientation"] ?? "horizontal").toLowerCase() === "vertical"
+      ? "column"
+      : "row";
   }
   if (tag === "HorizontalScrollView") return "row";
   if (tag === "ScrollView" || tag === "NestedScrollView") return "column";
@@ -502,7 +502,7 @@ export function buildRenderModel(
         style.flexDirection = "row";
         style.overflowX = "auto";
       } else if (tag === "LinearLayout") {
-        const o = orientationAlign((attrs["orientation"] as string) || "vertical");
+        const o = orientationAlign((attrs["orientation"] as string) || "horizontal");
         style.flexDirection = o.flexDirection;
         const g = gravityToFlexByOrientation(
           (attrs["gravity"] as string) || "",
@@ -779,8 +779,12 @@ export function buildRenderModel(
       // M4q：Button 家族预览对齐 Android 默认样式（minWidth 88dp / minHeight 48dp / 左右 16dp 内边距 /
       // 文字居中 / Button 默认全大写），仅在 XML 没显式写时才补
       if (tag === "Button" || tag === "AppCompatButton" || tag === "MaterialButton" || tag === "ImageButton") {
-        style.minWidth = style.minWidth ?? `${DP(88, scale)}px`;
-        style.minHeight = style.minHeight ?? `${DP(48, scale)}px`;
+        // M89h：Android 的 EXACTLY spec（显式写死的 layout_width/height）不受 min 宽高约束，
+        // 所以只有 wrap_content / 没写尺寸的按钮才补 88/48dp 下限（否则 40dp 的返回按钮被强制成 48dp）
+        const hasExpH = !!(style.height && style.height !== "auto" && !String(style.height).includes("%"));
+        const hasExpW = !!(style.width && style.width !== "auto" && !String(style.width).includes("%") && style.width !== "0px");
+        if (!hasExpW) style.minWidth = style.minWidth ?? `${DP(88, scale)}px`;
+        if (!hasExpH) style.minHeight = style.minHeight ?? `${DP(48, scale)}px`;
         style.paddingLeft = style.paddingLeft ?? `${DP(16, scale)}px`;
         style.paddingRight = style.paddingRight ?? `${DP(16, scale)}px`;
         style.paddingTop = style.paddingTop ?? `${DP(8, scale)}px`;
@@ -946,7 +950,9 @@ export function buildRenderModel(
         }
       } else if (!src) {
         style.backgroundColor = style.backgroundColor || "#E0D9E3";
-        style.minHeight = style.minHeight || `${DP(48, scale)}px`;
+        // M89h：显式写死高度时不再强制 48dp（Android 的 EXACTLY spec 不受 minHeight 约束）
+        const expH = !!(style.height && style.height !== "auto" && !String(style.height).includes("%"));
+        if (!expH) style.minHeight = style.minHeight || `${DP(48, scale)}px`;
       } else {
         // missing:xxx —— 引用不存在的资源：红色虚线占位（不静默变空白）
         style.backgroundColor = style.backgroundColor || "#FFEBEE";

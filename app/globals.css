@@ -13,7 +13,7 @@ body {
 }
 body {
   background: #ffffff;
-  color: #1d1b20;
+  color: var(--axv-title, #1d1b20);
   overscroll-behavior: none;
 }
 
@@ -35,6 +35,7 @@ body {
   letter-spacing: normal;
   text-transform: none;
   display: inline-block;
+  color: var(--axv-title, #1d1b20);
   /* Reserve the glyph box before the font loads, not the ligature text width. */
   width: 1em;
   height: 1em;

@@ -25,6 +25,8 @@ export interface XmlCodeViewProps {
   focusLine?: number;
   focusTick?: number;
   onCursorLine?: (line: number) => void;
+  /** M101：Ctrl/Cmd + 点击资源引用回调（raw 如 `@string/app_name`） */
+  onRefClick?: (raw: string) => void;
 
   /** 格式化（重排缩进，保留注释） */
   onFormat: () => void;
@@ -87,6 +89,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           focusTick={props.focusTick}
           onCursorLine={props.onCursorLine}
           onFormat={props.onFormat}
+          onRefClick={props.onRefClick}
           lang={props.lang}
           indent={props.indent}
           resNames={props.resNames}

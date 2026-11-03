@@ -52,6 +52,7 @@ import { computeSuggest } from "@/lib/xml/keyword-suggest";
 import { computeJavaSuggest, JAVA_SYMBOLS } from "@/lib/xml/java-vocab";
 import { KIND_LABEL, KIND_NAME, type SuggestKind } from "@/lib/xml/suggest-kind";
 import { estimateSuggestSize, placeSuggest, type Placement } from "@/lib/xml/suggest-position";
+import { tokenAt } from "@/lib/xml/ref-token";
 import { SYMBOLS } from "./XmlCodeEditor";
 
 export interface CodeEditorProps {
@@ -69,6 +70,8 @@ export interface CodeEditorProps {
   indent?: number;
   /** M45：资源名候选（@drawable/xxx 补全用），不传就只用文档里的 token */
   resNames?: string[];
+  /** M101：Ctrl/Cmd + 点击资源引用时回调（raw 如 `@string/app_name` / `R.id.btn`） */
+  onRefClick?: (raw: string) => void;
 }
 
 /** M76：在一份文本里找全部匹配（大小写不敏感，上限 500 条，空 query 返回空） */
@@ -292,6 +295,7 @@ export function CodeEditor({
   lang = "xml",
   indent = 4,
   resNames,
+  onRefClick,
 }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -305,8 +309,10 @@ export function CodeEditor({
   /** 回调放进 ref：view 只建一次，避免每次 render 重建 */
   const onChangeRef = useRef(onChange);
   const onCursorLineRef = useRef(onCursorLine);
+  const onRefClickRef = useRef(onRefClick);
   onChangeRef.current = onChange;
   onCursorLineRef.current = onCursorLine;
+  onRefClickRef.current = onRefClick;
   /** M57：最后一次由编辑器自身发出的文本——父层防抖回灌同一个值时据此跳过，避免“冲掉刚输入的字” */
   const lastEmittedRef = useRef<string | null>(null);
 
@@ -619,6 +625,17 @@ export function CodeEditor({
         }),
         // M45：失焦就关（M98：在弹窗上按住时不关，等 pointerup 再决定）
         EditorView.domEventHandlers({
+          // M101：Ctrl/Cmd + 点击资源引用 → 跳定义 / 查引用（画布以外最快的一条导航路线）
+          mousedown: (e, view) => {
+            if (e.button !== 0 || !(e.ctrlKey || e.metaKey)) return false;
+            const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+            if (pos == null) return false;
+            const t = tokenAt(view.state.doc.toString(), pos);
+            if (!t) return false;
+            e.preventDefault();
+            onRefClickRef.current?.(t.raw);
+            return true;
+          },
           blur: () => {
             if (pressRef.current) return false;
             setSugBoth(null);

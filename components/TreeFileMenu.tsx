@@ -302,6 +302,8 @@ export function MessageDialog(p: { title: string; text: string; onClose: () => v
 export function ConfirmDialog(p: {
   title: string;
   text: string;
+  /** M101：正文下方的附加说明（如删除前的影响面：被几处引用） */
+  detail?: string;
   danger?: boolean;
   onOk: () => void;
   onClose: () => void;
@@ -311,6 +313,7 @@ export function ConfirmDialog(p: {
       <div className="axv-dlg" role="dialog" aria-label={p.title}>
         <div className="axv-dlg-title">{p.title}</div>
         <div className="axv-dlg-hint axv-dlg-multiline">{p.text}</div>
+        {p.detail ? <div className="axv-dlg-hint axv-dlg-multiline axv-dlg-detail">{p.detail}</div> : null}
         <div className="axv-dlg-actions">
           <button className="axv-btn axv-ghost" onClick={p.onClose}>
             取消

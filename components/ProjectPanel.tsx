@@ -36,6 +36,22 @@ import {
   type TreeNodeRef,
 } from "@/components/TreeFileMenu";
 
+/**
+ * M101：资源路径 → 引用符号（如 `res/drawable/bg_card.xml` → `drawable/bg_card`）。
+ * 查不出（非资源路径 / 查不到）返回 null，不阻断删除。
+ */
+function resSymbolOf(rel: string): string | null {
+  const m = /\/res\/(layout|drawable|mipmap|values|raw|font|anim|animator|menu|xml|color|interpolator|transition|navigation)[^/]*\/([^/]+)$/.exec(rel);
+  if (!m) return null;
+  const type = m[1];
+  const name = m[2];
+  if (type === "values") {
+    // values 里是文件级的（strings.xml 本身没法用一条资源表示），跳过
+    return null;
+  }
+  return `${type}/${name.replace(/\.[^.]+$/, "")}`;
+}
+
 export interface ProjectPanelProps {
   tr: (key: string, fallback: string) => string;
 
@@ -81,6 +97,15 @@ export interface ProjectPanelProps {
   fileOps?: FileOpsCtx | null;
   /** M46：写操作完成后通知外部刷新（+1 projectRev 即可） */
   onFilesChanged?: () => void;
+
+  /**
+   * M101：删除前的影响面查询 —— 给一个资源符号（如 `drawable/bg_card`），
+   * 返回“被几处引用 + 前 3 处位置”；查不到或没实现返回 null。
+   * 删除确认弹窗里展示，避免删完才发现在别处用了。
+   */
+  checkDeleteImpact?: (
+    symbol: string,
+  ) => Promise<{ count: number; samples: { rel: string; line: number }[] } | null>;
 }
 
 type LoadState = BrowseEntry[] | "loading";
@@ -143,8 +168,12 @@ export function LazyTreeInner(props: {
   /** M46：文件操作（null = 不支持，不绑长按） */
   fileOps?: FileOpsCtx | null;
   onFilesChanged?: () => void;
+  /** M101：删除前的影响面查询（可选，查不到就不展示） */
+  checkDeleteImpact?: (
+    symbol: string,
+  ) => Promise<{ count: number; samples: { rel: string; line: number }[] } | null>;
 }) {
-  const { source, rev, currentFileName, onOpenEntry, extras, onOpenDrawable, onPreviewImage, fileOps } = props;
+  const { source, rev, currentFileName, onOpenEntry, extras, onOpenDrawable, onPreviewImage, fileOps, checkDeleteImpact } = props;
   const [kids, setKids] = useState<Record<string, LoadState>>({});
   const [open, setOpen] = useState<Set<string>>(new Set([""]));
 
@@ -322,13 +351,31 @@ export function LazyTreeInner(props: {
     props.onFilesChanged?.();
   };
 
+  /** M101：删除确认框里的“影响面”查询结果（null = 还在查/不适用） */
+  const [deleteImpact, setDeleteImpact] = useState<{
+    count: number;
+    samples: { rel: string; line: number }[];
+  } | null>(null);
+
   const runAction = (a: MenuAction) => {
     const target = menu?.target;
     setMenu(null);
     if (!target) return;
     if (a === "new") return setDlg({ kind: "new", target });
     if (a === "rename") return setDlg({ kind: "rename", target });
-    if (a === "delete") return setDlg({ kind: "delete", target });
+    if (a === "delete") {
+      setDlg({ kind: "delete", target });
+      // M101：打开确认框时异步查影响面（不阻塞弹窗出现）
+      setDeleteImpact(null);
+      const sym = resSymbolOf(target.rel);
+      if (sym && props.checkDeleteImpact) {
+        void props
+          .checkDeleteImpact(sym)
+          .then((r) => setDeleteImpact(r))
+          .catch(() => setDeleteImpact(null));
+      }
+      return;
+    }
     if (a === "copy") {
       setClipboard(target);
       setDlg({ kind: "msg", title: "已复制", text: `已复制「${target.name}」，到目标位置长按选「粘贴」。` });
@@ -551,6 +598,7 @@ export function LazyTreeInner(props: {
     const target = dlg?.kind === "delete" ? dlg.target : null;
     if (!fileOps || !target) return;
     setDlg(null);
+    setDeleteImpact(null);
     setBusy(true);
     const r = await deleteEntry(fileOps, target.rel, target.isDir);
     setBusy(false);
@@ -734,6 +782,15 @@ export function LazyTreeInner(props: {
         <ConfirmDialog
           title="删除"
           text={`确定删除「${dlg.target.name}」？${dlg.target.isDir ? "目录及其内容将被递归删除，" : ""}此操作不可撤销。`}
+          detail={
+            deleteImpact === null
+              ? undefined
+              : deleteImpact.count > 0
+                ? `⚠ 被 ${deleteImpact.count} 处引用：${deleteImpact.samples
+                    .map((s) => `${s.rel}${s.line > 1 ? ":" + s.line : ""}`)
+                    .join("、")}${deleteImpact.count > deleteImpact.samples.length ? " …" : ""}`
+                : "（项目里没找到引用）"
+          }
           danger
           onOk={() => void doDelete()}
           onClose={() => setDlg(null)}

@@ -8867,3 +8867,15 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 
 /* ===== M90b：设置项里的小标签（当前编辑的是浅色还是深色） ===== */
 .axv-set-tag { margin-left: 6px; padding: 1px 6px; font-size: 10px; font-style: normal; font-weight: 600; line-height: 15px; color: var(--axv-primary); background: var(--axv-primary-soft, rgba(0,0,0,0.06)); border-radius: 999px; vertical-align: 1px; }
+
+/* M101：代码面板里的操作反馈提示（exportNote 原先只在画布状态条处渲染） */
+.axv-code-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: min(78vw, 520px);
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+}

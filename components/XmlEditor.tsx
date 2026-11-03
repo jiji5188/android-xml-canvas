@@ -11,6 +11,7 @@ import { createResResolver } from "@/lib/xml/res-index";
 import { findUsages, type UsageHit } from "@/lib/xml/ai-usages";
 import { ResValuesPanel } from "@/components/ResValuesPanel";
 import { formatResRefHit } from "@/lib/xml/res-refs";
+import { parseRefToken, refAction } from "@/lib/xml/ref-token";
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue, startTransition } from "react";
 import { parseLayoutXml, findNode, serialize, nodeAtLine } from "@/lib/xml/parser";
 import { pathChainOf } from "@/lib/xml/path-chain";
@@ -569,6 +570,8 @@ export function XmlEditor() {
   }, []);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
  const [exportNote, setExportNote] = useState<string>(" ");
+  /** M101：toast 定时器（连续提示时先清上一个，避免新提示被旧定时器提前抹掉） */
+  const noteTimerRef = useRef<number | null>(null);
   /** M11j：正在编辑的生成图标（vector） */
   const [resIcon, setResIcon] = useState<{ name: string; xml: string; attr?: string } | null>(
     null
@@ -2843,8 +2846,10 @@ const findResolved = findResolvedNode;
    *  - 新建文件：先确认文件名 → 再弹系统文件夹选择器（可新建文件夹）→ 按 res 结构一起写
    *  - 依赖资源（生成的 shape/vector/values）一并写到 drawable/ values/ */
   const flashNote = (msg: string, ms = 3600) => {
+    // M101：连续弹提示时旧定时器会把新提示提前抹掉 —— 先清掉上一个
+    if (noteTimerRef.current) window.clearTimeout(noteTimerRef.current);
     setExportNote(msg);
-    window.setTimeout(() => setExportNote(""), ms);
+    noteTimerRef.current = window.setTimeout(() => setExportNote(""), ms);
   };
 
   /** 当前 xml → 落盘输入（四条保存路径共用） */
@@ -3160,32 +3165,79 @@ const findResolved = findResolvedNode;
     async (value: string) => {
       const resolver = createResResolver(aiFileIo, openRel ?? null);
       if (!resolver) {
-        setWsMsg("先打开一个项目目录，才能跳到资源定义（当前是单个文件）");
+        // M101：改成底部 toast —— wsMsg 只在项目面板里看得到，代码面板上点了“没反应”很难受
+        flashNote("先打开一个项目目录，才能跳到资源定义（当前是单个文件）");
         return;
       }
-      setWsMsg(`正在找 ${value} 的定义…`);
       const hit = await resolver.resolve(value);
       if (!hit) {
-        setWsMsg(`项目里没找到 ${value}（可能只在别的模块/依赖库里）`);
+        flashNote(`项目里没找到 ${value}（可能只在别的模块/依赖库里）`);
         return;
       }
       const going = formatResRefHit(hit.ref, hit.rel, hit.line);
       if (openRel && openRel === hit.rel) {
         jumpToCodeLine(hit.line);
-        setWsMsg(going);
+        flashNote(going);
         return;
       }
       const src = activeProjectRef.current?.source;
       if (!src) {
-        setWsMsg(`找到了：${going}，但当前没有可切换的项目源`);
+        flashNote(`找到了：${going}，但当前没有可切换的项目源`);
         return;
       }
       const name = hit.rel.split("/").pop() || hit.rel;
       await loadEntry(src, { kind: "file", name, rel: hit.rel });
       jumpToCodeLine(hit.line);
-      setWsMsg(going);
+      flashNote(going);
     },
-    [aiFileIo, jumpToCodeLine, loadEntry, openRel],
+    [aiFileIo, flashNote, jumpToCodeLine, loadEntry, openRel],
+  );
+
+  /**
+   * M101：删除资源前的影响面 —— 复用已有的 findUsages（带预算扫描，手机上也安全）。
+   * 入参是 `drawable/bg_card` 这种符号，内部拼成 `@drawable/bg_card` 去扫。
+   */
+  const checkDeleteImpact = useCallback(
+    async (symbol: string) => {
+      if (!aiFileIo) return null;
+      const res = await findUsages(aiFileIo, `@${symbol}`, undefined, { maxHits: 40 });
+      return {
+        count: res.hits.length,
+        samples: res.hits.slice(0, 3).map((h) => ({ rel: h.rel, line: h.line })),
+      };
+    },
+    [aiFileIo],
+  );
+
+  /**
+   * M101：代码面板里 Ctrl/Cmd + 点击资源引用 → 按写法分流。
+   *  - @+id/x / @id/x / R.id.x → 打开「查引用」浮层（id 没有独立定义文件）
+   *  - 其余（@string/x、R.string.x、@drawable/x…）→ 跳定义
+   *  - @android:x → 提示「框架内置，跳不了」
+   */
+  const onGotoRef = useCallback(
+    (raw: string) => {
+      const t = parseRefToken(raw);
+      if (!t) return;
+      const a = refAction(t);
+      if (a.kind === "none") {
+        flashNote(
+          a.reason === "framework" ? "@android: 内置资源，没有可跳的定义" : "这里没有可跳转的引用",
+        );
+        return;
+      }
+      // 没打开项目目录时，静默失败让人其妙（wsMsg 在不看项目面板时看不到）→ 用底部 toast 提示
+      if (!aiFileIo) {
+        flashNote("先打开一个项目目录，才能跳转 / 查引用（当前是单个文件）");
+        return;
+      }
+      if (a.kind === "usages") {
+        void openUsages(a.refValue);
+        return;
+      }
+      void openResRef(a.refValue);
+    },
+    [aiFileIo, flashNote, openResRef, openUsages],
   );
 
   return (
@@ -3361,7 +3413,7 @@ const findResolved = findResolvedNode;
         isPathLocked={isPathLocked}
       />
 
-      {/* XML 代码视图（M25i：搬到 components/XmlCodeView.tsx） */}
+      {/* M101：代码面板也要看得到 toast（exportNote 的汉堡包在 CanvasStage，代码 tab 看不到） */}
       <XmlCodeView
         open={mobileTab === "xml" || mobileTab === "values"}
         isMobile={isMobile}
@@ -3374,6 +3426,7 @@ const findResolved = findResolvedNode;
         focusTick={focusTick}
         onCursorLine={onCodeCursorLine}
         onFormat={doFormat}
+        onRefClick={onGotoRef}
         lang={editorLang}
         indent={editorTheme.indent}
         resNames={useMemo(() => {
@@ -3393,6 +3446,11 @@ const findResolved = findResolvedNode;
         fileKey={openRel || saveOrigin?.name || ""}
         onNote={flashNote}
       />
+
+      {/* M101：代码 tab 也能看到操作反馈（exportNote 原本只在画布里的状态条） */}
+      {(mobileTab === "xml" || mobileTab === "values") && exportNote.trim() ? (
+        <div className="axv-toast axv-code-toast">{exportNote}</div>
+      ) : null}
 
       {/* 左侧滑面板（M25g：图标条 + 标题栏搬到 components/LeftRail.tsx） */}
       <LeftRail
@@ -3518,6 +3576,7 @@ const findResolved = findResolvedNode;
               onRefreshProject={() => void refreshActiveProject()}
               fileOps={activeProject ? fileOpsCtxOf(activeProject) : null}
               onFilesChanged={() => setProjectRev((n) => n + 1)}
+              checkDeleteImpact={checkDeleteImpact}
               onNewProject={(suggest) => {
                 setNewProjName(suggest);
                 setNewProjOpen(true);

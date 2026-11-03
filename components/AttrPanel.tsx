@@ -5,6 +5,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { createPortal } from "react-dom";
 import { parseResRef } from "@/lib/xml/res-refs";
 import type { ResolvedNode } from "@/lib/xml/types";
@@ -200,7 +201,7 @@ export function AttrPanel({
       /** 按钮背景：优先 shape 预览，其次 vector 缩略，再次位图，最后纯色 */
       // M53：hex 色块也要过 ARGB→CSS（Android 8 位是 #AARRGGBB，浏览器当 #RRGGBBAA）
       let btnBg: React.CSSProperties = { background: isHex ? argbToCssColor(value) : "transparent" };
-      let btnLabel = isHex ? "" : isRes ? "🖼" : "＋ 选择";
+      let btnLabel = isHex ? "" : isRes ? "🖼" : tt("＋ 选择");
       if (isRes && genXml && /^<(ripple|selector|layer-list|inset|shape)/.test(genXml)) {
         const spec = parseShapeSpec(genXml);
         if (spec) {
@@ -243,7 +244,7 @@ export function AttrPanel({
             className="axv-attr-input"
             style={{ flex: 1, minWidth: 0 }}
             value={drafts[name] ?? value}
-            placeholder="@drawable/bg_card 或 #FFFFFF"
+            placeholder={tt("@drawable/bg_card 或 #FFFFFF")} // i18n-ignore
             spellCheck={false}
             onChange={(e) => setDrafts((d) => ({ ...d, [name]: e.target.value }))}
             onBlur={() => {
@@ -256,12 +257,12 @@ export function AttrPanel({
             className={"axv-dp-btn" + (isHex || isRes ? "" : " is-empty")}
             title={
               isHex
-                ? `当前是纯色 ${value}。点按钮可换成资源、改色或自定义形状`
+                ? tt("当前是纯色 {value}。点按钮可换成资源、改色或自定义形状", { value })
                 : isRes
-                  ? `当前是资源 ${value}。点按钮可换资源或编辑参数`
-                  : "点按钮选择颜色 / 图片 xml 资源 / 自定义形状 / 图标"
+                  ? tt("当前是资源 {value}。点按钮可换资源或编辑参数", { value })
+                  : tt("点按钮选择颜色 / 图片 xml 资源 / 自定义形状 / 图标")
             }
-            aria-label={`选择 ${name} 的背景`}
+            aria-label={tt("选择 {name} 的背景", { name })}
             onClick={() => setDpOpen(name)}
           >
             {btnLabel ? <span className="axv-dp-btn-label">{btnLabel}</span> : <span className="axv-dp-prev" style={btnBg} />}
@@ -274,14 +275,14 @@ export function AttrPanel({
       <div className="axv-attr-color" style={{ display: "flex", gap: 6, alignItems: "center", width: "100%" }}>
         {isHex2 ? (
           <ColorField
-            label={`${name} 颜色`}
+            label={tt("{name} 颜色", { name })}
             value={value}
             fallback="#FFFFFF"
             allowTransparent
             onChange={(css) => commit(name, toAndroidHex(parseColorOr(css, "#FFFFFF")))}
           />
         ) : (
-          <span className="axv-attr-sw" style={{ background: "transparent" }} title="非 hex 颜色值" />
+          <span className="axv-attr-sw" style={{ background: "transparent" }} title={tt("非 hex 颜色值")} />
         )}
         <input
           className="axv-attr-input"
@@ -358,7 +359,7 @@ export function AttrPanel({
       case "color":
         return renderColor(name, value, name === "background" || name === "src" || name === "foreground" || name === "tint");
       default: {
-        const ph: Record<string, string> = { dimen: "8dp / 14sp", number: "0.5", ref: "@+id/xxx 或 parent", string: "…" };
+        const ph: Record<string, string> = { dimen: "8dp / 14sp", number: "0.5", ref: tt("@+id/xxx 或 parent"), string: "…" };
         return (
           <input
             className="axv-attr-input"
@@ -398,7 +399,7 @@ export function AttrPanel({
     <div className="axv-attr-panel">
       {/* M16e：层级链（根 → 当前），比只看单层更清楚自己在哪一层 */}
       {chain && chain.length > 1 ? (
-        <div className="axv-attr-chain" title="层级链：点任意一层可直接选中它">
+        <div className="axv-attr-chain" title={tt("层级链：点任意一层可直接选中它")}>
           {chain.map((c, i) => (
             <span key={c.path} className="axv-chain-item">
               {i > 0 ? <span className="axv-chain-sep">&gt;</span> : null}
@@ -421,11 +422,11 @@ export function AttrPanel({
         {onDeleteNode ? (
           <button
             className="axv-attr-del-node"
-            title="删除当前选中的控件"
-            aria-label="删除当前选中的控件"
+            title={tt("删除当前选中的控件")}
+            aria-label={tt("删除当前选中的控件")}
             onClick={onDeleteNode}
           >
-            🗑 删除
+            {tt("🗑 删除")}
           </button>
         ) : null}
       </div>
@@ -433,11 +434,11 @@ export function AttrPanel({
       {/* M3e：层级（elevation）专用控件——比在属性行里手打数字好找 */}
       <div className="axv-elev">
         <div className="axv-elev-head">
-          <span className="axv-elev-title">层级</span>
+          <span className="axv-elev-title">{tt("层级")}</span>
           <span className="axv-elev-val">
             {tzDp > 0 ? `Z ${elevDp + tzDp}dp` : `${elevDp}dp`}
           </span>
-          <span className="axv-elev-tip" title="抬得越高越靠上层：能盖住兄弟控件，并带阴影（Android: elevation）">
+          <span className="axv-elev-tip" title={tt("抬得越高越靠上层：能盖住兄弟控件，并带阴影（Android: elevation）")}>
             elevation
           </span>
         </div>
@@ -448,7 +449,7 @@ export function AttrPanel({
           max={24}
           step={1}
           value={elevDp > 24 ? 24 : elevDp}
-          aria-label="层级高度"
+          aria-label={tt("层级高度")}
           onChange={(e) => commitElev(Number(e.target.value))}
         />
         <div className="axv-elev-presets">
@@ -456,7 +457,7 @@ export function AttrPanel({
             <button
               key={v}
               className={"axv-elev-chip" + (elevDp === v ? " is-on" : "")}
-              title={v === 0 ? "平放（无阴影，不抬升）" : `抬升 ${v}dp`}
+              title={v === 0 ? tt("平放（无阴影，不抬升）") : tt("抬升 {v}dp", { v })}
               onClick={() => commitElev(v)}
             >
               {v}
@@ -473,7 +474,7 @@ export function AttrPanel({
           className={"axv-attr-tab" + (tab === "attrs" ? " is-on" : "")}
           onClick={() => setTab("attrs")}
         >
-          属性
+          {tt("属性")}
         </button>
         <button
           role="tab"
@@ -481,7 +482,7 @@ export function AttrPanel({
           className={"axv-attr-tab" + (tab === "docs" ? " is-on" : "")}
           onClick={() => setTab("docs")}
         >
-          文档
+          {tt("文档")}
         </button>
       </div>
 
@@ -500,7 +501,7 @@ export function AttrPanel({
                 rel="noreferrer noopener"
                 title={url}
               >
-                官方文档
+                {tt("官方文档")}
                 <span className="msr" aria-hidden="true">open_in_new</span>
               </a>
             ) : null;
@@ -519,7 +520,7 @@ export function AttrPanel({
                 <div className="axv-doc-row">
                   <code className="axv-doc-name">{a.name}</code>
                   <span className="axv-doc-type">{a.type}</span>
-                  {owned.has(a.name) ? <span className="axv-doc-badge">已设</span> : null}
+                  {owned.has(a.name) ? <span className="axv-doc-badge">{tt("已设")}</span> : null}
                 </div>
                 <div className="axv-doc-desc">{a.desc}</div>
                 {a.values?.length ? (
@@ -540,29 +541,31 @@ export function AttrPanel({
         <div className="axv-attr-filter">
           <input
             className="axv-attr-filter-input"
-            placeholder={`过滤 ${allRows.length} 个属性…`}
-            aria-label="过滤属性"
+            placeholder={tt("过滤 {n} 个属性…", { n: allRows.length })}
+            aria-label={tt("过滤属性")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
           <button
             type="button"
             className={"axv-attr-filter-toggle" + (onlyChanged ? " is-on" : "")}
-            title="只显示与默认值不同的属性"
+            title={tt("只显示与默认值不同的属性")}
             onClick={() => setOnlyChanged((v) => !v)}
           >
-            只看已修改 {changedCount}
+            {tt("只看已修改 {n}", { n: changedCount })}
           </button>
           {qq ? (
-            <button type="button" className="axv-attr-filter-clear" title="清空搜索" onClick={() => setQ("")}>✕</button>
+            <button type="button" className="axv-attr-filter-clear" title={tt("清空搜索")} onClick={() => setQ("")}>
+              ✕
+            </button>
           ) : null}
         </div>
       ) : null}
       <div className="axv-attr-rows">
-        {allRows.length === 0 && <div className="axv-attr-empty">该节点还没有属性</div>}
+        {allRows.length === 0 && <div className="axv-attr-empty">{tt("该节点还没有属性")}</div>}
         {allRows.length > 0 && rows.length === 0 && (
           <div className="axv-attr-empty">
-            {onlyChanged && !qq ? `没有已修改的属性（共 ${allRows.length} 个都是默认值）` : `没有匹配「${q}」的属性`}
+            {onlyChanged && !qq ? tt("没有已修改的属性（共 {n} 个都是默认值）", { n: allRows.length }) : tt("没有匹配「{q}」的属性", { q })}
           </div>
         )}
         {rows.map(([name, value]) => {
@@ -576,8 +579,8 @@ export function AttrPanel({
                 {onOpenRef && parseResRef(vstr) ? (
                   <button
                     className="axv-attr-jump"
-                    title={`跳到定义：${vstr}`}
-                    aria-label={`跳到 ${vstr} 的定义`}
+                    title={tt("跳到定义：{v}", { v: vstr })}
+                    aria-label={tt("跳到 {v} 的定义", { v: vstr })}
                     onClick={() => onOpenRef(vstr)}
                   >
                     <span className="msr" aria-hidden="true">arrow_outward</span>
@@ -586,8 +589,8 @@ export function AttrPanel({
                 {onFindUsages && parseResRef(vstr) ? (
                   <button
                     className="axv-attr-uses"
-                    title={`查看 ${vstr} 在哪些地方被引用`}
-                    aria-label={`查看 ${vstr} 的引用`}
+                    title={tt("查看 {v} 在哪些地方被引用", { v: vstr })}
+                    aria-label={tt("查看 {v} 的引用", { v: vstr })}
                     onClick={() => onFindUsages(vstr)}
                   >
                     <span className="msr" aria-hidden="true">travel_explore</span>
@@ -597,7 +600,7 @@ export function AttrPanel({
                   <button
                     className="axv-attr-info"
                     title={hint}
-                    aria-label={`${name} 说明`}
+                    aria-label={tt("{name} 说明", { name })}
                     onClick={() => setHintOpen((h) => (h === name ? null : name))}
                   >
                     ?
@@ -605,8 +608,8 @@ export function AttrPanel({
                 ) : null}
                 <button
                   className="axv-attr-del"
-                  title={`删除 ${name}`}
-                  aria-label={`删除 ${name}`}
+                  title={tt("删除 {name}", { name })}
+                  aria-label={tt("删除 {name}", { name })}
                   onClick={() => onRemove(name)}
                 >
                   ✕
@@ -618,7 +621,7 @@ export function AttrPanel({
         })}
       </div>
       <button className="axv-attr-add" onClick={onAddAttr}>
-        ＋ 添加属性
+        {tt("＋ 添加属性")}
       </button>
         </>
       )}

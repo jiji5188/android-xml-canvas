@@ -49,6 +49,7 @@ import { java } from "@codemirror/lang-java";
 import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
 import { computeSuggest, type SuggestKind } from "@/lib/xml/keyword-suggest";
+import { computeJavaSuggest, JAVA_SYMBOLS } from "@/lib/xml/java-vocab";
 import { estimateSuggestSize, placeSuggest, type Placement } from "@/lib/xml/suggest-position";
 import { SYMBOLS } from "./XmlCodeEditor";
 
@@ -301,6 +302,9 @@ export function CodeEditor({
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const langComp = useRef(new Compartment());
+  /** M96：候选列表按语言分流（xml 走标签/属性，java 走关键字/类/方法） */
+  const langRef = useRef(lang);
+  langRef.current = lang;
   /** M40：缩进宽度（indentUnit + tabSize）单独一个 compartment，改设置即时生效 */
   const indentComp = useRef(new Compartment());
   /** 回调放进 ref：view 只建一次，避免每次 render 重建 */
@@ -376,7 +380,10 @@ export function CodeEditor({
     const head = sel.head;
     const line = v.state.doc.lineAt(head);
     const col = head - line.from + 1;
-    const ctx = computeSuggest(v.state.doc.toString(), { line: line.number, col }, resNamesRef.current);
+    const ctx =
+      langRef.current === "java"
+        ? computeJavaSuggest(v.state.doc.toString(), { line: line.number, col })
+        : computeSuggest(v.state.doc.toString(), { line: line.number, col }, resNamesRef.current);
     if (!ctx) {
       setSugBoth(null);
       return;
@@ -805,7 +812,7 @@ export function CodeEditor({
             <span className="msr" aria-hidden="true">format_align_left</span>
           </button>
         ) : null}
-        {SYMBOLS.map((s) => (
+        {(lang === "java" ? JAVA_SYMBOLS : SYMBOLS).map((s) => (
           <button
             key={s.label}
             type="button"

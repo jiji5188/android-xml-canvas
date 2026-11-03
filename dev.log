@@ -6,664 +6,1558 @@
 ▲ Next.js 16.4.2 (Turbopack)
 - Local:         http://localhost:3000
 - Network:       http://192.168.31.101:3000
-✓ Ready in 351ms
-✓ Running next.config.ts took 74ms
-⚠ Slow filesystem detected. The benchmark took 241ms. If \\?\D:\android-xml-canvas\repo\.next\dev is a network drive, consider moving it to a local folder.
+✓ Ready in 758ms
+✓ Running next.config.ts took 28ms
+
+⚠ Slow filesystem detected. The benchmark took 297ms. If \\?\D:\android-xml-canvas\repo\.next\dev is a network drive, consider moving it to a local folder.
 See more: https://nextjs.org/docs/app/guides/local-development
+○ Compiling /jtest ...
+⨯ ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  [90m2 |[0m
+  [90m3 |[0m [36mimport[0m { useState } [36mfrom[0m [32m"react"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m [33mCodeEditor[0m [36mfrom[0m [32m"@/components/CodeEditor"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m [32m"@/components/xml-canvas.css"[0m;
+  [90m6 |[0m
+  [90m7 |[0m [36mconst[0m [33mSAMPLE[0m = [32m`public class MainActivity extends AppCompatActivity {[0m
 
-○ Compiling / ...
- GET / 200 in 631ms (next.js: 507ms, application-code: 125ms)
- GET /xml/ 200 in 58ms (next.js: 4ms, application-code: 54ms)
- GET /cvtest/?v=26 200 in 94ms (next.js: 5ms, application-code: 89ms)
- GET /cvtest/?v=26 200 in 31ms (next.js: 1.5ms, application-code: 29ms)
-✓ Compiled in 1002ms
- GET /cvtest/?v=27 200 in 107ms (next.js: 1.4ms, application-code: 106ms)
-✓ Compiled in 135ms
- GET /cvtest/?v=28 200 in 62ms (next.js: 2ms, application-code: 60ms)
-[browser] Received NaN for the `y` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `height` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `cy` attribute. If this is expected, cast the value to a string. 
-✓ Compiled in 247ms
-✓ Compiled in 1560ms
-✓ Compiled in 154ms
-✓ Compiled in 97ms
-✓ Compiled in 108ms
-✓ Compiled in 646ms
-✓ Compiled in 140ms
- GET /cvtest/?v=29 200 in 78ms (next.js: 3ms, application-code: 75ms)
-✓ Compiled in 156ms
-✓ Compiled in 182ms
- GET /cvtest/?v=30 200 in 30ms (next.js: 0.8ms, application-code: 29ms)
-✓ Compiled in 174ms
- GET /cvtest/?v=31 200 in 31ms (next.js: 0.7ms, application-code: 30ms)
-✓ Compiled in 135ms
- GET /cvtest/?v=28 200 in 112ms (next.js: 9ms, application-code: 103ms)
-✓ Compiled in 1130ms
-✓ Compiled in 4.3s
-✓ Compiled in 205ms
-✓ Compiled in 481ms
- GET /xml/ 200 in 420ms (next.js: 1.0ms, application-code: 419ms)
- GET /cvtest/?v=32 200 in 92ms (next.js: 7ms, application-code: 85ms)
- GET /cvtest/?v=27 200 in 28ms (next.js: 0.5ms, application-code: 27ms)
- GET /cvtest/?v=28 200 in 30ms (next.js: 1.0ms, application-code: 29ms)
- GET /cvtest/?v=33 200 in 47ms (next.js: 0.5ms, application-code: 46ms)
- GET /cvtest/?v=27 200 in 31ms (next.js: 0.5ms, application-code: 30ms)
- GET /cvtest/?v=33 200 in 192ms (next.js: 1.2ms, application-code: 191ms)
- GET /cvtest/?v=33 200 in 26ms (next.js: 0.6ms, application-code: 25ms)
-✓ Compiled in 6.2s
-✓ Compiled in 170ms
- GET /cvtest/?v=28 200 in 25ms (next.js: 0.8ms, application-code: 25ms)
-✓ Compiled in 290ms
- GET /cvtest/?v=34 200 in 203ms (next.js: 0.9ms, application-code: 202ms)
-✓ Compiled in 625ms
-✓ Compiled in 4.2s
- GET /cvtest/?v=35 200 in 94ms (next.js: 23ms, application-code: 71ms)
-✓ Compiled in 1082ms
-✓ Compiled in 4.9s
-✓ Compiled in 348ms
-✓ Compiled in 131ms
-✓ Compiled in 96ms
-✓ Compiled in 136ms
-✓ Compiled in 102ms
- GET /xml/ 200 in 88ms (next.js: 1.6ms, application-code: 86ms)
-✓ Compiled in 121ms
- GET /cvtest/?v=40 200 in 109ms (next.js: 13ms, application-code: 97ms)
-✓ Compiled in 116ms
- GET /cvtest/?v=41 200 in 27ms (next.js: 0.4ms, application-code: 27ms)
-✓ Compiled in 118ms
- GET /cvtest/?v=42 200 in 45ms (next.js: 4ms, application-code: 41ms)
-✓ Compiled in 100ms
- GET /cvtest/?v=43 200 in 62ms (next.js: 1.8ms, application-code: 60ms)
-✓ Compiled in 103ms
- GET /cvtest/?v=44 200 in 89ms (next.js: 3ms, application-code: 86ms)
- GET /xml/ 200 in 37ms (next.js: 1.3ms, application-code: 36ms)
-✓ Compiled in 101ms
- GET /cvtest/?v=45 200 in 42ms (next.js: 0.8ms, application-code: 41ms)
- GET /xml/ 200 in 42ms (next.js: 1.5ms, application-code: 41ms)
-[browser] Received NaN for the `y` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `height` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `cy` attribute. If this is expected, cast the value to a string. 
-✓ Compiled in 2.1s
-✓ Compiled in 137ms
-✓ Compiled in 137ms
- GET /cvtest/?v=46 200 in 46ms (next.js: 3ms, application-code: 43ms)
-✓ Compiled in 1436ms
- GET /xml/ 200 in 67ms (next.js: 4ms, application-code: 63ms)
- GET /cvtest/?v=46 404 in 2.5s (next.js: 2.5s, application-code: 39ms)
- GET /cvtest/?v=46 404 in 79ms (next.js: 28ms, application-code: 51ms)
- GET /cvtest/?v=46 404 in 2.4s (next.js: 2.3s, application-code: 92ms)
-✓ Compiled in 4.3s
-✓ Compiled in 174ms
-✓ Compiled in 93ms
-✓ Compiled in 97ms
-✓ Compiled in 234ms
-✓ Compiled in 457ms
-✓ Compiled in 245ms
-✓ Compiled in 135ms
- GET /cvtest/?v=46 404 in 65ms (next.js: 20ms, application-code: 45ms)
-✓ Compiled in 450ms
- GET / 200 in 110ms (next.js: 0.5ms, application-code: 110ms)
- GET /xml/ 200 in 51ms (next.js: 11ms, application-code: 41ms)
- GET /cvtest/?v=46 404 in 320ms (next.js: 298ms, application-code: 22ms)
- GET /cvtest/?v=46 404 in 194ms (next.js: 7ms, application-code: 187ms)
-○ Compiling /m88test ...
-⨯ ./app/m88test/page.tsx:4:1
-Error: Export IconCanvasEditor doesn't exist in target module
-  [90m2 |[0m [90m// 临时验证页（验完删除）：直接挂 IconCanvasEditor[0m
-  [90m3 |[0m [36mimport[0m * [36mas[0m [33mReact[0m [36mfrom[0m [32m"react"[0m;
-[31m[1m>[0m [90m4 |[0m [36mimport[0m { [33mIconCanvasEditor[0m } [36mfrom[0m [32m"@/components/IconCanvasEditor"[0m;
-  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
-  [90m5 |[0m
-  [90m6 |[0m [36mconst[0m [33mXML[0m = [32m`<vector xmlns:android="http://schemas.android.com/apk/res/android"[0m
-  [90m7 |[0m [32m    android:width="24dp" android:height="24dp"[0m
-
-The export IconCanvasEditor was not found in module [project]/components/IconCanvasEditor.tsx [app-client] (ecmascript).
-Did you mean to import default?
+The export default was not found in module [project]/components/CodeEditor.tsx [app-client] (ecmascript).
+Did you mean to import CodeEditor?
 All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
 Import traces:
   Client Component Browser:
-    ./app/m88test/page.tsx [Client Component Browser]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
 
   Client Component SSR:
-    ./app/m88test/page.tsx [Client Component SSR]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component]
 
 
 
-./app/m88test/page.tsx:4:1
-Error: Export IconCanvasEditor doesn't exist in target module
-  [90m2 |[0m [90m// 临时验证页（验完删除）：直接挂 IconCanvasEditor[0m
-  [90m3 |[0m [36mimport[0m * [36mas[0m [33mReact[0m [36mfrom[0m [32m"react"[0m;
-[31m[1m>[0m [90m4 |[0m [36mimport[0m { [33mIconCanvasEditor[0m } [36mfrom[0m [32m"@/components/IconCanvasEditor"[0m;
-  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
-  [90m5 |[0m
-  [90m6 |[0m [36mconst[0m [33mXML[0m = [32m`<vector xmlns:android="http://schemas.android.com/apk/res/android"[0m
-  [90m7 |[0m [32m    android:width="24dp" android:height="24dp"[0m
+./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  [90m2 |[0m
+  [90m3 |[0m [36mimport[0m { useState } [36mfrom[0m [32m"react"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m [33mCodeEditor[0m [36mfrom[0m [32m"@/components/CodeEditor"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m [32m"@/components/xml-canvas.css"[0m;
+  [90m6 |[0m
+  [90m7 |[0m [36mconst[0m [33mSAMPLE[0m = [32m`public class MainActivity extends AppCompatActivity {[0m
 
-The export IconCanvasEditor was not found in module [project]/components/IconCanvasEditor.tsx [app-ssr] (ecmascript).
-Did you mean to import default?
+The export default was not found in module [project]/components/CodeEditor.tsx [app-ssr] (ecmascript).
+Did you mean to import CodeEditor?
 All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
 Import traces:
   Client Component Browser:
-    ./app/m88test/page.tsx [Client Component Browser]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
 
   Client Component SSR:
-    ./app/m88test/page.tsx [Client Component SSR]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component]
 
 
-○ Compiling /_error ...
-[browser] ./app/m88test/page.tsx:4:1
-Error: Export IconCanvasEditor doesn't exist in target module
-  2 | // 临时验证页（验完删除）：直接挂 IconCanvasEditor
-  3 | import * as React from "react";
-> 4 | import { IconCanvasEditor } from "@/components/IconCanvasEditor";
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  5 |
-  6 | const XML = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
-  7 |     android:width="24dp" android:height="24dp"
+ GET /jtest/ 500 in 166ms (next.js: 95ms, application-code: 72ms)
+[browser] Uncaught Error: ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  2 |
+  3 | import { useState } from "react";
+> 4 | import CodeEditor from "@/components/CodeEditor";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 | import "@/components/xml-canvas.css";
+  6 |
+  7 | const SAMPLE = `public class MainActivity extends AppCompatActivity {
 
-The export IconCanvasEditor was not found in module [project]/components/IconCanvasEditor.tsx [app-client] (ecmascript).
-Did you mean to import default?
+The export default was not found in module [project]/components/CodeEditor.tsx [app-client] (ecmascript).
+Did you mean to import CodeEditor?
 All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
 Import traces:
   Client Component Browser:
-    ./app/m88test/page.tsx [Client Component Browser]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
 
   Client Component SSR:
-    ./app/m88test/page.tsx [Client Component SSR]
-    ./app/m88test/page.tsx [Server Component] 
-[browser] ./app/m88test/page.tsx:4:1
-Error: Export IconCanvasEditor doesn't exist in target module
-  2 | // 临时验证页（验完删除）：直接挂 IconCanvasEditor
-  3 | import * as React from "react";
-> 4 | import { IconCanvasEditor } from "@/components/IconCanvasEditor";
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  5 |
-  6 | const XML = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
-  7 |     android:width="24dp" android:height="24dp"
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component]
 
-The export IconCanvasEditor was not found in module [project]/components/IconCanvasEditor.tsx [app-ssr] (ecmascript).
-Did you mean to import default?
+
+[browser] ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  2 |
+  3 | import { useState } from "react";
+> 4 | import CodeEditor from "@/components/CodeEditor";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 | import "@/components/xml-canvas.css";
+  6 |
+  7 | const SAMPLE = `public class MainActivity extends AppCompatActivity {
+
+The export default was not found in module [project]/components/CodeEditor.tsx [app-client] (ecmascript).
+Did you mean to import CodeEditor?
 All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
 Import traces:
   Client Component Browser:
-    ./app/m88test/page.tsx [Client Component Browser]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
 
   Client Component SSR:
-    ./app/m88test/page.tsx [Client Component SSR]
-    ./app/m88test/page.tsx [Server Component] 
-[browser] ./app/m88test/page.tsx:4:1
-Error: Export IconCanvasEditor doesn't exist in target module
-  2 | // 临时验证页（验完删除）：直接挂 IconCanvasEditor
-  3 | import * as React from "react";
-> 4 | import { IconCanvasEditor } from "@/components/IconCanvasEditor";
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  5 |
-  6 | const XML = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
-  7 |     android:width="24dp" android:height="24dp"
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component] 
+[browser] ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  2 |
+  3 | import { useState } from "react";
+> 4 | import CodeEditor from "@/components/CodeEditor";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 | import "@/components/xml-canvas.css";
+  6 |
+  7 | const SAMPLE = `public class MainActivity extends AppCompatActivity {
 
-The export IconCanvasEditor was not found in module [project]/components/IconCanvasEditor.tsx [app-client] (ecmascript).
-Did you mean to import default?
+The export default was not found in module [project]/components/CodeEditor.tsx [app-ssr] (ecmascript).
+Did you mean to import CodeEditor?
 All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
 Import traces:
   Client Component Browser:
-    ./app/m88test/page.tsx [Client Component Browser]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
 
   Client Component SSR:
-    ./app/m88test/page.tsx [Client Component SSR]
-    ./app/m88test/page.tsx [Server Component] 
-[browser] ./app/m88test/page.tsx:4:1
-Error: Export IconCanvasEditor doesn't exist in target module
-  2 | // 临时验证页（验完删除）：直接挂 IconCanvasEditor
-  3 | import * as React from "react";
-> 4 | import { IconCanvasEditor } from "@/components/IconCanvasEditor";
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  5 |
-  6 | const XML = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
-  7 |     android:width="24dp" android:height="24dp"
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component] 
+[browser] ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  2 |
+  3 | import { useState } from "react";
+> 4 | import CodeEditor from "@/components/CodeEditor";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 | import "@/components/xml-canvas.css";
+  6 |
+  7 | const SAMPLE = `public class MainActivity extends AppCompatActivity {
 
-The export IconCanvasEditor was not found in module [project]/components/IconCanvasEditor.tsx [app-ssr] (ecmascript).
-Did you mean to import default?
+The export default was not found in module [project]/components/CodeEditor.tsx [app-client] (ecmascript).
+Did you mean to import CodeEditor?
 All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
 Import traces:
   Client Component Browser:
-    ./app/m88test/page.tsx [Client Component Browser]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
 
   Client Component SSR:
-    ./app/m88test/page.tsx [Client Component SSR]
-    ./app/m88test/page.tsx [Server Component] 
- GET /m88test/ 500 in 6.5s (next.js: 6.3s, application-code: 238ms)
-[browser] ./app/m88test/page.tsx:4:1
-Error: Export IconCanvasEditor doesn't exist in target module
-  2 | // 临时验证页（验完删除）：直接挂 IconCanvasEditor
-  3 | import * as React from "react";
-> 4 | import { IconCanvasEditor } from "@/components/IconCanvasEditor";
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  5 |
-  6 | const XML = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
-  7 |     android:width="24dp" android:height="24dp"
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component] 
+[browser] ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  2 |
+  3 | import { useState } from "react";
+> 4 | import CodeEditor from "@/components/CodeEditor";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 | import "@/components/xml-canvas.css";
+  6 |
+  7 | const SAMPLE = `public class MainActivity extends AppCompatActivity {
 
-The export IconCanvasEditor was not found in module [project]/components/IconCanvasEditor.tsx [app-client] (ecmascript).
-Did you mean to import default?
+The export default was not found in module [project]/components/CodeEditor.tsx [app-ssr] (ecmascript).
+Did you mean to import CodeEditor?
 All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
 Import traces:
   Client Component Browser:
-    ./app/m88test/page.tsx [Client Component Browser]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
 
   Client Component SSR:
-    ./app/m88test/page.tsx [Client Component SSR]
-    ./app/m88test/page.tsx [Server Component] 
-[browser] ./app/m88test/page.tsx:4:1
-Error: Export IconCanvasEditor doesn't exist in target module
-  2 | // 临时验证页（验完删除）：直接挂 IconCanvasEditor
-  3 | import * as React from "react";
-> 4 | import { IconCanvasEditor } from "@/components/IconCanvasEditor";
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  5 |
-  6 | const XML = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
-  7 |     android:width="24dp" android:height="24dp"
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component] 
+⨯ ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  [90m2 |[0m
+  [90m3 |[0m [36mimport[0m { useState } [36mfrom[0m [32m"react"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m [33mCodeEditor[0m [36mfrom[0m [32m"@/components/CodeEditor"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m [32m"@/components/xml-canvas.css"[0m;
+  [90m6 |[0m
+  [90m7 |[0m [36mconst[0m [33mSAMPLE[0m = [32m`public class MainActivity extends AppCompatActivity {[0m
 
-The export IconCanvasEditor was not found in module [project]/components/IconCanvasEditor.tsx [app-ssr] (ecmascript).
-Did you mean to import default?
+The export default was not found in module [project]/components/CodeEditor.tsx [app-client] (ecmascript).
+Did you mean to import CodeEditor?
 All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
 Import traces:
   Client Component Browser:
-    ./app/m88test/page.tsx [Client Component Browser]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
 
   Client Component SSR:
-    ./app/m88test/page.tsx [Client Component SSR]
-    ./app/m88test/page.tsx [Server Component] 
-[browser] ./app/m88test/page.tsx:4:1
-Error: Export IconCanvasEditor doesn't exist in target module
-  2 | // 临时验证页（验完删除）：直接挂 IconCanvasEditor
-  3 | import * as React from "react";
-> 4 | import { IconCanvasEditor } from "@/components/IconCanvasEditor";
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  5 |
-  6 | const XML = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
-  7 |     android:width="24dp" android:height="24dp"
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component]
 
-The export IconCanvasEditor was not found in module [project]/components/IconCanvasEditor.tsx [app-client] (ecmascript).
-Did you mean to import default?
+
+
+./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  [90m2 |[0m
+  [90m3 |[0m [36mimport[0m { useState } [36mfrom[0m [32m"react"[0m;
+[31m[1m>[0m [90m4 |[0m [36mimport[0m [33mCodeEditor[0m [36mfrom[0m [32m"@/components/CodeEditor"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m5 |[0m [36mimport[0m [32m"@/components/xml-canvas.css"[0m;
+  [90m6 |[0m
+  [90m7 |[0m [36mconst[0m [33mSAMPLE[0m = [32m`public class MainActivity extends AppCompatActivity {[0m
+
+The export default was not found in module [project]/components/CodeEditor.tsx [app-ssr] (ecmascript).
+Did you mean to import CodeEditor?
 All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
 Import traces:
   Client Component Browser:
-    ./app/m88test/page.tsx [Client Component Browser]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
 
   Client Component SSR:
-    ./app/m88test/page.tsx [Client Component SSR]
-    ./app/m88test/page.tsx [Server Component] 
-[browser] ./app/m88test/page.tsx:4:1
-Error: Export IconCanvasEditor doesn't exist in target module
-  2 | // 临时验证页（验完删除）：直接挂 IconCanvasEditor
-  3 | import * as React from "react";
-> 4 | import { IconCanvasEditor } from "@/components/IconCanvasEditor";
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  5 |
-  6 | const XML = `<vector xmlns:android="http://schemas.android.com/apk/res/android"
-  7 |     android:width="24dp" android:height="24dp"
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component]
 
-The export IconCanvasEditor was not found in module [project]/components/IconCanvasEditor.tsx [app-ssr] (ecmascript).
-Did you mean to import default?
+
+ GET /jtest/ 500 in 12ms (next.js: 7ms, application-code: 5ms)
+[browser] ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  2 |
+  3 | import { useState } from "react";
+> 4 | import CodeEditor from "@/components/CodeEditor";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 | import "@/components/xml-canvas.css";
+  6 |
+  7 | const SAMPLE = `public class MainActivity extends AppCompatActivity {
+
+The export default was not found in module [project]/components/CodeEditor.tsx [app-client] (ecmascript).
+Did you mean to import CodeEditor?
 All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
 Import traces:
   Client Component Browser:
-    ./app/m88test/page.tsx [Client Component Browser]
-    ./app/m88test/page.tsx [Server Component]
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
 
   Client Component SSR:
-    ./app/m88test/page.tsx [Client Component SSR]
-    ./app/m88test/page.tsx [Server Component] 
-✓ Compiled in 115ms
- GET /cvtest/?v=46 404 in 100ms (next.js: 54ms, application-code: 46ms)
- GET /xml/ 200 in 53ms (next.js: 17ms, application-code: 37ms)
- GET /cvtest/?v=46 404 in 42ms (next.js: 16ms, application-code: 26ms)
- GET /m88test/ 200 in 32ms (next.js: 4ms, application-code: 29ms)
- GET /cvtest/?v=46 404 in 121ms (next.js: 8ms, application-code: 112ms)
- GET /m88test/?v=1 200 in 42ms (next.js: 0.9ms, application-code: 41ms)
- GET /m88test/?v=1 200 in 29ms (next.js: 0.6ms, application-code: 28ms)
- GET /m88test/?v=1 200 in 28ms (next.js: 0.7ms, application-code: 28ms)
- GET /m88test/?v=1 200 in 27ms (next.js: 0.9ms, application-code: 26ms)
- GET /m88test/?v=1 200 in 42ms (next.js: 1.5ms, application-code: 41ms)
-✓ Compiled in 648ms
-✓ Compiled in 148ms
- GET /m88test/?v=1 200 in 108ms (next.js: 11ms, application-code: 97ms)
- GET /xml/ 200 in 80ms (next.js: 3ms, application-code: 78ms)
- GET /m88test/?v=1 404 in 2.8s (next.js: 2.8s, application-code: 27ms)
- GET /cvtest/?v=46 404 in 2.8s (next.js: 2.7s, application-code: 101ms)
- GET /cvtest/?v=46 404 in 77ms (next.js: 8ms, application-code: 69ms)
- GET /m88test/?v=1 404 in 49ms (next.js: 10ms, application-code: 40ms)
- GET /m88test/?v=1 404 in 3.8s (next.js: 3.7s, application-code: 85ms)
- GET /xml/ 200 in 92ms (next.js: 1.3ms, application-code: 91ms)
- GET /xml/ 200 in 33ms (next.js: 0.5ms, application-code: 33ms)
-✓ Compiled in 7.9s
-✓ Compiled in 200ms
- GET /xml/ 200 in 103ms (next.js: 1.4ms, application-code: 102ms)
- GET /xml/ 200 in 108ms (next.js: 78ms, application-code: 30ms)
- GET /xml/ 200 in 33ms (next.js: 2ms, application-code: 31ms)
- GET /m88test/?v=9 200 in 103ms (next.js: 20ms, application-code: 83ms)
-[browser] Received NaN for the `y` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `height` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `cy` attribute. If this is expected, cast the value to a string. 
-✓ Compiled in 250ms
- GET /m88test/?v=10 200 in 125ms (next.js: 0.9ms, application-code: 124ms)
- GET /xml/ 200 in 276ms (next.js: 1.9ms, application-code: 274ms)
- GET /m88test/?v=10 404 in 819ms (next.js: 561ms, application-code: 258ms)
- GET /xml/ 200 in 284ms (next.js: 183ms, application-code: 101ms)
- GET /xml/ 200 in 238ms (next.js: 12ms, application-code: 226ms)
- GET /m88test/?v=10 404 in 243ms (next.js: 63ms, application-code: 180ms)
- GET /m88test/?v=10 404 in 34ms (next.js: 8ms, application-code: 27ms)
- GET /m88test/?v=10 404 in 36ms (next.js: 6ms, application-code: 30ms)
- GET /m88test/?v=10 404 in 30ms (next.js: 7ms, application-code: 23ms)
- GET /m88test/?v=10 404 in 34ms (next.js: 9ms, application-code: 25ms)
- GET /m88test/?v=10 404 in 134ms (next.js: 45ms, application-code: 89ms)
-✓ Compiled in 433ms
- GET /xml/ 200 in 141ms (next.js: 5ms, application-code: 136ms)
- GET /xml/ 200 in 139ms (next.js: 40ms, application-code: 100ms)
- GET /m88test/?v=10 200 in 90ms (next.js: 3ms, application-code: 86ms)
- GET /xml/ 200 in 48ms (next.js: 4ms, application-code: 43ms)
- GET /m88test/?v=20 200 in 291ms (next.js: 13ms, application-code: 277ms)
- GET /xml/ 200 in 160ms (next.js: 2ms, application-code: 158ms)
- GET /xml/ 200 in 159ms (next.js: 17ms, application-code: 142ms)
- GET /m88test/?v=10 404 in 420ms (next.js: 292ms, application-code: 128ms)
- GET /m88test/?v=20 404 in 465ms (next.js: 350ms, application-code: 115ms)
- GET /xml/ 200 in 169ms (next.js: 6ms, application-code: 163ms)
- GET /m88test/?v=10 404 in 281ms (next.js: 58ms, application-code: 223ms)
- GET /m88test/?v=20 404 in 265ms (next.js: 35ms, application-code: 230ms)
- GET /xml/ 200 in 29ms (next.js: 0.9ms, application-code: 28ms)
-✓ Compiled in 598ms
- GET /xml/ 200 in 290ms (next.js: 8ms, application-code: 282ms)
- GET /xml/ 200 in 286ms (next.js: 128ms, application-code: 158ms)
- GET /m88test/?v=20 200 in 132ms (next.js: 5ms, application-code: 127ms)
- GET /m88test/?v=10 200 in 119ms (next.js: 4ms, application-code: 116ms)
- GET /xml/ 200 in 48ms (next.js: 3ms, application-code: 45ms)
- GET /m88test/?v=30 200 in 89ms (next.js: 1.7ms, application-code: 87ms)
-✓ Compiled in 1043ms
- GET /m88test/?v=31 200 in 680ms (next.js: 39ms, application-code: 641ms)
- GET /xml/ 200 in 134ms (next.js: 1.9ms, application-code: 132ms)
- GET /xml/ 200 in 134ms (next.js: 114ms, application-code: 20ms)
- GET /m88test/?v=31 404 in 3.5s (next.js: 3.2s, application-code: 328ms)
- GET /xml/ 200 in 334ms (next.js: 94ms, application-code: 240ms)
- GET /m88test/?v=20 404 in 3.6s (next.js: 3.5s, application-code: 105ms)
- GET /m88test/?v=10 404 in 3.5s (next.js: 3.4s, application-code: 80ms)
- GET /m88test/?v=31 404 in 789ms (next.js: 37ms, application-code: 752ms)
- GET /m88test/?v=20 404 in 789ms (next.js: 65ms, application-code: 723ms)
- GET /m88test/?v=10 404 in 810ms (next.js: 25ms, application-code: 785ms)
- GET /m88test/?v=31 404 in 207ms (next.js: 189ms, application-code: 18ms)
- GET /xml/ 200 in 28ms (next.js: 0.7ms, application-code: 27ms)
-✓ Compiled in 1544ms
- GET /xml/ 200 in 482ms (next.js: 458ms, application-code: 24ms)
- GET /xml/ 200 in 484ms (next.js: 1.3ms, application-code: 483ms)
- GET /xml/ 200 in 17ms (next.js: 0.7ms, application-code: 16ms)
- GET /m88test/?v=10 200 in 271ms (next.js: 2ms, application-code: 269ms)
- GET /m88test/?v=31 200 in 270ms (next.js: 214ms, application-code: 57ms)
- GET /m88test/?v=40 200 in 87ms (next.js: 0.7ms, application-code: 87ms)
- GET /xml/ 200 in 327ms (next.js: 8ms, application-code: 319ms)
- GET /xml/ 200 in 324ms (next.js: 56ms, application-code: 269ms)
- GET /m88test/?v=31 404 in 536ms (next.js: 299ms, application-code: 237ms)
- GET /m88test/?v=10 404 in 593ms (next.js: 411ms, application-code: 182ms)
- GET /m88test/?v=40 404 in 584ms (next.js: 427ms, application-code: 158ms)
- GET /xml/ 200 in 421ms (next.js: 7ms, application-code: 414ms)
- GET /m88test/?v=31 404 in 766ms (next.js: 98ms, application-code: 668ms)
- GET /m88test/?v=10 404 in 464ms (next.js: 115ms, application-code: 349ms)
- GET /m88test/?v=40 404 in 467ms (next.js: 170ms, application-code: 297ms)
- GET /xml/ 200 in 107ms (next.js: 1.0ms, application-code: 106ms)
- GET /xml/ 200 in 29ms (next.js: 1.1ms, application-code: 27ms)
-✓ Compiled in 1330ms
- GET /xml/ 200 in 110ms (next.js: 1.4ms, application-code: 108ms)
- GET /xml/ 200 in 111ms (next.js: 18ms, application-code: 93ms)
- GET /xml/ 200 in 27ms (next.js: 2.0ms, application-code: 25ms)
- GET /m88test/?v=31 200 in 188ms (next.js: 32ms, application-code: 156ms)
- GET /m88test/?v=40 200 in 160ms (next.js: 60ms, application-code: 99ms)
- GET /m88test/?v=10 200 in 104ms (next.js: 28ms, application-code: 76ms)
- GET /m88test/?v=50 200 in 163ms (next.js: 7ms, application-code: 157ms)
- GET /m88test/?v=51 200 in 80ms (next.js: 1.1ms, application-code: 79ms)
- GET /xml/ 200 in 384ms (next.js: 5ms, application-code: 380ms)
- GET /xml/ 200 in 383ms (next.js: 25ms, application-code: 358ms)
- GET /m88test/?v=10 404 in 690ms (next.js: 358ms, application-code: 333ms)
- GET /m88test/?v=40 404 in 690ms (next.js: 414ms, application-code: 276ms)
- GET /m88test/?v=31 404 in 706ms (next.js: 459ms, application-code: 247ms)
- GET /m88test/?v=51 404 in 701ms (next.js: 536ms, application-code: 165ms)
- GET /xml/ 200 in 171ms (next.js: 11ms, application-code: 160ms)
- GET /m88test/?v=10 404 in 795ms (next.js: 186ms, application-code: 609ms)
- GET /m88test/?v=40 404 in 720ms (next.js: 171ms, application-code: 549ms)
- GET /m88test/?v=31 404 in 726ms (next.js: 237ms, application-code: 489ms)
- GET /m88test/?v=51 404 in 692ms (next.js: 249ms, application-code: 442ms)
-✓ Compiled in 1137ms
- GET /xml/ 200 in 878ms (next.js: 9ms, application-code: 870ms)
- GET /xml/ 200 in 874ms (next.js: 228ms, application-code: 647ms)
- GET /m88test/?v=10 200 in 534ms (next.js: 5ms, application-code: 529ms)
- GET /m88test/?v=31 200 in 421ms (next.js: 31ms, application-code: 390ms)
- GET /m88test/?v=40 200 in 288ms (next.js: 19ms, application-code: 269ms)
- GET /m88test/?v=51 200 in 236ms (next.js: 8ms, application-code: 227ms)
- GET /xml/ 200 in 271ms (next.js: 5ms, application-code: 266ms)
- GET /m88test/?v=60 200 in 342ms (next.js: 1.2ms, application-code: 341ms)
- GET /m88test/?v=31 200 in 798ms (next.js: 4ms, application-code: 794ms)
- GET /xml/ 200 in 487ms (next.js: 6ms, application-code: 481ms)
- GET /xml/ 200 in 459ms (next.js: 6ms, application-code: 453ms)
- GET /m88test/?v=31 404 in 1054ms (next.js: 637ms, application-code: 417ms)
- GET /m88test/?v=10 404 in 1083ms (next.js: 741ms, application-code: 342ms)
- GET /m88test/?v=40 404 in 1114ms (next.js: 812ms, application-code: 302ms)
- GET /m88test/?v=60 404 in 1215ms (next.js: 889ms, application-code: 326ms)
- GET /m88test/?v=31 404 in 846ms (next.js: 88ms, application-code: 758ms)
- GET /m88test/?v=10 404 in 820ms (next.js: 168ms, application-code: 652ms)
- GET /m88test/?v=40 404 in 677ms (next.js: 199ms, application-code: 478ms)
- GET /m88test/?v=60 404 in 644ms (next.js: 230ms, application-code: 415ms)
- GET /xml/ 200 in 41ms (next.js: 0.4ms, application-code: 40ms)
- GET /xml/ 200 in 20ms (next.js: 0.6ms, application-code: 20ms)
- GET /xml/ 200 in 131ms (next.js: 16ms, application-code: 115ms)
- GET /m88test/?v=31 404 in 194ms (next.js: 94ms, application-code: 100ms)
- GET /xml/ 200 in 30ms (next.js: 0.5ms, application-code: 30ms)
- GET /xml/ 200 in 49ms (next.js: 0.5ms, application-code: 49ms)
- GET /xml/ 200 in 57ms (next.js: 0.9ms, application-code: 56ms)
- GET /xml/ 200 in 925ms (next.js: 5ms, application-code: 920ms)
- GET /xml/ 200 in 922ms (next.js: 68ms, application-code: 854ms)
- GET /xml/ 200 in 602ms (next.js: 153ms, application-code: 449ms)
- GET /m88test/?v=70 200 in 394ms (next.js: 10ms, application-code: 384ms)
-✓ Compiled in 9.5s
- GET /xml/ 200 in 191ms (next.js: 9ms, application-code: 183ms)
- GET /xml/ 200 in 187ms (next.js: 27ms, application-code: 160ms)
- GET /m88test/?v=70 404 in 380ms (next.js: 249ms, application-code: 131ms)
- GET /xml/ 200 in 65ms (next.js: 2ms, application-code: 62ms)
- GET /m88test/?v=70 404 in 373ms (next.js: 29ms, application-code: 343ms)
-✓ Compiled in 492ms
- GET /xml/ 200 in 121ms (next.js: 3ms, application-code: 118ms)
- GET /xml/ 200 in 128ms (next.js: 64ms, application-code: 64ms)
- GET /m88test/?v=70 200 in 53ms (next.js: 2ms, application-code: 51ms)
- GET /xml/ 200 in 309ms (next.js: 8ms, application-code: 301ms)
- GET /m88test/?v=80 200 in 83ms (next.js: 5ms, application-code: 78ms)
-✓ Compiled in 945ms
- GET /xml/ 200 in 402ms (next.js: 3ms, application-code: 399ms)
- GET /m88test/?v=70 404 in 1275ms (next.js: 886ms, application-code: 389ms)
- GET /xml/ 200 in 415ms (next.js: 88ms, application-code: 327ms)
- GET /m88test/?v=80 404 in 1296ms (next.js: 990ms, application-code: 307ms)
- GET /xml/ 200 in 223ms (next.js: 7ms, application-code: 215ms)
- GET /xml/ 200 in 357ms (next.js: 12ms, application-code: 345ms)
- GET /xml/ 200 in 582ms (next.js: 4ms, application-code: 578ms)
- GET /m88test/?v=70 404 in 812ms (next.js: 147ms, application-code: 665ms)
- GET /m88test/?v=80 404 in 809ms (next.js: 171ms, application-code: 638ms)
- GET /xml/ 200 in 101ms (next.js: 5ms, application-code: 97ms)
- GET /xml/ 200 in 73ms (next.js: 1.7ms, application-code: 72ms)
-✓ Compiled in 644ms
- GET /xml/ 200 in 53ms (next.js: 1.7ms, application-code: 52ms)
- GET /xml/ 200 in 53ms (next.js: 24ms, application-code: 29ms)
- GET /xml/ 200 in 21ms (next.js: 1.8ms, application-code: 19ms)
- GET /m88test/?v=80 200 in 194ms (next.js: 33ms, application-code: 161ms)
- GET /m88test/?v=70 200 in 164ms (next.js: 98ms, application-code: 66ms)
- GET /m88test/?v=90 200 in 65ms (next.js: 1.5ms, application-code: 63ms)
- GET /xml/ 200 in 268ms (next.js: 2.0ms, application-code: 266ms)
- GET /xml/ 200 in 246ms (next.js: 4ms, application-code: 242ms)
- GET /m88test/?v=80 404 in 1488ms (next.js: 1276ms, application-code: 212ms)
- GET /m88test/?v=90 404 in 1472ms (next.js: 1320ms, application-code: 152ms)
- GET /m88test/?v=70 404 in 1491ms (next.js: 1357ms, application-code: 134ms)
- GET /xml/ 200 in 140ms (next.js: 9ms, application-code: 131ms)
- GET /m88test/?v=80 404 in 604ms (next.js: 46ms, application-code: 557ms)
- GET /m88test/?v=90 404 in 605ms (next.js: 235ms, application-code: 369ms)
- GET /m88test/?v=70 404 in 608ms (next.js: 339ms, application-code: 269ms)
-✓ Compiled in 8.5s
- GET /xml/ 200 in 564ms (next.js: 22ms, application-code: 542ms)
- GET /xml/ 200 in 74ms (next.js: 10ms, application-code: 64ms)
- GET /xml/ 200 in 40ms (next.js: 4ms, application-code: 36ms)
-✓ Compiled in 6.1s
- GET /m88test/?v=90 200 in 982ms (next.js: 33ms, application-code: 950ms)
- GET /m88test/?v=70 200 in 543ms (next.js: 10ms, application-code: 532ms)
- GET /m88test/?v=80 200 in 1002ms (next.js: 420ms, application-code: 583ms)
- GET /m88test/?v=100 200 in 737ms (next.js: 2ms, application-code: 735ms)
- GET /m88test/?v=90 200 in 642ms (next.js: 0.8ms, application-code: 641ms)
- GET /m88test/?v=70 200 in 532ms (next.js: 1.0ms, application-code: 531ms)
- GET /xml/ 200 in 50ms (next.js: 3ms, application-code: 47ms)
- GET /m88test/?v=80 200 in 387ms (next.js: 1.1ms, application-code: 386ms)
- GET /xml/ 200 in 361ms (next.js: 0.7ms, application-code: 360ms)
- GET /xml/ 200 in 116ms (next.js: 42ms, application-code: 74ms)
- GET /xml/ 200 in 115ms (next.js: 2ms, application-code: 113ms)
-✓ Compiled in 381ms
- GET /m88test/?v=101 200 in 54ms (next.js: 3ms, application-code: 50ms)
- GET /m88test/?v=101 200 in 76ms (next.js: 1.5ms, application-code: 74ms)
- GET /xml/ 200 in 379ms (next.js: 2ms, application-code: 377ms)
- GET /xml/ 200 in 379ms (next.js: 45ms, application-code: 334ms)
- GET /m88test/?v=90 404 in 1331ms (next.js: 1029ms, application-code: 302ms)
- GET /m88test/?v=101 404 in 1388ms (next.js: 1185ms, application-code: 203ms)
- GET /m88test/?v=70 404 in 1308ms (next.js: 1133ms, application-code: 175ms)
- GET /m88test/?v=80 404 in 1304ms (next.js: 1200ms, application-code: 104ms)
- GET /xml/ 200 in 82ms (next.js: 3ms, application-code: 80ms)
- GET /m88test/?v=90 404 in 669ms (next.js: 49ms, application-code: 620ms)
- GET /m88test/?v=101 404 in 671ms (next.js: 120ms, application-code: 551ms)
- GET /m88test/?v=70 404 in 679ms (next.js: 181ms, application-code: 498ms)
- GET /m88test/?v=80 404 in 680ms (next.js: 267ms, application-code: 413ms)
-[browser] Received NaN for the `y` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `height` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `cy` attribute. If this is expected, cast the value to a string. 
- GET /xml/ 200 in 92ms (next.js: 0.9ms, application-code: 92ms)
- GET /xml/ 200 in 83ms (next.js: 1.0ms, application-code: 82ms)
- GET /xml/ 200 in 39ms (next.js: 1.2ms, application-code: 38ms)
-[browser] Received NaN for the `y` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `height` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `cy` attribute. If this is expected, cast the value to a string. 
- GET /xml/ 200 in 63ms (next.js: 4ms, application-code: 60ms)
- GET /xml/ 200 in 62ms (next.js: 23ms, application-code: 39ms)
- GET /xml/ 200 in 25ms (next.js: 0.9ms, application-code: 24ms)
- GET /m88test/?v=101 200 in 336ms (next.js: 18ms, application-code: 318ms)
- GET /m88test/?v=90 200 in 321ms (next.js: 159ms, application-code: 162ms)
- GET /m88test/?v=80 200 in 166ms (next.js: 68ms, application-code: 98ms)
- GET /m88test/?v=70 200 in 68ms (next.js: 3ms, application-code: 66ms)
- GET /m88test/?v=200 200 in 64ms (next.js: 1.3ms, application-code: 63ms)
-✓ Compiled in 1297ms
- GET /xml/ 200 in 38ms (next.js: 1.5ms, application-code: 37ms)
-✓ Compiled in 2.4s
-✓ Compiled in 502ms
- GET /m88test/?v=300 200 in 86ms (next.js: 1.1ms, application-code: 85ms)
-✓ Compiled in 144ms
- GET /m88test/?v=310 200 in 30ms (next.js: 1.2ms, application-code: 29ms)
-✓ Compiled in 206ms
- GET /xml/ 200 in 20ms (next.js: 0.4ms, application-code: 20ms)
- GET /m88test/?v=320 200 in 31ms (next.js: 0.7ms, application-code: 30ms)
- GET /xml/ 200 in 18ms (next.js: 0.3ms, application-code: 18ms)
-✓ Compiled in 576ms
- GET /xml/ 200 in 168ms (next.js: 5ms, application-code: 164ms)
- GET /xml/ 200 in 167ms (next.js: 36ms, application-code: 131ms)
- GET /xml/ 200 in 106ms (next.js: 7ms, application-code: 98ms)
- GET /xml/ 200 in 218ms (next.js: 1.3ms, application-code: 217ms)
- GET /xml/ 200 in 219ms (next.js: 13ms, application-code: 205ms)
- GET /m88test/?v=320 404 in 1459ms (next.js: 1270ms, application-code: 190ms)
- GET /xml/ 200 in 222ms (next.js: 93ms, application-code: 128ms)
- GET /m88test/?v=90 404 in 1479ms (next.js: 1371ms, application-code: 108ms)
- GET /xml/ 200 in 199ms (next.js: 3ms, application-code: 196ms)
- GET /m88test/?v=320 404 in 279ms (next.js: 54ms, application-code: 225ms)
- GET /xml/ 200 in 357ms (next.js: 7ms, application-code: 350ms)
- GET /m88test/?v=90 404 in 451ms (next.js: 299ms, application-code: 151ms)
- GET /m88test/?v=320 404 in 612ms (next.js: 83ms, application-code: 529ms)
- GET /m88test/?v=90 404 in 525ms (next.js: 164ms, application-code: 361ms)
-[browser] Received NaN for the `y` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `height` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `cy` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `value` attribute. If this is expected, cast the value to a string. 
- GET /xml/ 200 in 17ms (next.js: 1.3ms, application-code: 15ms)
- GET /m88test/?v=400 200 in 23ms (next.js: 1.1ms, application-code: 22ms)
- GET /xml/ 200 in 18ms (next.js: 0.4ms, application-code: 18ms)
- GET /m88test/?v=400 200 in 31ms (next.js: 0.6ms, application-code: 30ms)
-✓ Compiled in 116ms
- GET /m88test/?v=410 200 in 41ms (next.js: 3ms, application-code: 38ms)
-✓ Compiled in 221ms
- GET /xml/ 200 in 19ms (next.js: 0.4ms, application-code: 19ms)
-✓ Compiled in 315ms
-✓ Compiled in 148ms
- GET /m88test/?v=500 200 in 61ms (next.js: 3ms, application-code: 58ms)
- GET /m88test/?v=500 200 in 21ms (next.js: 0.6ms, application-code: 21ms)
-✓ Compiled in 166ms
- GET /m88test/?v=510 200 in 25ms (next.js: 0.8ms, application-code: 24ms)
- GET /xml/ 200 in 20ms (next.js: 3ms, application-code: 17ms)
- GET /m88test/?v=510 404 in 302ms (next.js: 277ms, application-code: 25ms)
- GET /m88test/?v=510 404 in 181ms (next.js: 15ms, application-code: 165ms)
- GET /xml/ 200 in 21ms (next.js: 0.4ms, application-code: 20ms)
-✓ Compiled in 159ms
-✓ Compiled in 1456ms
- GET /xml/ 200 in 19ms (next.js: 0.6ms, application-code: 18ms)
-✓ Compiled in 131ms
-✓ Compiled in 1254ms
-✓ Compiled in 191ms
-✓ Compiled in 326ms
- GET /m88test/?v=510 200 in 83ms (next.js: 5ms, application-code: 78ms)
- GET /xml/ 200 in 255ms (next.js: 4ms, application-code: 251ms)
- GET /xml/ 200 in 77ms (next.js: 3ms, application-code: 74ms)
- GET /m88test/?v=510 200 in 243ms (next.js: 3ms, application-code: 240ms)
- GET /xml/ 200 in 153ms (next.js: 1.0ms, application-code: 152ms)
- GET /m88test/?v=600 200 in 26ms (next.js: 0.8ms, application-code: 25ms)
- GET /m88test/?v=600 404 in 1128ms (next.js: 988ms, application-code: 140ms)
- GET /xml/ 200 in 143ms (next.js: 101ms, application-code: 41ms)
- GET /m88test/?v=600 404 in 48ms (next.js: 23ms, application-code: 24ms)
-✓ Compiled in 119ms
- GET /xml/ 200 in 22ms (next.js: 0.5ms, application-code: 22ms)
-[browser] Received NaN for the `y` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `height` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `cy` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `x` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `width` attribute. If this is expected, cast the value to a string. 
-[browser] Received NaN for the `cx` attribute. If this is expected, cast the value to a string. 
-✓ Compiled in 451ms
-✓ Compiled in 94ms
- GET /xml/ 200 in 52ms (next.js: 8ms, application-code: 43ms)
-✓ Compiled in 387ms
- GET /m88test/?v=600 200 in 177ms (next.js: 11ms, application-code: 167ms)
- GET /xml/ 200 in 63ms (next.js: 14ms, application-code: 50ms)
- GET /xml/ 200 in 320ms (next.js: 6ms, application-code: 314ms)
- GET /xml/ 200 in 138ms (next.js: 9ms, application-code: 129ms)
- GET /m88test/?v=600 200 in 329ms (next.js: 1.0ms, application-code: 328ms)
- GET /xml/ 200 in 293ms (next.js: 2ms, application-code: 291ms)
- GET /xml/ 200 in 34ms (next.js: 0.7ms, application-code: 33ms)
- GET /m88test/?v=700 200 in 28ms (next.js: 0.4ms, application-code: 28ms)
-✓ Compiled in 115ms
- GET /m88test/?v=701 200 in 150ms (next.js: 3ms, application-code: 147ms)
- GET /xml/ 200 in 107ms (next.js: 4ms, application-code: 103ms)
- GET /xml/ 200 in 107ms (next.js: 30ms, application-code: 77ms)
- GET /m88test/?v=701 404 in 290ms (next.js: 238ms, application-code: 52ms)
-✓ Compiled in 170ms
- GET /m88test/?v=701 404 in 188ms (next.js: 126ms, application-code: 62ms)
-✓ Compiled in 298ms
-✓ Compiled in 101ms
-✓ Compiled in 100ms
-✓ Compiled in 96ms
-✓ Compiled in 106ms
-✓ Compiled in 119ms
-✓ Compiled in 113ms
-✓ Compiled in 1660ms
-✓ Compiled in 163ms
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component] 
+[browser] ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  2 |
+  3 | import { useState } from "react";
+> 4 | import CodeEditor from "@/components/CodeEditor";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 | import "@/components/xml-canvas.css";
+  6 |
+  7 | const SAMPLE = `public class MainActivity extends AppCompatActivity {
+
+The export default was not found in module [project]/components/CodeEditor.tsx [app-ssr] (ecmascript).
+Did you mean to import CodeEditor?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component] 
+[browser] ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  2 |
+  3 | import { useState } from "react";
+> 4 | import CodeEditor from "@/components/CodeEditor";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 | import "@/components/xml-canvas.css";
+  6 |
+  7 | const SAMPLE = `public class MainActivity extends AppCompatActivity {
+
+The export default was not found in module [project]/components/CodeEditor.tsx [app-client] (ecmascript).
+Did you mean to import CodeEditor?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component] 
+[browser] ./app/jtest/page.tsx:4:1
+Error: Export default doesn't exist in target module
+  2 |
+  3 | import { useState } from "react";
+> 4 | import CodeEditor from "@/components/CodeEditor";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  5 | import "@/components/xml-canvas.css";
+  6 |
+  7 | const SAMPLE = `public class MainActivity extends AppCompatActivity {
+
+The export default was not found in module [project]/components/CodeEditor.tsx [app-ssr] (ecmascript).
+Did you mean to import CodeEditor?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./app/jtest/page.tsx [Client Component Browser]
+    ./app/jtest/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/jtest/page.tsx [Client Component SSR]
+    ./app/jtest/page.tsx [Server Component] 
+✓ Compiled in 185ms
+ GET /jtest/ 200 in 434ms (next.js: 255ms, application-code: 179ms)
+ GET /jtest/ 200 in 80ms (next.js: 0.7ms, application-code: 80ms)
+✓ Compiled in 124ms
+ GET /jtest/?r=2 200 in 27ms (next.js: 1.3ms, application-code: 26ms)
+ GET /jtest/?r=2 404 in 314ms (next.js: 290ms, application-code: 24ms)
+ GET /jtest/?r=2 404 in 33ms (next.js: 5ms, application-code: 28ms)
+✓ Compiled in 19ms
+ GET /jtest/?r=2 404 in 112ms (next.js: 31ms, application-code: 81ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 58ms (next.js: 12ms, application-code: 47ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 46ms (next.js: 13ms, application-code: 33ms)
+ GET /jtest/?r=2 404 in 46ms (next.js: 13ms, application-code: 33ms)
+✓ Compiled in 2ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 9ms, application-code: 21ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 46ms (next.js: 12ms, application-code: 34ms)
+ GET /jtest/?r=2 404 in 50ms (next.js: 15ms, application-code: 35ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 31ms (next.js: 5ms, application-code: 26ms)
+✓ Compiled in 2ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 8ms, application-code: 22ms)
+ GET /jtest/?r=2 404 in 45ms (next.js: 18ms, application-code: 27ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 7ms, application-code: 18ms)
+✓ Compiled in 4ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 5ms, application-code: 21ms)
+ GET /jtest/?r=2 404 in 54ms (next.js: 35ms, application-code: 19ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 5ms, application-code: 27ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 4ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 6ms, application-code: 19ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 6ms, application-code: 31ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 8ms, application-code: 21ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 9ms, application-code: 20ms)
+✓ Compiled in 2ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 12ms, application-code: 20ms)
+ GET /jtest/?r=2 404 in 23ms (next.js: 5ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 10ms, application-code: 22ms)
+✓ Compiled in 2ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 39ms (next.js: 7ms, application-code: 32ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 38ms (next.js: 13ms, application-code: 25ms)
+ GET /jtest/?r=2 404 in 30ms (next.js: 12ms, application-code: 19ms)
+✓ Compiled in 3ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 71ms (next.js: 46ms, application-code: 26ms)
+ GET /jtest/?r=2 404 in 35ms (next.js: 9ms, application-code: 25ms)
+✓ Compiled in 2ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 8ms, application-code: 22ms)
+ GET /jtest/?r=2 404 in 47ms (next.js: 10ms, application-code: 36ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 12ms, application-code: 18ms)
+✓ Compiled in 2ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 44ms (next.js: 13ms, application-code: 30ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 41ms (next.js: 7ms, application-code: 33ms)
+✓ Compiled in 8ms
+ GET /jtest/?r=2 404 in 59ms (next.js: 21ms, application-code: 38ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 97ms (next.js: 74ms, application-code: 24ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 10ms, application-code: 27ms)
+ GET /jtest/?r=2 404 in 45ms (next.js: 14ms, application-code: 30ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 47ms (next.js: 10ms, application-code: 38ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 38ms (next.js: 11ms, application-code: 27ms)
+ GET /jtest/?r=2 404 in 37ms (next.js: 11ms, application-code: 26ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 47ms (next.js: 19ms, application-code: 28ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 44ms (next.js: 9ms, application-code: 35ms)
+ GET /jtest/?r=2 404 in 33ms (next.js: 8ms, application-code: 26ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 8ms, application-code: 19ms)
+✓ Compiled in 4ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 9ms, application-code: 28ms)
+ GET /jtest/?r=2 404 in 26ms (next.js: 7ms, application-code: 20ms)
+✓ Compiled in 4ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 31ms (next.js: 11ms, application-code: 21ms)
+ GET /jtest/?r=2 404 in 34ms (next.js: 7ms, application-code: 27ms)
+✓ Compiled in 1ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 100ms (next.js: 17ms, application-code: 82ms)
+ GET /jtest/?r=2 404 in 49ms (next.js: 14ms, application-code: 35ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 50ms (next.js: 26ms, application-code: 23ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 7ms, application-code: 15ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 6ms, application-code: 21ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 44ms (next.js: 25ms, application-code: 19ms)
+✓ Compiled in 4ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 10ms, application-code: 20ms)
+ GET /jtest/?r=2 404 in 23ms (next.js: 5ms, application-code: 17ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 4ms, application-code: 16ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 15ms, application-code: 18ms)
+✓ Compiled in 2ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 8ms, application-code: 20ms)
+ GET /jtest/?r=2 404 in 28ms (next.js: 8ms, application-code: 20ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 45ms (next.js: 22ms, application-code: 23ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 7ms, application-code: 21ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 4ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 38ms (next.js: 8ms, application-code: 30ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 40ms (next.js: 11ms, application-code: 29ms)
+✓ Compiled in 4ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 54ms (next.js: 9ms, application-code: 45ms)
+ GET /jtest/?r=2 404 in 27ms (next.js: 10ms, application-code: 17ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 47ms (next.js: 30ms, application-code: 18ms)
+✓ Compiled in 3ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 9ms, application-code: 16ms)
+ GET /jtest/?r=2 404 in 28ms (next.js: 9ms, application-code: 19ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 6ms, application-code: 15ms)
+ GET /jtest/?r=2 404 in 36ms (next.js: 16ms, application-code: 19ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 7ms, application-code: 20ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 8ms, application-code: 25ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 4ms, application-code: 16ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 5ms, application-code: 17ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 41ms (next.js: 23ms, application-code: 18ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 43ms (next.js: 19ms, application-code: 24ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 43ms (next.js: 27ms, application-code: 16ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 10ms, application-code: 27ms)
+✓ Compiled in 2ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 34ms (next.js: 6ms, application-code: 28ms)
+ GET /jtest/?r=2 404 in 19ms (next.js: 4ms, application-code: 16ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 8ms, application-code: 21ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 5ms, application-code: 25ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 5ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 5ms, application-code: 17ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 39ms (next.js: 7ms, application-code: 33ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 5ms, application-code: 21ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 8ms, application-code: 20ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 40ms (next.js: 23ms, application-code: 18ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 5ms, application-code: 16ms)
+ GET /jtest/?r=2 404 in 21ms (next.js: 5ms, application-code: 15ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 38ms (next.js: 11ms, application-code: 27ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 48ms (next.js: 26ms, application-code: 22ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 5ms, application-code: 15ms)
+✓ Compiled in 3ms
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 58ms (next.js: 16ms, application-code: 43ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 53ms (next.js: 20ms, application-code: 33ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 31ms (next.js: 6ms, application-code: 25ms)
+ GET /jtest/?r=2 404 in 48ms (next.js: 12ms, application-code: 36ms)
+✓ Compiled in 8ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 45ms (next.js: 15ms, application-code: 30ms)
+ GET /jtest/?r=2 404 in 33ms (next.js: 13ms, application-code: 20ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 58ms (next.js: 30ms, application-code: 28ms)
+✓ Compiled in 6ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 54ms (next.js: 11ms, application-code: 43ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 35ms (next.js: 18ms, application-code: 17ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 47ms (next.js: 13ms, application-code: 35ms)
+ GET /jtest/?r=2 404 in 51ms (next.js: 20ms, application-code: 31ms)
+✓ Compiled in 13ms
+ GET /jtest/?r=2 404 in 68ms (next.js: 42ms, application-code: 26ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 12ms, application-code: 22ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 11ms, application-code: 26ms)
+✓ Compiled in 3ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 56ms (next.js: 26ms, application-code: 30ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 38ms (next.js: 9ms, application-code: 28ms)
+ GET /jtest/?r=2 404 in 26ms (next.js: 6ms, application-code: 20ms)
+✓ Compiled in 4ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 9ms, application-code: 28ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 42ms (next.js: 12ms, application-code: 30ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 54ms (next.js: 30ms, application-code: 24ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 10ms, application-code: 19ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 7ms, application-code: 21ms)
+ GET /jtest/?r=2 404 in 30ms (next.js: 9ms, application-code: 22ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 38ms (next.js: 12ms, application-code: 26ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 10ms, application-code: 20ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 9ms, application-code: 19ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 49ms (next.js: 29ms, application-code: 20ms)
+✓ Compiled in 4ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 83ms (next.js: 24ms, application-code: 60ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 12ms, application-code: 21ms)
+ GET /jtest/?r=2 404 in 59ms (next.js: 33ms, application-code: 26ms)
+✓ Compiled in 3ms
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 50ms (next.js: 18ms, application-code: 32ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 12ms, application-code: 26ms)
+ GET /jtest/?r=2 404 in 48ms (next.js: 12ms, application-code: 35ms)
+✓ Compiled in 2ms
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 110ms (next.js: 8ms, application-code: 102ms)
+ GET /jtest/?r=2 404 in 66ms (next.js: 46ms, application-code: 20ms)
+✓ Compiled in 7ms
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 75ms (next.js: 15ms, application-code: 60ms)
+✓ Compiled in 13ms
+ GET /jtest/?r=2 404 in 264ms (next.js: 33ms, application-code: 231ms)
+✓ Compiled in 18ms
+ GET /jtest/?r=2 404 in 78ms (next.js: 17ms, application-code: 61ms)
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 4ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 8ms, application-code: 24ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 40ms (next.js: 19ms, application-code: 21ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 5ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 38ms (next.js: 22ms, application-code: 16ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 6ms, application-code: 27ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 7ms, application-code: 16ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 5ms, application-code: 18ms)
+ GET /jtest/?r=2 404 in 41ms (next.js: 6ms, application-code: 35ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 9ms, application-code: 25ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 5ms, application-code: 21ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 11ms, application-code: 17ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 7ms, application-code: 18ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 7ms, application-code: 19ms)
+✓ Compiled in 2ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 41ms (next.js: 9ms, application-code: 33ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 11ms, application-code: 16ms)
+ GET /jtest/?r=2 404 in 37ms (next.js: 14ms, application-code: 23ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 31ms (next.js: 8ms, application-code: 23ms)
+✓ Compiled in 5ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 5ms, application-code: 16ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 6ms, application-code: 19ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 42ms (next.js: 10ms, application-code: 32ms)
+ GET /jtest/?r=2 404 in 45ms (next.js: 19ms, application-code: 26ms)
+✓ Compiled in 13ms
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 12ms, application-code: 20ms)
+ GET /jtest/?r=2 404 in 28ms (next.js: 6ms, application-code: 22ms)
+✓ Compiled in 4ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 7ms, application-code: 18ms)
+ GET /jtest/?r=2 404 in 27ms (next.js: 9ms, application-code: 18ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 126ms (next.js: 102ms, application-code: 24ms)
+ GET /jtest/?r=2 404 in 63ms (next.js: 42ms, application-code: 20ms)
+✓ Compiled in 7ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 12ms, application-code: 23ms)
+ GET /jtest/?r=2 404 in 40ms (next.js: 17ms, application-code: 23ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 7ms, application-code: 30ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 5ms, application-code: 19ms)
+✓ Compiled in 2ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 31ms (next.js: 12ms, application-code: 19ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 7ms, application-code: 29ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 67ms (next.js: 45ms, application-code: 21ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 35ms (next.js: 9ms, application-code: 26ms)
+✓ Compiled in 3ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 9ms, application-code: 24ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 50ms (next.js: 10ms, application-code: 40ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 31ms (next.js: 7ms, application-code: 24ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 4ms, application-code: 19ms)
+ GET /jtest/?r=2 404 in 24ms (next.js: 3ms, application-code: 21ms)
+✓ Compiled in 2ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 57ms (next.js: 16ms, application-code: 41ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 6ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 35ms (next.js: 6ms, application-code: 29ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 15ms, application-code: 21ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 7ms, application-code: 29ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 5ms, application-code: 31ms)
+✓ Compiled in 1ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 4ms, application-code: 22ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 56ms (next.js: 30ms, application-code: 26ms)
+ GET /jtest/?r=2 404 in 51ms (next.js: 19ms, application-code: 31ms)
+✓ Compiled in 3ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 67ms (next.js: 25ms, application-code: 42ms)
+ GET /jtest/?r=2 404 in 31ms (next.js: 9ms, application-code: 22ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 11ms, application-code: 22ms)
+✓ Compiled in 6ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 39ms (next.js: 13ms, application-code: 26ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 42ms (next.js: 10ms, application-code: 32ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 7ms, application-code: 29ms)
+ GET /jtest/?r=2 404 in 55ms (next.js: 32ms, application-code: 22ms)
+✓ Compiled in 24ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 6ms, application-code: 15ms)
+✓ Compiled in 3ms
+✓ Compiled in 24ms
+ GET /jtest/?r=2 404 in 87ms (next.js: 60ms, application-code: 27ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 66ms (next.js: 9ms, application-code: 57ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 12ms, application-code: 20ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 38ms (next.js: 10ms, application-code: 28ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 57ms (next.js: 7ms, application-code: 50ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 3ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 5ms, application-code: 19ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 9ms, application-code: 16ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 31ms (next.js: 4ms, application-code: 27ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 5ms, application-code: 18ms)
+ GET /jtest/?r=2 404 in 29ms (next.js: 8ms, application-code: 21ms)
+✓ Compiled in 3ms
+✓ Compiled in 13ms
+ GET /jtest/?r=2 404 in 51ms (next.js: 13ms, application-code: 38ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 19ms, application-code: 14ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 41ms (next.js: 12ms, application-code: 29ms)
+ GET /jtest/?r=2 404 in 37ms (next.js: 10ms, application-code: 27ms)
+✓ Compiled in 3ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 94ms (next.js: 13ms, application-code: 81ms)
+ GET /jtest/?r=2 404 in 60ms (next.js: 19ms, application-code: 41ms)
+✓ Compiled in 3ms
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 67ms (next.js: 14ms, application-code: 53ms)
+ GET /jtest/?r=2 404 in 49ms (next.js: 23ms, application-code: 26ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 35ms (next.js: 8ms, application-code: 26ms)
+✓ Compiled in 2ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 12ms, application-code: 24ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 98ms (next.js: 22ms, application-code: 75ms)
+ GET /jtest/?r=2 404 in 41ms (next.js: 14ms, application-code: 26ms)
+✓ Compiled in 5ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 64ms (next.js: 12ms, application-code: 52ms)
+ GET /jtest/?r=2 404 in 26ms (next.js: 7ms, application-code: 19ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 4ms, application-code: 23ms)
+✓ Compiled in 1ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 40ms (next.js: 13ms, application-code: 27ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 8ms, application-code: 17ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 5ms, application-code: 19ms)
+ GET /jtest/?r=2 404 in 24ms (next.js: 7ms, application-code: 16ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 51ms (next.js: 23ms, application-code: 29ms)
+✓ Compiled in 4ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 74ms (next.js: 16ms, application-code: 58ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 59ms (next.js: 17ms, application-code: 42ms)
+✓ Compiled in 11ms
+ GET /jtest/?r=2 404 in 48ms (next.js: 16ms, application-code: 32ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 72ms (next.js: 31ms, application-code: 41ms)
+✓ Compiled in 25ms
+ GET /jtest/?r=2 404 in 85ms (next.js: 27ms, application-code: 58ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 162ms (next.js: 10ms, application-code: 151ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 305ms (next.js: 41ms, application-code: 264ms)
+ GET /jtest/?r=2 404 in 48ms (next.js: 14ms, application-code: 33ms)
+✓ Compiled in 18ms
+✓ Compiled in 8ms
+ GET /jtest/?r=2 404 in 61ms (next.js: 26ms, application-code: 36ms)
+✓ Compiled in 11ms
+ GET /jtest/?r=2 404 in 73ms (next.js: 36ms, application-code: 37ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 56ms (next.js: 22ms, application-code: 34ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 41ms (next.js: 10ms, application-code: 31ms)
+ GET /jtest/?r=2 404 in 28ms (next.js: 10ms, application-code: 18ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 2ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 34ms (next.js: 10ms, application-code: 25ms)
+ GET /jtest/?r=2 404 in 30ms (next.js: 13ms, application-code: 17ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 7ms, application-code: 16ms)
+✓ Compiled in 2ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 10ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 28ms (next.js: 10ms, application-code: 18ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 4ms, application-code: 22ms)
+✓ Compiled in 2ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 35ms (next.js: 9ms, application-code: 26ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 222ms (next.js: 35ms, application-code: 187ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 135ms (next.js: 19ms, application-code: 116ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 166ms (next.js: 37ms, application-code: 129ms)
+✓ Compiled in 16ms
+ GET /jtest/?r=2 404 in 84ms (next.js: 36ms, application-code: 48ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 55ms (next.js: 19ms, application-code: 35ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 177ms (next.js: 40ms, application-code: 137ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 127ms (next.js: 46ms, application-code: 82ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 316ms (next.js: 64ms, application-code: 252ms)
+✓ Compiled in 78ms
+ GET /jtest/?r=2 404 in 294ms (next.js: 104ms, application-code: 190ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 98ms (next.js: 28ms, application-code: 70ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 67ms (next.js: 17ms, application-code: 51ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 59ms (next.js: 22ms, application-code: 37ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 53ms (next.js: 17ms, application-code: 36ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 61ms (next.js: 17ms, application-code: 44ms)
+ GET /jtest/?r=2 404 in 30ms (next.js: 9ms, application-code: 21ms)
+✓ Compiled in 4ms
+✓ Compiled in 19ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 15ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 21ms (next.js: 4ms, application-code: 17ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 6ms, application-code: 22ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 4ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 10ms, application-code: 16ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 4ms, application-code: 19ms)
+✓ Compiled in 2ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 47ms (next.js: 26ms, application-code: 21ms)
+ GET /jtest/?r=2 404 in 33ms (next.js: 7ms, application-code: 25ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 4ms, application-code: 17ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 7ms, application-code: 21ms)
+✓ Compiled in 2ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 39ms (next.js: 13ms, application-code: 25ms)
+ GET /jtest/?r=2 404 in 26ms (next.js: 11ms, application-code: 16ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 7ms, application-code: 17ms)
+✓ Compiled in 2ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 7ms, application-code: 20ms)
+ GET /jtest/?r=2 404 in 17ms (next.js: 3ms, application-code: 14ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 6ms, application-code: 24ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 8ms, application-code: 25ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 42ms (next.js: 14ms, application-code: 28ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 51ms (next.js: 16ms, application-code: 36ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 7ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 22ms (next.js: 7ms, application-code: 15ms)
+✓ Compiled in 3ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 35ms (next.js: 9ms, application-code: 26ms)
+ GET /jtest/?r=2 404 in 37ms (next.js: 13ms, application-code: 24ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 40ms (next.js: 14ms, application-code: 27ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 7ms, application-code: 18ms)
+✓ Compiled in 3ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 45ms (next.js: 6ms, application-code: 39ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 48ms (next.js: 23ms, application-code: 25ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 10ms, application-code: 18ms)
+ GET /jtest/?r=2 404 in 37ms (next.js: 9ms, application-code: 28ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 4ms, application-code: 16ms)
+ GET /jtest/?r=2 404 in 22ms (next.js: 6ms, application-code: 16ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 34ms (next.js: 9ms, application-code: 25ms)
+✓ Compiled in 3ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 5ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 25ms (next.js: 6ms, application-code: 19ms)
+✓ Compiled in 1ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 53ms (next.js: 13ms, application-code: 40ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 10ms, application-code: 27ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 9ms, application-code: 22ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 12ms, application-code: 24ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 55ms (next.js: 16ms, application-code: 39ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 40ms (next.js: 21ms, application-code: 19ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 5ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 6ms, application-code: 23ms)
+ GET /jtest/?r=2 404 in 26ms (next.js: 5ms, application-code: 21ms)
+✓ Compiled in 3ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 5ms, application-code: 17ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 7ms, application-code: 21ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 7ms, application-code: 25ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 78ms (next.js: 22ms, application-code: 55ms)
+ GET /jtest/?r=2 404 in 42ms (next.js: 11ms, application-code: 31ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 102ms (next.js: 15ms, application-code: 87ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 48ms (next.js: 20ms, application-code: 28ms)
+ GET /jtest/?r=2 404 in 35ms (next.js: 7ms, application-code: 28ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 10ms, application-code: 19ms)
+✓ Compiled in 2ms
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 88ms (next.js: 52ms, application-code: 36ms)
+ GET /jtest/?r=2 404 in 36ms (next.js: 12ms, application-code: 23ms)
+✓ Compiled in 3ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 13ms, application-code: 15ms)
+ GET /jtest/?r=2 404 in 33ms (next.js: 8ms, application-code: 25ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 6ms, application-code: 26ms)
+ GET /jtest/?r=2 404 in 45ms (next.js: 17ms, application-code: 28ms)
+✓ Compiled in 2ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 62ms (next.js: 11ms, application-code: 51ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 50ms (next.js: 13ms, application-code: 37ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 43ms (next.js: 13ms, application-code: 30ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 41ms (next.js: 17ms, application-code: 24ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 12ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 25ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 1ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 69ms (next.js: 14ms, application-code: 54ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 83ms (next.js: 22ms, application-code: 62ms)
+✓ Compiled in 18ms
+ GET /jtest/?r=2 404 in 99ms (next.js: 32ms, application-code: 66ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 10ms, application-code: 22ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 150ms (next.js: 47ms, application-code: 103ms)
+✓ Compiled in 10ms
+ GET /jtest/?r=2 404 in 83ms (next.js: 18ms, application-code: 65ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 38ms (next.js: 10ms, application-code: 28ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 40ms (next.js: 17ms, application-code: 23ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 10ms, application-code: 19ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 57ms (next.js: 15ms, application-code: 41ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 107ms (next.js: 17ms, application-code: 90ms)
+✓ Compiled in 60ms
+ GET /jtest/?r=2 404 in 84ms (next.js: 24ms, application-code: 60ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 85ms (next.js: 31ms, application-code: 54ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 50ms (next.js: 26ms, application-code: 25ms)
+✓ Compiled in 12ms
+ GET /jtest/?r=2 404 in 112ms (next.js: 60ms, application-code: 51ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 66ms (next.js: 27ms, application-code: 39ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 62ms (next.js: 22ms, application-code: 40ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 82ms (next.js: 34ms, application-code: 48ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 59ms (next.js: 9ms, application-code: 50ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 39ms (next.js: 7ms, application-code: 31ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 72ms (next.js: 37ms, application-code: 35ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 10ms, application-code: 21ms)
+ GET /jtest/?r=2 404 in 64ms (next.js: 38ms, application-code: 26ms)
+✓ Compiled in 14ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 62ms (next.js: 14ms, application-code: 49ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 150ms (next.js: 71ms, application-code: 79ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 41ms (next.js: 16ms, application-code: 26ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 50ms (next.js: 27ms, application-code: 23ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 9ms, application-code: 18ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 60ms (next.js: 32ms, application-code: 28ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 45ms (next.js: 28ms, application-code: 18ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 80ms (next.js: 56ms, application-code: 24ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 298ms (next.js: 94ms, application-code: 204ms)
+✓ Compiled in 30ms
+ GET /jtest/?r=2 404 in 430ms (next.js: 147ms, application-code: 283ms)
+✓ Compiled in 25ms
+ GET /jtest/?r=2 404 in 480ms (next.js: 66ms, application-code: 414ms)
+✓ Compiled in 109ms
+ GET /jtest/?r=2 404 in 246ms (next.js: 117ms, application-code: 128ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 132ms (next.js: 36ms, application-code: 96ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 151ms (next.js: 14ms, application-code: 138ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 97ms (next.js: 47ms, application-code: 51ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 117ms (next.js: 69ms, application-code: 48ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 51ms (next.js: 10ms, application-code: 41ms)
+ GET /jtest/?r=2 404 in 50ms (next.js: 24ms, application-code: 27ms)
+✓ Compiled in 9ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 73ms (next.js: 49ms, application-code: 24ms)
+ GET /jtest/?r=2 404 in 49ms (next.js: 17ms, application-code: 31ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 13ms, application-code: 21ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 35ms (next.js: 19ms, application-code: 16ms)
+✓ Compiled in 4ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 69ms (next.js: 45ms, application-code: 24ms)
+ GET /jtest/?r=2 404 in 26ms (next.js: 6ms, application-code: 20ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 41ms (next.js: 13ms, application-code: 27ms)
+ GET /jtest/?r=2 404 in 33ms (next.js: 11ms, application-code: 22ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 62ms (next.js: 7ms, application-code: 55ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 168ms (next.js: 13ms, application-code: 155ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 84ms (next.js: 18ms, application-code: 66ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 56ms (next.js: 20ms, application-code: 37ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 773ms (next.js: 21ms, application-code: 752ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 63ms (next.js: 30ms, application-code: 33ms)
+ GET /jtest/?r=2 404 in 52ms (next.js: 12ms, application-code: 40ms)
+✓ Compiled in 5ms
+✓ Compiled in 9ms
+ GET /jtest/?r=2 404 in 118ms (next.js: 19ms, application-code: 99ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 130ms (next.js: 16ms, application-code: 114ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 161ms (next.js: 24ms, application-code: 137ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 276ms (next.js: 71ms, application-code: 206ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 139ms (next.js: 65ms, application-code: 74ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 147ms (next.js: 30ms, application-code: 117ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 190ms (next.js: 47ms, application-code: 143ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 46ms (next.js: 10ms, application-code: 36ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 8ms, application-code: 22ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 48ms (next.js: 17ms, application-code: 31ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 138ms (next.js: 54ms, application-code: 84ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 61ms (next.js: 17ms, application-code: 44ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 206ms (next.js: 63ms, application-code: 143ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 42ms (next.js: 12ms, application-code: 30ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 259ms (next.js: 43ms, application-code: 216ms)
+✓ Compiled in 9ms
+ GET /jtest/?r=2 404 in 79ms (next.js: 34ms, application-code: 45ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 213ms (next.js: 92ms, application-code: 120ms)
+✓ Compiled in 11ms
+ GET /jtest/?r=2 404 in 116ms (next.js: 16ms, application-code: 100ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 79ms (next.js: 30ms, application-code: 49ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 9ms, application-code: 19ms)
+ GET /jtest/?r=2 404 in 39ms (next.js: 21ms, application-code: 17ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 5ms, application-code: 16ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 17ms, application-code: 19ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 53ms (next.js: 35ms, application-code: 18ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 5ms, application-code: 15ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 4ms, application-code: 21ms)
+✓ Compiled in 4ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 6ms, application-code: 15ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 70ms (next.js: 22ms, application-code: 48ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 69ms (next.js: 17ms, application-code: 52ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 121ms (next.js: 37ms, application-code: 84ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 111ms (next.js: 40ms, application-code: 70ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 7ms, application-code: 14ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 118ms (next.js: 49ms, application-code: 70ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 84ms (next.js: 31ms, application-code: 53ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 223ms (next.js: 62ms, application-code: 161ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 200ms (next.js: 56ms, application-code: 144ms)
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 191ms (next.js: 27ms, application-code: 165ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 55ms (next.js: 18ms, application-code: 37ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 222ms (next.js: 81ms, application-code: 140ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 169ms (next.js: 37ms, application-code: 132ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 419ms (next.js: 204ms, application-code: 215ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 202ms (next.js: 44ms, application-code: 158ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 207ms (next.js: 29ms, application-code: 178ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 219ms (next.js: 84ms, application-code: 135ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 74ms (next.js: 20ms, application-code: 54ms)
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 104ms (next.js: 60ms, application-code: 44ms)
+ GET /jtest/?r=2 404 in 39ms (next.js: 6ms, application-code: 34ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 19ms (next.js: 6ms, application-code: 13ms)
+✓ Compiled in 4ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 5ms, application-code: 15ms)
+ GET /jtest/?r=2 404 in 21ms (next.js: 6ms, application-code: 15ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 6ms, application-code: 14ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 43ms (next.js: 19ms, application-code: 24ms)
+✓ Compiled in 4ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 8ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 19ms (next.js: 5ms, application-code: 14ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 6ms, application-code: 18ms)
+✓ Compiled in 2ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 18ms, application-code: 15ms)
+ GET /jtest/?r=2 404 in 22ms (next.js: 7ms, application-code: 15ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 7ms, application-code: 15ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 19ms (next.js: 5ms, application-code: 14ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 19ms (next.js: 5ms, application-code: 14ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 5ms, application-code: 15ms)
+✓ Compiled in 4ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 4ms, application-code: 16ms)
+ GET /jtest/?r=2 404 in 29ms (next.js: 6ms, application-code: 23ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 22ms, application-code: 15ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 38ms (next.js: 21ms, application-code: 17ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 47ms (next.js: 30ms, application-code: 17ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 7ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 9ms, application-code: 16ms)
+✓ Compiled in 2ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 7ms, application-code: 29ms)
+ GET /jtest/?r=2 404 in 44ms (next.js: 26ms, application-code: 18ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 42ms (next.js: 15ms, application-code: 27ms)
+✓ Compiled in 10ms
+ GET /jtest/?r=2 404 in 34ms (next.js: 7ms, application-code: 27ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 5ms, application-code: 15ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 5ms, application-code: 15ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 6ms, application-code: 20ms)
+ GET /jtest/?r=2 404 in 20ms (next.js: 6ms, application-code: 14ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 6ms, application-code: 24ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 23ms, application-code: 13ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 19ms (next.js: 5ms, application-code: 15ms)
+✓ Compiled in 4ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 19ms (next.js: 5ms, application-code: 14ms)
+ GET /jtest/?r=2 404 in 41ms (next.js: 22ms, application-code: 19ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 6ms, application-code: 23ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 5ms, application-code: 15ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 9ms, application-code: 16ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 7ms, application-code: 21ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 9ms, application-code: 21ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 6ms, application-code: 14ms)
+✓ Compiled in 4ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 7ms, application-code: 15ms)
+ GET /jtest/?r=2 404 in 20ms (next.js: 6ms, application-code: 15ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 8ms, application-code: 13ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 4ms, application-code: 21ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 7ms, application-code: 16ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 43ms (next.js: 26ms, application-code: 16ms)
+✓ Compiled in 4ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 6ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 28ms (next.js: 9ms, application-code: 20ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 4ms, application-code: 21ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 8ms, application-code: 14ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 6ms, application-code: 15ms)
+✓ Compiled in 3ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 5ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 18ms (next.js: 5ms, application-code: 14ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 5ms, application-code: 23ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 6ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 11ms, application-code: 26ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 52ms (next.js: 27ms, application-code: 26ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 5ms, application-code: 16ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 5ms, application-code: 14ms)
+✓ Compiled in 4ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 7ms, application-code: 20ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 6ms, application-code: 18ms)
+ GET /jtest/?r=2 404 in 30ms (next.js: 9ms, application-code: 21ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 34ms (next.js: 7ms, application-code: 27ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 7ms, application-code: 25ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 19ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 41ms (next.js: 16ms, application-code: 25ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 8ms, application-code: 17ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 7ms, application-code: 16ms)
+✓ Compiled in 5ms
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 9ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 32ms (next.js: 6ms, application-code: 26ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 9ms, application-code: 27ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 9ms, application-code: 17ms)
+✓ Compiled in 2ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 8ms, application-code: 19ms)
+ GET /jtest/?r=2 404 in 61ms (next.js: 28ms, application-code: 33ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 8ms, application-code: 21ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 8ms, application-code: 19ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 19ms (next.js: 5ms, application-code: 14ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 8ms, application-code: 17ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 6ms, application-code: 26ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 19ms (next.js: 5ms, application-code: 14ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 35ms (next.js: 7ms, application-code: 27ms)
+✓ Compiled in 2ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 8ms, application-code: 25ms)
+ GET /jtest/?r=2 404 in 23ms (next.js: 6ms, application-code: 17ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 8ms, application-code: 28ms)
+✓ Compiled in 6ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 9ms, application-code: 20ms)
+ GET /jtest/?r=2 404 in 56ms (next.js: 39ms, application-code: 17ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 44ms (next.js: 10ms, application-code: 34ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 9ms, application-code: 18ms)
+✓ Compiled in 5ms
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 92ms (next.js: 65ms, application-code: 28ms)
+ GET /jtest/?r=2 404 in 34ms (next.js: 8ms, application-code: 26ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 13ms, application-code: 18ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 9ms, application-code: 18ms)
+✓ Compiled in 5ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 9ms, application-code: 20ms)
+ GET /jtest/?r=2 404 in 28ms (next.js: 7ms, application-code: 21ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 40ms (next.js: 9ms, application-code: 32ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 56ms (next.js: 30ms, application-code: 26ms)
+✓ Compiled in 47ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 8ms, application-code: 22ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 10ms, application-code: 18ms)
+✓ Compiled in 4ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 6ms, application-code: 30ms)
+ GET /jtest/?r=2 404 in 35ms (next.js: 8ms, application-code: 27ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 47ms (next.js: 29ms, application-code: 18ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 84ms (next.js: 59ms, application-code: 26ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 6ms, application-code: 26ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 6ms, application-code: 14ms)
+✓ Compiled in 3ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 6ms, application-code: 21ms)
+ GET /jtest/?r=2 404 in 21ms (next.js: 5ms, application-code: 16ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 25ms (next.js: 6ms, application-code: 20ms)
+ GET /jtest/?r=2 404 in 28ms (next.js: 6ms, application-code: 21ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 17ms)
+✓ Compiled in 3ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 10ms, application-code: 27ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 8ms, application-code: 15ms)
+✓ Compiled in 16ms
+ GET /jtest/?r=2 404 in 98ms (next.js: 59ms, application-code: 39ms)
+ GET /jtest/?r=2 404 in 37ms (next.js: 5ms, application-code: 31ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 19ms (next.js: 5ms, application-code: 14ms)
+ GET /jtest/?r=2 404 in 34ms (next.js: 9ms, application-code: 25ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 6ms, application-code: 15ms)
+✓ Compiled in 4ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 10ms, application-code: 18ms)
+ GET /jtest/?r=2 404 in 23ms (next.js: 8ms, application-code: 15ms)
+✓ Compiled in 4ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 58ms (next.js: 20ms, application-code: 37ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 78ms (next.js: 58ms, application-code: 20ms)
+ GET /jtest/?r=2 404 in 21ms (next.js: 6ms, application-code: 16ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 7ms, application-code: 22ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 11ms, application-code: 25ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 40ms (next.js: 26ms, application-code: 14ms)
+✓ Compiled in 3ms
+✓ Compiled in 0ms
+ GET /jtest/?r=2 404 in 115ms (next.js: 32ms, application-code: 83ms)
+ GET /jtest/?r=2 404 in 34ms (next.js: 20ms, application-code: 14ms)
+✓ Compiled in 5ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 8ms, application-code: 19ms)
+ GET /jtest/?r=2 404 in 31ms (next.js: 15ms, application-code: 17ms)
+✓ Compiled in 4ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 10ms, application-code: 28ms)
+✓ Compiled in 21ms
+ GET /jtest/?r=2 404 in 33ms (next.js: 6ms, application-code: 28ms)
+ GET /jtest/?r=2 404 in 20ms (next.js: 5ms, application-code: 15ms)
+✓ Compiled in 12ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 6ms, application-code: 22ms)
+ GET /jtest/?r=2 404 in 20ms (next.js: 6ms, application-code: 14ms)
+✓ Compiled in 4ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 4ms, application-code: 17ms)
+ GET /jtest/?r=2 404 in 23ms (next.js: 6ms, application-code: 17ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 40ms (next.js: 19ms, application-code: 21ms)
+✓ Compiled in 12ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 42ms (next.js: 6ms, application-code: 36ms)
+ GET /jtest/?r=2 404 in 32ms (next.js: 7ms, application-code: 25ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 5ms, application-code: 18ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 10ms, application-code: 18ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 46ms (next.js: 24ms, application-code: 21ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 22ms (next.js: 6ms, application-code: 16ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 5ms, application-code: 32ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 5ms, application-code: 16ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 5ms, application-code: 19ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 35ms (next.js: 7ms, application-code: 28ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 43ms (next.js: 28ms, application-code: 15ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 3ms, application-code: 17ms)
+✓ Compiled in 4ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 6ms, application-code: 18ms)
+ GET /jtest/?r=2 404 in 53ms (next.js: 33ms, application-code: 19ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 6ms, application-code: 21ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 6ms, application-code: 14ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 7ms, application-code: 25ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 44ms (next.js: 18ms, application-code: 26ms)
+✓ Compiled in 8ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 8ms, application-code: 14ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 6ms, application-code: 17ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 45ms (next.js: 29ms, application-code: 16ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 18ms (next.js: 5ms, application-code: 13ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 34ms (next.js: 8ms, application-code: 26ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 21ms (next.js: 6ms, application-code: 15ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 38ms (next.js: 22ms, application-code: 17ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 39ms (next.js: 15ms, application-code: 25ms)
+✓ Compiled in 6ms
+ GET /jtest/?r=2 404 in 20ms (next.js: 5ms, application-code: 15ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 9ms, application-code: 15ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 51ms (next.js: 25ms, application-code: 26ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 19ms (next.js: 5ms, application-code: 14ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 24ms (next.js: 6ms, application-code: 19ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 5ms, application-code: 21ms)
+✓ Compiled in 8ms
+ GET /jtest/?r=2 404 in 37ms (next.js: 21ms, application-code: 15ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 45ms (next.js: 28ms, application-code: 17ms)
+✓ Compiled in 8ms
+ GET /jtest/?r=2 404 in 35ms (next.js: 6ms, application-code: 29ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 32ms (next.js: 18ms, application-code: 14ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 12ms, application-code: 15ms)
+✓ Compiled in 5ms
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 48ms (next.js: 8ms, application-code: 40ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 31ms (next.js: 11ms, application-code: 21ms)
+ GET /jtest/?r=2 404 in 22ms (next.js: 6ms, application-code: 15ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 27ms (next.js: 5ms, application-code: 23ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 7ms, application-code: 16ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 30ms (next.js: 14ms, application-code: 16ms)
+✓ Compiled in 6ms
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 23ms (next.js: 5ms, application-code: 17ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 28ms (next.js: 9ms, application-code: 19ms)
+ GET /jtest/?r=2 404 in 39ms (next.js: 11ms, application-code: 28ms)
+✓ Compiled in 7ms
+ GET /jtest/?r=2 404 in 49ms (next.js: 31ms, application-code: 18ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 18ms (next.js: 4ms, application-code: 14ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 36ms (next.js: 7ms, application-code: 29ms)
+✓ Compiled in 2ms
+ GET /jtest/?r=2 404 in 31ms (next.js: 7ms, application-code: 24ms)
+✓ Compiled in 3ms
+ GET /jtest/?r=2 404 in 26ms (next.js: 8ms, application-code: 18ms)
+✓ Compiled in 5ms
+ GET /jtest/?r=2 404 in 29ms (next.js: 5ms, application-code: 24ms)
+✓ Compiled in 4ms
+ GET /jtest/?r=2 404 in 54ms (next.js: 29ms, application-code: 25ms)
+✓ Compiled in 24ms
+ GET /jtest/?r=2 404 in 45ms (next.js: 27ms, application-code: 17ms)
+✓ Compiled in 7ms
+✓ Compiled in 1ms
+ GET /jtest/?r=2 404 in 43ms (next.js: 4ms, application-code: 38ms)
+✓ Compiled in 4ms

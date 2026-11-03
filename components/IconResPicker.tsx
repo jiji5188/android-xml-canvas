@@ -4,6 +4,7 @@
 // M89k：把 svg-board 那套图标库弹窗完整搬进来（分类二级筛选 + 分页 + 粘贴 SVG），
 // 与画布编辑器里的 IconPickerPanel 同为 .axv-cp.axv-iconlib 外壳。
 import * as React from "react";
+import { t as tt } from "@/lib/i18n-src";
 import {
   ICON_MATERIAL,
   ICON_BUILTIN,
@@ -39,8 +40,8 @@ const TAB_LABELS: Array<[Tab, string]> = [
   ["material", "Material"],
   ["lucide", "Lucide"],
   ["tabler", "Tabler"],
-  ["geo", "几何"],
-  ["paste", "粘贴 SVG"],
+  ["geo", "几何"], // i18n-ignore
+  ["paste", "粘贴 SVG"], // i18n-ignore
 ];
 
 /** 每页图标数（svg-board 是 24，这里带名字，48 少翻几页） */
@@ -81,14 +82,14 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
     if (lazy[tab]) return;
     const p = decompressIconSet(tab);
     if (!p) {
-      setErr("当前环境不支持 gzip 解压");
+      setErr(tt("当前环境不支持 gzip 解压"));
       return;
     }
     let alive = true;
     p.then((arr) => {
       if (alive) setLazy((prev) => ({ ...prev, [tab]: arr }));
     }).catch(() => {
-      if (alive) setErr("图标库解压失败");
+      if (alive) setErr(tt("图标库解压失败"));
     });
     return () => {
       alive = false;
@@ -123,12 +124,12 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
   const doPaste = () => {
     const parts = parsePastedSvg(paste);
     if (!parts) {
-      setPasteErr("没解析出任何图形（支持 path / circle / ellipse / rect / line / polygon / polyline）");
+      setPasteErr(tt("没解析出任何图形（支持 path / circle / ellipse / rect / line / polygon / polyline）"));
       return;
     }
     const nm = resName.trim().toLowerCase().replace(/\.xml$/, "");
     if (!isValidResName(nm)) {
-      setPasteErr("资源名不合法：只能用小写字母、数字、下划线，且不能以数字开头");
+      setPasteErr(tt("资源名不合法：只能用小写字母、数字、下划线，且不能以数字开头"));
       return;
     }
     const src = parts[0];
@@ -166,7 +167,7 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
       <div
         className="axv-cp axv-iconlib"
         role="dialog"
-        aria-label={attrName ? `图标资源 · ${attrName}` : "图标资源"}
+        aria-label={attrName ? tt("图标资源 · {attr}", { attr: attrName }) : tt("图标资源")}
         aria-modal="true"
       >
         <div className="cp-header">
@@ -174,9 +175,9 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
             <span className="msr" aria-hidden>
               apps
             </span>
-            {attrName ? `图标资源 · ${attrName}` : "图标资源"}
+            {attrName ? tt("图标资源 · {attr}", { attr: attrName }) : tt("图标资源")}
           </div>
-          <button type="button" className="cp-x" onClick={onClose} title="关闭">
+          <button type="button" className="cp-x" onClick={onClose} title={tt("关闭")}>
             ✕
           </button>
         </div>
@@ -203,7 +204,7 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
         {tab === "paste" ? (
           <div className="axv-iconlib-paste">
             <p className="axv-iconlib-hint">
-              把 SVG 源码整个粘进来（支持 path / circle / ellipse / rect / line / polygon / polyline），会转成 vector drawable。
+              {tt("把 SVG 源码整个粘进来（支持 path / circle / ellipse / rect / line / polygon / polyline），会转成 vector drawable。")}
             </p>
             <textarea
               className="axv-iconlib-ta"
@@ -212,7 +213,7 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
               onChange={(e) => setPaste(e.target.value)}
             />
             <div className="axv-iconlib-namerow">
-              <span>资源名</span>
+              <span>{tt("资源名")}</span>
               <input
                 value={resName}
                 spellCheck={false}
@@ -223,10 +224,10 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
             {pasteErr ? <p className="axv-iconlib-err">{pasteErr}</p> : null}
             <div className="axv-iconlib-foot">
               <button type="button" className="cp-btn cp-copy" onClick={onClose}>
-                取消
+                {tt("取消")}
               </button>
               <button type="button" className="cp-btn cp-confirm" onClick={doPaste}>
-                保存并使用
+                {tt("保存并使用")}
               </button>
             </div>
           </div>
@@ -248,11 +249,11 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
               <span className="msr" aria-hidden>
                 search
               </span>
-              <input placeholder="搜索图标名…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <input placeholder={tt("搜索图标名…")} value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-            {value ? <p className="axv-iconlib-hint">当前值：{value}</p> : null}
+            {value ? <p className="axv-iconlib-hint">{tt("当前值：{v}", { v: value })}</p> : null}
             {err ? <p className="axv-iconlib-err">{err}</p> : null}
-            {loading ? <p className="axv-iconlib-hint">正在解压 {tab} …</p> : null}
+            {loading ? <p className="axv-iconlib-hint">{tt("正在解压 {tab} …", { tab })}</p> : null}
             {!loading && !err ? (
               <div className="axv-iconlib-grid">
                 {pageItems.map((it, i) => (
@@ -282,20 +283,20 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
                     </span>
                   </button>
                 ))}
-                {!list.length ? <p className="axv-iconlib-hint">没有匹配「{q}」的图标</p> : null}
+                {!list.length ? <p className="axv-iconlib-hint">{tt("没有匹配「{q}」的图标", { q })}</p> : null}
               </div>
             ) : null}
             {!loading && !err && list.length > ICON_PAGE ? (
               <div className="axv-iconlib-pager">
-                <button type="button" disabled={pg <= 1} onClick={() => setPage(pg - 1)} title="上一页">
+                <button type="button" disabled={pg <= 1} onClick={() => setPage(pg - 1)} title={tt("上一页")}>
                   <span className="msr" aria-hidden>
                     chevron_left
                   </span>
                 </button>
                 <span>
-                  {pg} / {pages} · 共 {list.length} 个
+                  {tt("{a} / {b} · 共 {n} 个", { a: pg, b: pages, n: list.length })}
                 </span>
-                <button type="button" disabled={pg >= pages} onClick={() => setPage(pg + 1)} title="下一页">
+                <button type="button" disabled={pg >= pages} onClick={() => setPage(pg + 1)} title={tt("下一页")}>
                   <span className="msr" aria-hidden>
                     chevron_right
                   </span>
@@ -303,9 +304,9 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
               </div>
             ) : null}
             <div className="axv-iconlib-foot">
-              <span className="axv-iconlib-count">共 {list.length} 个</span>
+              <span className="axv-iconlib-count">{tt("共 {n} 个", { n: list.length })}</span>
               <button type="button" className="cp-btn cp-copy" onClick={onClose}>
-                取消
+                {tt("取消")}
               </button>
             </div>
           </>

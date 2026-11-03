@@ -322,3 +322,21 @@ Import trace:
 ✓ Compiled in 190ms
  GET /xml/?r=m101b 200 in 29ms (next.js: 1.3ms, application-code: 27ms)
 ✓ Compiled in 142ms
+✓ Compiled in 660ms
+✓ Compiled in 113ms
+✓ Compiled in 500ms
+✓ Compiled in 3.1s
+✓ Compiled in 370ms
+○ Compiling / ...
+ GET / 200 in 33ms (next.js: 4ms, application-code: 29ms)
+ GET /xml/ 200 in 31ms (next.js: 1.2ms, application-code: 29ms)
+✓ Compiled in 264ms
+✓ Compiled in 124ms
+✓ Compiled in 460ms
+✓ Compiled in 170ms
+✓ Compiled in 253ms
+✓ Compiled in 334ms
+✓ Compiled in 93ms
+✓ Compiled in 91ms
+✓ Compiled in 104ms
+✓ Compiled in 107ms

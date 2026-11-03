@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import type { ResolvedNode } from "@/lib/xml/types";
 
 export interface SibOption {
@@ -28,10 +29,10 @@ interface Props {
 type Side = "Start" | "End" | "Top" | "Bottom";
 
 const SIDES: { side: Side; title: string; marginAttr: string; variants: { mode: string; label: string }[] }[] = [
-  { side: "Start", title: "左边（start）", marginAttr: "layout_marginStart", variants: [{ mode: "toStartOf", label: "左对齐" }, { mode: "toEndOf", label: "接在右缘" }] },
-  { side: "End", title: "右边（end）", marginAttr: "layout_marginEnd", variants: [{ mode: "toEndOf", label: "右对齐" }, { mode: "toStartOf", label: "接在左缘" }] },
-  { side: "Top", title: "顶部（top）", marginAttr: "layout_marginTop", variants: [{ mode: "toTopOf", label: "顶部对齐" }, { mode: "toBottomOf", label: "接在下缘" }] },
-  { side: "Bottom", title: "底部（bottom）", marginAttr: "layout_marginBottom", variants: [{ mode: "toBottomOf", label: "底部对齐" }, { mode: "toTopOf", label: "接在上缘" }] },
+  { side: "Start", title: "左边（start）", marginAttr: "layout_marginStart", variants: [{ mode: "toStartOf", label: "左对齐" }, { mode: "toEndOf", label: "接在右缘" }] }, // i18n-ignore
+  { side: "End", title: "右边（end）", marginAttr: "layout_marginEnd", variants: [{ mode: "toEndOf", label: "右对齐" }, { mode: "toStartOf", label: "接在左缘" }] }, // i18n-ignore
+  { side: "Top", title: "顶部（top）", marginAttr: "layout_marginTop", variants: [{ mode: "toTopOf", label: "顶部对齐" }, { mode: "toBottomOf", label: "接在下缘" }] }, // i18n-ignore
+  { side: "Bottom", title: "底部（bottom）", marginAttr: "layout_marginBottom", variants: [{ mode: "toBottomOf", label: "底部对齐" }, { mode: "toTopOf", label: "接在上缘" }] }, // i18n-ignore
 ];
 
 const attrName = (side: Side, mode: string) => `layout_constraint${side}_${mode}`;
@@ -106,8 +107,8 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
   return (
     <div className="axv-constraint">
       <div className="axv-constraint-head">
-        <span>约束布局</span>
-        <span className="axv-constraint-count">{constraintCount} / 4 边</span>
+        <span>{tt("约束布局")}</span>
+        <span className="axv-constraint-count">{tt("{n} / 4 边", { n: constraintCount })}</span>
       </div>
 
       {SIDES.map((s) => {
@@ -123,10 +124,10 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
                   className="axv-attr-select"
                   value={target}
                   onChange={(e) => setTarget(s, e.target.value)}
-                  aria-label={`${s.title} 约束目标`}
+                  aria-label={tt("{title} 约束目标", { title: s.title })}
                 >
-                  <option value="">无约束</option>
-                  <option value="parent">父容器</option>
+                  <option value="">{tt("无约束")}</option>
+                  <option value="parent">{tt("父容器")}</option>
                   {siblings.map((o) => (
                     <option key={o.ref} value={o.ref}>{o.label}</option>
                   ))}
@@ -136,7 +137,7 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
                     className="axv-attr-select"
                     value={mode}
                     onChange={(e) => setMode(s, e.target.value)}
-                    aria-label={`${s.title} 对齐方式`}
+                    aria-label={tt("{title} 对齐方式", { title: s.title })}
                   >
                     {s.variants.map((v) => (
                       <option key={v.mode} value={v.mode}>{v.label}</option>
@@ -147,7 +148,7 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
             </div>
             {mode && (
               <div className="axv-constraint-row axv-constraint-sub">
-                <label className="axv-attr-name">边距</label>
+                <label className="axv-attr-name">{tt("边距")}</label>
                 <input
                   className="axv-attr-input"
                   inputMode="numeric"
@@ -158,7 +159,7 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
                   onKeyDown={(e) => {
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   }}
-                  aria-label={`${s.title} 边距`}
+                  aria-label={tt("{title} 边距", { title: s.title })}
                 />
               </div>
             )}
@@ -171,7 +172,7 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
         <div className="axv-constraint-bias">
           {hasStart && hasEnd && (
             <label className="axv-bias-row">
-              <span>水平位置</span>
+              <span>{tt("水平位置")}</span>
               <input
                 type="range"
                 min={0}
@@ -185,7 +186,7 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
           )}
           {hasTop && hasBottom && (
             <label className="axv-bias-row">
-              <span>垂直位置</span>
+              <span>{tt("垂直位置")}</span>
               <input
                 type="range"
                 min={0}
@@ -201,11 +202,11 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
       ) : null}
 
       <div className="axv-constraint-actions">
-        <button className="axv-constraint-btn" onClick={onAuto} title="根据当前位置就近推断约束">
-          自动约束
+        <button className="axv-constraint-btn" onClick={onAuto} title={tt("根据当前位置就近推断约束")}>
+          {tt("自动约束")}
         </button>
-        <button className="axv-constraint-btn axv-ghost" onClick={onClear} title="删除该控件的全部约束">
-          清除约束
+        <button className="axv-constraint-btn axv-ghost" onClick={onClear} title={tt("删除该控件的全部约束")}>
+          {tt("清除约束")}
         </button>
       </div>
 
@@ -218,9 +219,9 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
       )}
 
       <div className="axv-constraint-hint">
-        目标控件需要 id 才能被约束；父容器是 {shortTag(node.tag) === "ConstraintLayout" ? "ConstraintLayout" : "ConstraintLayout"} 时生效。
-        {siblings.length === 0 ? "（同级暂无带 id 的控件）" : ""}
-        当前选中：{node.rawAttrs.id ? refLabel(node.rawAttrs.id) : "无 id（自动约束会先补 id）"}
+        {tt("目标控件需要 id 才能被约束；父容器是 ConstraintLayout 时生效。")}
+        {siblings.length === 0 ? tt("（同级暂无带 id 的控件）") : ""}
+        {tt("当前选中：")} {node.rawAttrs.id ? refLabel(node.rawAttrs.id) : tt("无 id（自动约束会先补 id）")}
       </div>
     </div>
   );

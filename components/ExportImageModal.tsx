@@ -4,6 +4,7 @@
 // 纯前端：把手机壳 DOM 交给 html-to-image 序列化，不需要服务端渲染。
 
 import { useEffect, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { createPortal } from "react-dom";
 import {
   downloadUrl,
@@ -31,9 +32,9 @@ interface Props {
 }
 
 const RATIOS: { v: ExportRatio; label: string; hint: string }[] = [
-  { v: 1, label: "1x", hint: "逻辑像素，体积最小" },
-  { v: 2, label: "2x", hint: "适合分享/文档（推荐）" },
-  { v: 3, label: "3x", hint: "高清，文件偏大" },
+  { v: 1, label: "1x", hint: "逻辑像素，体积最小" }, // i18n-ignore
+  { v: 2, label: "2x", hint: "适合分享/文档（推荐）" }, // i18n-ignore
+  { v: 3, label: "3x", hint: "高清，文件偏大" }, // i18n-ignore
 ];
 
 export function ExportImageModal({ getTarget, deviceLabel, width, height, onClose, onToast }: Props) {
@@ -60,7 +61,7 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
     if (busy) return;
     const target = getTarget();
     if (!target || !target.el) {
-      setErr("预览还没渲染出来，稍后再试");
+      setErr(tt("预览还没渲染出来，稍后再试"));
       return;
     }
     setErr("");
@@ -74,18 +75,18 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
           background: target.background,
         });
         downloadUrl(exportFileName("svg", deviceLabel, ratio).replace(/\.svg$/, "-vector.svg"), url);
-        onToast?.(`已导出矢量 SVG（${Math.round(width)}×${Math.round(height)} px）`);
+        onToast?.(tt("已导出矢量 SVG（{w}×{h} px）", { w: Math.round(width), h: Math.round(height) }));
         onClose();
         return;
       }
       const url = kind === "png" ? await renderPng(target, ratio) : await renderSvg(target);
       downloadUrl(exportFileName(kind, deviceLabel, ratio), url);
       const px = kind === "png" ? `${Math.round(width * ratio)}×${Math.round(height * ratio)} px` : `${Math.round(width)}×${Math.round(height)} px`;
-      onToast?.(`已导出 ${kind.toUpperCase()}（${px}）`);
+      onToast?.(tt("已导出 {k}（{px}）", { k: kind.toUpperCase(), px }));
       onClose();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setErr("导出失败：" + msg);
+      setErr(tt("导出失败：") + msg);
     } finally {
       setBusy(null);
     }
@@ -93,10 +94,10 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
 
   const body = (
     <div className="axv-modal-backdrop" onClick={() => (busy ? undefined : onClose())}>
-      <div className="axv-modal axv-export-modal" role="dialog" aria-label="导出预览图" onClick={(e) => e.stopPropagation()}>
+      <div className="axv-modal axv-export-modal" role="dialog" aria-label={tt("导出预览图")} onClick={(e) => e.stopPropagation()}>
         <div className="axv-modal-head">
-          <span>导出预览图</span>
-          <button className="axv-icon-btn" onClick={onClose} disabled={!!busy} aria-label="关闭">
+          <span>{tt("导出预览图")}</span>
+          <button className="axv-icon-btn" onClick={onClose} disabled={!!busy} aria-label={tt("关闭")}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 22 }}>
               close
             </span>
@@ -115,7 +116,7 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
           </div>
 
           <div className="axv-shape-field">
-            <label>倍率（仅 PNG）</label>
+            <label>{tt("倍率（仅 PNG）")}</label>
             <div className="axv-shape-seg">
               {RATIOS.map((r) => (
                 <button
@@ -132,14 +133,14 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
           </div>
 
           <div className="axv-export-note">
-            导出的是当前画布（含状态栏 / 导航栏，不含选中虚线框等编辑装饰）。
-            SVG 内含 foreignObject 外壳，浏览器与 Figma 可正常打开；矢量 SVG 是原生图元（rect/text/path），
-            可在 Illustrator / Inkscape 里编辑，但图标字体会依赖本机字体。
+            {tt("导出的是当前画布（含状态栏 / 导航栏，不含选中虚线框等编辑装饰）。")}
+            {tt("SVG 内含 foreignObject 外壳，浏览器与 Figma 可正常打开；矢量 SVG 是原生图元（rect/text/path），")}
+            {tt("可在 Illustrator / Inkscape 里编辑，但图标字体会依赖本机字体。")}
           </div>
 
           {nativeAvailable() ? (
             <div className="axv-shape-field">
-              <label>保存位置</label>
+              <label>{tt("保存位置")}</label>
               <button
                 className="axv-btn"
                 onClick={() => {
@@ -149,8 +150,8 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
                   }
                 }}
               >
-                {wsLabel || "下载/XML画板"}
-                <span style={{ opacity: 0.55, marginLeft: 6 }}>（更改）</span>
+                {wsLabel || tt("下载/XML画板")}
+                <span style={{ opacity: 0.55, marginLeft: 6 }}>{tt("（更改）")}</span>
               </button>
             </div>
           ) : null}
@@ -159,13 +160,13 @@ export function ExportImageModal({ getTarget, deviceLabel, width, height, onClos
 
           <div className="axv-export-actions">
             <button className="axv-btn axv-btn-primary" disabled={!!busy} onClick={() => doExport("png")}>
-              {busy === "png" ? "导出中…" : "下载 PNG"}
+              {busy === "png" ? tt("导出中…") : tt("下载 PNG")}
             </button>
             <button className="axv-btn" disabled={!!busy} onClick={() => doExport("svg")}>
-              {busy === "svg" ? "导出中…" : "下载 SVG"}
+              {busy === "svg" ? tt("导出中…") : tt("下载 SVG")}
             </button>
-            <button className="axv-btn" disabled={!!busy} onClick={() => doExport("svgv")} title="原生矢量图元，可在设计工具里逐层编辑">
-              {busy === "svgv" ? "导出中…" : "矢量 SVG"}
+            <button className="axv-btn" disabled={!!busy} onClick={() => doExport("svgv")} title={tt("原生矢量图元，可在设计工具里逐层编辑")}>
+              {busy === "svgv" ? tt("导出中…") : tt("矢量 SVG")}
             </button>
           </div>
         </div>

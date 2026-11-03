@@ -3,12 +3,13 @@
 // components/DrawablePicker.tsx — M4b：background 等属性的「资源选择对话框」
 // 一个输入框（显示资源 ID，即属性值本身）+ 一个「选择」按钮，点击弹出本对话框。
 // 对话框内四个入口：
-//   🎨 颜色：取色器 + 预设色板 → 直接写 #hex
+//   🎨 {tt("颜色")}：取色器 + 预设色板 → 直接写 #hex
 //   🖼 图片/xml 资源：已上传的 res/drawable（位图 + xml 矢量 + shape）列表 → 写 @drawable/name
 //   ⬛ 编辑/创建 xml 形状：打开全屏 ShapeEditor（选已有资源 = 编辑，新名字 = 创建）
 //   📦 图标：弹 IconPickerPanel（Material Symbols → 生成 vector drawable）
 
 import { useEffect, useMemo, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { ColorPicker } from "./ColorPicker";
 import { IconResPicker } from "./IconResPicker";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
@@ -143,24 +144,24 @@ export function DrawablePicker({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="axv-modal axv-dp-modal" role="dialog" aria-label="选择背景资源">
+      <div className="axv-modal axv-dp-modal" role="dialog" aria-label={tt("选择背景资源")}>
         <div className="axv-modal-head">
           <span>
-            {attrName} · 选择资源
+            {attrName} · {tt("选择资源")}
             {isHex ? <code className="axv-dp-cur"> {value}</code> : null}
           </span>
-          <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">
+          <button className="axv-icon-btn" onClick={onClose} aria-label={tt("关闭")}>
             ✕
           </button>
         </div>
 
         {/* 资源 ID 行：输入框 + 校验（Android 资源名只能 a-z0-9_，颜色不能当文件名） */}
         <div className="axv-dp-idrow">
-          <code className="axv-dp-idlabel">@drawable/ 或 #hex</code>
+          <code className="axv-dp-idlabel">{tt("@drawable/ 或 #hex")}</code>
           <input
             className={"axv-attr-input axv-dp-id" + (idError ? " is-bad" : "")}
             value={idDraft}
-            placeholder="@drawable/bg_card 或 #FFFFFF"
+            placeholder={tt("@drawable/bg_card 或 #FFFFFF")}
             spellCheck={false}
             onChange={(e) => setIdDraft(e.target.value)}
             onBlur={() => {
@@ -182,25 +183,25 @@ export function DrawablePicker({
               className={"axv-dp-tab" + (effTab === "color" ? " is-on" : "")}
               onClick={() => setTab("color")}
             >
-              🎨 颜色
+              🎨 {tt("颜色")}
             </button>
           ) : null}
           <button
             className={"axv-dp-tab" + (effTab === "res" ? " is-on" : "")}
             onClick={() => setTab("res")}
           >
-            资源列表（{resCount}）
+            {tt("资源列表（{n}）", { n: resCount })}
           </button>
           {/* M11p：这两个是「动作页签」，点了直接打开对应编辑器，不再出中间面板 */}
           <button className="axv-dp-tab" onClick={() => onEditShape(currentShapeXml())}>
-            ⬛ 编辑/创建 XML 形状
+            ⬛ {tt("编辑/创建 XML 形状")}
           </button>
           <button className="axv-dp-tab" onClick={() => onEditIcon?.()}>
-            📦 图标编辑
+            📦 {tt("图标编辑")}
           </button>
           {/* M89j：直接从图标库挑一个 → 存 res/drawable 并写回 @drawable/<名> */}
           <button className="axv-dp-tab" onClick={() => setIconOpen(true)}>
-            🎯 选取图标
+            🎯 {tt("选取图标")}
           </button>
         </div>
 
@@ -212,24 +213,24 @@ export function DrawablePicker({
                 <button
                   type="button"
                   className="axv-dp-color-swatch"
-                  aria-label={`${attrName} 颜色`}
-                  title={isHex ? value.toUpperCase() : "选择颜色"}
+                  aria-label={tt("{attr} 颜色", { attr: attrName })}
+                  title={isHex ? value.toUpperCase() : tt("选择颜色")}
                   onClick={() => setColorOpen(true)}
                 >
                   <span className="axv-cf-checker" aria-hidden="true" />
                   <span className="axv-cf-layer" style={{ background: isHex ? value : undefined }} aria-hidden="true" />
                 </button>
                 <div className="axv-dp-color-meta">
-                  <div className="axv-dp-color-val">{isHex ? value.toUpperCase() : "未设纯色"}</div>
+                  <div className="axv-dp-color-val">{isHex ? value.toUpperCase() : tt("未设纯色")}</div>
                   <button type="button" className="axv-dp-color-btn" onClick={() => setColorOpen(true)}>
-                    选择颜色
+                    {tt("选择颜色")}
                   </button>
                 </div>
               </div>
               {colorOpen ? (
                 <ColorPicker
                   value={isHex ? value : "#FFFFFF"}
-                  label={`${attrName} 颜色`}
+                  label={tt("{attr} 颜色", { attr: attrName })}
                   presets={SWATCHES}
                   abovePage
                   onConfirm={(next) => {
@@ -241,8 +242,8 @@ export function DrawablePicker({
               ) : null}
               <div className="axv-dp-hint" style={{ marginBottom: 10 }}>
                 {isHex
-                  ? `当前 ${value.toUpperCase()}（透明度 ${alphaPct}%，点色块选颜色，确认后生效）`
-                  : "当前值不是纯色：选一个颜色会覆盖它"}
+                  ? tt("当前 {val}（透明度 {a}%，点色块选颜色，确认后生效）", { val: value.toUpperCase(), a: alphaPct })
+                  : tt("当前值不是纯色：选一个颜色会覆盖它")}
               </div>
               <div className="axv-dp-swatch-grid">
                 {SWATCHES.map((c) => (
@@ -262,13 +263,13 @@ export function DrawablePicker({
             <div className="axv-dp-res">
               {items.length === 0 ? (
                 <div className="axv-dp-empty">
-                  没有可选资源。先在左侧「资源」里上传 res/ 目录（含 drawable/），或用下面两个 tab 生成一个。
+                  {tt("没有可选资源。先在左侧「资源」里上传 res/ 目录（含 drawable/），或用下面两个 tab 生成一个。")}
                 </div>
               ) : (
                 <>
                   <input
                     className="axv-attr-input axv-dp-search"
-                    placeholder={`搜索 ${resCount} 个 drawable…`}
+                    placeholder={tt("搜索 {n} 个 drawable…", { n: resCount })}
                     value={filter}
                     spellCheck={false}
                     onChange={(e) => setFilter(e.target.value)}
@@ -292,12 +293,12 @@ export function DrawablePicker({
                           </span>
                           <span className="axv-dp-res-meta">
                             <code>{it.name}</code>
-                            <small>{it.kind === "png" ? "位图" : it.kind === "vector" ? "vector（本工具生成）" : "xml drawable"}</small>
+                            <small>{it.kind === "png" ? tt("位图") : it.kind === "vector" ? tt("vector（本工具生成）") : tt("xml drawable")}</small>
                           </span>
                           <span className="axv-dp-res-kind">
                             {isShapeXml(it.xml) ? (
-                              <a className="axv-dp-editlink" title="打开形状编辑器修改" onClick={(e) => { e.stopPropagation(); onEditShape(it.xml!); }}>
-                                编辑
+                              <a className="axv-dp-editlink" title={tt("打开形状编辑器修改")} onClick={(e) => { e.stopPropagation(); onEditShape(it.xml!); }}>
+                                {tt("编辑")}
                               </a>
                             ) : null}
                           </span>
@@ -338,11 +339,11 @@ function validateAttrValue(v: string): string | null {
   if (/^#(?:[0-9a-fA-F]{3,8})$/.test(s)) return null;
   if (/^\?(?:attr|android:attr)\//.test(s)) return null;
   const m = /^@(?:android:)?([a-z]+)\/(.+)$/.exec(s);
-  if (!m) return "格式应为 #RRGGBB、@drawable/名字 或 @color/名字";
+  if (!m) return tt("格式应为 #RRGGBB、@drawable/名字 或 @color/名字");
   const [, kind, rawName] = m;
   const name = rawName.replace(/\.xml$/, "");
   if (!isValidResName(name)) {
-    return `资源名 “${name}” 不合法：只能用小写字母、数字、下划线，且不能以数字开头（颜色请直接填 #RRGGBB）`;
+    return tt("资源名 “{name}” 不合法：只能用小写字母、数字、下划线，且不能以数字开头（颜色请直接填 #RRGGBB）", { name });
   }
   return kind === "drawable" || kind === "mipmap" || kind === "color" ? null : null;
 }

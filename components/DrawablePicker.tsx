@@ -33,8 +33,6 @@ interface Props {
   generatedXml?: Record<string, string>;
   /** 打开形状编辑器（全屏）。existingXml = 选中的 xml 资源全文（编辑用），undefined = 新建 */
   onEditShape: (existingXml?: string) => void;
-  /** 直接弹图标选择器（M3g 已有面板） */
-  onPickIcon?: () => void;
   /** M11p：直接打开图标编辑器（编辑当前值的 vector，或新建一个） */
   onEditIcon?: () => void;
   /** 选中的值写回属性 */
@@ -60,7 +58,6 @@ export function DrawablePicker({
   xmlDrawables,
   generatedXml,
   onEditShape,
-  onPickIcon,
   onEditIcon,
   onCommit,
   onApply,
@@ -89,7 +86,7 @@ export function DrawablePicker({
 
   const items = useMemo<DrawableItem[]>(() => {
     const out: DrawableItem[] = [];
-    for (const [name, url] of Object.entries(bitmapDrawables ?? {})) {
+    for (const name of Object.keys(bitmapDrawables ?? {})) {
       out.push({ name, kind: "png" });
     }
     for (const [name, xml] of Object.entries(xmlDrawables ?? {})) {

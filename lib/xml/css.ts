@@ -1805,6 +1805,25 @@ export function buildRenderModel(
   };
   patchTableStretch(rootNode);
 
+  // M89g：wrap_content 容器里放 match_parent 子项时，CSS 的百分比会失效
+  // （height:100% 遇到父容器 height:auto 会退化成 auto）→ 表现为 gravity / layout_gravity 完全没效果。
+  // Android 的语义是把子项撑满父容器的可用空间，父容器随之变大；
+  // 所以这里自下而上把这类父容器的主轴尺寸提升成 100%，等价于「填满上一级」。
+  const patchFillChain = (n: ResolvedNode): void => {
+    for (const c of n.children) patchFillChain(c);
+    if (n.style.display !== "flex") return;
+    const col = String(n.style.flexDirection ?? "row") === "column";
+    const key = col ? "height" : "width";
+    const cur = String(n.style[key] ?? "");
+    if (cur !== "" && cur !== "auto") return;
+    const needFill = n.children.some((c) => {
+      if (c.style.position === "absolute") return false;
+      return String(c.style[key] ?? "") === "100%";
+    });
+    if (needFill) n.style[key] = "100%";
+  };
+  patchFillChain(rootNode);
+
   return { root: rootNode, issues };
 }
 

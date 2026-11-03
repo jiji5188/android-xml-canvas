@@ -18,8 +18,6 @@ import {
   groupsFromModel,
   invertMat,
   isRenderableColor,
-  modelToShapes,
-  scalePath,
   scaleShape,
   shapeBox,
   shapeD,
@@ -30,7 +28,7 @@ import {
   unionBox,
   alignShapes,
   convertShapesToPaths,
-  moveInList,
+  modelToShapes,
   type Box,
   type CanvasMeta,
   type DrawShape,
@@ -273,14 +271,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       return g ? groupMatrix(g) : null;
     },
     [specOf],
-  );
-  /** 指针（视口坐标）→ 该图形所在组的局部坐标 */
-  const toLocal = useCallback(
-    (s: DrawShape | undefined, p: { x: number; y: number }) => {
-      const m = s ? matOf(s) : null;
-      return m ? invertMat(m, p) : p;
-    },
-    [matOf],
   );
   /** 选中项若全在同一组 → 返回那个组（选中框/手柄按局部坐标处理） */
   const selGroup = useMemo<GroupSpec | null>(() => {
@@ -1046,21 +1036,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     }
   };
 
-  /** 层级：提到最前 / 沉到最后 */
-  const moveSel = (dir: "front" | "back") => {
-    if (!sel.length) return;
-    pushHistory();
-    setShapes((list) => moveInList(list, sel, dir));
-  };
-
-  /** 删除选中 */
-  const deleteSel = () => {
-    if (!sel.length) return;
-    pushHistory();
-    setShapes((list) => list.filter((s) => !sel.includes(s.id)));
-    setSel([]);
-  };
-
   /** 图层显示 / 锁定 */
   const toggleFlag = (id: string, key: "hidden" | "locked") => {
     pushHistory();
@@ -1411,7 +1386,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           </div>
 
           <div className="axv-cv-stage" ref={stageRef}>
-            <div className="axv-cv-board" style={{ width: `${Math.round(300 * zoom)}px`, background: bg ? toCss(bg) : "#fff" }}>
+            <div className="axv-cv-board" style={{ width: `${Math.round(300 * zoom)}px`, background: bg ? toCss(bg) : undefined }}>
               <svg
                 viewBox={`0 0 ${meta.vw} ${meta.vh}`}
                 className={"axv-cv-svg" + (tool === "select" ? " is-select" : "")}

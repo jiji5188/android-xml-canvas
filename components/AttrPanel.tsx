@@ -651,10 +651,6 @@ export function AttrPanel({
             /** M4b：从对话框进入形状编辑器时带已有 XML 回填参数 */
             shapeEditRef.current = existingXml;
           }}
-          onPickIcon={() => {
-            setDpOpen(null);
-            setIconPick(dpOpen);
-          }}
           onEditIcon={() => {
             const attr = dpOpen;
             const nm = String(node.rawAttrs[attr] ?? "")

@@ -8088,7 +8088,14 @@ button.axv-sb-item:hover {
   aspect-ratio: 1 / 1;
   max-width: 100%;
   max-height: 100%;
-  background: #fff;
+  /* 透明棋盘底：让无填充的矢量图形看得见边界 */
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #ccc 25%, #0000 25% 75%, #ccc 75%, #ccc),
+    linear-gradient(45deg, #ccc 25%, #0000 25% 75%, #ccc 75%, #ccc);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+  background-repeat: repeat, repeat;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.06);
   overflow: hidden;

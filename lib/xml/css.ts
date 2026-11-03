@@ -817,12 +817,16 @@ export function buildRenderModel(
       const ml = attrs["maxLines"] as number;
       const ellip = (attrs["ellipsize"] as string) || "";
       if (ml > 0 || ellip) {
+        // M89i：clamp / ellipsis 不能直接挂在 .axv-text 容器上——它是个 inline-flex 容器，
+        // 写成 display:-webkit-box 会把 gravity 映射来的 justify-content/align-items 一起废掉，
+        // 而且 text-overflow 对匿名 flex 子项不生效（表现：文字被硬切半个字，没有省略号）。
+        // 这里只留标记，由 XmlCanvas 把 clamp/nowrap 套到内层文字元素上。
+        style.overflow = "hidden";
         if (ml > 0) {
-          // M11x：少了 -webkit-box-orient: vertical，line-clamp 完全不生效（多行照样溢出）
-          style.display = "-webkit-box";
           style.WebkitBoxOrient = "vertical";
           style.WebkitLineClamp = String(ml);
-          style.overflow = "hidden";
+        } else {
+          style.whiteSpace = "nowrap";
         }
         if (ellip === "end") style.textOverflow = "ellipsis";
         else if (ellip === "start") style.textAlign = "right";

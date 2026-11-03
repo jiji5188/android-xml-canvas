@@ -91,6 +91,32 @@ function shortTag(tag: string): string {
   return tag.includes(".") ? tag.slice(tag.lastIndexOf(".") + 1) : tag;
 }
 
+/** M89i：maxLines / ellipsize 的裁剪要落在内层文字元素上。
+ *  .axv-text 是 inline-flex 容器，text-overflow 对它里的匿名 flex 子项无效（文字只会被硬切），
+ *  而且写成 display:-webkit-box 还会把 gravity 映射的 justify-content / align-items 一起废掉。 */
+function textClipStyle(style: ResolvedNode["style"] | undefined): React.CSSProperties {
+  const s = style as Record<string, unknown> | undefined;
+  if (!s) return {};
+  const clamp = s.WebkitLineClamp ?? s.webkitLineClamp;
+  const out: React.CSSProperties = {};
+  if (clamp !== undefined && clamp !== null && String(clamp) !== "") {
+    out.display = "-webkit-box";
+    out.WebkitBoxOrient = "vertical";
+    out.WebkitLineClamp = Number(clamp);
+    out.overflow = "hidden";
+  } else if (s.textOverflow === "ellipsis") {
+    out.display = "block";
+    out.overflow = "hidden";
+    out.textOverflow = "ellipsis";
+    out.whiteSpace = "nowrap";
+  } else {
+    return {};
+  }
+  out.minWidth = 0;
+  out.maxWidth = "100%";
+  return out;
+}
+
 interface DragState {
   side: ConstraintSide;
   x1: number;
@@ -605,7 +631,7 @@ export function XmlCanvas({
       ) : null}
       {(() => {
         const c = node.compound;
-        if (!c) return node.text ? <span>{node.text}</span> : null;
+        if (!c) return node.text ? <span style={textClipStyle(node.style)}>{node.text}</span> : null;
         const icon = (src?: string) =>
           src ? (
             src.startsWith("data:") ? (
@@ -635,7 +661,7 @@ export function XmlCanvas({
             {c.top ? icon(c.top) : null}
             <span style={{ display: "inline-flex", alignItems: "center", gap: c.start ? `${c.gap}px` : undefined }}>
               {c.start ? icon(c.start) : null}
-              {node.text ? <span>{node.text}</span> : null}
+              {node.text ? <span style={textClipStyle(node.style)}>{node.text}</span> : null}
               {c.end ? icon(c.end) : null}
             </span>
             {c.bottom ? icon(c.bottom) : null}

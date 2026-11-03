@@ -1400,7 +1400,6 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     <path d="M2 0H0V2" fill="none" stroke="#00000012" strokeWidth="0.08" />
                   </pattern>
                 </defs>
-                <rect x={0} y={0} width={meta.vw} height={meta.vh} fill={bg ? toCss(bg) : "#ffffff"} />
                 {showGrid ? (
                   <rect x={0} y={0} width={meta.vw} height={meta.vh} fill="url(#axv-cv-grid)" />
                 ) : null}

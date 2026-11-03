@@ -661,6 +661,11 @@ export function AttrPanel({
             setDpOpen(null);
             onEditIconResource?.(isVec ? nm : "", isVec ? xml : undefined, attr);
           }}
+          onPickIconResource={(resourceName, vectorXml) => {
+            // M89j：图标库里选的图标 → 存 res/drawable + 写回属性值（与 AttrPanel 内联图标选择同一套）
+            onPickIcon?.(dpOpen, resourceName, vectorXml);
+            setDpOpen(null);
+          }}
           onCommit={(v) => {
             commit(dpOpen, v);
             setDpOpen(null);

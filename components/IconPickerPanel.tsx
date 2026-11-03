@@ -6,7 +6,7 @@
 import * as React from "react";
 import { ICON_MATERIAL, ICON_BUILTIN, ICON_CATS, decompressIconSet, type IconItem } from "@/lib/xml/icon-libs";
 import { parsePastedSvg } from "@/lib/xml/svg-paste";
-import { scalePath, translateShape, type DrawShape } from "@/lib/xml/canvas-shapes";
+import { scalePath, scaleShapeLite, translateShape, type DrawShape } from "@/lib/xml/canvas-shapes";
 import { iconToShapes } from "@/lib/xml/icon-to-shapes";
 
 type TabKey = "material" | "lucide" | "tabler" | "geo" | "paste";
@@ -21,6 +21,9 @@ const TAB_LABELS: Array<[TabKey, string]> = [
 
 let seq = 0;
 const nextId = () => `ic${Date.now().toString(36)}${(seq++).toString(36)}`;
+
+/** M89k：每页图标数（svg-board 是 24，带名字的网格用 48 刚好少翻几页） */
+const ICON_PAGE = 48;
 
 /** 24x24 图标 → 当前视口里的 path 图形（等比缩放 + 居中，留 10% 边距） */
 export interface IconPickerPanelProps {
@@ -44,6 +47,9 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
   const [err, setErr] = React.useState("");
   const [paste, setPaste] = React.useState("");
   const [pasteErr, setPasteErr] = React.useState("");
+  /** M89k：分页（移植 svg-board 图标库弹窗）——一次只渲染一页，Tabler 5000+ 也能翻到 */
+  const [page, setPage] = React.useState(1);
+  React.useEffect(() => setPage(1), [tab, cat, q]);
 
   // 切到懒加载库时首次解压（结果缓存，来回切 tab 不再解）
   React.useEffect(() => {
@@ -79,6 +85,10 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
   }, [pool, cat, q]);
 
   const cats = tab === "geo" ? ICON_CATS.filter(([k]) => k === "all" || k === "geo") : ICON_CATS;
+
+  const pages = Math.max(1, Math.ceil(list.length / ICON_PAGE));
+  const pg = Math.min(Math.max(1, page), pages);
+  const pageItems = list.slice((pg - 1) * ICON_PAGE, pg * ICON_PAGE);
 
   const pick = (it: IconItem) => onPick(iconToShapes(it, viewport.vw, viewport.vh));
 
@@ -198,7 +208,7 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
             ) : null}
             {!loading && !err ? (
               <div className="axv-iconlib-grid">
-                {list.slice(0, 300).map((it, i) => (
+                {pageItems.map((it, i) => (
                   <button
                     key={it.n + i}
                     type="button"
@@ -222,6 +232,33 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
                 {!list.length ? <p className="axv-iconlib-hint">没有匹配「{q}」的图标</p> : null}
               </div>
             ) : null}
+            {!loading && !err && list.length > ICON_PAGE ? (
+              <div className="axv-iconlib-pager">
+                <button
+                  type="button"
+                  disabled={pg <= 1}
+                  onClick={() => setPage(pg - 1)}
+                  title="上一页"
+                >
+                  <span className="msr" aria-hidden>
+                    chevron_left
+                  </span>
+                </button>
+                <span>
+                  {pg} / {pages} · 共 {list.length} 个
+                </span>
+                <button
+                  type="button"
+                  disabled={pg >= pages}
+                  onClick={() => setPage(pg + 1)}
+                  title="下一页"
+                >
+                  <span className="msr" aria-hidden>
+                    chevron_right
+                  </span>
+                </button>
+              </div>
+            ) : null}
             <div className="axv-iconlib-foot">
               <span className="axv-iconlib-count">
                 共 {list.length} 个 · {mode === "insert" ? "单击插入为图层" : "单击替换画布"}
@@ -235,51 +272,4 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
       </div>
     </div>
   );
-}
-
-/** 非 path 图元的等比缩放（rect/circle/ellipse/line 各自换算） */
-function scaleShapeLite(s: DrawShape, k: number): DrawShape {
-  const c = { ...s };
-  switch (c.type) {
-    case "rect":
-    case "roundRect":
-      c.x *= k;
-      c.y *= k;
-      c.w *= k;
-      c.h *= k;
-      if (c.round) c.round *= k;
-      break;
-    case "circle":
-      c.cx *= k;
-      c.cy *= k;
-      c.r *= k;
-      break;
-    case "ellipse":
-      c.cx *= k;
-      c.cy *= k;
-      c.rx *= k;
-      c.ry *= k;
-      break;
-    case "line":
-      c.x1 *= k;
-      c.y1 *= k;
-      c.x2 *= k;
-      c.y2 *= k;
-      break;
-    case "polygon":
-    case "star":
-      c.cx *= k;
-      c.cy *= k;
-      c.r *= k;
-      break;
-    case "text":
-      c.x *= k;
-      c.y *= k;
-      c.size *= k;
-      break;
-    default:
-      break;
-  }
-  c.strokeWidth *= k;
-  return c;
 }

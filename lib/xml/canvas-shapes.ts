@@ -1248,3 +1248,50 @@ export function scaleShape(s: DrawShape, from: Box, to: Box): DrawShape {
   }
   return s;
 }
+
+/** 以原点为中心等比缩放图形（粘贴 SVG 归一视口用；path 走 scalePath） */
+export function scaleShapeLite(s: DrawShape, k: number): DrawShape {
+  const c = { ...s } as DrawShape;
+  switch (c.type) {
+    case "rect":
+    case "roundRect":
+      c.x *= k;
+      c.y *= k;
+      c.w *= k;
+      c.h *= k;
+      if (c.round) c.round *= k;
+      break;
+    case "circle":
+      c.cx *= k;
+      c.cy *= k;
+      c.r *= k;
+      break;
+    case "ellipse":
+      c.cx *= k;
+      c.cy *= k;
+      c.rx *= k;
+      c.ry *= k;
+      break;
+    case "line":
+      c.x1 *= k;
+      c.y1 *= k;
+      c.x2 *= k;
+      c.y2 *= k;
+      break;
+    case "polygon":
+    case "star":
+      c.cx *= k;
+      c.cy *= k;
+      c.r *= k;
+      break;
+    case "text":
+      c.x *= k;
+      c.y *= k;
+      c.size *= k;
+      break;
+    default:
+      break;
+  }
+  c.strokeWidth *= k;
+  return c;
+}

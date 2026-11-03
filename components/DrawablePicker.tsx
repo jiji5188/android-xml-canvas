@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ColorPicker } from "./ColorPicker";
+import { IconResPicker } from "./IconResPicker";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { isValidResName } from "@/lib/xml/resname";
 
@@ -35,6 +36,8 @@ interface Props {
   onEditShape: (existingXml?: string) => void;
   /** M11p：直接打开图标编辑器（编辑当前值的 vector，或新建一个） */
   onEditIcon?: () => void;
+  /** M89j：从图标库选一个图标 → 存成 res/drawable/<name>.xml 并写回 @drawable/<name> */
+  onPickIconResource?: (resourceName: string, vectorXml: string) => void;
   /** 选中的值写回属性 */
   onCommit: (value: string) => void;
   /** M52：只写回不关弹窗（拖透明度滑杆 / 取色器连续调整用） */
@@ -59,6 +62,7 @@ export function DrawablePicker({
   generatedXml,
   onEditShape,
   onEditIcon,
+  onPickIconResource,
   onCommit,
   onApply,
   imageOnly,
@@ -70,6 +74,8 @@ export function DrawablePicker({
   const [filter, setFilter] = useState("");
   /** 弹窗取色器开关 */
   const [colorOpen, setColorOpen] = useState(false);
+  /** M89j：图标库选择器开关 */
+  const [iconOpen, setIconOpen] = useState(false);
   /** 资源 ID 输入框草稿（不与属性实时同步，回车/失焦才写回，避免污染 XML） */
   const [idDraft, setIdDraft] = useState(value);
   useEffect(() => setIdDraft(value), [value]);
@@ -192,6 +198,10 @@ export function DrawablePicker({
           <button className="axv-dp-tab" onClick={() => onEditIcon?.()}>
             📦 图标编辑
           </button>
+          {/* M89j：直接从图标库挑一个 → 存 res/drawable 并写回 @drawable/<名> */}
+          <button className="axv-dp-tab" onClick={() => setIconOpen(true)}>
+            🎯 选取图标
+          </button>
         </div>
 
         <div className="axv-dp-body">
@@ -301,6 +311,21 @@ export function DrawablePicker({
           ) : null}
         </div>
       </div>
+
+      {/* M89j：图标库选择器（盖在本弹窗之上，选完直接写回 @drawable/<名>） */}
+      {iconOpen ? (
+        <IconResPicker
+          value={value}
+          attrName={attrName}
+          existing={Object.keys({ ...(xmlDrawables ?? {}), ...(generatedXml ?? {}) })}
+          onClose={() => setIconOpen(false)}
+          onPick={(resourceName, vectorXml) => {
+            setIconOpen(false);
+            if (onPickIconResource) onPickIconResource(resourceName, vectorXml);
+            else onCommit(`@drawable/${resourceName}`);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

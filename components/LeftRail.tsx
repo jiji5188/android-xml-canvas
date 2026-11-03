@@ -16,30 +16,30 @@ interface RailItem {
 
 /** 上半部分：工作相关 */
 const TOP_ITEMS: RailItem[] = [
-  { view: "parts", icon: "widgets", titleKey: "rail.parts", fallback: "组件" },
-  { view: "layers", icon: "account_tree", titleKey: "rail.layers", fallback: "图层" },
-  { view: "ai", icon: "auto_awesome", titleKey: "rail.ai", fallback: "AI 助手" },
-  { view: "assets", icon: "category", titleKey: "rail.assets", fallback: "已生成资源" },
-  { view: "values", icon: "palette", titleKey: "rail.values", fallback: "资源值" },
-  { view: "res", icon: "folder_open", titleKey: "rail.res", fallback: "项目管理" },
+  { view: "parts", icon: "widgets", titleKey: "rail.parts", fallback: "组件" }, // i18n-ignore
+  { view: "layers", icon: "account_tree", titleKey: "rail.layers", fallback: "图层" }, // i18n-ignore
+  { view: "ai", icon: "auto_awesome", titleKey: "rail.ai", fallback: "AI 助手" }, // i18n-ignore
+  { view: "assets", icon: "category", titleKey: "rail.assets", fallback: "已生成资源" }, // i18n-ignore
+  { view: "values", icon: "palette", titleKey: "rail.values", fallback: "资源值" }, // i18n-ignore
+  { view: "res", icon: "folder_open", titleKey: "rail.res", fallback: "项目管理" }, // i18n-ignore
 ];
 
 /** 下半部分：设置 / 关于（中间用弹性空隙顶到底部） */
 const BOTTOM_ITEMS: RailItem[] = [
-  { view: "settings", icon: "settings", titleKey: "rail.settings", fallback: "设置" },
-  { view: "about", icon: "info", titleKey: "rail.about", fallback: "关于" },
+  { view: "settings", icon: "settings", titleKey: "rail.settings", fallback: "设置" }, // i18n-ignore
+  { view: "about", icon: "info", titleKey: "rail.about", fallback: "关于" }, // i18n-ignore
 ];
 
 const TITLES: Record<LeftView, { key: string; fallback: string }> = {
-  parts: { key: "rail.parts", fallback: "组件" },
-  layers: { key: "rail.layers", fallback: "图层" },
-  ai: { key: "rail.ai", fallback: "AI 助手" },
-  code: { key: "rail.code", fallback: "XML 代码" },
-  values: { key: "rail.values", fallback: "资源值" },
-  res: { key: "rail.res", fallback: "项目管理" },
-  assets: { key: "rail.assets", fallback: "已生成资源" },
-  settings: { key: "rail.settings", fallback: "设置" },
-  about: { key: "rail.about", fallback: "关于" },
+  parts: { key: "rail.parts", fallback: "组件" }, // i18n-ignore
+  layers: { key: "rail.layers", fallback: "图层" }, // i18n-ignore
+  ai: { key: "rail.ai", fallback: "AI 助手" }, // i18n-ignore
+  code: { key: "rail.code", fallback: "XML 代码" }, // i18n-ignore
+  values: { key: "rail.values", fallback: "资源值" }, // i18n-ignore
+  res: { key: "rail.res", fallback: "项目管理" }, // i18n-ignore
+  assets: { key: "rail.assets", fallback: "已生成资源" }, // i18n-ignore
+  settings: { key: "rail.settings", fallback: "设置" }, // i18n-ignore
+  about: { key: "rail.about", fallback: "关于" }, // i18n-ignore
 };
 
 export interface LeftRailProps {

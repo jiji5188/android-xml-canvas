@@ -6,6 +6,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import type { ResolvedNode } from "@/lib/xml/types";
 import { DRAG_WIDGET_MIME } from "./widget-catalog";
 import { isContainerTag } from "@/lib/xml/insert";
@@ -708,7 +709,7 @@ export function XmlCanvas({
               onPointerMove={onMove}
               onPointerUp={endDrag}
               onClick={(e) => e.stopPropagation()}
-              title={"拖到目标控件上建立 " + side + " 约束"}
+              title={tt("拖到目标控件上建立 ") + side + tt(" 约束")}
             />
           ))}
           {drag ? (
@@ -725,7 +726,7 @@ export function XmlCanvas({
           {showMoveHandle ? (
             <span
               className="axv-geom-move"
-              title="拖动我移动控件（写回 layout_marginStart / layout_marginTop）"
+              title={tt("拖动我移动控件（写回 layout_marginStart / layout_marginTop）")}
               onPointerDown={beginGeom("move")}
               onClick={(e) => e.stopPropagation()}
             >
@@ -738,12 +739,12 @@ export function XmlCanvas({
               className={"axv-geom-resize axv-geom-" + m}
               title={
                 m === "left"
-                  ? "拖动改宽度（左边）"
+                  ? tt("拖动改宽度（左边）")
                   : m === "right"
-                    ? "拖动改宽度（右边）"
+                    ? tt("拖动改宽度（右边）")
                     : m === "top"
-                      ? "拖动改高度（上边）"
-                      : "拖动改高度（下边）"
+                      ? tt("拖动改高度（上边）")
+                      : tt("拖动改高度（下边）")
               }
               onPointerDown={beginGeom(m)}
               onClick={(e) => e.stopPropagation()}
@@ -757,7 +758,7 @@ export function XmlCanvas({
       {absMoveOk && inRL ? (
         <span
           className="axv-geom-move axv-geom-cl"
-          title="拖动我移动控件（写回 layout_marginStart / layout_marginTop；位置由相对规则决定）"
+          title={tt("拖动我移动控件（写回 layout_marginStart / layout_marginTop；位置由相对规则决定）")}
           onPointerDown={beginGeom("move", true)}
           onClick={(e) => e.stopPropagation()}
         >
@@ -775,8 +776,8 @@ export function XmlCanvas({
               className={"axv-geom-resize axv-geom-cl axv-geom-cl-" + m}
               title={
                 m === "left" || m === "right"
-                  ? "拖动改 layout_width（位置由约束/规则决定，不会跑飞）"
-                  : "拖动改 layout_height（位置由约束/规则决定，不会跑飞）"
+                  ? tt("拖动改 layout_width（位置由约束/规则决定，不会跑飞）")
+                  : tt("拖动改 layout_height（位置由约束/规则决定，不会跑飞）")
               }
               onPointerDown={beginGeom(m, true)}
               onClick={(e) => e.stopPropagation()}

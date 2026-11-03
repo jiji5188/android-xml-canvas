@@ -1,3 +1,4 @@
+import { t as tt } from "@/lib/i18n-src";
 // components/StatusBar.tsx — 底部状态条（M27）
 //
 // 开发工具没有状态条会让人一直心里没底：当前文件是哪个、设备多宽、缩放多少、
@@ -55,15 +56,15 @@ export function StatusBar(props: StatusBarProps) {
           type="button"
           className="axv-sb-item axv-sb-issue"
           onClick={props.onIssues}
-          title="显示/隐藏问题标记"
+          title={tt("显示/隐藏问题标记")}
         >
           <span className="msr" aria-hidden="true">error</span>
-          {props.issueCount} 个问题
+          {tt("{n} 个问题", { n: props.issueCount })}
         </button>
       ) : (
-        <span className="axv-sb-item axv-sb-ok" title="没有结构性问题">
+        <span className="axv-sb-item axv-sb-ok" title={tt("没有结构性问题")}>
           <span className="msr" aria-hidden="true">check_circle</span>
-          无问题
+          {tt("无问题")}
         </span>
       )}
 
@@ -78,7 +79,7 @@ export function StatusBar(props: StatusBarProps) {
         type="button"
         className="axv-sb-item axv-sb-zoom"
         onClick={props.onResetZoom}
-        title="点击恢复 100%"
+        title={tt("点击恢复 100%")}
       >
         {pct}%
       </button>

@@ -13,6 +13,7 @@
 // 输出：CSS 颜色串（与 ColorField 一致），alpha=1 时 #rrggbb，否则 rgba(...)。
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { hsvPanelBackground, hsvToRgb, rgbToHsvKeepHue, type Hsv } from "@/lib/xml/hsv";
 import {
   parseColor,
@@ -160,7 +161,7 @@ export function HsvPicker({
         ref={panelRef}
         style={{ background: hsvPanelBackground(hsv.h) }}
         role="slider"
-        aria-label={`${label} 饱和度与明度`}
+        aria-label={tt("{label} 饱和度与明度", { label })}
         aria-valuetext={`S ${Math.round(hsv.s * 100)}% V ${Math.round(hsv.v * 100)}%`}
         tabIndex={-1}
       >
@@ -173,7 +174,7 @@ export function HsvPicker({
 
       {/* 色相 */}
       <div className="axv-hsv-row">
-        <span className="axv-hsv-lab">色相</span>
+        <span className="axv-hsv-lab">{tt("色相")}</span>
         <input
           className="axv-hsv-hue"
           type="range"
@@ -181,7 +182,7 @@ export function HsvPicker({
           max={360}
           step={1}
           value={Math.round(hsv.h)}
-          aria-label={`${label} 色相`}
+          aria-label={tt("{label} 色相", { label })}
           onChange={(e) => emit({ ...hsv, h: Number(e.target.value) }, rgba.a)}
         />
         <b className="axv-hsv-num">{Math.round(hsv.h)}°</b>
@@ -189,7 +190,7 @@ export function HsvPicker({
 
       {/* 透明度 */}
       <div className="axv-hsv-row">
-        <span className="axv-hsv-lab">透明</span>
+        <span className="axv-hsv-lab">{tt("透明")}</span>
         <span className="axv-hsv-alpha-wrap">
           <span className="axv-hsv-checker" aria-hidden="true" />
           <span
@@ -204,7 +205,7 @@ export function HsvPicker({
             max={100}
             step={1}
             value={alphaPct}
-            aria-label={`${label} 透明度`}
+            aria-label={tt("{label} 透明度", { label })}
             onChange={(e) => onChange(withAlpha(rgba, Number(e.target.value) / 100))}
           />
         </span>
@@ -222,7 +223,7 @@ export function HsvPicker({
           spellCheck={false}
           aria-label={`${label} ARGB`}
           placeholder="#AARRGGBB"
-          title="支持 #AARRGGBB / #RRGGBB / #RGB"
+          title={tt("支持 #AARRGGBB / #RRGGBB / #RGB")}
           value={draft ?? argb}
           onChange={(e) => {
             const t = e.target.value;
@@ -250,7 +251,7 @@ export function HsvPicker({
               className="axv-hsv-preset"
               style={{ background: p }}
               title={p}
-              aria-label={`预设 ${p}`}
+              aria-label={tt("预设 {c}", { c: p })}
               onClick={() => applyText(p)}
             />
           ))}
@@ -267,7 +268,7 @@ export function HsvPicker({
               onChange({ r: rgba.r, g: rgba.g, b: rgba.b, a: 0 });
             }}
           >
-            透明
+            {tt("透明")}
           </button>
         ) : null}
         <button
@@ -278,18 +279,18 @@ export function HsvPicker({
             onDone?.();
           }}
         >
-          完成
+          {tt("完成")}
         </button>
       </div>
 
       {/* 原生取色兜底：某些颜色（屏幕取色）只能靠系统面板 */}
       <label className="axv-hsv-native-row">
-        <span>系统取色器</span>
+        <span>{tt("系统取色器")}</span>
         <input
           className="axv-hsv-native"
           type="color"
           value={rgbHex}
-          aria-label={`${label} 系统取色`}
+          aria-label={tt("{label} 系统取色", { label })}
           onChange={(e) => {
             const c = parseColor(e.target.value);
             if (c) applyText(e.target.value);

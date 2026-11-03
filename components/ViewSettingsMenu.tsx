@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { createPortal } from "react-dom";
 import { deviceById, deviceGroups } from "@/lib/xml/theme";
 
@@ -71,8 +72,8 @@ export function ViewSettingsMenu({ deviceId, onDevice, scale, onScale }: ViewSet
       <button
         ref={btnRef}
         className={"axv-tb-btn" + (open ? " is-on" : "")}
-        title={`显示与设备 · ${device.label}`}
-        aria-label="显示与设备"
+        title={tt("显示与设备 · {label}", { label: device.label })}
+        aria-label={tt("显示与设备")}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -88,11 +89,11 @@ export function ViewSettingsMenu({ deviceId, onDevice, scale, onScale }: ViewSet
               ref={panelRef}
               className="axv-vs-panel"
               role="dialog"
-              aria-label="显示与设备"
+              aria-label={tt("显示与设备")}
               style={{ left: pos.left, top: pos.top }}
             >
               <div className="axv-vs-row">
-                <label htmlFor="axv-vs-device">预览设备</label>
+                <label htmlFor="axv-vs-device">{tt("预览设备")}</label>
                 <select
                   id="axv-vs-device"
                   value={deviceId}
@@ -111,17 +112,17 @@ export function ViewSettingsMenu({ deviceId, onDevice, scale, onScale }: ViewSet
                 </select>
               </div>
               <div className="axv-vs-hint">
-                对应资源目录 <code>{device.hint || "layout/"}</code>
+                {tt("对应资源目录")} <code>{device.hint || "layout/"}</code>
                 {device.dpi ? <span> · {device.dpi}dpi</span> : null}
               </div>
 
               <div className="axv-vs-row">
-                <label htmlFor="axv-vs-zoom">画布缩放</label>
+                <label htmlFor="axv-vs-zoom">{tt("画布缩放")}</label>
                 <div className="axv-vs-zoom">
                   <button
                     type="button"
                     onClick={() => onScale(Math.max(0.4, Math.round((scale - 0.1) * 10) / 10))}
-                    aria-label="缩小"
+                    aria-label={tt("缩小")}
                   >
                     −
                   </button>
@@ -133,12 +134,12 @@ export function ViewSettingsMenu({ deviceId, onDevice, scale, onScale }: ViewSet
                     step={0.1}
                     value={scale}
                     onChange={(e) => onScale(parseFloat(e.target.value))}
-                    aria-label="缩放"
+                    aria-label={tt("缩放")}
                   />
                   <button
                     type="button"
                     onClick={() => onScale(Math.min(1.5, Math.round((scale + 0.1) * 10) / 10))}
-                    aria-label="放大"
+                    aria-label={tt("放大")}
                   >
                     ＋
                   </button>
@@ -147,7 +148,7 @@ export function ViewSettingsMenu({ deviceId, onDevice, scale, onScale }: ViewSet
               <div className="axv-vs-foot">
                 <span>{scale.toFixed(2)}×</span>
                 <button type="button" className="axv-vs-reset" onClick={() => onScale(1)}>
-                  复位 100%
+                  {tt("复位 100%")}
                 </button>
               </div>
             </div>,

@@ -4,9 +4,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { ATTR_CATALOG, type AttrSpec } from "./attr-catalog";
 
-const GROUP_ORDER: AttrSpec["group"][] = ["布局", "约束", "文本", "外观", "控件", "其他"];
+const GROUP_ORDER: AttrSpec["group"][] = ["布局", "约束", "文本", "外观", "控件", "其他"]; // i18n-ignore
 
 interface Props {
   open: boolean;
@@ -62,14 +63,14 @@ export function AddAttrModal({ open, existing, tag, onClose, onPick }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="axv-modal" role="dialog" aria-label="添加属性">
+      <div className="axv-modal" role="dialog" aria-label={tt("添加属性")}>
         <div className="axv-modal-head">
-          <span>添加属性</span>
-          <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">✕</button>
+          <span>{tt("添加属性")}</span>
+          <button className="axv-icon-btn" onClick={onClose} aria-label={tt("关闭")}>✕</button>
         </div>
         <input
           className="axv-modal-search"
-          placeholder="搜索属性名，如 margin / gravity / text…"
+          placeholder={tt("搜索属性名，如 margin / gravity / text…")}
           value={q}
           autoFocus
           onChange={(e) => setQ(e.target.value)}
@@ -93,7 +94,7 @@ export function AddAttrModal({ open, existing, tag, onClose, onPick }: Props) {
                   >
                     <span className="axv-modal-item-name">{s.name}</span>
                     {added ? (
-                      <span className="axv-modal-item-tag">已存在</span>
+                      <span className="axv-modal-item-tag">{tt("已存在")}</span>
                     ) : (
                       s.desc ? <span className="axv-modal-item-desc">{s.desc}</span> : null
                     )}
@@ -102,7 +103,7 @@ export function AddAttrModal({ open, existing, tag, onClose, onPick }: Props) {
               })}
             </div>
           ))}
-          {groups.size === 0 && <div className="axv-modal-empty">没有匹配的属性</div>}
+          {groups.size === 0 && <div className="axv-modal-empty">{tt("没有匹配的属性")}</div>}
         </div>
       </div>
     </div>

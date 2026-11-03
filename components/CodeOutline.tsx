@@ -5,6 +5,7 @@
 // 纯展示 + 回调，解析在 lib/xml/java-outline.ts。
 
 import { useMemo, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import type { OutlineItem } from "@/lib/xml/java-outline";
 
 export interface CodeOutlineProps {
@@ -33,17 +34,17 @@ export function CodeOutline({ items, currentLine = 0, onJump, fileName }: CodeOu
         <input
           className="axv-outline-search"
           value={q}
-          placeholder="搜索函数名"
+          placeholder={tt("搜索函数名")}
           onChange={(e) => setQ(e.target.value)}
         />
         <span className="axv-outline-count" title={fileName}>
-          {methods} 个函数
+          {tt("{n} 个函数", { n: methods })}
         </span>
       </div>
 
       {shown.length === 0 ? (
         <div className="axv-attr-hint">
-          {items.length === 0 ? "没识别到函数（文件可能还没保存或语法不完整）" : "没有匹配的函数"}
+          {items.length === 0 ? tt("没识别到函数（文件可能还没保存或语法不完整）") : tt("没有匹配的函数")}
         </div>
       ) : (
         <ul className="axv-outline-list">
@@ -61,7 +62,7 @@ export function CodeOutline({ items, currentLine = 0, onJump, fileName }: CodeOu
                     className="axv-outline-class"
                     style={{ paddingLeft: 8 + Math.min(it.depth, 3) * 10 }}
                     onClick={() => onJump(it.line)}
-                    title={`跳到第 ${it.line} 行`}
+                    title={tt("跳到第 {n} 行", { n: it.line })}
                   >
                     <span className="msr" aria-hidden="true">
                       {it.depth === 0 ? "folder_special" : "widgets"}
@@ -75,7 +76,7 @@ export function CodeOutline({ items, currentLine = 0, onJump, fileName }: CodeOu
                     className={"axv-outline-item" + (active ? " is-active" : "")}
                     style={{ paddingLeft: 14 + Math.min(Math.max(it.depth - 1, 0), 3) * 10 }}
                     onClick={() => onJump(it.line)}
-                    title={`跳到第 ${it.line} 行`}
+                    title={tt("跳到第 {n} 行", { n: it.line })}
                   >
                     <span className="axv-outline-name">{it.name}</span>
                     {it.sig ? <span className="axv-outline-sig">{it.sig}</span> : null}

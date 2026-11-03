@@ -4,6 +4,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import {
   WIDGETS,
   WIDGET_GROUPS,
@@ -72,14 +73,14 @@ export function WidgetPalette({ onInsert, hasSelection }: Props) {
     <div className="axv-pp">
       <div className="axv-pp-search">
         <input
-          placeholder="搜索控件名 / 类名"
+          placeholder={tt("搜索控件名 / 类名")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          aria-label="搜索组件"
+          aria-label={tt("搜索组件")}
         />
       </div>
       <div className="axv-pp-scroll">
-        {tree.length === 0 && <div className="axv-pp-empty">没有匹配的组件</div>}
+        {tree.length === 0 && <div className="axv-pp-empty">{tt("没有匹配的组件")}</div>}
         {tree.map((node) => {
           const libCollapsed = !searching && !!collapsedLib[node.lib];
           return (
@@ -126,7 +127,7 @@ export function WidgetPalette({ onInsert, hasSelection }: Props) {
                               key={w.key}
                               type="button"
                               className="axv-pp-tile"
-                              title={`${w.label}（${w.tag}）· 点击插入 / 拖到画布`}
+                              title={tt("{label}（{tag}）· 点击插入 / 拖到画布", { label: w.label, tag: w.tag })}
                               draggable
                               onDragStart={(e) => {
                                 e.dataTransfer.setData(DRAG_WIDGET_MIME, w.key);
@@ -154,7 +155,7 @@ export function WidgetPalette({ onInsert, hasSelection }: Props) {
         })}
       </div>
       <div className="axv-pp-foot">
-        {hasSelection ? "点磁贴插入到选中控件（同级或子级）" : "点磁贴插入到当前屏幕根节点"}
+        {hasSelection ? tt("点磁贴插入到选中控件（同级或子级）") : tt("点磁贴插入到当前屏幕根节点")}
       </div>
     </div>
   );

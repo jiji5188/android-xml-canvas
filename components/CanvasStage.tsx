@@ -5,6 +5,7 @@
 // 所有状态与回调都由 XmlEditor 注入，这里纯展示（props 进、JSX 出），方便单独调外壳样式。
 
 import type { DragEvent, RefObject } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { DRAG_WIDGET_MIME } from "./widget-catalog";
 import { XmlCanvas } from "./XmlCanvas";
 import CanvasBoundary from "@/components/CanvasBoundary";
@@ -153,7 +154,7 @@ export function CanvasStage(props: CanvasStageProps) {
           <div className="axv-parse-fail-hint">
             {tr(
               "err.parseHint",
-              "先到「代码」面板修正这段内容，画布会自动恢复；改动不会丢失，也不会影响你原来的文件。",
+              tt("先到「代码」面板修正这段内容，画布会自动恢复；改动不会丢失，也不会影响你原来的文件。"),
             )}
           </div>
           <button className="axv-parse-fail-btn" onClick={() => gotoLine(1)}>
@@ -220,7 +221,7 @@ export function CanvasStage(props: CanvasStageProps) {
                 title: tr("err.crashTitle", "画布渲染出错了"),
                 hint: tr(
                   "err.crashHint",
-                  "这不是你操作的问题，多半是某段布局数据超出了支持范围。到「代码」面板改一下（哪怕加个空格再删掉）画布会自动重试。",
+                  tt("这不是你操作的问题，多半是某段布局数据超出了支持范围。到「代码」面板改一下（哪怕加个空格再删掉）画布会自动重试。"),
                 ),
                 fix: tr("err.fix", "去代码面板修正"),
                 retry: tr("err.retry", "重试渲染"),
@@ -242,17 +243,17 @@ export function CanvasStage(props: CanvasStageProps) {
           {/* 导航栏（三键导航：返回 / 主页 / 多任务） */}
           {showSystemBars && (
           <div className="axv-navbar" style={{ height: NAV_BAR_H }}>
-            <span className="axv-nav-btn" title="返回">
+            <span className="axv-nav-btn" title={tt("返回")}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M13.5 4.5 L14.5 4.5 L14.5 4.75 L14.75 4.75 L14.75 5 L15 5 L15 5.75 L14.75 5.75 L14.75 6.25 L14.5 6.25 L14.5 6.5 L14.25 6.5 L14.25 6.75 L14 6.75 L14 7 L13.75 7 L13.75 7.25 L13.5 7.25 L13.5 7.5 L13.25 7.5 L13.25 7.75 L13 7.75 L13 8 L12.75 8 L12.75 8.25 L12.5 8.25 L12.5 8.5 L12.25 8.5 L12.25 8.75 L12 8.75 L12 9 L11.75 9 L11.75 9.25 L11.5 9.25 L11.5 9.5 L11.25 9.5 L11.25 9.75 L11 9.75 L11 10.25 L11.25 10.25 L11.25 10.5 L11.5 10.5 L11.5 10.75 L11.75 10.75 L11.75 11 L12 11 L12 11.25 L12.25 11.25 L12.25 11.5 L12.5 11.5 L12.5 11.75 L12.75 11.75 L12.75 12 L13 12 L13 12.25 L13.25 12.25 L13.25 12.5 L13.5 12.5 L13.5 12.75 L13.75 12.75 L13.75 13 L14 13 L14 13.25 L14.25 13.25 L14.25 13.5 L14.5 13.5 L14.5 13.75 L14.75 13.75 L14.75 14.25 L15 14.25 L15 15 L14.75 15 L14.75 15.25 L14.5 15.25 L14.5 15.5 L13.5 15.5 L13.5 15.25 L13.25 15.25 L13.25 15 L13 15 L13 14.75 L12.75 14.75 L12.75 14.5 L12.5 14.5 L12.5 14.25 L12.25 14.25 L12.25 14 L12 14 L12 13.75 L11.75 13.75 L11.75 13.5 L11.5 13.5 L11.5 13.25 L11.25 13.25 L11.25 13 L11 13 L11 12.75 L10.75 12.75 L10.75 12.5 L10.5 12.5 L10.5 12.25 L10.25 12.25 L10.25 12 L10 12 L10 11.75 L9.75 11.75 L9.75 11.5 L9.5 11.5 L9.5 11.25 L9.25 11.25 L9.25 11 L9 11 L9 10.75 L8.75 10.75 L8.75 10.5 L8.5 10.5 L8.5 9.5 L8.75 9.5 L8.75 9.25 L9 9.25 L9 9 L9.25 9 L9.25 8.75 L9.5 8.75 L9.5 8.5 L9.75 8.5 L9.75 8.25 L10 8.25 L10 8 L10.25 8 L10.25 7.75 L10.5 7.75 L10.5 7.5 L10.75 7.5 L10.75 7.25 L11 7.25 L11 7 L11.25 7 L11.25 6.75 L11.5 6.75 L11.5 6.5 L11.75 6.5 L11.75 6.25 L12 6.25 L12 6 L12.25 6 L12.25 5.75 L12.5 5.75 L12.5 5.5 L12.75 5.5 L12.75 5.25 L13 5.25 L13 5 L13.25 5 L13.25 4.75 L13.5 4.75 Z" fill="currentColor" />
               </svg>
             </span>
-            <span className="axv-nav-btn" title="主页">
+            <span className="axv-nav-btn" title={tt("主页")}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" strokeWidth="2" />
               </svg>
             </span>
-            <span className="axv-nav-btn" title="多任务">
+            <span className="axv-nav-btn" title={tt("多任务")}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="5.5" y="5.5" width="13" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
               </svg>
@@ -264,11 +265,11 @@ export function CanvasStage(props: CanvasStageProps) {
       ) : null}
       {showIssues && issues.length > 0 && (
         <div className="axv-issues">
-          <strong>{issues.length} 条提示：</strong>
+          <strong>{tt("{n} 条提示：", { n: issues.length })}</strong>
           {issues.slice(0, 8).map((i, idx) => (
             <div key={idx}>[{i.level}] {i.nodePath} {i.message}</div>
           ))}
-          {issues.length > 8 && <div>… 共 {issues.length} 条</div>}
+          {issues.length > 8 && <div>{tt("… 共 {n} 条", { n: issues.length })}</div>}
         </div>
       )}
     </div>

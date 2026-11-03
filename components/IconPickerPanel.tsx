@@ -4,6 +4,7 @@
 // Lucide/Tabler 走 gzip+base64 懒解压（首次 80~250ms），几何永远可用。
 // 单击图标 = 替换整块画布；双击 / 底部按钮 = 追加成新图层。
 import * as React from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { ICON_MATERIAL, ICON_BUILTIN, ICON_CATS, decompressIconSet, type IconItem } from "@/lib/xml/icon-libs";
 import { parsePastedSvg } from "@/lib/xml/svg-paste";
 import { scalePath, scaleShapeLite, translateShape, type DrawShape } from "@/lib/xml/canvas-shapes";
@@ -15,8 +16,8 @@ const TAB_LABELS: Array<[TabKey, string]> = [
   ["material", "Material"],
   ["lucide", "Lucide"],
   ["tabler", "Tabler"],
-  ["geo", "几何"],
-  ["paste", "粘贴 SVG"],
+  ["geo", "几何"], // i18n-ignore
+  ["paste", "粘贴 SVG"], // i18n-ignore
 ];
 
 let seq = 0;
@@ -39,7 +40,7 @@ export interface IconPickerPanelProps {
   title?: string;
 }
 
-export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库", mode = "replace" }: IconPickerPanelProps) {
+export function IconPickerPanel({ onPick, onClose, viewport, title = tt("图标库"), mode = "replace" }: IconPickerPanelProps) {
   const [tab, setTab] = React.useState<TabKey>("material");
   const [cat, setCat] = React.useState("all");
   const [q, setQ] = React.useState("");
@@ -58,13 +59,13 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
     let alive = true;
     const p = decompressIconSet(tab);
     if (!p) {
-      setErr("当前环境不支持 gzip 解压，该图标库不可用");
+      setErr(tt("当前环境不支持 gzip 解压，该图标库不可用"));
       return;
     }
     p.then((arr) => {
       if (alive) setLazy((prev) => ({ ...prev, [tab]: arr }));
     }).catch(() => {
-      if (alive) setErr("图标库解压失败（可能是浏览器不支持 DecompressionStream）");
+      if (alive) setErr(tt("图标库解压失败（可能是浏览器不支持 DecompressionStream）"));
     });
     return () => {
       alive = false;
@@ -95,7 +96,7 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
   const parsedPaste = () => {
     const parts = parsePastedSvg(paste);
     if (!parts) {
-      setPasteErr("没解析出任何图形（支持 path / circle / ellipse / rect / line / polygon / polyline）");
+      setPasteErr(tt("没解析出任何图形（支持 path / circle / ellipse / rect / line / polygon / polyline）"));
       return null;
     }
     setPasteErr("");
@@ -138,7 +139,7 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
             </span>
             {title}
           </div>
-          <button type="button" className="cp-x" onClick={onClose} title="关闭">
+          <button type="button" className="cp-x" onClick={onClose} title={tt("关闭")}>
             ✕
           </button>
         </div>
@@ -164,7 +165,7 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
         {tab === "paste" ? (
           <div className="axv-iconlib-paste">
             <p className="axv-iconlib-hint">
-              粘贴 SVG 源码（支持 path / circle / ellipse / rect / line / polygon / polyline），会转成可编辑图元。
+              {tt("粘贴 SVG 源码（支持 path / circle / ellipse / rect / line / polygon / polyline），会转成可编辑图元。")}
             </p>
             <textarea
               className="axv-iconlib-ta"
@@ -175,10 +176,10 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
             {pasteErr ? <p className="axv-iconlib-err">{pasteErr}</p> : null}
             <div className="axv-iconlib-foot">
               <button type="button" className="cp-btn cp-copy" onClick={onClose}>
-                取消
+                {tt("取消")}
               </button>
               <button type="button" className="cp-btn cp-confirm" onClick={() => doPaste(mode)}>
-                {mode === "insert" ? "插入画布" : "替换画布"}
+                {mode === "insert" ? tt("插入画布") : tt("替换画布")}
               </button>
             </div>
           </div>
@@ -200,11 +201,11 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
               <span className="msr" aria-hidden>
                 search
               </span>
-              <input placeholder="搜索图标名…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <input placeholder={tt("搜索图标名…")} value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             {err ? <p className="axv-iconlib-err">{err}</p> : null}
             {loading ? (
-              <p className="axv-iconlib-hint">正在解压 {tab} …（首次约 100~250ms）</p>
+              <p className="axv-iconlib-hint">{tt("正在解压 {tab} …（首次约 100~250ms）", { tab })}</p>
             ) : null}
             {!loading && !err ? (
               <div className="axv-iconlib-grid">
@@ -229,7 +230,7 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
                     <span>{it.n}</span>
                   </button>
                 ))}
-                {!list.length ? <p className="axv-iconlib-hint">没有匹配「{q}」的图标</p> : null}
+                {!list.length ? <p className="axv-iconlib-hint">{tt("没有匹配「{q}」的图标", { q })}</p> : null}
               </div>
             ) : null}
             {!loading && !err && list.length > ICON_PAGE ? (
@@ -238,20 +239,20 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
                   type="button"
                   disabled={pg <= 1}
                   onClick={() => setPage(pg - 1)}
-                  title="上一页"
+                  title={tt("上一页")}
                 >
                   <span className="msr" aria-hidden>
                     chevron_left
                   </span>
                 </button>
                 <span>
-                  {pg} / {pages} · 共 {list.length} 个
+                  {tt("{a} / {b} · 共 {n} 个", { a: pg, b: pages, n: list.length })}
                 </span>
                 <button
                   type="button"
                   disabled={pg >= pages}
                   onClick={() => setPage(pg + 1)}
-                  title="下一页"
+                  title={tt("下一页")}
                 >
                   <span className="msr" aria-hidden>
                     chevron_right
@@ -261,10 +262,10 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = "图标库"
             ) : null}
             <div className="axv-iconlib-foot">
               <span className="axv-iconlib-count">
-                共 {list.length} 个 · {mode === "insert" ? "单击插入为图层" : "单击替换画布"}
+                {tt("共 {n} 个 · {act}", { n: list.length, act: mode === "insert" ? tt("单击插入为图层") : tt("单击替换画布") })}
               </span>
               <button type="button" className="cp-btn cp-copy" onClick={onClose}>
-                取消
+                {tt("取消")}
               </button>
             </div>
           </>

@@ -340,3 +340,75 @@ Import trace:
 ✓ Compiled in 91ms
 ✓ Compiled in 104ms
 ✓ Compiled in 107ms
+✓ Compiled in 940ms
+✓ Compiled in 137ms
+✓ Compiled in 1807ms
+[browser] Uncaught ReferenceError: tt is not defined
+    at CodeEditor (components/CodeEditor.tsx:877:63)
+    at Set.forEach (<anonymous>)
+    at XmlCodeView (components/XmlCodeEditor.tsx:434:60)
+    at XmlEditor (components/XmlEditor.tsx:3417:7)
+    at XmlPage (app/xml/page.tsx:8:10)
+  875 |       )}
+  876 |
+> 877 |       <div className="axv-sym-bar" role="toolbar" aria-label={tt("常用符号")}>
+      |                                                               ^
+  878 |         {onFormat ? (
+  879 |           <button
+  880 |             type="button"
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /xml/?r=m101b 200 in 29ms (next.js: 0.8ms, application-code: 28ms)
+✓ Compiled in 1026ms
+✓ Compiled in 120ms
+✓ Compiled in 1660ms
+[browser] Uncaught ReferenceError: tt is not defined
+    at WidgetPalette (components/WidgetPalette.tsx:75:24)
+    at Set.forEach (<anonymous>)
+    at XmlEditor (components/XmlEditor.tsx:3469:15)
+    at XmlPage (app/xml/page.tsx:8:10)
+  73 |       <div className="axv-pp-search">
+  74 |         <input
+> 75 |           placeholder={tt("搜索控件名 / 类名")}
+     |                        ^
+  76 |           value={q}
+  77 |           onChange={(e) => setQ(e.target.value)}
+  78 |           aria-label={tt("搜索组件")}
+ GET /xml/?r=m101b 200 in 47ms (next.js: 0.9ms, application-code: 46ms)
+[browser] Uncaught ReferenceError: tt is not defined
+    at module evaluation (components/CanvasBoundary.tsx:27:10)
+    at module evaluation (components/CanvasStage.tsx:10:1)
+    at module evaluation (components/XmlEditor.tsx:136:1)
+    at module evaluation (components/widget-catalog.ts:1023:33)
+    at <unknown> (.next\dev\static\chunks\components_XmlEditor_tsx_1kug7hoaa0dz4._.js:26:16)
+    at XmlPage (app/xml/page.tsx:8:10)
+  25 |
+  26 | const DEFAULT_LABELS: Labels = {
+> 27 |   title: tt("画布渲染出错了"),
+     |          ^
+  28 |   hint: tt("这不是你操作的问题，多半是某段布局数据超出了支持范围。到「代码」面板改一下（哪怕加个空格再删掉）画布会自动重试。"),
+  29 |   fix: tt("去代码面板修正"),
+  30 |   retry: tt("重试渲染"),
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 317ms
+ GET /xml/?r=m101b 200 in 56ms (next.js: 1.8ms, application-code: 55ms)
+✓ Compiled in 111ms
+✓ Compiled in 103ms
+[browser] Uncaught ReferenceError: tt is not defined
+    at Inspector (components/Inspector.tsx:62:39)
+    at Set.forEach (<anonymous>)
+    at XmlEditor (components/XmlEditor.tsx:3634:7)
+    at XmlPage (app/xml/page.tsx:8:10)
+  60 |     <aside className={"axv-slide-right" + (open ? " axv-open" : "")}>
+  61 |       <div className="axv-slide-head">
+> 62 |         <span>{isOutline ? tt("函数") : tt("属性")}</span>
+     |                                     ^
+  63 |         <button className="axv-icon-btn" title={tt("关闭面板")} aria-label={tt("关闭面板")} onClick={onClose}>
+  64 |           <span className="msr" aria-hidden="true" style={{ fontSize: 24 }}>
+  65 |             right_panel_close
+✓ Compiled in 292ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /xml/?r=m101b 200 in 40ms (next.js: 1.0ms, application-code: 39ms)
+✓ Compiled in 117ms
+✓ Compiled in 94ms
+✓ Compiled in 100ms
+✓ Compiled in 105ms

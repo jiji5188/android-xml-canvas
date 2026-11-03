@@ -11,6 +11,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
@@ -112,7 +113,7 @@ function buildErrDeco(doc: { lines: number; line(n: number): { from: number } },
     ranges.push(
       Decoration.line({
         class: "axv-cm-errline",
-        attributes: { title: m.get(ln) || "结构问题" },
+        attributes: { title: m.get(ln) || tt("结构问题") },
       }).range(doc.line(ln).from),
     );
   }
@@ -755,7 +756,7 @@ export function CodeEditor({
           <div
             className="axv-sug"
             role="listbox"
-            aria-label="关键词提示"
+            aria-label={tt("关键词提示")}
             style={{
               left: sug.placement.left,
               top: sug.placement.top,
@@ -804,8 +805,8 @@ export function CodeEditor({
               ref={findRef}
               className="axv-find-input"
               value={query}
-              placeholder="在当前文件里查找"
-              aria-label="查找"
+              placeholder={tt("在当前文件里查找")}
+              aria-label={tt("查找")}
               onChange={(e) => {
                 setQuery(e.target.value);
                 setHitIdx(0);
@@ -824,15 +825,15 @@ export function CodeEditor({
             <span className="axv-find-count">
               {hits.length === 0
                 ? query.trim()
-                  ? "无匹配"
+                  ? tt("无匹配")
                   : ""
                 : `${Math.min(hitIdx + 1, hits.length)}/${hits.length}`}
             </span>
             <button
               type="button"
               className="axv-find-btn"
-              title="上一个（Shift+Enter）"
-              aria-label="上一个"
+              title={tt("上一个（Shift+Enter）")}
+              aria-label={tt("上一个")}
               disabled={hits.length === 0}
               onClick={() => gotoHit(hitIdx - 1)}
             >
@@ -841,8 +842,8 @@ export function CodeEditor({
             <button
               type="button"
               className="axv-find-btn"
-              title="下一个（Enter）"
-              aria-label="下一个"
+              title={tt("下一个（Enter）")}
+              aria-label={tt("下一个")}
               disabled={hits.length === 0}
               onClick={() => gotoHit(hitIdx + 1)}
             >
@@ -851,8 +852,8 @@ export function CodeEditor({
             <button
               type="button"
               className="axv-find-btn"
-              title="关闭（Esc）"
-              aria-label="关闭查找"
+              title={tt("关闭（Esc）")}
+              aria-label={tt("关闭查找")}
               onClick={() => {
                 setFindOpen(false);
                 viewRef.current?.focus();
@@ -868,18 +869,18 @@ export function CodeEditor({
         <div className="axv-code-errbar">
           <span className="axv-err-dot" aria-hidden="true" />
           <span>
-            第 {firstErr.line} 行 · {firstErr.message}
-            {errors && errors.length > 1 ? `　（共 ${errors.length} 处）` : ""}
+            {tt("第 {n} 行 · {msg}", { n: firstErr.line, msg: firstErr.message })}
+            {errors && errors.length > 1 ? tt("　（共 {n} 处）", { n: errors.length }) : ""}
           </span>
         </div>
       )}
 
-      <div className="axv-sym-bar" role="toolbar" aria-label="常用符号">
+      <div className="axv-sym-bar" role="toolbar" aria-label={tt("常用符号")}>
         {onFormat ? (
           <button
             type="button"
             className="axv-sym-btn axv-sym-action"
-            title="重排缩进（保留注释）"
+            title={tt("重排缩进（保留注释）")}
             onMouseDown={(e) => e.preventDefault()}
             onTouchStart={(e) => e.preventDefault()}
             onClick={onFormat}

@@ -6,6 +6,7 @@
 //   - 改成 React 受控组件，方便在图标编辑器里直接替换旧 ColorField
 //   - 输出保持为项目里的 Android 颜色字符串（#RRGGBB / #AARRGGBB），由 parseColorOr/toAndroidHex 转换
 import { useCallback, useEffect, useRef, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { createPortal } from "react-dom";
 import {
   colorToPickerColor,
@@ -223,7 +224,7 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
       <div className="axv-cp" role="dialog" aria-label={label} aria-modal="true">
         <div className="cp-header">
           <div className="cp-title">{label}</div>
-          <button className="cp-close" aria-label="关闭" onClick={onClose}>
+          <button className="cp-close" aria-label={tt("关闭")} onClick={onClose}>
             ×
           </button>
         </div>
@@ -241,7 +242,7 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
           </div>
 
           <div className="cp-row">
-            <label>色相 H <span>{Math.round(picker.h)}°</span></label>
+            <label>{tt("色相")} H <span>{Math.round(picker.h)}°</span></label>
             <input
               type="range"
               min={0}
@@ -252,7 +253,7 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
             />
           </div>
           <div className="cp-row">
-            <label>透明度 A <span>{picker.a.toFixed(2)}</span></label>
+            <label>{tt("透明度")} A <span>{picker.a.toFixed(2)}</span></label>
             <div className="cp-alpha-wrap">
               <div className="cp-checker-bg" />
               <div className="cp-alpha-bar" style={{ background: `linear-gradient(90deg, rgba(${previewRgb.r},${previewRgb.g},${previewRgb.b},0), rgb(${previewRgb.r},${previewRgb.g},${previewRgb.b}))` }} />
@@ -284,7 +285,7 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
             </div>
           </div>
 
-          <div className="cp-preset-title">预设颜色</div>
+          <div className="cp-preset-title">{tt("预设颜色")}</div>
           <div className="cp-preset-grid">
             {presets.map((c) => (
               <div key={c} className="cp-preset" style={{ background: c }} onClick={() => pickPreset(c)} title={c} />
@@ -294,11 +295,11 @@ export function ColorPicker({ value, label, onConfirm, onClose, presets = DEFAUL
           <div className="cp-actions">
             {showCancel ? (
               <button type="button" className="cp-btn cp-copy" onClick={onClose}>
-                取消
+                {tt("取消")}
               </button>
             ) : null}
             <button type="button" className="cp-btn cp-confirm" onClick={confirm}>
-              确认选择
+              {tt("确认选择")}
             </button>
           </div>
         </div>

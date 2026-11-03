@@ -5,6 +5,7 @@
 // 这里用 ErrorBoundary 把画布圈起来：崩了只丢画布，工具栏/代码面板还在，能继续修。
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { t as tt } from "@/lib/i18n-src";
 
 interface Labels {
   title: string;
@@ -24,10 +25,10 @@ interface Props {
 }
 
 const DEFAULT_LABELS: Labels = {
-  title: "画布渲染出错了",
-  hint: "这不是你操作的问题，多半是某段布局数据超出了支持范围。到「代码」面板改一下（哪怕加个空格再删掉）画布会自动重试。",
-  fix: "去代码面板修正",
-  retry: "重试渲染",
+  title: tt("画布渲染出错了"),
+  hint: tt("这不是你操作的问题，多半是某段布局数据超出了支持范围。到「代码」面板改一下（哪怕加个空格再删掉）画布会自动重试。"),
+  fix: tt("去代码面板修正"),
+  retry: tt("重试渲染"),
 };
 
 interface State {
@@ -51,7 +52,7 @@ export default class CanvasBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[axv] 画布渲染崩溃", error, info.componentStack);
+    console.error("[axv] 画布渲染崩溃", error, info.componentStack); // i18n-ignore
   }
 
   render() {
@@ -64,7 +65,7 @@ export default class CanvasBoundary extends Component<Props, State> {
           bug_report
         </span>
         <div className="axv-parse-fail-title">{L.title}</div>
-        <div className="axv-parse-fail-msg">{error.message || "未知渲染错误"}</div>
+        <div className="axv-parse-fail-msg">{error.message || tt("未知渲染错误")}</div>
         <div className="axv-parse-fail-hint">{L.hint}</div>
         <div className="axv-parse-fail-btns">
           <button className="axv-parse-fail-btn" onClick={() => this.props.onFix?.()}>

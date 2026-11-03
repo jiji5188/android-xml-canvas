@@ -14,6 +14,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import type { XmlNode } from "../lib/xml/types";
 import { isContainerTag } from "../lib/xml/insert";
 import { filterLayerTree } from "../lib/xml/layer-filter";
@@ -63,7 +64,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
     }
   }, [selectedPath, q]);
 
-  if (!root) return <div className="axv-lt-empty">没有节点</div>;
+  if (!root) return <div className="axv-lt-empty">{tt("没有节点")}</div>;
 
   const toggle = (p: string) =>
     setCollapsed((s) => {
@@ -251,7 +252,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
           {kids.length > 0 ? (
             <button
               className="axv-lt-toggle"
-              aria-label={open ? "折叠" : "展开"}
+              aria-label={open ? tt("折叠") : tt("展开")}
               onClick={(e) => {
                 e.stopPropagation();
                 toggle(n.path);
@@ -270,8 +271,8 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
             {onToggleLock ? (
               <button
                 className={"axv-lt-lock" + (locked ? " on" : "")}
-                title={locked ? "解除锁定" : "锁定组件（锁定后画布点不中、不能拖动）"}
-                aria-label={locked ? "解锁" : "锁定"}
+                title={locked ? tt("解除锁定") : tt("锁定组件（锁定后画布点不中、不能拖动）")}
+                aria-label={locked ? tt("解锁") : tt("锁定")}
                 onClick={(e) => {
                   e.stopPropagation();
                   // M35c：未选中行只做选中，不执行锁定（防误触）
@@ -288,8 +289,8 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
               </button>
             ) : null}
             <button
-              title="删除"
-              aria-label="删除"
+              title={tt("删除")}
+              aria-label={tt("删除")}
               className="danger"
               disabled={isRoot}
               onClick={(e) => {
@@ -316,8 +317,8 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
                 (pressPath === n.path ? " arming" : "") +
                 (locked ? " off" : "")
               }
-              title={locked ? "已锁定，不能拖动" : "按住拖动：调顺序 / 放进容器"}
-              aria-label="拖动调整层级"
+              title={locked ? tt("已锁定，不能拖动") : tt("按住拖动：调顺序 / 放进容器")}
+              aria-label={tt("拖动调整层级")}
               disabled={locked}
               onPointerDown={(e) => {
                 if (locked || selectedPath !== n.path) return;
@@ -345,8 +346,8 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
       <div className="axv-lt-search">
         <input
           className="axv-lt-search-input"
-          placeholder={`搜索 ${root.children.length} 个节点…`}
-          aria-label="搜索图层"
+          placeholder={tt("搜索 {n} 个节点…", { n: root.children.length })}
+          aria-label={tt("搜索图层")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -354,7 +355,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
           <button
             type="button"
             className="axv-lt-search-clear"
-            title="清空搜索"
+            title={tt("清空搜索")}
             onClick={() => setQ("")}
           >
             ✕
@@ -362,15 +363,15 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
         ) : null}
       </div>
       {filter.active && filter.keep.size === 0 ? (
-        <div className="axv-lt-empty">没有匹配「{q}」的节点</div>
+        <div className="axv-lt-empty">{tt("没有匹配「{q}」的节点", { q })}</div>
       ) : (
         renderItem(root, 0, 1)
       )}
       {onDragMove ? (
         <div className="axv-lt-hint">
           {dragPath
-            ? "松手完成移动：行上方/下方 = 换兄弟位置，容器中间 = 放进容器"
-            : "选中一行后，按住行尾的 ⣿ 手柄拖动（手机长按 0.2 秒）：靠上/靠下 = 换兄弟位置，中间 = 放进容器"}
+            ? tt("松手完成移动：行上方/下方 = 换兄弟位置，容器中间 = 放进容器")
+            : tt("选中一行后，按住行尾的 ⣿ 手柄拖动（手机长按 0.2 秒）：靠上/靠下 = 换兄弟位置，中间 = 放进容器")}
         </div>
       ) : null}
     </div>

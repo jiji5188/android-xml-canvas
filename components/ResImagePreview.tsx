@@ -5,6 +5,7 @@
 // M11o：如果是矢量图（vector drawable），底部「复制引用」后面多一个「编辑」→ 打开图标编辑器。
 
 import { useEffect, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { createPortal } from "react-dom";
 
 interface Props {
@@ -50,7 +51,7 @@ export function ResImagePreview({ rel, name, url, xml, onEdit, onClose }: Props)
               {size ? ` · ${size.w}×${size.h}` : ""}
             </span>
           </span>
-          <button className="axv-icon-btn" onClick={onClose} title="关闭（Esc）">
+          <button className="axv-icon-btn" onClick={onClose} title={tt("关闭（Esc）")}>
             ✕
           </button>
         </div>
@@ -67,10 +68,10 @@ export function ResImagePreview({ rel, name, url, xml, onEdit, onClose }: Props)
             />
           ) : (
             <div className="axv-imgprev-empty">
-              没解析到这张图的内容
+              {tt("没解析到这张图的内容")}
               <br />
               <span style={{ fontSize: 12, opacity: 0.7 }}>
-                可能是该文件不是图片、或导入时被跳过了（只收 png/jpg/webp/gif/bmp 与 vector xml）
+                {tt("可能是该文件不是图片、或导入时被跳过了（只收 png/jpg/webp/gif/bmp 与 vector xml）")}
               </span>
             </div>
           )}
@@ -82,20 +83,20 @@ export function ResImagePreview({ rel, name, url, xml, onEdit, onClose }: Props)
             onClick={() => {
               void navigator.clipboard?.writeText(`@drawable/${name}`);
             }}
-            title="复制资源引用"
+            title={tt("复制资源引用")}
           >
-            引用
+            {tt("引用")}
           </button>
           {isVector ? (
             <button
               className="axv-btn axv-imgprev-edit"
               onClick={() => xml && onEdit?.(xml)}
-              title="打开图标编辑器（颜色 / 尺寸 / 路径 / 旋转）"
+              title={tt("打开图标编辑器（颜色 / 尺寸 / 路径 / 旋转）")}
             >
               <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
                 edit
               </span>
-              编辑
+              {tt("编辑")}
             </button>
           ) : null}
         </div>

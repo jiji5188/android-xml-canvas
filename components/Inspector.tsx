@@ -4,6 +4,7 @@
 // → AttrPanel（属性列表 / 图标 / 形状编辑入口）。所有状态都在 XmlEditor，这里纯展示 + 回调。
 
 import type { ResolvedNode } from "@/lib/xml/types";
+import { t as tt } from "@/lib/i18n-src";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import type { OutlineItem } from "@/lib/xml/java-outline";
 import { AttrPanel } from "./AttrPanel";
@@ -59,8 +60,8 @@ export function Inspector(props: InspectorProps) {
   return (
     <aside className={"axv-slide-right" + (open ? " axv-open" : "")}>
       <div className="axv-slide-head">
-        <span>{isOutline ? "函数" : "属性"}</span>
-        <button className="axv-icon-btn" title="关闭面板" aria-label="关闭面板" onClick={onClose}>
+        <span>{isOutline ? tt("函数") : tt("属性")}</span>
+        <button className="axv-icon-btn" title={tt("关闭面板")} aria-label={tt("关闭面板")} onClick={onClose}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 24 }}>
             right_panel_close
           </span>
@@ -79,9 +80,9 @@ export function Inspector(props: InspectorProps) {
             {node.sourceFile ? (
               <div
                 className="axv-include-readonly"
-                title="include 展开进来的节点：主 XML 里没有它的实体，改不了（要改去那个文件）"
+                title={tt("include 展开进来的节点：主 XML 里没有它的实体，改不了（要改去那个文件）")}
               >
-                ⚠ 来自 <b>{node.sourceFile}</b>（include 展开，只读）
+                ⚠ {tt("来自")} <b>{node.sourceFile}</b>（{tt("include 展开，只读")}）
               </div>
             ) : null}
             {props.isChildOfCL && (
@@ -113,7 +114,7 @@ export function Inspector(props: InspectorProps) {
             />
           </div>
         ) : (
-          <div className="axv-attr-hint">在画布或图层树上点任意控件查看并编辑属性</div>
+          <div className="axv-attr-hint">{tt("在画布或图层树上点任意控件查看并编辑属性")}</div>
         )}
       </div>
     </aside>

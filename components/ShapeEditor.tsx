@@ -8,6 +8,7 @@
 //   顶栏（返回 + 标题 + 工具） / 左工具条 + 画布 / 右侧参数栏（手机可滑出） / 底部可折叠抽屉（分页） / 底栏保存
 
 import { useEffect, useMemo, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { useOverlayBack } from "@/lib/overlay-back";
 import {
   argbColorsForPreview,
@@ -43,17 +44,17 @@ interface Props {
 type SheetTab = "shape" | "fill" | "stroke" | "effect";
 
 const KINDS: { v: ShapeKind; label: string; icon: string }[] = [
-  { v: "rectangle", label: "矩形", icon: "crop_square" },
-  { v: "oval", label: "椭圆", icon: "circle" },
-  { v: "line", label: "线条", icon: "remove" },
+  { v: "rectangle", label: tt("矩形"), icon: "crop_square" },
+  { v: "oval", label: tt("椭圆"), icon: "circle" },
+  { v: "line", label: tt("线条"), icon: "remove" },
 ];
 
 /** 底部抽屉的分页（和图标编辑器同款） */
 const SHEET_TABS: [SheetTab, string][] = [
-  ["shape", "形状"],
-  ["fill", "填充"],
-  ["stroke", "描边"],
-  ["effect", "效果"],
+  ["shape", tt("形状")],
+  ["fill", tt("填充")],
+  ["stroke", tt("描边")],
+  ["effect", tt("效果")],
 ];
 
 const RIPPLE_DEFAULT = "#33FFFFFF";
@@ -170,12 +171,12 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
   const prevH = isLine ? 2 : 140;
 
   return (
-    <div className="axv-icon-page axv-cv-page" role="dialog" aria-label="自定义形状">
+    <div className="axv-icon-page axv-cv-page" role="dialog" aria-label={tt("自定义形状")}>
       <div className="axv-shape-head">
-        <button className="axv-icon-back" onClick={close} aria-label="返回编辑器" title="返回">
+        <button className="axv-icon-back" onClick={close} aria-label={tt("返回编辑器")} title={tt("返回")}>
           <span className="msr" aria-hidden="true">arrow_back</span>
         </button>
-        <span className="axv-shape-title">自定义形状 · {attrName}</span>
+        <span className="axv-shape-title">{tt("自定义形状 · {name}", { name: attrName })}</span>
         <span className="axv-cv-head-tools">
           <button
             className="axv-icon-btn"
@@ -183,16 +184,16 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
               setSheetTab("shape");
               setSheetOpen(true);
             }}
-            title="形状参数"
-            aria-label="形状参数"
+            title={tt("形状参数")}
+            aria-label={tt("形状参数")}
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>tune</span>
           </button>
           <button
             className={"axv-icon-btn" + (showRaw ? " is-on" : "")}
             onClick={() => setShowRaw((v) => !v)}
-            title="查看生成的 XML"
-            aria-label="查看生成的 XML"
+            title={tt("查看生成的 XML")}
+            aria-label={tt("查看生成的 XML")}
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
           </button>
@@ -202,7 +203,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
       <div className="axv-icon-page-body axv-cv-body">
         {/* 左：形状工具条 + 画布预览 */}
         <div className="axv-cv-left">
-          <div className="axv-cv-tools" role="toolbar" aria-label="形状类型">
+          <div className="axv-cv-tools" role="toolbar" aria-label={tt("形状类型")}>
             {KINDS.map((k) => (
               <button
                 key={k.v}
@@ -221,8 +222,8 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
               onClick={() =>
                 setSpec((s) => ({ ...s, ripple: s.ripple ? undefined : { color: RIPPLE_DEFAULT } }))
               }
-              title="点按水波纹"
-              aria-label="点按水波纹"
+              title={tt("点按水波纹")}
+              aria-label={tt("点按水波纹")}
               aria-pressed={!!spec.ripple}
             >
               <span className="msr" aria-hidden="true">touch_app</span>
@@ -236,8 +237,8 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                     : { ...s, shadow: { dx: 0, dy: 4, blur: 6, color: "#1F000000" } },
                 )
               }
-              title="阴影层"
-              aria-label="阴影层"
+              title={tt("阴影层")}
+              aria-label={tt("阴影层")}
               aria-pressed={!!spec.shadow}
             >
               <span className="msr" aria-hidden="true">layers</span>
@@ -260,7 +261,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
               />
             </div>
             <div className="axv-cv-hint" style={{ textAlign: "center" }}>
-              预览 = 画布效果（同一套渲染规则）
+              {tt("预览 = 画布效果（同一套渲染规则）")}
             </div>
           </div>
         </div>
@@ -270,14 +271,14 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
           type="button"
           className={"axv-cv-form-toggle" + (formOpen ? "" : " is-closed")}
           onClick={() => setFormOpen((v) => !v)}
-          aria-label={formOpen ? "收起参数面板" : "展开参数面板"}
-          title={formOpen ? "收起参数面板" : "展开参数面板"}
+          aria-label={formOpen ? tt("收起参数面板") : tt("展开参数面板")}
+          title={formOpen ? tt("收起参数面板") : tt("展开参数面板")}
         >
           <span className="msr" aria-hidden="true">{formOpen ? "chevron_right" : "chevron_left"}</span>
         </button>
         <div className={"axv-icon-ed-form axv-cv-form" + (formOpen ? "" : " is-closed")}>
           <div className="axv-set-group">
-            <div className="axv-set-label">资源名</div>
+            <div className="axv-set-label">{tt("资源名")}</div>
             <div className="axv-shape-name-row">
               <code>@drawable/</code>
               <input
@@ -288,13 +289,13 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                 onChange={(e) => setName(sanitizeResName(e.target.value, ""))}
               />
             </div>
-            {nameConflicts ? <div className="axv-shape-warn">这个名字已被占用，换一个或改已有资源</div> : null}
+            {nameConflicts ? <div className="axv-shape-warn">{tt("这个名字已被占用，换一个或改已有资源")}</div> : null}
           </div>
 
           <div className="axv-set-group">
             <button className="axv-set-btn" onClick={() => setShowRaw((v) => !v)}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
-              {showRaw ? "收起 XML" : "查看生成的 XML"}
+              {showRaw ? tt("收起 XML") : tt("查看生成的 XML")}
             </button>
             {showRaw ? <pre className="axv-icon-ed-raw">{xml}</pre> : null}
           </div>
@@ -304,7 +305,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
         <div className={"axv-cv-sheet" + (sheetOpen ? "" : " is-collapsed")}>
           <div className="axv-cv-sheet-head" onClick={() => setSheetOpen((v) => !v)}>
             <span className="axv-cv-grabber" aria-hidden="true" />
-            <span className="axv-cv-sheet-title">样式</span>
+            <span className="axv-cv-sheet-title">{tt("样式")}</span>
             <div className="axv-cv-sheet-tabs" onClick={(e) => e.stopPropagation()}>
               {SHEET_TABS.map(([k, label]) => (
                 <button
@@ -326,7 +327,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
             {sheetTab === "shape" ? (
               <div className="axv-cv-sheet-pane">
                 <div className="axv-shape-field">
-                  <label>形状</label>
+                  <label>{tt("形状")}</label>
                   <div className="axv-shape-seg">
                     {KINDS.map((k) => (
                       <button
@@ -343,19 +344,19 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                 {spec.kind === "rectangle" ? (
                   <div className="axv-shape-field">
                     <label>
-                      圆角
+                      {tt("圆角")}
                       <button className="axv-shape-link" onClick={() => togglePerCorner(!perCorner)}>
-                        {perCorner ? "统一" : "四角独立"}
+                        {perCorner ? tt("统一") : tt("四角独立")}
                       </button>
                     </label>
                     {perCorner ? (
                       <div className="axv-shape-corners">
                         {(
                           [
-                            ["tl", "左上"],
-                            ["tr", "右上"],
-                            ["br", "右下"],
-                            ["bl", "左下"],
+                            ["tl", tt("左上")],
+                            ["tr", tt("右上")],
+                            ["br", tt("右下")],
+                            ["bl", tt("左下")],
                           ] as const
                         ).map(([k, label]) => (
                           <input
@@ -398,17 +399,17 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                         )
                       }
                     />
-                    内缩（&lt;inset&gt;）
+                    {tt("内缩（<inset>）")}
                   </label>
                   {spec.inset ? (
                     <>
                       <div className="axv-shape-corners" style={{ marginTop: 6 }}>
                         {(
                           [
-                            ["l", "左"],
-                            ["t", "上"],
-                            ["r", "右"],
-                            ["b", "下"],
+                            ["l", tt("左")],
+                            ["t", tt("上")],
+                            ["r", tt("右")],
+                            ["b", tt("下")],
                           ] as const
                         ).map(([k, label]) => (
                           <input
@@ -416,7 +417,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                             className="axv-attr-input"
                             type="number"
                             min={0}
-                            title={`内缩${label}（dp）`}
+                            title={tt("内缩{side}（dp）", { side: label })}
                             placeholder={label}
                             value={spec.inset?.[k] ?? 0}
                             onChange={(e) =>
@@ -433,7 +434,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                         style={{ marginTop: 6 }}
                         onClick={() => setSpec((s) => ({ ...s, inset: { l: 4, t: 4, r: 4, b: 4 } }))}
                       >
-                        四边统一 4dp
+                        {tt("四边统一 4dp")}
                       </button>
                     </>
                   ) : null}
@@ -445,28 +446,28 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
               <div className="axv-cv-sheet-pane">
                 {!grad ? (
                   <div className="axv-shape-field">
-                    <label>填充色</label>
+                    <label>{tt("填充色")}</label>
                     <div className="axv-shape-color">
                       <ColorField
                         aboveModal
-                        label="填充色"
+                        label={tt("填充色")}
                         value={spec.solid ?? "#FFFFFF"}
                         onChange={(css) => setSolid(cssToShapeColor(css))}
                       />
                       <input
                         className="axv-attr-input"
                         value={spec.solid ?? ""}
-                        placeholder="#FFFFFF 或 #80FFFFFF（带透明度）"
+                        placeholder="#FFFFFF 或 #80FFFFFF（带透明度）" // i18n-ignore
                         spellCheck={false}
                         onChange={(e) => setSolid(e.target.value)}
                       />
-                      <label className="axv-shape-alpha" title="拖动调填充透明度">
+                      <label className="axv-shape-alpha" title={tt("拖动调填充透明度")}>
                         <input
                           type="range"
                           min={0}
                           max={100}
                           step={1}
-                          aria-label="填充不透明度"
+                          aria-label={tt("填充不透明度")}
                           value={alphaPercent(spec.solid)}
                           onChange={(e) => setSolid(withAlphaPercent(spec.solid ?? "#FFFFFF", Number(e.target.value)))}
                         />
@@ -481,7 +482,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                   open={advanced}
                   onToggle={(e) => setAdvanced((e.currentTarget as HTMLDetailsElement).open)}
                 >
-                  <summary>高级：渐变</summary>
+                  <summary>{tt("高级：渐变")}</summary>
                   <div className="axv-shape-field">
                     <label className="axv-shape-check">
                       <input
@@ -496,13 +497,13 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                           }
                         }}
                       />
-                      使用渐变（替换纯色）
+                      {tt("使用渐变（替换纯色）")}
                     </label>
                   </div>
                   {grad ? (
                     <>
                       <div className="axv-shape-field">
-                        <label>类型</label>
+                        <label>{tt("类型")}</label>
                         <div className="axv-shape-seg">
                           {(["linear", "radial", "sweep"] as GradientType[]).map((t) => (
                             <button
@@ -510,40 +511,40 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                               className={"axv-shape-seg-btn" + (grad.type === t ? " is-on" : "")}
                               onClick={() => setGradient({ type: t })}
                             >
-                              {t === "linear" ? "线性" : t === "radial" ? "径向" : "扫描"}
+                              {t === "linear" ? tt("线性") : t === "radial" ? tt("径向") : tt("扫描")}
                             </button>
                           ))}
                         </div>
                       </div>
                       <div className="axv-shape-field">
-                        <label>颜色（起点 / 中间 / 终点）</label>
+                        <label>{tt("颜色（起点 / 中间 / 终点）")}</label>
                         <div className="axv-shape-row">
                           <ColorField
                             aboveModal
-                            label="渐变起点"
+                            label={tt("渐变起点")}
                             value={grad.start}
                             onChange={(css) => setGradient({ start: cssToShapeColor(css) })}
                           />
                           <ColorField
                             aboveModal
-                            label="渐变中间色"
+                            label={tt("渐变中间色")}
                             value={grad.center ?? grad.end}
                             onChange={(css) => setGradient({ center: cssToShapeColor(css) })}
                           />
                           <ColorField
                             aboveModal
-                            label="渐变终点"
+                            label={tt("渐变终点")}
                             value={grad.end}
                             onChange={(css) => setGradient({ end: cssToShapeColor(css) })}
                           />
                           <button className="axv-shape-link" onClick={() => setGradient({ center: undefined })}>
-                            去掉中间色
+                            {tt("去掉中间色")}
                           </button>
                         </div>
                       </div>
                       {grad.type === "linear" ? (
                         <div className="axv-shape-field">
-                          <label>角度</label>
+                          <label>{tt("角度")}</label>
                           <div className="axv-shape-range">
                             <input
                               type="range"
@@ -567,8 +568,8 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
               <div className="axv-cv-sheet-pane">
                 <div className="axv-shape-field">
                   <label>
-                    描边
-                    <span className="axv-shape-hint">宽度 0 = 无描边</span>
+                    {tt("描边")}
+                    <span className="axv-shape-hint">{tt("宽度 0 = 无描边")}</span>
                   </label>
                   <div className="axv-shape-row">
                     <input
@@ -585,7 +586,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                     />
                     <ColorField
                       aboveModal
-                      label="描边色"
+                      label={tt("描边色")}
                       value={spec.stroke?.color ?? "#E0E0E0"}
                       onChange={(css) => setStroke({ color: cssToShapeColor(css), width: spec.stroke?.width ?? 1 })}
                     />
@@ -602,7 +603,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                             );
                         }}
                       />
-                      虚线
+                      {tt("虚线")}
                     </label>
                   </div>
                   {dashed ? (
@@ -612,7 +613,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                         type="number"
                         min={1}
                         value={spec.stroke?.dashWidth ?? 4}
-                        title="虚线段长 dp"
+                        title={tt("虚线段长 dp")}
                         onChange={(e) => setStroke({ dashWidth: Number(e.target.value) })}
                       />
                       <input
@@ -620,7 +621,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                         type="number"
                         min={1}
                         value={spec.stroke?.dashGap ?? 3}
-                        title="虚线间隔 dp"
+                        title={tt("虚线间隔 dp")}
                         onChange={(e) => setStroke({ dashGap: Number(e.target.value) })}
                       />
                     </div>
@@ -640,13 +641,13 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                         setSpec((s) => ({ ...s, ripple: e.target.checked ? { color: RIPPLE_DEFAULT } : undefined }))
                       }
                     />
-                    点按水波纹（&lt;ripple&gt;）
+                    {tt("点按水波纹（<ripple>）")}
                   </label>
                   {spec.ripple ? (
                     <div className="axv-shape-color">
                       <ColorField
                         aboveModal
-                        label="涟漪色"
+                        label={tt("涟漪色")}
                         value={spec.ripple.color}
                         onChange={(css) => setSpec((s) => ({ ...s, ripple: { color: cssToShapeColor(css) } }))}
                       />
@@ -656,13 +657,13 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                         spellCheck={false}
                         onChange={(e) => setSpec((s) => ({ ...s, ripple: { color: e.target.value } }))}
                       />
-                      <label className="axv-shape-alpha" title="拖动调涟漪透明度">
+                      <label className="axv-shape-alpha" title={tt("拖动调涟漪透明度")}>
                         <input
                           type="range"
                           min={0}
                           max={100}
                           step={1}
-                          aria-label="涟漪不透明度"
+                          aria-label={tt("涟漪不透明度")}
                           value={alphaPercent(spec.ripple.color)}
                           onChange={(e) =>
                             setSpec((s) => ({
@@ -693,23 +694,23 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                         )
                       }
                     />
-                    按下/禁用用不同颜色（&lt;selector&gt;）
+                    {tt("按下/禁用用不同颜色（<selector>）")}
                   </label>
                   {spec.states ? (
                     <div className="axv-shape-row" style={{ marginTop: 6 }}>
-                      <span className="axv-shape-hint">按下</span>
+                      <span className="axv-shape-hint">{tt("按下")}</span>
                       <ColorField
                         aboveModal
-                        label="按下态颜色"
+                        label={tt("按下态颜色")}
                         value={spec.states.pressed ?? spec.solid ?? "#FFFFFF"}
                         onChange={(css) =>
                           setSpec((s) => ({ ...s, states: { ...s.states, pressed: cssToShapeColor(css) } }))
                         }
                       />
-                      <span className="axv-shape-hint">禁用</span>
+                      <span className="axv-shape-hint">{tt("禁用")}</span>
                       <ColorField
                         aboveModal
-                        label="禁用态颜色"
+                        label={tt("禁用态颜色")}
                         value={spec.states.disabled ?? "#EEEEEE"}
                         onChange={(css) =>
                           setSpec((s) => ({ ...s, states: { ...s.states, disabled: cssToShapeColor(css) } }))
@@ -719,7 +720,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                         className="axv-shape-link"
                         onClick={() => setSpec((s) => ({ ...s, states: { ...s.states, disabled: undefined } }))}
                       >
-                        不要禁用态
+                        {tt("不要禁用态")}
                       </button>
                     </div>
                   ) : null}
@@ -739,14 +740,14 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                         )
                       }
                     />
-                    阴影层（&lt;layer-list&gt;）
+                    {tt("阴影层（<layer-list>）")}
                   </label>
                   {spec.shadow ? (
                     <div className="axv-shape-row" style={{ marginTop: 6 }}>
                       <input
                         className="axv-attr-input"
                         type="number"
-                        title="水平偏移 dp"
+                        title={tt("水平偏移 dp")}
                         value={spec.shadow.dx}
                         onChange={(e) =>
                           setSpec((s) => ({ ...s, shadow: { ...s.shadow!, dx: Number(e.target.value) } }))
@@ -755,7 +756,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                       <input
                         className="axv-attr-input"
                         type="number"
-                        title="垂直偏移 dp"
+                        title={tt("垂直偏移 dp")}
                         value={spec.shadow.dy}
                         onChange={(e) =>
                           setSpec((s) => ({ ...s, shadow: { ...s.shadow!, dy: Number(e.target.value) } }))
@@ -764,7 +765,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                       <input
                         className="axv-attr-input"
                         type="number"
-                        title="扩散 dp（没有真模糊，靠外扩近似）"
+                        title={tt("扩散 dp（没有真模糊，靠外扩近似）")}
                         value={spec.shadow.blur}
                         onChange={(e) =>
                           setSpec((s) => ({ ...s, shadow: { ...s.shadow!, blur: Number(e.target.value) } }))
@@ -772,7 +773,7 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                       />
                       <ColorField
                         aboveModal
-                        label="阴影色"
+                        label={tt("阴影色")}
                         value={spec.shadow.color}
                         onChange={(css) =>
                           setSpec((s) => ({ ...s, shadow: { ...s.shadow!, color: cssToShapeColor(css) } }))
@@ -790,15 +791,15 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
       <div className="axv-icon-page-foot">
         <span>
           <span className="axv-icon-page-foot-note">
-            保存后生成 res/drawable/{name || "…"}.xml，导出 res 包时一并带走。
+            {tt("保存后生成 res/drawable/{name}.xml，导出 res 包时一并带走。", { name: name || "…" })}
           </span>
         </span>
         <span style={{ display: "flex", gap: 8 }}>
           <button className="axv-btn axv-ghost" onClick={close}>
-            取消
+            {tt("取消")}
           </button>
           <button className="axv-btn axv-btn-primary" onClick={save} disabled={!name.trim() || nameConflicts}>
-            保存并应用
+            {tt("保存并应用")}
           </button>
         </span>
       </div>

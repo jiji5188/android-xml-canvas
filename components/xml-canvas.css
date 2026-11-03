@@ -8598,7 +8598,7 @@ button.axv-sb-item:hover {
     border: 1px solid rgba(0, 0, 0, 0.10);
     border-right: none;
     border-radius: 10px 0 0 10px;
-    background: var(--axv-surface, #fff);
+    background: linear-gradient(270deg, var(--axv-rail-bg), var(--axv-primary));
     box-shadow: -2px 0 10px rgba(16, 24, 40, 0.10);
     color: inherit;
     cursor: pointer;

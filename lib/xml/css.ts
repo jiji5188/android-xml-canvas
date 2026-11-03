@@ -197,7 +197,8 @@ function gravityToFlexByOrientation(
   vertical: boolean
 ): { justifyContent?: string; alignItems?: string } {
   const parts = (gRaw || "")
-    .split("|")
+    .toLowerCase()
+    .split(/[|,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean);
   const out: { justifyContent?: string; alignItems?: string } = {};
@@ -211,7 +212,7 @@ function gravityToFlexByOrientation(
       ? "start"
       : has("end", "right")
         ? "end"
-        : has("fill_horizontal")
+        : has("fill_horizontal", "fill")
           ? "fill"
           : "";
   // 纵向分量
@@ -221,7 +222,7 @@ function gravityToFlexByOrientation(
       ? "start"
       : has("bottom")
         ? "end"
-        : has("fill_vertical")
+        : has("fill_vertical", "fill")
           ? "fill"
           : "";
 
@@ -333,13 +334,70 @@ function layoutGravityToGridSelf(g: string): Record<string, string> {
   return out;
 }
 
-function layoutGravityToSelf(g: string): Record<string, string> {
-  const v: Record<string, string> = {};
-  if (!g) return v;
-  if (g.includes("center")) v.alignSelf = "center";
-  if (g.includes("end") || g.includes("right")) v.alignSelf = "flex-end";
-  if (g.includes("start") || g.includes("left")) v.alignSelf = "flex-start";
-  return v;
+/** layout_gravity 的分量拆分（容忍 | 、逗号、空格混写，全部小写化） */
+function gravityParts(gRaw: string): string[] {
+  return String(gRaw || "")
+    .toLowerCase()
+    .split(/[|,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+type ParentAxis = "row" | "column" | "auto";
+
+/**
+ * 父容器的主轴方向（决定 layout_gravity 的哪个分量对应交叉轴）。
+ * LinearLayout 没写 orientation 时按项目既有约定当竖排（Android 原生默认是横排，这里沿用仓库口径）。
+ */
+function parentFlexAxis(tag: string, attrs: Record<string, string>): ParentAxis {
+  if (tag === "TableRow") return "row";
+  if (tag === "TableLayout") return "column";
+  if (tag === "LinearLayout") {
+    return String(attrs["orientation"] ?? "vertical").toLowerCase() === "horizontal"
+      ? "row"
+      : "column";
+  }
+  if (tag === "HorizontalScrollView") return "row";
+  if (tag === "ScrollView" || tag === "NestedScrollView") return "column";
+  return "auto";
+}
+
+/**
+ * android:layout_gravity → CSS align-self（按父容器主轴取向）。
+ * Android 的分量是「屏幕方向」的，而 CSS 的 align-self 永远是交叉轴：
+ *   父容器横排（row）   → 交叉轴是纵向，只认 top/bottom/center_vertical/fill_vertical
+ *   父容器竖排（column）→ 交叉轴是横向，只认 start/left/end/right/center_horizontal/fill_horizontal
+ * 主轴方向的分量在 LinearLayout 里对子项无效 —— 老实现统一按字符串内容取 alignSelf，
+ * 于是「横排布局里 layout_gravity=center_horizontal 的子控件莫名垂直居中」「bottom 不生效」。
+ */
+function layoutGravityToSelf(gRaw: string, axis: ParentAxis = "auto"): Record<string, string> {
+  const out: Record<string, string> = {};
+  const parts = gravityParts(gRaw);
+  if (!parts.length) return out;
+  const has = (...vals: string[]) => parts.some((p) => vals.includes(p));
+
+  const hSelf = has("fill_horizontal", "fill")
+    ? "stretch"
+    : has("center", "center_horizontal")
+      ? "center"
+      : has("start", "left")
+        ? "flex-start"
+        : has("end", "right")
+          ? "flex-end"
+          : "";
+  const vSelf = has("fill_vertical", "fill")
+    ? "stretch"
+    : has("center", "center_vertical")
+      ? "center"
+      : has("top")
+        ? "flex-start"
+        : has("bottom")
+          ? "flex-end"
+          : "";
+
+  const picked = axis === "row" ? vSelf : hSelf;
+  if (picked) out.alignSelf = picked;
+  return out;
 }
 
 /** M2v：GridLayout 列数——显式 columnCount 优先，否则按子项最大的 layout_column+1 推，兜底 1 */
@@ -1155,10 +1213,16 @@ export function buildRenderModel(
     }
 
     // layout_gravity（FrameLayout / LinearLayout 子项）
-    const lg = layoutGravityToSelf((attrs["layoutGravity"] as string) || "");
+    // M89f：先拿到父容器（标签 + orientation），才能判断 layout_gravity 哪一半进交叉轴
+    const parentNode = findParentNode(root, node);
+    const parentTag = shortTag(parentNode?.tag ?? "");
+    const parentRawAttrs = (parentNode?.attrs ?? {}) as Record<string, string>;
+    const lg = layoutGravityToSelf(
+      (attrs["layoutGravity"] as string) || "",
+      parentFlexAxis(parentTag, parentRawAttrs)
+    );
     Object.assign(style, lg);
     // FrameLayout / CoordinatorLayout / DrawerLayout 子项绝对定位（Android 这三者都是堆叠语义）
-    const parentTag = shortTag(findParentTag(root, node) ?? "");
     const FRAME_PARENTS = new Set(["FrameLayout", "CoordinatorLayout", "DrawerLayout", "FragmentContainerView"]);
     if (FRAME_PARENTS.has(parentTag)) {
       style.position = "absolute";
@@ -1758,14 +1822,18 @@ function findSourceNode(root: XmlNode, path: string): XmlNode | null {
 }
 
 /** 从 root 找某 node 的父节点 tag（M1 简化：FrameLayout 子项绝对定位判断） */
-function findParentTag(root: XmlNode, target: XmlNode): string | null {
-  const walk = (n: XmlNode, parent: string | null): string | null => {
-    if (n.path === target.path) return parent;
+function findParentNode(root: XmlNode, target: XmlNode): XmlNode | null {
+  const walk = (n: XmlNode): XmlNode | null => {
     for (const c of n.children) {
-      const r = walk(c, n.tag);
-      if (r !== null) return r;
+      if (c.path === target.path) return n;
+      const r = walk(c);
+      if (r) return r;
     }
     return null;
   };
-  return walk(root, null);
+  return walk(root);
+}
+
+function findParentTag(root: XmlNode, target: XmlNode): string | null {
+  return findParentNode(root, target)?.tag ?? null;
 }

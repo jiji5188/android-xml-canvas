@@ -58,18 +58,18 @@ describe("computeSuggest", () => {
     const ctx = computeSuggest(doc, { line: 2, col: 6 });
     expect(ctx).not.toBeNull();
     if (ctx) {
-      expect(ctx.kind).toBe("tag");
+      expect(ctx.kind).toBe("class"); // M99：tag → 类
       expect(ctx.prefix).toBe("Te");
       expect(ctx.items).toContain("TextView");
     }
   });
 
   it("属性名上下文：补全高频属性", () => {
-    // 在 <LinearLayout 后写 "andr"
-    const ctx = computeSuggest(doc, { line: 1, col: 25 });
+    // 在 <LinearLayout 后写 "andr"（属性名从 col 15 开始，写到第 4 个字 = col 19）
+    const ctx = computeSuggest(doc, { line: 1, col: 19 });
     expect(ctx).not.toBeNull();
     if (ctx) {
-      expect(ctx.kind).toBe("attr");
+      expect(ctx.kind).toBe("prop"); // M99：attr → 属
       expect(ctx.prefix).toContain("andr");
       expect(ctx.items).toContain("android:id");
     }
@@ -80,7 +80,7 @@ describe("computeSuggest", () => {
     const ctx = computeSuggest(doc, { line: 2, col: 65 });
     expect(ctx).not.toBeNull();
     if (ctx) {
-      expect(ctx.kind).toBe("value");
+      expect(ctx.kind).toBe("const"); // M99：value → 常
       expect(ctx.items).toContain("match_parent");
     }
   });
@@ -90,7 +90,7 @@ describe("computeSuggest", () => {
     const ctx = computeSuggest(doc, { line: 3, col: 38 }, ["ic_logo", "ic_back"]);
     expect(ctx).not.toBeNull();
     if (ctx) {
-      expect(ctx.kind).toBe("resource");
+      expect(ctx.kind).toBe("ref"); // M99：resource → 引
       expect(ctx.items).toContain("@drawable/ic_logo");
     }
   });

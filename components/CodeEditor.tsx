@@ -48,8 +48,9 @@ import { autoCloseTags, xml } from "@codemirror/lang-xml";
 import { java } from "@codemirror/lang-java";
 import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
-import { computeSuggest, type SuggestKind } from "@/lib/xml/keyword-suggest";
+import { computeSuggest } from "@/lib/xml/keyword-suggest";
 import { computeJavaSuggest, JAVA_SYMBOLS } from "@/lib/xml/java-vocab";
+import { KIND_LABEL, KIND_NAME, type SuggestKind } from "@/lib/xml/suggest-kind";
 import { estimateSuggestSize, placeSuggest, type Placement } from "@/lib/xml/suggest-position";
 import { SYMBOLS } from "./XmlCodeEditor";
 
@@ -91,18 +92,12 @@ interface SugState {
   items: string[];
   sel: number;
   kind: SuggestKind;
+  /** M99：与 items 对应的分类（逐条不同） */
+  kinds?: SuggestKind[];
   prefix: string;
   placement: Placement;
   width: number;
 }
-
-const KIND_LABEL: Record<SuggestKind, string> = {
-  tag: "标签",
-  attr: "属性",
-  value: "值",
-  resource: "资源",
-  plain: "词",
-};
 
 /* ===== 错误行装饰：行底色 + 左侧红条 + 悬停看原因 ===== */
 const setErrLines = StateEffect.define<Map<number, string>>();
@@ -420,7 +415,15 @@ export function CodeEditor({
       size,
       { width: rect.width, height: rect.height },
     );
-    setSugBoth({ items: ctx.items, sel: 0, kind: ctx.kind, prefix: ctx.prefix, placement, width: size.width });
+    setSugBoth({
+      items: ctx.items,
+      sel: 0,
+      kind: ctx.kind,
+      kinds: ctx.kinds,
+      prefix: ctx.prefix,
+      placement,
+      width: size.width,
+    });
   }, [setSugBoth]);
 
   /** 防抖：连续打字时不要每个键都算一遍 */
@@ -748,7 +751,10 @@ export function CodeEditor({
             onPointerCancel={cancelPress}
             onPointerLeave={cancelPress}
           >
-            {sug.items.map((it, i) => (
+            {sug.items.map((it, i) => {
+              // M99：每条自带分类，角标单字（声/类/方/变/常/引/属）
+              const k = sug.kinds?.[i] ?? sug.kind;
+              return (
               <div
                 key={it}
                 className={"axv-sug-item" + (i === sug.sel ? " sel" : "")}
@@ -767,9 +773,12 @@ export function CodeEditor({
                 }}
               >
                 <span className="axv-sug-text">{it}</span>
-                <span className="axv-sug-kind">{KIND_LABEL[sug.kind]}</span>
+                <span className={"axv-sug-kind is-" + k} title={KIND_NAME[k]}>
+                  {KIND_LABEL[k]}
+                </span>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : null}
         {findOpen ? (

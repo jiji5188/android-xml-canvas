@@ -66,7 +66,7 @@ describe("M96 Java 候选计算", () => {
     expect(s).not.toBeNull();
     expect(s!.items[0]).toBe("class");
     expect(s!.prefix).toBe("cl");
-    expect(s!.kind).toBe("plain");
+    expect(s!.kind).toBe("decl"); // M99：kind 从 plain 变成逐条分类后的首条分类
   });
 
   it("修饰符：pr → private，且能候选到 protected", () => {

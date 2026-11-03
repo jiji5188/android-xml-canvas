@@ -7,6 +7,8 @@
 //
 // 纯数据 + 纯函数，方便单测；不做语义分析，只按前缀过滤 + 去重。
 
+import { extractJavaTokens, type SuggestKind } from "./suggest-kind";
+
 export interface JavaSymbol {
   label: string;
   insert: string;
@@ -285,7 +287,7 @@ const MAX_ITEMS = 24; // M98：从 12 提到 24，配合弹窗滚动（320px 高
 export function computeJavaSuggest(
   doc: string,
   cursor: { line: number; col: number },
-): { line: number; col: number; prefix: string; kind: "plain"; items: string[] } | null {
+): { line: number; col: number; prefix: string; kind: SuggestKind; items: string[]; kinds: SuggestKind[] } | null {
   const lines = doc.split("\n");
   const li = Math.max(0, Math.min(cursor.line - 1, lines.length - 1));
   const lineText = lines[li] ?? "";
@@ -299,28 +301,48 @@ export function computeJavaSuggest(
   const body = isAt ? prefix.slice(1) : prefix;
   if (body.length < 2 && !isAt) return null;
 
-  const pool = isAt
-    ? ["Override", "Test", "NonNull", "Nullable", "SuppressWarnings", "Deprecated"]
-    : [...JAVA_KEYWORDS, ...JAVA_TYPES, ...JAVA_METHODS];
+  // M99：本文件已有的变量/常量/方法/类型/引用排在词表前面
+  //        ——写 `user` 时最想看到的是这个文件里的 userName，而不是 JDK 的 UserManager
+  const tok = extractJavaTokens(doc);
+  const pool: { text: string; kind: SuggestKind }[] = [];
+  const addAll = (words: string[], kind: SuggestKind) => {
+    for (const w of words) pool.push({ text: w, kind });
+  };
+  if (isAt) {
+    addAll(["Override", "Test", "NonNull", "Nullable", "SuppressWarnings", "Deprecated"].map((a) => "@" + a), "ref");
+  } else {
+    addAll(tok.vars, "var");
+    addAll(tok.consts, "const");
+    addAll(tok.methods, "method");
+    addAll(tok.refs, "ref");
+    addAll(tok.types, "class");
+    addAll(JAVA_KEYWORDS, "decl");
+    addAll(JAVA_TYPES, "class");
+    addAll(JAVA_METHODS, "method");
+  }
 
   const lower = body.toLowerCase();
   const seen = new Set<string>();
-  const items: string[] = [];
-  const push = (w: string) => {
-    const key = isAt ? "@" + w : w;
-    if (seen.has(key) || items.length >= MAX_ITEMS) return;
+  const picked: { text: string; kind: SuggestKind }[] = [];
+  const push = (it: { text: string; kind: SuggestKind }) => {
+    const key = isAt ? it.text : it.text;
+    // M99：自己不要当候选（文档 token 会把刚打的半个词也扫进来）
+    if (it.text === prefix || it.text === body) return;
+    if (seen.has(key) || picked.length >= MAX_ITEMS) return;
     seen.add(key);
-    items.push(key);
+    picked.push(it);
   };
   // 第一轮只留「前缀开头」的（最常见的匹配），不够 6 条再补「包含」的
-  for (const w of pool) {
-    if (w.toLowerCase().startsWith(lower)) push(w);
+  for (const it of pool) {
+    if (it.text.toLowerCase().startsWith(lower)) push(it);
   }
-  if (items.length < 6) {
-    for (const w of pool) {
-      if (!w.toLowerCase().startsWith(lower) && w.toLowerCase().includes(lower)) push(w);
+  if (picked.length < 6) {
+    for (const it of pool) {
+      if (!it.text.toLowerCase().startsWith(lower) && it.text.toLowerCase().includes(lower)) push(it);
     }
   }
-  if (items.length === 0) return null;
-  return { line: cursor.line, col, prefix, kind: "plain", items };
+  if (picked.length === 0) return null;
+  const items = picked.map((p) => p.text);
+  const kinds = picked.map((p) => p.kind);
+  return { line: cursor.line, col, prefix, kind: kinds[0] ?? "plain", items, kinds };
 }

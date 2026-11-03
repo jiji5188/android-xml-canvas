@@ -808,13 +808,31 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* M99：候选词分类角标（声/类/方/变/常/引/属）——单字 + 淡底色，
+   26px 行高里不挤掉候选词；颜色只做区分，不抢主文 */
 .axv-sug-kind {
   flex: 0 0 auto;
-  font-size: 10.5px;
+  font-size: 10px;
+  line-height: 14px;
   font-family: inherit;
-  opacity: 0.55;
-  padding-left: 4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 2px;
+  margin-left: 6px;
+  border-radius: 3px;
+  text-align: center;
+  font-weight: 600;
+  opacity: 0.9;
+  color: #6b7280;
+  background: rgba(127, 127, 127, 0.14);
 }
+.axv-sug-kind.is-decl { color: #7c3aed; background: rgba(139, 92, 246, 0.18); }
+.axv-sug-kind.is-class { color: #2563eb; background: rgba(59, 130, 246, 0.18); }
+.axv-sug-kind.is-method { color: #059669; background: rgba(16, 185, 129, 0.18); }
+.axv-sug-kind.is-var { color: #0284c7; background: rgba(14, 165, 233, 0.18); }
+.axv-sug-kind.is-const { color: #b45309; background: rgba(245, 158, 11, 0.2); }
+.axv-sug-kind.is-ref { color: #be185d; background: rgba(236, 72, 153, 0.18); }
+.axv-sug-kind.is-prop { color: #475569; background: rgba(100, 116, 139, 0.18); }
 
 /* 分段控件：胶囊内 3px 缝，首尾圆角（M3E 同款） */
 .axv-seg {

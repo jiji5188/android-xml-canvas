@@ -8,8 +8,10 @@
 // 纯函数，Node / 浏览器都能测。
 
 import { ANDROID_TAGS, ANDROID_ATTRS, ANDROID_VALUES } from "./android-vocab";
+import { classifyXmlItem, kindFromXmlContext, type SuggestKind } from "./suggest-kind";
 
-export type SuggestKind = "tag" | "attr" | "value" | "resource" | "plain";
+// M99：分类定义搬到 suggest-kind.ts（XML / Java 共用一套单字角标）
+export type { SuggestKind };
 
 export interface SuggestContext {
   line: number;
@@ -17,6 +19,8 @@ export interface SuggestContext {
   prefix: string;
   kind: SuggestKind;
   items: string[];
+  /** 与 items 一一对应的分类（M99）；缺省时用 kind */
+  kinds?: SuggestKind[];
 }
 
 /** 高频 Android 标签（M94：改由 android-vocab 统一维护） */
@@ -27,6 +31,28 @@ const ATTR_WHITELIST = ANDROID_ATTRS;
 
 /** 高频属性值 */
 const VALUE_WHITELIST = ANDROID_VALUES;
+
+/** M99：`@` 后面还没打 / 时先给的命名空间 */
+const RES_NAMESPACES = [
+  "drawable",
+  "string",
+  "color",
+  "dimen",
+  "style",
+  "layout",
+  "id",
+  "menu",
+  "anim",
+  "animator",
+  "font",
+  "mipmap",
+  "raw",
+  "xml",
+  "integer",
+  "bool",
+  "array",
+  "attr",
+];
 
 /** 可组成「当前词」的字符（光标左边的连续段） */
 const WORD_RE = /[A-Za-z0-9_.:@#+\/-]/;
@@ -106,7 +132,8 @@ export function resourceMatches(prefix: string, resNames: string[]): string[] {
 }
 
 /** 排候选：文档 token + 白名单，按前缀过滤 + 长度/字母排序，上限 12 */
-function rankItems(prefix: string, docTokens: string[], kind: SuggestKind): string[] {
+type RankCtx = "tag" | "attr" | "value" | "resource" | "plain";
+function rankItems(prefix: string, docTokens: string[], kind: RankCtx): string[] {
   const p = prefix.toLowerCase();
   const pool = new Set<string>(docTokens);
   if (kind === "tag") for (const t of TAG_WHITELIST) pool.add(t);
@@ -163,23 +190,33 @@ export function computeSuggest(
   const docTokens = extractDocumentTokens(doc);
 
   // 上下文判定（优先级：resource > value > tag/attr > plain）
-  let kind: SuggestKind = "plain";
-  if (prefix.startsWith("@")) kind = "resource";
-  else if (inAttrValue(lineText, col)) kind = "value";
-  else if (inTag(lineText, col)) kind = tagVsAttr(lineText, col);
+  let ctxKind: RankCtx = "plain";
+  if (prefix.startsWith("@")) ctxKind = "resource";
+  else if (inAttrValue(lineText, col)) ctxKind = "value";
+  else if (inTag(lineText, col)) ctxKind = tagVsAttr(lineText, col);
 
   let items: string[];
-  if (kind === "resource") {
-    if (resNames && resNames.length > 0) {
+  if (ctxKind === "resource") {
+    // M99：刚敲到 `@draw`（还没有 /）→ 先补命名空间，不然这里一片空白
+    if (!prefix.includes("/")) {
+      items = RES_NAMESPACES.map((n) => `@${n}/`)
+        .filter((t) => t.toLowerCase().startsWith(prefix.toLowerCase()))
+        .slice(0, 12);
+    } else if (resNames && resNames.length > 0) {
       items = resourceMatches(prefix, resNames);
     } else {
       items = rankItems(prefix, docTokens, "value");
     }
     if (items.length === 0) items = rankItems(prefix, docTokens, "plain");
   } else {
-    items = rankItems(prefix, docTokens, kind);
+    items = rankItems(prefix, docTokens, ctxKind);
   }
   if (items.length === 0) return null;
+  // M99：不要把「正在打的词」本身当候选（文档 token 会把它扫进来）
+  items = items.filter((t) => t !== prefix);
+  if (items.length === 0) return null;
 
-  return { line: cursor.line, col, prefix, kind, items };
+  // M99：逐条分类（同一个列表里可能混着「变量 + 标签 + 属性」）
+  const kinds = items.map((t) => classifyXmlItem(t, ctxKind));
+  return { line: cursor.line, col, prefix, kind: kindFromXmlContext(ctxKind), items, kinds };
 }

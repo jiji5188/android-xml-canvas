@@ -179,6 +179,7 @@ function themeTokensBase(presetId: string, mode: ThemeMode): Record<string, stri
       scrim: "rgba(20, 18, 32, 0.55)",
       danger: "#b3261e",
       ok: "#1f7a3d",
+      warn: "#a15c00",
     };
   }
   return {
@@ -204,6 +205,7 @@ function themeTokensBase(presetId: string, mode: ThemeMode): Record<string, stri
     scrim: "rgba(0, 0, 0, 0.62)",
     danger: "#f2b8b5",
     ok: "#9fd9a8",
+    warn: "#f2c76e",
   };
 }
 

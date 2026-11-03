@@ -290,7 +290,7 @@
 /* 拖组件到画布上的落点高亮（容器 = 会变成子节点；普通控件 = 插到它后面） */
 .axv-node.axv-drop-hit {
   box-shadow: inset 0 0 0 2px #04409F;
-  background-color: rgba(4, 64, 159, 0.06);
+  background-color: color-mix(in srgb, var(--axv-primary) 6%, transparent);
 }
 
 /* 画布舞台（旧版规则已移除，见下方 v3 骨架） */
@@ -352,8 +352,8 @@
   z-index: 5;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(27, 27, 31, 0.82);
-  color: var(--axv-on-primary);
+  background: color-mix(in srgb, var(--axv-title) 84%, transparent);
+  color: var(--axv-surface);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
@@ -584,7 +584,7 @@
 }
 .axv-zoom input[type="range"] {
   width: 112px;
-  accent-color: #04409F;
+  accent-color: var(--axv-primary);
 }
 .axv-zoom span {
   font-size: 12px;
@@ -676,7 +676,7 @@
 .axv-vs-zoom input[type="range"] {
   flex: 1 1 auto;
   min-width: 0;
-  accent-color: #04409F;
+  accent-color: var(--axv-primary);
 }
 .axv-vs-foot {
   display: flex;
@@ -684,7 +684,7 @@
   justify-content: space-between;
   margin-top: 10px;
   padding-top: 9px;
-  border-top: 1px solid #eef0f4;
+  border-top: 1px solid var(--axv-outline);
   color: var(--axv-on-surface-variant);
 }
 .axv-vs-foot > span {
@@ -918,8 +918,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* M20c：半透明白底 */
-  background-color: #ffffff1a;
+  /* M91d：改为不透明主题面，半透明在深色主题下会透出浅底 */
+  background-color: var(--axv-surface);
 }
 .axv-rail-head {
   display: flex;
@@ -958,7 +958,7 @@
   flex: 0 0 auto;
 }
 .axv-icon-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--axv-hover);
 }
 
 /* ===== 右侧滑面板：属性 ===== */
@@ -998,8 +998,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  /* M20c：半透明白底 */
-  background-color: #ffffff1a;
+  /* M91d：改为不透明主题面，半透明在深色主题下会透出浅底 */
+  background-color: var(--axv-surface);
 }
 
 /* 代码 / 资源 编辑器 */
@@ -1145,7 +1145,7 @@
   font-family: inherit;
 }
 .axv-pp-group-head:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--axv-hover);
 }
 .axv-pp-grid {
   display: grid;
@@ -1162,7 +1162,7 @@
   gap: 6px;
   padding: 12px 6px 10px;
   border-radius: 16px;
-  background: color-mix(in srgb, var(--axv-surface-head) 10%, #ffffff85);
+  background: color-mix(in srgb, var(--axv-surface) 94%, var(--axv-title) 6%);
   color: var(--axv-on-surface);
   border: none;
   cursor: grab;
@@ -1202,7 +1202,7 @@
   padding: 8px 14px 36px 14px;
   font-size: 11px;
   color: var(--axv-on-surface-variant);
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid var(--axv-outline);
   text-align: center;
 }
 
@@ -1232,7 +1232,7 @@
   -webkit-touch-callout: none;
 }
 .axv-lt-row:hover {
-  background: rgba(4, 64, 159, 0.06);
+  background: color-mix(in srgb, var(--axv-primary) 6%, transparent);
 }
 .axv-lt-row.sel {
   background: var(--axv-primary-soft);
@@ -1251,7 +1251,7 @@
   border-radius: 6px;
 }
 .axv-lt-toggle:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--axv-hover);
 }
 .axv-lt-tag {
   font-size: 12px;
@@ -1292,7 +1292,7 @@
   padding: 0;
 }
 .axv-lt-actions button:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--axv-hover);
 }
 .axv-lt-actions button.danger:hover {
   background: color-mix(in srgb, var(--axv-danger) 14%, var(--axv-surface));
@@ -1327,7 +1327,7 @@
   pointer-events: auto;
 }
 .axv-lt-handle:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: var(--axv-hover);
   color: var(--axv-on-surface);
 }
 .axv-lt-handle.arming {
@@ -1349,7 +1349,7 @@
 /* M20m：锁定开关 + 锁定行的观感 */
 .axv-lt-actions button.axv-lt-lock.on {
   color: var(--axv-primary, #5b5b66);
-  background: rgba(0, 0, 0, 0.07);
+  background: var(--axv-hover);
 }
 .axv-lt-row.locked .axv-lt-tag,
 .axv-lt-row.locked .axv-lt-label {
@@ -1372,7 +1372,7 @@
   color: var(--axv-on-surface-variant);
   line-height: 1.5;
   padding: 6px 10px 8px;
-  border-bottom: 1px dashed #ececf2;
+  border-bottom: 1px dashed var(--axv-outline);
   margin-bottom: 4px;
 }
 /* M31j：不再用 draggable 属性，改用可按压状态给 grab 光标 */
@@ -1398,7 +1398,7 @@ body.axv-lt-dragging .axv-lt-row {
 }
 /* 拖到行中间：整个行变蓝框，表示「放进这个容器」 */
 .axv-lt-row.drop-inside {
-  background: rgba(4, 64, 159, 0.1);
+  background: color-mix(in srgb, var(--axv-primary) 10%, transparent);
   box-shadow: inset 0 0 0 2px #04409F;
   border-radius: 6px;
 }
@@ -1418,7 +1418,7 @@ body.axv-lt-dragging .axv-lt-row {
   max-height: 90px;
   overflow-y: auto;
   background: color-mix(in srgb, #f5a524 18%, var(--axv-surface));
-  color: #F5A524;
+  color: var(--axv-warn);
   font-size: 12px;
   padding: 8px 12px;
   border: 1px solid color-mix(in srgb, #F5A524 40%, var(--axv-surface));
@@ -1450,7 +1450,7 @@ body.axv-lt-dragging .axv-lt-row {
   font-family: ui-monospace, Consolas, monospace;
   font-size: 11.5px;
   color: var(--axv-primary);
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--axv-hover);
   border-radius: 5px;
   padding: 0 6px;
 }
@@ -1531,7 +1531,7 @@ body.axv-lt-dragging .axv-lt-row {
   padding: 3px 9px 3px 8px;
   border-radius: 999px;
   background: var(--axv-primary-soft, var(--axv-primary-soft));
-  color: var(--axv-primary, var(--axv-primary));
+  color: var(--axv-primary, #04409f);
   font-size: 11.5px;
   font-weight: 600;
   text-decoration: none;
@@ -1556,7 +1556,7 @@ body.axv-lt-dragging .axv-lt-row {
   font-size: 11px;
   font-weight: 600;
   color: var(--axv-primary);
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--axv-hover);
   border-radius: 6px;
   padding: 1px 7px;
 }
@@ -1571,7 +1571,7 @@ body.axv-lt-dragging .axv-lt-row {
   background: color-mix(in srgb, #f5a524 18%, var(--axv-surface));
   border: 1px solid color-mix(in srgb, #F5A524 40%, var(--axv-surface));
   border-radius: 8px;
-  color: #F5A524;
+  color: var(--axv-warn);
   line-height: 1.6;
 }
 .axv-doc-list {
@@ -1580,7 +1580,7 @@ body.axv-lt-dragging .axv-lt-row {
   gap: 8px;
 }
 .axv-doc-item {
-  border: 1px solid #ececf2;
+  border: 1px solid var(--axv-outline);
   border-radius: 8px;
   padding: 7px 9px;
   background: var(--axv-surface);
@@ -1728,13 +1728,13 @@ body.axv-lt-dragging .axv-lt-row {
   text-overflow: ellipsis;
 }
 .axv-chain-node:hover {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--axv-hover);
   color: var(--axv-primary);
 }
 .axv-chain-node.on {
   color: var(--axv-primary);
   font-weight: 700;
-  background: rgba(0, 0, 0, 0.07);
+  background: var(--axv-hover);
 }
 .axv-chain-id {
   font-style: normal;
@@ -1751,7 +1751,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-attr-id {
   font-size: 11px;
   color: var(--axv-primary);
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--axv-hover);
   border-radius: 6px;
   padding: 1px 8px;
 }
@@ -1767,7 +1767,7 @@ body.axv-lt-dragging .axv-lt-row {
   cursor: pointer;
   line-height: 1.3;
 }
-.axv-attr-del-node:hover { background: #FEE2E2; border-color: #F87171; }
+.axv-attr-del-node:hover { background: #FEE2E2; border-color: var(--axv-danger); }
 
 .axv-attr-rows {
   display: flex;
@@ -1883,7 +1883,7 @@ body.axv-lt-dragging .axv-lt-row {
   cursor: pointer;
 }
 .axv-attr-add:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--axv-hover);
   border-color: var(--axv-primary);
 }
 
@@ -2026,7 +2026,7 @@ body.axv-lt-dragging .axv-lt-row {
   border: 1px solid var(--axv-ok);
 }
 .axv-export-summary.is-warn {
-  color: #F5A524;
+  color: var(--axv-warn);
   background: color-mix(in srgb, #f5a524 18%, var(--axv-surface));
   border: 1px solid color-mix(in srgb, #F5A524 45%, var(--axv-surface));
 }
@@ -2120,7 +2120,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.38);
+  background: var(--axv-scrim);
   z-index: 25;
   transition: opacity 0.18s ease;
 }
@@ -2196,7 +2196,7 @@ body.axv-lt-dragging .axv-lt-row {
   max-width: 120px;
   flex: 0 0 auto;
 }
-.axv-tab-sample:focus { outline: 2px solid #04409F; }
+.axv-tab-sample:focus { outline: 2px solid var(--axv-primary); }
 .axv-mob-xml {
   position: absolute;
   /* M11d：工具栏贴顶后整体上移（0~46 工具栏 + 52~92 标签栏 → 100 起） */
@@ -2211,7 +2211,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 1;
   min-height: 0;
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--axv-outline);
   background: var(--axv-surface-head);
 }
 
@@ -2220,7 +2220,7 @@ body.axv-lt-dragging .axv-lt-row {
   position: relative;
   min-height: 0;
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--axv-outline);
   background: var(--axv-code-bg, var(--axv-surface));
   overflow: hidden;
   display: flex;
@@ -2238,7 +2238,7 @@ body.axv-lt-dragging .axv-lt-row {
   width: 52px;
   overflow: hidden;
   background: var(--axv-code-bg, var(--axv-surface-head));
-  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  border-right: 1px solid var(--axv-outline);
   position: relative;
 }
 .axv-gutter-inner {
@@ -2258,7 +2258,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-ln-err {
   color: var(--axv-danger);
   font-weight: 700;
-  background: rgba(220, 38, 38, 0.1);
+  background: color-mix(in srgb, var(--axv-danger) 10%, transparent);
 }
 .axv-code-wrap {
   position: relative;
@@ -2277,8 +2277,8 @@ body.axv-lt-dragging .axv-lt-row {
   left: 0;
   right: 0;
   height: 21px;
-  background: rgba(220, 38, 38, 0.07);
-  border-left: 3px solid rgba(220, 38, 38, 0.55);
+  background: color-mix(in srgb, var(--axv-danger) 7%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--axv-danger) 55%, transparent);
 }
 /* M37b：当前行背景（在错误行带之前渲染，错误行会盖在上面） */
 .axv-code-cur {
@@ -2286,7 +2286,7 @@ body.axv-lt-dragging .axv-lt-row {
   left: 0;
   right: 0;
   height: 21px;
-  background: var(--axv-code-cur-bg, rgba(11, 95, 165, 0.08));
+  background: var(--axv-code-cur-bg, color-mix(in srgb, var(--axv-primary) 8%, transparent));
   pointer-events: none;
 }
 /* 底部错误提示条 */
@@ -2319,15 +2319,15 @@ body.axv-lt-dragging .axv-lt-row {
 /* M2q：include 展开节点的只读提示条 */
 .axv-include-readonly {
   font-size: 12px;
-  color: #F5A524;
+  color: var(--axv-warn);
   background: color-mix(in srgb, #f5a524 18%, var(--axv-surface));
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  border: 1px solid color-mix(in srgb, var(--axv-warn) 35%, transparent);
   border-radius: 8px;
   padding: 8px 10px;
   line-height: 1.5;
 }
 .axv-constraint {
-  border: 1px solid rgba(4, 64, 159, 0.18);
+  border: 1px solid color-mix(in srgb, var(--axv-primary) 18%, transparent);
   background: var(--axv-surface-head);
   border-radius: 12px;
   padding: 10px 10px 12px;
@@ -2351,7 +2351,7 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-constraint-side {
   padding: 6px 0;
-  border-top: 1px solid rgba(4, 64, 159, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--axv-primary) 8%, transparent);
 }
 .axv-constraint-row {
   display: flex;
@@ -2386,7 +2386,7 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-bias-row input[type="range"] {
   flex: 1;
-  accent-color: #04409F;
+  accent-color: var(--axv-primary);
 }
 .axv-bias-val {
   width: 42px;
@@ -2439,7 +2439,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex-direction: column;
   min-height: 0;
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--axv-outline);
   background: var(--axv-surface);
   overflow: hidden;
 }
@@ -2467,7 +2467,7 @@ body.axv-lt-dragging .axv-lt-row {
   padding: 0 8px;
   border-radius: 7px;
   border: 1px solid transparent;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--axv-hover);
   color: var(--axv-on-surface-variant);
   font: inherit;
   font-size: 12px;
@@ -2481,7 +2481,7 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-val-chip.on {
   background: var(--axv-primary);
-  color: #fff;
+  color: var(--axv-on-primary);
   border-color: var(--axv-primary);
 }
 .axv-val-chip.on b {
@@ -2561,7 +2561,7 @@ body.axv-lt-dragging .axv-lt-row {
   padding: 4px 10px;
 }
 .axv-val-row:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--axv-hover);
 }
 .axv-val-tag {
   flex: 0 0 44px;
@@ -2570,16 +2570,16 @@ body.axv-lt-dragging .axv-lt-row {
   text-align: center;
   padding: 2px 0;
   border-radius: 5px;
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--axv-hover);
 }
 .axv-val-tag.k-color {
-  color: #8a4b00;
-  background: rgba(255, 170, 0, 0.16);
+  color: var(--axv-warn);
+  background: color-mix(in srgb, var(--axv-warn) 16%, transparent);
 }
 .axv-val-tag.k-dimen,
 .axv-val-tag.k-integer {
-  color: #0b5fa5;
-  background: rgba(11, 95, 165, 0.12);
+  color: var(--axv-primary);
+  background: color-mix(in srgb, var(--axv-primary) 12%, transparent);
 }
 .axv-val-row input.axv-val-name {
   flex: 0 0 34%;
@@ -2639,7 +2639,7 @@ body.axv-lt-dragging .axv-lt-row {
   cursor: pointer;
 }
 .axv-val-del:hover {
-  background: rgba(220, 38, 38, 0.12);
+  background: color-mix(in srgb, var(--axv-danger) 12%, transparent);
   color: var(--axv-danger);
 }
 .axv-val-del .msr {
@@ -2715,7 +2715,7 @@ body.axv-lt-dragging .axv-lt-row {
   height: 18px;
   padding: 0 6px;
   border-radius: 9px;
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--axv-hover);
   color: var(--axv-on-surface-variant);
   font-size: 11px;
   line-height: 18px;
@@ -2778,7 +2778,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 0 0 40px;
   padding: 3px 0;
   border-radius: 5px;
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--axv-hover);
   color: var(--axv-on-surface-variant);
   font-size: 10.5px;
   text-align: center;
@@ -2786,8 +2786,8 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-mf-tag.comp {
   flex-basis: 56px;
-  color: #0b5fa5;
-  background: rgba(11, 95, 165, 0.11);
+  color: var(--axv-primary);
+  background: color-mix(in srgb, var(--axv-primary) 11%, transparent);
 }
 .axv-mf-empty {
   padding: 4px 2px 6px;
@@ -2808,7 +2808,7 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-mf-warn {
   margin-top: 6px;
-  color: #a15c00;
+  color: var(--axv-warn);
   font-size: 12px;
 }
 @media (max-width: 520px) {
@@ -2851,7 +2851,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-cm .cm-editor.cm-focused .cm-selectionBackground,
 .axv-cm .cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
 .axv-cm .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
-  background: var(--axv-code-sel-bg, rgba(4, 64, 159, 0.18));
+  background: var(--axv-code-sel-bg, color-mix(in srgb, var(--axv-primary) 18%, transparent));
 }
 .axv-code-hl,
 .axv-code-ta {
@@ -2902,7 +2902,7 @@ body.axv-lt-dragging .axv-lt-row {
   overflow: auto;
 }
 .axv-code-ta::selection {
-  background: var(--axv-code-sel-bg, rgba(4, 64, 159, 0.18));
+  background: var(--axv-code-sel-bg, color-mix(in srgb, var(--axv-primary) 18%, transparent));
   color: var(--axv-code-sel-fg, transparent);
 }
 
@@ -2955,11 +2955,11 @@ body.axv-lt-dragging .axv-lt-row {
   width: 52px;
   height: 26px;
   padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--axv-outline);
   border-radius: 7px;
   overflow: hidden;
   cursor: pointer;
-  background: #fff;
+  background: var(--axv-surface);
 }
 .axv-cf-swatch:disabled {
   opacity: 0.45;
@@ -2985,7 +2985,7 @@ body.axv-lt-dragging .axv-lt-row {
   height: 30px;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--axv-outline);
 }
 .axv-cf-row {
   display: flex;
@@ -3001,9 +3001,9 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 1;
   height: 26px;
   padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--axv-outline);
   border-radius: 6px;
-  background: #fff;
+  background: var(--axv-surface);
   cursor: pointer;
 }
 .axv-cf-alpha {
@@ -3021,7 +3021,7 @@ body.axv-lt-dragging .axv-lt-row {
   height: 27px;
   padding: 0 8px;
   box-sizing: border-box;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--axv-outline);
   border-radius: 7px;
   background: var(--axv-surface, #fff);
   color: inherit;
@@ -3031,7 +3031,7 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-cf-trans {
   height: 26px;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--axv-outline);
   border-radius: 7px;
   background: none;
   color: inherit;
@@ -3290,7 +3290,7 @@ body.axv-lt-dragging .axv-lt-row {
     height: 45%;
     min-height: 220px;
     border-right: none;
-    border-bottom: 1px solid #313244;
+    border-bottom: 1px solid var(--axv-outline);
   }
   .axv-right-pane {
     min-height: 0;
@@ -3345,8 +3345,8 @@ body.axv-lt-dragging .axv-lt-row {
 
 /* M3 导出提示浮层（M7c 从 .axv-export-note 拆出来：那个类名被导出弹窗的说明块占用，两者风格冲突） */
 .axv-toast {
-  background: #323232;
-  color: var(--axv-on-primary);
+  background: color-mix(in srgb, var(--axv-title) 88%, transparent);
+  color: var(--axv-surface);
   font-size: 12px;
   padding: 6px 14px;
   border-radius: 6px;
@@ -3355,7 +3355,7 @@ body.axv-lt-dragging .axv-lt-row {
 }
 
 /* M3b 上传 res 资源按钮激活态 */
-.axv-tb-btn.axv-tb-active { background: #4f46e5; color: #fff; }
+.axv-tb-btn.axv-tb-active { background: var(--axv-primary); color: var(--axv-on-primary); }
 
 /* ===== M3g 图标选择器 ===== */
 .axv-icon-modal {
@@ -3369,13 +3369,13 @@ body.axv-lt-dragging .axv-lt-row {
   align-items: center;
   gap: 8px;
   padding: 6px 14px;
-  border-bottom: 1px solid rgba(0,0,0,.08);
+  border-bottom: 1px solid var(--axv-outline);
 }
 .axv-icon-search input {
   flex: 1;
   min-width: 0;
   height: 34px;
-  border: 1px solid rgba(0,0,0,.12);
+  border: 1px solid var(--axv-outline);
   border-radius: 8px;
   padding: 0 10px;
   font-size: 13px;
@@ -3384,7 +3384,7 @@ body.axv-lt-dragging .axv-lt-row {
   background: var(--axv-surface);
   color: var(--axv-on-surface);
 }
-.axv-icon-search input:focus { border-color: #4f46e5; }
+.axv-icon-search input:focus { border-color: var(--axv-primary); }
 .axv-icon-err {
   margin: 8px 14px 0;
   padding: 8px 10px;
@@ -3411,7 +3411,7 @@ body.axv-lt-dragging .axv-lt-row {
   justify-content: center;
   gap: 2px;
   height: 68px;
-  border: 1px solid rgba(0,0,0,.08);
+  border: 1px solid var(--axv-outline);
   border-radius: 10px;
   background: var(--axv-surface);
   color: var(--axv-on-surface);
@@ -3419,7 +3419,7 @@ body.axv-lt-dragging .axv-lt-row {
   padding: 4px;
   overflow: hidden;
 }
-.axv-icon-cell:hover { background: #f4f2ff; border-color: #4f46e5; }
+.axv-icon-cell:hover { background: var(--axv-primary-soft); border-color: var(--axv-primary); }
 .axv-icon-cell .msr { font-size: 24px; line-height: 1; }
 .axv-icon-name {
   font-size: 9.5px;
@@ -3430,8 +3430,8 @@ body.axv-lt-dragging .axv-lt-row {
   white-space: nowrap;
   color: var(--axv-on-surface-variant);
 }
-.axv-icon-cell.is-current { border-color: #4f46e5; background: #ede9fe; }
-.axv-icon-cell.is-dup .axv-icon-name { color: #8a6d1f; }
+.axv-icon-cell.is-current { border-color: var(--axv-primary); background: var(--axv-primary-soft); }
+.axv-icon-cell.is-dup .axv-icon-name { color: var(--axv-warn); }
 .axv-icon-badge {
   position: absolute;
   top: 2px;
@@ -3458,7 +3458,7 @@ body.axv-lt-dragging .axv-lt-row {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 14px;
-  border-top: 1px solid rgba(0,0,0,.08);
+  border-top: 1px solid var(--axv-outline);
   font-size: 11.5px;
   color: var(--axv-on-surface-variant);
 }
@@ -3472,44 +3472,44 @@ body.axv-lt-dragging .axv-lt-row {
 /* ===== M3h 自定义形状编辑器 ===== */
 .axv-shape-modal { width: min(880px, 94vw); max-height: 88vh; display: flex; flex-direction: column; }
 .axv-shape-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
-.axv-shape-form { flex: 1 1 52%; min-width: 0; overflow-y: auto; padding: 12px 16px; border-left: 1px solid rgba(0,0,0,.08); background-color: #d5d5d517; }
+.axv-shape-form { flex: 1 1 52%; min-width: 0; overflow-y: auto; padding: 12px 16px; border-left: 1px solid var(--axv-outline); background-color: #d5d5d517; }
 .axv-shape-field { margin-bottom: 12px; }
-.axv-shape-field > label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #4a4a55; margin-bottom: 5px; }
-.axv-shape-hint { font-weight: 400; color: #8b8b98; font-size: 11px; }
-.axv-shape-link { margin-left: auto; border: none; background: none; color: #4f46e5; font-size: 11px; cursor: pointer; padding: 0; text-decoration: underline; }
+.axv-shape-field > label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--axv-title); margin-bottom: 5px; }
+.axv-shape-hint { font-weight: 400; color: var(--axv-desc); font-size: 11px; }
+.axv-shape-link { margin-left: auto; border: none; background: none; color: var(--axv-primary); font-size: 11px; cursor: pointer; padding: 0; text-decoration: underline; }
 .axv-shape-seg { display: flex; gap: 4px; }
-.axv-shape-seg-btn { flex: 1; height: 30px; border: 1px solid rgba(0,0,0,.12); background: #fff; border-radius: 8px; font-size: 12px; cursor: pointer; color: #34343d; }
-.axv-shape-seg-btn.is-on { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.axv-shape-seg-btn { flex: 1; height: 30px; border: 1px solid var(--axv-outline); background: var(--axv-surface); border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--axv-title); }
+.axv-shape-seg-btn.is-on { background: var(--axv-primary); border-color: var(--axv-primary); color: var(--axv-on-primary); }
 .axv-shape-color { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 /* M89n：色块 + 色值输入框同一行（input 默认 100% 宽会被挤到下一行） */
 .axv-shape-color .axv-attr-input { flex: 1 1 140px; width: auto; min-width: 0; }
 .axv-shape-color .axv-shape-alpha { flex: 1 1 100%; }
 /* M52：填充色 / 涟漪色旁边直接拖透明度 */
 .axv-shape-alpha { flex: 1 1 120px; min-width: 110px; display: flex; align-items: center; gap: 6px; }
-.axv-shape-alpha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--axv-primary, #4f46e5); }
-.axv-shape-alpha > b { font-size: 11px; min-width: 32px; text-align: right; color: #6b6b78; font-variant-numeric: tabular-nums; }
-.axv-shape-color input[type="color"] { flex: 0 0 34px; width: 34px; height: 30px; border: 1px solid rgba(0,0,0,.12); border-radius: 6px; padding: 0; background: #fff; cursor: pointer; }
+.axv-shape-alpha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--axv-primary, var(--axv-primary)); }
+.axv-shape-alpha > b { font-size: 11px; min-width: 32px; text-align: right; color: var(--axv-desc); font-variant-numeric: tabular-nums; }
+.axv-shape-color input[type="color"] { flex: 0 0 34px; width: 34px; height: 30px; border: 1px solid var(--axv-outline); border-radius: 6px; padding: 0; background: var(--axv-surface); cursor: pointer; }
 /* M63g：形状页取色按钮换成自定义 ColorField → 压到跟旧 input[type=color] 一样大 */
 .axv-shape-color .axv-cf-swatch,
 .axv-shape-row .axv-cf-swatch { flex: 0 0 34px; width: 34px; height: 30px; border-radius: 6px; }
 .axv-shape-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .axv-shape-row input[type="number"] { width: 68px; }
-.axv-shape-row input[type="color"] { width: 34px; height: 30px; border: 1px solid rgba(0,0,0,.12); border-radius: 6px; padding: 0; background: #fff; cursor: pointer; }
+.axv-shape-row input[type="color"] { width: 34px; height: 30px; border: 1px solid var(--axv-outline); border-radius: 6px; padding: 0; background: var(--axv-surface); cursor: pointer; }
 .axv-shape-corners { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .axv-shape-range { display: flex; align-items: center; gap: 8px; }
 .axv-shape-range input[type="range"] { flex: 1; }
-.axv-shape-range span { font-size: 11.5px; color: #6b6b78; min-width: 40px; text-align: right; }
-.axv-shape-check { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #34343d; cursor: pointer; }
-.axv-shape-check-line { font-weight: 600; color: #4a4a55; }
-.axv-shape-adv { margin-top: 4px; padding-top: 10px; border-top: 1px dashed rgba(0,0,0,.12); }
-.axv-shape-adv > summary { font-size: 12px; font-weight: 600; color: #4a4a55; cursor: pointer; margin-bottom: 10px; }
+.axv-shape-range span { font-size: 11.5px; color: var(--axv-desc); min-width: 40px; text-align: right; }
+.axv-shape-check { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--axv-title); cursor: pointer; }
+.axv-shape-check-line { font-weight: 600; color: var(--axv-title); }
+.axv-shape-adv { margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--axv-outline); }
+.axv-shape-adv > summary { font-size: 12px; font-weight: 600; color: var(--axv-title); cursor: pointer; margin-bottom: 10px; }
 .axv-shape-side { flex: 1 1 48%; min-width: 0; display: flex; flex-direction: column; padding: 12px 16px; overflow-y: auto; background-color: #d5d5d517; }
-.axv-shape-preview-box { display: grid; place-items: center; height: 140px; border: 1px dashed rgba(0,0,0,.14); border-radius: 12px; background: #ffffff61; }
+.axv-shape-preview-box { display: grid; place-items: center; height: 140px; border: 1px dashed var(--axv-outline); border-radius: 12px; background: #ffffff61; }
 .axv-shape-preview { max-width: 100%; }
-.axv-shape-preview-note { font-size: 11px; color: #8b8b98; text-align: center; margin: 6px 0 12px; }
-.axv-shape-name > label { font-size: 12px; font-weight: 600; color: #4a4a55; display: block; margin-bottom: 5px; }
+.axv-shape-preview-note { font-size: 11px; color: var(--axv-desc); text-align: center; margin: 6px 0 12px; }
+.axv-shape-name > label { font-size: 12px; font-weight: 600; color: var(--axv-title); display: block; margin-bottom: 5px; }
 .axv-shape-name-row { display: flex; align-items: center; gap: 4px; }
-.axv-shape-name-row code { font-size: 11.5px; color: #6b6b78; white-space: nowrap; }
+.axv-shape-name-row code { font-size: 11.5px; color: var(--axv-desc); white-space: nowrap; }
 .axv-shape-warn { margin-top: 5px; font-size: 11px; color: #b3261e; }
 .axv-shape-xml {
   flex: 1;
@@ -3524,12 +3524,12 @@ body.axv-lt-dragging .axv-lt-row {
   overflow: auto;
   white-space: pre;
 }
-.axv-shape-foot { display: flex; align-items: center; justify-content: space-evenly; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-top: 1px solid rgba(0,0,0,.08); font-size: 11.5px; color: #6b6b78; }
-.axv-shape-foot code { background: #f1f0f6; padding: 1px 4px; border-radius: 4px; }
+.axv-shape-foot { display: flex; align-items: center; justify-content: space-evenly; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--axv-outline); font-size: 11.5px; color: var(--axv-desc); }
+.axv-shape-foot code { background: var(--axv-surface-head); padding: 1px 4px; border-radius: 4px; }
 .axv-shape-foot-btns { display: flex; gap: 8px; }
 @media (max-width: 720px) {
   .axv-shape-body { flex-direction: column; }
-  .axv-shape-form { border-right: none; border-bottom: 1px solid rgba(0,0,0,.08); }
+  .axv-shape-form { border-right: none; border-bottom: 1px solid var(--axv-outline); }
 }
 
 /* ===== M4a 运行调试 ===== */
@@ -3548,7 +3548,7 @@ body.axv-lt-dragging .axv-lt-row {
   gap: 12px;
   padding: 8px 14px;
   background: rgba(255, 255, 255, 0.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--axv-outline);
   font-size: 13px;
 }
 .axv-run-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
@@ -3558,7 +3558,7 @@ body.axv-lt-dragging .axv-lt-row {
   font-weight: 400;
   font-size: 11.5px;
   color: var(--axv-on-surface-variant);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--axv-outline);
   border-radius: 999px;
   padding: 1px 8px;
 }
@@ -3630,7 +3630,7 @@ body.axv-lt-dragging .axv-lt-row {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid var(--axv-outline);
   background: #101016;
 }
 .axv-run-log-head {
@@ -3640,7 +3640,7 @@ body.axv-lt-dragging .axv-lt-row {
   padding: 7px 12px;
   font-size: 12px;
   color: var(--axv-on-surface-variant);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--axv-outline);
   font-family: ui-monospace, Cascadia, Consolas, monospace;
 }
 .axv-run-log-title { display: inline-flex; align-items: center; gap: 8px; }
@@ -3732,7 +3732,7 @@ body.axv-lt-dragging .axv-lt-row {
 /* M52：取色器旁边直接拖透明度（不弹浮层） */
 .axv-dp-alpha { flex: 1 1 180px; min-width: 150px; display: flex; align-items: center; gap: 8px; }
 .axv-dp-alpha > span { font-size: 11.5px; color: var(--axv-on-surface-variant); white-space: nowrap; }
-.axv-dp-alpha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--axv-primary, #4f46e5); }
+.axv-dp-alpha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--axv-primary, var(--axv-primary)); }
 .axv-dp-alpha > b { font-size: 11.5px; min-width: 34px; text-align: right; color: var(--axv-on-surface); font-variant-numeric: tabular-nums; }
 .axv-dp-alpha input[type="range"]:disabled { opacity: 0.45; }
 .axv-dp-hint { font-size: 11.5px; color: var(--axv-on-surface-variant); }
@@ -3753,7 +3753,7 @@ body.axv-lt-dragging .axv-lt-row {
   width: 56px;
   height: 56px;
   border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--axv-outline);
   overflow: hidden;
   padding: 0;
   cursor: pointer;
@@ -3877,7 +3877,7 @@ body.axv-lt-dragging .axv-lt-row {
   padding: 0 16px;
   /* M20e：半透明白底 */
   background: #ffffff24;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--axv-outline);
 }
 .axv-shape-back {
   display: inline-flex;
@@ -3885,7 +3885,7 @@ body.axv-lt-dragging .axv-lt-row {
   gap: 3px;
   height: 30px;
   padding: 0 8px 0 5px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--axv-outline);
   border-radius: 999px;
   background: #ffffff24;
   color: var(--axv-on-surface);
@@ -3912,7 +3912,7 @@ body.axv-lt-dragging .axv-lt-row {
   min-width: 0;
   padding: 18px 22px 28px;
   overflow-y: auto;
-  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  border-left: 1px solid var(--axv-outline);
   border-bottom: none;
   background-color: #d5d5d517;
 }
@@ -3937,7 +3937,7 @@ body.axv-lt-dragging .axv-lt-row {
 }
 @media (max-width: 900px) {
   .axv-shape-page .axv-shape-body { grid-template-columns: 1fr; }
-  .axv-shape-page .axv-shape-form { border-right: none; border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+  .axv-shape-page .axv-shape-form { border-right: none; border-bottom: 1px solid var(--axv-outline); }
   .axv-shape-page .axv-shape-preview-box { min-height: 150px; }
 }
 
@@ -4146,7 +4146,7 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-imgprev-foot code {
   font-size: 12px;
-  color: #4a4653;
+  color: var(--axv-title);
 }
 
 /* ===== M5b 已生成资源管理面板 ===== */
@@ -4250,12 +4250,12 @@ body.axv-lt-dragging .axv-lt-row {
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 999px;
-  background: #e8f2ff;
+  background: var(--axv-primary-soft);
   color: var(--axv-primary);
 }
 .axv-assets-badge.is-unused {
   background: var(--axv-surface-head);
-  color: #98a2b3;
+  color: var(--axv-desc);
 }
 .axv-assets-sub {
   font-size: 11px;
@@ -4935,7 +4935,7 @@ body.axv-lt-dragging .axv-lt-row {
   width: 36px;
   height: 36px;
   place-items: center;
-  border: 1px solid rgba(0, 0, 0, 0.10);
+  border: 1px solid var(--axv-outline);
   border-radius: 10px;
   background: #ffffff24;
   color: var(--axv-on-surface);
@@ -4990,7 +4990,7 @@ body.axv-lt-dragging .axv-lt-row {
   gap: 6px;
   height: auto;
   padding: 0 16px 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid var(--axv-outline);
   background: #ffffff24;
   font-size: 12px;
   color: var(--axv-muted, var(--axv-on-surface-variant));
@@ -5072,16 +5072,16 @@ body.axv-lt-dragging .axv-lt-row {
   border-radius: 10px;
   border: 1px solid #f0c36d;
   background: color-mix(in srgb, #f5a524 18%, var(--axv-surface));
-  color: #F5A524;
+  color: var(--axv-warn);
   font-size: 12px;
   line-height: 1.5;
 }
 .axv-icon-ed-warn .msr {
   flex: 0 0 auto;
-  color: #F5A524;
+  color: var(--axv-warn);
 }
 html[data-axv-theme="dark"] .axv-icon-ed-warn {
-  border-color: #F5A524;
+  border-color: var(--axv-warn);
   background: #3a2f13;
   color: #f2d79a;
 }
@@ -5560,7 +5560,7 @@ button.axv-ws-caret:hover {
   width: 14px;
   height: 14px;
   border-radius: 5px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--axv-outline);
   flex: 0 0 auto;
 }
 .axv-token-name {
@@ -5812,7 +5812,7 @@ button.axv-ws-caret:hover {
   position: fixed;
   inset: 0;
   z-index: 4100;
-  background: rgba(0, 0, 0, 0.42);
+  background: var(--axv-scrim);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -6053,13 +6053,13 @@ button.axv-ws-caret:hover {
   color: var(--axv-on-surface-variant);
 }
 .axv-rv-tag.k-color {
-  background: color-mix(in srgb, #b06a00 18%, transparent);
+  background: color-mix(in srgb, var(--axv-warn) 18%, transparent);
 }
 .axv-rv-tag.k-string {
-  background: color-mix(in srgb, #1565c0 16%, transparent);
+  background: color-mix(in srgb, var(--axv-primary) 16%, transparent);
 }
 .axv-rv-tag.k-dimen {
-  background: color-mix(in srgb, #2e7d32 16%, transparent);
+  background: color-mix(in srgb, var(--axv-ok) 16%, transparent);
 }
 .axv-rv-name {
   flex: 0 0 34%;
@@ -6178,11 +6178,11 @@ button.axv-ws-caret:hover {
 .axv-ai-tool.error .axv-ai-tool-ic,
 .axv-ai-tool.error .axv-ai-tool-label,
 .axv-ai-tool.error .axv-ai-tool-meta {
-  color: #d93025;
+  color: var(--axv-danger);
 }
 .axv-ai-tool.stopped .axv-ai-tool-ic,
 .axv-ai-tool.stopped .axv-ai-tool-meta {
-  color: #b26a00;
+  color: var(--axv-warn);
 }
 @keyframes axv-spin {
   to {
@@ -6259,10 +6259,10 @@ button.axv-ws-caret:hover {
   gap: 4px;
 }
 .axv-ai-diffcard-stat .add {
-  color: #2e7d32;
+  color: var(--axv-ok);
 }
 .axv-ai-diffcard-stat .del {
-  color: #c62828;
+  color: var(--axv-danger);
 }
 .axv-ai-diff {
   margin: 0;
@@ -6286,11 +6286,11 @@ button.axv-ws-caret:hover {
 }
 .axv-ai-diff-line.op-add {
   background: rgba(46, 125, 50, 0.12);
-  color: #2e7d32;
+  color: var(--axv-ok);
 }
 .axv-ai-diff-line.op-del {
   background: rgba(198, 40, 40, 0.12);
-  color: #c62828;
+  color: var(--axv-danger);
 }
 .axv-ai-diff-line.op-ctx {
   color: var(--axv-on-surface-variant);
@@ -6552,7 +6552,7 @@ button.axv-ws-caret:hover {
   min-height: 112px;
   padding: 12px 32px;
   box-sizing: border-box;
-  border-bottom: 2px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 2px solid var(--axv-outline);
   background: #ffffff;
   cursor: pointer;
   user-select: none;
@@ -6560,7 +6560,7 @@ button.axv-ws-caret:hover {
   transition: background-color 0.12s ease;
 }
 .axv-run-grid .axv-run-row {
-  border: 2px solid rgba(0, 0, 0, 0.08);
+  border: 2px solid var(--axv-outline);
   border-radius: 16px;
   align-items: center;
   padding: 24px 16px;
@@ -6679,7 +6679,7 @@ button.axv-ws-caret:hover {
   border-radius: 9px;
   border: 1px solid #f0d9a8;
   background: #fff8e6;
-  color: #7a5b00;
+  color: var(--axv-warn);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -6687,8 +6687,8 @@ button.axv-ws-caret:hover {
   margin-left: auto;
   flex: 0 0 auto;
   border: 1px solid #d9b45a;
-  background: #fff;
-  color: #7a5b00;
+  background: var(--axv-surface);
+  color: var(--axv-warn);
   border-radius: 7px;
   padding: 3px 8px;
   font-size: 11.5px;
@@ -6928,7 +6928,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   color: var(--axv-on-surface, #222);
 }
 .axv-dlg-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-.axv-dlg-label { font-size: 12px; color: var(--axv-desc, #777); }
+.axv-dlg-label { font-size: 12px; color: var(--axv-desc, var(--axv-desc)); }
 .axv-dlg-input {
   width: 100%;
   height: 34px;
@@ -6945,10 +6945,10 @@ html[data-axv-theme="dark"] .axv-struct-warn {
 .axv-dlg-sub { margin-top: 8px; }
 .axv-dlg-radio-group { display: flex; gap: 14px; font-size: 13px; }
 .axv-dlg-radio { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-.axv-dlg-hint { font-size: 12px; color: var(--axv-desc, #888); margin-bottom: 10px; min-height: 14px; }
+.axv-dlg-hint { font-size: 12px; color: var(--axv-desc, var(--axv-desc)); margin-bottom: 10px; min-height: 14px; }
 .axv-dlg-multiline { white-space: pre-wrap; line-height: 1.6; }
 .axv-dlg-actions { display: flex; justify-content: flex-end; gap: 10px; }
-.axv-btn-danger { background: #d33; color: #fff; }
+.axv-btn-danger { background: var(--axv-danger); color: var(--axv-on-primary); }
 .axv-btn-danger:hover { background: #c22; }
 
 /* M46b: 移动模式工具条 + 拖拽手柄 + 落点高亮 */
@@ -7081,7 +7081,7 @@ button.axv-sb-item:hover {
   outline-offset: 1px;
 }
 .axv-sb-issue {
-  color: #c62828;
+  color: var(--axv-danger);
   opacity: 1;
 }
 .axv-sb-issue .msr,
@@ -7089,7 +7089,7 @@ button.axv-sb-item:hover {
   font-size: 15px;
 }
 .axv-sb-ok {
-  color: color-mix(in srgb, #2e7d32 80%, var(--axv-on-surface));
+  color: color-mix(in srgb, var(--axv-ok) 80%, var(--axv-on-surface));
 }
 .axv-sb-dim {
   opacity: 0.55;
@@ -7446,7 +7446,7 @@ button.axv-sb-item:hover {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--axv-outline);
 }
 .axv-hsv-dot {
   position: absolute;
@@ -7493,7 +7493,7 @@ button.axv-sb-item:hover {
   height: 16px;
   border-radius: 50%;
   background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--axv-outline);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 .axv-hsv-hue::-moz-range-thumb,
@@ -7502,7 +7502,7 @@ button.axv-sb-item:hover {
   height: 16px;
   border-radius: 50%;
   background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--axv-outline);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 /* 透明度：棋盘格底层 + 渐变层 + 透明轨道 */
@@ -7557,7 +7557,7 @@ button.axv-sb-item:hover {
   height: 28px;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--axv-outline);
 }
 .axv-hsv-prev-layer {
   position: absolute;
@@ -7569,7 +7569,7 @@ button.axv-sb-item:hover {
   height: 28px;
   padding: 0 8px;
   box-sizing: border-box;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--axv-outline);
   border-radius: 7px;
   background: var(--axv-surface, #fff);
   color: inherit;
@@ -7591,7 +7591,7 @@ button.axv-sb-item:hover {
 .axv-hsv-preset {
   height: 18px;
   border-radius: 5px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--axv-outline);
   cursor: pointer;
   padding: 0;
 }
@@ -7602,7 +7602,7 @@ button.axv-sb-item:hover {
 .axv-hsv-btn {
   flex: 1;
   height: 28px;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--axv-outline);
   border-radius: 8px;
   background: none;
   color: inherit;
@@ -7627,7 +7627,7 @@ button.axv-sb-item:hover {
   width: 62px;
   height: 24px;
   padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--axv-outline);
   border-radius: 6px;
   background: none;
   cursor: pointer;
@@ -7671,14 +7671,14 @@ button.axv-sb-item:hover {
 .axv-iconlib-tab {
   flex: 0 0 auto;
   border: 0;
-  background: #f2f2f2;
-  color: #444;
+  background: var(--axv-surface-head);
+  color: var(--axv-desc);
   font-size: 13px;
   padding: 7px 12px;
   border-radius: 999px;
   cursor: pointer;
 }
-.axv-iconlib-tab.on { background: #333; color: #fff; }
+.axv-iconlib-tab.on { background: var(--axv-title); color: var(--axv-on-primary); }
 .axv-iconlib-tab:active { transform: scale(0.96); }
 
 .axv-iconlib-chips {
@@ -7689,15 +7689,15 @@ button.axv-sb-item:hover {
   padding: 10px 14px;
 }
 .axv-iconlib-chip {
-  border: 1px solid #ddd;
-  background: #fff;
-  color: #555;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  color: var(--axv-desc);
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 999px;
   cursor: pointer;
 }
-.axv-iconlib-chip.on { border-color: #333; background: #333; color: #fff; }
+.axv-iconlib-chip.on { border-color: var(--axv-title); background: var(--axv-title); color: var(--axv-on-primary); }
 
 .axv-iconlib-search {
   display: flex;
@@ -7705,19 +7705,19 @@ button.axv-sb-item:hover {
   flex: 0 0 auto;
   gap: 8px;
   margin: 0 14px 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--axv-outline);
   border-radius: 9px;
   padding: 7px 10px;
-  background: #fafafa;
+  background: var(--axv-surface-head);
 }
-.axv-iconlib-search .msr { font-size: 16px; color: #888; }
+.axv-iconlib-search .msr { font-size: 16px; color: var(--axv-desc); }
 .axv-iconlib-search input {
   flex: 1;
   border: 0;
   outline: 0;
   background: transparent;
   font-size: 13px;
-  color: #333;
+  color: var(--axv-title);
 }
 
 .axv-iconlib-grid {
@@ -7736,40 +7736,40 @@ button.axv-sb-item:hover {
   align-items: center;
   gap: 5px;
   padding: 10px 4px 8px;
-  border: 1px solid #e3e3e3;
+  border: 1px solid var(--axv-outline);
   border-radius: 10px;
-  background: #fff;
-  color: #333;
+  background: var(--axv-surface);
+  color: var(--axv-title);
   cursor: pointer;
   font-size: 11px;
 }
-.axv-iconlib-cell svg { color: #1d1b20; }
+.axv-iconlib-cell svg { color: var(--axv-title); }
 .axv-iconlib-cell span {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #666;
+  color: var(--axv-desc);
 }
-.axv-iconlib-cell:hover { border-color: #333; background: #f7f7f7; }
+.axv-iconlib-cell:hover { border-color: var(--axv-title); background: var(--axv-surface-head); }
 .axv-iconlib-cell:active { transform: scale(0.95); }
 
 .axv-iconlib-paste { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; }
-.axv-iconlib-hint { font-size: 12px; color: #777; line-height: 1.6; padding: 0 14px; }
-.axv-iconlib-err { font-size: 12px; color: #c62828; padding: 0 14px; }
+.axv-iconlib-hint { font-size: 12px; color: var(--axv-desc); line-height: 1.6; padding: 0 14px; }
+.axv-iconlib-err { font-size: 12px; color: var(--axv-danger); padding: 0 14px; }
 .axv-iconlib-ta {
   width: 100%;
   min-height: 120px;
   resize: vertical;
-  border: 1px solid #ddd;
+  border: 1px solid var(--axv-outline);
   border-radius: 9px;
   padding: 8px 10px;
   font: 12px/1.6 Consolas, "SF Mono", monospace;
-  color: #333;
+  color: var(--axv-title);
   outline: 0;
   box-sizing: border-box;
 }
-.axv-iconlib-ta:focus { border-color: #333; }
+.axv-iconlib-ta:focus { border-color: var(--axv-title); }
 
 .axv-iconlib-foot {
   display: flex;
@@ -7778,9 +7778,9 @@ button.axv-sb-item:hover {
   justify-content: space-between;
   gap: 10px;
   padding: 12px 14px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--axv-outline);
 }
-.axv-iconlib-count { font-size: 12px; color: #888; }
+.axv-iconlib-count { font-size: 12px; color: var(--axv-desc); }
 
 /* M89k：分页（移植 svg-board 图标库弹窗的 ipager） */
 .axv-iconlib-pager {
@@ -7791,15 +7791,15 @@ button.axv-sb-item:hover {
   gap: 10px;
   padding: 4px 14px 8px;
   font-size: 12px;
-  color: #777;
+  color: var(--axv-desc);
 }
 .axv-iconlib-pager button {
   width: 30px;
   height: 30px;
   border: 0;
   border-radius: 9px;
-  background: #f2f2f2;
-  color: #333;
+  background: var(--axv-surface-head);
+  color: var(--axv-title);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -7811,24 +7811,24 @@ button.axv-sb-item:hover {
 .axv-iconlib-pager .msr { font-size: 18px; }
 
 /* M89k：粘贴 SVG 时的资源名输入行 */
-.axv-iconlib-namerow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #666; }
+.axv-iconlib-namerow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--axv-desc); }
 .axv-iconlib-namerow input {
   flex: 1;
   min-width: 0;
-  border: 1px solid #ddd;
+  border: 1px solid var(--axv-outline);
   border-radius: 8px;
   padding: 7px 9px;
   font-size: 12.5px;
-  color: #333;
+  color: var(--axv-title);
   outline: 0;
 }
-.axv-iconlib-namerow input:focus { border-color: #333; }
+.axv-iconlib-namerow input:focus { border-color: var(--axv-title); }
 
 /* M79：来自 colorpicker.html 的“弹窗式”颜色选择器（Canvas HSV 面板） */
 .axv-cp-mask {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
+  background: var(--axv-scrim);
   z-index: 5000;
   display: flex;
   align-items: center;
@@ -7841,8 +7841,8 @@ button.axv-sb-item:hover {
 .axv-cp {
   width: 380px;
   max-width: 100%;
-  background: #fff;
-  color: #222;
+  background: var(--axv-surface);
+  color: var(--axv-title);
   border-radius: 14px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.28);
   overflow: hidden;
@@ -7853,20 +7853,20 @@ button.axv-sb-item:hover {
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--axv-outline);
 }
-.cp-title { font-size: 15px; font-weight: 600; color: #333; }
+.cp-title { font-size: 15px; font-weight: 600; color: var(--axv-title); }
 .cp-close {
   border: 0;
   background: transparent;
   font-size: 22px;
   line-height: 1;
-  color: #888;
+  color: var(--axv-desc);
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 6px;
 }
-.cp-close:hover { background: #f0f0f0; color: #333; }
+.cp-close:hover { background: #f0f0f0; color: var(--axv-title); }
 
 .cp-body { padding: 16px; }
 
@@ -7876,7 +7876,7 @@ button.axv-sb-item:hover {
   height: 220px;
   border-radius: 10px;
   overflow: hidden;
-  background: #f5f5f5;
+  background: var(--axv-surface-head);
   cursor: crosshair;
   touch-action: none;
 }
@@ -7889,7 +7889,7 @@ button.axv-sb-item:hover {
   position: absolute;
   width: 14px;
   height: 14px;
-  border: 2px solid #fff;
+  border: 2px solid var(--axv-surface);
   border-radius: 50%;
   box-shadow: 0 0 3px #000;
   pointer-events: none;
@@ -7899,7 +7899,7 @@ button.axv-sb-item:hover {
 .cp-row label {
   display: block;
   font-size: 12px;
-  color: #555;
+  color: var(--axv-desc);
   margin-bottom: 4px;
 }
 .cp-row label span { color: #999; margin-left: 6px; }
@@ -7923,7 +7923,7 @@ button.axv-sb-item:hover {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--axv-surface);
   border: 1px solid #ccc;
   box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }
@@ -7931,7 +7931,7 @@ button.axv-sb-item:hover {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--axv-surface);
   border: 1px solid #ccc;
   box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }
@@ -7970,7 +7970,7 @@ button.axv-sb-item:hover {
   border-radius: 8px;
   overflow: hidden;
   position: relative;
-  border: 1px solid #ddd;
+  border: 1px solid var(--axv-outline);
   flex: 0 0 auto;
 }
 .cp-preview-layer {
@@ -7989,7 +7989,7 @@ button.axv-sb-item:hover {
   flex-direction: column;
   gap: 4px;
 }
-.cp-input-group label { font-size: 11px; color: #666; }
+.cp-input-group label { font-size: 11px; color: var(--axv-desc); }
 .cp-input-group input {
   width: 100%;
   min-width: 0;
@@ -7997,11 +7997,11 @@ button.axv-sb-item:hover {
   border: 1px solid #ccc;
   border-radius: 6px;
   font-size: 11px;
-  color: #222;
-  background: #fff;
+  color: var(--axv-title);
+  background: var(--axv-surface);
 }
 
-.cp-preset-title { font-size: 12px; color: #555; margin: 8px 0 6px; }
+.cp-preset-title { font-size: 12px; color: var(--axv-desc); margin: 8px 0 6px; }
 .cp-preset-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
@@ -8011,7 +8011,7 @@ button.axv-sb-item:hover {
 .cp-preset {
   height: 28px;
   border-radius: 5px;
-  border: 1px solid rgba(0,0,0,0.08);
+  border: 1px solid var(--axv-outline);
   cursor: pointer;
 }
 .cp-preset:hover { outline: 2px solid #3498db; outline-offset: 1px; }
@@ -8022,11 +8022,11 @@ button.axv-sb-item:hover {
   padding: 9px;
   border: none;
   border-radius: 8px;
-  color: #fff;
+  color: var(--axv-on-primary);
   cursor: pointer;
   font-size: 13px;
 }
-.cp-copy { background: #666; }
+.cp-copy { background: var(--axv-desc); }
 .cp-confirm { background: #3498db; }
 
 /* 图标编辑器里的“取色”按钮和色块 */
@@ -8036,7 +8036,7 @@ button.axv-sb-item:hover {
   gap: 6px;
   margin-top: 8px;
   padding: 6px 10px;
-  border: 1px solid rgba(255,255,255,0.28);
+  border: 1px solid var(--axv-outline);
   border-radius: 8px;
   background: #ffffff22;
   color: #fff;
@@ -8048,14 +8048,14 @@ button.axv-sb-item:hover {
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  border: 1px solid rgba(0,0,0,0.25);
+  border: 1px solid var(--axv-outline);
   display: inline-block;
 }
 
 .axv-icon-ed-cp-inline {
   margin-left: 8px;
   padding: 2px 6px;
-  border: 1px solid rgba(0,0,0,0.2);
+  border: 1px solid var(--axv-outline);
   background: transparent;
   color: inherit;
   border-radius: 4px;
@@ -8098,7 +8098,7 @@ button.axv-sb-item:hover {
   align-items: center;
   gap: 2px;
   padding: 6px 10px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--axv-outline);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -8118,13 +8118,13 @@ button.axv-sb-item:hover {
 }
 .axv-cv-tool .msr { font-size: 19px; }
 .axv-cv-tool:hover { background: rgba(0, 0, 0, 0.06); }
-.axv-cv-tool.on { background: var(--axv-primary-soft-border); color: #fff; }
+.axv-cv-tool.on { background: var(--axv-primary-soft-border); color: var(--axv-on-primary); }
 .axv-cv-tool-sep {
   flex: 0 0 auto;
   width: 1px;
   height: 20px;
   margin: 0 6px;
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--axv-hover);
 }
 
 .axv-cv-stage {
@@ -8137,7 +8137,7 @@ button.axv-sb-item:hover {
   justify-content: center;
   gap: 10px;
   padding: 20px 16px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--axv-hover);
 }
 
 .axv-cv-board {
@@ -8146,7 +8146,7 @@ button.axv-sb-item:hover {
   max-width: 100%;
   max-height: 100%;
   /* 透明棋盘底：让无填充的矢量图形看得见边界 */
-  background-color: #fff;
+  background-color: var(--axv-surface);
   background-image:
     linear-gradient(45deg, #ccc 25%, #0000 25% 75%, #ccc 75%, #ccc),
     linear-gradient(45deg, #ccc 25%, #0000 25% 75%, #ccc 75%, #ccc);
@@ -8179,7 +8179,7 @@ button.axv-sb-item:hover {
   flex: 0 0 288px;
   max-width: 288px;
   overflow-y: auto;
-  border-left: 1px solid rgba(0, 0, 0, 0.06);
+  border-left: 1px solid var(--axv-outline);
   padding: 10px 12px 18px;
 }
 
@@ -8202,7 +8202,7 @@ button.axv-sb-item:hover {
   gap: 6px;
   height: 26px;
   padding: 0 8px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--axv-outline);
   border-radius: 6px;
   background: transparent;
   color: inherit;
@@ -8210,34 +8210,34 @@ button.axv-sb-item:hover {
   font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
-.axv-cv-swatch:hover { border-color: rgba(27, 110, 243, 0.6); }
+.axv-cv-swatch:hover { border-color: color-mix(in srgb, var(--axv-primary) 60%, transparent); }
 .axv-cv-swatch-val {
   padding: 0 2px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.72);
-  color: #1d1b20;
+  background: color-mix(in srgb, var(--axv-surface) 72%, transparent);
+  color: var(--axv-title);
 }
 
 .axv-cv-toggle {
   height: 26px;
   min-width: 30px;
   padding: 0 8px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--axv-outline);
   border-radius: 6px;
   background: transparent;
   color: inherit;
   font-size: 11px;
   cursor: pointer;
 }
-.axv-cv-toggle.on { background: #1b6ef3; border-color: #1b6ef3; color: #fff; }
+.axv-cv-toggle.on { background: var(--axv-primary); border-color: var(--axv-primary); color: var(--axv-on-primary); }
 
 .axv-cv-num {
   width: 75px;
   height: 26px;
   padding: 0 6px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--axv-outline);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.6);
+  background: color-mix(in srgb, var(--axv-surface) 60%, transparent);
   color: inherit;
   font-size: 12px;
   text-align: center;
@@ -8254,7 +8254,7 @@ button.axv-sb-item:hover {
 
 .axv-cv-extra {
   padding: 4px 0 0 0;
-  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+  border-top: 1px dashed var(--axv-outline);
   margin-top: 4px;
 }
 
@@ -8284,16 +8284,16 @@ button.axv-sb-item:hover {
   height: 30px;
   padding: 0 6px 0 2px;
   border-radius: 6px;
-  background: rgba(27, 110, 243, 0.06);
-  border-left: 2px solid rgba(27, 110, 243, 0.45);
+  background: color-mix(in srgb, var(--axv-primary) 6%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--axv-primary) 45%, transparent);
   cursor: pointer;
   user-select: none;
 }
-.axv-cv-grp:hover { background: rgba(27, 110, 243, 0.12); }
-.axv-cv-grp.on { background: rgba(27, 110, 243, 0.18); }
+.axv-cv-grp:hover { background: color-mix(in srgb, var(--axv-primary) 12%, transparent); }
+.axv-cv-grp.on { background: color-mix(in srgb, var(--axv-primary) 18%, transparent); }
 .axv-cv-grp-ico {
   font-size: 15px;
-  color: #1b6ef3;
+  color: var(--axv-primary);
   flex: 0 0 auto;
 }
 .axv-cv-grp-name {
@@ -8308,29 +8308,29 @@ button.axv-sb-item:hover {
   color: inherit;
   padding: 0 4px;
 }
-.axv-cv-grp-name:hover { border-color: rgba(0, 0, 0, 0.12); }
+.axv-cv-grp-name:hover { border-color: var(--axv-outline); }
 .axv-cv-grp-name:focus {
   outline: none;
-  border-color: #1b6ef3;
-  background: #fff;
+  border-color: var(--axv-primary);
+  background: var(--axv-surface);
 }
 /* 组内成员行缩进一点，层级一眼能看出来 */
 .axv-cv-layers > .axv-cv-layer[data-layer-id] { margin-left: 0; }
 .axv-cv-grp-panel {
-  border: 1px solid rgba(27, 110, 243, 0.25);
+  border: 1px solid color-mix(in srgb, var(--axv-primary) 25%, transparent);
   border-radius: 8px;
   padding: 8px 10px;
-  background: rgba(27, 110, 243, 0.05);
+  background: color-mix(in srgb, var(--axv-primary) 5%, transparent);
 }
 /* 旧的分组数值标签规则已并入上面的 .axv-cv-val */
 .axv-cv-layer:hover { background: rgba(0, 0, 0, 0.05); }
-.axv-cv-layer.on { background: rgba(27, 110, 243, 0.12); }
+.axv-cv-layer.on { background: color-mix(in srgb, var(--axv-primary) 12%, transparent); }
 .axv-cv-layer-dot {
   flex: 0 0 12px;
   width: 12px;
   height: 12px;
   border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--axv-outline);
 }
 .axv-cv-layer-name {
   flex: 1 1 auto;
@@ -8360,7 +8360,7 @@ button.axv-sb-item:hover {
     flex: 1 1 auto;
     max-width: none;
     border-left: none;
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    border-top: 1px solid var(--axv-outline);
   }
   .axv-cv-stage { padding: 12px; }
 }
@@ -8434,13 +8434,13 @@ button.axv-sb-item:hover {
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--axv-outline);
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.5);
+  background: color-mix(in srgb, var(--axv-surface) 50%, transparent);
   color: inherit;
   cursor: pointer;
 }
-.axv-cv-align-btn:hover:not(:disabled) { border-color: rgba(27, 110, 243, 0.6); color: #1b6ef3; }
+.axv-cv-align-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--axv-primary) 60%, transparent); color: var(--axv-primary); }
 .axv-cv-align-btn:disabled { opacity: 0.3; cursor: default; }
 .axv-cv-align-btn .msr { font-size: 16px; }
 
@@ -8450,7 +8450,7 @@ button.axv-sb-item:hover {
   height: 22px;
   padding: 0;
   border-radius: 5px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--axv-outline);
   cursor: pointer;
 }
 .axv-cv-preset:hover { transform: translateY(-1px); }
@@ -8462,14 +8462,14 @@ button.axv-sb-item:hover {
   margin-left: 8px;
   padding: 0 6px;
   height: 20px;
-  border: 1px solid rgba(0, 0, 0, 0.16);
+  border: 1px solid var(--axv-outline);
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--axv-hover);
   color: inherit;
   font-size: 12px;
   cursor: pointer;
 }
-.axv-cv-mini:hover { border-color: rgba(27, 110, 243, 0.6); color: #1b6ef3; }
+.axv-cv-mini:hover { border-color: color-mix(in srgb, var(--axv-primary) 60%, transparent); color: var(--axv-primary); }
 
 .axv-cv-sublabel { font-size: 10px; opacity: 0.55; margin: 2px 0 4px; }
 .axv-cv-textnote {
@@ -8494,7 +8494,7 @@ button.axv-sb-item:hover {
   display: flex;
   flex-direction: column;
   padding-top: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--axv-outline);
   border-radius: 14px 14px 0px 0px;
   background: var(--axv-hover);
   backdrop-filter: blur(14px) saturate(1.3);
@@ -8511,7 +8511,7 @@ button.axv-sb-item:hover {
   align-items: flex-end;
   gap: 8px;
   padding: 0 10px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--axv-outline);
   cursor: pointer;
   user-select: none;
 }
@@ -8523,7 +8523,7 @@ button.axv-sb-item:hover {
   width: 34px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(0, 0, 0, 0.16);
+  background: var(--axv-hover);
 }
 .axv-cv-sheet-title {
   font-size: 12px;
@@ -8538,7 +8538,7 @@ button.axv-sb-item:hover {
   gap: 2px;
   padding: 2px 2px 0px 2px;
   border-radius: 8px 8px 0px 0px;
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--axv-hover);
   /* M88l：tab 变多了（样式/属性/排列/图层/资源/画布），窄屏横向滚动而不是挤爆 */
   flex: 0 1 auto;
   min-width: 0;
@@ -8558,7 +8558,7 @@ button.axv-sb-item:hover {
   cursor: pointer;
   white-space: nowrap;
 }
-.axv-cv-sheet-tab:hover { color: #1b6ef3; }
+.axv-cv-sheet-tab:hover { color: var(--axv-primary); }
 .axv-cv-sheet-tab.on {
   background: var(--axv-primary);
   color: var(--axv-toolbar-soft);
@@ -8629,7 +8629,7 @@ button.axv-sb-item:hover {
     max-height: none;
     /* 底部样式抽屉浮在上面，留出空间让最后几行也能滚到可点位置 */
     padding: 10px 12px 150px;
-    border-left: 1px solid rgba(0, 0, 0, 0.10);
+    border-left: 1px solid var(--axv-outline);
     border-top: none;
     border-radius: 14px 0 0 14px;
     background: var(--axv-surface, #fff);
@@ -8662,7 +8662,7 @@ button.axv-sb-item:hover {
     width: 26px;
     height: 52px;
     padding: 0;
-    border: 1px solid rgba(0, 0, 0, 0.10);
+    border: 1px solid var(--axv-outline);
     border-right: none;
     border-radius: 10px 0 0 10px;
     background: linear-gradient(270deg, var(--axv-rail-bg), var(--axv-primary));
@@ -8696,7 +8696,7 @@ button.axv-sb-item:hover {
 .axv-cv-size {
   min-width: 48px;
   padding: 6px 10px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--axv-outline);
   border-radius: 8px;
   background: transparent;
   color: var(--axv-title);
@@ -8705,9 +8705,9 @@ button.axv-sb-item:hover {
 }
 .axv-cv-size:hover { background: rgba(0, 0, 0, 0.05); }
 .axv-cv-size.on {
-  background: var(--axv-code-sel-bg, rgba(4, 64, 159, 0.18));
+  background: var(--axv-code-sel-bg, color-mix(in srgb, var(--axv-primary) 18%, transparent));
   border-color: var(--axv-primary-soft-border);
-  color: #fff;
+  color: var(--axv-on-primary);
 }
 
 .axv-cv-chk {
@@ -8717,7 +8717,7 @@ button.axv-sb-item:hover {
   font-size: 12px;
   cursor: pointer;
 }
-.axv-cv-chk input { accent-color: #1b6ef3; }
+.axv-cv-chk input { accent-color: var(--axv-primary); }
 
 .axv-cv-layer-grip {
   flex: 0 0 auto;
@@ -8732,13 +8732,14 @@ button.axv-sb-item:hover {
 }
 .axv-cv-layer-grip:active { cursor: grabbing; opacity: 0.8; }
 .axv-cv-layer.is-dragging { opacity: 0.55; }
-.axv-cv-layer.is-drop { outline: 2px dashed #1b6ef3; outline-offset: -2px; }
+.axv-cv-layer.is-drop { outline: 2px dashed var(--axv-primary); outline-offset: -2px; }
 
 /* ===== M89c：全局输入框统一样式（边框/底色/focus）
    只作用于文本类 input，checkbox/radio/range/color/file 保持原生外观 ===== */
 input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"], [type="reset"])) {
-  border: 1px solid var(--axv-line, var(--axv-outline));
-  background: var(--axv-on-primary);
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  color: var(--axv-title);
 }
 input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"], [type="reset"])):focus {
   border: 1px solid var(--axv-primary);
@@ -8761,13 +8762,13 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 /* 关键：列容器里的子项不许被压缩，否则列表会被裁掉大半（overflow:hidden 把行吃掉） */
 .axv-thm-body > * { flex: 0 0 auto; }
 .axv-thm-mode { display: flex; flex-direction: column; gap: 6px; }
-.axv-thm-sect { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--axv-title, #333); display: flex; align-items: baseline; gap: 8px; }
+.axv-thm-sect { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--axv-title, var(--axv-title)); display: flex; align-items: baseline; gap: 8px; }
 .axv-thm-note { font-weight: 400; font-size: 11px; color: var(--axv-desc, #7a7a85); }
-.axv-thm-list { display: flex; flex-direction: column; border: 1px solid var(--axv-outline, rgba(0,0,0,0.12)); border-radius: 12px; overflow: hidden; background: var(--axv-surface, #fff); }
-.axv-thm-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) 28px 28px; align-items: center; gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--axv-outline, rgba(0,0,0,0.12)); }
+.axv-thm-list { display: flex; flex-direction: column; border: 1px solid var(--axv-outline, var(--axv-outline)); border-radius: 12px; overflow: hidden; background: var(--axv-surface, var(--axv-surface)); }
+.axv-thm-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) 28px 28px; align-items: center; gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--axv-outline, var(--axv-outline)); }
 .axv-thm-row:last-child { border-bottom: none; }
 .axv-thm-row.is-changed { background: var(--axv-primary-soft, rgba(0,0,0,0.03)); }
-.axv-thm-name { font-size: 12.5px; color: var(--axv-title, #333); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.axv-thm-name { font-size: 12.5px; color: var(--axv-title, var(--axv-title)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .axv-thm-val { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--axv-desc, #7a7a85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .axv-thm-reset { width: 28px; height: 28px; display: grid; place-items: center; border: none; border-radius: 8px; background: transparent; color: var(--axv-desc, #7a7a85); cursor: pointer; }
 .axv-thm-reset .msr { font-size: 16px; }

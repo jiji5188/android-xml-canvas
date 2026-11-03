@@ -29,6 +29,7 @@ import {
   unionBox,
   alignShapes,
   convertShapesToPaths,
+  defaultRoundFor,
   modelToShapes,
   type Box,
   type CanvasMeta,
@@ -408,7 +409,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             y: p.y,
             w: 0.01,
             h: 0.01,
-            round: Math.max(0.5, meta.vw * 0.1),
+            // M91b：只有「圆角矩形」工具才带默认圆角，直角矩形必须是 0，
+            // 否则画出来是圆角（旧代码两种工具共用这一行，直角矩形被强行 10% 圆角）
+            round: defaultRoundFor(t, meta.vw),
             fill: st.fill,
             stroke: st.stroke,
             strokeWidth: st.strokeWidth,

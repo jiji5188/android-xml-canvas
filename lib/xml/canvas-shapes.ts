@@ -219,6 +219,11 @@ function nstr(n: number): string {
 
 /* ---------------- 图元 → pathData ---------------- */
 
+/** 新建矩形时的默认圆角：只有「圆角矩形」工具带圆角，直角矩形必须为 0 */
+export function defaultRoundFor(t: "rect" | "roundRect", vw: number): number {
+  return t === "roundRect" ? Math.max(0.5, vw * 0.1) : 0;
+}
+
 export function rectPath(x: number, y: number, w: number, h: number, round = 0): string {
   const W = Math.abs(w);
   const H = Math.abs(h);

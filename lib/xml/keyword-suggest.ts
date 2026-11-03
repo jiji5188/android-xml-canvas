@@ -7,6 +7,8 @@
 //
 // 纯函数，Node / 浏览器都能测。
 
+import { ANDROID_TAGS, ANDROID_ATTRS, ANDROID_VALUES } from "./android-vocab";
+
 export type SuggestKind = "tag" | "attr" | "value" | "resource" | "plain";
 
 export interface SuggestContext {
@@ -17,51 +19,14 @@ export interface SuggestContext {
   items: string[];
 }
 
-/** 高频 Android 标签 */
-const TAG_WHITELIST = [
-  "LinearLayout", "FrameLayout", "ConstraintLayout", "RelativeLayout",
-  "ScrollView", "HorizontalScrollView", "NestedScrollView", "RecyclerView",
-  "TextView", "EditText", "Button", "ImageButton", "CheckBox", "RadioButton",
-  "Switch", "ToggleButton", "ProgressBar", "SeekBar", "ImageView",
-  "CardView", "MaterialCardView", "Spinner", "AutoCompleteTextView",
-  "TabLayout", "View", "ViewStub", "Space", "Divider",
-  "GridLayout", "TableLayout", "TableRow", "DrawerLayout", "CoordinatorLayout",
-  "MaterialButton", "TextInputLayout", "TextInputEditText",
-];
+/** 高频 Android 标签（M94：改由 android-vocab 统一维护） */
+const TAG_WHITELIST = ANDROID_TAGS;
 
-/** 高频属性名 */
-const ATTR_WHITELIST = [
-  "android:id", "android:layout_width", "android:layout_height",
-  "android:layout_margin", "android:layout_marginLeft", "android:layout_marginRight",
-  "android:layout_marginTop", "android:layout_marginBottom",
-  "android:layout_gravity", "android:gravity", "android:orientation",
-  "android:background", "android:padding", "android:paddingLeft",
-  "android:paddingRight", "android:paddingTop", "android:paddingBottom",
-  "android:text", "android:textSize", "android:textColor", "android:textStyle",
-  "android:fontFamily", "android:maxLines", "android:singleLine",
-  "android:visibility", "android:alpha", "android:scaleType", "android:src",
-  "android:tint", "android:tintMode", "android:elevation",
-  "android:clickable", "android:focusable", "android:enabled", "android:tag",
-  "app:layout_constraintLeft_toLeftOf", "app:layout_constraintRight_toRightOf",
-  "app:layout_constraintTop_toTopOf", "app:layout_constraintBottom_toBottomOf",
-  "app:layout_constraintStart_toStartOf", "app:layout_constraintEnd_toEndOf",
-  "app:layout_constraintHorizontal_bias", "app:layout_constraintVertical_bias",
-  "app:cardCornerRadius", "app:cardElevation", "app:strokeWidth",
-  "app:strokeColor", "app:rippleColor", "app:tint", "app:tintMode",
-  "app:srcCompat", "app:src", "app:drawableStart", "app:drawableEnd",
-  "tools:context", "tools:ignore", "xmlns:android", "xmlns:app", "xmlns:tools",
-];
+/** 高频属性名（M94：改由 android-vocab 统一维护） */
+const ATTR_WHITELIST = ANDROID_ATTRS;
 
 /** 高频属性值 */
-const VALUE_WHITELIST = [
-  "match_parent", "wrap_content", "0dp", "4dp", "8dp", "12dp", "16dp",
-  "24dp", "32dp", "48dp", "64dp", "8sp", "12sp", "14sp", "16sp", "18sp",
-  "gone", "invisible", "visible", "left", "right", "top", "bottom", "center",
-  "start", "end", "center_vertical", "center_horizontal", "center_vertical|start",
-  "clip", "marquee", "middle", "normal", "bold", "italic", "bold|italic",
-  "centerCrop", "centerInside", "fitCenter", "fitStart", "fitEnd", "fitXY",
-  "tile", "fade", "infinite", "accelerate", "decelerate", "anticipate",
-];
+const VALUE_WHITELIST = ANDROID_VALUES;
 
 /** 可组成「当前词」的字符（光标左边的连续段） */
 const WORD_RE = /[A-Za-z0-9_.:@#+\/-]/;

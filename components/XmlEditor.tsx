@@ -139,6 +139,7 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
 import { loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
+import { setI18nLang } from "@/lib/i18n-src";
 import { XmlCodeView } from "./XmlCodeView";
 import { AttrPanel } from "./AttrPanel";
 import { AddAttrModal } from "./AddAttrModal";
@@ -642,6 +643,10 @@ export function XmlEditor() {
   const [langPref, setLangPref] = useState<LangPref>(() => loadLangPref());
   const lang = useMemo(() => resolveLang(langPref), [langPref]);
   const tr = useMemo(() => makeT(lang), [lang]);
+  // M95：把当前语言同步给模块级 t()，没接 lang prop 的组件也能跟着切
+  useEffect(() => {
+    setI18nLang(lang);
+  }, [lang]);
   useEffect(() => {
     saveLangPref(langPref);
     // 让 <html lang> 跟着走（影响字距/断行规则，也便于辅助技术识别）

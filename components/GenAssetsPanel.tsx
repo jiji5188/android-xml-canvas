@@ -5,6 +5,7 @@
 // 预览缩略图、引用计数、改名（同步改布局里的 @drawable/x）、删除（被引用时二次确认）、
 // 复制 / 下载 xml。
 
+import { t } from "@/lib/i18n-src";
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
@@ -106,25 +107,25 @@ export function GenAssetsPanel({
     if (!editing) return;
     const safe = sanitizeResName(draft, "ic");
     if (!safe) {
-      setErr("资源名不能为空（只能用 a-z 0-9 _，且字母开头）");
+      setErr(t("资源名不能为空（只能用 a-z 0-9 _，且字母开头）"));
       return;
     }
     if (safe !== draft.trim()) {
       // 允许自动纠正，但要说清楚
       setDraft(safe);
-      setErr(`已按 aapt 规则纠正为 ${safe}，再点一次「确定」`);
+      setErr(t("已按 aapt 规则纠正为 {name}，再点一次「确定」", { name: safe }));
       return;
     }
     if (safe !== editing && safe in assets) {
-      setErr(`已存在同名资源 ${safe}`);
+      setErr(t("已存在同名资源 {name}", { name: safe }));
       return;
     }
     const refs = countReferences(layoutXml, editing);
     onRename(editing, safe);
     onNote?.(
       refs > 0
-        ? `已改名 ${editing} → ${safe}，布局里 ${refs} 处引用已同步`
-        : `已改名 ${editing} → ${safe}`
+        ? t("已改名 {from} → {to}，布局里 {n} 处引用已同步", { from: editing ?? "", to: safe, n: refs })
+        : t("已改名 {from} → {to}", { from: editing ?? "", to: safe })
     );
     setEditing(null);
     setErr("");
@@ -137,16 +138,20 @@ export function GenAssetsPanel({
       return;
     }
     onDelete(name);
-    onNote?.(refs > 0 ? `已删除 ${name}（布局里 ${refs} 处引用会变成缺失资源）` : `已删除 ${name}`);
+    onNote?.(
+      refs > 0
+        ? t("已删除 {name}（布局里 {n} 处引用会变成缺失资源）", { name, n: refs })
+        : t("已删除 {name}", { name })
+    );
     setConfirmDel(null);
   };
 
   const copyXml = async (name: string, xml: string) => {
     try {
       await navigator.clipboard.writeText(xml);
-      onNote?.(`已复制 ${name} 的 xml`);
+      onNote?.(t("已复制 {name} 的 xml", { name }));
     } catch {
-      onNote?.("复制失败（浏览器不允许写剪贴板）");
+      onNote?.(t("复制失败（浏览器不允许写剪贴板）"));
     }
   };
 
@@ -156,8 +161,8 @@ export function GenAssetsPanel({
       void saveResFiles(projectRoot, [{ path: `drawable/${name}.xml`, text: xml }]).then((r) => {
         onNote?.(
           r.ok
-            ? `已写入《${projectName || "项目"}》app/src/main/res/drawable/${name}.xml`
-            : `写入项目失败：${r.failed[0] || "目录不可写"}`,
+            ? t("已写入《{project}》app/src/main/res/drawable/{name}.xml", { project: projectName || t("项目"), name })
+            : t("写入项目失败：{reason}", { reason: r.failed[0] || t("目录不可写") }),
         );
       });
       return;
@@ -174,7 +179,7 @@ export function GenAssetsPanel({
   /** 内嵌版：整块塞进左侧 tab 面板（无遮罩、无标题栏、无关闭按钮） */
   if (inline) {
     return (
-      <div className="axv-assets-inline" aria-label="已生成资源">
+      <div className="axv-assets-inline" aria-label={t("已生成资源")}>
       <div className="axv-assets-search">
         <span className="msr" aria-hidden="true" style={{ fontSize: 18, opacity: 0.6 }}>
           search
@@ -182,22 +187,22 @@ export function GenAssetsPanel({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="搜索资源名…"
-          aria-label="搜索资源名"
+          placeholder={t("搜索资源名…")}
+          aria-label={t("搜索资源名")}
         />
       </div>
 
 
       {total === 0 ? (
         <div className="axv-assets-empty">
-          还没有生成过资源。用属性面板的 <b>🖼</b> 选图标 / <b>⬛</b> 建形状，生成后会出现在这里。
+          {t("还没有生成过资源。用属性面板的")} <b>🖼</b> {t("选图标 /")} <b>⬛</b> {t("建形状，生成后会出现在这里。")}
         </div>
       ) : rows.length === 0 ? (
-        <div className="axv-assets-empty">没有匹配「{q}」的资源</div>
+        <div className="axv-assets-empty">{t("没有匹配「{q}」的资源", { q })}</div>
       ) : (
         <div className="axv-assets-list">
           {rows.map((r) => {
-            const t = thumb(r.name, r.xml);
+            const thumbOf = thumb(r.name, r.xml);
             const isEditing = editing === r.name;
             return (
               <div
@@ -214,17 +219,17 @@ export function GenAssetsPanel({
                 }}
                 title={
                   r.kind === "shape" && onEditShape
-                    ? "双击编辑形状内容"
+                    ? t("双击编辑形状内容")
                     : r.kind === "vector" && onEditIcon
-                      ? "双击编辑图标（颜色 / 尺寸 / 路径 / 旋转）"
+                      ? t("双击编辑图标（颜色 / 尺寸 / 路径 / 旋转）")
                       : undefined
                 }
               >
                 <div className="axv-assets-thumb">
-                  {t.url ? (
-                    <img src={t.url} alt="" />
+                  {thumbOf.url ? (
+                    <img src={thumbOf.url} alt="" />
                   ) : (
-                    <span className="axv-assets-swatch" style={t.css} />
+                    <span className="axv-assets-swatch" style={thumbOf.css} />
                   )}
                 </div>
 
@@ -251,9 +256,9 @@ export function GenAssetsPanel({
                       {r.name}
                       <span className="axv-assets-kind">{kindLabel(r.kind)}</span>
                       {r.refs === 0 ? (
-                        <span className="axv-assets-badge is-unused">未引用</span>
+                        <span className="axv-assets-badge is-unused">{t("未引用")}</span>
                       ) : (
-                        <span className="axv-assets-badge">引用 {r.refs}</span>
+                        <span className="axv-assets-badge">{t("引用 {n}", { n: r.refs })}</span>
                       )}
                     </div>
                   )}
@@ -267,7 +272,7 @@ export function GenAssetsPanel({
                   {isEditing ? (
                     <>
                       <button className="axv-btn axv-btn-sm" onClick={submitRename}>
-                        确定
+                        {t("确定")}
                       </button>
                       <button
                         className="axv-btn axv-btn-sm axv-ghost"
@@ -276,15 +281,15 @@ export function GenAssetsPanel({
                           setErr("");
                         }}
                       >
-                        取消
+                        {t("取消")}
                       </button>
                     </>
                   ) : (
                     <>
                       <button
                         className="axv-icon-btn"
-                        title="改名（会同步改布局里的引用）"
-                        aria-label="改名"
+                        title={t("改名（会同步改布局里的引用）")}
+                        aria-label={t("改名")}
                         onClick={() => startRename(r.name)}
                       >
                         <span className="msr" aria-hidden="true" style={{ fontSize: 19 }}>
@@ -293,8 +298,8 @@ export function GenAssetsPanel({
                       </button>
                       <button
                         className="axv-icon-btn"
-                        title="复制 xml"
-                        aria-label="复制 xml"
+                        title={t("复制 xml")}
+                        aria-label={t("复制 xml")}
                         onClick={() => void copyXml(r.name, r.xml)}
                       >
                         <span className="msr" aria-hidden="true" style={{ fontSize: 19 }}>
@@ -303,8 +308,8 @@ export function GenAssetsPanel({
                       </button>
                       <button
                         className="axv-icon-btn"
-                        title="下载 xml 文件"
-                        aria-label="下载 xml"
+                        title={t("下载 xml 文件")}
+                        aria-label={t("下载 xml")}
                         onClick={() => downloadXml(r.name, r.xml)}
                       >
                         <span className="msr" aria-hidden="true" style={{ fontSize: 19 }}>
@@ -317,10 +322,10 @@ export function GenAssetsPanel({
                         }
                         title={
                           confirmDel === r.name
-                            ? `再点一次确认删除（${r.refs} 处引用会变缺失）`
-                            : "删除资源"
+                            ? t("再点一次确认删除（{n} 处引用会变缺失）", { n: r.refs })
+                            : t("删除资源")
                         }
-                        aria-label="删除"
+                        aria-label={t("删除")}
                         onClick={() => submitDelete(r.name)}
                       >
                         <span className="msr" aria-hidden="true" style={{ fontSize: 19 }}>
@@ -339,8 +344,8 @@ export function GenAssetsPanel({
 
       <div className="axv-assets-foot">
         <span>
-          改名 / 删除只影响编辑器里生成的资源；已上传 res 目录里的同名文件不会被改动。
-          形状资源双击可直接改内容。
+          {t("改名 / 删除只影响编辑器里生成的资源；已上传 res 目录里的同名文件不会被改动。")}
+          {t("形状资源双击可直接改内容。")}
         </span>
       </div>
 
@@ -355,10 +360,10 @@ export function GenAssetsPanel({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="axv-modal axv-assets-modal" role="dialog" aria-label="已生成资源">
+      <div className="axv-modal axv-assets-modal" role="dialog" aria-label={t("已生成资源")}>
         <div className="axv-modal-head">
-          <span>已生成资源 · {total}</span>
-          <button className="axv-icon-btn" onClick={onClose} aria-label="关闭">
+          <span>{t("已生成资源")} · {total}</span>
+          <button className="axv-icon-btn" onClick={onClose} aria-label={t("关闭")}>
             ✕
           </button>
         </div>
@@ -370,29 +375,29 @@ export function GenAssetsPanel({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="搜索资源名…"
-            aria-label="搜索资源名"
+            placeholder={t("搜索资源名…")}
+            aria-label={t("搜索资源名")}
           />
         </div>
 
         {total === 0 ? (
           <div className="axv-assets-empty">
-            还没有生成过资源。用属性面板的 <b>🖼</b> 选图标 / <b>⬛</b> 建形状，生成后会出现在这里。
+            {t("还没有生成过资源。用属性面板的")} <b>🖼</b> {t("选图标 /")} <b>⬛</b> {t("建形状，生成后会出现在这里。")}
           </div>
         ) : rows.length === 0 ? (
-          <div className="axv-assets-empty">没有匹配「{q}」的资源</div>
+          <div className="axv-assets-empty">{t("没有匹配「{q}」的资源", { q })}</div>
         ) : (
           <div className="axv-assets-list">
             {rows.map((r) => {
-              const t = thumb(r.name, r.xml);
+              const thumbOf = thumb(r.name, r.xml);
               const isEditing = editing === r.name;
               return (
                 <div className="axv-assets-row" key={r.name}>
                   <div className="axv-assets-thumb">
-                    {t.url ? (
-                      <img src={t.url} alt="" />
+                    {thumbOf.url ? (
+                      <img src={thumbOf.url} alt="" />
                     ) : (
-                      <span className="axv-assets-swatch" style={t.css} />
+                      <span className="axv-assets-swatch" style={thumbOf.css} />
                     )}
                   </div>
 
@@ -419,9 +424,9 @@ export function GenAssetsPanel({
                         {r.name}
                         <span className="axv-assets-kind">{kindLabel(r.kind)}</span>
                         {r.refs === 0 ? (
-                          <span className="axv-assets-badge is-unused">未引用</span>
+                          <span className="axv-assets-badge is-unused">{t("未引用")}</span>
                         ) : (
-                          <span className="axv-assets-badge">引用 {r.refs}</span>
+                          <span className="axv-assets-badge">{t("引用 {n}", { n: r.refs })}</span>
                         )}
                       </div>
                     )}
@@ -435,7 +440,7 @@ export function GenAssetsPanel({
                     {isEditing ? (
                       <>
                         <button className="axv-btn axv-btn-sm" onClick={submitRename}>
-                          确定
+                          {t("确定")}
                         </button>
                         <button
                           className="axv-btn axv-btn-sm axv-ghost"
@@ -444,15 +449,15 @@ export function GenAssetsPanel({
                             setErr("");
                           }}
                         >
-                          取消
+                          {t("取消")}
                         </button>
                       </>
                     ) : (
                       <>
                         <button
                           className="axv-icon-btn"
-                          title="改名（会同步改布局里的引用）"
-                          aria-label="改名"
+                          title={t("改名（会同步改布局里的引用）")}
+                          aria-label={t("改名")}
                           onClick={() => startRename(r.name)}
                         >
                           <span className="msr" aria-hidden="true" style={{ fontSize: 19 }}>
@@ -461,8 +466,8 @@ export function GenAssetsPanel({
                         </button>
                         <button
                           className="axv-icon-btn"
-                          title="复制 xml"
-                          aria-label="复制 xml"
+                          title={t("复制 xml")}
+                          aria-label={t("复制 xml")}
                           onClick={() => void copyXml(r.name, r.xml)}
                         >
                           <span className="msr" aria-hidden="true" style={{ fontSize: 19 }}>
@@ -471,8 +476,8 @@ export function GenAssetsPanel({
                         </button>
                         <button
                           className="axv-icon-btn"
-                          title="下载 xml 文件"
-                          aria-label="下载 xml"
+                          title={t("下载 xml 文件")}
+                          aria-label={t("下载 xml")}
                           onClick={() => downloadXml(r.name, r.xml)}
                         >
                           <span className="msr" aria-hidden="true" style={{ fontSize: 19 }}>
@@ -485,10 +490,10 @@ export function GenAssetsPanel({
                           }
                           title={
                             confirmDel === r.name
-                              ? `再点一次确认删除（${r.refs} 处引用会变缺失）`
-                              : "删除资源"
+                              ? t("再点一次确认删除（{n} 处引用会变缺失）", { n: r.refs })
+                              : t("删除资源")
                           }
-                          aria-label="删除"
+                          aria-label={t("删除")}
                           onClick={() => submitDelete(r.name)}
                         >
                           <span className="msr" aria-hidden="true" style={{ fontSize: 19 }}>
@@ -506,11 +511,11 @@ export function GenAssetsPanel({
 
         <div className="axv-assets-foot">
           <span>
-            改名 / 删除只影响编辑器里生成的资源；已上传 res 目录里的同名文件不会被改动
+            {t("改名 / 删除只影响编辑器里生成的资源；已上传 res 目录里的同名文件不会被改动。")}
           </span>
           {inline ? null : (
             <button className="axv-btn" onClick={onClose}>
-              关闭
+              {t("关闭")}
             </button>
           )}
         </div>

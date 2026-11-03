@@ -3,9 +3,9 @@
 // 只翻译「编辑器外壳」的文案（工具栏、左栏、设置面板、保存/报错提示），
 // 用户自己的 XML 内容、示例项目里的中文一律不动。
 // 默认 auto：跟随系统语言（navigator.languages），识别不到就用简体中文。
+import { SRC_DICTS } from "./i18n-src";
 
-export type LangPref = "auto" | "zh-Hans" | "zh-Hant" | "en" | "ja";
-export type LangCode = Exclude<LangPref, "auto">;
+export type LangPref = "auto" | "zh-Hans" | "zh-Hant" | "en" | "ja";export type LangCode = Exclude<LangPref, "auto">;
 
 export const LS_KEY_LANG = "axv.lang";
 
@@ -291,7 +291,14 @@ const DICTS: Record<LangCode, Dict> = { "zh-Hans": zhHans, "zh-Hant": zhHant, en
 
 /** 取词：命中返回译文，未命中回退到调用方传入的中文原文 */
 export function translate(lang: LangCode, key: string, fallback: string, vars?: Record<string, string | number>): string {
-  const raw = DICTS[lang]?.[key] ?? DICTS["zh-Hans"][key] ?? fallback;
+  // M95：新增「中文原文当 key」的回退——没起 key 的旧文案只要在 SRC_* 里登记
+  // 就能被翻译，不用满仓库改名，回填成本从「起名 + 4 语言」降到「只补英文」。
+  const raw =
+    DICTS[lang]?.[key] ??
+    DICTS["zh-Hans"][key] ??
+    (lang !== "zh-Hans" ? SRC_DICTS[lang]?.[key] : undefined) ??
+    SRC_DICTS[lang]?.[fallback] ??
+    fallback;
   if (!vars) return raw;
   return raw.replace(/\{(\w+)\}/g, (_m, k: string) => String(vars[k] ?? ""));
 }

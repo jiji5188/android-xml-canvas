@@ -87,8 +87,69 @@ export function hsl(h: number, s: number, l: number): string {
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
+/** M90：单个 token 的覆盖表（token 名 → 颜色值） */
+export type ThemeTokenOverrides = Record<string, string>;
+
+/** M90：整套覆盖表：预设 id → 亮/暗各自的覆盖 */
+export type ThemeOverrides = Record<
+  string,
+  { light?: ThemeTokenOverrides; dark?: ThemeTokenOverrides }
+>;
+
+/** M90：覆盖表持久化 key */
+export const LS_KEY_THEME_OVERRIDES = "axv.themeOverrides";
+
+/** 一层颜色是不是能安全写进 CSS 变量（防脏数据把界面写坏） */
+function safeColor(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  if (!s) return null;
+  return s.length <= 64 ? s : null;
+}
+
+/** M90：宽松归一覆盖表；任何非法条目直接丢掉（回落到推导值） */
+export function normalizeOverrides(raw: unknown): ThemeOverrides {
+  const out: ThemeOverrides = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [pid, modes] of Object.entries(raw as Record<string, unknown>)) {
+    if (!THEME_PRESETS.some((p) => p.id === pid)) continue;
+    if (!modes || typeof modes !== "object") continue;
+    const dst: { light?: ThemeTokenOverrides; dark?: ThemeTokenOverrides } = {};
+    for (const mode of ["light", "dark"] as const) {
+      const m = (modes as Record<string, unknown>)[mode];
+      if (!m || typeof m !== "object") continue;
+      const tokens: ThemeTokenOverrides = {};
+      for (const [k, v] of Object.entries(m as Record<string, unknown>)) {
+        const c = safeColor(v);
+        if (c) tokens[k] = c;
+      }
+      if (Object.keys(tokens).length) dst[mode] = tokens;
+    }
+    if (dst.light || dst.dark) out[pid] = dst;
+  }
+  return out;
+}
+
 /** 一套主题的全部 token（含面板展示顺序之外的内部 token） */
-export function themeTokens(presetId: string, mode: ThemeMode): Record<string, string> {
+export function themeTokens(
+  presetId: string,
+  mode: ThemeMode,
+  overrides?: ThemeTokenOverrides,
+): Record<string, string> {
+  const base = themeTokensBase(presetId, mode);
+  if (!overrides) return base;
+  const out: Record<string, string> = { ...base };
+  for (const [k, v] of Object.entries(overrides)) {
+    // 只允许覆盖真实存在的 token，避免用户数据里塞进奇怪的属性名
+    if (k in out) {
+      const c = safeColor(v);
+      if (c) out[k] = c;
+    }
+  }
+  return out;
+}
+
+function themeTokensBase(presetId: string, mode: ThemeMode): Record<string, string> {
   const p = presetById(presetId);
   const k = p.sat ?? 1;
   const h = p.hue;
@@ -163,25 +224,29 @@ export function cssVarOf(token: string): string {
 }
 
 /** 取一套主题的 CSS 变量表（测试/服务端渲染也能用，不碰 DOM） */
-export function themeCssVars(presetId: string, mode: ThemeMode): Record<string, string> {
-  const tokens = themeTokens(presetId, mode);
+export function themeCssVars(
+  presetId: string,
+  mode: ThemeMode,
+  overrides?: ThemeTokenOverrides,
+): Record<string, string> {
+  const tokens = themeTokens(presetId, mode, overrides);
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(tokens)) {
-    if (k === "hover" || k === "scrim" || k === "danger" || k === "ok") {
-      out[cssVarOf(k)] = v;
-      continue;
-    }
     out[cssVarOf(k)] = v;
   }
   return out;
 }
 
 /** 浏览器里应用主题：写到 <html> 的内联样式上（覆盖 :root 默认值） */
-export function applyThemeToDom(presetId: string, mode: ThemeMode): void {
+export function applyThemeToDom(
+  presetId: string,
+  mode: ThemeMode,
+  overrides?: ThemeTokenOverrides,
+): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.setAttribute("data-axv-theme", mode);
   root.setAttribute("data-axv-preset", presetById(presetId).id);
-  const vars = themeCssVars(presetId, mode);
+  const vars = themeCssVars(presetId, mode, overrides);
   for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value);
 }

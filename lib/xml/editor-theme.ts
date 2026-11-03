@@ -26,20 +26,53 @@ export interface EditorPalette {
 export interface EditorTheme {
   /** 高亮方案 id（见 HL_PRESETS） */
   hl: string;
-  /** 光标颜色 */
+  /** 光标颜色（浅色主题下的值；深色见 dark） */
   cursor: string;
-  /** 选区背景 */
+  /** 选区背景（浅色） */
   selBg: string;
-  /** 选区文字颜色；transparent = 保留高亮层原色 */
+  /** 选区文字颜色（浅色）；transparent = 保留高亮层原色 */
   selFg: string;
-  /** M37b：当前行背景色 */
+  /** M37b：当前行背景色（浅色） */
   curBg: string;
+  /** M90b：深色主题下单独一套（缺项用 DARK_EDITOR_COLORS） */
+  dark?: Partial<EditorColorSet>;
   /** M37b：是否显示当前行高亮 */
   showCur: boolean;
   /** 字号 px（11-16） */
   fontSize: number;
   /** M40：缩进宽度（空格数，2-8） */
   indent: number;
+}
+
+/** M90b：代码编辑器跟主题走的那 4 个颜色 */
+export interface EditorColorSet {
+  cursor: string;
+  selBg: string;
+  selFg: string;
+  curBg: string;
+}
+
+export type EditorThemeMode = "light" | "dark";
+
+/** M90b：深色主题下的默认值（浅色值放深色底上会看不见） */
+export const DARK_EDITOR_COLORS: EditorColorSet = {
+  cursor: "#E6EDF3",
+  selBg: "rgba(56, 139, 253, 0.30)",
+  selFg: "transparent",
+  curBg: "rgba(255, 255, 255, 0.07)",
+};
+
+/** M90b：取某个亮/暗主题下实际生效的 4 个颜色 */
+export function colorsFor(t: EditorTheme, mode: EditorThemeMode = "light"): EditorColorSet {
+  if (mode === "dark") {
+    return {
+      cursor: t.dark?.cursor ?? DARK_EDITOR_COLORS.cursor,
+      selBg: t.dark?.selBg ?? DARK_EDITOR_COLORS.selBg,
+      selFg: t.dark?.selFg ?? DARK_EDITOR_COLORS.selFg,
+      curBg: t.dark?.curBg ?? DARK_EDITOR_COLORS.curBg,
+    };
+  }
+  return { cursor: t.cursor, selBg: t.selBg, selFg: t.selFg, curBg: t.curBg };
 }
 
 export interface HlPreset {
@@ -159,12 +192,23 @@ export function normalizeTheme(raw: unknown): EditorTheme {
   let indent = Number(o.indent);
   if (!Number.isFinite(indent)) indent = DEFAULT_EDITOR_THEME.indent;
   indent = Math.min(INDENT_MAX, Math.max(INDENT_MIN, Math.round(indent)));
+  // M90b：深色那套只保留合法项
+  let dark: Partial<EditorColorSet> | undefined;
+  if (o.dark && typeof o.dark === "object") {
+    const d: Partial<EditorColorSet> = {};
+    for (const k of ["cursor", "selBg", "selFg", "curBg"] as const) {
+      const v = (o.dark as Record<string, unknown>)[k];
+      if (typeof v === "string" && isColor(v)) d[k] = v.trim();
+    }
+    if (Object.keys(d).length) dark = d;
+  }
   return {
     hl,
     cursor: pick(o.cursor, DEFAULT_EDITOR_THEME.cursor),
     selBg: pick(o.selBg, DEFAULT_EDITOR_THEME.selBg),
     selFg: pick(o.selFg, DEFAULT_EDITOR_THEME.selFg),
     curBg: pick(o.curBg, DEFAULT_EDITOR_THEME.curBg),
+    ...(dark ? { dark } : {}),
     showCur: typeof o.showCur === "boolean" ? o.showCur : DEFAULT_EDITOR_THEME.showCur,
     fontSize,
     indent,
@@ -181,16 +225,17 @@ export function parseTheme(json: string | null): EditorTheme {
 }
 
 /** 主题 → CSS 变量表（空串表示不覆盖，让主题色继续生效） */
-export function themeVars(t: EditorTheme): Record<string, string> {
+export function themeVars(t: EditorTheme, mode: EditorThemeMode = "light"): Record<string, string> {
   const p = paletteOf(t.hl);
+  const c = colorsFor(t, mode);
+  const d = mode === "dark" ? DARK_EDITOR_COLORS : DEFAULT_EDITOR_THEME;
   const vars: Record<string, string> = {
-    "--axv-code-cursor": t.cursor || DEFAULT_EDITOR_THEME.cursor,
-    "--axv-code-sel-bg": t.selBg || DEFAULT_EDITOR_THEME.selBg,
+    "--axv-code-cursor": c.cursor || d.cursor,
+    "--axv-code-sel-bg": c.selBg || d.selBg,
     // M41：选区文字色默认透明（= 保留高亮色）；透明时写 inherit，否则文字会看不见
-    "--axv-code-sel-fg":
-      t.selFg && t.selFg !== "transparent" ? t.selFg : "inherit",
+    "--axv-code-sel-fg": c.selFg && c.selFg !== "transparent" ? c.selFg : "inherit",
     // M37b：关掉时写 transparent，CSS 不用再判开关
-    "--axv-code-cur-bg": t.showCur ? t.curBg || DEFAULT_EDITOR_THEME.curBg : "transparent",
+    "--axv-code-cur-bg": t.showCur ? c.curBg || d.curBg : "transparent",
     "--axv-code-font-size": `${normalizeTheme(t).fontSize}px`,
     "--axv-x-tag": p.tag,
     "--axv-x-attr": p.attr,
@@ -204,10 +249,14 @@ export function themeVars(t: EditorTheme): Record<string, string> {
 }
 
 /** 应用到 DOM（documentElement），空值变量会被移除回到默认 */
-export function applyEditorTheme(t: EditorTheme, root?: HTMLElement | null): void {
+export function applyEditorTheme(
+  t: EditorTheme,
+  mode: EditorThemeMode = "light",
+  root?: HTMLElement | null,
+): void {
   const el = root || (typeof document !== "undefined" ? document.documentElement : null);
   if (!el) return;
   // 先把可能残留的覆盖清掉，再写新值（比如从深色切回浅色要撤销 bg/fg）
   for (const k of ["--axv-code-bg", "--axv-code-fg"]) el.style.removeProperty(k);
-  for (const [k, v] of Object.entries(themeVars(t))) el.style.setProperty(k, v);
+  for (const [k, v] of Object.entries(themeVars(t, mode))) el.style.setProperty(k, v);
 }

@@ -2935,13 +2935,14 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-cm .cm-curline-hl {
   position: absolute;
   left: 0;
-  right: 0;
+  /* M90：宽度由 JS 按最长行设置（width style），不再用 right:0 钉在可视区上 */
   top: 0;
   height: 0;
+  width: 100%;
   pointer-events: none;
   background: var(--axv-code-cur-bg, transparent);
   z-index: -4;
-  will-change: transform;
+  will-change: transform, width;
 }
 
 /* M49：带 alpha 的颜色选择器（ColorField） */
@@ -5532,6 +5533,10 @@ button.axv-ws-caret:hover {
   font-weight: 600;
   color: var(--axv-title);
   text-align: left;
+  /* M90：卡片里还有调色板按钮，名字必须单行不换行 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .axv-theme-check {
   font-size: 16px;
@@ -8739,3 +8744,44 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   border: 1px solid var(--axv-primary);
   outline: none;
 }
+
+/* ===== M90：配色方案卡片编辑图标 ===== */
+.axv-theme-card { position: relative; }
+.axv-theme-pick { display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0; border: none; background: transparent; padding: 0; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.axv-theme-edit { flex: 0 0 auto; width: 22px; height: 22px; margin-left: 2px; display: grid; place-items: center; border: none; border-radius: 6px; background: transparent; color: var(--axv-desc, #7a7a85); cursor: pointer; opacity: 0.55; }
+.axv-theme-edit .msr { font-size: 14px; }
+.axv-theme-edit:hover { opacity: 1; background: var(--axv-hover, rgba(0,0,0,0.05)); color: var(--axv-primary); }
+.axv-theme-edit:active { background: var(--axv-primary-soft); }
+.axv-theme-card.on .axv-theme-edit { opacity: 0.9; }
+
+/* ===== M90：配色方案编辑子页 ===== */
+.axv-thm-page { background: var(--axv-app-bg, var(--axv-surface)); }
+.axv-thm-count { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--axv-primary); background: var(--axv-primary-soft, rgba(0,0,0,0.06)); padding: 2px 8px; border-radius: 999px; vertical-align: 2px; }
+.axv-thm-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
+/* 关键：列容器里的子项不许被压缩，否则列表会被裁掉大半（overflow:hidden 把行吃掉） */
+.axv-thm-body > * { flex: 0 0 auto; }
+.axv-thm-mode { display: flex; flex-direction: column; gap: 6px; }
+.axv-thm-sect { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--axv-title, #333); display: flex; align-items: baseline; gap: 8px; }
+.axv-thm-note { font-weight: 400; font-size: 11px; color: var(--axv-desc, #7a7a85); }
+.axv-thm-list { display: flex; flex-direction: column; border: 1px solid var(--axv-outline, rgba(0,0,0,0.12)); border-radius: 12px; overflow: hidden; background: var(--axv-surface, #fff); }
+.axv-thm-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) 28px 28px; align-items: center; gap: 10px; padding: 7px 10px; border-bottom: 1px solid var(--axv-outline, rgba(0,0,0,0.12)); }
+.axv-thm-row:last-child { border-bottom: none; }
+.axv-thm-row.is-changed { background: var(--axv-primary-soft, rgba(0,0,0,0.03)); }
+.axv-thm-name { font-size: 12.5px; color: var(--axv-title, #333); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.axv-thm-val { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--axv-desc, #7a7a85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.axv-thm-reset { width: 28px; height: 28px; display: grid; place-items: center; border: none; border-radius: 8px; background: transparent; color: var(--axv-desc, #7a7a85); cursor: pointer; }
+.axv-thm-reset .msr { font-size: 16px; }
+.axv-thm-reset:hover:not(:disabled) { background: var(--axv-hover, rgba(0,0,0,0.05)); color: var(--axv-primary); }
+.axv-thm-reset:disabled { opacity: 0.22; cursor: default; }
+.axv-thm-reset.is-empty { visibility: hidden; }
+.axv-thm-switch { cursor: pointer; }
+.axv-thm-switch input { justify-self: end; width: 18px; height: 18px; accent-color: var(--axv-primary); cursor: pointer; }
+.axv-thm-foot { flex-direction: row; align-items: center; justify-content: space-between; }
+@media (max-width: 720px) {
+  .axv-thm-row { grid-template-columns: 1fr 28px 28px; gap: 8px; }
+  .axv-thm-val { display: none; }
+  .axv-thm-foot { flex-wrap: wrap; gap: 8px; }
+}
+
+/* ===== M90b：设置项里的小标签（当前编辑的是浅色还是深色） ===== */
+.axv-set-tag { margin-left: 6px; padding: 1px 6px; font-size: 10px; font-style: normal; font-weight: 600; line-height: 15px; color: var(--axv-primary); background: var(--axv-primary-soft, rgba(0,0,0,0.06)); border-radius: 999px; vertical-align: 1px; }

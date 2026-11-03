@@ -63,8 +63,12 @@ import { lineOfPath, shouldResync } from "@/lib/xml/line-sync";
 import {
   THEME_PRESETS,
   DEFAULT_PRESET_ID,
+  LS_KEY_THEME_OVERRIDES,
   applyThemeToDom,
+  normalizeOverrides,
+  themeTokens,
   type ThemeMode,
+  type ThemeOverrides,
 } from "@/lib/xml/theme-presets";
 import {
   wsInfo,
@@ -132,6 +136,7 @@ import { CanvasStage } from "./CanvasStage";
 import { APP_VERSION } from "@/lib/version";
 import { AboutPanel } from "@/components/AboutPanel";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
 import { loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
 import { XmlCodeView } from "./XmlCodeView";
@@ -159,10 +164,13 @@ import "./xml-canvas.css";
 import { readableOn, deviceById } from "@/lib/xml/theme";
 import { DEFAULT_RENDER_THEME, type RenderTheme } from "@/lib/xml/theme";
 import {
+  DARK_EDITOR_COLORS,
   DEFAULT_EDITOR_THEME,
   LS_KEY_EDITOR_THEME,
   applyEditorTheme,
+  colorsFor,
   parseTheme,
+  type EditorColorSet,
   type EditorTheme,
 } from "@/lib/xml/editor-theme";
 
@@ -701,6 +709,16 @@ export function XmlEditor() {
       return DEFAULT_PRESET_ID;
     }
   });
+  /** M90：配色方案的逐项覆盖（方案 id → { light, dark }），存在 localStorage */
+  const [themeOverrides, setThemeOverrides] = useState<ThemeOverrides>(() => {
+    try {
+      return normalizeOverrides(JSON.parse(window.localStorage.getItem(LS_KEY_THEME_OVERRIDES) || "null"));
+    } catch {
+      return {};
+    }
+  });
+  /** M90：正在子页里编辑的方案 id（null = 没开） */
+  const [editingTheme, setEditingTheme] = useState<string | null>(null);
   /** M16d：预览渲染主题（默认 AppCompat，跟 AIDE 真机一致） */
   const [renderTheme, setRenderTheme] = useState<RenderTheme>(() => {
     try {
@@ -714,15 +732,90 @@ export function XmlEditor() {
   const [showIssues, setShowIssues] = useState(true);
 
   // M16h：应用配色方案（只影响编辑器外壳，不影响导出/预览）
+  // M90：带上当前方案的覆盖值；子页打开时临时预览正在编辑的那套（关闭就回原方案）
   useEffect(() => {
-    applyThemeToDom(themePreset, theme);
+    const shown = editingTheme ?? themePreset;
+    applyThemeToDom(shown, theme, themeOverrides[shown]?.[theme]);
     try {
       window.localStorage.setItem("axv.theme", theme);
       window.localStorage.setItem("axv.themePreset", themePreset);
     } catch {
       /* ignore */
     }
-  }, [theme, themePreset]);
+  }, [theme, themePreset, editingTheme, themeOverrides]);
+
+  // M90：覆盖表持久化
+  useEffect(() => {
+    try {
+      if (Object.keys(themeOverrides).length) {
+        window.localStorage.setItem(LS_KEY_THEME_OVERRIDES, JSON.stringify(themeOverrides));
+      } else {
+        window.localStorage.removeItem(LS_KEY_THEME_OVERRIDES);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [themeOverrides]);
+
+  /** M90：改一项颜色（写到「正在编辑的方案」× 当前亮暗）
+   *  ⚠️ 必须用 editingTheme，不能用 themePreset —— 用户可以从卡片直接编辑
+   *  未选中的方案，写错对象会把颜色存到当前方案上。 */
+  const patchThemeToken = useCallback(
+    (token: string, color: string) => {
+      const pid = editingTheme ?? themePreset;
+      // 改成跟默认值一模一样 → 当作「没改过」，不写冗余覆盖
+      const same = themeTokens(pid, theme)[token] === color;
+      setThemeOverrides((prev) => {
+        const cur = prev[pid] ?? {};
+        if (same) {
+          const modeMap = { ...(cur[theme] ?? {}) };
+          delete modeMap[token];
+          const nextPreset = { ...cur };
+          if (Object.keys(modeMap).length) nextPreset[theme] = modeMap;
+          else delete nextPreset[theme];
+          const next = { ...prev };
+          if (Object.keys(nextPreset).length) next[pid] = nextPreset;
+          else delete next[pid];
+          return next;
+        }
+        const modeMap = { ...(cur[theme] ?? {}), [token]: color };
+        return { ...prev, [pid]: { ...cur, [theme]: modeMap } };
+      });
+    },
+    [editingTheme, themePreset, theme],
+  );
+
+  /** M90：恢复单项默认（删掉覆盖值） */
+  const resetThemeToken = useCallback(
+    (token: string) => {
+      const pid = editingTheme ?? themePreset;
+      setThemeOverrides((prev) => {
+        const cur = prev[pid];
+        if (!cur) return prev;
+        const modeMap = { ...(cur[theme] ?? {}) };
+        delete modeMap[token];
+        const nextPreset = { ...cur };
+        if (Object.keys(modeMap).length) nextPreset[theme] = modeMap;
+        else delete nextPreset[theme];
+        const next = { ...prev };
+        if (Object.keys(nextPreset).length) next[pid] = nextPreset;
+        else delete next[pid];
+        return next;
+      });
+    },
+    [editingTheme, themePreset, theme],
+  );
+
+  /** M90：整套方案恢复默认 */
+  const resetThemePreset = useCallback(() => {
+    const pid = editingTheme ?? themePreset;
+    setThemeOverrides((prev) => {
+      if (!prev[pid]) return prev;
+      const next = { ...prev };
+      delete next[pid];
+      return next;
+    });
+  }, [editingTheme, themePreset]);
 
   // M11：启动时恢复主题（兼容旧 key：axv.theme=dark）
   // 注意：读 localStorage 必须在 useState 初始化里做，不能放 effect——
@@ -738,14 +831,25 @@ export function XmlEditor() {
   }, [renderTheme]);
 
   // M37：代码编辑器外观（CSS 变量 + localStorage 持久化）
+  // M90b：光标/选区/当前行 4 个颜色分浅色、深色两套，按当前主题取
   useEffect(() => {
-    applyEditorTheme(editorTheme);
+    applyEditorTheme(editorTheme, theme);
     try {
       window.localStorage.setItem(LS_KEY_EDITOR_THEME, JSON.stringify(editorTheme));
     } catch {
       /* ignore */
     }
-  }, [editorTheme]);
+  }, [editorTheme, theme]);
+
+  /** M90b：改代码编辑器的 4 个颜色之一（按当前亮/暗写对应那一套） */
+  const patchEditorColor = useCallback(
+    (patch: Partial<EditorColorSet>) => {
+      setEditorTheme((t) =>
+        theme === "dark" ? { ...t, dark: { ...(t.dark ?? {}), ...patch } } : { ...t, ...patch },
+      );
+    },
+    [theme],
+  );
 
   /* ===== M16i：工作目录 ===== */
   const wsSigRef = useRef<string>("");
@@ -3375,6 +3479,8 @@ const findResolved = findResolvedNode;
               onThemePreset={setThemePreset}
               theme={theme}
               onTheme={setTheme}
+              themeOverrides={themeOverrides}
+              onEditTheme={(id) => setEditingTheme(id)}
               langPref={langPref}
               onLangPref={setLangPref}
               wsState={wsState}
@@ -3389,6 +3495,7 @@ const findResolved = findResolvedNode;
               onShowIssues={setShowIssues}
               editorTheme={editorTheme}
               onEditorTheme={patchEditorTheme}
+              onEditorColor={patchEditorColor}
               onResetEditorTheme={resetEditorTheme}
               onSaveXml={saveProject}
             />
@@ -3723,6 +3830,23 @@ const findResolved = findResolvedNode;
           height={outerH}
           onClose={() => setImgExportOpen(false)}
           onToast={assetsNote}
+        />
+      ) : null}
+
+      {/* M90：配色方案编辑子页（改界面 token + 代码编辑器 4 个颜色） */}
+      {editingTheme ? (
+        <ThemeEditor
+          presetId={editingTheme}
+          mode={theme}
+          onMode={setTheme}
+          overrides={themeOverrides[editingTheme]?.[theme] ?? {}}
+          onChangeToken={patchThemeToken}
+          onResetToken={resetThemeToken}
+          onResetPreset={resetThemePreset}
+          editorTheme={editorTheme}
+          onEditorTheme={patchEditorTheme}
+          onEditorColor={patchEditorColor}
+          onClose={() => setEditingTheme(null)}
         />
       ) : null}
 

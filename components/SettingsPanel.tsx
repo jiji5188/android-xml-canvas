@@ -4,17 +4,25 @@
 // 好处：设置项以后加一堆开关也不会再把主文件撑行数。
 
 import { useState } from "react";
-import { THEME_PRESETS, themeTokens, type ThemeMode } from "@/lib/xml/theme-presets";
+import {
+  THEME_PRESETS,
+  themeTokens,
+  type ThemeMode,
+  type ThemeOverrides,
+} from "@/lib/xml/theme-presets";
 import { RENDER_THEMES, type RenderTheme } from "@/lib/xml/theme";
 import { LANG_OPTIONS, type LangPref } from "@/lib/i18n";
 import type { WsInfo } from "@/lib/xml/workspace";
 import {
+  DARK_EDITOR_COLORS,
   DEFAULT_EDITOR_THEME,
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
   HL_PRESETS,
   INDENT_MAX,
   INDENT_MIN,
+  colorsFor,
+  type EditorColorSet,
   type EditorTheme,
 } from "@/lib/xml/editor-theme";
 import { ColorField } from "./ColorField";
@@ -27,6 +35,10 @@ export interface SettingsPanelProps {
   onThemePreset: (id: string) => void;
   theme: ThemeMode;
   onTheme: (m: ThemeMode) => void;
+  /** M90：各方案的 token 覆盖（卡片预览要用真实值） */
+  themeOverrides: ThemeOverrides;
+  /** M90：打开「编辑配色方案」子页 */
+  onEditTheme: (id: string) => void;
 
   // 语言
   langPref: LangPref;
@@ -51,6 +63,8 @@ export interface SettingsPanelProps {
   // M37：代码编辑器外观
   editorTheme: EditorTheme;
   onEditorTheme: (patch: Partial<EditorTheme>) => void;
+  /** M90b：改当前亮/暗主题下的那 4 个代码颜色 */
+  onEditorColor: (patch: Partial<EditorColorSet>) => void;
   onResetEditorTheme: () => void;
 
   // 数据
@@ -58,6 +72,9 @@ export interface SettingsPanelProps {
 }
 
 export function SettingsPanel(p: SettingsPanelProps) {
+  // M90b：代码编辑器的光标/选区/当前行颜色分浅色、深色两套
+  const ec = colorsFor(p.editorTheme, p.theme);
+  const ecDefault = p.theme === "dark" ? DARK_EDITOR_COLORS : DEFAULT_EDITOR_THEME;
   const { tr } = p;
   // M50：每个分组可折叠，默认全部折叠（设置项现在太多了，一屏扫不完）
   const [openGroups, setOpenGroups] = useState<Set<number>>(() => new Set());
@@ -87,31 +104,41 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </button>
         <div className="axv-theme-grid">
           {THEME_PRESETS.map((preset) => {
-            const t = themeTokens(preset.id, p.theme);
+            const t = themeTokens(preset.id, p.theme, p.themeOverrides[preset.id]?.[p.theme]);
             const on = preset.id === p.themePreset;
             return (
-              <button
-                key={preset.id}
-                className={"axv-theme-card" + (on ? " on" : "")}
-                onClick={() => p.onThemePreset(preset.id)}
-                title={preset.note}
-              >
-                <span
-                  className="axv-theme-swatch"
-                  style={{
-                    background: `linear-gradient(135deg, ${t.primary}, ${t.toolbarBg})`,
-                    borderColor: t.primary,
-                  }}
+              <div className={"axv-theme-card" + (on ? " on" : "")} key={preset.id}>
+                <button
+                  type="button"
+                  className="axv-theme-pick"
+                  onClick={() => p.onThemePreset(preset.id)}
+                  title={preset.note}
+                  aria-pressed={on}
                 >
-                  <span style={{ background: t.panelBg }} />
-                </span>
-                <span className="axv-theme-name">{preset.name}</span>
-                {on ? (
-                  <span className="msr axv-theme-check" aria-hidden="true">
-                    check
+                  <span
+                    className="axv-theme-swatch"
+                    style={{
+                      background: `linear-gradient(135deg, ${t.primary}, ${t.toolbarBg})`,
+                      borderColor: t.primary,
+                    }}
+                  >
+                    <span style={{ background: t.panelBg }} />
                   </span>
-                ) : null}
-              </button>
+                  <span className="axv-theme-name">{preset.name}</span>
+                </button>
+                {/* M90：进子页改这一套的颜色（选中态不受影响，不会误切方案） */}
+                <button
+                  type="button"
+                  className="axv-theme-edit"
+                  onClick={() => p.onEditTheme(preset.id)}
+                  title={`修改「${preset.name}」的颜色`}
+                  aria-label={`修改「${preset.name}」的颜色`}
+                >
+                  <span className="msr" aria-hidden="true">
+                    palette
+                  </span>
+                </button>
+              </div>
             );
           })}
         </div>
@@ -133,6 +160,7 @@ export function SettingsPanel(p: SettingsPanelProps) {
           {THEME_PRESETS.find((x) => x.id === p.themePreset)?.note}
           。配色只作用于编辑器界面，不影响导出的布局。
         </div>
+        <div className="axv-set-hint">点卡片右侧的调色板图标，可以逐项改这套方案的颜色（浅色/深色分开存）。</div>
       </div>
 
       {/* ===== M23：界面语言 ===== */}
@@ -310,12 +338,15 @@ export function SettingsPanel(p: SettingsPanelProps) {
         </select>
 
         <div className="axv-set-row">
-          <span>光标颜色</span>
+          <span>
+            光标颜色
+            <i className="axv-set-tag">{p.theme === "dark" ? "深色" : "浅色"}</i>
+          </span>
           <ColorField
             label="光标颜色"
-            value={p.editorTheme.cursor}
-            fallback={DEFAULT_EDITOR_THEME.cursor}
-            onChange={(v) => p.onEditorTheme({ cursor: v })}
+            value={ec.cursor}
+            fallback={ecDefault.cursor}
+            onChange={(v) => p.onEditorColor({ cursor: v })}
           />
         </div>
 
@@ -323,9 +354,9 @@ export function SettingsPanel(p: SettingsPanelProps) {
           <span>选中背景色</span>
           <ColorField
             label="选中背景色"
-            value={p.editorTheme.selBg}
-            fallback={DEFAULT_EDITOR_THEME.selBg}
-            onChange={(v) => p.onEditorTheme({ selBg: v })}
+            value={ec.selBg}
+            fallback={ecDefault.selBg}
+            onChange={(v) => p.onEditorColor({ selBg: v })}
           />
         </div>
 
@@ -333,10 +364,10 @@ export function SettingsPanel(p: SettingsPanelProps) {
           <span>选中文字颜色</span>
           <ColorField
             label="选中文字颜色"
-            value={p.editorTheme.selFg}
-            fallback={DEFAULT_EDITOR_THEME.selFg}
+            value={ec.selFg}
+            fallback={ecDefault.selFg}
             allowTransparent
-            onChange={(v) => p.onEditorTheme({ selFg: v })}
+            onChange={(v) => p.onEditorColor({ selFg: v })}
           />
         </div>
 
@@ -385,10 +416,10 @@ export function SettingsPanel(p: SettingsPanelProps) {
           <span>当前行背景色</span>
           <ColorField
             label="当前行背景色"
-            value={p.editorTheme.curBg}
-            fallback={DEFAULT_EDITOR_THEME.curBg}
+            value={ec.curBg}
+            fallback={ecDefault.curBg}
             disabled={!p.editorTheme.showCur}
-            onChange={(v) => p.onEditorTheme({ curBg: v })}
+            onChange={(v) => p.onEditorColor({ curBg: v })}
           />
         </div>
 

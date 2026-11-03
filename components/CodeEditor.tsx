@@ -259,11 +259,18 @@ const cmCurLineBg = ViewPlugin.fromClass(
           // 行块坐标是相对内容盒的，但 .cm-content 自己有 padding-top（本项目 12px），
           // 我们的层挂在 scroller 上 → 必须补上这段，否则整块背景会往上偏一行。
           const padTop = parseFloat(getComputedStyle(v.contentDOM).paddingTop) || 0;
-          return { top: b.top + padTop, height: b.height };
+          // M90：宽度按「最长行」填（contentDOM 实际宽度 = 最长行），
+          // 而不是按可视区宽度（scroller clientWidth）——长行滚动时高亮不能中途断掉。
+          // 同时至少铺满可视区（max），否则短文件时右边会缺一截。
+          const contentEl = v.contentDOM;
+          const contentW = contentEl.offsetLeft + contentEl.offsetWidth;
+          const viewW = v.scrollDOM.clientWidth;
+          return { top: b.top + padTop, height: b.height, width: Math.max(viewW, contentW) };
         },
         write: (m) => {
           this.dom.style.transform = `translateY(${m.top}px)`;
           this.dom.style.height = `${m.height}px`;
+          this.dom.style.width = `${m.width}px`;
         },
       });
     }

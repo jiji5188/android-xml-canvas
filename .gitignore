@@ -79,3 +79,5 @@ dev.log
 dev*.log
 tmp-*.cjs
 tmp-*.mjs
+
+*.log

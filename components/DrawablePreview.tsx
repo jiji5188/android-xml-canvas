@@ -34,8 +34,8 @@ export interface DrawablePreviewProps {
   interactive?: boolean;
   /** 显示底部的状态提示/开关 */
   showStateBar?: boolean;
-  /** 棋盘格 / 白 / 深 */
-  backdrop?: "checker" | "white" | "dark";
+  /** 棋盘格 / 白 / 深 / 不上色（外面自己铺背景时用） */
+  backdrop?: "checker" | "white" | "dark" | "none";
   className?: string;
   /** 状态变化回调（外部想同步显示时用） */
   onStateChange?: (s: ViewState) => void;
@@ -311,7 +311,8 @@ function topShapeRadius(layers: RenderLayer[]): string {
   return "0px";
 }
 
-function backdropStyle(kind: "checker" | "white" | "dark"): string {
+function backdropStyle(kind: "checker" | "white" | "dark" | "none"): string {
+  if (kind === "none") return "transparent";
   if (kind === "white") return "#FFFFFF";
   if (kind === "dark") return "#3A3A3A";
   return "repeating-conic-gradient(#d9d9d9 0% 25%, #f4f4f4 0% 50%) 50% / 16px 16px";

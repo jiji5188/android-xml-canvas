@@ -8820,6 +8820,8 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   position: relative;
   overflow: hidden;
   border-radius: 2px;
+  /* M132：不再自己铺底色（透明=露出外层背景） */
+  background: none;
   touch-action: manipulation;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -9039,16 +9041,19 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   white-space: nowrap;
 }
 
+/* M132：预览背景层 = 外层 .axv-dw-preview（棋盘格 / 纯色由内联 style 给），
+   内层 .axv-dp-box 只负责画 drawable 内容，自己不铺底色。 */
 .axv-dw-preview {
   border-radius: 12px;
   padding: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  /* M131：背景只留一层 —— 由内部 .axv-dp-box 的 backdrop 决定（透明=棋盘格，其余=纯色） */
-  background: transparent;
+  overflow: hidden;
 }
 .axv-dw-canvas { border-radius: 8px; overflow: hidden; }
+/* M132：预览里四周留 20px，让外层背景（棋盘格）露一圈当边框；flex:none 防止被压扁 */
+.axv-dw-preview .axv-dp-box { margin: 20px; flex: 0 0 auto; }
 .axv-dw-meta { display: flex; gap: 10px; font-size: 11px; color: var(--axv-muted); margin-top: 8px; }
 .axv-dw-problems { display: flex; flex-direction: column; gap: 6px; }
 .axv-dw-problem {

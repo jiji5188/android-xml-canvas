@@ -141,15 +141,18 @@ export function DrawableEditor({
     onSave(safe, xml);
   };
 
+  /** M132：棋盘格回到外层 .axv-dw-preview 上，内层 .axv-dp-box 只负责画内容 */
   const previewBgStyle: React.CSSProperties =
     previewBg === "checker"
       ? {
-          backgroundImage: "repeating-conic-gradient(#0000000a 0% 25%, transparent 0% 50%) 50% / 12px 12px",
-          backgroundColor: "#f5f5f7",
+          backgroundImage:
+            "repeating-conic-gradient(rgb(217, 217, 217) 0%, rgb(217, 217, 217) 25%, rgb(244, 244, 244) 0%, rgb(244, 244, 244) 50%)",
+          backgroundPosition: "50% center",
+          backgroundSize: "16px 16px",
         }
       : previewBg === "white"
-        ? { backgroundColor: "#ffffff" }
-        : { backgroundColor: "#1a1a22" };
+        ? { background: "#ffffff" }
+        : { background: "#1a1a22" };
 
   return (
     <div className="axv-icon-page axv-cv-page" role="dialog" aria-label={tt("drawable 编辑器")}>
@@ -239,7 +242,7 @@ export function DrawableEditor({
             </div>
           ) : null}
 
-          <div className="axv-dw-preview">
+          <div className="axv-dw-preview" style={previewBgStyle}>
             <div className="axv-dw-canvas">
               <DrawablePreview
                 doc={focus}
@@ -247,7 +250,7 @@ export function DrawableEditor({
                 width={220}
                 height={140}
                 showStateBar
-                backdrop={previewBg}
+                backdrop="none"
               />
             </div>
             {focused ? (

@@ -36,6 +36,8 @@ export interface DrawablePreviewProps {
   showStateBar?: boolean;
   /** 棋盘格 / 白 / 深 / 不上色（外面自己铺背景时用） */
   backdrop?: "checker" | "white" | "dark" | "none";
+  /** M133：显示「整个 drawable 的边界」参照框（选区之外的位置，看图层往哪偏移） */
+  showBounds?: boolean;
   className?: string;
   /** 状态变化回调（外部想同步显示时用） */
   onStateChange?: (s: ViewState) => void;
@@ -49,6 +51,7 @@ export function DrawablePreview({
   resolveRef,
   interactive = true,
   showStateBar = true,
+  showBounds = false,
   backdrop = "checker",
   className,
   onStateChange,
@@ -170,6 +173,14 @@ export function DrawablePreview({
             <span className="msr" aria-hidden="true">lock</span>
           </div>
         ) : null}
+
+        {showBounds ? (
+          <div
+            className="axv-dp-bounds"
+            title={tt("drawable 边界")}
+            style={{ width, height, marginLeft: "-2px", marginTop: "-2px" }}
+          />
+        ) : null}
       </div>
 
       {showStateBar ? (
@@ -224,6 +235,25 @@ export function transformToCssStyle(layer: RenderLayer): React.CSSProperties | u
   return { transform: tf, transformOrigin: origin };
 }
 
+/**
+ * M133：Android Gravity → 对齐因子（0 = 左/上，0.5 = 居中，1 = 右/下）。
+ * 没写或写 fill 时按左上锚定；写 center 才居中。
+ */
+export function parseGravity(gravity?: string): { hz: number; vt: number } {
+  const toks = (gravity ?? "fill")
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const has = (n: string) => toks.includes(n);
+  let hz = 0;
+  let vt = 0;
+  if (has("center") || has("center_horizontal")) hz = 0.5;
+  else if (has("right") || has("end")) hz = 1;
+  if (has("center") || has("center_vertical")) vt = 0.5;
+  else if (has("bottom")) vt = 1;
+  return { hz, vt };
+}
+
 /** 单层渲染：shape 走 specToCss，color 直接铺色 */
 function LayerView({
   layer,
@@ -249,9 +279,20 @@ function LayerView({
     opacity: layer.alpha,
     pointerEvents: "none",
   };
-  if (layer.size?.w !== undefined || layer.size?.h !== undefined) {
-    if (layer.size.w !== undefined) style.width = px(layer.size.w);
-    if (layer.size.h !== undefined) style.height = px(layer.size.h);
+  // M133：item 的 width/height + gravity（对齐方式按 Android 的 Gravity 解析）
+  const sized = layer.size?.w !== undefined || layer.size?.h !== undefined;
+  if (sized) {
+    const cw = boxW - (inset.l + inset.r) * scale;
+    const ch = boxH - (inset.t + inset.b) * scale;
+    const w = layer.size?.w !== undefined ? layer.size.w * scale : cw;
+    const h = layer.size?.h !== undefined ? layer.size.h * scale : ch;
+    const { hz, vt } = parseGravity(layer.gravity);
+    style.width = `${w}px`;
+    style.height = `${h}px`;
+    style.left = `${inset.l * scale + (cw - w) * hz}px`;
+    style.top = `${inset.t * scale + (ch - h) * vt}px`;
+    delete style.right;
+    delete style.bottom;
   }
 
   if (layer.kind === "shape" && layer.spec) {

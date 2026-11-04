@@ -192,4 +192,28 @@ describe("M118 drawable 图层树", () => {
     if (doc.t !== "color") return;
     expect(doc.color).toBe("#FF00FF00");
   });
+
+  it("M133：item 的 width/height/gravity 传给渲染层，shape 里的 <size> 也认", () => {
+    const xml = `<layer-list ${NS}>
+      <item android:width="120dp" android:height="80dp" android:gravity="center">
+        <shape android:shape="rectangle"><solid android:color="#FF112233"/></shape>
+      </item>
+      <item>
+        <shape android:shape="rectangle"><size android:width="40dp" android:height="40dp"/></shape>
+      </item>
+    </layer-list>`;
+    const doc = parseDrawable(xml)!;
+    if (doc.t !== "layer") return;
+    // 解析出来的 item 尺寸
+    expect(doc.items[0].size).toEqual({ w: 120, h: 80 });
+    expect(doc.items[0].gravity).toBe("center");
+
+    const layers = flattenDrawable(doc);
+    // 第一层：item 显式 width/height 生效
+    expect(layers[0].size).toEqual({ w: 120, h: 80 });
+    expect(layers[0].gravity).toBe("center");
+    // 第二层：item 没写 width/height，退到 shape 的 <size>
+    expect(layers[1].size).toEqual({ w: 40, h: 40 });
+    expect(layers[1].gravity).toBeUndefined();
+  });
 });

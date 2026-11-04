@@ -6,6 +6,7 @@ import {
   breadcrumb,
   childAt,
   childCount,
+  insertChild,
   moveChild,
   nodeAt,
   removeChild,
@@ -159,5 +160,53 @@ describe("M121 drawable-edit：插槽属性", () => {
     const r: DrawableNode = { t: "ripple", content: shape("#FF000000"), mask: shape("#FFFFFFFF") };
     expect(slotOf(r, [0]).mask).toBe(false);
     expect(slotOf(r, [1]).mask).toBe(true);
+  });
+});
+
+describe("M133 insertChild：在指定位置插入同级节点", () => {
+  it("layer：插到中间，其余顺序不变", () => {
+    const t = layerTree();
+    const res = insertChild(t, [], 1, shape("#FF000003"));
+    expect(res).not.toBeNull();
+    if (!res) return;
+    expect(childCount(res.root)).toBe(3);
+    expect((childAt(res.root, 0) as { spec: { solid: string } }).spec.solid).toBe("#FF000001");
+    expect((childAt(res.root, 1) as { spec: { solid: string } }).spec.solid).toBe("#FF000003");
+    expect((childAt(res.root, 2) as { spec: { solid: string } }).spec.solid).toBe("#FF000002");
+    // 返回的新路径指向刚插的那一层
+    expect(res.path).toEqual([1]);
+  });
+
+  it("layer：插到最前（0）和最后（length）都行", () => {
+    const t = layerTree();
+    const first = insertChild(t, [], 0, shape("#FF00000A"))!;
+    expect((childAt(first.root, 0) as { spec: { solid: string } }).spec.solid).toBe("#FF00000A");
+    const last = insertChild(t, [], 2, shape("#FF00000B"))!;
+    expect((childAt(last.root, 2) as { spec: { solid: string } }).spec.solid).toBe("#FF00000B");
+  });
+
+  it("selector：插入的是兜底状态（states 为空）", () => {
+    const sel: DrawableNode = {
+      t: "selector",
+      items: [{ key: "a", states: { state_pressed: "true" }, node: shape("#FF000000") }],
+    };
+    const res = insertChild(sel, [], 0, shape("#FF999999"))!;
+    expect(slotOf(res.root, [0]).states).toEqual({});
+    expect(slotOf(res.root, [1]).states).toEqual({ state_pressed: "true" });
+  });
+
+  it("ripple：只有空着的槽位可插，插满返回 null", () => {
+    const r: DrawableNode = { t: "ripple", content: shape("#FF000000") };
+    const asMask = insertChild(r, [], 1, shape("#FFFFFFFF"));
+    expect(asMask).not.toBeNull();
+    expect(slotOf(asMask!.root, [1]).mask).toBe(true);
+    // 两个槽位都占了 → 再插失败
+    expect(insertChild(asMask!.root, [], 0, shape("#FF111111"))).toBeNull();
+  });
+
+  it("叶子节点和非容器不能插", () => {
+    expect(insertChild(shape("#FF000000"), [], 0, shape("#FF111111"))).toBeNull();
+    // 越界索引也拒绝
+    expect(insertChild(layerTree(), [], 99, shape("#FF222222"))).toBeNull();
   });
 });

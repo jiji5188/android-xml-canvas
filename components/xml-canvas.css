@@ -9305,6 +9305,38 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   flex-wrap: wrap;
   gap: 5px;
 }
+/* M133：drawable 边界参照框（选区之外的位置，看图层往哪偏移） */
+.axv-dp-bounds {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: -2px;
+  border: 1px dashed var(--axv-primary);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 5;
+}
+/* M133：同级插入（上方 / 下方）方向切换 */
+.axv-dt-add-dir {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.axv-dt-dir-btn {
+  flex: 1 1 0;
+  padding: 4px 8px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 12px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface-variant);
+  font-size: 11px;
+  cursor: pointer;
+}
+.axv-dt-dir-btn.is-on {
+  border-color: var(--axv-primary);
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+}
 .axv-dt-add-item {
   display: inline-flex;
   align-items: center;

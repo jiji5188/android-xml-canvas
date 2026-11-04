@@ -127,6 +127,48 @@ export function addChild(root: DrawableNode, path: Path, child: DrawableNode): {
   }
 }
 
+/**
+ * M133：在容器的第 index 个位置插入一个子节点（0 = 最前面/最底层）。
+ * layer/selector 支持任意位置；ripple 只有 content(0)/mask(1) 两个槽位。
+ */
+export function insertChild(
+  root: DrawableNode,
+  path: Path,
+  index: number,
+  child: DrawableNode,
+): { root: DrawableNode; path: Path } | null {
+  const target = nodeAt(root, path);
+  if (!target) return null;
+
+  switch (target.t) {
+    case "layer": {
+      if (index < 0 || index > target.items.length) return null;
+      const item: LayerItem = { key: nextKey(path, index), node: child };
+      const items = target.items.slice();
+      items.splice(index, 0, item);
+      return { root: replaceAt(root, path, { ...target, items }), path: [...path, index] };
+    }
+    case "selector": {
+      if (index < 0 || index > target.items.length) return null;
+      const item: StateItem = { key: nextKey(path, index), states: {}, node: child };
+      const items = target.items.slice();
+      items.splice(index, 0, item);
+      return { root: replaceAt(root, path, { ...target, items }), path: [...path, index] };
+    }
+    case "ripple": {
+      if (index === 0 && !target.content) {
+        return { root: replaceAt(root, path, { ...target, content: child }), path: [...path, 0] };
+      }
+      if (index === 1 && !target.mask) {
+        return { root: replaceAt(root, path, { ...target, mask: child }), path: [...path, 1] };
+      }
+      return null;
+    }
+    default:
+      return null;
+  }
+}
+
 /** 删掉第 i 个子节点；删空后容器保持空（由校验去报错） */
 export function removeChild(root: DrawableNode, path: Path, i: number): DrawableNode {
   const target = nodeAt(root, path);

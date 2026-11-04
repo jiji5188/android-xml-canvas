@@ -11,7 +11,7 @@
 //   结构（面包屑 + 子节点列表 + 添加菜单）
 //   参数（schema 驱动的属性行 + 形状的常用参数）
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { useOverlayBack } from "@/lib/overlay-back";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
@@ -49,6 +49,20 @@ function defaultTree(): DrawableNode {
   };
 }
 
+/** 手机/窄屏（≤840px）：结构树放进底部抽屉；宽屏只在右侧面板里画一份，避免同屏两棵一样的树 */
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(max-width: 840px)");
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  return narrow;
+}
+
 const TABS: [string, string][] = [
   ["tree", "结构"],
   ["attrs", "参数"],
@@ -83,6 +97,8 @@ export function DrawableEditor({
   const [formOpen, setFormOpen] = useState(true);
   const [name, setName] = useState<string>(() => resNameFromValue(value) || "bg");
   const [presetOpen, setPresetOpen] = useState(false);
+  /** 窄屏：底部抽屉里再画一棵结构树；宽屏只在右侧面板画一份 */
+  const narrow = useNarrow();
 
   const close = useOverlayBack(true, onClose);
 
@@ -250,6 +266,7 @@ export function DrawableEditor({
                 width={220}
                 height={140}
                 showStateBar
+                showBounds
                 backdrop="none"
               />
             </div>
@@ -359,8 +376,15 @@ export function DrawableEditor({
                       </div>
                       <div className="axv-dt-ro-note">{tt(info.note)}</div>
                     </div>
-                  ) : (
+                  ) : narrow ? (
                     <DrawableTree root={root} path={path} onSelect={setPath} onChange={mutate} />
+                  ) : (
+                    <div className="axv-dt-ro">
+                      <div className="axv-dt-ro-title">{tt("结构树在右侧面板里")}</div>
+                      <div className="axv-dt-ro-note">
+                        {tt("宽屏时结构树固定显示在右边，这里不重复画一份；手机上会出现在这个抽屉里。")}
+                      </div>
+                    </div>
                   )}
                 </>
               ) : tab === "attrs" ? (

@@ -425,6 +425,10 @@ interface WalkCtx {
   keyPrefix: string;
   /** M127：从祖先/自身累积的非内缩变换 */
   transform?: Transform[];
+  /** 当前 item 显式指定的宽高（<item android:width/height>），优先于 shape 的 <size> */
+  layerSize?: { w?: number; h?: number };
+  /** 当前 item 的重力（默认 fill） */
+  layerGravity?: string;
 }
 
 function walk(node: DrawableNode, ctxIn: WalkCtx): void {
@@ -453,7 +457,8 @@ function walk(node: DrawableNode, ctxIn: WalkCtx): void {
 
   switch (node.t) {
     case "shape": {
-      ctx.out.push({
+      const size = ctx.layerSize ?? node.spec.size;
+      const out: RenderLayer = {
         key: ctx.keyPrefix,
         path: label("shape"),
         kind: "shape",
@@ -461,7 +466,10 @@ function walk(node: DrawableNode, ctxIn: WalkCtx): void {
         inset: { ...ctx.inset },
         alpha: ctx.alpha,
         ...(ctx.transform?.length ? { transform: [...ctx.transform] } : {}),
-      });
+      };
+      if (size?.w !== undefined || size?.h !== undefined) out.size = size;
+      if (ctx.layerGravity) out.gravity = ctx.layerGravity;
+      ctx.out.push(out);
       return;
     }
     case "color": {
@@ -486,6 +494,8 @@ function walk(node: DrawableNode, ctxIn: WalkCtx): void {
           inset: addInset(ctx.inset, off),
           alpha: ctx.alpha * (item.alpha ?? 1),
           keyPrefix: `${ctx.keyPrefix}.${i}`,
+          layerSize: item.size ?? ctx.layerSize,
+          layerGravity: item.gravity ?? ctx.layerGravity,
         });
       });
       return;

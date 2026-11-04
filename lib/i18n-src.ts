@@ -1124,6 +1124,18 @@ export const SRC_EN: SrcDict = {
   "这个节点不能再加内容": "This node can't hold more content",
   "叶子节点，不能再往里加内容": "Leaf node — nothing can be added inside",
   "上移": "Move up",
+  // ---- M133 结构树同级插入 ----
+  "插入同级": "Insert sibling",
+  "在这一行上方/下方插入": "Insert above / below this row",
+  "插到「{name}」上方": "Insert above \"{name}\"",
+  "插到「{name}」下方": "Insert below \"{name}\"",
+  "上方": "Above",
+  "下方": "Below",
+  "drawable 边界": "drawable bounds",
+  "结构树在右侧面板里": "The structure tree lives in the right panel",
+  "宽屏时结构树固定显示在右边，这里不重复画一份；手机上会出现在这个抽屉里。":
+    "On wide screens the tree stays pinned on the right, so it isn't duplicated here; on phones it appears in this drawer.",
+  "选区之外": "outside the selection",
   "下移": "Move down",
   "结构树（图层 / 状态 / 水波纹）": "Structure tree (layers / states / ripples)",
   "结构树": "Structure tree",

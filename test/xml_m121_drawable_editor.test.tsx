@@ -125,10 +125,10 @@ describe("M121 DrawableEditor：树 + 参数 + 保存", () => {
       />,
     );
 
-    // 选中第 1 个状态项（第 0 行是根） → 参数页
+    // 选中第 1 个状态项（第 0 行是根）；M131 起颜色编辑在「形状」页（参数页只剩 schema 属性）
     pickRow(h, 1);
     await flush();
-    byText(h, "参数")!.click();
+    byText(h, "形状")!.click();
     await flush();
 
     const hex = h.querySelector<HTMLInputElement>(".axv-attr-color .axv-attr-input");

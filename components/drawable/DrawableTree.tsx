@@ -14,7 +14,16 @@ import { t as tt } from "@/lib/i18n-src";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 import { childChoices } from "@/lib/xml/drawable-schema";
 import { nodeSummary } from "@/lib/xml/drawable-attrs";
-import { addChild, childAt, childCount, moveChild, removeChild, slotLabelOf, type Path } from "@/lib/xml/drawable-edit";
+import {
+  addChild,
+  childAt,
+  childCount,
+  insertChild,
+  moveChild,
+  removeChild,
+  slotLabelOf,
+  type Path,
+} from "@/lib/xml/drawable-edit";
 
 const ICON: Record<string, string> = {
   shape: "square",
@@ -100,6 +109,10 @@ export function DrawableTree({
   const [opened, setOpened] = useState<Set<string>>(() => new Set([""]));
   /** 哪一行弹着「加组件」菜单 */
   const [addAt, setAddAt] = useState<string | null>(null);
+  /** M133：哪一行弹着「插入同级」菜单（key = 父路径:序号） */
+  const [insertAt, setInsertAt] = useState<string | null>(null);
+  /** 插入方向：上方 / 下方 */
+  const [insertAbove, setInsertAbove] = useState(false);
 
   const toggle = (key: string) => {
     setOpened((s) => {
@@ -146,12 +159,72 @@ export function DrawableTree({
     </div>
   );
 
+  /** M133：同级插入菜单（选 A：先选中某行，再往上/下插） */
+  const insertMenu = (
+    parent: DrawableNode,
+    parentPath: Path,
+    index: number,
+    depth: number,
+  ) => {
+    const at = insertAbove ? index : index + 1;
+    const slot = slotLabelOf(parent, index);
+    return (
+      <div className="axv-dt-add" style={{ marginLeft: 24 + depth * 8 }}>
+        <div className="axv-dt-add-title">
+          {insertAbove
+            ? tt("插到「{name}」上方", { name: tt(slot) })
+            : tt("插到「{name}」下方", { name: tt(slot) })}
+        </div>
+        <div className="axv-dt-add-dir">
+          <button
+            type="button"
+            className={"axv-dt-dir-btn" + (insertAbove ? " is-on" : "")}
+            onClick={() => setInsertAbove(true)}
+          >
+            {tt("上方")}
+          </button>
+          <button
+            type="button"
+            className={"axv-dt-dir-btn" + (insertAbove ? "" : " is-on")}
+            onClick={() => setInsertAbove(false)}
+          >
+            {tt("下方")}
+          </button>
+        </div>
+        <div className="axv-dt-add-list">
+          {childChoices(parent).map((c) => (
+            <button
+              key={c.kind}
+              type="button"
+              className="axv-dt-add-item"
+              aria-label={tt(c.label)}
+              title={tt(c.label)}
+              onClick={() => {
+                const res = insertChild(root, parentPath, at, c.make());
+                if (!res) return;
+                onChange(res.root);
+                onSelect(res.path);
+                setInsertAt(null);
+              }}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 15 }}>
+                {ICON[c.kind] ?? "add"}
+              </span>
+              <span>{tt(c.label)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const renderNode = (
     node: DrawableNode,
     here: Path,
     depth: number,
     slotLabel?: string,
     sibOps?: React.ReactNode,
+    afterRow?: React.ReactNode,
   ): React.ReactNode => {
     const kids = childCount(node);
     const key = here.join("/");
@@ -168,6 +241,7 @@ export function DrawableTree({
           onClick={() => {
             onSelect(here);
             closeAdd();
+            setInsertAt(null);
           }}
           data-path={key}
         >
@@ -236,14 +310,31 @@ export function DrawableTree({
         </div>
 
         {addAt === key ? addMenu(node, here, depth) : null}
+        {afterRow}
 
         {open
           ? Array.from({ length: kids }).map((_, i) => {
               const child = childAt(node, i);
               if (!child) return null;
               const canReorder = node.t === "layer" || node.t === "selector";
+              const insKey = `${here.join("/")}#${i}`;
               const sib = canReorder ? (
                 <>
+                  <button
+                    className={"axv-dt-op" + (insertAt === insKey ? " is-on" : "")}
+                    title={tt("在这一行上方/下方插入")}
+                    aria-label={tt("插入同级")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelect([...here, i]);
+                      setAddAt(null);
+                      setInsertAt((v) => (v === insKey ? null : insKey));
+                    }}
+                  >
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 15 }}>
+                      playlist_add
+                    </span>
+                  </button>
                   <button
                     className="axv-dt-op"
                     disabled={i === 0}
@@ -272,7 +363,14 @@ export function DrawableTree({
                   </button>
                 </>
               ) : null;
-              return renderNode(child, [...here, i], depth + 1, slotLabelOf(node, i), sib);
+              return renderNode(
+                child,
+                [...here, i],
+                depth + 1,
+                slotLabelOf(node, i),
+                sib,
+                insertAt === insKey ? insertMenu(node, here, i, depth + 1) : null,
+              );
             })
           : null}
       </div>

@@ -255,7 +255,7 @@ export function DrawableEditor({
           </div>
         </div>
 
-        <div className="axv-icon-ed-form axv-cv-form">
+        <div className="axv-icon-ed-form axv-cv-form axv-cv-form-drawable">
           <div className="axv-set-group">
             <div className="axv-set-label">{tt("资源名")}</div>
             <div className="axv-shape-name-row">
@@ -270,6 +270,15 @@ export function DrawableEditor({
             </div>
             {nameConflicts ? <div className="axv-shape-warn">{tt("这个名字已被占用，换一个或改已有资源")}</div> : null}
           </div>
+
+          {readonly ? null : (
+            <div className="axv-set-group axv-dt-group">
+              <div className="axv-set-label">{tt("结构")}</div>
+              <div className="axv-dt-inline">
+                <DrawableTree root={root} path={path} onSelect={setPath} onChange={mutate} />
+              </div>
+            </div>
+          )}
 
           {showRaw ? <pre className="axv-icon-ed-raw axv-dw-raw">{xml}</pre> : null}
 

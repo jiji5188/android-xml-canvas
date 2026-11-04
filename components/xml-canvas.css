@@ -9061,6 +9061,41 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 }
 .axv-transform-remove { align-self: flex-start; padding: 6px 12px; font-size: 12px; }
 
+
+/* M128 结构树内联到资源表单（axv-set-group 剩余空间）
+   右栏整体变 flex 列：资源名/检查/XML 保持自然高度，结构组吃掉剩余空间，
+   树形框自己内部滚动，不再和底部抽屉抢位置。 */
+.axv-cv-form-drawable {
+  display: flex;
+  flex-direction: column;
+  /* 结构组 flex:1 吃掉剩余空间；XML 原样块打开时总高超过视口，整栏滚动（树盒子自身不跟着被截断） */
+  overflow-y: auto;
+}
+.axv-dt-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 140px;
+  border-bottom: 0;
+}
+.axv-dt-inline {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid var(--axv-outline, #ddd);
+  border-radius: 8px;
+  padding: 6px 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.axv-dt-inline .axv-tree-crumbs {
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.axv-dt-inline .axv-layer-row {
+  padding: 2px 0;
+}
+
 /* M127 树行变换摘要 */
 .axv-dt-transform {
   color: var(--axv-primary, #3b82f6);

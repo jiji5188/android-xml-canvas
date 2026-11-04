@@ -1212,6 +1212,7 @@ export const SRC_EN: SrcDict = {
   "往「{name}」里加": "Add to {name}",
   "根元素：{tag}（{label}）": "Root element: {tag} ({label})",
   "只读类型，只能查看。要改内容请直接改 XML，或换支持的根元素。": "Read-only type. Edit the XML directly, or switch to a supported root element.",
+  "当前节点不是形状（{tag}）。先回「结构」页选中一个形状，再回来调形状与边距。": "This node is not a shape ({tag}). Pick a shape in the Structure tab first, then come back to edit its shape and margin.",
   "空": "Empty",
   "还没有内容，从预设或空模板开始。": "Nothing yet — start from a preset or a blank template.",
   "单形状用形状面板编辑，参数最全。": "A single shape is best edited in the shape panel.",

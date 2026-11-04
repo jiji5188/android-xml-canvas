@@ -8647,6 +8647,8 @@ button.axv-sb-item:hover {
   .axv-cv-form-toggle.is-closed { right: 0; }
   .axv-cv-form-toggle .msr { font-size: 18px; opacity: 0.7; }
   .axv-cv-form-toggle:active { transform: scale(0.96); }
+  /* M131：右栏展开时铺一层蒙版，点蒙版也能收起（桌面端不显示） */
+  .axv-cv-form-mask { display: block; }
 }
 
 @media (max-width: 840px) {
@@ -9010,7 +9012,42 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 /* ── M121 drawable 结构树编辑器 ── */
 .axv-dw-bar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; margin-bottom: 8px; }
 .axv-dw-bar .axv-shape-seg { flex: 0 0 auto; }
-.axv-dw-preview { border-radius: 12px; padding: 14px; display: flex; align-items: center; justify-content: center; }
+/* M131：手机端右栏滑面板背后的蒙版（桌面端不显示，点一下收起面板） */
+.axv-cv-form-mask {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  background: rgba(15, 23, 42, 0.38);
+  border: none;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* M131：形状/边距页顶部显示当前节点路径 */
+.axv-dw-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--axv-muted);
+  margin-bottom: 2px;
+}
+.axv-dw-who-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.axv-dw-preview {
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* M131：背景只留一层 —— 由内部 .axv-dp-box 的 backdrop 决定（透明=棋盘格，其余=纯色） */
+  background: transparent;
+}
 .axv-dw-canvas { border-radius: 8px; overflow: hidden; }
 .axv-dw-meta { display: flex; gap: 10px; font-size: 11px; color: var(--axv-muted); margin-top: 8px; }
 .axv-dw-problems { display: flex; flex-direction: column; gap: 6px; }

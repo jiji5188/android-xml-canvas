@@ -106,7 +106,16 @@ function ColorRow({
   );
 }
 
-export function ShapeFields({ spec, onChange }: { spec: Spec; onChange: Up }) {
+export function ShapeFields({
+  spec,
+  onChange,
+  /** M131：拆成两个 tab —— shape = 填充/渐变/环宽/圆角/描边；margin = 宽/高 + 内边距。不传 = 全部。 */
+  part,
+}: {
+  spec: Spec;
+  onChange: Up;
+  part?: "shape" | "margin";
+}) {
   const grad = spec.gradient;
   const stroke = spec.stroke;
   const corners = spec.corners;
@@ -119,34 +128,189 @@ export function ShapeFields({ spec, onChange }: { spec: Spec; onChange: Up }) {
 
   return (
     <div className="axv-dw-quick">
-      <div className="axv-set-label">{tt("形状")}</div>
-
-      {spec.kind !== "line" ? (
+      {part !== "margin" ? (
         <>
+          <div className="axv-set-label">{tt("形状")}</div>
+
+          {spec.kind !== "line" ? (
+            <>
+              <div className="axv-shape-field">
+                <label className="axv-shape-label">{tt("填充")}</label>
+                <div className="axv-shape-seg">
+                  {[
+                    { v: false, label: "纯色" },
+                    { v: true, label: "渐变" },
+                  ].map((o) => (
+                    <button
+                      key={String(o.v)}
+                      type="button"
+                      className={"axv-shape-seg-btn" + ((!!grad === o.v) ? " is-on" : "")}
+                      onClick={() =>
+                        onChange(
+                          o.v
+                            ? {
+                                ...spec,
+                                gradient: grad ?? {
+                                  type: "linear",
+                                  start: spec.solid ?? "#FF888888",
+                                  end: "#FF222222",
+                                  angle: 90,
+                                },
+                              }
+                            : { ...spec, gradient: undefined, solid: spec.solid ?? grad?.start ?? "#FF3B82F6" },
+                        )
+                      }
+                    >
+                      {tt(o.label)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {grad ? (
+                <>
+                  <div className="axv-shape-field">
+                    <label className="axv-shape-label">{tt("渐变方向")}</label>
+                    <div className="axv-shape-seg">
+                      {(["linear", "radial", "sweep"] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          className={"axv-shape-seg-btn" + (grad.type === t ? " is-on" : "")}
+                          onClick={() => onChange({ ...spec, gradient: { ...grad, type: t } })}
+                        >
+                          {tt(GRAD_LABEL[t])}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <ColorRow
+                    label="起始色"
+                    value={grad.start}
+                    onChange={(v) => v && onChange({ ...spec, gradient: { ...grad, start: v } })}
+                  />
+                  <ColorRow
+                    label="结束色"
+                    value={grad.end}
+                    onChange={(v) => v && onChange({ ...spec, gradient: { ...grad, end: v } })}
+                  />
+                  {grad.type === "radial" ? (
+                    <ColorRow
+                      label="中心色"
+                      value={grad.center}
+                      onChange={(v) => v && onChange({ ...spec, gradient: { ...grad, center: v } })}
+                    />
+                  ) : null}
+                  {grad.type === "linear" ? (
+                    <NumField
+                      label="角度"
+                      suffix="°"
+                      value={grad.angle}
+                      placeholder="90"
+                      onChange={(v) => onChange({ ...spec, gradient: { ...grad, angle: v } })}
+                    />
+                  ) : null}
+                </>
+              ) : (
+                <ColorRow
+                  label="填充色"
+                  value={spec.solid}
+                  onChange={(v) => onChange({ ...spec, solid: v })}
+                  fallback="#FF3B82F6"
+                />
+              )}
+            </>
+          ) : null}
+
+          {spec.kind === "ring" ? (
+            <NumField
+              label="环宽比例"
+              suffix="%"
+              value={spec.ringHole === undefined ? undefined : Math.round(spec.ringHole * 100)}
+              placeholder="40"
+              onChange={(v) => onChange({ ...spec, ringHole: v === undefined ? undefined : Math.min(0.95, v / 100) })}
+            />
+          ) : null}
+
+          {spec.kind === "rectangle" ? (
+            <>
+              <div className="axv-shape-field">
+                <label className="axv-shape-label">{tt("圆角")}</label>
+                <div className="axv-shape-seg">
+                  {[
+                    { v: false, label: "统一" },
+                    { v: true, label: "四角独立" },
+                  ].map((o) => (
+                    <button
+                      key={String(o.v)}
+                      type="button"
+                      className={"axv-shape-seg-btn" + ((!!corners === o.v) ? " is-on" : "")}
+                      onClick={() => {
+                        if (o.v) {
+                          const r = spec.radius ?? 0;
+                          onChange({ ...spec, radius: undefined, corners: { tl: r, tr: r, br: r, bl: r } });
+                        } else {
+                          const r = corners?.tl ?? spec.radius ?? 0;
+                          onChange({ ...spec, corners: undefined, radius: r });
+                        }
+                      }}
+                    >
+                      {tt(o.label)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {corners ? (
+                <div className="axv-dw-grid2">
+                  <NumField
+                    label="左上"
+                    value={corners.tl}
+                    onChange={(v) => onChange({ ...spec, corners: { ...corners, tl: v ?? 0 } })}
+                  />
+                  <NumField
+                    label="右上"
+                    value={corners.tr}
+                    onChange={(v) => onChange({ ...spec, corners: { ...corners, tr: v ?? 0 } })}
+                  />
+                  <NumField
+                    label="右下"
+                    value={corners.br}
+                    onChange={(v) => onChange({ ...spec, corners: { ...corners, br: v ?? 0 } })}
+                  />
+                  <NumField
+                    label="左下"
+                    value={corners.bl}
+                    onChange={(v) => onChange({ ...spec, corners: { ...corners, bl: v ?? 0 } })}
+                  />
+                </div>
+              ) : (
+                <NumField
+                  label="圆角"
+                  value={spec.radius}
+                  placeholder="0"
+                  onChange={(v) => onChange({ ...spec, radius: v ?? 0 })}
+                />
+              )}
+            </>
+          ) : null}
+
+          {/* 描边：line 形状必须有，其它可选 */}
           <div className="axv-shape-field">
-            <label className="axv-shape-label">{tt("填充")}</label>
+            <label className="axv-shape-label">{tt("描边")}</label>
             <div className="axv-shape-seg">
               {[
-                { v: false, label: "纯色" },
-                { v: true, label: "渐变" },
+                { v: false, label: "无" },
+                { v: true, label: "有" },
               ].map((o) => (
                 <button
                   key={String(o.v)}
                   type="button"
-                  className={"axv-shape-seg-btn" + ((!!grad === o.v) ? " is-on" : "")}
+                  className={"axv-shape-seg-btn" + ((!!stroke === o.v) ? " is-on" : "")}
                   onClick={() =>
                     onChange(
                       o.v
-                        ? {
-                            ...spec,
-                            gradient: grad ?? {
-                              type: "linear",
-                              start: spec.solid ?? "#FF888888",
-                              end: "#FF222222",
-                              angle: 90,
-                            },
-                          }
-                        : { ...spec, gradient: undefined, solid: spec.solid ?? grad?.start ?? "#FF3B82F6" },
+                        ? { ...spec, stroke: stroke ?? { width: 1, color: "#FFDDDDDD" } }
+                        : { ...spec, stroke: undefined },
                     )
                   }
                 >
@@ -155,213 +319,68 @@ export function ShapeFields({ spec, onChange }: { spec: Spec; onChange: Up }) {
               ))}
             </div>
           </div>
-
-          {grad ? (
+          {stroke ? (
             <>
-              <div className="axv-shape-field">
-                <label className="axv-shape-label">{tt("渐变方向")}</label>
-                <div className="axv-shape-seg">
-                  {(["linear", "radial", "sweep"] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      className={"axv-shape-seg-btn" + (grad.type === t ? " is-on" : "")}
-                      onClick={() => onChange({ ...spec, gradient: { ...grad, type: t } })}
-                    >
-                      {tt(GRAD_LABEL[t])}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <ColorRow
-                label="起始色"
-                value={grad.start}
-                onChange={(v) => v && onChange({ ...spec, gradient: { ...grad, start: v } })}
+              <NumField
+                label="描边宽度"
+                value={stroke.width}
+                placeholder="1"
+                onChange={(v) => onChange({ ...spec, stroke: { ...stroke, width: v ?? 1 } })}
               />
               <ColorRow
-                label="结束色"
-                value={grad.end}
-                onChange={(v) => v && onChange({ ...spec, gradient: { ...grad, end: v } })}
+                label="描边色"
+                value={stroke.color}
+                onChange={(v) => onChange({ ...spec, stroke: { ...stroke, color: v ?? "#FFDDDDDD" } })}
+                fallback="#FFDDDDDD"
               />
-              {grad.type === "radial" ? (
-                <ColorRow
-                  label="中心色"
-                  value={grad.center}
-                  onChange={(v) => onChange({ ...spec, gradient: { ...grad, center: v } })}
-                />
-              ) : null}
-              {grad.type === "linear" ? (
+              <div className="axv-dw-grid2">
                 <NumField
-                  label="角度"
-                  suffix="°"
-                  value={grad.angle}
-                  placeholder="90"
-                  onChange={(v) => onChange({ ...spec, gradient: { ...grad, angle: v } })}
+                  label="虚线宽"
+                  value={stroke.dashWidth}
+                  onChange={(v) => onChange({ ...spec, stroke: { ...stroke, dashWidth: v } })}
                 />
-              ) : null}
+                <NumField
+                  label="虚线间隔"
+                  value={stroke.dashGap}
+                  onChange={(v) => onChange({ ...spec, stroke: { ...stroke, dashGap: v } })}
+                />
+              </div>
             </>
-          ) : (
-            <ColorRow
-              label="填充色"
-              value={spec.solid}
-              onChange={(v) => onChange({ ...spec, solid: v })}
-              fallback="#FF3B82F6"
-            />
-          )}
+          ) : null}
         </>
       ) : null}
 
-      {spec.kind === "ring" ? (
-        <NumField
-          label="环宽比例"
-          suffix="%"
-          value={spec.ringHole === undefined ? undefined : Math.round(spec.ringHole * 100)}
-          placeholder="40"
-          onChange={(v) => onChange({ ...spec, ringHole: v === undefined ? undefined : Math.min(0.95, v / 100) })}
-        />
-      ) : null}
-
-      {spec.kind === "rectangle" ? (
+      {part !== "shape" ? (
         <>
-          <div className="axv-shape-field">
-            <label className="axv-shape-label">{tt("圆角")}</label>
-            <div className="axv-shape-seg">
-              {[
-                { v: false, label: "统一" },
-                { v: true, label: "四角独立" },
-              ].map((o) => (
-                <button
-                  key={String(o.v)}
-                  type="button"
-                  className={"axv-shape-seg-btn" + ((!!corners === o.v) ? " is-on" : "")}
-                  onClick={() => {
-                    if (o.v) {
-                      const r = spec.radius ?? 0;
-                      onChange({ ...spec, radius: undefined, corners: { tl: r, tr: r, br: r, bl: r } });
-                    } else {
-                      const r = corners?.tl ?? spec.radius ?? 0;
-                      onChange({ ...spec, corners: undefined, radius: r });
-                    }
-                  }}
-                >
-                  {tt(o.label)}
-                </button>
-              ))}
-            </div>
-          </div>
-          {corners ? (
-            <div className="axv-dw-grid2">
-              <NumField
-                label="左上"
-                value={corners.tl}
-                onChange={(v) => onChange({ ...spec, corners: { ...corners, tl: v ?? 0 } })}
-              />
-              <NumField
-                label="右上"
-                value={corners.tr}
-                onChange={(v) => onChange({ ...spec, corners: { ...corners, tr: v ?? 0 } })}
-              />
-              <NumField
-                label="右下"
-                value={corners.br}
-                onChange={(v) => onChange({ ...spec, corners: { ...corners, br: v ?? 0 } })}
-              />
-              <NumField
-                label="左下"
-                value={corners.bl}
-                onChange={(v) => onChange({ ...spec, corners: { ...corners, bl: v ?? 0 } })}
-              />
-            </div>
-          ) : (
-            <NumField
-              label="圆角"
-              value={spec.radius}
-              placeholder="0"
-              onChange={(v) => onChange({ ...spec, radius: v ?? 0 })}
-            />
-          )}
-        </>
-      ) : null}
-
-      {/* 描边：line 形状必须有，其它可选 */}
-      <div className="axv-shape-field">
-        <label className="axv-shape-label">{tt("描边")}</label>
-        <div className="axv-shape-seg">
-          {[
-            { v: false, label: "无" },
-            { v: true, label: "有" },
-          ].map((o) => (
-            <button
-              key={String(o.v)}
-              type="button"
-              className={"axv-shape-seg-btn" + ((!!stroke === o.v) ? " is-on" : "")}
-              onClick={() =>
-                onChange(
-                  o.v
-                    ? { ...spec, stroke: stroke ?? { width: 1, color: "#FFDDDDDD" } }
-                    : { ...spec, stroke: undefined },
-                )
-              }
-            >
-              {tt(o.label)}
-            </button>
-          ))}
-        </div>
-      </div>
-      {stroke ? (
-        <>
-          <NumField
-            label="描边宽度"
-            value={stroke.width}
-            placeholder="1"
-            onChange={(v) => onChange({ ...spec, stroke: { ...stroke, width: v ?? 1 } })}
-          />
-          <ColorRow
-            label="描边色"
-            value={stroke.color}
-            onChange={(v) => onChange({ ...spec, stroke: { ...stroke, color: v ?? "#FFDDDDDD" } })}
-            fallback="#FFDDDDDD"
-          />
+          <div className="axv-set-label">{tt("边距")}</div>
           <div className="axv-dw-grid2">
             <NumField
-              label="虚线宽"
-              value={stroke.dashWidth}
-              onChange={(v) => onChange({ ...spec, stroke: { ...stroke, dashWidth: v } })}
+              label="宽"
+              value={spec.size?.w}
+              onChange={(v) => onChange({ ...spec, size: v || spec.size?.h ? { w: v, h: spec.size?.h } : undefined })}
             />
             <NumField
-              label="虚线间隔"
-              value={stroke.dashGap}
-              onChange={(v) => onChange({ ...spec, stroke: { ...stroke, dashGap: v } })}
+              label="高"
+              value={spec.size?.h}
+              onChange={(v) => onChange({ ...spec, size: v || spec.size?.w ? { w: spec.size?.w, h: v } : undefined })}
             />
+          </div>
+          <div className="axv-dw-grid2">
+            <NumField label="内边距左" value={pad.l} onChange={(v) => setPad("l", v)} />
+            <NumField label="内边距上" value={pad.t} onChange={(v) => setPad("t", v)} />
+            <NumField label="内边距右" value={pad.r} onChange={(v) => setPad("r", v)} />
+            <NumField label="内边距下" value={pad.b} onChange={(v) => setPad("b", v)} />
           </div>
         </>
       ) : null}
 
-      <div className="axv-set-label">{tt("尺寸与留白")}</div>
-      <div className="axv-dw-grid2">
-        <NumField
-          label="宽"
-          value={spec.size?.w}
-          onChange={(v) => onChange({ ...spec, size: v || spec.size?.h ? { w: v, h: spec.size?.h } : undefined })}
-        />
-        <NumField
-          label="高"
-          value={spec.size?.h}
-          onChange={(v) => onChange({ ...spec, size: v || spec.size?.w ? { w: spec.size?.w, h: v } : undefined })}
-        />
-      </div>
-      <div className="axv-dw-grid2">
-        <NumField label="内边距左" value={pad.l} onChange={(v) => setPad("l", v)} />
-        <NumField label="内边距上" value={pad.t} onChange={(v) => setPad("t", v)} />
-        <NumField label="内边距右" value={pad.r} onChange={(v) => setPad("r", v)} />
-        <NumField label="内边距下" value={pad.b} onChange={(v) => setPad("b", v)} />
-      </div>
-
-      <div className="axv-dw-hint">
-        {tt("当前形状：{kind}。想换成别的形状，回到「结构」页改形状类型。", {
-          kind: tt(KIND_LABEL[spec.kind] ?? spec.kind),
-        })}
-      </div>
+      {part === undefined ? (
+        <div className="axv-dw-hint">
+          {tt("当前形状：{kind}。想换成别的形状，回到「结构」页改形状类型。", {
+            kind: tt(KIND_LABEL[spec.kind] ?? spec.kind),
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

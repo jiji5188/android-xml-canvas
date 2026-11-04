@@ -1583,6 +1583,13 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
         </div>
 
         {/* 右：参数面板（移动端是靠右滑出的浮层，左侧带箭头开关） */}
+        {formOpen ? (
+          <div
+            className="axv-cv-form-mask"
+            onClick={() => setFormOpen(false)}
+            aria-hidden="true"
+          />
+        ) : null}
         <button
           type="button"
           className={"axv-cv-form-toggle" + (formOpen ? "" : " is-closed")}

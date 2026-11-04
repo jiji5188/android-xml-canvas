@@ -478,6 +478,13 @@ export function ShapeEditorInner({ attrName, value, existingXml, existingNames, 
         </div>
 
         {/* 右：资源名 + 生成的 XML（手机上是靠右滑出的浮层） */}
+        {formOpen ? (
+          <div
+            className="axv-cv-form-mask"
+            onClick={() => setFormOpen(false)}
+            aria-hidden="true"
+          />
+        ) : null}
         <button
           type="button"
           className={"axv-cv-form-toggle" + (formOpen ? "" : " is-closed")}

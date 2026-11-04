@@ -52,6 +52,8 @@ function defaultTree(): DrawableNode {
 const TABS: [string, string][] = [
   ["tree", "结构"],
   ["attrs", "参数"],
+  ["shape", "形状"],
+  ["margin", "边距"],
 ];
 
 export function DrawableEditor({
@@ -237,9 +239,16 @@ export function DrawableEditor({
             </div>
           ) : null}
 
-          <div className="axv-dw-preview" style={previewBgStyle}>
+          <div className="axv-dw-preview">
             <div className="axv-dw-canvas">
-              <DrawablePreview doc={focus} interactive width={220} height={140} showStateBar />
+              <DrawablePreview
+                doc={focus}
+                interactive
+                width={220}
+                height={140}
+                showStateBar
+                backdrop={previewBg}
+              />
             </div>
             {focused ? (
               <button className="axv-dw-focus" onClick={() => setPath([])}>
@@ -257,6 +266,13 @@ export function DrawableEditor({
           </div>
         </div>
 
+        {formOpen ? (
+          <div
+            className="axv-cv-form-mask"
+            onClick={() => setFormOpen(false)}
+            aria-hidden="true"
+          />
+        ) : null}
         <button
           type="button"
           className={"axv-cv-form-toggle" + (formOpen ? "" : " is-closed")}
@@ -344,7 +360,7 @@ export function DrawableEditor({
                     <DrawableTree root={root} path={path} onSelect={setPath} onChange={mutate} />
                   )}
                 </>
-              ) : (
+              ) : tab === "attrs" ? (
                 <div className="axv-dw-attrs">
                   {/* 参数页看不到面包屑，给一个明确的上一层出口，否则在叶子里容易迷路 */}
                   {path.length > 0 ? (
@@ -364,12 +380,30 @@ export function DrawableEditor({
                   ) : (
                     <TransformTabs node={node} onChange={(n) => mutate(replaceAt(root, path, n))} />
                   )}
-                  {!readonly && node.t === "shape" ? (
+                </div>
+              ) : (
+                <div className="axv-dw-attrs">
+                  {/* 形状 / 边距两页都作用于「当前选中的形状叶子」，没选中就退回结构页挑一个 */}
+                  <div className="axv-dw-who">
+                    <span className="axv-dw-who-path">{breadcrumb(root, path).map((b) => b.label).join(" › ")}</span>
+                  </div>
+                  {readonly ? (
+                    <div className="axv-dt-ro-note">
+                      {tt("只读类型，只能查看。要改内容请直接改 XML，或换支持的根元素。")}
+                    </div>
+                  ) : node.t === "shape" ? (
                     <ShapeFields
+                      part={tab === "shape" ? "shape" : "margin"}
                       spec={node.spec}
                       onChange={(spec) => mutate(replaceAt(root, path, { ...node, spec }))}
                     />
-                  ) : null}
+                  ) : (
+                    <div className="axv-dt-ro-note">
+                      {tt("当前节点不是形状（{tag}）。先回「结构」页选中一个形状，再回来调形状与边距。", {
+                        tag: `<${node.t === "ref" ? "item" : node.t}>`,
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

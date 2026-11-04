@@ -22,6 +22,7 @@ import {
 } from "@/lib/xml/shape-gen";
 import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
 import { ColorField } from "./ColorField";
+import { DrawableEditor } from "./DrawableEditor";
 import { DrawablePreview } from "./DrawablePreview";
 import { parseDrawable } from "@/lib/xml/drawable-node";
 import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
@@ -86,7 +87,9 @@ const SHEET_TABS: [SheetTab, string][] = [
 
 const RIPPLE_DEFAULT = "#33FFFFFF";
 
-export function ShapeEditor({ attrName, value, existingXml, existingNames, onClose, onSave }: Props) {
+export function ShapeEditorInner({ attrName, value, existingXml, existingNames, onClose, onSave }: Props) {
+  /** M121：切到「结构树」编辑器（编辑 layer-list / selector / ripple 等非纯形状的 drawable） */
+  const [treeMode, setTreeMode] = useState(false);
   const initial = useMemo<ShapeSpec>(() => {
     const parsed = existingXml ? parseShapeSpec(existingXml) : null;
     return (
@@ -318,6 +321,20 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
   const prevH = isLine ? 2 : 140;
   const ringPct = Math.round((spec.ringHole ?? 0.4) * 50);
 
+  // M121：结构树模式（同一个入口，不再另开一套弹窗）
+  if (treeMode) {
+    return (
+      <DrawableEditor
+        attrName={attrName}
+        value={value}
+        existingXml={xml}
+        existingNames={existingNames}
+        onClose={() => setTreeMode(false)}
+        onSave={onSave}
+      />
+    );
+  }
+
   return (
     <div className="axv-icon-page axv-cv-page" role="dialog" aria-label={tt("自定义形状")}>
       <div className="axv-shape-head">
@@ -354,6 +371,14 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
             aria-label={tt("形状参数")}
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>tune</span>
+          </button>
+          <button
+            className="axv-icon-btn"
+            onClick={() => setTreeMode(true)}
+            title={tt("结构树（图层 / 状态 / 水波纹）")}
+            aria-label={tt("结构树")}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>account_tree</span>
           </button>
           <button
             className={"axv-icon-btn" + (showRaw ? " is-on" : "")}
@@ -1184,6 +1209,29 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
       </div>
     </div>
   );
+}
+
+/**
+ * M121：入口路由器。
+ * 纯 <shape> 走形状面板（参数最全）；selector / layer-list / ripple / inset / <color> 走结构树编辑器。
+ * 这样原来「打开一个 selector 资源结果被形状面板改坏」的问题从根上没了。
+ */
+export function ShapeEditor(props: Props) {
+  const root = useMemo(() => (props.existingXml ? parseDrawable(props.existingXml) : null), [props.existingXml]);
+  const isTree = !!root && root.t !== "shape";
+  if (isTree) {
+    return (
+      <DrawableEditor
+        attrName={props.attrName}
+        value={props.value}
+        existingXml={props.existingXml}
+        existingNames={props.existingNames}
+        onClose={props.onClose}
+        onSave={props.onSave}
+      />
+    );
+  }
+  return <ShapeEditorInner {...props} />;
 }
 
 /** #RRGGBBAA / #AARRGGBB / #RRGGBB → input[type=color] 需要的 #RRGGBB */

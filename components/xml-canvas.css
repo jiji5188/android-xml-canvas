@@ -8935,3 +8935,67 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-layer-ops button:hover:not(:disabled) { background: var(--axv-outline); color: var(--axv-title); }
 .axv-layer-ops button:disabled { opacity: 0.35; cursor: default; }
 .axv-layer-ops button[title="删除这层"]:hover { color: var(--axv-danger, #e5484d); }
+
+/* ── M121 drawable 树编辑：面包屑 / 子节点 / 添加菜单 / schema 属性行 ── */
+.axv-tree-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--axv-outline);
+}
+.axv-tree-crumb-wrap { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
+.axv-tree-sep { font-size: 11px; color: var(--axv-muted); }
+.axv-tree-crumb {
+  border: none;
+  background: transparent;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--axv-muted);
+  cursor: pointer;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-tree-crumb:hover { background: var(--axv-outline); color: var(--axv-title); }
+.axv-tree-crumb.is-on { color: var(--axv-title); font-weight: 600; }
+
+.axv-tree-add { margin-top: 10px; }
+.axv-tree-add-label { font-size: 11px; color: var(--axv-muted); margin-bottom: 6px; }
+.axv-tree-add-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.axv-tree-add-btn { font-size: 12px; padding: 5px 10px; }
+
+.axv-layer-op.is-danger:hover:not(:disabled) { color: var(--axv-danger, #e5484d); }
+
+.axv-attr-rows { display: flex; flex-direction: column; }
+.axv-attr-color { display: flex; align-items: center; gap: 6px; }
+.axv-attr-color .axv-cf { flex: 0 0 auto; }
+.axv-attr-color .axv-attr-input { flex: 1 1 auto; width: auto; min-width: 0; }
+.axv-attr-num { display: flex; align-items: center; gap: 6px; }
+.axv-attr-num .axv-attr-input { flex: 1 1 auto; min-width: 0; }
+.axv-attr-suffix { flex: 0 0 auto; font-size: 11px; color: var(--axv-muted); }
+
+/* ── M121 drawable 结构树编辑器 ── */
+.axv-dw-bar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; margin-bottom: 8px; }
+.axv-dw-bar .axv-shape-seg { flex: 0 0 auto; }
+.axv-dw-preview { border-radius: 12px; padding: 14px; display: flex; align-items: center; justify-content: center; }
+.axv-dw-canvas { border-radius: 8px; overflow: hidden; }
+.axv-dw-meta { display: flex; gap: 10px; font-size: 11px; color: var(--axv-muted); margin-top: 8px; }
+.axv-dw-problems { display: flex; flex-direction: column; gap: 6px; }
+.axv-dw-problem {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--axv-warn, #b8860b);
+  background: var(--axv-surface);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.axv-dw-problem.is-error { color: var(--axv-danger, #e5484d); }
+.axv-dw-problem-path { display: block; font-size: 10px; opacity: 0.75; margin-bottom: 2px; }
+.axv-dw-attrs { display: flex; flex-direction: column; gap: 4px; }
+.axv-dw-quick { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--axv-outline); }
+.axv-dw-raw { max-height: 220px; overflow: auto; margin-top: 8px; }

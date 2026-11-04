@@ -208,18 +208,28 @@ export function GenAssetsPanel({
               <div
                 className={
                   "axv-assets-row" +
-                  ((onEditShape && r.kind === "shape") || (onEditIcon && r.kind === "vector")
+                  (((onEditShape &&
+                      (r.kind === "shape" ||
+                        r.kind === "selector" ||
+                        r.kind === "layer-list" ||
+                        r.kind === "ripple" ||
+                        r.kind === "inset" ||
+                        r.kind === "other")) ||
+                    (onEditIcon && r.kind === "vector"))
                     ? " axv-assets-row-editable"
                     : "")
                 }
                 key={r.name}
                 onDoubleClick={() => {
-                  if (r.kind === "shape" && onEditShape) onEditShape(r.name, r.xml);
-                  else if (r.kind === "vector" && onEditIcon) onEditIcon(r.name, r.xml);
+                  // M129：selector / layer-list / ripple / inset / 纯色 / 未识别的 xml
+                  // 也交给通用 drawable 编辑器（ShapeEditor 入口路由器会自动分流：
+                  // 认识的可编辑，不认识的进只读 + 原样保存，不会改坏文件）
+                  if (onEditShape && r.kind !== "vector") onEditShape(r.name, r.xml);
+                  if (r.kind === "vector" && onEditIcon) onEditIcon(r.name, r.xml);
                 }}
                 title={
-                  r.kind === "shape" && onEditShape
-                    ? t("双击编辑形状内容")
+                  onEditShape && r.kind !== "vector"
+                    ? t("双击编辑（结构 / 参数 / 预览）")
                     : r.kind === "vector" && onEditIcon
                       ? t("双击编辑图标（颜色 / 尺寸 / 路径 / 旋转）")
                       : undefined

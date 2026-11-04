@@ -43,7 +43,7 @@ interface Props {
   onSave: (name: string, xml: string) => void;
 }
 
-type SheetTab = "shape" | "fill" | "stroke" | "effect";
+type SheetTab = "shape" | "fill" | "stroke" | "effect" | "layers";
 
 const KINDS: { v: ShapeKind; label: string; icon: string }[] = [
   { v: "rectangle", label: tt("矩形"), icon: "crop_square" },
@@ -81,6 +81,7 @@ const SHEET_TABS: [SheetTab, string][] = [
   ["fill", tt("填充")],
   ["stroke", tt("描边")],
   ["effect", tt("效果")],
+  ["layers", tt("图层")],
 ];
 
 const RIPPLE_DEFAULT = "#33FFFFFF";
@@ -98,28 +99,49 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
     );
   }, [existingXml]);
 
-  const [spec, setSpec] = useState<ShapeSpec>(initial);
-  /* M117：撤销/重做（spec 历史栈，最多 30 步） */
+  /*
+   * M119：图层模型
+   * rootSpec 是权威数据（含 layers），spec 是“当前编辑目标”：
+   * 选中某一层时，形状/填充/描边/效果四个抽屉页改的是那一层的 shape，未选中时改根。
+   */
+  const [rootSpec, setRootSpec] = useState<ShapeSpec>(initial);
+  const [activeLayer, setActiveLayer] = useState<number | null>(null);
+  const spec: ShapeSpec =
+    activeLayer !== null && rootSpec.layers?.[activeLayer]
+      ? rootSpec.layers[activeLayer].spec
+      : rootSpec;
+  const setSpec = (updater: ShapeSpec | ((s: ShapeSpec) => ShapeSpec)) =>
+    setRootSpec((prev) => {
+      const apply = (s: ShapeSpec) => (typeof updater === "function" ? updater(s) : updater);
+      if (activeLayer !== null && prev.layers?.[activeLayer]) {
+        const layers = prev.layers.slice();
+        layers[activeLayer] = { ...layers[activeLayer], spec: apply(layers[activeLayer].spec) };
+        return { ...prev, layers };
+      }
+      return apply(prev);
+    });
+
+  /* M117：撤销/重做（rootSpec 历史栈，最多 30 步） */
   const [undoStack, setUndoStack] = useState<ShapeSpec[]>([]);
   const [redoStack, setRedoStack] = useState<ShapeSpec[]>([]);
   const commitSpec = (updater: (s: ShapeSpec) => ShapeSpec) => {
-    setUndoStack((prev) => [...prev.slice(-29), spec]);
+    setUndoStack((prev) => [...prev.slice(-29), rootSpec]);
     setRedoStack([]);
-    setSpec((s) => updater(s));
+    setSpec(updater);
   };
   const undo = () => {
     if (undoStack.length === 0) return;
     const prev = undoStack[undoStack.length - 1];
     setUndoStack((s) => s.slice(0, -1));
-    setRedoStack((s) => [...s, spec]);
-    setSpec(prev);
+    setRedoStack((s) => [...s, rootSpec]);
+    setRootSpec(prev);
   };
   const redo = () => {
     if (redoStack.length === 0) return;
     const next = redoStack[redoStack.length - 1];
     setRedoStack((s) => s.slice(0, -1));
-    setUndoStack((s) => [...s, spec]);
-    setSpec(next);
+    setUndoStack((s) => [...s, rootSpec]);
+    setRootSpec(next);
   };
   const [advanced, setAdvanced] = useState<boolean>(!!initial.gradient);
   const [perCorner, setPerCorner] = useState<boolean>(!!initial.corners);
@@ -166,6 +188,59 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
 
   const patch = (p: Partial<ShapeSpec>) => setSpec((s) => ({ ...s, ...p }));
 
+  /* ── M119：图层操作（直接改 rootSpec，不走“当前编辑目标”分流） ── */
+  const layers = rootSpec.layers ?? [];
+  const kindLabel = (k: ShapeKind) => KINDS.find((x) => x.v === k)?.label ?? k;
+  const mutateRoot = (updater: (s: ShapeSpec) => ShapeSpec) => {
+    setUndoStack((prev) => [...prev.slice(-29), rootSpec]);
+    setRedoStack([]);
+    setRootSpec((prev) => updater(prev));
+  };
+  /** 只保留纯 shape 字段，防止层里套层/套 selector */
+  const plainOf = (s: ShapeSpec): ShapeSpec => ({
+    kind: s.kind,
+    solid: s.solid,
+    gradient: s.gradient,
+    radius: s.radius,
+    corners: s.corners,
+    stroke: s.stroke,
+    size: s.size,
+    ringHole: s.ringHole,
+  });
+  const addLayer = () => {
+    const base = plainOf(layers.length ? layers[layers.length - 1].spec : rootSpec);
+    mutateRoot((s) => ({ ...s, layers: [...(s.layers ?? []), { spec: { ...base } }] }));
+    setActiveLayer(layers.length);
+    setSheetTab("layers");
+    setSheetOpen(true);
+  };
+  const removeLayer = (i: number) => {
+    mutateRoot((s) => {
+      const ls = (s.layers ?? []).filter((_, k) => k !== i);
+      return { ...s, layers: ls.length ? ls : undefined };
+    });
+    setActiveLayer((cur) => (cur === null ? null : cur === i ? null : cur > i ? cur - 1 : cur));
+  };
+  const moveLayer = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= layers.length) return;
+    mutateRoot((s) => {
+      const ls = (s.layers ?? []).slice();
+      const t = ls[i];
+      ls[i] = ls[j];
+      ls[j] = t;
+      return { ...s, layers: ls };
+    });
+    setActiveLayer((cur) => (cur === i ? j : cur === j ? i : cur));
+  };
+  const patchLayerItem = (i: number, p: Partial<NonNullable<ShapeSpec["layers"]>[number]["item"]>) =>
+    mutateRoot((s) => {
+      const ls = (s.layers ?? []).slice();
+      if (!ls[i]) return s;
+      ls[i] = { ...ls[i], item: { ...ls[i].item, ...p } };
+      return { ...s, layers: ls };
+    });
+
   const setSolid = (color: string) => {
     setSpec((s) => ({ ...s, solid: color, gradient: undefined }));
     setAdvanced(false);
@@ -202,10 +277,10 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
     });
   };
 
-  const xml = useMemo(() => buildShapeXml(spec), [spec]);
+  const xml = useMemo(() => buildShapeXml(rootSpec), [rootSpec]);
   const css = useMemo(() => specToCss(argbColorsForPreview(spec)), [spec]);
   /** M118：预览走的就是即将写入 XML 的那棵树，而不是另一套近似样式 */
-  const doc = useMemo(() => parseDrawable(buildShapeXml(spec)), [spec]);
+  const doc = useMemo(() => parseDrawable(buildShapeXml(rootSpec)), [rootSpec]);
 
   /* M117：Ctrl/Cmd + Z / Shift+Z 撤销重做 */
   useEffect(() => {
@@ -945,6 +1020,147 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                     </div>
                   ) : null}
                 </div>
+              </div>
+            ) : null}
+            {activeLayer !== null && layers[activeLayer] ? (
+              <div className="axv-layer-target">
+                <span className="msr" aria-hidden="true">layers</span>
+                <span>
+                  {tt("正在编辑第 {n} 层", { n: String(activeLayer + 1) })}
+                  <i>{kindLabel(layers[activeLayer].spec.kind)}</i>
+                </span>
+                <button className="axv-shape-link" onClick={() => setActiveLayer(null)}>
+                  {tt("回到整体")}
+                </button>
+              </div>
+            ) : null}
+
+            {sheetTab === "layers" ? (
+              <div className="axv-cv-sheet-pane">
+                <div className="axv-shape-field">
+                  <label>
+                    {tt("图层")}
+                    <span className="axv-shape-hint">{tt("从下往上叠，最后一项在最上层")}</span>
+                  </label>
+                  {layers.length === 0 ? (
+                    <div className="axv-shape-hint" style={{ padding: "4px 0" }}>
+                      {tt("还没有图层。加一层就变成 <layer-list>，可以叠多层形状。")}
+                    </div>
+                  ) : (
+                    <div className="axv-layer-list">
+                      {layers
+                        .map((L, i) => ({ L, i }))
+                        .reverse()
+                        .map(({ L, i }) => {
+                          const swatch = specToCss(argbColorsForPreview(L.spec));
+                          return (
+                            <div key={i} className={"axv-layer-row" + (activeLayer === i ? " is-on" : "")}>
+                              <button
+                                type="button"
+                                className="axv-layer-pick"
+                                onClick={() => setActiveLayer(activeLayer === i ? null : i)}
+                                title={tt("点一下编辑这层")}
+                              >
+                                <span className="axv-layer-idx">{i + 1}</span>
+                                <span
+                                  className="axv-layer-swatch"
+                                  style={{
+                                    background: swatch.background,
+                                    borderRadius: swatch.borderRadius,
+                                    border: swatch.border,
+                                  }}
+                                />
+                                <span className="axv-layer-name">{kindLabel(L.spec.kind)}</span>
+                                {L.item && (L.item.left || L.item.top || L.item.right || L.item.bottom) ? (
+                                  <span className="axv-layer-off">
+                                    {tt("偏移 {l}/{t}/{r}/{b}", {
+                                      l: String(L.item.left ?? 0),
+                                      t: String(L.item.top ?? 0),
+                                      r: String(L.item.right ?? 0),
+                                      b: String(L.item.bottom ?? 0),
+                                    })}
+                                  </span>
+                                ) : null}
+                              </button>
+                              <div className="axv-layer-ops">
+                                <button
+                                  type="button"
+                                  className="msr"
+                                  title={tt("上移一层")}
+                                  disabled={i === layers.length - 1}
+                                  onClick={() => moveLayer(i, 1)}
+                                >
+                                  arrow_upward
+                                </button>
+                                <button
+                                  type="button"
+                                  className="msr"
+                                  title={tt("下移一层")}
+                                  disabled={i === 0}
+                                  onClick={() => moveLayer(i, -1)}
+                                >
+                                  arrow_downward
+                                </button>
+                                <button
+                                  type="button"
+                                  className="msr"
+                                  title={tt("删除这层")}
+                                  onClick={() => removeLayer(i)}
+                                >
+                                  delete
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                  <button type="button" className="axv-shape-preset" onClick={addLayer}>
+                    {layers.length ? tt("再加一层") : tt("添加一层")}
+                  </button>
+                </div>
+
+                {activeLayer !== null && layers[activeLayer] ? (
+                  <div className="axv-shape-field">
+                    <label>
+                      {tt("这一层的边距")}
+                      <span className="axv-shape-hint">{tt("dp，负值往外偏")}</span>
+                    </label>
+                    <div className="axv-shape-corners">
+                      {(
+                        [
+                          ["left", tt("左")],
+                          ["top", tt("上")],
+                          ["right", tt("右")],
+                          ["bottom", tt("下")],
+                        ] as const
+                      ).map(([k, label]) => (
+                        <input
+                          key={k}
+                          className="axv-attr-input"
+                          type="number"
+                          title={label}
+                          value={layers[activeLayer].item?.[k] ?? 0}
+                          onChange={(e) => patchLayerItem(activeLayer, { [k]: Number(e.target.value) || undefined })}
+                        />
+                      ))}
+                    </div>
+                    <div className="axv-shape-row" style={{ marginTop: 6 }}>
+                      <span className="axv-shape-hint">{tt("不透明度")}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={Math.round((layers[activeLayer].item?.alpha ?? 1) * 100)}
+                        onChange={(e) =>
+                          patchLayerItem(activeLayer, { alpha: Number(e.target.value) / 100 })
+                        }
+                        aria-label={tt("图层不透明度")}
+                      />
+                      <b>{Math.round((layers[activeLayer].item?.alpha ?? 1) * 100)}%</b>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

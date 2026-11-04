@@ -34,8 +34,8 @@ describe("M117 ring shape 底层生成/反解析/预览", () => {
     expect(parsed?.solid).toBe("#FF123456");
   });
 
-  it("parseShapeSpec：普通 shadow layer-list（双 item 但内层不是 inset oval）不误判成 ring", () => {
-    // 手工构造：shadow 场景下 shadow 层 + 内容层都是 oval，但 item[1] 没有 insetLeft
+  it("parseShapeSpec：无偏移的双层 layer-list 当图层（不是 shadow、也不是双 oval 伪 ring）", () => {
+    // M119 起：没有 item 偏移就不猜“阴影”了，两层就是两层图层
     const xml = [
       `<layer-list xmlns:android="http://schemas.android.com/apk/res/android">`,
       `  <item>`,
@@ -47,9 +47,10 @@ describe("M117 ring shape 底层生成/反解析/预览", () => {
       `</layer-list>`,
     ].join("\n");
     const parsed = parseShapeSpec(xml);
-    // 没有 insetLeft → 不走 ring 分支，走 shadow 分支（kind 仍是 oval）
+    // 没有 insetLeft → 不走 ring 分支；也没偏移 → 不是 shadow
     expect(parsed?.kind).toBe("oval");
-    expect(parsed?.shadow).toBeDefined();
+    expect(parsed?.layers?.length).toBe(2);
+    expect(parsed?.shadow).toBeUndefined();
   });
 
   it("specToCss：ring 预览用 ellipse farthest-side 透明洞", () => {

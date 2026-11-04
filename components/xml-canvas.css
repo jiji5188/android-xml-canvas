@@ -8856,3 +8856,82 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   color: var(--axv-desc);
   opacity: 0.5;
 }
+
+/* M119：形状编辑器图层（layer-list） */
+.axv-layer-target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin: 0 0 6px;
+  border-radius: 8px;
+  background: var(--axv-primary-weak, rgba(59,130,246,0.12));
+  color: var(--axv-title);
+  font-size: 12px;
+}
+.axv-layer-target .msr { font-size: 16px; color: var(--axv-primary); }
+.axv-layer-target i { font-style: normal; color: var(--axv-desc); margin-left: 6px; }
+.axv-layer-target .axv-shape-link { margin-left: auto; }
+
+.axv-layer-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.axv-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  border-radius: 8px;
+  padding: 2px 4px;
+}
+.axv-layer-row.is-on { border-color: var(--axv-primary); box-shadow: 0 0 0 1px var(--axv-primary) inset; }
+.axv-layer-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  padding: 5px 4px;
+  cursor: pointer;
+  color: var(--axv-title);
+  font-size: 12px;
+  text-align: left;
+}
+.axv-layer-idx {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 5px;
+  background: var(--axv-outline);
+  color: var(--axv-desc);
+  font-size: 11px;
+}
+.axv-layer-swatch {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 18px;
+  background-image: repeating-conic-gradient(#0000000a 0% 25%, transparent 0% 50%);
+  background-size: 8px 8px;
+}
+.axv-layer-name { flex: 0 0 auto; }
+.axv-layer-off { flex: 1 1 auto; min-width: 0; color: var(--axv-desc); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.axv-layer-ops { display: flex; gap: 2px; flex: 0 0 auto; }
+.axv-layer-ops button {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--axv-desc);
+  font-size: 16px;
+  cursor: pointer;
+}
+.axv-layer-ops button:hover:not(:disabled) { background: var(--axv-outline); color: var(--axv-title); }
+.axv-layer-ops button:disabled { opacity: 0.35; cursor: default; }
+.axv-layer-ops button[title="删除这层"]:hover { color: var(--axv-danger, #e5484d); }

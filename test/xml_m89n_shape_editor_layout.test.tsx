@@ -59,7 +59,7 @@ describe("M89n 形状编辑器 = 图标编辑器的布局骨架", () => {
   it("底部抽屉分四页：形状 / 填充 / 描边 / 效果", async () => {
     await mount(shape());
     const tabs = [...document.querySelectorAll(".axv-cv-sheet-tab")].map((b) => b.textContent?.trim());
-    expect(tabs).toEqual(["形状", "填充", "描边", "效果"]);
+    expect(tabs).toEqual(["形状", "填充", "描边", "效果", "图层"]);
   });
 
   it("切到椭圆 → 画布预览变圆（同一套渲染规则）", async () => {

@@ -1092,6 +1092,18 @@ export const SRC_EN: SrcDict = {
   "重新生成": "Regenerate",
   "超时（秒）": "Timeout (s)",
   "推理模型思考时间长，可调到 600 秒；超过这个时间就算卡住": "Reasoning models can think for a long time — raise this to 600s; past that it counts as stuck",
+  "从下往上叠，最后一项在最上层": "Bottom to top; the last item sits on top",
+  "点一下编辑这层": "Tap to edit this layer",
+  "偏移 {l}/{t}/{r}/{b}": "Offset {l}/{t}/{r}/{b}",
+  "删除这层": "Delete layer",
+  "再加一层": "Add another layer",
+  "添加一层": "Add layer",
+  "还没有图层。加一层就变成 <layer-list>，可以叠多层形状。": "No layers yet. Adding one turns this into a <layer-list> that stacks shapes.",
+  "这一层的边距": "Insets of this layer",
+  "dp，负值往外偏": "dp; negative values push outward",
+  "图层不透明度": "Layer opacity",
+  "正在编辑第 {n} 层": "Editing layer {n}",
+  "回到整体": "Back to whole",
 };
 
 /** 繁體 —— 只登记与简体不同的；没登记的会先试英文兜底 */

@@ -10,6 +10,24 @@ import { androidColorToCss } from "./color-argb";
 export type ShapeKind = "rectangle" | "oval" | "ring" | "line";
 export type GradientType = "linear" | "radial" | "sweep";
 
+/** M119：layer-list 的单个图层项（item 属性） */
+export interface ShapeLayerItem {
+  left?: number;
+  top?: number;
+  right?: number;
+  bottom?: number;
+  width?: number;
+  height?: number;
+  alpha?: number;
+  gravity?: string;
+}
+
+/** M119：一层 = 一个独立 shape + 它在 item 上的偏移 */
+export interface ShapeLayer {
+  spec: ShapeSpec;
+  item?: ShapeLayerItem;
+}
+
 export interface ShapeSpec {
   kind: ShapeKind;
   /** 纯色填充（#RRGGBB / #AARRGGBB）；与 gradient 二选一 */
@@ -41,6 +59,12 @@ export interface ShapeSpec {
   inset?: { l?: number; t?: number; r?: number; b?: number };
   /** M117 ring 形状的镂空比例（0~1，越大洞越大；0.5=中间一半） */
   ringHole?: number;
+  /**
+   * M119：layer-list 图层（索引 0 = 最底，最后一项画在最上）。
+   * 非空时输出 <layer-list>；每层是一个独立 shape。
+   * 层内不再嵌 layers / states / ripple / shadow——Android 上多层嵌套自己写，不在这里套娃。
+   */
+  layers?: ShapeLayer[];
 }
 
 const NS = "http://schemas.android.com/apk/res/android";
@@ -55,18 +79,29 @@ export function buildShapeXml(spec: ShapeSpec): string {
 
   // 2. ring：Android 原生 <shape android:shape="ring">，用 innerRadiusRatio / thicknessRatio 表达洞
   // 不包 layer-list——双 oval 叠透明层并不存在“打洞”，透明只是透出下层，结果仍是实心块
-  // 2. layer-list：阴影层 + 内容层
+  // 2. layer-list：阴影层（若有）+ 自定义图层（若有）+ 内容层
+  const layerItems: string[] = [];
   if (spec.shadow) {
     const s = spec.shadow;
-    const shadowLines: string[] = [];
     const off = offsetAttrs(s.dx, s.dy, s.blur);
-    shadowLines.push(`<item${off}>`);
-    shadowLines.push(
-      ...indentAll(shapeBlock({ ...spec, shadow: undefined, states: undefined, stroke: undefined }, 0, { solid: s.color }), 1),
+    const shadowShape = shapeBlock(
+      { ...spec, shadow: undefined, states: undefined, stroke: undefined, layers: undefined },
+      0,
+      { solid: s.color },
     );
-    shadowLines.push(`</item>`);
-    const contentItem = [`<item>`, ...indentAll(block, 1), `</item>`];
-    block = [`<layer-list>`, ...indentAll([...shadowLines, ...contentItem], 1), `</layer-list>`];
+    layerItems.push(`<item${off}>`, ...indentAll(shadowShape, 1), `</item>`);
+  }
+  if (spec.layers && spec.layers.length) {
+    // 自定义图层：每层一个 item，按数组顺序从底到顶
+    for (const L of spec.layers) {
+      layerItems.push(`<item${itemAttrs(L.item)}>`, ...indentAll(shapeBlock(plainShape(L.spec), 0), 1), `</item>`);
+    }
+  } else if (spec.shadow) {
+    // 只有阴影时，内容层跟在阴影后面
+    layerItems.push(`<item>`, ...indentAll(block, 1), `</item>`);
+  }
+  if (layerItems.length) {
+    block = [`<layer-list>`, ...indentAll(layerItems, 1), `</layer-list>`];
     wrapped = true;
   }
 
@@ -210,6 +245,44 @@ function offsetAttrs(dx: number, dy: number, blur: number): string {
 function dpNum(n: number): string {
   return `${Math.round(n * 100) / 100}dp`;
 }
+
+/** M119：<item> 上的偏移/尺寸/透明度属性 */
+function itemAttrs(it: ShapeLayerItem | undefined): string {
+  if (!it) return "";
+  const parts: string[] = [];
+  const dims: [keyof ShapeLayerItem, string][] = [
+    ["left", "left"],
+    ["top", "top"],
+    ["right", "right"],
+    ["bottom", "bottom"],
+    ["width", "width"],
+    ["height", "height"],
+  ];
+  for (const [k, name] of dims) {
+    const v = it[k];
+    if (typeof v === "number" && v !== 0) parts.push(`android:${name}="${dp(v)}"`);
+  }
+  if (it.gravity) parts.push(`android:gravity="${it.gravity}"`);
+  if (typeof it.alpha === "number" && it.alpha !== 1) {
+    parts.push(`android:alpha="${Math.round(it.alpha * 100) / 100}"`);
+  }
+  return parts.length ? " " + parts.join(" ") : "";
+}
+
+/** M119：图层里只允许“纯 shape”，拿掉所有包装器字段，避免套娃 */
+function plainShape(spec: ShapeSpec): ShapeSpec {
+  const {
+    kind,
+    solid,
+    gradient,
+    radius,
+    corners,
+    stroke,
+    size,
+    ringHole,
+  } = spec;
+  return { kind, solid, gradient, radius, corners, stroke, size, ringHole };
+}
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
@@ -293,25 +366,43 @@ function parseWrap(node: XmlNode): ShapeSpec | null {
   if (node.tag === "layer-list") {
     const items = node.children.filter((c) => c.tag === "item");
     if (items.length === 0) return null;
-        // M117：ring 已改为原生 <shape android:shape="ring">，不再用双 oval + inset 伪造。
-    // 双 oval 的 layer-list 真实语义是「阴影/底色层 + 内容层」，不应再误判成 ring。
-    // 约定：第一个 = 阴影层，最后一个 = 内容层
-    let shadow: ShapeSpec["shadow"];
-    if (items.length >= 2) {
-      const first = firstElementChild(items[0]);
-      const spec0 = first ? parseWrap(first) : null;
-      const attrs = items[0].attrs;
-      const left = num(attrs["left"]) ?? 0;
-      const top = num(attrs["top"]) ?? 0;
-      if (spec0?.solid) {
-        shadow = { dx: left !== 0 ? -left : 0, dy: top, blur: 0, color: spec0.solid };
-      }
+    const parsed = items.map((it) => {
+      const child = firstElementChild(it);
+      return { spec: child ? parseWrap(child) : null, item: readItemAttrs(it.attrs) };
+    });
+    const valid = parsed.filter((p): p is { spec: ShapeSpec; item: ShapeLayerItem | undefined } => !!p.spec);
+    if (valid.length === 0) return null;
+
+    // 兼容旧“阴影”写法：恰好两层、第一层带左上偏移、两层同 kind → 视为阴影层 + 内容层
+    const [a, b] = parsed;
+    if (
+      parsed.length === 2 &&
+      a.spec &&
+      b.spec &&
+      a.item &&
+      (a.item.left !== undefined || a.item.top !== undefined) &&
+      a.item.right === undefined &&
+      a.item.bottom === undefined &&
+      a.spec.kind === b.spec.kind
+    ) {
+      const left = a.item.left ?? 0;
+      const top = a.item.top ?? 0;
+      return {
+        ...b.spec,
+        shadow: { dx: left !== 0 ? -left : 0, dy: top, blur: 0, color: a.spec.solid ?? "#00000000" },
+      };
     }
-    const last = firstElementChild(items[items.length - 1]);
-    if (!last) return null;
-    const content = parseWrap(last);
-    if (!content) return null;
-    return shadow ? { ...content, shadow } : content;
+
+    // M119：真正的图层——每层保留自己的 item 偏移
+    const top = valid[valid.length - 1].spec;
+    return {
+      kind: top.kind,
+      solid: top.solid,
+      gradient: top.gradient,
+      radius: top.radius,
+      corners: top.corners,
+      layers: valid.map((p) => ({ spec: p.spec, item: p.item })),
+    };
   }
 
   if (node.tag !== "shape") return null;
@@ -388,6 +479,22 @@ function parseShapeNode(node: XmlNode): ShapeSpec {
     }
   }
   return spec;
+}
+
+/** M119：读 <item> 上的偏移/尺寸/透明度 */
+function readItemAttrs(attrs: Record<string, string>): ShapeLayerItem | undefined {
+  const out: ShapeLayerItem = {};
+  for (const k of ["left", "top", "right", "bottom", "width", "height"] as const) {
+    const v = num(attrs[k]);
+    if (v !== undefined && v !== 0) out[k] = v;
+  }
+  const alpha = attrs["alpha"];
+  if (alpha !== undefined) {
+    const a = Number(alpha);
+    if (Number.isFinite(a) && a >= 0 && a <= 1 && a !== 1) out.alpha = a;
+  }
+  if (attrs["gravity"]) out.gravity = attrs["gravity"];
+  return Object.keys(out).length ? out : undefined;
 }
 
 function num(raw: string | undefined): number | undefined {

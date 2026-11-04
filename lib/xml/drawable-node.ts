@@ -14,7 +14,7 @@
 
 import { parseLayoutXml } from "./parser";
 import type { XmlNode } from "./types";
-import type { ShapeSpec } from "./shape-gen";
+import { parseShapeElement, type ShapeSpec } from "./shape-gen";
 
 /** 视图状态（对应 selector 的 android:state_*） */
 export interface ViewState {
@@ -49,6 +49,8 @@ export interface ColorLeaf {
   t: "color";
   /** 原始色值，如 #FF112233 / @color/x */
   color: string;
+  /** 源文件是 <color>#fff</color> 文本写法（build 时原样写回文本，不改写成属性） */
+  asText?: boolean;
 }
 
 /** android:drawable="@drawable/x" 或 <item android:drawable="@drawable/x"/> */
@@ -114,6 +116,8 @@ export interface InsetNode {
 export interface UnsupportedNode {
   t: "unsupported";
   tag: string;
+  /** M120：原始子树序列化文本——「看不懂但不要弄丢」，build 时原样写回 */
+  raw?: string;
 }
 
 const ELEMENT = (n: XmlNode) => n.tag !== "#text" && n.tag !== "#comment";
@@ -146,7 +150,10 @@ export function parseDrawable(xml: string): DrawableNode | null {
   // <color>#ff0000</color> 的色值在文本节点里，parser 不保留文本 → 从原文兜底
   if (node.t === "color" && node.color === "#00000000") {
     const m = xml.match(/<color\b[^>]*>\s*(@?[#A-Za-z0-9_/.:]+)\s*<\/color>/i);
-    if (m) node.color = m[1];
+    if (m) {
+      node.color = m[1];
+      node.asText = true;
+    }
   }
   return node;
 }
@@ -167,8 +174,20 @@ function parseNode(node: XmlNode, path: string): DrawableNode {
     case "inset":
       return parseInset(node, path);
     default:
-      return { t: "unsupported", tag: node.tag };
+      return { t: "unsupported", tag: node.tag, raw: serializeXmlNode(node) };
   }
+}
+
+/** XmlNode → XML 文本（M120：给不支持的子树保留原文用；属性顺序保持解析顺序） */
+export function serializeXmlNode(n: XmlNode, level = 0): string {
+  const pad = "    ".repeat(level);
+  const attrs = Object.entries(n.attrs)
+    .map(([k, v]) => `android:${k}="${v}"`)
+    .join(" ");
+  const kids = n.children.filter((c) => c.tag !== "#text" && c.tag !== "#comment");
+  if (kids.length === 0) return `${pad}<${n.tag}${attrs ? " " + attrs : ""}/>`;
+  const inner = kids.map((c) => serializeXmlNode(c, level + 1)).join("\n");
+  return `${pad}<${n.tag}${attrs ? " " + attrs : ""}>\n${inner}\n${pad}</${n.tag}>`;
 }
 
 function parseLayerItems(node: XmlNode, path: string): LayerItem[] {
@@ -272,86 +291,9 @@ function clamp01(n: number): number {
   return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 1;
 }
 
-/** shape 叶子：复用 shape-gen 的解析口径（含 ring / 渐变 / 描边 / size） */
+/** shape 叶子：直接复用 shape-gen 的解析（M120 起不再各写一套，避免漂移） */
 function parseShapeLeaf(node: XmlNode): ShapeSpec {
-  // parseShapeSpec 接受整份 XML，这里把节点重新序列化太浪费；直接走内部逻辑太耦合，
-  // 因此用一个小的形状转换（与 parseShapeNode 保持一致的最小集）。
-  const kindRaw = node.attrs["shape"];
-  const kind: ShapeSpec["kind"] =
-    kindRaw === "oval" || kindRaw === "line" || kindRaw === "ring"
-      ? (kindRaw as ShapeSpec["kind"])
-      : "rectangle";
-  const spec: ShapeSpec = { kind };
-
-  if (kind === "ring") {
-    const irr = numOf(node.attrs["innerRadiusRatio"]);
-    const tr = numOf(node.attrs["thicknessRatio"]);
-    spec.ringHole = irr && tr && irr + tr > 0 ? Math.max(0, Math.min(1, tr / (irr + tr))) : 0.4;
-  }
-  if (node.attrs["useLevel"] !== undefined) {
-    // 仅记录存在，不改形状
-  }
-
-  for (const child of kids(node)) {
-    const a = child.attrs;
-    switch (child.tag) {
-      case "solid":
-        if (a["color"]) spec.solid = a["color"];
-        break;
-      case "gradient": {
-        const typeRaw = a["type"] || "linear";
-        const type: "linear" | "radial" | "sweep" =
-          typeRaw === "radial" || typeRaw === "sweep" ? typeRaw : "linear";
-        const start = a["startColor"] || a["centerColor"] || a["endColor"] || "#00000000";
-        spec.gradient = {
-          type,
-          start,
-          ...(a["centerColor"] ? { center: a["centerColor"] } : {}),
-          end: a["endColor"] || start,
-          ...(a["angle"] !== undefined ? { angle: numOf(a["angle"]) } : {}),
-        };
-        break;
-      }
-      case "corners": {
-        spec.radius = numOf(a["radius"]) ?? 0;
-        const tl = numOf(a["topLeftRadius"]);
-        const tr = numOf(a["topRightRadius"]);
-        const br = numOf(a["bottomRightRadius"]);
-        const bl = numOf(a["bottomLeftRadius"]);
-        if (tl !== undefined || tr !== undefined || br !== undefined || bl !== undefined) {
-          spec.corners = { tl: tl ?? spec.radius, tr: tr ?? spec.radius, br: br ?? spec.radius, bl: bl ?? spec.radius };
-        }
-        break;
-      }
-      case "stroke": {
-        const w = numOf(a["width"]) ?? 0;
-        if (w > 0) {
-          spec.stroke = {
-            width: w,
-            color: a["color"] || "#00000000",
-            ...(a["dashWidth"] ? { dashWidth: numOf(a["dashWidth"]) } : {}),
-            ...(a["dashGap"] ? { dashGap: numOf(a["dashGap"]) } : {}),
-          };
-        }
-        break;
-      }
-      case "size": {
-        const w = numOf(a["width"]);
-        const h = numOf(a["height"]);
-        if (w !== undefined || h !== undefined) spec.size = { w, h };
-        break;
-      }
-      default:
-        break;
-    }
-  }
-  return spec;
-}
-
-function numOf(raw: string | undefined): number | undefined {
-  if (raw === undefined || raw === "") return undefined;
-  const n = parseFloat(raw);
-  return Number.isFinite(n) ? n : undefined;
+  return parseShapeElement(node);
 }
 
 // ---------------- 展开成渲染层 ----------------

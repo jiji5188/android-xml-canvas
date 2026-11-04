@@ -49,6 +49,8 @@ export interface ShapeSpec {
   stroke?: { width: number; color: string; dashWidth?: number; dashGap?: number };
   /** 固定尺寸（dp，可选） */
   size?: { w?: number; h?: number };
+  /** M120：形状内部留白（<padding>，dp）——以前解析时会丢掉，导致“打开再保存”丢内容 */
+  padding?: { l?: number; t?: number; r?: number; b?: number };
   /** 点按水波纹（最外层 <ripple>） */
   ripple?: { color: string };
   /** 按下 / 禁用态颜色（<selector>；常态 = 上面的 solid/gradient） */
@@ -165,6 +167,16 @@ export function buildShapeXml(spec: ShapeSpec): string {
 
   return block.join("\n") + "\n";
 }
+/** M120：给 drawable 树内嵌用——返回 <shape> 片段（不带 xmlns，build 时由外层统一声明） */
+export function shapeElementLines(spec: ShapeSpec): string[] {
+  return shapeBlock(spec, 0);
+}
+
+/** M120：把 <shape> 节点解析成 ShapeSpec（供 drawable-node 复用，避免两套解析漂移） */
+export function parseShapeElement(node: XmlNode): ShapeSpec {
+  return parseShapeNode(node);
+}
+
 function shapeBlock(
   spec: ShapeSpec,
   _level: number,
@@ -215,6 +227,20 @@ function shapeBlock(
     if (spec.size.w) parts.push(`android:width="${dp(spec.size.w)}"`);
     if (spec.size.h) parts.push(`android:height="${dp(spec.size.h)}"`);
     inner.push(`${IND}<size ${parts.join(" ")}/>`);
+  }
+
+  // M120：<padding>（四边全等时写 android:left…，而不是不存在的简写）
+  if (spec.padding) {
+    const p = spec.padding;
+    const vals = [p.l, p.t, p.r, p.b];
+    if (vals.some((v) => v !== undefined && v !== 0)) {
+      const parts: string[] = [];
+      if (p.l) parts.push(`android:left="${dp(p.l)}"`);
+      if (p.t) parts.push(`android:top="${dp(p.t)}"`);
+      if (p.r) parts.push(`android:right="${dp(p.r)}"`);
+      if (p.b) parts.push(`android:bottom="${dp(p.b)}"`);
+      inner.push(`${IND}<padding ${parts.join(" ")}/>` );
+    }
   }
 
   // M117：ring 不用 oval 顶替，原生写法就是 shape="ring"
@@ -471,6 +497,14 @@ function parseShapeNode(node: XmlNode): ShapeSpec {
           dashWidth: num(a["dashWidth"]),
           dashGap: num(a["dashGap"]),
         };
+      }
+    } else if (child.tag === "padding") {
+      const l = num(a["left"]);
+      const t = num(a["top"]);
+      const r = num(a["right"]);
+      const b = num(a["bottom"]);
+      if ([l, t, r, b].some((v) => v !== undefined)) {
+        spec.padding = { l, t, r, b };
       }
     } else if (child.tag === "size") {
       const w = num(a["width"]);

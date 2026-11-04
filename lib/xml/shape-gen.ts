@@ -7,7 +7,7 @@ import type { XmlNode } from "./types";
 import { androidAngleToCss } from "./shape";
 import { androidColorToCss } from "./color-argb";
 
-export type ShapeKind = "rectangle" | "oval" | "line";
+export type ShapeKind = "rectangle" | "oval" | "ring" | "line";
 export type GradientType = "linear" | "radial" | "sweep";
 
 export interface ShapeSpec {
@@ -39,6 +39,8 @@ export interface ShapeSpec {
   shadow?: { dx: number; dy: number; blur: number; color: string };
   /** 内缩（<inset>，dp） */
   inset?: { l?: number; t?: number; r?: number; b?: number };
+  /** M117 ring 形状的镂空比例（0~1，越大洞越大；0.5=中间一半） */
+  ringHole?: number;
 }
 
 const NS = "http://schemas.android.com/apk/res/android";
@@ -51,6 +53,8 @@ export function buildShapeXml(spec: ShapeSpec): string {
   /** 是否已被任意包装器包住（没有则根节点要带 xmlns） */
   let wrapped = false;
 
+  // 2. ring：Android 原生 <shape android:shape="ring">，用 innerRadiusRatio / thicknessRatio 表达洞
+  // 不包 layer-list——双 oval 叠透明层并不存在“打洞”，透明只是透出下层，结果仍是实心块
   // 2. layer-list：阴影层 + 内容层
   if (spec.shadow) {
     const s = spec.shadow;
@@ -83,6 +87,8 @@ export function buildShapeXml(spec: ShapeSpec): string {
     wrapped = true;
   }
 
+  // 2b. ring 不包 layer-list：原生 ring 直接一个 shape
+
   // 4. selector：按下 / 禁用 / 常态
   if (spec.states && (spec.states.pressed || spec.states.disabled)) {
     const items: string[] = [];
@@ -105,7 +111,7 @@ export function buildShapeXml(spec: ShapeSpec): string {
     wrapped = true;
   }
 
-  // 5. ripple 最外层
+  // 6. ripple 最外层
   if (spec.ripple) {
     block = [
       `<ripple`,
@@ -176,7 +182,17 @@ function shapeBlock(
     inner.push(`${IND}<size ${parts.join(" ")}/>`);
   }
 
-  return [`<shape android:shape="${spec.kind}">`, ...inner, `</shape>`];
+  // M117：ring 不用 oval 顶替，原生写法就是 shape="ring"
+  const shapeName = spec.kind;
+  const rootAttrs = [`android:shape="${shapeName}"`];
+  if (spec.kind === "ring") {
+    // 洞占比 h（内径/外径）→ innerRadiusRatio = 2/h，thicknessRatio = 2/(1-h)
+    const h = Math.max(0.05, Math.min(0.95, spec.ringHole ?? 0.4));
+    rootAttrs.push(`android:innerRadiusRatio="${round2(2 / h)}"`);
+    rootAttrs.push(`android:thicknessRatio="${round2(2 / (1 - h))}"`);
+    rootAttrs.push(`android:useLevel="false"`);
+  }
+  return [`<shape ${rootAttrs.join(" ")}>`, ...inner, `</shape>`];
 }
 
 /** layer-list 的 item 偏移：dx>0 往右（left=-dx），dy>0 往下（top=dy） */
@@ -193,6 +209,9 @@ function offsetAttrs(dx: number, dy: number, blur: number): string {
 
 function dpNum(n: number): string {
   return `${Math.round(n * 100) / 100}dp`;
+}
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 function dp(n: number): string {
   return dpNum(n);
@@ -274,6 +293,8 @@ function parseWrap(node: XmlNode): ShapeSpec | null {
   if (node.tag === "layer-list") {
     const items = node.children.filter((c) => c.tag === "item");
     if (items.length === 0) return null;
+        // M117：ring 已改为原生 <shape android:shape="ring">，不再用双 oval + inset 伪造。
+    // 双 oval 的 layer-list 真实语义是「阴影/底色层 + 内容层」，不应再误判成 ring。
     // 约定：第一个 = 阴影层，最后一个 = 内容层
     let shadow: ShapeSpec["shadow"];
     if (items.length >= 2) {
@@ -307,9 +328,19 @@ function firstElementChild(node: XmlNode): XmlNode | null {
 }
 
 function parseShapeNode(node: XmlNode): ShapeSpec {
-  const kindRaw = (node.attrs["shape"] || "rectangle").toLowerCase();
-  const kind: ShapeKind = kindRaw === "oval" || kindRaw === "line" ? (kindRaw as ShapeKind) : "rectangle";
+  const kindRaw = node.attrs["shape"]; // M117: ring 是 Android 原生 kind，不再被默认成 rectangle
+  const kind: ShapeKind =
+    kindRaw === "oval" || kindRaw === "line" || kindRaw === "ring"
+      ? (kindRaw as ShapeKind)
+      : "rectangle";
   const spec: ShapeSpec = { kind };
+
+  if (kind === "ring") {
+    // h = innerRadius / (innerRadius + thickness) = tr / (irr + tr)
+    const irr = num(node.attrs["innerRadiusRatio"]);
+    const tr = num(node.attrs["thicknessRatio"]);
+    spec.ringHole = irr && tr && irr + tr > 0 ? Math.max(0, Math.min(1, tr / (irr + tr))) : 0.4;
+  }
 
   for (const child of node.children) {
     const a = child.attrs;
@@ -371,9 +402,11 @@ function num(raw: string | undefined): number | undefined {
 export function shapeResourceName(spec: ShapeSpec, existing: string[] = []): string {
   const kindPart = spec.kind === "rectangle" ? "rect" : spec.kind;
   const bits: string[] = [kindPart];
-  const r = spec.corners
-    ? Math.max(spec.corners.tl, spec.corners.tr, spec.corners.br, spec.corners.bl)
-    : spec.radius;
+  if (spec.kind === "ring") {
+    const hole = Math.round((spec.ringHole ?? 0.4) * 100);
+    bits.push(`h${hole}`);
+  }
+  const r = spec.kind === "ring" ? undefined : spec.corners ? Math.max(spec.corners.tl, spec.corners.tr, spec.corners.br, spec.corners.bl) : spec.radius;
   if (r && r > 0) bits.push(`r${Math.round(r)}`);
   if (spec.shadow) bits.push("shadow");
   if (spec.ripple) bits.push("ripple");
@@ -443,7 +476,21 @@ export function specToCss(
     css.background = resolveColor(spec.solid);
   }
 
-  if (spec.kind === "oval") {
+  if (spec.kind === "ring") {
+    // M117：ring 预览 = 外圆 + 内圆镂空（透明洞）
+    // CSS 没有真镂空，用 background: radial-gradient 模拟
+    const h = Math.max(0, Math.min(1, spec.ringHole ?? 0.4));
+    // radial-gradient 的百分比相对的是渐变半径，所以洞占比 h 直接对应 h*100%
+    const holePct = Math.round(h * 1000) / 10;
+    // 洞内透明，洞外实色
+    const color = spec.solid ? resolveColor(spec.solid) : "#00000000";
+    const transparent = "#00000000";
+    // 关键：circle 的半径取 farthest-corner，宽扁盒子上洞会溢出上下边（只剩两个月牙）。
+    // 改成 ellipse farthest-side（100% = 盒宽/高的一半），洞就是同心椭圆，任意宽高比都正常。
+    css.background = `radial-gradient(ellipse farthest-side at 50% 50%, ${transparent} ${holePct}%, ${transparent} ${holePct + 0.4}%, ${color} ${holePct + 0.4}%, ${color} 100%)`;
+    css.borderRadius = "50%";
+    // ring 没有 corners
+  } else if (spec.kind === "oval") {
     css.borderRadius = "50%";
   } else if (spec.corners) {
     const c = spec.corners;

@@ -44,16 +44,16 @@ describe("M89n 形状编辑器 = 图标编辑器的布局骨架", () => {
     expect(document.querySelector(".axv-icon-page.axv-cv-page")).not.toBeNull();
     expect(document.querySelector(".axv-shape-head .axv-icon-back")).not.toBeNull();
     expect(document.querySelector(".axv-cv-left .axv-cv-tools")).not.toBeNull();
-    expect(document.querySelector(".axv-cv-stage .axv-shape-preview")).not.toBeNull();
+    expect(document.querySelector(".axv-cv-stage .axv-dp-box")).not.toBeNull();
     expect(document.querySelector(".axv-cv-form-toggle")).not.toBeNull();
     expect(document.querySelector(".axv-cv-form")).not.toBeNull();
     expect(document.querySelector(".axv-cv-sheet")).not.toBeNull();
     expect(document.querySelector(".axv-icon-page-foot .axv-btn-primary")).not.toBeNull();
   });
 
-  it("工具条 = 3 种形状 + 涟漪 + 阴影（5 个按钮）", async () => {
+  it("工具条 = 4 种形状（含环形）+ 涟漪 + 阴影（6 个按钮）", async () => {
     await mount(shape());
-    expect(document.querySelectorAll(".axv-cv-tool").length).toBe(5);
+    expect(document.querySelectorAll(".axv-cv-tool").length).toBe(6);
   });
 
   it("底部抽屉分四页：形状 / 填充 / 描边 / 效果", async () => {
@@ -68,7 +68,7 @@ describe("M89n 形状编辑器 = 图标编辑器的布局骨架", () => {
     const oval = tools.find((b) => b.getAttribute("aria-label") === "椭圆") as HTMLElement;
     oval.click();
     await flush();
-    const prev = document.querySelector(".axv-shape-preview") as HTMLElement;
+    const prev = document.querySelector(".axv-cv-stage .axv-dp-layer") as HTMLElement;
     expect(prev.style.borderRadius).toBe("50%");
     expect(oval.getAttribute("aria-pressed")).toBe("true");
   });

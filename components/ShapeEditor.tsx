@@ -22,6 +22,8 @@ import {
 } from "@/lib/xml/shape-gen";
 import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
 import { ColorField } from "./ColorField";
+import { DrawablePreview } from "./DrawablePreview";
+import { parseDrawable } from "@/lib/xml/drawable-node";
 import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
 
 /** 取色器回传的 CSS 串 → 形状规格里存的 Android 写法（#RRGGBB / #AARRGGBB，大写） */
@@ -46,8 +48,32 @@ type SheetTab = "shape" | "fill" | "stroke" | "effect";
 const KINDS: { v: ShapeKind; label: string; icon: string }[] = [
   { v: "rectangle", label: tt("矩形"), icon: "crop_square" },
   { v: "oval", label: tt("椭圆"), icon: "circle" },
+  { v: "ring", label: tt("环形"), icon: "ring" },
   { v: "line", label: tt("线条"), icon: "remove" },
 ];
+
+/** M117：常用预设（点一下直接填参数） */
+const SHAPE_PRESETS: { label: string; apply: (s: ShapeSpec) => ShapeSpec }[] = [
+  {
+    label: tt("圆角卡片"),
+    apply: (s) => ({ ...s, kind: "rectangle", radius: 16, solid: "#FFFFFF", gradient: undefined, stroke: undefined }),
+  },
+  {
+    label: tt("胶囊"),
+    apply: (s) => ({ ...s, kind: "rectangle", radius: 999, solid: "#FFFFFF", gradient: undefined, stroke: undefined }),
+  },
+  {
+    label: tt("圆形"),
+    apply: (s) => ({ ...s, kind: "oval", solid: "#FFFFFF", gradient: undefined, stroke: undefined, corners: undefined, radius: undefined }),
+  },
+  {
+    label: tt("环形"),
+    apply: (s) => ({ ...s, kind: "ring", ringHole: 0.5, solid: "#FFFFFF", gradient: undefined, stroke: undefined, corners: undefined, radius: undefined }),
+  },
+];
+
+/** M117：圆角快捷值 */
+const RADIUS_PRESETS = [0, 4, 8, 12, 16, 24, 32, 999];
 
 /** 底部抽屉的分页（和图标编辑器同款） */
 const SHEET_TABS: [SheetTab, string][] = [
@@ -73,6 +99,28 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
   }, [existingXml]);
 
   const [spec, setSpec] = useState<ShapeSpec>(initial);
+  /* M117：撤销/重做（spec 历史栈，最多 30 步） */
+  const [undoStack, setUndoStack] = useState<ShapeSpec[]>([]);
+  const [redoStack, setRedoStack] = useState<ShapeSpec[]>([]);
+  const commitSpec = (updater: (s: ShapeSpec) => ShapeSpec) => {
+    setUndoStack((prev) => [...prev.slice(-29), spec]);
+    setRedoStack([]);
+    setSpec((s) => updater(s));
+  };
+  const undo = () => {
+    if (undoStack.length === 0) return;
+    const prev = undoStack[undoStack.length - 1];
+    setUndoStack((s) => s.slice(0, -1));
+    setRedoStack((s) => [...s, spec]);
+    setSpec(prev);
+  };
+  const redo = () => {
+    if (redoStack.length === 0) return;
+    const next = redoStack[redoStack.length - 1];
+    setRedoStack((s) => s.slice(0, -1));
+    setUndoStack((s) => [...s, spec]);
+    setSpec(next);
+  };
   const [advanced, setAdvanced] = useState<boolean>(!!initial.gradient);
   const [perCorner, setPerCorner] = useState<boolean>(!!initial.corners);
   const [dashed, setDashed] = useState<boolean>(!!initial.stroke?.dashWidth);
@@ -89,6 +137,18 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
   const [sheetOpen, setSheetOpen] = useState(true);
   const [sheetTab, setSheetTab] = useState<SheetTab>("fill");
   const [showRaw, setShowRaw] = useState(false);
+  /* M117：预览背景切换（透明格 / 白 / 深） */
+  const [previewBg, setPreviewBg] = useState<"checker" | "white" | "dark">("checker");
+  const previewBgStyle: React.CSSProperties =
+    previewBg === "checker"
+      ? {
+          backgroundImage:
+            "repeating-conic-gradient(#0000000a 0% 25%, transparent 0% 50%) 50% / 12px 12px",
+          backgroundColor: "#f5f5f7",
+        }
+      : previewBg === "white"
+        ? { backgroundColor: "#ffffff" }
+        : { backgroundColor: "#1a1a22" };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -144,16 +204,27 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
 
   const xml = useMemo(() => buildShapeXml(spec), [spec]);
   const css = useMemo(() => specToCss(argbColorsForPreview(spec)), [spec]);
+  /** M118：预览走的就是即将写入 XML 的那棵树，而不是另一套近似样式 */
+  const doc = useMemo(() => parseDrawable(buildShapeXml(spec)), [spec]);
 
+  /* M117：Ctrl/Cmd + Z / Shift+Z 撤销重做 */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      onClose();
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.shiftKey) redo();
+        else undo();
+      }
     };
     document.addEventListener("keydown", onKey, true);
     return () => document.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  }, [onClose, undoStack, redoStack, spec]);
 
   const save = () => {
     const safe = sanitizeResName(name);
@@ -167,8 +238,10 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
 
   /* 画布里的预览尺寸（dp）：线条铺满，其它给一块矩形/椭圆 */
   const isLine = spec.kind === "line";
+  const isRing = spec.kind === "ring";
   const prevW = isLine ? 240 : 220;
   const prevH = isLine ? 2 : 140;
+  const ringPct = Math.round((spec.ringHole ?? 0.4) * 50);
 
   return (
     <div className="axv-icon-page axv-cv-page" role="dialog" aria-label={tt("自定义形状")}>
@@ -178,6 +251,24 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
         </button>
         <span className="axv-shape-title">{tt("自定义形状 · {name}", { name: attrName })}</span>
         <span className="axv-cv-head-tools">
+          <button
+            className="axv-icon-btn"
+            onClick={undo}
+            disabled={undoStack.length === 0}
+            title={tt("撤销")}
+            aria-label={tt("撤销")}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>undo</span>
+          </button>
+          <button
+            className="axv-icon-btn"
+            onClick={redo}
+            disabled={redoStack.length === 0}
+            title={tt("重做")}
+            aria-label={tt("重做")}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>redo</span>
+          </button>
           <button
             className="axv-icon-btn"
             onClick={() => {
@@ -246,22 +337,39 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
           </div>
 
           <div className="axv-cv-stage">
-            <div className="axv-cv-board" style={{ width: 300, display: "grid", placeItems: "center" }}>
-              <div
-                className="axv-shape-preview"
-                style={{
-                  background: css.background,
-                  borderRadius: css.borderRadius,
-                  border: css.border,
-                  // M5c：inset 预览——背景向内裁掉 l/t/r/b（画布里由独立背景层实现）
-                  clipPath: css.clipPath,
-                  width: prevW,
-                  height: prevH,
-                }}
-              />
+            <div
+              className="axv-cv-board"
+              style={{ width: 300, display: "grid", placeItems: "center", ...previewBgStyle }}
+            >
+              <div className="axv-shape-preview-slot" style={{ width: prevW, height: prevH }}>
+                <DrawablePreview
+                  doc={doc}
+                  width={prevW}
+                  height={prevH}
+                  scale={1}
+                  backdrop={previewBg}
+                  showStateBar
+                />
+              </div>
             </div>
             <div className="axv-cv-hint" style={{ textAlign: "center" }}>
               {tt("预览 = 画布效果（同一套渲染规则）")}
+              <div className="axv-shape-pv-bg" style={{ marginTop: 6, display: "inline-flex", gap: 4 }}>
+                {(["checker", "white", "dark"] as const).map((bg) => (
+                  <button
+                    key={bg}
+                    type="button"
+                    className={"axv-shape-pv-bg-btn" + (previewBg === bg ? " is-on" : "")}
+                    onClick={() => setPreviewBg(bg)}
+                    title={bg === "checker" ? tt("透明格") : bg === "white" ? tt("白底") : tt("深底")}
+                    aria-label={bg === "checker" ? tt("透明格") : bg === "white" ? tt("白底") : tt("深底")}
+                  >
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>
+                      {bg === "checker" ? "grid_4x4" : bg === "white" ? "wb_sunny" : "dark_mode"}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -326,6 +434,23 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
           <div className="axv-cv-sheet-body">
             {sheetTab === "shape" ? (
               <div className="axv-cv-sheet-pane">
+                {/* M117：预设样式 */}
+                <div className="axv-shape-field">
+                  <label>{tt("预设")}</label>
+                  <div className="axv-shape-preset-row">
+                    {SHAPE_PRESETS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        className="axv-shape-preset"
+                        onClick={() => commitSpec(p.apply)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="axv-shape-field">
                   <label>{tt("形状")}</label>
                   <div className="axv-shape-seg">
@@ -340,6 +465,26 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                     ))}
                   </div>
                 </div>
+
+                {/* M117：环形洞比例（仅 ring） */}
+                {isRing ? (
+                  <div className="axv-shape-field">
+                    <label>
+                      {tt("环洞比例")}
+                      <span className="axv-shape-hint">{tt("越大洞越大")}</span>
+                    </label>
+                    <div className="axv-shape-range">
+                      <input
+                        type="range"
+                        min={0}
+                        max={90}
+                        value={Math.round((spec.ringHole ?? 0.4) * 100)}
+                        onChange={(e) => patch({ ringHole: Number(e.target.value) / 100 })}
+                      />
+                      <span>{ringPct}%</span>
+                    </div>
+                  </div>
+                ) : null}
 
                 {spec.kind === "rectangle" ? (
                   <div className="axv-shape-field">
@@ -371,16 +516,34 @@ export function ShapeEditor({ attrName, value, existingXml, existingNames, onClo
                         ))}
                       </div>
                     ) : (
-                      <div className="axv-shape-range">
-                        <input
-                          type="range"
-                          min={0}
-                          max={48}
-                          value={spec.radius ?? 0}
-                          onChange={(e) => patch({ radius: Number(e.target.value) })}
-                        />
-                        <span>{spec.radius ?? 0}dp</span>
-                      </div>
+                      <>
+                        <div className="axv-shape-range">
+                          <input
+                            type="range"
+                            min={0}
+                            max={48}
+                            value={spec.radius ?? 0}
+                            onChange={(e) => patch({ radius: Number(e.target.value) })}
+                          />
+                          <span>{spec.radius ?? 0}dp</span>
+                        </div>
+                        {/* M117：圆角快捷值 */}
+                        <div className="axv-shape-radius-quick">
+                          {RADIUS_PRESETS.map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              className={
+                                "axv-shape-radius-chip" +
+                                ((spec.radius ?? 0) === r ? " is-on" : "")
+                              }
+                              onClick={() => patch({ radius: r })}
+                            >
+                              {r === 999 ? tt("胶囊") : `${r}`}
+                            </button>
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
                 ) : null}

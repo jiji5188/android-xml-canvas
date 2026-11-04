@@ -11,6 +11,21 @@ export type SrcDict = Record<string, string>;
 
 /** 英文 —— 简体中文原文 → English */
 export const SRC_EN: SrcDict = {
+  // ---- M117/M118 形状编辑器 + drawable 图层预览 ----
+  "预设": "Presets",
+  "形状预设": "Shape presets",
+  "环洞比例": "Ring hole",
+  "越大洞越大": "Larger = bigger hole",
+  "胶囊": "Pill",
+  "环形": "Ring",
+  "常态": "Rest",
+  "按住看波纹": "Hold to see ripple",
+  "点击试效果": "Tap to preview",
+  "预览禁用态": "Preview disabled state",
+  "只读预览": "Read-only preview",
+  "暂不支持预览": "Preview not supported yet",
+  "重置": "Reset",
+
   // ---- 已生成资源面板（GenAssetsPanel）----
   "已生成资源": "Generated assets",
   "搜索资源名…": "Search asset name…",

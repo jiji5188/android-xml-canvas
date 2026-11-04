@@ -38,6 +38,9 @@ export interface DrawablePreviewProps {
   backdrop?: "checker" | "white" | "dark" | "none";
   /** M133：显示「整个 drawable 的边界」参照框（选区之外的位置，看图层往哪偏移） */
   showBounds?: boolean;
+  /** M135：把「预览框」自己画（棋盘格/纯色底 + 内边距），这样底部状态条
+      （常态 / 按下 / 禁用）落在框外面，不会被父层 overflow:hidden 裁掉 */
+  frame?: React.CSSProperties;
   className?: string;
   /** 状态变化回调（外部想同步显示时用） */
   onStateChange?: (s: ViewState) => void;
@@ -53,6 +56,7 @@ export function DrawablePreview({
   showStateBar = true,
   showBounds = false,
   backdrop = "checker",
+  frame,
   className,
   onStateChange,
 }: DrawablePreviewProps) {
@@ -125,63 +129,80 @@ export function DrawablePreview({
   /** 波纹要贴着最上层的形状裁（近似） */
   const clipRadius = topShapeRadius(layers);
 
-  return (
-    <div className={"axv-dp" + (className ? " " + className : "")} style={{ width, height }}>
-      <div
-        className={
-          "axv-dp-box" +
-          (interactive && !disabled ? " is-live" : "") +
-          (disabled ? " is-disabled" : "")
-        }
-        style={{
-          width,
-          height,
-          background: backdropStyle(backdrop),
-        }}
-        onPointerDown={down}
-        onPointerUp={up}
-        onPointerCancel={up}
-        onPointerLeave={up}
-      >
-        {layers.map((l) => (
-          <LayerView key={l.key} layer={l} scale={scale} boxW={width} boxH={height} />
-        ))}
+  /** M135：预览框（棋盘格 / 纯色底 + 内边距）由外层传入时，框只包住 drawable，
+      底部状态条落在框外 —— 以前框包着整块（含状态条），overflow:hidden 把按钮裁没了 */
+  const boxNode = (
+    <div
+      className={
+        "axv-dp-box" +
+        (interactive && !disabled ? " is-live" : "") +
+        (disabled ? " is-disabled" : "")
+      }
+      style={{
+        width,
+        height,
+        background: backdropStyle(backdrop),
+      }}
+      onPointerDown={down}
+      onPointerUp={up}
+      onPointerCancel={up}
+      onPointerLeave={up}
+    >
+      {layers.map((l) => (
+        <LayerView key={l.key} layer={l} scale={scale} boxW={width} boxH={height} />
+      ))}
 
-        {showRipple ? (
-          <div
-            className="axv-dp-ripple-mask"
-            style={{ borderRadius: clipRadius, opacity: pressed ? 1 : 0 }}
-          >
-            <span
-              key={pressed ? "on" : "off"}
-              className={"axv-dp-ripple" + (pressed ? " is-on" : " is-fading")}
-              style={
-                {
-                  // 注意：Android 的 #AARRGGBB 直接交给 CSS 会被当成 #RRGGBBAA，必须转换
-                  background: androidColorToCss(rippleColor),
-                  left: `${origin.x}%`,
-                  top: `${origin.y}%`,
-                  ["--axv-dp-ripple-size" as string]: `${Math.max(width, height) * 2}px`,
-                } as React.CSSProperties
-              }
-            />
-          </div>
-        ) : null}
-
-        {!interactive ? (
-          <div className="axv-dp-lock" title={tt("只读预览")}>
-            <span className="msr" aria-hidden="true">lock</span>
-          </div>
-        ) : null}
-
-        {showBounds ? (
-          <div
-            className="axv-dp-bounds"
-            title={tt("drawable 边界")}
-            style={{ width, height, marginLeft: "-2px", marginTop: "-2px" }}
+      {showRipple ? (
+        <div
+          className="axv-dp-ripple-mask"
+          style={{ borderRadius: clipRadius, opacity: pressed ? 1 : 0 }}
+        >
+          <span
+            key={pressed ? "on" : "off"}
+            className={"axv-dp-ripple" + (pressed ? " is-on" : " is-fading")}
+            style={
+              {
+                // 注意：Android 的 #AARRGGBB 直接交给 CSS 会被当成 #RRGGBBAA，必须转换
+                background: androidColorToCss(rippleColor),
+                left: `${origin.x}%`,
+                top: `${origin.y}%`,
+                ["--axv-dp-ripple-size" as string]: `${Math.max(width, height) * 2}px`,
+              } as React.CSSProperties
+            }
           />
-        ) : null}
-      </div>
+        </div>
+      ) : null}
+
+      {!interactive ? (
+        <div className="axv-dp-lock" title={tt("只读预览")}>
+          <span className="msr" aria-hidden="true">lock</span>
+        </div>
+      ) : null}
+
+      {showBounds ? (
+        <div
+          className="axv-dp-bounds"
+          title={tt("drawable 边界")}
+          style={{ width, height, marginLeft: "-2px", marginTop: "-2px" }}
+        />
+      ) : null}
+    </div>
+  );
+
+  return (
+    // M135：带状态条时高度必须自适应（以前写死 height，状态条被父层 overflow:hidden 裁掉，
+    // 「按下 / 禁用」按钮看不到）；只有纯预览（无状态条）才保持严格尺寸
+    <div
+      className={"axv-dp" + (className ? " " + className : "")}
+      style={{ width: frame ? "auto" : width, height: showStateBar ? "auto" : height }}
+    >
+      {frame ? (
+        <div className="axv-dp-frame" style={frame}>
+          {boxNode}
+        </div>
+      ) : (
+        boxNode
+      )}
 
       {showStateBar ? (
         <div className="axv-dp-state">

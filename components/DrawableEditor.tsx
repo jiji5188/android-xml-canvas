@@ -101,6 +101,24 @@ export function DrawableEditor({
   const [presetOpen, setPresetOpen] = useState(false);
   /** 窄屏：底部抽屉里再画一棵结构树；宽屏只在右侧面板画一份 */
   const narrow = useNarrow();
+  // M135：宽屏抽屉是浮层，量出它实际占的高度把左右两栏顶上去，
+  // 否则右栏底部的 XML 代码框会被抽屉压掉一半（抽屉高度随页签内容变，写死数值不准）
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [sheetH, setSheetH] = useState(0);
+  useEffect(() => {
+    const el = sheetRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setSheetH(el.offsetHeight));
+    ro.observe(el);
+    setSheetH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, []);
+  /** 收起时只露 45px 的标题条 */
+  const sheetSpace = sheetH > 0 ? (sheetOpen ? sheetH + 6 : 51) : 0;
+  // M135：窄屏默认收起右栏（75vw 的面板一打开就把预览盖掉），先看预览，要调参数再拉出来
+  useEffect(() => {
+    setFormOpen(!narrow);
+  }, [narrow]);
 
   const close = useOverlayBack(true, onClose);
 
@@ -208,7 +226,10 @@ export function DrawableEditor({
         </span>
       </div>
 
-      <div className="axv-icon-page-body axv-cv-body">
+      <div
+        className="axv-icon-page-body axv-cv-body"
+        style={sheetSpace && !narrow ? { paddingBottom: sheetSpace } : undefined}
+      >
         <div className="axv-cv-left">
           <div className="axv-dw-bar">
             <div className="axv-shape-seg">
@@ -254,25 +275,27 @@ export function DrawableEditor({
             </div>
           ) : null}
 
-          <div className="axv-dw-preview" style={previewBgStyle}>
-            <div className="axv-dw-canvas">
-              <DrawablePreview
-                doc={focus}
-                interactive
-                width={220}
-                height={140}
-                showStateBar
-                showBounds
-                backdrop="none"
-              />
-            </div>
-            {focused ? (
+          <div className="axv-dw-stage">
+            <DrawablePreview
+              doc={focus}
+              interactive
+              width={220}
+              height={140}
+              showStateBar
+              showBounds
+              backdrop="none"
+              frame={previewBgStyle}
+            />
+          </div>
+
+          {focused ? (
+            <div className="axv-dw-stage axv-dw-stage-focus">
               <button className="axv-dw-focus" onClick={() => setPath([])}>
                 <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>layers</span>
                 {tt("只看选中层")}
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           <div className="axv-dw-meta">
             <span>{tt("共 {n} 个节点", { n: String(countNodes(root)) })}</span>
@@ -339,7 +362,7 @@ export function DrawableEditor({
           ) : null}
         </div>
 
-        <div className={"axv-cv-sheet" + (sheetOpen ? "" : " is-collapsed")}>
+        <div className={"axv-cv-sheet" + (sheetOpen ? "" : " is-collapsed")} ref={sheetRef}>
           <div className="axv-cv-sheet-head" onClick={() => setSheetOpen((v) => !v)}>
             <span className="axv-cv-grabber" aria-hidden="true" />
             <span className="axv-cv-sheet-title">{tt("内容")}</span>

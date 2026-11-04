@@ -8657,8 +8657,12 @@ button.axv-sb-item:hover {
   .axv-cv-body .axv-cv-form-mask { display: block; }
 }
 
+/* M135：宽屏下抽屉占的高度由 DrawableEditor 用 ResizeObserver 量出来，
+   已改成行内 style 给 .axv-cv-body 加 padding-bottom；这里不再写死数值 */
+
 @media (max-width: 840px) {
-  .axv-cv-sheet { left: 4px; right: 4px; bottom: 0px; max-height: 46vh; border-radius: 14px 14px 0px 0px; }
+  .axv-cv-sheet { left: 4px; right: 4px; bottom: 0px; max-height: 46vh; border-radius: 14px 14px 0px 0px; }  /* M135：窄屏预览框收一圈留白，220×140 在 360~420px 宽的屏上也能完整站稳 */
+  .axv-dp-frame { padding: 12px; }
   .axv-cv-sheet-tab { padding: 0 8px; font-size: 12px; }
   .axv-cv-sheet-title { display: none; }
   .axv-cv-sheet-tabs { margin-left: 0; }
@@ -9047,6 +9051,24 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   white-space: nowrap;
 }
 
+/* M135：预览框改由 DrawablePreview 内部的 .axv-dp-frame 画（框只包住 drawable），
+   外面这层 .axv-dw-stage 只负责水平居中 */
+.axv-dw-stage {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+}
+.axv-dw-stage-focus { margin-top: 6px; justify-content: flex-end; position: relative; }
+.axv-dw-stage-focus .axv-dw-focus { position: static; }
+.axv-dp-frame {
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
 /* M132：预览背景层 = 外层 .axv-dw-preview（棋盘格 / 纯色由内联 style 给），
    内层 .axv-dp-box 只负责画 drawable 内容，自己不铺底色。 */
 .axv-dw-preview {
@@ -9056,11 +9078,15 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  /* M135：预览框不再拉满整行（拉满会让棋盘格比 drawable 大一圈，看着像画布尺寸），
+     改为收缩到内容宽度 + 水平居中；窄屏时再缩一圈内边距，保证 220×140 不被裁 */
+  align-self: center;
+  max-width: 100%;
 }
 .axv-dw-canvas { border-radius: 8px; overflow: hidden; }
 /* M132：预览里四周留 20px，让外层背景（棋盘格）露一圈当边框；flex:none 防止被压扁 */
 .axv-dw-preview .axv-dp-box { margin: 20px; flex: 0 0 auto; }
-.axv-dw-meta { display: flex; gap: 10px; font-size: 11px; color: var(--axv-muted); margin-top: 8px; }
+.axv-dw-meta { display: flex; gap: 10px; font-size: 11px; color: var(--axv-muted); margin-top: 8px; justify-content: center; }
 .axv-dw-problems { display: flex; flex-direction: column; gap: 6px; }
 .axv-dw-problem {
   font-size: 11px;

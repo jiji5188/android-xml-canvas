@@ -18,6 +18,10 @@ export interface XmlNode {
   /** M2q：该子树是从哪个 include 展开来的（文件名，如 "header.xml"）。
    *  渲染模型里存在，但回写主 XML 时这些节点不可编辑。 */
   includeFile?: string;
+  /** M126：该元素在去声明后的源文本里的字节区间 [srcStart, srcEnd)。
+   *  drawable 结构树用它把「不认识的子树」原样切片回写（注释/缩进/换行全保留）。 */
+  srcStart?: number;
+  srcEnd?: number;
 }
 
 /** 解析错误/警告（不阻断渲染） */

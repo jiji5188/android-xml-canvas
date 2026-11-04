@@ -37,7 +37,9 @@ export function buildDrawable(node: DrawableNode): string {
   if (lines.length === 0) return "";
   // 根节点补 xmlns（内层不重复声明）
   lines[0] = lines[0].replace(/^<([A-Za-z][\w.-]*)/, (_m, tag: string) => `<${tag} xmlns:android="${NS}"`);
-  return lines.join("\n") + "\n";
+  // M126：源文件有 XML 声明就原样放回去（以前会被丢掉）
+  const decl = (node as { decl?: string }).decl;
+  return (decl ? decl + "\n" : "") + lines.join("\n") + "\n";
 }
 
 /** 不带 xmlns 的片段（嵌在 <item> 里时用），已按 level 缩进 */
@@ -114,15 +116,24 @@ function emit(node: DrawableNode, level: number): string[] {
     }
 
     default: {
-      // 看不懂的标签：有原文就原样写回（只重新对齐缩进），没有就输出自闭合占位
+      // M126：不认识的标签：有原始字节就**整体平移**（内部注释/换行/缩进全保留），没有就输出自闭合占位
       const raw = (node as { raw?: string }).raw;
       const tag = (node as { tag?: string }).tag ?? "shape";
       const pad = IND.repeat(level);
       if (raw && raw.trim()) {
-        return raw
-          .split("\n")
-          .map((l) => (l.trim() ? pad + l.trim() : ""))
-          .filter((l, i, arr) => !(l === "" && (i === 0 || i === arr.length - 1)));
+        const rawLines = raw.split("\n");
+        const first = rawLines.find((l) => l.trim());
+        const base = first ? first.length - first.trimStart().length : 0;
+        const lines = rawLines.map((l) => {
+          if (!l.trim()) return "";
+          // 去掉每行自带的 base 缩进，再加上新位置的同名 base，保留相对缩进
+          const stripped = l.slice(base).replace(/\s+$/, "");
+          return pad + stripped;
+        });
+        // 去掉首尾空行
+        while (lines.length && lines[0] === "") lines.shift();
+        while (lines.length && lines[lines.length - 1] === "") lines.pop();
+        return lines;
       }
       return [`${pad}<${tag}/>`];
     }

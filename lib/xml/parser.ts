@@ -17,7 +17,7 @@ export const KNOWN_TAGS = new Set([
 ]);
 
 /** 轻量 XML 解析（支持属性、嵌套、注释、自闭合；不支持 CDATA/实体除标准五件套） */
-export function parseLayoutXml(xml: string, resourceDeclOk = true): { root: XmlNode | null; issues: XmlIssue[] } {
+export function parseLayoutXml(xml: string, resourceDeclOk = true): { root: XmlNode | null; issues: XmlIssue[]; text: string } {
   const issues: XmlIssue[] = [];
   // 去掉 XML 声明与 doctype
   const text = xml
@@ -43,7 +43,8 @@ export function parseLayoutXml(xml: string, resourceDeclOk = true): { root: XmlN
   if (!root && text.trim() !== "") {
     issues.push({ level: "error", nodePath: "#0", message: "无法解析根元素（XML 可能不完整）" });
   }
-  return { root, issues };
+  // M126：把去掉声明后的源文本一起返回，给需要「原始切片」的调用方（drawable 结构树）
+  return { root, issues, text };
 }
 
 function skipWs(s: string, pos: { i: number }): void {
@@ -157,10 +158,14 @@ function parseElement(s: string, pos: { i: number; lineOf?: (o: number) => numbe
     children: [],
     path,
     line: pos.lineOf ? pos.lineOf(openIdx) : undefined,
+    srcStart: openIdx,
   };
 
   // 自闭合标签没有子元素，直接返回（不要吞掉后面的兄弟节点）
-  if (selfClosed) return node;
+  if (selfClosed) {
+    node.srcEnd = pos.i;
+    return node;
+  }
 
   // 子元素
   while (true) {
@@ -195,6 +200,7 @@ function parseElement(s: string, pos: { i: number; lineOf?: (o: number) => numbe
     // 文本节点：M1 忽略（TextView 文本走 android:text 属性）
     while (pos.i < s.length && s[pos.i] !== "<") pos.i++;
   }
+  node.srcEnd = pos.i;
   return node;
 }
 

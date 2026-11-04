@@ -144,9 +144,9 @@ export function refName(raw: string | undefined): string | null {
 
 /** 解析 drawable XML → 图层树；根不是 drawable 返回 null */
 export function parseDrawable(xml: string): DrawableNode | null {
-  const { root } = parseLayoutXml(xml);
+  const { root, text } = parseLayoutXml(xml);
   if (!root) return null;
-  const node = parseNode(root, "0");
+  const node = parseNode(root, "0", text);
   // <color>#ff0000</color> 的色值在文本节点里，parser 不保留文本 → 从原文兜底
   if (node.t === "color" && node.color === "#00000000") {
     const m = xml.match(/<color\b[^>]*>\s*(@?[#A-Za-z0-9_/.:]+)\s*<\/color>/i);
@@ -155,10 +155,13 @@ export function parseDrawable(xml: string): DrawableNode | null {
       node.asText = true;
     }
   }
+  // M126：保留原始 XML 声明，保存时原样放回去（以前会被丢掉）
+  const decl = xml.match(/^\s*(<\?xml[\s\S]*?\?>)/i);
+  if (decl) (node as { decl?: string }).decl = decl[1];
   return node;
 }
 
-function parseNode(node: XmlNode, path: string): DrawableNode {
+function parseNode(node: XmlNode, path: string, src?: string): DrawableNode {
   switch (node.tag) {
     case "shape":
       return { t: "shape", spec: parseShapeLeaf(node) };
@@ -166,16 +169,28 @@ function parseNode(node: XmlNode, path: string): DrawableNode {
       // <color android:color="#f00"/> 或 <color>#f00</color>（文本节点解析器不保留，下面是兜底）
       return { t: "color", color: node.attrs["color"] ?? "#00000000" };
     case "layer-list":
-      return { t: "layer", items: parseLayerItems(node, path) };
+      return { t: "layer", items: parseLayerItems(node, path, src) };
     case "selector":
-      return { t: "selector", items: parseStateItems(node, path) };
+      return { t: "selector", items: parseStateItems(node, path, src) };
     case "ripple":
-      return parseRipple(node, path);
+      return parseRipple(node, path, src);
     case "inset":
-      return parseInset(node, path);
+      return parseInset(node, path, src);
     default:
-      return { t: "unsupported", tag: node.tag, raw: serializeXmlNode(node) };
+      return { t: "unsupported", tag: node.tag, raw: rawSlice(node, src) ?? serializeXmlNode(node) };
   }
+}
+
+/** M126：不认识的子树优先取**原始字节**（注释/换行/缩进全保留），拿不到才退回序列化 */
+function rawSlice(node: XmlNode, src?: string): string | null {
+  if (!src) return null;
+  const { srcStart, srcEnd } = node;
+  if (typeof srcStart !== "number" || typeof srcEnd !== "number") return null;
+  if (srcEnd <= srcStart) return null;
+  // 回退到行首，把原始缩进一并带走；回写时才能正确整体平移（否则首行无缩进、后续行缩进被算歪）
+  let start = srcStart;
+  while (start > 0 && src[start - 1] !== "\n") start--;
+  return src.slice(start, srcEnd);
 }
 
 /** XmlNode → XML 文本（M120：给不支持的子树保留原文用；属性顺序保持解析顺序） */
@@ -190,14 +205,14 @@ export function serializeXmlNode(n: XmlNode, level = 0): string {
   return `${pad}<${n.tag}${attrs ? " " + attrs : ""}>\n${inner}\n${pad}</${n.tag}>`;
 }
 
-function parseLayerItems(node: XmlNode, path: string): LayerItem[] {
+function parseLayerItems(node: XmlNode, path: string, src?: string): LayerItem[] {
   const out: LayerItem[] = [];
   const items = kids(node).filter((c) => c.tag === "item");
   items.forEach((it, i) => {
     const key = `${path}.${i}`;
     const inner = it.attrs["drawable"] ? null : kids(it).find(ELEMENT);
     const child: DrawableNode = inner
-      ? parseNode(inner, key)
+      ? parseNode(inner, key, src)
       : it.attrs["drawable"]
         ? toRefOrColor(it.attrs["drawable"])
         : { t: "unsupported", tag: "item" };
@@ -223,7 +238,7 @@ function parseLayerItems(node: XmlNode, path: string): LayerItem[] {
   return out;
 }
 
-function parseStateItems(node: XmlNode, path: string): StateItem[] {
+function parseStateItems(node: XmlNode, path: string, src?: string): StateItem[] {
   const out: StateItem[] = [];
   kids(node)
     .filter((c) => c.tag === "item")
@@ -235,7 +250,7 @@ function parseStateItems(node: XmlNode, path: string): StateItem[] {
       }
       const inner = kids(it).find(ELEMENT);
       const child: DrawableNode = inner
-        ? parseNode(inner, key)
+        ? parseNode(inner, key, src)
         : it.attrs["drawable"]
           ? toRefOrColor(it.attrs["drawable"])
           : { t: "unsupported", tag: "item" };
@@ -244,7 +259,7 @@ function parseStateItems(node: XmlNode, path: string): StateItem[] {
   return out;
 }
 
-function parseRipple(node: XmlNode, path: string): DrawableNode {
+function parseRipple(node: XmlNode, path: string, src?: string): DrawableNode {
   let content: DrawableNode | undefined;
   let mask: DrawableNode | undefined;
   kids(node)
@@ -253,7 +268,7 @@ function parseRipple(node: XmlNode, path: string): DrawableNode {
       const key = `${path}.${i}`;
       const inner = kids(it).find(ELEMENT);
       const child: DrawableNode = inner
-        ? parseNode(inner, key)
+        ? parseNode(inner, key, src)
         : it.attrs["drawable"]
           ? toRefOrColor(it.attrs["drawable"])
           : { t: "unsupported", tag: "item" };
@@ -269,7 +284,7 @@ function parseRipple(node: XmlNode, path: string): DrawableNode {
   };
 }
 
-function parseInset(node: XmlNode, path: string): DrawableNode {
+function parseInset(node: XmlNode, path: string, src?: string): DrawableNode {
   const inner = kids(node).find(ELEMENT);
   return {
     t: "inset",
@@ -277,7 +292,7 @@ function parseInset(node: XmlNode, path: string): DrawableNode {
     top: dp(node.attrs["insetTop"] ?? node.attrs["insetT"]) ?? 0,
     right: dp(node.attrs["insetRight"] ?? node.attrs["insetR"]) ?? 0,
     bottom: dp(node.attrs["insetBottom"] ?? node.attrs["insetB"]) ?? 0,
-    node: inner ? parseNode(inner, `${path}.0`) : { t: "unsupported", tag: "inset" },
+    node: inner ? parseNode(inner, `${path}.0`, src) : { t: "unsupported", tag: "inset" },
   };
 }
 

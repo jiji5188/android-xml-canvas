@@ -11,7 +11,7 @@
 //   结构（面包屑 + 子节点列表 + 添加菜单）
 //   参数（schema 驱动的属性行 + 形状的常用参数）
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { useOverlayBack } from "@/lib/overlay-back";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
@@ -62,6 +62,10 @@ export function DrawableEditor({
   onSave,
 }: DrawableEditorProps) {
   const [root, setRoot] = useState<DrawableNode>(() => parseDrawable(existingXml ?? "") ?? defaultTree());
+  /** 初始树引用：没动过任何编辑时保存原样写回（注释、换行、声明全保留，一个字节都不碰） */
+  const initialRef = useRef(root);
+  /** existingXml 是否解析成功（解析失败 = 别拿默认树去覆盖用户文件） */
+  const parsedOk = useMemo(() => (existingXml ? parseDrawable(existingXml) !== null : true), [existingXml]);
   /** 根元素识别：决定是「能编辑」还是「只读但原样保存」（M124） */
   const info = useMemo(() => rootInfo(existingXml), [existingXml]);
   const readonly = info.route === "readonly";
@@ -122,6 +126,13 @@ export function DrawableEditor({
       return;
     }
     if (errors.length > 0) return;
+    // M126 保真：existingXml 解析失败时不许存（默认树不能覆盖用户文件）；
+    // 用户一点没改时直接写回原文，注释/换行/XML 声明全部原样
+    if (existingXml && !parsedOk) return;
+    if (existingXml && root === initialRef.current) {
+      onSave(safe, existingXml);
+      return;
+    }
     onSave(safe, xml);
   };
 

@@ -77,12 +77,13 @@ export function DrawableTree({
   onSelect: (p: Path) => void;
   onChange: (next: DrawableNode) => void;
 }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  /** M125：默认只展开顶层（根），更深的先折叠，避免手机上内容满屏 */
+  const [opened, setOpened] = useState<Set<string>>(() => new Set([""]));
   /** 哪一行弹着「加组件」菜单 */
   const [addAt, setAddAt] = useState<string | null>(null);
 
   const toggle = (key: string) => {
-    setCollapsed((s) => {
+    setOpened((s) => {
       const next = new Set(s);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -90,13 +91,15 @@ export function DrawableTree({
     });
   };
 
+  const isCollapsed = (key: string) => !opened.has(key);
+
   const samePath = (a: Path, b: Path) => a.length === b.length && a.every((v, i) => v === b[i]);
   const closeAdd = () => {
     if (addAt) setAddAt(null);
   };
 
   const addMenu = (node: DrawableNode, here: Path, depth: number) => (
-    <div className="axv-dt-add" style={{ marginLeft: 22 + depth * 14 }}>
+    <div className="axv-dt-add" style={{ marginLeft: 24 + depth * 8 }}>
       <div className="axv-dt-add-title">{tt("往「{name}」里加", { name: nodeTitle(node) })}</div>
       <div className="axv-dt-add-list">
         {childChoices(node).map((c) => (
@@ -135,13 +138,13 @@ export function DrawableTree({
     const key = here.join("/");
     const isRoot = here.length === 0;
     const selected = samePath(path, here);
-    const open = kids > 0 && !collapsed.has(key);
+    const open = kids > 0 && !isCollapsed(key);
 
     return (
       <div key={key}>
         <div
           className={"axv-dt-row" + (selected ? " sel" : "")}
-          style={{ paddingLeft: 8 + depth * 14 }}
+          style={{ paddingLeft: 8 + depth * 8 }}
           onClick={() => {
             onSelect(here);
             closeAdd();

@@ -9185,3 +9185,24 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* M125：预览「只看选中层」小按钮 */
+.axv-dw-preview {
+  position: relative;
+}
+.axv-dw-focus {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border: 1px solid var(--axv-primary);
+  border-radius: 13px;
+  background: var(--axv-primary-soft);
+  color: var(--axv-primary);
+  font-size: 11px;
+  cursor: pointer;
+  z-index: 2;
+}

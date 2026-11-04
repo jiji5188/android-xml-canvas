@@ -75,9 +75,11 @@ afterEach(async () => {
 });
 
 describe("M124 结构树", () => {
-  it("整棵树一次显示：根 + 每个状态 + 状态里的形状", async () => {
-    await mount(SELECTOR);
-    const texts = rowText();
+  it("整棵树逐层展开后：根 + 每个状态 + 状态里的形状", async () => {
+    const state = await mount(SELECTOR);
+    void state;
+    // 根默认展开；再展开一层（shape 是叶子，不用展开）
+    let texts = rowText();
     expect(texts[0]).toContain("状态选择");
     expect(texts.join("|")).toContain("按下");
     expect(texts.join("|")).toContain("兜底");
@@ -87,11 +89,14 @@ describe("M124 结构树", () => {
     expect(rows().length).toBe(3); // 根 + 2 状态
   });
 
-  it("嵌套容器按深度缩进，层级一眼可见", async () => {
+  it("嵌套容器按 8dp 缩进，逐层展开后层级一眼可见", async () => {
     await mount(NESTED);
+    // 先展开「内容」行（layer），让 shape 露出来
+    rows()[1].querySelector<HTMLButtonElement>(".axv-dt-chev")!.click();
+    await flush();
     const pads = rows().map((r) => parseInt(r.style.paddingLeft || "0", 10));
-    for (let i = 1; i < pads.length; i++) expect(pads[i]).toBeGreaterThanOrEqual(pads[i - 1] - 14);
-    expect(Math.max(...pads)).toBeGreaterThanOrEqual(pads[0] + 28);
+    // 8dp 一档：根 8、内容 16、形状 24
+    expect(pads).toEqual([8, 16, 24, 24]);
     expect(rowText().join("|")).toContain("图层叠加");
   });
 

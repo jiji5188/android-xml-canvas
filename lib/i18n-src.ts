@@ -1231,6 +1231,7 @@ export const SRC_EN: SrcDict = {
   "这看起来不是 drawable，建议在对应的编辑器里改，这里只保证不改坏。": "This doesn't look like a drawable. Edit it in its own editor; here we only avoid breaking it.",
   "还不认识这个根元素，只能查看和原样保存。": "Unknown root element — view-only, saved as-is.",
   "形状 · {kind}": "Shape · {kind}",
+  "只看选中层": "Only selected layer",
 };
 
 /** 繁體 —— 只登记与简体不同的；没登记的会先试英文兜底 */

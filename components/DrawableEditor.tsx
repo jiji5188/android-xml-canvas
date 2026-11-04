@@ -24,6 +24,7 @@ import { validateDrawable } from "@/lib/xml/drawable-schema";
 import { DRAWABLE_PRESETS } from "@/lib/xml/drawable-presets";
 import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
 import { DrawablePreview } from "./DrawablePreview";
+import { focusDoc } from "@/lib/xml/drawable-focus";
 import { AttrRows } from "./drawable/AttrRows";
 import { ShapeFields } from "./drawable/ShapeFields";
 import { DrawableTree } from "./drawable/DrawableTree";
@@ -80,6 +81,9 @@ export function DrawableEditor({
   const problems = useMemo(() => validateDrawable(root), [root]);
   const errors = problems.filter((p) => p.level === "error");
   const node = nodeAt(root, path) ?? root;
+  /** 选中某一层时就只看它（同样的 flatten 路径，不是另画一套） */
+  const focus = useMemo(() => focusDoc(root, path), [root, path]);
+  const focused = path.length > 0;
   const nameConflicts = existingNames.includes(name) && !existingXml;
 
   const mutate = (next: DrawableNode) => {
@@ -221,14 +225,14 @@ export function DrawableEditor({
 
           <div className="axv-dw-preview" style={previewBgStyle}>
             <div className="axv-dw-canvas">
-              <DrawablePreview
-                doc={root}
-                interactive
-                width={220}
-                height={140}
-                showStateBar
-              />
+              <DrawablePreview doc={focus} interactive width={220} height={140} showStateBar />
             </div>
+            {focused ? (
+              <button className="axv-dw-focus" onClick={() => setPath([])}>
+                <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>layers</span>
+                {tt("只看选中层")}
+              </button>
+            ) : null}
           </div>
 
           <div className="axv-dw-meta">

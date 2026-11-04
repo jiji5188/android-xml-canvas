@@ -23,8 +23,23 @@ const ICON: Record<string, string> = {
   layer: "layers",
   selector: "rule",
   ripple: "water_drop",
-  inset: "crop_free",
   unsupported: "help",
+};
+
+const TRANSFORM_ICON: Record<string, string> = {
+  inset: "crop_free",
+  clip: "crop",
+  scale: "aspect_ratio",
+  rotate: "rotate_right",
+  "animated-rotate": "rotate_right",
+};
+
+const TRANSFORM_LABEL: Record<string, string> = {
+  inset: "内缩",
+  clip: "裁剪",
+  scale: "缩放",
+  rotate: "旋转",
+  "animated-rotate": "动画旋转",
 };
 
 /** 节点自身名字（不是子节点行标题） */
@@ -50,20 +65,24 @@ export function nodeTitle(n: DrawableNode): string {
       return tt("状态选择");
     case "ripple":
       return tt("水波纹");
-    case "inset":
-      return tt("内缩");
     default:
       return n.tag || tt("未支持");
   }
 }
 
 function isContainerNode(n: DrawableNode): boolean {
-  return n.t === "layer" || n.t === "selector" || n.t === "ripple" || n.t === "inset";
+  return n.t === "layer" || n.t === "selector" || n.t === "ripple";
 }
 
 function canAddTo(n: DrawableNode): boolean {
-  if (n.t === "inset") return !n.node || n.node.t === "unsupported";
   return n.t === "layer" || n.t === "selector" || n.t === "ripple";
+}
+
+/** M127：变换链的摘要（树行右侧小字："内缩 + 旋转"） */
+function transformSummary(n: DrawableNode): string | null {
+  const chain = (n as { transform?: { kind: string }[] }).transform;
+  if (!chain?.length) return null;
+  return chain.map((t) => TRANSFORM_LABEL[t.kind] ?? t.kind).join(" + ");
 }
 
 export function DrawableTree({
@@ -139,6 +158,7 @@ export function DrawableTree({
     const isRoot = here.length === 0;
     const selected = samePath(path, here);
     const open = kids > 0 && !isCollapsed(key);
+    const tsum = transformSummary(node);
 
     return (
       <div key={key}>
@@ -174,7 +194,10 @@ export function DrawableTree({
 
           {slotLabel ? <span className="axv-dt-slot-tag">{slotLabel}</span> : null}
           <span className="axv-dt-name">{nodeTitle(node)}</span>
-          <span className="axv-dt-summary">{nodeSummary(node)}</span>
+          <span className="axv-dt-summary">
+            {tsum ? <span className="axv-dt-transform">{tsum}</span> : null}
+            {nodeSummary(node)}
+          </span>
 
           <span className="axv-dt-ops">
             {isContainerNode(node) && canAddTo(node) ? (

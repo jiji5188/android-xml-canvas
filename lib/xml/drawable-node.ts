@@ -28,6 +28,15 @@ export interface ViewState {
   [k: string]: boolean | undefined;
 }
 
+/** M127：几何变换（inset / clip / scale / rotate）——只包一个子节点、只改几何，所以不当节点 */
+export type TransformKind = "inset" | "clip" | "scale" | "rotate" | "animated-rotate";
+
+export interface Transform {
+  kind: TransformKind;
+  /** 原始属性（去掉 android: 前缀），值为字符串原样保留（如 "50%" / "4dp"） */
+  params: Record<string, string>;
+}
+
 export type DrawableNode =
   | ShapeLeaf
   | ColorLeaf
@@ -35,17 +44,21 @@ export type DrawableNode =
   | LayerNode
   | SelectorNode
   | RippleNode
-  | InsetNode
   | UnsupportedNode;
 
+/** 任何节点都可能带着一条变换链（外→内） */
+export interface WithTransform {
+  transform?: Transform[];
+}
+
 /** <shape> 叶子 */
-export interface ShapeLeaf {
+export interface ShapeLeaf extends WithTransform {
   t: "shape";
   spec: ShapeSpec;
 }
 
 /** <color> 叶子（纯色 drawable） */
-export interface ColorLeaf {
+export interface ColorLeaf extends WithTransform {
   t: "color";
   /** 原始色值，如 #FF112233 / @color/x */
   color: string;
@@ -54,7 +67,7 @@ export interface ColorLeaf {
 }
 
 /** android:drawable="@drawable/x" 或 <item android:drawable="@drawable/x"/> */
-export interface RefLeaf {
+export interface RefLeaf extends WithTransform {
   t: "ref";
   name: string;
 }
@@ -73,7 +86,7 @@ export interface LayerItem {
   node: DrawableNode;
 }
 
-export interface LayerNode {
+export interface LayerNode extends WithTransform {
   t: "layer";
   items: LayerItem[];
 }
@@ -86,12 +99,12 @@ export interface StateItem {
   node: DrawableNode;
 }
 
-export interface SelectorNode {
+export interface SelectorNode extends WithTransform {
   t: "selector";
   items: StateItem[];
 }
 
-export interface RippleNode {
+export interface RippleNode extends WithTransform {
   t: "ripple";
   /** 波纹色（android:color） */
   color?: string;
@@ -112,8 +125,8 @@ export interface InsetNode {
   node: DrawableNode;
 }
 
-/** 暂不支持的标签（animated-vector / level-list / clip / scale …），保留占位不崩 */
-export interface UnsupportedNode {
+/** 暂不支持的标签（animated-vector / level-list / bitmap …），保留占位不崩 */
+export interface UnsupportedNode extends WithTransform {
   t: "unsupported";
   tag: string;
   /** M120：原始子树序列化文本——「看不懂但不要弄丢」，build 时原样写回 */
@@ -121,6 +134,12 @@ export interface UnsupportedNode {
 }
 
 const ELEMENT = (n: XmlNode) => n.tag !== "#text" && n.tag !== "#comment";
+
+/** M127：包装类标签 —— 只包一个子节点、只改几何，解析时压成变换链，不当节点 */
+export const WRAPPER_TAGS: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
+
+export const isWrapperTag = (tag: string): tag is TransformKind =>
+  (WRAPPER_TAGS as string[]).includes(tag);
 
 function kids(node: XmlNode): XmlNode[] {
   return node.children.filter(ELEMENT);
@@ -175,7 +194,11 @@ function parseNode(node: XmlNode, path: string, src?: string): DrawableNode {
     case "ripple":
       return parseRipple(node, path, src);
     case "inset":
-      return parseInset(node, path, src);
+    case "clip":
+    case "scale":
+    case "rotate":
+    case "animated-rotate":
+      return parseWrapper(node, path, src);
     default:
       return { t: "unsupported", tag: node.tag, raw: rawSlice(node, src) ?? serializeXmlNode(node) };
   }
@@ -284,16 +307,41 @@ function parseRipple(node: XmlNode, path: string, src?: string): DrawableNode {
   };
 }
 
-function parseInset(node: XmlNode, path: string, src?: string): DrawableNode {
+
+/**
+ * M127：包装类标签（inset / clip / scale / rotate / animated-rotate）
+ * 只包一个子节点、只改几何 → 不建节点，压成子节点上的变换链（外层在前）。
+ * 这样树上不会多出一行「内缩」，用户看到的就是真实绘制的东西。
+ */
+function parseWrapper(node: XmlNode, path: string, src?: string): DrawableNode {
   const inner = kids(node).find(ELEMENT);
-  return {
-    t: "inset",
-    left: dp(node.attrs["insetLeft"] ?? node.attrs["insetL"]) ?? 0,
-    top: dp(node.attrs["insetTop"] ?? node.attrs["insetT"]) ?? 0,
-    right: dp(node.attrs["insetRight"] ?? node.attrs["insetR"]) ?? 0,
-    bottom: dp(node.attrs["insetBottom"] ?? node.attrs["insetB"]) ?? 0,
-    node: inner ? parseNode(inner, `${path}.0`, src) : { t: "unsupported", tag: "inset" },
-  };
+  const child: DrawableNode = inner
+    ? parseNode(inner, `${path}.0`, src)
+    : node.attrs["drawable"]
+      ? toRefOrColor(node.attrs["drawable"])
+      : { t: "unsupported", tag: node.tag };
+  const params: Record<string, string> = {};
+  for (const [k, v] of Object.entries(node.attrs)) params[k] = v;
+  // 老写法 android:insetL / insetT 归一成 insetLeft / insetTop
+  if (node.tag === "inset") {
+    for (const [short, full] of [
+      ["insetL", "insetLeft"],
+      ["insetT", "insetTop"],
+      ["insetR", "insetRight"],
+      ["insetB", "insetBottom"],
+    ] as const) {
+      if (params[short] !== undefined && params[full] === undefined) {
+        params[full] = params[short];
+        delete params[short];
+      }
+    }
+  }
+  return withTransform(child, { kind: node.tag as TransformKind, params });
+}
+
+/** 把一条变换加到链首（外层在前），不修改入参 */
+export function withTransform(node: DrawableNode, t: Transform): DrawableNode {
+  return { ...node, transform: [t, ...(node.transform ?? [])] } as DrawableNode;
 }
 
 function toRefOrColor(raw: string): DrawableNode {
@@ -328,6 +376,8 @@ export interface RenderLayer {
   size?: { w?: number; h?: number };
   alpha: number;
   gravity?: string;
+  /** M127：剩下的非内缩变换（旋转/缩放/裁剪），按外→内顺序，预览按顺序应用 */
+  transform?: Transform[];
 }
 
 export interface FlattenOptions {
@@ -373,9 +423,30 @@ interface WalkCtx {
   inset: { l: number; t: number; r: number; b: number };
   alpha: number;
   keyPrefix: string;
+  /** M127：从祖先/自身累积的非内缩变换 */
+  transform?: Transform[];
 }
 
-function walk(node: DrawableNode, ctx: WalkCtx): void {
+function walk(node: DrawableNode, ctxIn: WalkCtx): void {
+  // M127：先消化变换链——内缩累加到几何，其余（旋转/缩放/裁剪）随层带走
+  let ctx = ctxIn;
+  if (node.transform?.length) {
+    let inset = ctx.inset;
+    const rest: Transform[] = [...(ctx.transform ?? [])];
+    for (const t of node.transform) {
+      if (t.kind === "inset") {
+        inset = addInset(inset, {
+          l: dp(t.params["insetLeft"]) ?? 0,
+          t: dp(t.params["insetTop"]) ?? 0,
+          r: dp(t.params["insetRight"]) ?? 0,
+          b: dp(t.params["insetBottom"]) ?? 0,
+        });
+      } else if (t.kind !== "animated-rotate") {
+        rest.push(t);
+      }
+    }
+    ctx = { ...ctx, inset, transform: rest };
+  }
   if (ctx.depth > ctx.maxDepth) return;
 
   const label = (s: string) => [...ctx.path, s].join(" › ");
@@ -389,6 +460,7 @@ function walk(node: DrawableNode, ctx: WalkCtx): void {
         spec: node.spec,
         inset: { ...ctx.inset },
         alpha: ctx.alpha,
+        ...(ctx.transform?.length ? { transform: [...ctx.transform] } : {}),
       });
       return;
     }
@@ -400,6 +472,7 @@ function walk(node: DrawableNode, ctx: WalkCtx): void {
         color: node.color,
         inset: { ...ctx.inset },
         alpha: ctx.alpha,
+        ...(ctx.transform?.length ? { transform: [...ctx.transform] } : {}),
       });
       return;
     }
@@ -440,23 +513,9 @@ function walk(node: DrawableNode, ctx: WalkCtx): void {
           color: node.color ?? "#33FFFFFF",
           inset: { ...ctx.inset },
           alpha: ctx.alpha,
+          ...(ctx.transform?.length ? { transform: [...ctx.transform] } : {}),
         });
       }
-      return;
-    }
-    case "inset": {
-      walk(node.node, {
-        ...ctx,
-        depth: ctx.depth + 1,
-        path: [...ctx.path, "inset"],
-        inset: addInset(ctx.inset, {
-          l: node.left,
-          t: node.top,
-          r: node.right,
-          b: node.bottom,
-        }),
-        keyPrefix: `${ctx.keyPrefix}.i`,
-      });
       return;
     }
     case "ref": {
@@ -469,6 +528,7 @@ function walk(node: DrawableNode, ctx: WalkCtx): void {
           kind: "unsupported",
           inset: { ...ctx.inset },
           alpha: ctx.alpha,
+          ...(ctx.transform?.length ? { transform: [...ctx.transform] } : {}),
         });
         return;
       }
@@ -487,6 +547,7 @@ function walk(node: DrawableNode, ctx: WalkCtx): void {
         kind: "unsupported",
         inset: { ...ctx.inset },
         alpha: ctx.alpha,
+        ...(ctx.transform?.length ? { transform: [...ctx.transform] } : {}),
       });
     }
   }
@@ -544,8 +605,6 @@ export function countNodes(node: DrawableNode): number {
       return 1 + node.items.reduce((s, i) => s + countNodes(i.node), 0);
     case "ripple":
       return 1 + (node.content ? countNodes(node.content) : 0) + (node.mask ? countNodes(node.mask) : 0);
-    case "inset":
-      return 1 + countNodes(node.node);
     default:
       return 1;
   }

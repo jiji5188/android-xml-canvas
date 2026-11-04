@@ -88,7 +88,6 @@ const newRipple = (): DrawableNode => ({
   color: "#33FFFFFF",
   content: newShape(),
 });
-const newInset = (): DrawableNode => ({ t: "inset", left: 0, top: 0, right: 0, bottom: 0, node: newShape() });
 const newLayer = (): DrawableNode => ({ t: "layer", items: [{ key: "0.0", node: newShape() }] });
 const newSelector = (): DrawableNode => ({
   t: "selector",
@@ -104,7 +103,6 @@ const DRAWABLE_CHOICES: ChildDef[] = [
   { kind: "layer", label: "图层叠加", make: newLayer },
   { kind: "selector", label: "状态选择", make: newSelector },
   { kind: "ripple", label: "水波纹", make: newRipple },
-  { kind: "inset", label: "内缩", make: newInset },
   { kind: "ref", label: "引用已有资源", make: newRef },
 ];
 
@@ -198,26 +196,6 @@ export const NODE_DEFS: Record<string, NodeDef> = {
     editable: true,
     note: "一个内容 + 可选一个遮罩（遮罩只决定波纹画在哪里，本身不画）",
   },
-  inset: {
-    kind: "inset",
-    tag: "inset",
-    label: "内缩",
-    role: "wrapper",
-    attrs: [
-      { name: "insetLeft", type: "dimension", label: "左内缩" },
-      { name: "insetTop", type: "dimension", label: "上内缩" },
-      { name: "insetRight", type: "dimension", label: "右内缩" },
-      { name: "insetBottom", type: "dimension", label: "下内缩" },
-    ],
-    children: {
-      min: 1,
-      max: 1,
-      of: DRAWABLE_CHOICES,
-      slot: [],
-      childLabel: () => "内容",
-    },
-    editable: true,
-  },
   shape: {
     kind: "shape",
     tag: "shape",
@@ -274,45 +252,6 @@ export const NODE_DEFS: Record<string, NodeDef> = {
     attrs: [],
     editable: false,
     note: "按 level 数值切图，暂只读",
-  },
-  clip: {
-    kind: "clip",
-    tag: "clip",
-    label: "裁剪",
-    role: "wrapper",
-    attrs: [
-      { name: "clipOrientation", type: "enum", label: "裁剪方向", values: ["horizontal", "vertical"] },
-      { name: "gravity", type: "enum", label: "对齐", values: ["top", "bottom", "left", "right", "center"] },
-    ],
-    editable: false,
-    note: "跟 level 联动，暂只读",
-  },
-  scale: {
-    kind: "scale",
-    tag: "scale",
-    label: "缩放",
-    role: "wrapper",
-    attrs: [
-      { name: "scaleWidth", type: "percent", label: "宽缩放" },
-      { name: "scaleHeight", type: "percent", label: "高缩放" },
-      { name: "scaleGravity", type: "enum", label: "缩放基点", values: ["center", "top", "bottom", "left", "right"] },
-    ],
-    editable: false,
-    note: "跟 level 联动，暂只读",
-  },
-  rotate: {
-    kind: "rotate",
-    tag: "rotate",
-    label: "旋转",
-    role: "wrapper",
-    attrs: [
-      { name: "fromDegrees", type: "number", label: "起始角度" },
-      { name: "toDegrees", type: "number", label: "结束角度" },
-      { name: "pivotX", type: "percent", label: "旋转中心 X" },
-      { name: "pivotY", type: "percent", label: "旋转中心 Y" },
-    ],
-    editable: false,
-    note: "跟 level 联动，暂只读",
   },
 };
 
@@ -393,10 +332,6 @@ function visit(node: DrawableNode, path: string, out: Problem[]): void {
       if (node.mask) visit(node.mask, `${here} › 遮罩`, out);
       return;
     }
-    case "inset": {
-      visit(node.node, `${here} › 内容`, out);
-      return;
-    }
     case "shape": {
       const s = node.spec;
       if (s.kind === "ring" && s.stroke) {
@@ -454,8 +389,6 @@ export function currentChildCount(node: DrawableNode): number {
       return node.items.length;
     case "ripple":
       return (node.content ? 1 : 0) + (node.mask ? 1 : 0);
-    case "inset":
-      return 1;
     default:
       return 0;
   }

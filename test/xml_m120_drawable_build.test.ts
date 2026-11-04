@@ -77,7 +77,7 @@ describe("M120 buildDrawable：语义往返", () => {
     }
   });
 
-  it("inset 包 selector：内缩值和内层状态都在，且顺序不倒", () => {
+  it("inset 包 selector：内缩值压成变换链，内层状态都在且顺序不倒", () => {
     const xml = `<inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:insetLeft="8dp" android:insetTop="2dp" android:insetRight="8dp" android:insetBottom="2dp">
     <selector>
@@ -87,9 +87,17 @@ describe("M120 buildDrawable：语义往返", () => {
 </inset>`;
     const { a, b } = roundTrip(xml);
     expect(b).toEqual(a);
-    if (b.t === "inset") {
-      expect([b.left, b.top, b.right, b.bottom]).toEqual([8, 2, 8, 2]);
-      expect(b.node.t).toBe("selector");
+    if (b.t === "selector") {
+      const t = b.transform?.[0];
+      expect(t?.kind).toBe("inset");
+      expect(t?.params).toMatchObject({
+        insetLeft: "8dp",
+        insetTop: "2dp",
+        insetRight: "8dp",
+        insetBottom: "2dp",
+      });
+      expect(b.items.length).toBe(2);
+      expect(b.items[0].states["state_pressed"]).toBe("true");
     }
   });
 
@@ -185,16 +193,13 @@ describe("M120 buildDrawable：输出内容", () => {
     expect(enabledAt).toBeGreaterThan(pressedAt);
   });
 
-  it("inset 全零时不写多余属性", () => {
+  it("inset 变换链全零时不写多余属性", () => {
     const xml = buildDrawable({
-      t: "inset",
-      left: 0,
-      top: 0,
-      right: 0,
-      bottom: 0,
-      node: { t: "color", color: "#FF000000" },
-    });
-    expect(xml).toContain("<inset xmlns:android");
+      t: "color",
+      color: "#FF000000",
+      transform: [{ kind: "inset", params: {} }],
+    } as any);
+    expect(xml).toContain("<inset");
     expect(xml).not.toContain("insetLeft");
   });
 
@@ -271,7 +276,11 @@ describe("M120 schema：能加什么子节点", () => {
     expect(currentChildCount(ripple)).toBe(2);
     expect(childChoices(ripple)).toEqual([]);
 
-    const inset: DrawableNode = { t: "inset", left: 1, top: 1, right: 1, bottom: 1, node: { t: "color", color: "#FF000000" } };
+    const inset: DrawableNode = {
+      t: "color",
+      color: "#FF000000",
+      transform: [{ kind: "inset", params: { insetLeft: "1dp", insetTop: "1dp", insetRight: "1dp", insetBottom: "1dp" } }],
+    } as any;
     expect(childChoices(inset)).toEqual([]);
   });
 

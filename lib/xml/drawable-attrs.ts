@@ -23,12 +23,6 @@ export function readAttr(node: DrawableNode, name: string): string | undefined {
       if (name === "color") return node.color;
       if (name === "radius") return node.radius;
       return undefined;
-    case "inset":
-      if (name === "insetLeft") return dpOut(node.left);
-      if (name === "insetTop") return dpOut(node.top);
-      if (name === "insetRight") return dpOut(node.right);
-      if (name === "insetBottom") return dpOut(node.bottom);
-      return undefined;
     default:
       return undefined;
   }
@@ -54,14 +48,6 @@ export function writeAttr(node: DrawableNode, name: string, value: string | unde
       if (name === "color") return { ...node, color: v || undefined };
       if (name === "radius") return { ...node, radius: v || undefined };
       return node;
-    case "inset": {
-      const n = dpIn(v);
-      if (name === "insetLeft") return { ...node, left: n };
-      if (name === "insetTop") return { ...node, top: n };
-      if (name === "insetRight") return { ...node, right: n };
-      if (name === "insetBottom") return { ...node, bottom: n };
-      return node;
-    }
     default:
       return node;
   }
@@ -83,8 +69,6 @@ function canWrite(node: DrawableNode, name: string): boolean {
       return name === "drawable";
     case "ripple":
       return name === "color" || name === "radius";
-    case "inset":
-      return name.startsWith("inset");
     default:
       return false;
   }
@@ -123,8 +107,6 @@ export function nodeSummary(node: DrawableNode): string {
       return `${node.items.length} 个状态`;
     case "ripple":
       return [node.content ? "内容" : "", node.mask ? "遮罩" : ""].filter(Boolean).join("+") || "空";
-    case "inset":
-      return `内缩 ${node.left}/${node.top}/${node.right}/${node.bottom}`;
     default:
       return (node as { tag?: string }).tag ?? "";
   }

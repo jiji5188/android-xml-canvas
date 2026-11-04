@@ -25,8 +25,6 @@ export function childCount(node: DrawableNode): number {
       return node.items.length;
     case "ripple":
       return (node.content ? 1 : 0) + (node.mask ? 1 : 0);
-    case "inset":
-      return 1;
     default:
       return 0;
   }
@@ -42,8 +40,6 @@ export function childAt(node: DrawableNode, i: number): DrawableNode | null {
       if (i === 0) return node.content ?? null;
       if (i === 1) return node.mask ?? null;
       return null;
-    case "inset":
-      return i === 0 ? node.node : null;
     default:
       return null;
   }
@@ -83,8 +79,6 @@ export function withChild(node: DrawableNode, i: number, next: DrawableNode): Dr
       if (i === 0) return { ...node, content: next };
       if (i === 1) return { ...node, mask: next };
       return node;
-    case "inset":
-      return i === 0 ? { ...node, node: next } : node;
     default:
       return node;
   }
@@ -128,12 +122,6 @@ export function addChild(root: DrawableNode, path: Path, child: DrawableNode): {
       }
       return null;
     }
-    case "inset":
-      // 包装类只有一个内容位：已经有真内容就返回 null（要换请先删）；占位符状态可以加
-      if (!target.node || target.node.t === "unsupported") {
-        return { root: replaceAt(root, path, { ...target, node: child }), path: [...path, 0] };
-      }
-      return null;
     default:
       return null;
   }
@@ -152,8 +140,6 @@ export function removeChild(root: DrawableNode, path: Path, i: number): Drawable
       if (i === 0) return replaceAt(root, path, { ...target, content: undefined });
       if (i === 1) return replaceAt(root, path, { ...target, mask: undefined });
       return root;
-    case "inset":
-      return i === 0 ? replaceAt(root, path, { ...target, node: { t: "unsupported", tag: "inset" } }) : root;
     default:
       return root;
   }
@@ -299,8 +285,6 @@ function rootLabel(node: DrawableNode): string {
       return "状态选择";
     case "ripple":
       return "水波纹";
-    case "inset":
-      return "内缩";
     case "shape":
       return "形状";
     case "color":
@@ -341,7 +325,6 @@ function childLabel(parent: DrawableNode, i: number, child: DrawableNode): strin
     return desc ? `${desc} · ${kind}` : `兜底 · ${kind}`;
   }
   if (parent.t === "ripple") return i === 1 ? "遮罩" : "内容";
-  if (parent.t === "inset") return "内容";
   return kind;
 }
 

@@ -130,13 +130,13 @@ describe("M118 drawable 图层树", () => {
     expect(layers.map((l) => l.kind)).toEqual(["color", "ripple"]);
   });
 
-  it("inset：内缩累加到子层", () => {
+  it("inset：内缩压成变换链，累加到子层", () => {
     const xml = `<inset ${NS} android:insetLeft="4dp" android:insetTop="6dp" android:insetRight="8dp" android:insetBottom="10dp">
       <shape android:shape="oval"><solid android:color="#FF00FFFF"/></shape>
     </inset>`;
     const doc = parseDrawable(xml)!;
-    if (doc.t !== "inset") throw new Error("应为 inset");
-    expect([doc.left, doc.top, doc.right, doc.bottom]).toEqual([4, 6, 8, 10]);
+    if (doc.t !== "shape") throw new Error("应为 shape 带 inset 变换");
+    expect(doc.transform?.[0].kind).toBe("inset");
     const layers = flattenDrawable(doc);
     expect(layers[0].inset).toEqual({ l: 4, t: 6, r: 8, b: 10 });
   });

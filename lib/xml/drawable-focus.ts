@@ -29,9 +29,6 @@ export function focusDoc(root: DrawableNode, path: Path): DrawableNode {
     case "ripple": {
       return idx === 1 ? { t: "ripple", color: parent.color, radius: parent.radius, mask: child } : { t: "ripple", color: parent.color, radius: parent.radius, content: child };
     }
-    case "inset": {
-      return { ...parent, node: child };
-    }
     default:
       return child;
   }

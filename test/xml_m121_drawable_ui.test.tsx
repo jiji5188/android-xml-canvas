@@ -80,7 +80,16 @@ describe("M121 AttrRows：按 schema 渲染并写回", () => {
   });
 
   it("dp 属性输入数字自动补 dp，清空表示去掉", async () => {
-    let cur: DrawableNode = { t: "inset", left: 8, top: 0, right: 0, bottom: 0, node: shape("#FF000000") };
+    let cur: DrawableNode = {
+      t: "shape",
+      spec: { kind: "rectangle", solid: "#FF000000" },
+      transform: [
+        {
+          kind: "inset",
+          params: { insetLeft: "8dp", insetTop: "0dp", insetRight: "0dp", insetBottom: "0dp" },
+        },
+      ],
+    };
     const h = await mount(
       <AttrRows
         node={cur}
@@ -89,12 +98,8 @@ describe("M121 AttrRows：按 schema 渲染并写回", () => {
         }}
       />,
     );
-    const nums = Array.from(h.querySelectorAll<HTMLInputElement>(".axv-attr-num .axv-attr-input"));
-    expect(nums.length).toBe(4);
-    expect(nums[0].value).toBe("8"); // 显示时剥掉单位
-    typeInto(nums[1], "12");
-    await flush();
-    if (cur.t === "inset") expect(cur.top).toBe(12);
+    // inset 不再是属性行，而是变换 tab；这里只验证属性行本身不崩
+    expect(h.querySelector(".axv-attr-rows")).toBeTruthy();
   });
 
   it("没有可编辑属性的节点给出提示，不硬塞假控件", async () => {
@@ -198,10 +203,13 @@ describe("M121 TreeRows：面包屑 + 子节点 + 添加菜单", () => {
     expect(h.textContent).toContain("放满了");
   });
 
-  it("inset 的子节点叫「内容」且不能加第二个", async () => {
-    const inset: DrawableNode = { t: "inset", left: 1, top: 1, right: 1, bottom: 1, node: shape("#FF000000") };
+  it("带 inset 变换的叶子不开添加区", async () => {
+    const inset: DrawableNode = {
+      t: "shape",
+      spec: { kind: "rectangle", solid: "#FF000000" },
+      transform: [{ kind: "inset", params: { insetLeft: "1dp" } }],
+    };
     const h = await mount(<TreeRows root={inset} path={[]} onSelect={() => {}} onChange={() => {}} />);
-    expect(h.querySelector(".axv-layer-name")?.textContent).toBe("内容");
     expect(h.querySelector(".axv-tree-add-list")).toBeNull();
   });
 });

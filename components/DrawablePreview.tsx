@@ -196,6 +196,34 @@ export function DrawablePreview({
   );
 }
 
+/** M127：把变换链翻成 CSS（内缩已消化成 inset，只剩旋转/缩放/裁剪） */
+export function transformToCssStyle(layer: RenderLayer): React.CSSProperties | undefined {
+  const chain = layer.transform;
+  if (!chain?.length) return undefined;
+  const parts: string[] = [];
+  let origin = "50% 50%";
+  for (const t of chain) {
+    if (t.kind === "rotate" || t.kind === "animated-rotate") {
+      const from = parseFloat(t.params["fromDegrees"]) || 0;
+      parts.unshift(`rotate(${from}deg)`);
+      const px = t.params["pivotX"] ?? "50%";
+      const py = t.params["pivotY"] ?? "50%";
+      if (px !== "50%" || py !== "50%") origin = `${px} ${py}`;
+    } else if (t.kind === "scale") {
+      const sw = parseFloat(t.params["scaleWidth"]) || 100;
+      const sh = parseFloat(t.params["scaleHeight"]) || 100;
+      parts.unshift(`scale(${sw / 100}, ${sh / 100})`);
+      const g = t.params["scaleGravity"] ?? "center";
+      if (g !== "center") origin = g;
+    } else if (t.kind === "clip") {
+      // 裁剪依赖 level 动态值，静态预览按全量画，不 fake
+    }
+  }
+  const tf = parts.filter(Boolean).join(" ");
+  if (!tf) return undefined;
+  return { transform: tf, transformOrigin: origin };
+}
+
 /** 单层渲染：shape 走 specToCss，color 直接铺色 */
 function LayerView({
   layer,
@@ -228,6 +256,7 @@ function LayerView({
 
   if (layer.kind === "shape" && layer.spec) {
     const css = specToCss(argbColorsForPreview(layer.spec));
+    const tf = transformToCssStyle(layer);
     return (
       <div
         className="axv-dp-layer"
@@ -240,18 +269,20 @@ function LayerView({
           border: css.border,
           clipPath: css.clipPath,
           boxShadow: css.boxShadow,
+          ...(tf ?? {}),
         }}
       />
     );
   }
 
   if (layer.kind === "color") {
+    const tf = transformToCssStyle(layer);
     return (
       <div
         className="axv-dp-layer"
         data-kind="color"
         data-path={layer.path}
-        style={{ ...style, background: androidColorToCss(layer.color ?? "#00000000") }}
+        style={{ ...style, background: androidColorToCss(layer.color ?? "#00000000"), ...(tf ?? {}) }}
       />
     );
   }

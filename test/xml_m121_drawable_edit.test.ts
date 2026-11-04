@@ -40,9 +40,14 @@ describe("M121 drawable-edit：读", () => {
     expect(nodeAt(ripple, [0])).toEqual(shape("#FF111111"));
     expect(nodeAt(ripple, [1])).toEqual(shape("#FF222222"));
 
-    const inset: DrawableNode = { t: "inset", left: 4, top: 4, right: 4, bottom: 4, node: shape("#FF333333") };
-    expect(childCount(inset)).toBe(1);
-    expect(childAt(inset, 0)).toEqual(shape("#FF333333"));
+    const inset: DrawableNode = {
+      t: "color",
+      color: "#FF333333",
+      transform: [{ kind: "inset", params: { insetLeft: "4dp" } }],
+    };
+    // M127：inset 不再是节点（压成变换链），所以占 0 个子位
+    expect(childCount(inset)).toBe(0);
+    expect(inset.transform?.[0].kind).toBe("inset");
   });
 
   it("面包屑把 item 说成人话，不出现 item 这个词", () => {
@@ -86,8 +91,12 @@ describe("M121 drawable-edit：增删改序", () => {
     }
   });
 
-  it("inset 只有一个内容位，加不了第二个", () => {
-    const inset: DrawableNode = { t: "inset", left: 0, top: 0, right: 0, bottom: 0, node: shape("#FF000000") };
+  it("带 inset 变换的叶子还是叶子，加不了子节点", () => {
+    const inset: DrawableNode = {
+      t: "color",
+      color: "#FF000000",
+      transform: [{ kind: "inset", params: { insetLeft: "4dp" } }],
+    };
     expect(addChild(inset, [], shape("#FFFFFFFF"))).toBeNull();
   });
 

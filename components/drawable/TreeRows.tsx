@@ -43,8 +43,7 @@ export function TreeRows({
     (c): c is DrawableNode => !!c,
   );
 
-  const maxed =
-    node.t === "ripple" ? n >= 2 : node.t === "inset" ? n >= 1 : false;
+  const maxed = node.t === "ripple" ? n >= 2 : false;
 
   return (
     <div className="axv-tree">
@@ -74,7 +73,7 @@ export function TreeRows({
               <span className="axv-layer-off">{nodeSummary(child)}</span>
             </button>
             <div className="axv-layer-ops">
-              {node.t !== "ripple" && node.t !== "inset" ? (
+              {node.t !== "ripple" ? (
                 <>
                   <button
                     type="button"
@@ -110,7 +109,7 @@ export function TreeRows({
         {n === 0 ? <div className="axv-shape-hint">{tt("里面还是空的")}</div> : null}
       </div>
 
-      {node.t === "layer" || node.t === "selector" || node.t === "ripple" || node.t === "inset" ? (
+      {node.t === "layer" || node.t === "selector" || node.t === "ripple" ? (
         <div className="axv-tree-add">
           {maxed || choices.length === 0 ? (
             <div className="axv-shape-hint">

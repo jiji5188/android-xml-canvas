@@ -42,6 +42,25 @@ export function buildDrawable(node: DrawableNode): string {
   return (decl ? decl + "\n" : "") + lines.join("\n") + "\n";
 }
 
+function transformAttrs(t: import("./drawable-node").Transform): string {
+  const keys = Object.keys(t.params).sort();
+  return joinAttrs(keys.map((k) => attr(k, t.params[k])));
+}
+
+/** M127：把变换链包回去（外→内顺序 = 数组顺序 = 标签从外到内嵌套） */
+function wrapTransforms(node: DrawableNode, lines: string[], level: number): string[] {
+  const chain = (node as { transform?: import("./drawable-node").Transform[] }).transform;
+  if (!chain?.length) return lines;
+  const out = [...lines];
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const pad = IND.repeat(level + i);
+    const t = chain[i];
+    out.splice(0, 0, `${pad}<${t.kind}${transformAttrs(t)}>`);
+    out.push(`${pad}</${t.kind}>`);
+  }
+  return out;
+}
+
 /** 不带 xmlns 的片段（嵌在 <item> 里时用），已按 level 缩进 */
 export function buildDrawableFragment(node: DrawableNode, level = 0): string[] {
   return emit(node, level);
@@ -49,20 +68,25 @@ export function buildDrawableFragment(node: DrawableNode, level = 0): string[] {
 
 function emit(node: DrawableNode, level: number): string[] {
   switch (node.t) {
-    case "shape":
-      return indent(shapeElementLines(node.spec), level);
+    case "shape": {
+      const out = indent(shapeElementLines(node.spec), level);
+      return wrapTransforms(node, out, level);
+    }
 
     case "color": {
       const pad = IND.repeat(level);
       // 源文件是文本写法就照原样写回，别硬改成属性
-      if (node.asText) return [`${pad}<color>${esc(node.color)}</color>`];
-      return [`${pad}<color android:color="${esc(node.color)}"/>`];
+      const line = node.asText
+        ? `${pad}<color>${esc(node.color)}</color>`
+        : `${pad}<color android:color="${esc(node.color)}"/>`;
+      return wrapTransforms(node, [line], level);
     }
 
     case "ref": {
       // 只有出现在容器子位才有意义；根位置也按 item 输出，且交给校验去报错
       const pad = IND.repeat(level);
-      return [`${pad}<item${joinAttrs([attr("drawable", `@drawable/${node.name.replace(/^@drawable\//, "")}`)])}/>`];
+      const line = `${pad}<item${joinAttrs([attr("drawable", `@drawable/${node.name.replace(/^@drawable\//, "")}`)])}/>`;
+      return wrapTransforms(node, [line], level);
     }
 
     case "layer": {
@@ -71,7 +95,7 @@ function emit(node: DrawableNode, level: number): string[] {
         out.push(...emitItem(item, level + 1, itemAttrs(item), `item-${i}`));
       });
       out.push(`${IND.repeat(level)}</layer-list>`);
-      return out;
+      return wrapTransforms(node, out, level);
     }
 
     case "selector": {
@@ -80,7 +104,7 @@ function emit(node: DrawableNode, level: number): string[] {
         out.push(...emitItem(item, level + 1, stateAttrs(item), `state-${i}`));
       });
       out.push(`${IND.repeat(level)}</selector>`);
-      return out;
+      return wrapTransforms(node, out, level);
     }
 
     case "ripple": {
@@ -98,22 +122,9 @@ function emit(node: DrawableNode, level: number): string[] {
         out.push(`${IND.repeat(level + 1)}</item>`);
       }
       out.push(`${IND.repeat(level)}</ripple>`);
-      return out;
+      return wrapTransforms(node, out, level);
     }
 
-    case "inset": {
-      const out: string[] = [
-        `${IND.repeat(level)}<inset${joinAttrs([
-          attr("insetLeft", node.left ? dpNum(node.left) : undefined),
-          attr("insetTop", node.top ? dpNum(node.top) : undefined),
-          attr("insetRight", node.right ? dpNum(node.right) : undefined),
-          attr("insetBottom", node.bottom ? dpNum(node.bottom) : undefined),
-        ])}>`,
-      ];
-      out.push(...emit(node.node, level + 1));
-      out.push(`${IND.repeat(level)}</inset>`);
-      return out;
-    }
 
     default: {
       // M126：不认识的标签：有原始字节就**整体平移**（内部注释/换行/缩进全保留），没有就输出自闭合占位
@@ -133,9 +144,9 @@ function emit(node: DrawableNode, level: number): string[] {
         // 去掉首尾空行
         while (lines.length && lines[0] === "") lines.shift();
         while (lines.length && lines[lines.length - 1] === "") lines.pop();
-        return lines;
+        return wrapTransforms(node, lines, level);
       }
-      return [`${pad}<${tag}/>`];
+      return wrapTransforms(node, [`${pad}<${tag}/>`], level);
     }
   }
 }

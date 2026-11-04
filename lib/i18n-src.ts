@@ -1232,6 +1232,16 @@ export const SRC_EN: SrcDict = {
   "还不认识这个根元素，只能查看和原样保存。": "Unknown root element — view-only, saved as-is.",
   "形状 · {kind}": "Shape · {kind}",
   "只看选中层": "Only selected layer",
+  "方向": "Direction",
+  "基点": "Origin",
+  "宽（%）": "Width (%)",
+  "高（%）": "Height (%)",
+  "起始角": "From degrees",
+  "结束角": "To degrees",
+  "轴心 X": "Pivot X",
+  "轴心 Y": "Pivot Y",
+  "添加「{name}」": "Add \u201c{name}\u201d",
+  "移除「{name}」": "Remove \u201c{name}\u201d",
 };
 
 /** 繁體 —— 只登记与简体不同的；没登记的会先试英文兜底 */

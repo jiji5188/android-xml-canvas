@@ -28,6 +28,7 @@ import { focusDoc } from "@/lib/xml/drawable-focus";
 import { AttrRows } from "./drawable/AttrRows";
 import { ShapeFields } from "./drawable/ShapeFields";
 import { DrawableTree } from "./drawable/DrawableTree";
+import { TransformTabs } from "./drawable/TransformTabs";
 
 export interface DrawableEditorProps {
   attrName: string;
@@ -340,7 +341,9 @@ export function DrawableEditor({
                     <div className="axv-dt-ro-note" style={{ marginTop: 8 }}>
                       {tt("只读类型，只能查看。要改内容请直接改 XML，或换支持的根元素。")}
                     </div>
-                  ) : null}
+                  ) : (
+                    <TransformTabs node={node} onChange={(n) => mutate(replaceAt(root, path, n))} />
+                  )}
                   {!readonly && node.t === "shape" ? (
                     <ShapeFields
                       spec={node.spec}

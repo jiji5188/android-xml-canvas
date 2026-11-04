@@ -9000,6 +9000,74 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-dw-quick { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--axv-outline); }
 .axv-dw-raw { max-height: 220px; overflow: auto; margin-top: 8px; }
 
+/* M127 变换 4 tab（内缩/裁剪/缩放/旋转） */
+.axv-transform-tabs { margin-top: 12px; }
+.axv-transform-tab-row {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: var(--axv-bg-soft, #f2f2f5);
+  border-radius: 10px;
+}
+.axv-transform-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--axv-text-2);
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.axv-transform-tab.on {
+  background: var(--axv-bg, #fff);
+  color: var(--axv-text);
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+.axv-transform-tab .axv-transform-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--axv-primary, #3b82f6);
+  display: inline-block;
+}
+.axv-transform-body { padding-top: 8px; }
+.axv-transform-add { width: 100%; padding: 10px; justify-content: center; }
+.axv-transform-params { display: flex; flex-direction: column; gap: 8px; }
+.axv-transform-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.axv-transform-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--axv-text-2);
+}
+.axv-transform-field input,
+.axv-transform-field select {
+  padding: 7px 9px;
+  border: 1px solid var(--axv-border, #ddd);
+  border-radius: 7px;
+  background: var(--axv-bg, #fff);
+  color: var(--axv-text);
+  font-size: 13px;
+}
+.axv-transform-remove { align-self: flex-start; padding: 6px 12px; font-size: 12px; }
+
+/* M127 树行变换摘要 */
+.axv-dt-transform {
+  color: var(--axv-primary, #3b82f6);
+  font-size: 11px;
+  margin-right: 6px;
+}
+
 /* M122：形状完整参数面板 */
 .axv-dw-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .axv-dw-grid2 .axv-shape-field { min-width: 0; }

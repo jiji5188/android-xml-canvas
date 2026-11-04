@@ -9004,3 +9004,14 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-dw-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .axv-dw-grid2 .axv-shape-field { min-width: 0; }
 .axv-dw-hint { margin-top: 10px; font-size: 11px; line-height: 1.6; color: var(--axv-sub); }
+
+/* M123：drawable 预设 */
+.axv-dw-bar { display: flex; align-items: center; gap: 8px; }
+.axv-dw-bar .axv-shape-seg { flex: 1 1 auto; }
+.axv-dw-preset-btn { flex: 0 0 auto; height: 30px; padding: 0 12px; font-size: 12px; border-radius: 8px; }
+.axv-dw-preset-btn.is-on { background: var(--axv-primary); color: var(--axv-on-primary); border-color: var(--axv-primary); }
+.axv-dw-presets { display: flex; flex-direction: column; gap: 6px; max-height: 232px; overflow-y: auto; overscroll-behavior: contain; padding: 8px; border: 1px solid var(--axv-outline); border-radius: 10px; background: var(--axv-surface); }
+.axv-dw-preset-item { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 8px; background: var(--axv-fill); cursor: pointer; }
+.axv-dw-preset-item:hover { border-color: var(--axv-primary); }
+.axv-dw-preset-name { font-size: 13px; color: var(--axv-title); }
+.axv-dw-preset-hint { font-size: 11px; line-height: 1.5; color: var(--axv-sub); }

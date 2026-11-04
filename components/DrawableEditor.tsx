@@ -20,6 +20,7 @@ import { buildDrawable } from "@/lib/xml/drawable-build";
 import { countNodes } from "@/lib/xml/drawable-node";
 import { nodeAt, replaceAt, breadcrumb, type Path } from "@/lib/xml/drawable-edit";
 import { validateDrawable } from "@/lib/xml/drawable-schema";
+import { DRAWABLE_PRESETS } from "@/lib/xml/drawable-presets";
 import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
 import { DrawablePreview } from "./DrawablePreview";
 import { AttrRows } from "./drawable/AttrRows";
@@ -67,6 +68,7 @@ export function DrawableEditor({
   const [showRaw, setShowRaw] = useState(false);
   const [previewBg, setPreviewBg] = useState<"checker" | "white" | "dark">("checker");
   const [name, setName] = useState<string>(() => resNameFromValue(value) || "bg");
+  const [presetOpen, setPresetOpen] = useState(false);
 
   const close = useOverlayBack(true, onClose);
 
@@ -92,6 +94,15 @@ export function DrawableEditor({
     setUndoStack((s) => [...s, root]);
     setRoot(redoStack[redoStack.length - 1]);
     setRedoStack((s) => s.slice(0, -1));
+  };
+
+  /** 套预设：预设给的是真 XML，走 parseDrawable 进来的东西和手搭的完全一样 */
+  const applyPreset = (xmlText: string) => {
+    const doc = parseDrawable(xmlText);
+    if (!doc) return;
+    mutate(doc);
+    setPath([]);
+    setPresetOpen(false);
   };
 
   const save = () => {
@@ -168,7 +179,30 @@ export function DrawableEditor({
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              className={"axv-btn axv-ghost axv-dw-preset-btn" + (presetOpen ? " is-on" : "")}
+              onClick={() => setPresetOpen((v) => !v)}
+            >
+              {tt("预设")}
+            </button>
           </div>
+
+          {presetOpen ? (
+            <div className="axv-dw-presets">
+              {DRAWABLE_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="axv-dw-preset-item"
+                  onClick={() => applyPreset(p.xml)}
+                >
+                  <span className="axv-dw-preset-name">{tt(p.name)}</span>
+                  <span className="axv-dw-preset-hint">{tt(p.hint)}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <div className="axv-dw-preview" style={previewBgStyle}>
             <div className="axv-dw-canvas">

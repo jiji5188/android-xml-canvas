@@ -14,7 +14,6 @@
 import { useMemo, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { useOverlayBack } from "@/lib/overlay-back";
-import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 import { parseDrawable } from "@/lib/xml/drawable-node";
 import { buildDrawable } from "@/lib/xml/drawable-build";
@@ -22,9 +21,9 @@ import { countNodes } from "@/lib/xml/drawable-node";
 import { nodeAt, replaceAt, breadcrumb, type Path } from "@/lib/xml/drawable-edit";
 import { validateDrawable } from "@/lib/xml/drawable-schema";
 import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
-import { ColorField } from "./ColorField";
 import { DrawablePreview } from "./DrawablePreview";
 import { AttrRows } from "./drawable/AttrRows";
+import { ShapeFields } from "./drawable/ShapeFields";
 import { TreeRows } from "./drawable/TreeRows";
 
 export interface DrawableEditorProps {
@@ -263,7 +262,7 @@ export function DrawableEditor({
                   ) : null}
                   <AttrRows node={node} onChange={(n) => mutate(replaceAt(root, path, n))} />
                   {node.t === "shape" ? (
-                    <ShapeQuick
+                    <ShapeFields
                       spec={node.spec}
                       onChange={(spec) => mutate(replaceAt(root, path, { ...node, spec }))}
                     />
@@ -294,128 +293,6 @@ export function DrawableEditor({
           </button>
         </span>
       </div>
-    </div>
-  );
-}
-
-/** 形状叶子的常用参数（完整版仍在 ShapeEditor，这里保证在树里也能改到能看的东西） */
-function ShapeQuick({
-  spec,
-  onChange,
-}: {
-  spec: Extract<DrawableNode, { t: "shape" }>["spec"];
-  onChange: (spec: Extract<DrawableNode, { t: "shape" }>["spec"]) => void;
-}) {
-  const radius = spec.radius ?? 0;
-  const stroke = spec.stroke;
-  return (
-    <div className="axv-dw-quick">
-      <div className="axv-set-label">{tt("形状")}</div>
-
-      <div className="axv-shape-field">
-        <label className="axv-shape-label">{tt("填充色")}</label>
-        <div className="axv-attr-color">
-          <ColorField
-            label={tt("填充色")}
-            value={spec.solid ?? "#00000000"}
-            fallback="#00000000"
-            onChange={(css) => onChange({ ...spec, solid: toAndroidHex(parseColorOr(css, "#00000000")) })}
-            aboveModal
-          />
-          <input
-            className="axv-attr-input"
-            value={spec.solid ?? ""}
-            spellCheck={false}
-            placeholder="#AARRGGBB"
-            onChange={(e) => onChange({ ...spec, solid: e.target.value.trim() || undefined })}
-          />
-        </div>
-      </div>
-
-      {spec.kind === "rectangle" ? (
-        <div className="axv-shape-field">
-          <label className="axv-shape-label">{tt("圆角")}</label>
-          <div className="axv-attr-num">
-            <input
-              className="axv-attr-input"
-              value={String(radius)}
-              inputMode="decimal"
-              onChange={(e) => {
-                const n = parseFloat(e.target.value);
-                onChange({ ...spec, radius: Number.isFinite(n) ? Math.max(0, n) : 0 });
-              }}
-            />
-            <span className="axv-attr-suffix">dp</span>
-          </div>
-        </div>
-      ) : null}
-
-      {spec.kind === "ring" ? (
-        <div className="axv-shape-field">
-          <label className="axv-shape-label">{tt("环宽比例")}</label>
-          <div className="axv-attr-num">
-            <input
-              className="axv-attr-input"
-              value={String(Math.round((spec.ringHole ?? 0.4) * 100))}
-              inputMode="decimal"
-              onChange={(e) => {
-                const n = parseFloat(e.target.value);
-                onChange({
-                  ...spec,
-                  ringHole: Number.isFinite(n) ? Math.min(95, Math.max(5, n / 100)) : 0.4,
-                });
-              }}
-            />
-            <span className="axv-attr-suffix">%</span>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="axv-shape-field">
-        <label className="axv-shape-label">{tt("描边宽度")}</label>
-        <div className="axv-attr-num">
-          <input
-            className="axv-attr-input"
-            value={String(stroke?.width ?? 0)}
-            inputMode="decimal"
-            onChange={(e) => {
-              const n = parseFloat(e.target.value);
-              const w = Number.isFinite(n) ? Math.max(0, n) : 0;
-              if (w <= 0) {
-                const next = { ...spec };
-                delete next.stroke;
-                onChange(next);
-                return;
-              }
-              onChange({ ...spec, stroke: { width: w, color: stroke?.color ?? "#FF000000" } });
-            }}
-          />
-          <span className="axv-attr-suffix">dp</span>
-        </div>
-      </div>
-
-      {stroke ? (
-        <div className="axv-shape-field">
-          <label className="axv-shape-label">{tt("描边色")}</label>
-          <div className="axv-attr-color">
-            <ColorField
-              label={tt("描边色")}
-              value={stroke.color}
-              fallback="#FF000000"
-              onChange={(css) =>
-                onChange({ ...spec, stroke: { ...stroke, color: toAndroidHex(parseColorOr(css, "#FF000000")) } })
-              }
-              aboveModal
-            />
-            <input
-              className="axv-attr-input"
-              value={stroke.color}
-              spellCheck={false}
-              onChange={(e) => onChange({ ...spec, stroke: { ...stroke, color: e.target.value.trim() } })}
-            />
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

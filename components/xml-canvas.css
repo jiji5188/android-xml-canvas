@@ -8999,3 +8999,8 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-dw-attrs { display: flex; flex-direction: column; gap: 4px; }
 .axv-dw-quick { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--axv-outline); }
 .axv-dw-raw { max-height: 220px; overflow: auto; margin-top: 8px; }
+
+/* M122：形状完整参数面板 */
+.axv-dw-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.axv-dw-grid2 .axv-shape-field { min-width: 0; }
+.axv-dw-hint { margin-top: 10px; font-size: 11px; line-height: 1.6; color: var(--axv-sub); }

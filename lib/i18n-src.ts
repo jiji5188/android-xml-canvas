@@ -1186,6 +1186,22 @@ export const SRC_EN: SrcDict = {
   "上内缩": "Inset top",
   "右内缩": "Inset right",
   "下内缩": "Inset bottom",
+
+// M122：形状完整参数面板
+  "渐变": "Gradient",
+  "渐变方向": "Direction",
+  "起始色": "Start color",
+  "结束色": "End color",
+  "中心色": "Center color",
+  "有": "Yes",
+  "虚线宽": "Dash width",
+  "虚线间隔": "Dash gap",
+  "尺寸与留白": "Size & padding",
+  "内边距左": "Padding left",
+  "内边距上": "Padding top",
+  "内边距右": "Padding right",
+  "内边距下": "Padding bottom",
+  "当前形状：{kind}。想换成别的形状，回到「结构」页改形状类型。": "Current shape: {kind}. To switch kind, go back to the Structure tab.",
 };
 
 /** 繁體 —— 只登记与简体不同的；没登记的会先试英文兜底 */

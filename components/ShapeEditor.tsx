@@ -43,6 +43,8 @@ interface Props {
   onClose: () => void;
   /** 保存：资源名 + XML */
   onSave: (name: string, xml: string) => void;
+  /** M130：从「新建 drawable」入口进来时强制走结构树（空文档默认会落到形状面板） */
+  forceTree?: boolean;
 }
 
 type SheetTab = "shape" | "fill" | "stroke" | "effect" | "layers";
@@ -1221,7 +1223,7 @@ export function ShapeEditor(props: Props) {
   const info = useMemo(() => rootInfo(props.existingXml), [props.existingXml]);
   // 组合类走结构树；只读类也进 DrawableEditor（会给明确说明 + 原样保存），
   // 绝不用形状面板去改一个不是 shape 的文件。
-  if (info.route === "tree" || info.route === "readonly") {
+  if (props.forceTree || info.route === "tree" || info.route === "readonly") {
     return (
       <DrawableEditor
         attrName={props.attrName}

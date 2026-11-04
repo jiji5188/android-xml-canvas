@@ -16,7 +16,8 @@ import {
   kindLabel,
 } from "@/lib/xml/asset-refs";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
-import { argbColorsForPreview, parseShapeSpec, specToCss } from "@/lib/xml/shape-gen";
+import { parseShapeSpec, specToCss, argbColorsForPreview } from "@/lib/xml/shape-gen";
+import { flattenDrawable, parseDrawable } from "@/lib/xml/drawable-node";
 import { sanitizeResName } from "@/lib/xml/resname";
 import { saveTextNative } from "@/lib/xml/native-save";
 import { saveResFiles, type ProjectSaveRoot } from "@/lib/xml/project-save";
@@ -39,13 +40,16 @@ interface Props {
   onEditShape?: (name: string, xml: string) => void;
   /** M11j：双击图标（vector）→ 打开图标编辑器 */
   onEditIcon?: (name: string, xml: string) => void;
+  /** M130：新建入口按钮（搜索框上方）：矢量图编辑 / Drawable 编辑 */
+  onNewIcon?: () => void;
+  onNewDrawable?: () => void;
   /** M36：当前项目的可写根（有则「下载」直接写进 app/src/main/res/drawable/） */
   projectRoot?: ProjectSaveRoot | null;
   /** M36：项目名（写盘提示用） */
   projectName?: string;
 }
 
-/** 缩略图：vector → data URL；shape/selector/layer-list → 按 CSS 近似画个色块 */
+/** 缩略图：vector → data URL；shape/selector/layer-list/ripple → 按 CSS 近似画个色块 */
 function thumb(name: string, xml: string): { url?: string; css?: CSSProperties } {
   if (/<vector[\s>]/.test(xml)) {
     const u = vectorToDataUrl(xml);
@@ -55,6 +59,32 @@ function thumb(name: string, xml: string): { url?: string; css?: CSSProperties }
   if (spec) {
     const css = specToCss(argbColorsForPreview(spec));
     return { css: css as CSSProperties };
+  }
+  // M129：组合类（selector / layer-list / ripple / inset）→ 取默认态最上层的形状/颜色近似
+  // 以前这里直接走紫虚线占位，看起来像「没识别」；现在就当画个缩略图。
+  try {
+    const root = parseDrawable(xml);
+    const layers = root ? flattenDrawable(root, {}) : [];
+    for (let i = layers.length - 1; i >= 0; i--) {
+      const l = layers[i];
+      if (l.kind === "ripple" || l.kind === "unsupported") continue;
+      if (l.spec) {
+        const css = specToCss(argbColorsForPreview(l.spec)) as CSSProperties;
+        // inset 用 margin 近似：预览块 26px，原作 1dp≈0.5px 太细看不出，压到 18%
+        const ins = l.inset;
+        if (ins && (ins.l || ins.t || ins.r || ins.b)) {
+          const px = (v: number) => `${Math.min(4, Math.round(v * 0.5))}px`;
+          (css as Record<string, string>).margin = `${px(ins.t)} ${px(ins.r)} ${px(ins.b)} ${px(ins.l)}`;
+        }
+        if (l.alpha < 1) (css as Record<string, string>).opacity = String(l.alpha);
+        return { css };
+      }
+      if (l.color) {
+        return { css: { background: l.color, opacity: l.alpha < 1 ? l.alpha : undefined } };
+      }
+    }
+  } catch {
+    // 解析不了就当不认识，落到下面的占位
   }
   return { css: { background: "#EDE7F6", border: "1px dashed #9575CD" } };
 }
@@ -69,6 +99,8 @@ export function GenAssetsPanel({
   inline,
   onEditShape,
   onEditIcon,
+  onNewIcon,
+  onNewDrawable,
   projectRoot,
   projectName,
 }: Props) {
@@ -180,6 +212,23 @@ export function GenAssetsPanel({
   if (inline) {
     return (
       <div className="axv-assets-inline" aria-label={t("已生成资源")}>
+      {/* M130：新建入口——不一定要先有资源才能开编辑器 */}
+      {(onNewIcon || onNewDrawable) ? (
+        <div className="axv-assets-new">
+          {onNewIcon ? (
+            <button type="button" className="axv-assets-new-btn" onClick={onNewIcon}>
+              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>style</span>
+              {t("矢量图编辑")}
+            </button>
+          ) : null}
+          {onNewDrawable ? (
+            <button type="button" className="axv-assets-new-btn" onClick={onNewDrawable}>
+              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>layers</span>
+              {t("Drawable 编辑")}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="axv-assets-search">
         <span className="msr" aria-hidden="true" style={{ fontSize: 18, opacity: 0.6 }}>
           search

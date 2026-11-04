@@ -77,6 +77,8 @@ export function DrawableEditor({
   const [sheetOpen, setSheetOpen] = useState(true);
   const [showRaw, setShowRaw] = useState(() => rootInfo(existingXml).route === "readonly");
   const [previewBg, setPreviewBg] = useState<"checker" | "white" | "dark">("checker");
+  /** 手机端右栏是滑面板，必须给开关，否则 selector 等类型打开后拦住了预览又关不掉（M130） */
+  const [formOpen, setFormOpen] = useState(true);
   const [name, setName] = useState<string>(() => resNameFromValue(value) || "bg");
   const [presetOpen, setPresetOpen] = useState(false);
 
@@ -255,7 +257,16 @@ export function DrawableEditor({
           </div>
         </div>
 
-        <div className="axv-icon-ed-form axv-cv-form axv-cv-form-drawable">
+        <button
+          type="button"
+          className={"axv-cv-form-toggle" + (formOpen ? "" : " is-closed")}
+          onClick={() => setFormOpen((v) => !v)}
+          aria-label={formOpen ? tt("收起参数面板") : tt("展开参数面板")}
+          title={formOpen ? tt("收起参数面板") : tt("展开参数面板")}
+        >
+          <span className="msr" aria-hidden="true">{formOpen ? "chevron_right" : "chevron_left"}</span>
+        </button>
+        <div className={"axv-icon-ed-form axv-cv-form axv-cv-form-drawable" + (formOpen ? "" : " is-closed")}>
           <div className="axv-set-group">
             <div className="axv-set-label">{tt("资源名")}</div>
             <div className="axv-shape-name-row">

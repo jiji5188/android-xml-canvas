@@ -594,7 +594,7 @@ export function XmlEditor() {
     null
   );
   /** M4u：从资源树里直接打开的「绘制编辑器」（drawable/*.xml） */
-  const [resShape, setResShape] = useState<{ name: string; xml: string } | null>(null);
+  const [resShape, setResShape] = useState<{ name: string; xml: string; forceTree?: boolean } | null>(null);
   /** M4u：从资源树里点开的图片预览 */
   const [resImage, setResImage] = useState<{ rel: string; name: string; url: string } | null>(null);
   const [scale, setScale] = useState(1);
@@ -3791,6 +3791,8 @@ const findResolved = findResolvedNode;
                 onDelete={onDeleteAsset}
                 onEditShape={(name, shapeXml) => setResShape({ name, xml: shapeXml })}
                 onEditIcon={(name, iconXml) => setResIcon({ name, xml: iconXml })}
+                onNewIcon={() => setResIcon({ name: "", xml: "" })}
+                onNewDrawable={() => setResShape({ name: "", xml: "", forceTree: true })}
                 onClose={() => setLeftView("parts")}
                 projectRoot={projRoot}
                 projectName={activeProject?.name || ""}
@@ -4259,6 +4261,7 @@ const findResolved = findResolvedNode;
           value={`@drawable/${resShape.name}`}
           existingXml={resShape.xml}
           existingNames={Object.keys(generatedDrawables)}
+          forceTree={resShape.forceTree}
           onClose={() => setResShape(null)}
           onSave={(resourceName, shapeXml) => {
             const safe = sanitizeResName(resourceName, "bg");

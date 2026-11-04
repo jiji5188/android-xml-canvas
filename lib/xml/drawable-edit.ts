@@ -129,7 +129,10 @@ export function addChild(root: DrawableNode, path: Path, child: DrawableNode): {
       return null;
     }
     case "inset":
-      // 包装类只有一个内容位，已经有内容就返回 null（要换请先删）
+      // 包装类只有一个内容位：已经有真内容就返回 null（要换请先删）；占位符状态可以加
+      if (!target.node || target.node.t === "unsupported") {
+        return { root: replaceAt(root, path, { ...target, node: child }), path: [...path, 0] };
+      }
       return null;
     default:
       return null;
@@ -313,6 +316,20 @@ function rootLabel(node: DrawableNode): string {
 export function childLabelOf(parent: DrawableNode, i: number): string {
   const child = childAt(parent, i);
   return child ? childLabel(parent, i, child) : `第 ${i + 1} 项`;
+}
+
+/** 只要「插槽名」——按下 / 第 1 层 / 内容，不带类型（结构树里类型由后面的节点名给） */
+export function slotLabelOf(parent: DrawableNode, i: number): string {
+  if (parent.t === "layer") return `第 ${i + 1} 层`;
+  if (parent.t === "selector") {
+    const st = parent.items[i]?.states ?? {};
+    const desc = Object.entries(st)
+      .map(([k, v]) => stateLabel(k, v))
+      .join("·");
+    return desc || "兜底";
+  }
+  if (parent.t === "ripple") return i === 1 ? "遮罩" : "内容";
+  return "内容";
 }
 
 function childLabel(parent: DrawableNode, i: number, child: DrawableNode): string {

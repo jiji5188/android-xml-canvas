@@ -25,6 +25,7 @@ import { ColorField } from "./ColorField";
 import { DrawableEditor } from "./DrawableEditor";
 import { DrawablePreview } from "./DrawablePreview";
 import { parseDrawable } from "@/lib/xml/drawable-node";
+import { rootInfo } from "@/lib/xml/drawable-root";
 import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
 
 /** 取色器回传的 CSS 串 → 形状规格里存的 Android 写法（#RRGGBB / #AARRGGBB，大写） */
@@ -1217,9 +1218,10 @@ export function ShapeEditorInner({ attrName, value, existingXml, existingNames, 
  * 这样原来「打开一个 selector 资源结果被形状面板改坏」的问题从根上没了。
  */
 export function ShapeEditor(props: Props) {
-  const root = useMemo(() => (props.existingXml ? parseDrawable(props.existingXml) : null), [props.existingXml]);
-  const isTree = !!root && root.t !== "shape";
-  if (isTree) {
+  const info = useMemo(() => rootInfo(props.existingXml), [props.existingXml]);
+  // 组合类走结构树；只读类也进 DrawableEditor（会给明确说明 + 原样保存），
+  // 绝不用形状面板去改一个不是 shape 的文件。
+  if (info.route === "tree" || info.route === "readonly") {
     return (
       <DrawableEditor
         attrName={props.attrName}

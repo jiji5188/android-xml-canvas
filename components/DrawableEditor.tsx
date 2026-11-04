@@ -16,6 +16,7 @@ import { t as tt } from "@/lib/i18n-src";
 import { useOverlayBack } from "@/lib/overlay-back";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 import { parseDrawable } from "@/lib/xml/drawable-node";
+import { rootInfo } from "@/lib/xml/drawable-root";
 import { buildDrawable } from "@/lib/xml/drawable-build";
 import { countNodes } from "@/lib/xml/drawable-node";
 import { nodeAt, replaceAt, breadcrumb, type Path } from "@/lib/xml/drawable-edit";
@@ -25,7 +26,7 @@ import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
 import { DrawablePreview } from "./DrawablePreview";
 import { AttrRows } from "./drawable/AttrRows";
 import { ShapeFields } from "./drawable/ShapeFields";
-import { TreeRows } from "./drawable/TreeRows";
+import { DrawableTree } from "./drawable/DrawableTree";
 
 export interface DrawableEditorProps {
   attrName: string;
@@ -60,12 +61,15 @@ export function DrawableEditor({
   onSave,
 }: DrawableEditorProps) {
   const [root, setRoot] = useState<DrawableNode>(() => parseDrawable(existingXml ?? "") ?? defaultTree());
+  /** 根元素识别：决定是「能编辑」还是「只读但原样保存」（M124） */
+  const info = useMemo(() => rootInfo(existingXml), [existingXml]);
+  const readonly = info.route === "readonly";
   const [undoStack, setUndoStack] = useState<DrawableNode[]>([]);
   const [redoStack, setRedoStack] = useState<DrawableNode[]>([]);
   const [path, setPath] = useState<Path>([]);
   const [tab, setTab] = useState<string>("tree");
   const [sheetOpen, setSheetOpen] = useState(true);
-  const [showRaw, setShowRaw] = useState(false);
+  const [showRaw, setShowRaw] = useState(() => rootInfo(existingXml).route === "readonly");
   const [previewBg, setPreviewBg] = useState<"checker" | "white" | "dark">("checker");
   const [name, setName] = useState<string>(() => resNameFromValue(value) || "bg");
   const [presetOpen, setPresetOpen] = useState(false);
@@ -107,7 +111,13 @@ export function DrawableEditor({
 
   const save = () => {
     const safe = sanitizeResName(name);
-    if (!safe || nameConflicts || errors.length > 0) return;
+    if (!safe || nameConflicts) return;
+    // 只读类型：原样写回，一个字节都不改（格式化、属性顺序、未知标签全保留）
+    if (readonly) {
+      onSave(safe, existingXml ?? "");
+      return;
+    }
+    if (errors.length > 0) return;
     onSave(safe, xml);
   };
 
@@ -127,7 +137,12 @@ export function DrawableEditor({
         <button className="axv-icon-back" onClick={close} aria-label={tt("返回编辑器")} title={tt("返回")}>
           <span className="msr" aria-hidden="true">arrow_back</span>
         </button>
-        <span className="axv-shape-title">{tt("drawable · {name}", { name: attrName })}</span>
+        <span className="axv-shape-title">
+          {tt("drawable · {name}", { name: attrName })}
+          {info.route !== "empty" && info.tag !== "shape" ? (
+            <span className="axv-dt-head-tag">{tt(info.label)}</span>
+          ) : null}
+        </span>
         <span className="axv-cv-head-tools">
           <button
             className="axv-icon-btn"
@@ -281,7 +296,18 @@ export function DrawableEditor({
           <div className="axv-cv-sheet-body">
             <div className="axv-cv-sheet-pane">
               {tab === "tree" ? (
-                <TreeRows root={root} path={path} onSelect={setPath} onChange={mutate} />
+                <>
+                  {readonly ? (
+                    <div className="axv-dt-ro">
+                      <div className="axv-dt-ro-title">
+                        {tt("根元素：{tag}（{label}）", { tag: `<${info.tag}>`, label: tt(info.label) })}
+                      </div>
+                      <div className="axv-dt-ro-note">{tt(info.note)}</div>
+                    </div>
+                  ) : (
+                    <DrawableTree root={root} path={path} onSelect={setPath} onChange={mutate} />
+                  )}
+                </>
               ) : (
                 <div className="axv-dw-attrs">
                   {/* 参数页看不到面包屑，给一个明确的上一层出口，否则在叶子里容易迷路 */}
@@ -295,7 +321,12 @@ export function DrawableEditor({
                     </button>
                   ) : null}
                   <AttrRows node={node} onChange={(n) => mutate(replaceAt(root, path, n))} />
-                  {node.t === "shape" ? (
+                  {readonly ? (
+                    <div className="axv-dt-ro-note" style={{ marginTop: 8 }}>
+                      {tt("只读类型，只能查看。要改内容请直接改 XML，或换支持的根元素。")}
+                    </div>
+                  ) : null}
+                  {!readonly && node.t === "shape" ? (
                     <ShapeFields
                       spec={node.spec}
                       onChange={(spec) => mutate(replaceAt(root, path, { ...node, spec }))}
@@ -321,7 +352,7 @@ export function DrawableEditor({
           <button
             className="axv-btn axv-btn-primary"
             onClick={save}
-            disabled={!name.trim() || nameConflicts || errors.length > 0}
+            disabled={!name.trim() || nameConflicts || (!readonly && errors.length > 0)}
           >
             {tt("保存并应用")}
           </button>

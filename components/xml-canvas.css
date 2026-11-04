@@ -9015,3 +9015,173 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-dw-preset-item:hover { border-color: var(--axv-primary); }
 .axv-dw-preset-name { font-size: 13px; color: var(--axv-title); }
 .axv-dw-preset-hint { font-size: 11px; line-height: 1.5; color: var(--axv-sub); }
+
+
+/* ── M124 drawable 结构树（和左侧图层面板同一套视觉语言） ── */
+.axv-dt {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.axv-dt-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding-right: 4px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  line-height: 1.2;
+}
+.axv-dt-row:hover {
+  background: var(--axv-hover);
+}
+.axv-dt-row.sel {
+  background: var(--axv-primary-soft);
+  box-shadow: inset 2px 0 0 var(--axv-primary);
+}
+.axv-dt-chev {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--axv-on-surface-variant);
+  padding: 0;
+  cursor: pointer;
+}
+.axv-dt-icon {
+  flex: 0 0 auto;
+  color: var(--axv-on-surface-variant);
+}
+.axv-dt-row.sel .axv-dt-icon {
+  color: var(--axv-primary);
+}
+.axv-dt-slot-tag {
+  flex: 0 0 auto;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--axv-surface-sunken);
+  color: var(--axv-on-surface-variant);
+  font-size: 10px;
+}
+.axv-dt-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-dt-ops {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+.axv-dt-op {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+  padding: 0;
+}
+.axv-dt-op:hover:not(:disabled) {
+  background: var(--axv-hover);
+  color: var(--axv-on-surface);
+}
+.axv-dt-op.is-on {
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+}
+.axv-dt-op.danger:hover:not(:disabled) {
+  color: var(--axv-danger);
+}
+.axv-dt-op:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+.axv-dt-add {
+  margin: 2px 0 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: var(--axv-surface-head);
+}
+.axv-dt-add-title {
+  margin-bottom: 6px;
+  color: var(--axv-on-surface-variant);
+  font-size: 11px;
+}
+.axv-dt-add-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.axv-dt-add-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 9px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 14px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font-size: 11px;
+  cursor: pointer;
+}
+.axv-dt-add-item:hover {
+  border-color: var(--axv-primary);
+  color: var(--axv-primary);
+}
+.axv-dt-ro {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--axv-outline-strong);
+  border-radius: 8px;
+  background: var(--axv-surface-sunken);
+}
+.axv-dt-ro-title {
+  font-size: 12px;
+  color: var(--axv-on-surface);
+  margin-bottom: 3px;
+}
+.axv-dt-ro-note {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--axv-on-surface-variant);
+}
+.axv-dt-head-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--axv-surface-sunken);
+  color: var(--axv-on-surface-variant);
+  font-size: 10px;
+  vertical-align: middle;
+}
+
+.axv-dt-summary {
+  flex: 0 0 auto;
+  color: var(--axv-on-surface-variant);
+  font-size: 10px;
+  opacity: 0.85;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

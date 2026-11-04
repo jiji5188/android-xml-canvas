@@ -35,6 +35,13 @@ async function mount(el: React.ReactElement) {
 const byText = (h: HTMLElement, text: string) =>
   Array.from(h.querySelectorAll<HTMLButtonElement>("button")).find((b) => b.textContent?.trim() === text);
 
+/** M124 换成结构树后：行 = .axv-dt-row，插槽名 = .axv-dt-slot-tag */
+const treeRows = (h: HTMLElement) => h.querySelectorAll(".axv-dt-row").length;
+const slotTags = (h: HTMLElement) =>
+  Array.from(h.querySelectorAll(".axv-dt-slot-tag")).map((n) => n.textContent?.trim());
+const pickRow = (h: HTMLElement, i: number) =>
+  h.querySelectorAll<HTMLDivElement>(".axv-dt-row")[i]?.click();
+
 const SELECTOR_XML = `<selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <shape android:shape="rectangle"><solid android:color="#FF0000FF"/></shape>
@@ -62,7 +69,8 @@ describe("M121 入口路由：非纯形状直接进结构树", () => {
       />,
     );
     expect(h.querySelector('[aria-label="drawable 编辑器"]')).toBeTruthy();
-    expect(h.querySelectorAll(".axv-layer-row").length).toBe(2);
+    // 根 + 2 个状态
+    expect(treeRows(h)).toBe(3);
   });
 
   it("纯形状仍然走原来的形状面板", async () => {
@@ -97,7 +105,7 @@ describe("M121 DrawableEditor：树 + 参数 + 保存", () => {
         onSave={() => {}}
       />,
     );
-    const names = Array.from(h.querySelectorAll(".axv-layer-name")).map((n) => n.textContent);
+    const names = slotTags(h);
     expect(names).toEqual(["内容", "遮罩"]);
     expect(h.textContent).not.toContain("item");
   });
@@ -117,8 +125,8 @@ describe("M121 DrawableEditor：树 + 参数 + 保存", () => {
       />,
     );
 
-    // 选中第 1 个状态项 → 参数页
-    h.querySelectorAll<HTMLButtonElement>(".axv-layer-pick")[0].click();
+    // 选中第 1 个状态项（第 0 行是根） → 参数页
+    pickRow(h, 1);
     await flush();
     byText(h, "参数")!.click();
     await flush();
@@ -158,14 +166,18 @@ describe("M121 DrawableEditor：树 + 参数 + 保存", () => {
         onSave={() => {}}
       />,
     );
-    expect(h.querySelectorAll(".axv-layer-row").length).toBe(1);
-    byText(h, "＋形状")!.click();
+    expect(treeRows(h)).toBe(2); // 根 + 1 层
+    // M124：加组件走「＋」菜单
+    h.querySelector<HTMLButtonElement>('[title="加组件"]')!.click();
     await flush();
-    expect(h.querySelectorAll(".axv-layer-row").length).toBe(2);
+    const addShape = h.querySelector<HTMLButtonElement>('.axv-dt-add-item[aria-label="形状"]')!;
+    addShape.click();
+    await flush();
+    expect(treeRows(h)).toBe(3);
 
     h.querySelector<HTMLButtonElement>('[aria-label="撤销"]')!.click();
     await flush();
-    expect(h.querySelectorAll(".axv-layer-row").length).toBe(1);
+    expect(treeRows(h)).toBe(2);
   });
 
   it("结构有错时禁止保存，并给出路径提示", async () => {
@@ -200,8 +212,8 @@ describe("M121 DrawableEditor：树 + 参数 + 保存", () => {
         onSave={() => {}}
       />,
     );
-    const arrows = Array.from(h.querySelectorAll(".axv-layer-op")).filter(
-      (b) => b.textContent === "↑" || b.textContent === "↓",
+    const arrows = Array.from(h.querySelectorAll(".axv-dt-op")).filter(
+      (b) => b.getAttribute("title") === "上移" || b.getAttribute("title") === "下移",
     );
     expect(arrows.length).toBe(0);
   });

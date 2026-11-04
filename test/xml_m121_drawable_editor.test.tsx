@@ -56,8 +56,7 @@ const SHAPE_XML = `<shape xmlns:android="http://schemas.android.com/apk/res/andr
     <corners android:radius="8dp"/>
 </shape>`;
 
-describe("M121 入口路由：非纯形状直接进结构树", () => {
-  it("selector 资源打开的是结构树编辑器，不是形状面板", async () => {
+describe("M121 入口路由：非纯形状直接进结构树", () => {  it("selector 资源打开的是结构树编辑器，不是形状面板", async () => {
     const h = await mount(
       <ShapeEditor
         attrName="android:background"
@@ -73,7 +72,7 @@ describe("M121 入口路由：非纯形状直接进结构树", () => {
     expect(treeRows(h)).toBe(3);
   });
 
-  it("纯形状仍然走原来的形状面板", async () => {
+  it("纯形状也进结构树编辑器（M135 淘汰旧形状面板）", async () => {
     const h = await mount(
       <ShapeEditor
         attrName="android:background"
@@ -84,8 +83,10 @@ describe("M121 入口路由：非纯形状直接进结构树", () => {
         onSave={() => {}}
       />,
     );
-    expect(h.querySelector('[aria-label="drawable 编辑器"]')).toBeNull();
-    expect(h.querySelector('[aria-label="自定义形状"]')).toBeTruthy();
+    expect(h.querySelector('[aria-label="drawable 编辑器"]')).toBeTruthy();
+    expect(h.querySelector('[aria-label="自定义形状"]')).toBeNull();
+    // 根只有一层 shape
+    expect(treeRows(h)).toBe(1);
   });
 });
 
@@ -107,7 +108,9 @@ describe("M121 DrawableEditor：树 + 参数 + 保存", () => {
     );
     const names = slotTags(h);
     expect(names).toEqual(["内容", "遮罩"]);
-    expect(h.textContent).not.toContain("item");
+    // M135：XML 代码框常驻，全文会含 <item>；这里只查结构树本身不出现 item 这个词
+    const treeText = [...h.querySelectorAll(".axv-dt-row")].map((r) => r.textContent).join(" ");
+    expect(treeText).not.toContain("item");
   });
 
   it("参数页能改形状填充色，保存出来的 XML 跟着变", async () => {
@@ -216,5 +219,119 @@ describe("M121 DrawableEditor：树 + 参数 + 保存", () => {
       (b) => b.getAttribute("title") === "上移" || b.getAttribute("title") === "下移",
     );
     expect(arrows.length).toBe(0);
+  });
+});
+
+
+const selXml = `<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle"><solid android:color="#FF0000FF"/></shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle"><solid android:color="#FFFFFFFF"/></shape>
+    </item>
+</selector>`;
+
+const llXml = `<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+      <item><shape android:shape="rectangle"><solid android:color="#FF000000"/></shape></item>
+      <item><shape android:shape="rectangle"><solid android:color="#FFFFFFFF"/></shape></item>
+    </layer-list>`;
+
+describe("M134：「这一层」面板（item 上的属性）", () => {
+  it("selector：能设状态位，保存进 XML", async () => {
+    let saved: { name: string; xml: string } | null = null;
+    const h = await mount(
+      <DrawableEditor
+        attrName="android:background"
+        value=""
+        existingXml={selXml}
+        existingNames={[]}
+        onClose={() => {}}
+        onSave={(name, xml) => {
+          saved = { name, xml };
+        }}
+      />,
+    );
+
+    pickRow(h, 2);
+    await flush();
+    byText(h, "参数")!.click();
+    await flush();
+
+    const panel = h.querySelector(".axv-slot");
+    expect(panel).toBeTruthy();
+    expect(panel!.textContent).toContain("这个状态生效的条件");
+
+    const rows = [...panel!.querySelectorAll(".axv-slot-state")];
+    const enabledRow = rows.find((r) => r.textContent?.includes("启用"));
+    expect(enabledRow).toBeTruthy();
+    const offBtn = [...enabledRow!.querySelectorAll<HTMLButtonElement>(".axv-shape-seg-btn")].find(
+      (b) => b.textContent === "否",
+    );
+    offBtn!.click();
+    await flush();
+
+    byText(h, "保存并应用")!.click();
+    await flush();
+    expect(saved).not.toBeNull();
+    expect(saved!.xml).toContain('android:state_enabled="false"');
+    const back = parseDrawable(saved!.xml)!;
+    expect(back.t).toBe("selector");
+    if (back.t === "selector") {
+      expect(back.items[back.items.length - 1].states["state_enabled"]).toBe("false");
+    }
+  });
+
+  it("layer：能改偏移/对齐/不透明度，保存进 XML", async () => {
+    let saved: { name: string; xml: string } | null = null;
+    const h = await mount(
+      <DrawableEditor
+        attrName="android:background"
+        value=""
+        existingXml={llXml}
+        existingNames={[]}
+        onClose={() => {}}
+        onSave={(name, xml) => {
+          saved = { name, xml };
+        }}
+      />,
+    );
+
+    pickRow(h, 2);
+    await flush();
+    byText(h, "参数")!.click();
+    await flush();
+
+    const panel = h.querySelector(".axv-slot");
+    expect(panel).toBeTruthy();
+    expect(panel!.textContent).toContain("这一层 · 第 2 层");
+
+    const inputs = panel!.querySelectorAll<HTMLInputElement>(".axv-slot-grid .axv-attr-input");
+    expect(inputs.length).toBeGreaterThanOrEqual(4);
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(inputs[0], "8");
+    inputs[0].dispatchEvent(new Event("input", { bubbles: true }));
+    setter?.call(inputs[1], "4");
+    inputs[1].dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+
+    const sel = panel!.querySelector<HTMLSelectElement>("select.axv-attr-input");
+    sel!.value = "center";
+    sel!.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+
+    const allIn = panel!.querySelectorAll<HTMLInputElement>(".axv-attr-input");
+    const op = allIn[allIn.length - 1];
+    setter?.call(op, "0.5");
+    op.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+
+    byText(h, "保存并应用")!.click();
+    await flush();
+
+    expect(saved!.xml).toContain('android:left="8dp"');
+    expect(saved!.xml).toContain('android:top="4dp"');
+    expect(saved!.xml).toContain('android:gravity="center"');
+    expect(saved!.xml).toContain('android:alpha="0.5"');
   });
 });

@@ -35,8 +35,8 @@ describe("M87 抽屉加入资源 tab + 整体变换挪到排列", () => {
     const form = src.slice(src.indexOf("axv-cv-form"), src.indexOf("axv-cv-sheet"));
     expect(form).not.toContain("尺寸（dp）");
     expect(form).not.toContain("水平镜像");
-    // 保留 pathData 与查看 XML
+    // 保留 pathData ；M135 起 XML 代码框常驻（不再有「查看生成的 XML」开关按钮）
     expect(form).toContain("axv-icon-ed-pathdata");
-    expect(form).toContain("查看生成的 XML");
+    expect(form).toContain("axv-icon-ed-raw");
   });
 });

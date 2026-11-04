@@ -6,8 +6,9 @@ import { resolve } from "node:path";
 const read = (f: string) => readFileSync(resolve(process.cwd(), f), "utf8");
 
 describe("M78 接入护栏", () => {
-  it("IconEditor / ShapeEditor 的返回与关闭都走 useOverlayBack 的 close", () => {
-    for (const f of ["components/IconEditor.tsx", "components/ShapeEditor.tsx"]) {
+  it("IconEditor / DrawableEditor 的返回与关闭都走 useOverlayBack 的 close", () => {
+    // M135：ShapeEditor 退化成 DrawableEditor 的薄封装，不再直接持有 overlay
+    for (const f of ["components/IconEditor.tsx", "components/DrawableEditor.tsx"]) {
       const src = read(f);
       expect(src, f).toContain('import { useOverlayBack } from "@/lib/overlay-back";');
       expect(src, f).toContain("const close = useOverlayBack(true, onClose);");

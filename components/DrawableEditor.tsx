@@ -19,13 +19,14 @@ import { parseDrawable } from "@/lib/xml/drawable-node";
 import { rootInfo } from "@/lib/xml/drawable-root";
 import { buildDrawable } from "@/lib/xml/drawable-build";
 import { countNodes } from "@/lib/xml/drawable-node";
-import { nodeAt, replaceAt, breadcrumb, type Path } from "@/lib/xml/drawable-edit";
+import { nodeAt, replaceAt, breadcrumb, parentOf, setSlot, slotOf, type Path } from "@/lib/xml/drawable-edit";
 import { validateDrawable } from "@/lib/xml/drawable-schema";
 import { DRAWABLE_PRESETS } from "@/lib/xml/drawable-presets";
 import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
 import { DrawablePreview } from "./DrawablePreview";
 import { focusDoc } from "@/lib/xml/drawable-focus";
 import { AttrRows } from "./drawable/AttrRows";
+import { SlotRows } from "./drawable/SlotRows";
 import { ShapeFields } from "./drawable/ShapeFields";
 import { DrawableTree } from "./drawable/DrawableTree";
 import { TransformTabs } from "./drawable/TransformTabs";
@@ -91,7 +92,8 @@ export function DrawableEditor({
   const [path, setPath] = useState<Path>([]);
   const [tab, setTab] = useState<string>("tree");
   const [sheetOpen, setSheetOpen] = useState(true);
-  const [showRaw, setShowRaw] = useState(() => rootInfo(existingXml).route === "readonly");
+  /** M135：XML 代码框不再可收起，默认一直显示（只读类型也只读展示） */
+  const showRaw = true;
   const [previewBg, setPreviewBg] = useState<"checker" | "white" | "dark">("checker");
   /** 手机端右栏是滑面板，必须给开关，否则 selector 等类型打开后拦住了预览又关不掉（M130） */
   const [formOpen, setFormOpen] = useState(true);
@@ -106,6 +108,8 @@ export function DrawableEditor({
   const problems = useMemo(() => validateDrawable(root), [root]);
   const errors = problems.filter((p) => p.level === "error");
   const node = nodeAt(root, path) ?? root;
+  /** M134：当前节点在父容器里的位置参数（item 上的属性） */
+  const parentNode = path.length > 0 ? parentOf(root, path) : null;
   /** 选中某一层时就只看它（同样的 flatten 路径，不是另画一套） */
   const focus = useMemo(() => focusDoc(root, path), [root, path]);
   const focused = path.length > 0;
@@ -200,14 +204,6 @@ export function DrawableEditor({
             aria-label={tt("重做")}
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>redo</span>
-          </button>
-          <button
-            className={"axv-icon-btn" + (showRaw ? " is-on" : "")}
-            onClick={() => setShowRaw((v) => !v)}
-            title={tt("查看生成的 XML")}
-            aria-label={tt("查看生成的 XML")}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
           </button>
         </span>
       </div>
@@ -328,7 +324,6 @@ export function DrawableEditor({
           )}
 
           {showRaw ? <pre className="axv-icon-ed-raw axv-dw-raw">{xml}</pre> : null}
-
           {problems.length > 0 ? (
             <div className="axv-set-group">
               <div className="axv-set-label">{tt("检查")}</div>
@@ -398,6 +393,16 @@ export function DrawableEditor({
                     >
                       {tt("← 上一层：{name}", { name: breadcrumb(root, path).slice(-2)[0].label })}
                     </button>
+                  ) : null}
+                  {/* M134：这一层自己的插槽参数（offset / 宽高 / 对齐 / 不透明度 / 状态位）
+                      放在节点属性前面：它描述「这一层怎么摆」，比节点自身的属性更外层 */}
+                  {!readonly && path.length > 0 ? (
+                    <SlotRows
+                      parent={parentNode ?? root}
+                      index={path[path.length - 1]}
+                      slot={slotOf(root, path)}
+                      onChange={(patch) => mutate(setSlot(root, path, patch))}
+                    />
                   ) : null}
                   <AttrRows node={node} onChange={(n) => mutate(replaceAt(root, path, n))} />
                   {readonly ? (

@@ -8155,6 +8155,10 @@ button.axv-sb-item:hover {
   border-left: 1px solid var(--axv-outline);
   padding: 10px 12px 18px;
 }
+/* M135：三个编辑器共用右栏，统一内边距（用户指定 10px 12px） */
+.axv-icon-ed-form.axv-cv-form {
+  padding: 10px 12px;
+}
 
 .axv-cv-hint {
   margin-left: 6px;
@@ -8462,7 +8466,8 @@ button.axv-sb-item:hover {
   left: 8px;
   right: 8px;
   bottom: 0px;
-  z-index: 8;
+  /* M135：抽屉压到右栏蒙版（z 8）/ 滑面板（z 9）之下，手机端展开右栏时不会盖住蒙版 */
+  z-index: 7;
   max-height: 42vh;
   display: flex;
   flex-direction: column;
@@ -8600,8 +8605,8 @@ button.axv-sb-item:hover {
     max-width: 75vw;
     height: 100%;
     max-height: none;
-    /* 底部样式抽屉浮在上面，留出空间让最后几行也能滚到可点位置 */
-    padding: 10px 12px 150px;
+    /* 底部样式抽屉浮在上面；M135 依用户要求收成 10px 12px，不再额外垫 150px */
+    padding: 10px 12px;
     border-left: 1px solid var(--axv-outline);
     border-top: none;
     border-radius: 14px 0 0 14px;
@@ -8647,8 +8652,9 @@ button.axv-sb-item:hover {
   .axv-cv-form-toggle.is-closed { right: 0; }
   .axv-cv-form-toggle .msr { font-size: 18px; opacity: 0.7; }
   .axv-cv-form-toggle:active { transform: scale(0.96); }
-  /* M131：右栏展开时铺一层蒙版，点蒙版也能收起（桌面端不显示） */
-  .axv-cv-form-mask { display: block; }
+  /* M131：右栏展开时铺一层蒙版，点蒙版也能收起（桌面端不显示）
+     M135：基础规则 .axv-cv-form-mask{display:none} 在文件里更靠后，同优先级会盖掉这里 → 提高一级选择器 */
+  .axv-cv-body .axv-cv-form-mask { display: block; }
 }
 
 @media (max-width: 840px) {
@@ -9287,6 +9293,44 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-dt-op:disabled {
   opacity: 0.28;
   cursor: default;
+}
+/* M134：「这一层」插槽参数（offset / 宽高 / 对齐 / 不透明度 / 状态位） */
+.axv-slot {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: var(--axv-surface-sunken);
+}
+.axv-slot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+}
+.axv-slot-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.axv-slot-state .axv-shape-label {
+  flex: 0 0 52px;
+}
+.axv-slot-state .axv-shape-seg {
+  flex: 0 0 auto;
+  width: 168px;
+}
+.axv-slot-state .axv-shape-seg-btn {
+  flex: 1 1 0;
+  padding: 3px 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.axv-slot .axv-shape-field {
+  margin-bottom: 6px;
+}
+.axv-slot select.axv-attr-input {
+  width: 100%;
 }
 .axv-dt-add {
   margin: 2px 0 6px;

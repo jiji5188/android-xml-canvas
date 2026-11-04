@@ -166,7 +166,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [tool, setTool] = useState<Tool>("select");
   const [resName, setResName] = useState(name);
   const [err, setErr] = useState("");
-  const [showRaw, setShowRaw] = useState(false);
+  /** M135：XML 代码框默认一直展开 */
+  const showRaw = true;
   const [picking, setPicking] = useState(false);
   /** 插入图标（多图标拼合）：不替换现有图形，而是把选中的图标追加成新图层 */
   const [inserting, setInserting] = useState(false);
@@ -1627,11 +1628,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           ) : null}
 
           <div className="axv-set-group">
-            <button className="axv-set-btn" onClick={() => setShowRaw((v) => !v)}>
-              <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
-              {showRaw ? tt("收起 XML") : tt("查看生成的 XML")}
-            </button>
-            {showRaw ? <textarea className="axv-icon-ed-raw" readOnly value={outXml} /> : null}
+            {/* M135：XML 代码框默认一直展开，不再有收起按钮 */}
+            <textarea className="axv-icon-ed-raw" readOnly value={outXml} />
           </div>
         </div>
 

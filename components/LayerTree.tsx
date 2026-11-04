@@ -31,7 +31,9 @@ export interface DropTarget {
 interface Props {
   root: XmlNode | null;
   selectedPath: string | null;
-  onSelect: (path: string) => void;
+  /** M115：多选附加项（不含主选） */
+  selectedPaths?: string[];
+  onSelect: (path: string, additive?: boolean) => void;
   /** 把 targetPath 挪到 toIndex（父级兄弟位置） */
   /** M34：上移/下移按钮改成拖拽手柄后不再使用，保留以免破坏调用方 */
   onMove?: (targetPath: string, toIndex: number) => void;
@@ -45,7 +47,17 @@ interface Props {
   onToggleLock?: (path: string) => void;
 }
 
-export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDragMove, lockedPaths, onToggleLock }: Props) {
+export function LayerTree({
+  root,
+  selectedPath,
+  selectedPaths,
+  onSelect,
+  onMove,
+  onRemove,
+  onDragMove,
+  lockedPaths,
+  onToggleLock,
+}: Props) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [dragPath, setDragPath] = useState<string | null>(null);
   /** M34：正按着手柄但还没达到拖拽阈值（长按前 220ms 的视觉反馈） */
@@ -235,6 +247,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
           className={
             "axv-lt-row" +
             (selectedPath === n.path ? " sel" : "") +
+            (selectedPath !== n.path && selectedPaths?.includes(n.path) ? " multi" : "") +
             (dragging ? " dragging" : "") +
             (zone === "inside" ? " drop-inside" : "") +
             (zone === "before" ? " drop-before" : "") +
@@ -245,7 +258,7 @@ export function LayerTree({ root, selectedPath, onSelect, onMove, onRemove, onDr
           data-path={n.path}
           data-container={isContainer ? "1" : "0"}
           style={{ paddingLeft: 10 + depth * 14 }}
-          onClick={() => onSelect(n.path)}
+          onClick={(e) => onSelect(n.path, e.ctrlKey || e.metaKey || e.shiftKey)}
           onDragOver={onDragOver}
           onDrop={onDropHere}
         >

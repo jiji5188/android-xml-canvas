@@ -115,6 +115,65 @@
   z-index: 5;
 }
 
+/* M115：多选附加项 —— 紫色虚线一圈，和主选（玫瑰色实线 + 手柄）区分开 */
+.axv-node.axv-multi {
+  outline: 1.5px dashed var(--axv-multi-ink, #7C3AED) !important;
+  outline-offset: 1px;
+}
+
+/* M115：多选工具条（画布左下悬浮） */
+.axv-multibar {
+  position: fixed;
+  left: 50%;
+  bottom: 62px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: var(--axv-surface, #fff);
+  color: var(--axv-on-surface);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--axv-outline-variant, #0000001a);
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+}
+.axv-multibar-n {
+  font-size: 11px;
+  line-height: 1;
+  padding: 0 8px 0 6px;
+  color: var(--axv-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.axv-mb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  font-size: 12px;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.axv-mb-btn:hover { background: var(--axv-primary-soft, #00000010); color: var(--axv-primary); }
+.axv-mb-x { padding: 0 8px; }
+
+/* 图层行：多选附加项 */
+.axv-lt-row.multi {
+  background: var(--axv-primary-soft, #00000010);
+  background: color-mix(in srgb, var(--axv-primary) 14%, transparent);
+  outline: 1px dashed var(--axv-primary);
+  outline-offset: -1px;
+}
+
 /* M6a：导出图片时去掉一切编辑态装饰（选中虚线框 / tag 标签头 / 拖拽高亮 / 尺寸手柄） */
 .axv-exporting .axv-node.axv-selected {
   outline: none !important;

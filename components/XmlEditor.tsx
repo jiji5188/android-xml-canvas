@@ -36,7 +36,7 @@ import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@
 import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild, childLimitOf } from "@/lib/xml/insert";
-import { moveNodeRaw, scanElements } from "@/lib/xml/reorder";
+import { moveNodeRaw, scanElements, elementAt } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml, type LintIssue } from "@/lib/xml/lint";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
@@ -154,6 +154,19 @@ import { GenAssetsPanel } from "./GenAssetsPanel";
 import IconCanvasEditor from "./IconCanvasEditor";
 import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/paths";
+// M115：画布多选 · 复制 / 粘贴 / 成组 / 解组
+import {
+  collectSnippets,
+  deletePaths as deletePathsText,
+  insertSnippetsAt,
+  normalizePaths,
+  renameDuplicateIds,
+  snippetsToText,
+  splitSnippets,
+  unwrapElement,
+  wrapSiblings,
+  canUnwrap,
+} from "@/lib/xml/clip";
 import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, lsGet, lsSet } from "@/lib/xml/storage";
 import { RunPreview } from "./RunPreview";
 import { Toolbar } from "./Toolbar";
@@ -569,6 +582,10 @@ export function XmlEditor() {
     }
   }, []);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  /** M115：多选的「附加项」（不含主选 selectedPath）；空数组 = 单选 */
+  const [selExtra, setSelExtra] = useState<string[]>([]);
+  /** M115：内部剪贴板（XML 片段；同时尽量写系统剪贴板） */
+  const clipRef = useRef<string>("");
  const [exportNote, setExportNote] = useState<string>(" ");
   /** M101：toast 定时器（连续提示时先清上一个，避免新提示被旧定时器提前抹掉） */
   const noteTimerRef = useRef<number | null>(null);
@@ -1316,12 +1333,20 @@ export function XmlEditor() {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // ===== 键盘快捷键：Ctrl/⌘ + Z 撤销 / Y 重做 / S 保存 / F 格式化 =====
+  // ===== 键盘快捷键：Ctrl/⌘ + Z 撤销 / Y 重做 / S 保存 / F 格式化 / C,V,D,G 多选操作 =====
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const k = e.key.toLowerCase();
+      // M115：在输入框 / 代码编辑器里不接 C V D G（那里要能正常复制粘贴文本）
+      const t = e.target as HTMLElement | null;
+      const inEditing =
+        !!t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable ||
+          !!t.closest?.(".cm-editor"));
       if (k === "z") {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -1335,6 +1360,23 @@ export function XmlEditor() {
       } else if (k === "f") {
         e.preventDefault();
         doFormat();
+      } else if (!inEditing && k === "c") {
+        // M115：复制选中的控件（没选中就不拦，留给浏览器）
+        if (!selectedPath) return;
+        e.preventDefault();
+        copySelection();
+      } else if (!inEditing && k === "v") {
+        if (!selectedPath) return;
+        e.preventDefault();
+        pasteSelection();
+      } else if (!inEditing && k === "d") {
+        if (!selectedPath) return;
+        e.preventDefault();
+        duplicateSelection();
+      } else if (!inEditing && k === "g") {
+        e.preventDefault();
+        if (e.shiftKey) ungroupSelection();
+        else groupSelection();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -2852,9 +2894,213 @@ const findResolved = findResolvedNode;
     noteTimerRef.current = window.setTimeout(() => setExportNote(""), ms);
   };
 
+  /* ===== M115：画布多选 / 复制 / 粘贴 / 成组 / 解组 ===== */
+  /** 当前实际多选集合（主选在前，附加在后；按 path 字典序排序方便成组判定） */
+  const selPaths = useMemo(() => {
+    if (!selectedPath) return selExtra.length ? selExtra : [];
+    return normalizePaths([selectedPath, ...selExtra]);
+  }, [selectedPath, selExtra]);
+
+  /** M115：取消主选时一并取消多选 */
+  useEffect(() => {
+    if (selectedPath === null && selExtra.length) setSelExtra([]);
+  }, [selectedPath, selExtra.length]);
+
+  /** M115：单选 / 追加多选。additive = Ctrl/⌘/Shift 按住 */
+  const selectPath = useCallback(
+    (p: string | null, additive = false) => {
+      if (!p) {
+        setSelectedPath(null);
+        setSelExtra([]);
+        return;
+      }
+      if (p === "#0") {
+        setSelectedPath(p);
+        setSelExtra([]);
+        return;
+      }
+      if (!additive) {
+        setSelectedPath(p);
+        setSelExtra([]);
+        return;
+      }
+      // 追加模式：已包含且不止一个 → 取消该节点；否则加入
+      setSelExtra((prev) => {
+        const all = selectedPath ? [selectedPath, ...prev] : [...prev];
+        if (all.length > 1 && all.includes(p)) {
+          setSelectedPath(all.filter((x) => x !== p)[0] ?? null);
+          return all.filter((x) => x !== p);
+        }
+        return [...prev, p];
+      });
+      if (selectedPath) setSelectedPath(selectedPath);
+      else setSelectedPath(p);
+    },
+    [selectedPath],
+  );
+
+  /** 取一份「路径仍然有效」的多选集合（文档变过之后可能失效） */
+  const validSelPaths = useCallback((): string[] => {
+    if (!selPaths.length) return [];
+    const root = scanElements(xml);
+    if (!root) return [];
+    return selPaths.filter((p) => elementAt(root, p) !== null);
+  }, [selPaths, xml]);
+
+  /** M115：复制当前多选到内部剪贴板 + 系统剪贴板 */
+  const copySelection = useCallback((): number => {
+    const paths = validSelPaths();
+    if (!paths.length) return 0;
+    const text = snippetsToText(collectSnippets(xml, paths));
+    clipRef.current = text;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+    flashNote(tt("已复制 {n} 个控件", { n: paths.length }), 2200);
+    return paths.length;
+  }, [validSelPaths, xml, flashNote]);
+
+  /** M115：把内部剪贴板（或系统剪贴板里的 XML）粘贴到主选节点之后 */
+  const pasteSelection = useCallback((): number => {
+    const paths = validSelPaths();
+    const anchor = selectedPath ?? paths[0];
+    if (!anchor) {
+      flashNote(tt("先选中一个控件再粘贴"), 3000);
+      return 0;
+    }
+    const { parentPath, index } = splitPath(anchor);
+    // 粘贴目标：最后一个选中项之后（单选时就是主选之后）
+    const lastIdx = paths.length ? splitPath(paths[paths.length - 1]).index : index;
+    const targetIndex = lastIdx + 1;
+
+    const place = (text: string, from: string): number => {
+      const parts = splitSnippets(text);
+      if (!parts.length) {
+        flashNote(from === "sys" ? tt("剪贴板里没有可粘贴的控件 XML") : tt("内部剪贴板已失效，请重新复制"), 3200);
+        return 0;
+      }
+      const base = currentXml();
+      const renamed = parts.map((p) => renameDuplicateIds(base, p));
+      const r = insertSnippetsAt(base, parentPath, targetIndex, renamed);
+      if (!r.ok) {
+        flashNote(r.reason ?? tt("粘贴失败"), 3600);
+        return 0;
+      }
+      setXmlAndTrack(r.xml);
+      setSelectedPath(r.firstPath);
+      setSelExtra([]);
+      flashNote(
+        from === "sys" ? tt("已粘贴（来自系统剪贴板）") : tt("已粘贴 {n} 个控件", { n: r.count }),
+        2400,
+      );
+      return r.count;
+    };
+
+    const snippet = clipRef.current;
+    if (snippet.trim()) return place(snippet, "inner");
+    // 没有内部剪贴板：试读系统剪贴板（异步，只看不像 XML 就提示）
+    void navigator.clipboard
+      ?.readText?.()
+      .then((text) => {
+        if (text && /<\w[^>]*>/.test(text)) place(text, "sys");
+        else flashNote(tt("剪贴板里没有可粘贴的控件 XML"), 3200);
+      })
+      .catch(() => flashNote(tt("读不到系统剪贴板，请先在本应用里复制一次"), 3600));
+    return 0;
+  }, [validSelPaths, selectedPath, setXmlAndTrack, currentXml, flashNote]);
+
+  /** M115：Ctrl+D 式「就地复制」= 复制 + 紧跟原位置粘贴 */
+  const duplicateSelection = useCallback((): number => {
+    const paths = validSelPaths();
+    if (paths.length === 1) {
+      const text = snippetsToText(collectSnippets(xml, paths));
+      clipRef.current = text;
+      const { parentPath, index } = splitPath(paths[0]);
+      const r = insertSnippetsAt(xml, parentPath, index + 1, [renameDuplicateIds(xml, text)]);
+      if (!r.ok) {
+        flashNote(r.reason ?? tt("无法复制"), 3600);
+        return 0;
+      }
+      setXmlAndTrack(r.xml);
+      setSelectedPath(r.firstPath);
+      setSelExtra([]);
+      flashNote(tt("已复制 1 个控件"), 2200);
+      return 1;
+    }
+    if (!paths.length) return 0;
+    const text = snippetsToText(collectSnippets(xml, paths));
+    clipRef.current = text;
+    const { parentPath } = splitPath(paths[paths.length - 1]);
+    const idxs = paths.map((p) => splitPath(p).index).sort((a, b) => a - b);
+    const r = insertSnippetsAt(xml, parentPath, idxs[idxs.length - 1] + 1, [renameDuplicateIds(xml, text)]);
+    if (!r.ok) {
+      flashNote(r.reason ?? tt("无法复制"), 3600);
+      return 0;
+    }
+    setXmlAndTrack(r.xml);
+    setSelectedPath(r.firstPath);
+    setSelExtra([]);
+    flashNote(tt("已复制 {n} 个控件", { n: paths.length }), 2200);
+    return paths.length;
+  }, [validSelPaths, xml, setXmlAndTrack, flashNote]);
+
+  /** M115：Ctrl+G 成组（多选相邻兄弟） */
+  const groupSelection = useCallback((): string | null => {
+    const paths = validSelPaths();
+    if (paths.length < 2) {
+      flashNote(tt("至少选中两个控件才能成组"), 3200);
+      return null;
+    }
+    const r = wrapSiblings(xml, paths);
+    if (!r.ok) {
+      flashNote(r.reason ?? tt("成组失败"), 3600);
+      return null;
+    }
+    setXmlAndTrack(r.xml);
+    setSelectedPath(r.newPath);
+    setSelExtra([]);
+    flashNote(tt("已把 {n} 个控件包进 FrameLayout", { n: paths.length }), 2600);
+    return r.newPath;
+  }, [validSelPaths, xml, setXmlAndTrack, flashNote]);
+
+  /** M115：Ctrl+Shift+G 解组（仅对主选容器） */
+  const ungroupSelection = useCallback((): string[] => {
+    if (!selectedPath) return [];
+    if (!canUnwrap(xml, selectedPath)) {
+      flashNote(tt("选中的不是带子控件的容器，解不了组"), 3200);
+      return [];
+    }
+    const r = unwrapElement(xml, selectedPath);
+    if (!r.ok) {
+      flashNote(r.reason ?? tt("解组失败"), 3600);
+      return [];
+    }
+    setXmlAndTrack(r.xml);
+    setSelectedPath(r.childPaths[0] ?? null);
+    setSelExtra(r.childPaths.slice(1));
+    flashNote(tt("已解组：子控件已提出来"), 2400);
+    return r.childPaths;
+  }, [selectedPath, xml, setXmlAndTrack, flashNote]);
+
+  /** M115：删除当前多选（有 ≥2 时用文本切片批量删；否则走原单删） */
+  const deleteSelection = useCallback((): number => {
+    const paths = validSelPaths();
+    if (paths.length < 2) {
+      // 走原有 onRemoveNode 路径（保留其状态/历史行为）
+      if (selectedPath) onRemoveNode(selectedPath);
+      setSelExtra([]);
+      return 1;
+    }
+    const out = deletePathsText(xml, paths);
+    setXmlAndTrack(out);
+    setSelExtra([]);
+    setSelectedPath(null);
+    flashNote(tt("已删除 {n} 个控件", { n: paths.length }), 2400);
+    return paths.length;
+  }, [validSelPaths, xml, selectedPath, onRemoveNode, setXmlAndTrack, setSelExtra, flashNote]);
+
   /** 当前 xml → 落盘输入（四条保存路径共用） */
-  const currentSaveInput = (name?: string): SaveInput => ({
-    xml: currentXml(),
+  const currentSaveInput = (name?: string): SaveInput => ({    xml: currentXml(),
     mode: exportMode,
     name: name || saveOrigin?.name || activeFile(project)?.name || "activity_main.xml",
     generatedDrawables,
@@ -3406,12 +3652,41 @@ const findResolved = findResolvedNode;
         lintErrCount={lintErrCount}
         exportNote={exportNote}
         selectedPath={selectedPath}
-        onSelectPath={setSelectedPath}
+        selectedPaths={selExtra}
+        onSelectPath={selectPath}
         onDropWidget={onDropWidget}
         onConstraintDraw={onConstraintDraw}
         onGeometryChange={onGeometryChange}
         isPathLocked={isPathLocked}
       />
+
+      {/* M115：多选工具条（触屏没 Ctrl，按钮是唯一入口） */}
+      {selPaths.length >= 2 && mobileTab !== "values" ? (
+        <div className="axv-multibar" role="toolbar" aria-label={tt("多选操作")}>
+          <span className="axv-multibar-n">{tt("已选 {n} 个", { n: selPaths.length })}</span>
+          <button className="axv-mb-btn" onClick={() => copySelection()} title={tt("复制（Ctrl+C）")}>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>content_copy</span>
+            {tt("复制")}
+          </button>
+          <button className="axv-mb-btn" onClick={() => groupSelection()} title={tt("成组（Ctrl+G）")}>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>folder_zip</span>
+            {tt("成组")}
+          </button>
+          <button className="axv-mb-btn" onClick={() => deleteSelection()} title={tt("删除（Del）")}>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>delete</span>
+            {tt("删除")}
+          </button>
+          <button
+            className="axv-mb-btn axv-mb-x"
+            aria-label={tt("取消多选")}
+            onClick={() => {
+              setSelExtra([]);
+            }}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>close</span>
+          </button>
+        </div>
+      ) : null}
 
       {/* M101：代码面板也要看得到 toast（exportNote 的汉堡包在 CanvasStage，代码 tab 看不到） */}
       <XmlCodeView
@@ -3474,7 +3749,8 @@ const findResolved = findResolvedNode;
               <LayerTree
                 root={treeRoot}
                 selectedPath={selectedPath}
-                onSelect={setSelectedPath}
+                selectedPaths={selExtra}
+                onSelect={selectPath}
                 onMove={onMoveSibling}
                 onRemove={onRemoveNode}
                 onDragMove={onDragMoveNode}

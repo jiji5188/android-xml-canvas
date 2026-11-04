@@ -62,9 +62,11 @@ export interface GeomPatch {
 }
 
 interface XmlCanvasProps {
+  /** M115：多选附加项（不含主选 selectedPath） */
+  selectedPaths?: string[];
   node: ResolvedNode;
   selectedPath: string | null;
-  onSelect: (path: string) => void;
+  onSelect: (path: string, additive?: boolean) => void;
   /** 拖组件到画布上：path = 落点节点，key = 组件 key */
   onDropWidget?: (path: string, key: string, isContainer: boolean) => void;
   /** M2c：画约束线。childPath = 被约束的子控件，targetPath = 目标（"CL" 表示父容器） */
@@ -157,6 +159,7 @@ interface GeomDrag {
 export function XmlCanvas({
   node,
   selectedPath,
+  selectedPaths,
   onSelect,
   onDropWidget,
   onConstraintDraw,
@@ -197,6 +200,8 @@ export function XmlCanvas({
   }, [node]);
 
   const isSel = selectedPath === node.path;
+  /** M115：多选附加项（不是主选）——只画一圈虚线，不给手柄/拖拽，避免和主选打架 */
+  const isMulti = !isSel && !!selectedPaths && selectedPaths.includes(node.path);
   // M4g：能否接收子控件只看标签（只有 ViewGroup 才算容器）。
   // 叶子节点即使因为粘贴错误已经有子节点，也不当容器用 —— 拖进去只能插成兄弟。
   const isContainer = isContainerTag(node.tag);
@@ -495,6 +500,7 @@ export function XmlCanvas({
         "axv-node " +
         node.className +
         (isSel ? " axv-selected" : "") +
+        (isMulti ? " axv-multi" : "") +
         (dropHit === node.path ? " axv-drop-hit" : "") +
         (isContainer ? " axv-container" : "") +
         (leafWithChildren ? " axv-leaf-invalid" : "")
@@ -503,7 +509,7 @@ export function XmlCanvas({
       onClick={(e) => {
         e.stopPropagation();
         if (lockedHere) return;
-        onSelect(node.path);
+        onSelect(node.path, e.ctrlKey || e.metaKey || e.shiftKey);
       }}
       onDragOver={
         onDropWidget

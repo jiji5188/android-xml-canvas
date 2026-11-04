@@ -55,7 +55,9 @@ export interface CanvasStageProps {
   exportNote: string;
 
   selectedPath: string | null;
-  onSelectPath: (p: string | null) => void;
+  /** M115：多选附加项 */
+  selectedPaths?: string[];
+  onSelectPath: (p: string | null, additive?: boolean) => void;
   onDropWidget: (path: string, key: string, isContainer: boolean) => void;
   onConstraintDraw: (
     childPath: string,
@@ -100,6 +102,7 @@ export function CanvasStage(props: CanvasStageProps) {
     lintErrCount,
     exportNote,
     selectedPath,
+    selectedPaths,
     onSelectPath,
     onDropWidget,
     onConstraintDraw,
@@ -230,6 +233,7 @@ export function CanvasStage(props: CanvasStageProps) {
               <XmlCanvas
                 node={model.root}
                 selectedPath={selectedPath}
+                selectedPaths={selectedPaths}
                 onSelect={onSelectPath}
                 onDropWidget={onDropWidget}
                 onConstraintDraw={onConstraintDraw}

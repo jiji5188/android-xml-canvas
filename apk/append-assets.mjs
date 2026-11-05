@@ -48,21 +48,33 @@ function findEocd(buf) {
 }
 
 function main() {
-  const [apkPath, assetsDir] = [process.argv[2], process.argv[3]].map((s) => path.resolve(s));
+  // 用法：node append-assets.mjs <apk> <assets-www-dir> [--add <本地文件> <zip 内路径>]...
+  // M151：需要把 native 库（lib/arm64-v8a/libaapt2.so）也一并追加，走同一套 STORE 逻辑
+  const args = process.argv.slice(2);
+  const extras = [];
+  const plain = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--add") {
+      extras.push({ src: path.resolve(args[i + 1]), name: args[i + 2] });
+      i += 2;
+    } else plain.push(args[i]);
+  }
+  const [apkPath, assetsDir] = plain.map((s) => path.resolve(s));
   if (!apkPath || !assetsDir) {
-    console.error("用法: node append-assets.mjs <apk> <assets-www-dir>");
+    console.error("用法: node append-assets.mjs <apk> <assets-www-dir> [--add <file> <zipPath>]...");
     process.exit(2);
   }
 
-  // 收集要追加的文件（保持目录序，稳定输出）
+  // 收集要追加的文件（保持目录序，稳定输出）：{ src, name }
   const files = [];
   (function walk(dir, rel) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const r = rel ? rel + "/" + e.name : e.name;
       if (e.isDirectory()) walk(path.join(dir, e.name), r);
-      else files.push(r);
+      else files.push({ src: path.join(dir, e.name), name: "assets/www/" + r });
     }
   })(assetsDir, "");
+  for (const e of extras) files.push(e);
 
   const buf = fs.readFileSync(apkPath);
   const { cdOffset, cdSize } = findEocd(buf);
@@ -80,8 +92,8 @@ function main() {
   const enc = new TextEncoder();
 
   for (const rel of files) {
-    const data = fs.readFileSync(path.join(assetsDir, rel));
-    const name = enc.encode("assets/www/" + rel);
+    const data = fs.readFileSync(rel.src);
+    const name = enc.encode(rel.name);
     const crc = crc32(data);
 
     const lh = new Uint8Array(30 + name.length);

@@ -114,7 +114,8 @@ run(jbrExe("jar"), ["uf", "build/base.apk", "-C", "build/dex", "classes.dex"], a
 
 // 6.5) assets 必须用正斜杠：aapt2 在 Windows 上会写成反斜杠（AssetManager 读不到，白屏），
 //      .NET ZipArchive 追加又会写 data descriptor（启动闪退）——用 append-assets.mjs 纯手写 STORE
-run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "build", "base.apk"), path.join(apk, "assets", "www")], apk);
+run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "build", "base.apk"), path.join(apk, "assets", "www"),
+  "--add", path.join(apk, "lib", "arm64-v8a", "libaapt2.so"), "lib/arm64-v8a/libaapt2.so"], apk);
 
 // 7) zipalign + 签名
 const keystore = path.join(apk, "debug.keystore");

@@ -80,6 +80,22 @@ public class PreviewActivity extends Activity {
             info = "加载失败：\n" + sw;
             Log.e(TAG, info);
         }
+        // M151 自检：跑一遍 aapt2 version，确认 native 库能执行
+        try {
+            File bin = new File(getApplicationInfo().nativeLibraryDir, "libaapt2.so");
+            File work = new File(getCacheDir(), "aapt2-work");
+            if (!work.exists() && !work.mkdirs()) work = getCacheDir();
+            ProcessBuilder pb = new ProcessBuilder(bin.getAbsolutePath(), "version")
+                    .directory(work).redirectErrorStream(true);
+            pb.environment().put("TMPDIR", getCacheDir().getAbsolutePath());
+            Process p = pb.start();
+            String out = new String(p.getInputStream().readAllBytes()).trim();
+            int code = p.waitFor();
+            info += "\n\naapt2 自检: exit=" + code + " " + out;
+        } catch (Throwable t) {
+            info += "\n\naapt2 自检失败: " + t;
+            Log.e(TAG, "aapt2 self-check failed", t);
+        }
 
         TextView head = new TextView(this);
         head.setText(info);

@@ -129,7 +129,10 @@ describe("M64b D3：停止要停住整个工具循环", () => {
 
     expect(streamCalls.length).toBe(1);
     expect(readCalls).toBe(1);
-    expect(el.querySelector(".axv-ai-list")!.textContent || "").toContain("已停止");
+    // M148：停止是过程信息 → 只进调试日志，不占用聊天框
+    expect(el.querySelector(".axv-ai-log-body")!.textContent || "").toContain("已停止");
+    // 聊天框里不该多出过程气泡（只有用户那句提问）
+    expect(el.querySelectorAll(".axv-ai-msg.assistant").length).toBe(0);
     // 停止后不应该再出现「正在生成…」
     expect(el.querySelector(".axv-ai-typing")).toBeNull();
   });

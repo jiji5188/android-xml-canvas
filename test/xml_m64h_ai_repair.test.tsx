@@ -81,7 +81,7 @@ async function ask(el: HTMLElement, q = "这个布局长什么样") {
   ta.dispatchEvent(new Event("input", { bubbles: true }));
   await flush(1);
   ([...el.querySelectorAll("button")] as HTMLButtonElement[]).find((b) => (b.textContent || "").includes("发送"))!.click();
-  await flush(8);
+  await flush(40);
 }
 
 beforeEach(() => {
@@ -118,7 +118,8 @@ describe("M64h A4：工具格式修复", () => {
     expect(repair).toContain('{"tool":"工具名","args":{...}}');
     expect(readCalls).toBe(1);
     expect(listText(el)).toContain("读到了");
-    expect(listText(el)).toContain("工具调用格式无效");
+    // M148：修格式的提示是过程信息 → 进调试日志，不进聊天框
+    expect(el.querySelector(".axv-ai-log-body")!.textContent || "").toContain("工具调用格式无效");
   });
 
   it("两次都坏 → 不执行文件操作，降级成普通回答并标注未改动", async () => {

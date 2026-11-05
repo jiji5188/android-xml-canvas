@@ -6607,6 +6607,87 @@ button.axv-ws-caret:hover {
 }
 .axv-ai-chip:hover:not(:disabled) { border-color: var(--axv-primary); color: var(--axv-primary); }
 .axv-ai-chip:disabled { opacity: 0.5; cursor: default; }
+/* ===== M148：调试日志面板（工具调用/模型原始输出/报错都在这里，不进聊天框） ===== */
+.axv-ai-log { flex: 0 0 auto; border-top: 1px solid var(--axv-outline); background: var(--axv-surface-head); }
+.axv-ai-log-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 8px 0 10px;
+  border-bottom: 1px solid var(--axv-outline);
+}
+.axv-ai-log-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-ai-log-toggle b { font-size: 12px; font-weight: 700; }
+.axv-ai-log-count {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--axv-on-surface-variant);
+  background: var(--axv-surface);
+  border: 1px solid var(--axv-outline);
+  border-radius: 999px;
+  padding: 0 7px;
+  min-width: 20px;
+  text-align: center;
+}
+.axv-ai-log-head .axv-ai-spacer { flex: 1; }
+.axv-ai-log-body {
+  height: 160px;
+  overflow: auto;
+  padding: 8px 10px;
+  background: var(--axv-surface);
+  font-size: 10.5px;
+  line-height: 1.5;
+  display: grid;
+  gap: 6px;
+}
+.axv-ai-log-empty { color: var(--axv-on-surface-variant); padding: 4px 2px; }
+.axv-ai-log-row { display: grid; grid-template-columns: 52px 64px 1fr; gap: 8px; padding: 5px 8px; border-left: 3px solid var(--axv-outline); background: var(--axv-surface-head); border-radius: 6px; }
+.axv-ai-log-time { color: var(--axv-on-surface-variant); font-variant-numeric: tabular-nums; }
+.axv-ai-log-kind { font-weight: 700; }
+.axv-ai-log-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--axv-on-surface);
+  font-family: var(--axv-font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  max-height: 120px;
+  overflow: auto;
+}
+/* 分类颜色（需求：日志带分类颜色） */
+.axv-ai-log-row.k-system { border-left-color: var(--axv-primary, #5b9dff); }
+.axv-ai-log-row.k-system .axv-ai-log-kind { color: var(--axv-primary, #5b9dff); }
+.axv-ai-log-row.k-tool_call { border-left-color: #ff9d3c; }
+.axv-ai-log-row.k-tool_call .axv-ai-log-kind { color: #ff9d3c; }
+.axv-ai-log-row.k-tool_result { border-left-color: #3fbf6f; }
+.axv-ai-log-row.k-tool_result .axv-ai-log-kind { color: #3fbf6f; }
+.axv-ai-log-row.k-model_raw { border-left-color: #e0b341; }
+.axv-ai-log-row.k-model_raw .axv-ai-log-kind { color: #e0b341; }
+.axv-ai-log-row.k-error { border-left-color: #ff6b6b; }
+.axv-ai-log-row.k-error .axv-ai-log-kind { color: #ff6b6b; }
+.axv-ai-log-row.k-error .axv-ai-log-text { color: #ff6b6b; }
+.axv-ai-log-row.k-info { border-left-color: var(--axv-on-surface-variant); }
+.axv-ai-log-row.k-info .axv-ai-log-kind { color: var(--axv-on-surface-variant); }
+.axv-ai-continue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  font-size: 12px;
+  color: #ff9d3c;
+}
+.axv-ai-continue-txt { flex: 1; }
+
 .axv-ai-input { padding: 8px 12px 12px; display: grid; gap: 8px; }
 .axv-ai-input textarea {
   width: 100%;

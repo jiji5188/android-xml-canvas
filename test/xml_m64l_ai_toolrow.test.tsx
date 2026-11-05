@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-// test/xml_m64l_ai_toolrow.test.tsx — M64l（D2）：工具日志折叠成一行
+// test/xml_m64l_ai_toolrow.test.tsx — M148 改写：工具过程只进「调试日志」面板
 //
-// 以前每次工具调用产生两行文字（⏳ 读取 x.xml… → ✅ 读取 x.xml），三轮就是六行，
-// 而且正文里没有任何有用信息。现在每步一行小灰字（图标 + 动作 + 目标 + 耗时），
-// 点一下才展开工具原始输出，失败的标红。
+// 老行为（M64l）：工具调用在聊天流里折成一行小灰字。
+// 新行为（M148）：聊天框只显示「用户提问 + 最终回答」，
+// 工具调用 / 工具返回 / 报错全部落在底部独立的调试日志面板里，按类型染色。
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRoot, type Root } from "react-dom/client";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
@@ -19,6 +19,7 @@ const replies: string[] = [];
 vi.mock("@/lib/xml/ai-transport", () => ({
   nativeAiAvailable: () => false,
   defaultTimeoutMs: () => 300_000,
+  looksLikeToolsRejected: () => false,
   streamChat: vi.fn(async (_cfg: unknown, _msgs: unknown[]) => ({
     ok: true,
     content: replies.shift() ?? "",
@@ -83,6 +84,9 @@ async function ask(el: HTMLElement, q: string) {
   await flush(20);
 }
 
+const logText = (el: HTMLElement) => el.querySelector(".axv-ai-log-body")?.textContent || "";
+const chatText = (el: HTMLElement) => el.querySelector(".axv-ai-list")?.textContent || "";
+
 beforeEach(() => {
   installStorage();
   replies.length = 0;
@@ -99,51 +103,73 @@ afterEach(() => {
   host = null;
 });
 
-describe("M64l D2：工具日志折叠", () => {
-  it("同一次回复里的两次工具调用各占一行，且不再有 ⏳/✅ 气泡", async () => {
-    // 单次回复最多解析 2 个工具调用（M64h 上限），所以这里用 2 个
+describe("M148：工具过程进调试日志，聊天框只留最终回答", () => {
+  it("两次工具调用 → 日志里两条 tool_call，聊天框没有工具行", async () => {
     replies.push([calls[0], calls[2]].join("\n\n"), "都看完了。");
     const el = await mount();
     await ask(el, "看看这几个文件");
 
-    const rows = el.querySelectorAll(".axv-ai-tool");
+    const rows = el.querySelectorAll(".axv-ai-log-row.k-tool_call");
     expect(rows.length).toBe(2);
-    expect(el.querySelector(".axv-ai-list")!.textContent).not.toContain("⏳");
-    expect(el.querySelector(".axv-ai-list")!.textContent).not.toContain("✅");
-    // 每行带动作 + 目标
-    const first = rows[0].textContent || "";
-    expect(first).toContain("读取");
-    expect(first).toContain("a.xml");
+    expect(logText(el)).toContain("read_file");
+    expect(logText(el)).toContain("a.xml");
+    expect(logText(el)).toContain("list_files");
+
+    // 聊天流里不再有工具行，也没有 ⏳/✅ 这类过程标记
+    expect(el.querySelectorAll(".axv-ai-tool").length).toBe(0);
+    expect(chatText(el)).not.toContain("⏳");
+    expect(chatText(el)).not.toContain("✅");
+    // 只保留提问 + 最终回答
+    expect(chatText(el)).toContain("都看完了。");
   });
 
-  it("点开才看到工具原始输出，再点收起", async () => {
+  it("工具返回内容整段进日志（可展开的完整输出）", async () => {
     replies.push(calls[0], "读完了。");
     const el = await mount();
     await ask(el, "读一下 a.xml");
 
-    const row = el.querySelector(".axv-ai-tool")!;
-    expect(row.querySelector(".axv-ai-tool-out")).toBeNull();
-    (row.querySelector(".axv-ai-tool-head") as HTMLButtonElement).click();
-    await flush(2);
-    const out = el.querySelector(".axv-ai-tool-out");
-    expect(out).not.toBeNull();
-    expect(out!.textContent).toContain("<LinearLayout/>");
-    (el.querySelector(".axv-ai-tool-head") as HTMLButtonElement).click();
-    await flush(2);
-    expect(el.querySelector(".axv-ai-tool-out")).toBeNull();
+    const res = el.querySelector(".axv-ai-log-row.k-tool_result");
+    expect(res).not.toBeNull();
+    expect(res!.textContent).toContain("<LinearLayout/>");
+    expect(chatText(el)).toContain("读完了。");
   });
 
-  it("失败的工具标 error 并带「失败」", async () => {
+  it("失败的工具标 error 并带错误原文", async () => {
     replies.push(calls[1], "那个文件不存在。");
     const el = await mount();
     await ask(el, "读 missing.xml");
 
-    const row = el.querySelector(".axv-ai-tool")!;
-    expect(row.className).toContain("error");
-    expect(row.textContent).toContain("失败");
-    // 错误原文在展开后才能看到（默认收起，不刷屏）
-    (row.querySelector(".axv-ai-tool-head") as HTMLButtonElement).click();
+    const rows = el.querySelectorAll(".axv-ai-log-row.k-error");
+    expect(rows.length).toBeGreaterThan(0);
+    expect(logText(el)).toContain("文件不存在");
+    expect(chatText(el)).toContain("那个文件不存在。");
+  });
+
+  it("调试日志面板可以折叠 / 展开，也能一键清空", async () => {
+    replies.push("你好。");
+    const el = await mount();
+    expect(el.querySelector(".axv-ai-log-body")).not.toBeNull();
+
+    // 折叠
+    (el.querySelector(".axv-ai-log-toggle") as HTMLButtonElement).click();
     await flush(2);
-    expect(el.querySelector(".axv-ai-tool-out")!.textContent).toContain("文件不存在");
+    expect(el.querySelector(".axv-ai-log-body")).toBeNull();
+
+    // 展开
+    (el.querySelector(".axv-ai-log-toggle") as HTMLButtonElement).click();
+    await flush(2);
+    expect(el.querySelector(".axv-ai-log-body")).not.toBeNull();
+
+    // 清空
+    await ask(el, "在吗");
+    const before = el.querySelectorAll(".axv-ai-log-row").length;
+    expect(before).toBeGreaterThan(0);
+    const clearBtn = [...el.querySelectorAll(".axv-ai-log-head button")].find((b) =>
+      (b.getAttribute("title") || "").includes("清空"),
+    ) as HTMLButtonElement;
+    clearBtn.click();
+    await flush(2);
+    expect(el.querySelectorAll(".axv-ai-log-row").length).toBe(0);
+    expect(el.querySelector(".axv-ai-log-empty")).not.toBeNull();
   });
 });

@@ -18,7 +18,7 @@ import {
   type AiMessage,
 } from "@/lib/xml/ai";
 import { defaultTimeoutMs, friendlyAiError, nativeAiAvailable, streamChat } from "@/lib/xml/ai-transport";
-import { AI_TOOL_PROMPT, AI_TOOL_PROMPT_NATIVE, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo } from "@/lib/xml/ai-tools";
+import { AI_TOOL_PROMPT, AI_TOOL_PROMPT_NATIVE, createNativeIo, parseToolReply, runTool, stripToolBlocks, type AiFileIo, type AiToolCall } from "@/lib/xml/ai-tools";
 import { AI_TOOL_SPECS, looksLikeToolsRejected, supportsNativeTools, toAiToolCall, toHistoryToolCalls } from "@/lib/xml/ai-fc";
 import { refreshAiCaches } from "@/lib/xml/ai-tools";
 import { clearChatFor, loadChatFor, saveChatFor } from "@/lib/xml/ai-chat-store";
@@ -36,9 +36,20 @@ import { aiAllowProtectedGet, aiAllowProtectedSet } from "@/lib/xml/ai-paths";
 import { formatToolMemory, memoryEntryFromTool, pushToolMemory, type ToolMemoryEntry } from "@/lib/xml/ai-tool-memory";
 import { batchLabel, makeBatch, pushBatch, restoreBatch, type AiHistoryBatch } from "@/lib/xml/ai-history";
 import { collectProjectFacts, formatProjectFacts, type ProjectFacts } from "@/lib/xml/ai-facts";
-
-/** 工具循环最多几轮（防模型无限读文件） */
-const MAX_TOOL_ROUNDS = 10;
+import {
+  clipLog,
+  DEFAULT_MAX_ROUNDS,
+  formatLogs,
+  loadMaxRounds,
+  LOG_KIND_LABEL,
+  LS_KEY_MAX_ROUNDS,
+  pushLogEntry,
+  runWithTimeout,
+  TOOL_TIMEOUT_MS,
+  looksLikeTranscript,
+  type LogEntry,
+  type LogKind,
+} from "@/lib/xml/ai-log";
 
 interface Props {
   /** 当前打开的文档内容（布局 XML / Java 源码 / values 资源…都可能是） */
@@ -83,59 +94,7 @@ interface ChatItem extends AiMessage {
   tool?: { name: string; target: string; state: "running" | "done" | "error" | "stopped"; out?: string; ms?: number };
 }
 
-const TOOL_LABEL: Record<string, string> = {
-  read_file: tt("读取"),
-  outline: tt("大纲"),
-  write_file: tt("写入"),
-  apply_patch: tt("修改"),
-  list_files: tt("列出"),
-  search_files: tt("搜索"),
-  find_usages: tt("查引用"),
-  check_java: tt("自检"),
-};
 
-/** M64l（D2）：一行工具日志（默认收起，点开看工具原样输出） */
-function AiToolRow({ tool }: { tool: NonNullable<ChatItem["tool"]> }) {
-  const [open, setOpen] = useState(false);
-  const hasOut = !!tool.out;
-  const icon =
-    tool.state === "running"
-      ? "progress_activity"
-      : tool.state === "error"
-        ? "error"
-        : tool.state === "stopped"
-          ? "stop_circle"
-          : "check_circle";
-  const meta = [
-    tool.target,
-    tool.ms !== undefined ? `${tool.ms}ms` : "",
-    tool.state === "error" ? tt("失败") : tool.state === "stopped" ? tt("已停止") : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return (
-    <div className={"axv-ai-tool " + tool.state}>
-      <button
-        className="axv-ai-tool-head"
-        onClick={() => setOpen((v) => !v)}
-        disabled={!hasOut}
-        title={hasOut ? (open ? tt("收起结果") : tt("展开工具结果")) : undefined}
-      >
-        <span className="msr axv-ai-tool-ic" aria-hidden="true">
-          {icon}
-        </span>
-        <span className="axv-ai-tool-label">{TOOL_LABEL[tool.name] ?? tool.name}</span>
-        <span className="axv-ai-tool-meta">{meta}</span>
-        {hasOut ? (
-          <span className="msr axv-ai-tool-caret" aria-hidden="true">
-            {open ? "expand_more" : "chevron_right"}
-          </span>
-        ) : null}
-      </button>
-      {open && hasOut ? <pre className="axv-ai-tool-out">{tool.out}</pre> : null}
-    </div>
-  );
-}
 
 /** M97：思考过程独立框（自己滚，不抢正文的流量） */
 function AiThink({ text, live, ms }: { text: string; live: boolean; ms?: number }) {
@@ -221,6 +180,31 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   const [factsInfo, setFactsInfo] = useState<ProjectFacts | null>(null);
   /** M64k（A7）：会话内「读过什么」的摘要记忆（换文件就清空，否则旧文件内容会串到新文档里） */
   const toolMemRef = useRef<ToolMemoryEntry[]>([]);
+  // ===== M148：调试日志（中间过程只进这里；聊天框只留用户提问 + 最终回答） =====
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logOpen, setLogOpen] = useState(true);
+  const logIdRef = useRef(0);
+  const liveLogRef = useRef(-1);
+  const logScrollRef = useRef<HTMLDivElement | null>(null);
+  /** M148：工具轮数上限（默认 10，设置里可改） */
+  const [maxRounds, setMaxRounds] = useState(() => loadMaxRounds(window.localStorage.getItem(LS_KEY_MAX_ROUNDS)));
+  /** M148：到轮数上限后的断点（点「继续」时从这里恢复，重新给一份额度） */
+  const contRef = useRef<null | { msgs: AiMessage[]; io: AiFileIo | null; stage: AiFileIo | null; useTools: boolean }>(null);
+  const [canContinue, setCanContinue] = useState(false);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LS_KEY_MAX_ROUNDS, String(maxRounds));
+    } catch {
+      /* 静默 */
+    }
+  }, [maxRounds]);
+
+  useEffect(() => {
+    if (!logOpen) return;
+    const el = logScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [logs, logOpen]);
 
   useEffect(() => {
     toolMemRef.current = [];
@@ -308,6 +292,274 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
   const ctxSelection = withSelection ? selection ?? null : null;
   const ctxResources = resources ?? null;
 
+  // ===== M148：调试日志（中间过程只进这里，聊天框只留最终回答） =====
+  const pushLog = useCallback((kind: LogKind, text: string) => {
+    liveLogRef.current = -1;
+    const body = clipLog(text);
+    setLogs((l) => pushLogEntry(l, { id: ++logIdRef.current, at: Date.now(), kind, text: body }));
+  }, []);
+
+  /** 流式增量：同一段输出原地刷新，不要每个 delta 都塞一条日志 */
+  const pushLive = useCallback((kind: LogKind, text: string) => {
+    const body = clipLog(text);
+    setLogs((l) => {
+      const id = liveLogRef.current;
+      if (id > 0) {
+        const idx = l.findIndex((e) => e.id === id);
+        if (idx >= 0) {
+          const next = [...l];
+          next[idx] = { ...next[idx], text: body, at: Date.now() };
+          return next;
+        }
+      }
+      const nid = ++logIdRef.current;
+      liveLogRef.current = nid;
+      return pushLogEntry(l, { id: nid, at: Date.now(), kind, text: body });
+    });
+  }, []);
+
+  /**
+   * M148：请求 → 工具 → 回喂的循环。
+   *
+   * 与老实现的区别：**中途不再往聊天框追加任何东西**。
+   * 模型零散输出、工具调用、工具返回、报错全部进调试日志；
+   * 只有确认拿到「最终回答」（没有 tool_calls / 没有可执行工具）才追加一条助手消息。
+   */
+  const runLoop = useCallback(
+    async (args: {
+      msgs: AiMessage[];
+      io: AiFileIo | null;
+      stage: AiFileIo | null;
+      useTools: boolean;
+      docInfo: ReturnType<typeof aiDocContextOf>;
+      ctrl: AbortController;
+      /** 起算轮次：点「继续」时传 0，等于重新给一份轮数额度 */
+      baseRound: number;
+    }) => {
+      let useTools = args.useTools;
+      let msgs = args.msgs;
+      const { ctrl, io, stage, docInfo, baseRound } = args;
+      /** M64h（A4）：一次回复里只给一次修格式的机会 */
+      let repaired = false;
+      /** 最近一段「带工具调用的回复里模型自己说的话」——回喂后若模型没再给正文，就用它当最终回答 */
+      let lastShown = "";
+
+      /** 收尾：最终回答才进聊天框；幻觉 / 空内容一律拦下 */
+      const finish = (text: string) => {
+        const body = stripToolBlocks(text).trim() || stripToolBlocks(lastShown).trim();
+        if (looksLikeTranscript(body)) {
+          pushLog("error", tt("模型把对话数组/对话模板当成了正文（幻觉），已拦下不显示：\n{text}", { text: clipLog(body, 1200) }));
+          pushLog("info", tt("建议换个模型，或把「最大 token」调大后重试"));
+          setChat((c) => [
+            ...c,
+            {
+              role: "assistant",
+              content: tt("（模型这次返回的是对话记录而不是回答，已拦下；明细见调试日志）"),
+              failed: true,
+            },
+          ]);
+          return;
+        }
+        if (!body) {
+          pushLog("error", tt("模型没有返回任何内容"));
+          setChat((c) => [...c, { role: "assistant", content: tt("（模型返回空内容，可以点重试）"), failed: true }]);
+          return;
+        }
+        setChat((c) => [
+          ...c,
+          {
+            role: "assistant",
+            content: body,
+            streaming: false,
+            code: extractCodeBlock(body),
+            codeTag: docInfo.codeTag,
+            canReplace: docInfo.canReplaceCanvas,
+          },
+        ]);
+      };
+
+      /** 执行一个工具：8 秒超时；超时也返回错误文本，保证回喂的 tool 消息不缺 */
+      const execTool = async (call: AiToolCall, target: string): Promise<string> => {
+        pushLog("tool_call", `${call.tool} → ${target}`);
+        const started = Date.now();
+        const r = await runWithTimeout(runTool(call, (stage ?? io) as AiFileIo), TOOL_TIMEOUT_MS);
+        const ms = Date.now() - started;
+        if (!r.ok) {
+          pushLog("error", tt("工具超时（超过 {s} 秒）：{name}，已跳过并继续会话", { s: Math.round(TOOL_TIMEOUT_MS / 1000), name: call.tool }));
+          return tt("错误：工具执行超时（超过 {s} 秒），已跳过", { s: Math.round(TOOL_TIMEOUT_MS / 1000) });
+        }
+        const out = r.value;
+        if (out.startsWith(tt("错误："))) pushLog("error", out);
+        else pushLog("tool_result", tt("{name} · {ms}ms\n{out}", { name: call.tool, ms, out: clipLog(out) }));
+        toolMemRef.current = pushToolMemory(toolMemRef.current, memoryEntryFromTool(call.tool, target, out));
+        return out;
+      };
+
+      for (let round = baseRound; ; round++) {
+        if (ctrl.signal.aborted) {
+          pushLog("info", tt("已停止（用户中断）"));
+          return;
+        }
+        pushLog("info", tt("第 {n} 轮请求 · 模型 {m}", { n: round - baseRound + 1, m: cfg.model }));
+        liveLogRef.current = -1;
+        let acc = "";
+        let thought = "";
+        const thinkStart = Date.now();
+        const res = await streamChat(cfg, msgs, {
+          signal: ctrl.signal,
+          timeoutMs: defaultTimeoutMs(cfg),
+          tools: useTools ? AI_TOOL_SPECS : undefined,
+          // M148：流式片段只写日志，聊天框等最终回答
+          onChunk: (t) => {
+            acc += t;
+            pushLive("model_raw", acc);
+          },
+          onReasoning: (t) => {
+            thought += t;
+            pushLive("model_raw", tt("（思考中 {s} 秒）\n{text}", { s: Math.round((Date.now() - thinkStart) / 1000), text: thought }));
+          },
+        });
+        setUseNative(res.via === "native");
+
+        if (ctrl.signal.aborted) {
+          pushLog("info", tt("已停止（用户中断）"));
+          return;
+        }
+
+        if (!res.ok) {
+          // M73（D1）：这个服务端/中转不认 tools —— 静默关掉，本轮改用文本协议重来
+          if (
+            useTools &&
+            (looksLikeToolsRejected(res.error) ||
+              // M74：有的中转只回「400 Bad Request」不提 tool —— 首轮 + 还没跑过工具时也降级重试一次
+              (round === baseRound && /(^|\D)(400|422)(\D|$)/.test(res.error || "")))
+          ) {
+            useTools = false;
+            pushLog("error", tt("服务端不认 tools，改用正文协议重试：{err}", { err: res.error || "" }));
+            continue;
+          }
+          pushLog("error", tt("请求失败：{err}", { err: res.error || tt("调用失败") }));
+          setChat((c) => [
+            ...c,
+            { role: "assistant", content: friendlyAiError(res.error || tt("调用失败")), failed: true },
+          ]);
+          return;
+        }
+
+        if (thought.trim()) pushLog("model_raw", tt("[思考过程]\n{text}", { text: clipLog(thought) }));
+
+        // M73（D1）：原生 function calling —— 结构化 tool_calls
+        if (io && res.toolCalls && res.toolCalls.length) {
+          const conv = res.toolCalls.map((fc) => ({ fc, ...toAiToolCall(fc) }));
+          if (res.content) {
+            lastShown = res.content;
+            pushLog("model_raw", tt("[本轮说明]\n{text}", { text: clipLog(res.content) }));
+          }
+          if (round - baseRound >= maxRounds) {
+            pushLog("error", tt("已达工具调用轮数上限（{n} 轮），点「继续」可再要 {n} 轮", { n: maxRounds }));
+            contRef.current = { msgs, io, stage, useTools };
+            setCanContinue(true);
+            return;
+          }
+          const results: string[] = [];
+          for (const item of conv) {
+            if (ctrl.signal.aborted) break;
+            const call = item.call;
+            const target = call
+              ? call.tool === "search_files"
+                ? call.query || ""
+                : call.tool === "list_files"
+                  ? call.dir || "/"
+                  : call.path || ""
+              : item.fc.name;
+            if (!call) {
+              pushLog("error", tt("工具参数无法解析：{err}", { err: item.error ?? "" }));
+              results.push(tt("错误：{err}", { err: item.error ?? "" }));
+              continue;
+            }
+            results.push(await execTool(call, target));
+          }
+          if (ctrl.signal.aborted) {
+            pushLog("info", tt("已停止（用户中断）"));
+            return;
+          }
+          // 回喂：assistant.tool_calls + 每个 id 一条 tool 消息（缺一条协议就断了）
+          msgs = [
+            ...msgs,
+            { role: "assistant", content: res.content || "", tool_calls: toHistoryToolCalls(res.toolCalls) },
+            ...conv.map((item, i) => ({
+              role: "tool" as const,
+              tool_call_id: item.fc.id,
+              content: results[i] ?? tt("（未执行）"),
+            })),
+          ];
+          continue;
+        }
+
+        // ===== 文本协议（服务端不认 tools 时）=====
+        const parsed = io ? parseToolReply(res.content) : { calls: [], errors: [], blocks: 0 };
+        const calls = parsed.calls;
+        const shown = stripToolBlocks(res.content);
+
+        // M64h（A4）：工具块格式坏了 → 重问一次（把错误原文喂回去），二次失败就降级成普通回答
+        if (parsed.errors.length && !repaired) {
+          repaired = true;
+          pushLog("error", tt("工具调用格式无效（本轮未执行）：{err}", { err: parsed.errors[0] }));
+          msgs = [
+            ...msgs,
+            { role: "assistant", content: res.content },
+            {
+              role: "user",
+              content: `上一条回复里的工具调用不能执行，原因：\n- ${parsed.errors.join("\n- ")}\n\n请重新只输出一行 JSON，格式必须是：{"tool":"工具名","args":{...}}；不要解释、不要注释、不要换行、不要中文引号。如果确实不需要工具，就直接回答我。`, // i18n-ignore：发给模型的提示词，不翻译
+            },
+          ];
+          continue;
+        }
+
+        // 有工具但已经到轮数上限：存断点等用户点「继续」，不要吞掉这轮
+        if (calls.length && io && round - baseRound >= maxRounds) {
+          pushLog("error", tt("已达工具调用轮数上限（{n} 轮），点「继续」可再要 {n} 轮", { n: maxRounds }));
+          contRef.current = { msgs, io, stage, useTools };
+          setCanContinue(true);
+          return;
+        }
+
+        if (!calls.length || !io) {
+          const tail = parsed.errors.length ? tt("\n\n（工具调用格式无效，本轮未改动文件：{err}）", { err: parsed.errors[0] }) : "";
+          finish(shown + tail);
+          return;
+        }
+
+        // 先把模型这轮的说明留在日志里，再执行工具
+        if (shown.trim()) {
+          lastShown = shown;
+          pushLog("model_raw", tt("[本轮说明]\n{text}", { text: clipLog(shown) }));
+        }
+        const results: string[] = [];
+        for (const call of calls) {
+          if (ctrl.signal.aborted) break;
+          const target =
+            call.tool === "search_files"
+              ? call.query || ""
+              : call.tool === "list_files"
+                ? call.dir || "/"
+                : call.path || "";
+          results.push(await execTool(call, target));
+        }
+        if (ctrl.signal.aborted) {
+          pushLog("info", tt("已停止（用户中断）"));
+          return;
+        }
+        msgs = [
+          ...msgs,
+          { role: "assistant", content: res.content },
+          { role: "user", content: tt("工具结果：\n{res}", { res: results.join("\n\n") }) },
+        ];
+      }
+    },
+    [cfg, maxRounds, pushLive, pushLog],
+  );
+
   const send = useCallback(
     async (
       text: string,
@@ -328,6 +580,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       }
       setErr("");
       setBusy(true);
+      setCanContinue(false);
+      contRef.current = null;
       // M97：记住这一轮是从哪个对话前缀开始的（重试用）
       retryRef.current = { text: q, intent, base: baseChat };
       if (opts0?.base) setChat([...baseChat, { role: "user", content: q }]);
@@ -341,7 +595,7 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       // M64e（B3）：有写能力的通道包一层暂存，写不直接落盘
       const stage = io ? stageFor(io).host : null;
       // M73（D1）：优先原生 function calling；服务端不认 tools 时本轮退回文本协议
-      let useTools = !!io && supportsNativeTools(cfg);
+      const useTools = !!io && supportsNativeTools(cfg);
       // M64i（A6）：先把「项目里真实有什么」扫出来（同一个项目缓存一份，不每轮重扫）
       const facts = await factsFor(io, docRel);
       const mem = formatToolMemory(toolMemRef.current);
@@ -373,246 +627,32 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
       if (mem) volatile.push(mem);
       const userContent = [...volatile, q].filter(Boolean).join("\n\n");
 
-      let msgs: AiMessage[] = [
+      const msgs: AiMessage[] = [
         { role: "system", content: sys },
         ...history,
         { role: "user", content: userContent },
       ];
-      /** M64h（A4）：一次回复里只给一次修格式的机会 */
-      let repaired = false;
 
-      const patchLast = (fn: (item: ChatItem) => ChatItem) =>
-        setChat((c) => {
-          if (!c.length) return c;
-          const n = [...c];
-          const last = n[n.length - 1];
-          if (!last.streaming) return c;
-          n[n.length - 1] = fn(last);
-          return n;
-        });
+      // M148：整份 system（含项目事实 + 文档）只进调试日志，不进聊天框
+      pushLog("system", tt("模型 {m} · {u} · 工具调用 {t}", { m: cfg.model, u: cfg.baseUrl, t: useTools ? tt("开") : tt("关") }));
+      pushLog("system", sys);
 
       try {
-        for (let round = 0; ; round++) {
-          // M64b（D3）：停止后不再开新轮，也不再发请求
-          if (ctrl.signal.aborted) break;
-          setChat((c) => [...c, { role: "assistant", content: "", streaming: true }]);
-          let acc = "";
-          // M97：思考过程单独累，不进正文；耗时用于「思考了 N 秒」
-          let thought = "";
-          const thinkStart = Date.now();
-          const res = await streamChat(cfg, msgs, {
-            signal: ctrl.signal,
-            timeoutMs: defaultTimeoutMs(cfg),
-            tools: useTools ? AI_TOOL_SPECS : undefined,
-            onChunk: (t) => {
-              acc += t;
-              patchLast((m) => ({ ...m, content: acc }));
-            },
-            onReasoning: (t) => {
-              thought += t;
-              const th = thought;
-              patchLast((m) => ({ ...m, reasoning: th, thinkMs: Date.now() - thinkStart }));
-            },
-          });
-          setUseNative(res.via === "native");
-
-          // 用户点了「停止」：静默收尾，不要报「请求超时/中断」吓人
-          if (ctrl.signal.aborted) {
-            setChat((c) => c.filter((m) => !m.streaming));
-            break;
-          }
-
-          if (!res.ok) {
-            // M73（D1）：这个服务端/中转不认 tools —— 静默关掉，本轮改用文本协议重来
-            if (
-              useTools &&
-              (looksLikeToolsRejected(res.error) ||
-                // M74：有的中转只回「400 Bad Request」不提 tool —— 首轮 + 还没跑过工具时也降级重试一次
-                (round === 0 && /(^|\D)(400|422)(\D|$)/.test(res.error || "")))
-            ) {
-              useTools = false;
-              setChat((c) => c.filter((m) => !m.streaming));
-              continue;
-            }
-            setChat((c) => c.filter((m) => !m.streaming));
-            // M97：失败不删气泡，就地变成一条「失败 + 重试」
-            setChat((c) => [
-              ...c,
-              {
-                role: "assistant",
-                content: friendlyAiError(res.error || tt("调用失败")),
-                failed: true,
-              },
-            ]);
-            setErr("");
-            return;
-          }
-
-          // M73（D1）：原生 function calling —— 结构化 tool_calls，不用再解析正文 JSON 块
-          if (io && res.toolCalls && res.toolCalls.length) {
-            const conv = res.toolCalls.map((fc) => ({ fc, ...toAiToolCall(fc) }));
-            const shownFc = stripToolBlocks(res.content || "");
-            if (round >= MAX_TOOL_ROUNDS) {
-              patchLast((m) => ({
-                ...m,
-                content: shownFc || tt("（已达工具调用轮数上限，先停在这里）"),
-                streaming: false,
-                code: extractCodeBlock(shownFc),
-                codeTag: doc.codeTag,
-                canReplace: doc.canReplaceCanvas,
-              }));
-              break;
-            }
-            patchLast((m) => ({ ...m, content: shownFc, streaming: false }));
-            const results: string[] = [];
-            for (const item of conv) {
-              if (ctrl.signal.aborted) break;
-              const call = item.call;
-              const target = call
-                ? call.tool === "search_files"
-                  ? call.query || ""
-                  : call.tool === "list_files"
-                    ? call.dir || "/"
-                    : call.path || ""
-                : item.fc.name;
-              const started = Date.now();
-              setChat((c) => [
-                ...c,
-                {
-                  role: "assistant",
-                  content: "",
-                  streaming: false,
-                  tool: { name: call ? call.tool : item.fc.name, target, state: "running" },
-                },
-              ]);
-              const out = call ? await runTool(call, stage ?? (io as AiFileIo)) : tt("错误：{err}", { err: item.error ?? "" });
-              const patchTool = (next: Partial<NonNullable<ChatItem["tool"]>>) =>
-                setChat((c) => {
-                  const n = [...c];
-                  const last = n[n.length - 1];
-                  if (last?.tool) n[n.length - 1] = { ...last, tool: { ...last.tool, ...next } };
-                  return n;
-                });
-              if (ctrl.signal.aborted) {
-                patchTool({ state: "stopped", out, ms: Date.now() - started });
-                break;
-              }
-              results.push(out);
-              if (call) {
-                toolMemRef.current = pushToolMemory(toolMemRef.current, memoryEntryFromTool(call.tool, target, out));
-              }
-              patchTool({
-                state: out.startsWith(tt("错误：")) ? "error" : "done",
-                out,
-                ms: Date.now() - started,
-              });
-            }
-            if (ctrl.signal.aborted) break;
-            // 回喂：assistant.tool_calls + 每个 id 一条 tool 消息（缺一条协议就断了）
-            msgs = [
-              ...msgs,
-              { role: "assistant", content: res.content || "", tool_calls: toHistoryToolCalls(res.toolCalls) },
-              ...conv.map((item, i) => ({
-                role: "tool" as const,
-                tool_call_id: item.fc.id,
-                content: results[i] ?? tt("（未执行）"),
-              })),
-            ];
-            continue;
-          }
-
-          const parsed = io ? parseToolReply(res.content) : { calls: [], errors: [], blocks: 0 };
-          const calls = parsed.calls;
-          const shown = stripToolBlocks(res.content);
-
-          // M64h（A4）：工具块格式坏了 → 重问一次（把错误原文喂回去），二次失败就降级成普通回答
-          if (parsed.errors.length && !repaired) {
-            repaired = true;
-            setChat((c) => [...c, { role: "assistant", content: tt("⚠️ 工具调用格式无效（本轮未执行）：{err}", { err: parsed.errors[0] }) }]);
-            msgs = [
-              ...msgs,
-              { role: "assistant", content: res.content },
-              {
-                role: "user",
-                content: `上一条回复里的工具调用不能执行，原因：\n- ${parsed.errors.join("\n- ")}\n\n请重新只输出一行 JSON，格式必须是：{"tool":"工具名","args":{...}}；不要解释、不要注释、不要换行、不要中文引号。如果确实不需要工具，就直接回答我。`, // i18n-ignore：发给模型的提示词，不翻译
-              },
-            ];
-            continue;
-          }
-
-          if (!calls.length || round >= MAX_TOOL_ROUNDS || !io) {
-            const tail = parsed.errors.length ? tt("\n\n（工具调用格式无效，本轮未改动文件：{err}）", { err: parsed.errors[0] }) : "";
-            patchLast((m) => ({
-              ...m,
-              content: shown + tail,
-              streaming: false,
-              code: extractCodeBlock(shown),
-              codeTag: doc.codeTag,
-              canReplace: doc.canReplaceCanvas,
-            }));
-            break;
-          }
-
-          // 有工具调用：先把模型这轮的说明落下来，再执行工具
-          patchLast((m) => ({ ...m, content: shown, streaming: false }));
-          const results: string[] = [];
-          for (const call of calls) {
-            // 每步都看一次 abort：停止后不再调 bridge，也不再往下拼下一轮消息
-            if (ctrl.signal.aborted) break;
-            // M64l（D2）：目标只存干净路径（文案在渲染时拼）
-            const target =
-              call.tool === "search_files"
-                ? call.query || ""
-                : call.tool === "list_files"
-                  ? call.dir || "/"
-                  : call.path || "";
-            const started = Date.now();
-            // 先占一行（running），跑完原地改成 done / error，不再追加第二行
-            setChat((c) => [
-              ...c,
-              { role: "assistant", content: "", streaming: false, tool: { name: call.tool, target, state: "running" } },
-            ]);
-            const out = await runTool(call, stage ?? (io as AiFileIo));
-            const patchTool = (next: Partial<NonNullable<ChatItem["tool"]>>) =>
-              setChat((c) => {
-                const n = [...c];
-                const last = n[n.length - 1];
-                if (last?.tool) n[n.length - 1] = { ...last, tool: { ...last.tool, ...next } };
-                return n;
-              });
-            if (ctrl.signal.aborted) {
-              // 工具已经跑完了但用户中途停了：标记成已中断，不再请求下一轮
-              patchTool({ state: "stopped", out, ms: Date.now() - started });
-              break;
-            }
-            results.push(out);
-            // M64k（A7）：记下来，下一句追问时不必重读
-            toolMemRef.current = pushToolMemory(toolMemRef.current, memoryEntryFromTool(call.tool, target, out));
-            patchTool({
-              state: out.startsWith(tt("错误：")) ? "error" : "done",
-              out,
-              ms: Date.now() - started,
-            });
-          }
-          if (ctrl.signal.aborted) break;
-          msgs = [
-            ...msgs,
-            { role: "assistant", content: res.content },
-            { role: "user", content: tt("工具结果：\n{res}", { res: results.join("\n\n") }) },
-          ];
-        }
+        await runLoop({ msgs, io, stage, useTools, docInfo: doc, ctrl, baseRound: 0 });
       } finally {
         abortRef.current = null;
         setBusy(false);
       }
     },
-    [busy, cfg, chat, ctxResources, ctxSelection, doc, docRel, factsFor, fileIo, projectName, withXml, xml],
+    [busy, cfg, chat, ctxResources, ctxSelection, doc, docRel, factsFor, fileIo, projectName, pushLog, runLoop, stageFor, withXml, xml],
   );
 
   const stop = () => {
     abortRef.current?.abort();
     abortRef.current = null;
     setBusy(false);
+    setCanContinue(false);
+    contRef.current = null;
     onNote?.(tt("已停止"));
   };
 
@@ -622,6 +662,30 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
     if (!r || busy) return;
     void send(r.text, r.intent, { base: r.base });
   }, [busy, send]);
+
+  /** M148：达到轮数上限后，用户点「继续」——从断点恢复，重新给 maxRounds 轮额度 */
+  const continueRun = useCallback(() => {
+    const c = contRef.current;
+    if (!c || busy) return;
+    contRef.current = null;
+    setCanContinue(false);
+    setBusy(true);
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    pushLog("info", tt("继续：再给 {n} 轮工具额度", { n: maxRounds }));
+    void runLoop({
+      msgs: c.msgs,
+      io: c.io,
+      stage: c.stage,
+      useTools: c.useTools,
+      docInfo: doc,
+      ctrl,
+      baseRound: 0,
+    }).finally(() => {
+      abortRef.current = null;
+      setBusy(false);
+    });
+  }, [busy, doc, maxRounds, pushLog, runLoop]);
 
   const testConn = useCallback(async () => {
     const bad = validateConfig(cfg);
@@ -898,6 +962,23 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
               />
             </label>
 
+            {/* M148：工具调用轮数上限（达到上限会提示「继续」） */}
+            <label className="axv-ai-field" title={tt("一次提问里工具最多跑多少轮；到上限会停下等你点「继续」")}>
+              <span>{tt("工具轮数")}</span>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                step={1}
+                value={maxRounds}
+                onChange={(e) => {
+                  const raw = e.target.value.trim();
+                  if (!raw) return;
+                  setMaxRounds(loadMaxRounds(String(raw)));
+                }}
+              />
+            </label>
+
             <label className="axv-ai-check" title={tt("默认关闭：AI 不能改 build.gradle / AndroidManifest.xml / build/ / .git/ 等")}>
               <input
                 type="checkbox"
@@ -970,14 +1051,8 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           </div>
         ) : null}
 
-        {chat.map((m, i) =>
-          m.tool ? (
-            <AiToolRow key={i} tool={m.tool} />
-          ) : (
-            <div key={i} className={"axv-ai-msg " + m.role}>
-            {m.reasoning ? (
-              <AiThink text={m.reasoning} live={!!m.streaming && !m.content} ms={m.thinkMs} />
-            ) : null}
+        {chat.filter((m) => !m.tool).map((m, i) => (
+          <div key={i} className={"axv-ai-msg " + m.role}>
             <div className={"axv-ai-bubble" + (m.failed ? " is-failed" : "")}>
               {m.content.replace(/```[a-zA-Z0-9_-]*\s*\n[\s\S]*?```/g, tt("〔代码见下〕"))}
               {m.streaming ? <span className="axv-ai-cursor">▍</span> : null}
@@ -1029,7 +1104,17 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
 
         {busy && !chat.some((m) => m.streaming) ? (
           <div className="axv-ai-msg assistant">
-            <div className="axv-ai-bubble axv-ai-typing">{tt("正在生成…")}</div>
+            <div className="axv-ai-bubble axv-ai-typing">{tt("正在生成…（中间过程见下方调试日志）")}</div>
+          </div>
+        ) : null}
+
+        {/* M148：达到轮数上限 → 提示可以「继续」 */}
+        {canContinue && !busy ? (
+          <div className="axv-ai-continue">
+            <span className="axv-ai-continue-txt">{tt("工具调用已达 {n} 轮上限，还有没跑完的操作", { n: maxRounds })}</span>
+            <button className="axv-ai-mini" onClick={continueRun}>
+              {tt("继续（再给 {n} 轮）", { n: maxRounds })}
+            </button>
           </div>
         ) : null}
       </div>
@@ -1132,6 +1217,62 @@ export default function AiPanel({ xml, docRel, selection, resources, onReplaceXm
           ))}
         </div>
       ) : null}
+
+      {/* ===== M148：调试日志（工具调用/模型原始输出/报错都在这里，不进聊天框） ===== */}
+      <div className={"axv-ai-log" + (logOpen ? " is-open" : "")}>
+        <div className="axv-ai-log-head">
+          <button
+            className="axv-ai-log-toggle"
+            onClick={() => setLogOpen((v) => !v)}
+            aria-expanded={logOpen}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
+              {logOpen ? "expand_more" : "chevron_right"}
+            </span>
+            <b>{tt("调试日志")}</b>
+            <span className="axv-ai-log-count">{logs.length}</span>
+          </button>
+          <span className="axv-ai-spacer" />
+          <button
+            className="axv-ai-mini"
+            title={tt("复制全部日志")}
+            disabled={!logs.length}
+            onClick={() => void copy(formatLogs(logs))}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>content_copy</span>
+          </button>
+          <button
+            className="axv-ai-mini"
+            title={tt("清空日志")}
+            disabled={!logs.length}
+            onClick={() => {
+              setLogs([]);
+              liveLogRef.current = -1;
+            }}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>delete_sweep</span>
+          </button>
+        </div>
+        {logOpen ? (
+          <div className="axv-ai-log-body" ref={logScrollRef}>
+            {logs.length === 0 ? (
+              <div className="axv-ai-log-empty">
+                {tt("还没有日志：发一条消息，就能看到请求、工具调用、工具返回和模型的原始输出")}
+              </div>
+            ) : (
+              logs.map((e) => (
+                <div key={e.id} className={"axv-ai-log-row k-" + e.kind}>
+                  <span className="axv-ai-log-time">
+                    {new Date(e.at).toLocaleTimeString("zh-CN", { hour12: false })}
+                  </span>
+                  <span className="axv-ai-log-kind">{tt(LOG_KIND_LABEL[e.kind])}</span>
+                  <pre className="axv-ai-log-text">{e.text}</pre>
+                </div>
+              ))
+            )}
+          </div>
+        ) : null}
+      </div>
 
       {/* ===== 输入 ===== */}
       <div className="axv-ai-input">

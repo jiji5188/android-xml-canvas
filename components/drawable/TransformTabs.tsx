@@ -41,7 +41,9 @@ export function TransformTabs({ node, onChange }: Props) {
           ? { clipOrientation: "horizontal", gravity: "center" }
           : k === "scale"
             ? { scaleWidth: "100%", scaleHeight: "100%", scaleGravity: "center" }
-            : { fromDegrees: "0", toDegrees: "360", pivotX: "50%", pivotY: "50%" };
+            : k === "rotate"
+              ? { fromDegrees: "0", pivotX: "50%", pivotY: "50%" }
+              : { fromDegrees: "0", toDegrees: "360", pivotX: "50%", pivotY: "50%" };
     // 按默认顺序插入
     const order: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
     const idx = order.indexOf(k);
@@ -217,38 +219,53 @@ export function TransformTabs({ node, onChange }: Props) {
               </div>
             ) : null}
 
-            {tab === "rotate" ? (
+            {tab === "rotate" || tab === "animated-rotate" ? (
               <div className="axv-transform-grid">
                 {(
-                  [
-                    ["fromDegrees", "起始角"],
-                    ["toDegrees", "结束角"],
-                    ["pivotX", "轴心 X"],
-                    ["pivotY", "轴心 Y"],
-                  ] as const
+                  (tab === "animated-rotate"
+                    ? [
+                        ["fromDegrees", "起始角"],
+                        ["toDegrees", "结束角"],
+                        ["pivotX", "轴心 X"],
+                        ["pivotY", "轴心 Y"],
+                      ]
+                    : [
+                        ["fromDegrees", "旋转角度"],
+                        ["pivotX", "轴心 X"],
+                        ["pivotY", "轴心 Y"],
+                      ]) as readonly (readonly [string, string])[]
                 ).map(([key, label]) => (
                   <label key={key} className="axv-transform-field">
                     <span>{tt(label)}</span>
                     <input
                       className="axv-attr-input"
                       inputMode="decimal"
-                      defaultValue={active.params[key] ?? "0"}
-                      onBlur={(e) => {
+                      // 受控：修改就立刻进预览（原来只在 onBlur 提交，输完没离开输入框就看不到任何变化）
+                      value={active.params[key] ?? (key === "pivotX" || key === "pivotY" ? "50%" : "0")}
+                      onChange={(e) => {
                         const raw = e.target.value.trim();
+                        if (raw === "") {
+                          setParam(tab, key, "");
+                          return;
+                        }
                         const n = parseFloat(raw);
                         if (key === "pivotX" || key === "pivotY") {
-                          setParam(tab, key, raw.endsWith("%") || raw === "" ? raw || "50%" : `${n || 50}%`);
+                          setParam(tab, key, raw.endsWith("%") ? raw : Number.isFinite(n) ? `${n}%` : raw);
                         } else {
-                          setParam(tab, key, Number.isFinite(n) ? String(n) : "0");
+                          setParam(tab, key, Number.isFinite(n) ? String(n) : raw);
                         }
-                      }}
-                      onKeyUp={(e) => {
-                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                       }}
                       placeholder={key === "pivotX" || key === "pivotY" ? "50%" : "0"}
                     />
                   </label>
                 ))}
+                {tab === "rotate" && (parseFloat(active.params["fromDegrees"] ?? "0") || 0) === 0 ? (
+                  <div className="axv-transform-field" style={{ gridColumn: "1 / -1" }}>
+                    <span className="axv-shape-hint">
+                      {tt("0° = 不旋转（原生语义），改成任意角度即可看到效果")}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

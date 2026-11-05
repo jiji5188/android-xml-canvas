@@ -1,0 +1,10 @@
+M153：修旋转无法预览（角度输入改成即时生效）
+
+根因：TransformTabs 的角度输入只在 onBlur 提交，输完没离开输入框预览完全不动；
+而且 rotate 面板里还挂着仅 animated-rotate 才有的「结束角」，误导性很强。
+
+- 角度 / 轴心改成受控输入，onChange 立刻写回节点 → 预览即时跟手
+- rotate 只显示「旋转角度 / 轴心 X / 轴心 Y」；结束角只在 animated-rotate 出现
+- 添加 rotate 时的默认参数去掉 toDegrees（原本会给 <rotate> 塞一个无效属性）
+- 角度为 0 时给提示：0° = 不旋转（原生语义）
+- 新增 test/xml_m152_rotate_preview.test.tsx：校验 rotate 层 style 真的带 transform

@@ -6,6 +6,7 @@
 // 布局与形状编辑器一致：整页全屏（.axv-icon-page），不是小弹窗。
 
 import { useMemo, useState } from "react";
+import { t as tt } from "@/lib/i18n-src";
 import { useOverlayBack } from "@/lib/overlay-back";
 import { createPortal } from "react-dom";
 import { buildVectorXml, parseVectorModel, nextRotation } from "@/lib/xml/vector-edit";
@@ -64,15 +65,15 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
   if (!model) {
     const msg =
       kind === "bitmap"
-        ? "这是普通图片（png / jpg 等位图），不是矢量图标 —— 图标编辑器只能改 <vector> 资源。位图请直接用图片资源，或点下面的按钮从图标库重新选一个。"
-        : "这个文件不是标准 <vector>，暂时只能原样查看。可以点下面的按钮改用图标库里的字形。";
+        ? tt("这是普通图片（png / jpg 等位图），不是矢量图标 —— 图标编辑器只能改 <vector> 资源。位图请直接用图片资源，或点下面的按钮从图标库重新选一个。")
+        : tt("这个文件不是标准 <vector>，暂时只能原样查看。可以点下面的按钮改用图标库里的字形。");
     const body = (
-      <div className="axv-icon-page" role="dialog" aria-label="图标编辑器">
+      <div className="axv-icon-page" role="dialog" aria-label={tt("图标编辑器")}>
         <div className="axv-shape-head">
-          <button className="axv-icon-back" onClick={close} aria-label="返回编辑器" title="返回">
+          <button className="axv-icon-back" onClick={close} aria-label={tt("返回编辑器")} title={tt("返回")}>
             <span className="msr" aria-hidden="true">arrow_back</span>
           </button>
-          <span className="axv-shape-title">编辑图标 · {name}</span>
+          <span className="axv-shape-title">{tt("编辑图标 · {name}", { name })}</span>
         </div>
         <div className="axv-icon-page-body">
           <div className="axv-icon-ed-form">
@@ -88,10 +89,10 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
                   setActivePath(0);
                 }}
               >
-                从图标库选一个
+                {tt("从图标库选一个")}
               </button>
               <button className="axv-btn axv-ghost" onClick={close}>
-                关闭
+                {tt("关闭")}
               </button>
             </div>
             {xml ? <textarea className="axv-icon-ed-raw" readOnly value={xml} /> : null}
@@ -143,11 +144,11 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
   const save = () => {
     const safe = resName.trim().replace(/[^a-zA-Z0-9_]/g, "_");
     if (!safe) {
-      setErr("资源名不能为空");
+      setErr(tt("资源名不能为空"));
       return;
     }
     if (safe !== name && existingNames.includes(safe)) {
-      setErr(`已存在同名资源 ${safe}`);
+      setErr(tt("已存在同名资源 {name}", { name: safe }));
       return;
     }
     onSave(safe, buildVectorXml(model, safe));
@@ -156,12 +157,12 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
   const cur = model.paths[activePath] ?? model.paths[0];
 
   const body = (
-    <div className="axv-icon-page" role="dialog" aria-label="图标编辑器">
+    <div className="axv-icon-page" role="dialog" aria-label={tt("图标编辑器")}>
       <div className="axv-shape-head">
-        <button className="axv-icon-back" onClick={close} aria-label="返回编辑器" title="返回">
+        <button className="axv-icon-back" onClick={close} aria-label={tt("返回编辑器")} title={tt("返回")}>
           <span className="msr" aria-hidden="true">arrow_back</span>
         </button>
-        <span className="axv-shape-title">编辑图标 · {name}</span>
+        <span className="axv-shape-title">{tt("编辑图标 · {name}", { name })}</span>
       </div>
 
       <div className="axv-icon-page-body">
@@ -180,13 +181,13 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
           {kind === "empty" ? (
             <div className="axv-icon-ed-warn">
               <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>info</span>
-              <span>当前还没有图标内容，点「选择图标」从图标库挑一个字形，或直接在下面改路径。</span>
+              <span>{tt("当前还没有图标内容，点「选择图标」从图标库挑一个字形，或直接在下面改路径。")}</span>
             </div>
           ) : null}
           <div className="axv-set-group">
-            <div className="axv-set-label">资源</div>
+            <div className="axv-set-label">{tt("资源")}</div>
             <div className="axv-icon-ed-row">
-              <span>名称</span>
+              <span>{tt("名称")}</span>
               <input
                 className="axv-icon-ed-input"
                 value={resName}
@@ -197,11 +198,11 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
               />
               <button className="axv-icon-ed-pick" onClick={() => setPicking(true)}>
                 <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>apps</span>
-                选择图标
+                {tt("选择图标")}
               </button>
             </div>
             <label className="axv-icon-ed-row">
-              <span>尺寸（dp）</span>
+              <span>{tt("尺寸（dp）")}</span>
               <span className="axv-icon-ed-two">
                 <input
                   className="axv-icon-ed-input"
@@ -223,61 +224,61 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
           </div>
 
           <div className="axv-set-group">
-            <div className="axv-set-label">填充颜色</div>
+            <div className="axv-set-label">{tt("填充颜色")}</div>
             <div className="axv-icon-ed-swatches">
               {PRESET_COLORS.map((c) => (
                 <button
                   key={c}
                   className="axv-icon-ed-swatch"
                   style={{ background: c }}
-                  title={`全部填充 ${c}`}
+                  title={tt("全部填充 {color}", { color: c })}
                   onClick={() => applyColorToAll(c)}
                 />
               ))}
               <button
                 type="button"
                 className="axv-icon-ed-cp"
-                title="选择颜色（当前 path）"
+                title={tt("选择颜色（当前 path）")}
                 onClick={() => setColorTarget(activePath)}
               >
                 <span className="axv-cp-swatch" style={{ background: toHex(cur?.fill ?? "#1D1B20") }} />
-                取色
+                {tt("取色")}
               </button>
               <button
                 type="button"
                 className="axv-icon-ed-cp"
-                title="选择颜色（全部 path）"
+                title={tt("选择颜色（全部 path）")}
                 onClick={() => setColorTarget("all")}
               >
                 <span className="axv-cp-swatch" style={{ background: toHex(cur?.fill ?? "#1D1B20") }} />
-                全部取色
+                {tt("全部取色")}
               </button>
             </div>
             <div className="axv-set-hint">
-              点色块 = 全部 path 统一上色；「取色」改当前 path（{activePath + 1}/{model.paths.length}）；「全部取色」改全部 path
+              {tt("点色块 = 全部 path 统一上色；「取色」改当前 path（{n}/{m}）；「全部取色」改全部 path", { n: activePath + 1, m: model.paths.length })}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
               <button
                 type="button"
                 className="axv-icon-ed-cp"
-                title="选择颜色（当前 path）"
+                title={tt("选择颜色（当前 path）")}
                 onClick={() => setColorTarget(activePath)}
               >
                 <span className="axv-cp-swatch" style={{ background: toHex(cur?.fill ?? "#1D1B20") }} />
-                取色
+                {tt("取色")}
               </button>
               <button
                 type="button"
                 className="axv-icon-ed-cp"
-                title="选择颜色（全部 path）"
+                title={tt("选择颜色（全部 path）")}
                 onClick={() => setColorTarget("all")}
               >
                 <span className="axv-cp-swatch" style={{ background: toHex(cur?.fill ?? "#1D1B20") }} />
-                全部取色
+                {tt("全部取色")}
               </button>
             </div>
             <label className="axv-icon-ed-row">
-              <span>不透明度</span>
+              <span>{tt("不透明度")}</span>
               <input
                 type="range"
                 min={0}
@@ -291,36 +292,36 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
           </div>
 
           <div className="axv-set-group">
-            <div className="axv-set-label">变换</div>
+            <div className="axv-set-label">{tt("变换")}</div>
             <div className="axv-icon-ed-btns">
               <button
                 className="axv-set-btn"
                 onClick={() => patchGroup({ rotation: nextRotation(model.group.rotation) })}
               >
                 <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>rotate_90_degrees_cw</span>
-                旋转 {model.group.rotation}°
+                {tt("旋转 {deg}°", { deg: model.group.rotation })}
               </button>
               <button
                 className={"axv-set-btn" + (model.group.scaleX === -1 ? " on" : "")}
                 onClick={() => patchGroup({ scaleX: model.group.scaleX === -1 ? 1 : -1 })}
               >
                 <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip</span>
-                水平镜像
+                {tt("水平镜像")}
               </button>
               <button
                 className={"axv-set-btn" + (model.group.scaleY === -1 ? " on" : "")}
                 onClick={() => patchGroup({ scaleY: model.group.scaleY === -1 ? 1 : -1 })}
               >
                 <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>flip</span>
-                垂直镜像
+                {tt("垂直镜像")}
               </button>
             </div>
-            <div className="axv-set-hint">只在编辑器和画布里生效，导出就是标准 &lt;group&gt; 变换。</div>
+            <div className="axv-set-hint">{tt("只在编辑器和画布里生效，导出就是标准 <group> 变换。")}</div>
           </div>
 
           <div className="axv-set-group">
             <div className="axv-set-label">
-              路径（{model.paths.length}）
+              {tt("路径（{n}）", { n: model.paths.length })}
               <button
                 className="axv-icon-ed-mini"
                 onClick={() => {
@@ -339,7 +340,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
                   setActivePath(model.paths.length);
                 }}
               >
-                ＋ 复制一条
+                {tt("＋ 复制一条")}
               </button>
             </div>
             <div className="axv-icon-ed-paths">
@@ -354,19 +355,19 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
                   <button
                     type="button"
                     className="axv-icon-ed-cp-inline"
-                    title={`选择颜色（第 ${i + 1} 条 path）`}
+                    title={tt("选择颜色（第 {n} 条 path）", { n: i + 1 })}
                     onClick={(e) => {
                       e.stopPropagation();
                       setActivePath(i);
                       setColorTarget(i);
                     }}
                   >
-                    取色
+                    {tt("取色")}
                   </button>
                   {model.paths.length > 1 ? (
                     <button
                       className="axv-icon-ed-del"
-                      title="删除这条 path"
+                      title={tt("删除这条 path")}
                       onClick={(e) => {
                         e.stopPropagation();
                         setModel((m) =>
@@ -387,7 +388,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
                 value={cur.d}
                 spellCheck={false}
                 onChange={(e) => patchPath(activePath, { d: e.target.value })}
-                placeholder="pathData，例如 M12 2 L22 20 H2 Z"
+                placeholder={tt("pathData，例如 M12 2 L22 20 H2 Z")}
               />
             ) : null}
           </div>
@@ -395,7 +396,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
           <div className="axv-set-group">
             <button className="axv-set-btn" onClick={() => setShowRaw((v) => !v)}>
               <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code</span>
-              {showRaw ? "收起 XML" : "查看生成的 XML"}
+              {showRaw ? tt("收起 XML") : tt("查看生成的 XML")}
             </button>
             {showRaw ? (
               <textarea className="axv-icon-ed-raw" readOnly value={buildVectorXml(model, resName)} />
@@ -405,13 +406,13 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
       </div>
 
       <div className="axv-icon-page-foot">
-        <span>保存后立即写回 drawable/{resName}.xml，布局里所有引用同步生效。</span>
+        <span>{tt("保存后立即写回 drawable/{name}.xml，布局里所有引用同步生效。", { name: resName })}</span>
         <span style={{ display: "flex", gap: 8 }}>
           <button className="axv-btn axv-ghost" onClick={close}>
-            取消
+            {tt("取消")}
           </button>
           <button className="axv-btn" onClick={save}>
-            保存
+            {tt("保存")}
           </button>
         </span>
       </div>
@@ -419,7 +420,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
       {/* M79：统一颜色选择器（来自 colorpicker.html） */}
       {colorTarget !== null ? (
         <ColorPicker
-          label={colorTarget === "all" ? "全部 path 颜色" : `第 ${Number(colorTarget) + 1} 条 path 颜色`}
+          label={colorTarget === "all" ? tt("全部 path 颜色") : tt("第 {n} 条 path 颜色", { n: Number(colorTarget) + 1 })}
           value={
             colorTarget === "all"
               ? model.paths[0]?.fill ?? "#1D1B20"
@@ -439,7 +440,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
       {picking ? (
         <IconResPicker
           value={`@drawable/${resName}`}
-          attrName="编辑图标"
+          attrName={tt("编辑图标")}
           existing={existingNames}
           onClose={() => setPicking(false)}
           onPick={(_rn, vectorXml, iconName) => {

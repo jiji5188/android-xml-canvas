@@ -67,10 +67,10 @@ function useNarrow(): boolean {
 }
 
 const TABS: [string, string][] = [
-  ["tree", "结构"],
-  ["attrs", "参数"],
-  ["shape", "形状"],
-  ["margin", "边距"],
+  ["tree", tt("结构")],
+  ["attrs", tt("参数")],
+  ["shape", tt("形状")],
+  ["margin", tt("边距")],
 ];
 
 export function DrawableEditor({
@@ -337,9 +337,9 @@ export function DrawableEditor({
             <div className="axv-shape-seg">
               {(
                 [
-                  ["checker", "透明"],
-                  ["white", "白底"],
-                  ["dark", "深色"],
+                  ["checker", tt("透明")],
+                  ["white", tt("白底")],
+                  ["dark", tt("深色")],
                 ] as const
               ).map(([k, label]) => (
                 <button

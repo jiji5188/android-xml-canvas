@@ -94,7 +94,7 @@ export function WidgetPalette({ onInsert, hasSelection }: Props) {
                 <span className="msr" aria-hidden="true" style={{ fontSize: 20 }}>
                   {node.icon}
                 </span>
-                <span className="axv-pp-lib-name">{node.label}</span>
+                <span className="axv-pp-lib-name">{tt(node.label)}</span>
                 <span className="axv-pp-lib-count">{node.total}</span>
                 <span className="msr axv-pp-caret" aria-hidden="true">
                   {libCollapsed ? "expand_more" : "expand_less"}
@@ -114,7 +114,7 @@ export function WidgetPalette({ onInsert, hasSelection }: Props) {
                         <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
                           {GROUP_ICON[cat]}
                         </span>
-                        <span>{cat}</span>
+                        <span>{tt(cat)}</span>
                         <span className="axv-pp-cat-count">{list.length}</span>
                         <span className="msr axv-pp-caret" aria-hidden="true">
                           {catCollapsed ? "expand_more" : "expand_less"}
@@ -127,7 +127,7 @@ export function WidgetPalette({ onInsert, hasSelection }: Props) {
                               key={w.key}
                               type="button"
                               className="axv-pp-tile"
-                              title={tt("{label}（{tag}）· 点击插入 / 拖到画布", { label: w.label, tag: w.tag })}
+                              title={tt("{label}（{tag}）· 点击插入 / 拖到画布", { label: tt(w.label), tag: w.tag })}
                               draggable
                               onDragStart={(e) => {
                                 e.dataTransfer.setData(DRAG_WIDGET_MIME, w.key);
@@ -142,7 +142,7 @@ export function WidgetPalette({ onInsert, hasSelection }: Props) {
                               >
                                 {w.icon}
                               </span>
-                              <span className="axv-pp-tile-label">{w.label}</span>
+                              <span className="axv-pp-tile-label">{tt(w.label)}</span>
                             </button>
                           ))}
                         </div>

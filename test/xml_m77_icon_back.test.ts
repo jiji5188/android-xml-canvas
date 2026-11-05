@@ -51,8 +51,8 @@ describe("图标编辑器返回按钮（M77 → M88 统一左侧返回）", () =
   it("IconEditor 两处 head 都用返回按钮，且不再留旧的 axv-shape-back", () => {
     expect(editor.split('className="axv-icon-back"').length - 1).toBe(2);
     expect(editor).not.toContain("axv-shape-back");
-    expect(editor).toContain('aria-label="返回编辑器"');
-    expect(editor).toContain('title="返回"');
+    expect(editor).toContain('aria-label={tt("返回编辑器")}');
+    expect(editor).toContain('title={tt("返回")}');
   });
 
   it("M88：页头右上 ✕ 已删除（旧 IconEditor + 画布式 IconCanvasEditor 都不再有）", () => {

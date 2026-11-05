@@ -12,5 +12,9 @@ export default defineConfig({
     include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
     exclude: ["node_modules", "out", "e2e"],
     testTimeout: 20000,
+    // M144：jsdom 不提供 localStorage（Node 24 的同名全局占了位），make 一份内存版
+    setupFiles: ["test/setup.ts"],
+    // M144：树展开状态走 localStorage，jsdom 必须给个非 opaque 的 url 才有 storage
+    environmentOptions: { jsdom: { url: "http://localhost/" } },
   },
 });

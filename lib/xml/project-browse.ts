@@ -579,6 +579,92 @@ export function isResChildDirRel(rel: string): boolean {
   return parts[parts.length - 2].toLowerCase() === "res";
 }
 
+// ── M144：文件行的描述文案 ──
+// 用户要求：副标题必须说清楚「这是什么」，不许一律兜底成「布局文件」。
+// 优先看目录语义（res/xxx），再看扩展名；完全认不出时返回 ""（宁可不显示也不乱猜）。
+
+/** res/drawable/ic_x.xml → { dir: "drawable", name: "ic_x" }；不在 res/ 下返回 null */
+function resPathOf(rel: string): { dir: string; file: string } | null {
+  const parts = rel.split("/").filter(Boolean);
+  const idx = parts.lastIndexOf("res");
+  if (idx < 0 || idx === parts.length - 1) return null;
+  return { dir: (parts[idx + 1] || "").toLowerCase(), file: parts[parts.length - 1] };
+}
+
+const EXT_DESC: Record<string, string> = {
+  java: "Java 源码",
+  kt: "Kotlin 源码",
+  kts: "Kotlin 构建脚本",
+  gradle: "Gradle 构建配置",
+  properties: "项目配置",
+  toml: "依赖版本 catalog",
+  json: "JSON 数据",
+  md: "说明文档",
+  txt: "文本文件",
+  ttf: "字体文件",
+  otf: "字体文件",
+  mp3: "音频文件",
+  wav: "音频文件",
+  ogg: "音频文件",
+  mp4: "视频文件",
+  webm: "视频文件",
+  db: "数据库文件",
+  sqlite: "数据库文件",
+  sql: "SQL 脚本",
+  bin: "二进制文件",
+  pak: "打包数据",
+  yml: "YAML 配置",
+  yaml: "YAML 配置",
+  proto: "protobuf 定义",
+  sh: "Shell 脚本",
+  bat: "批处理脚本",
+  ps1: "PowerShell 脚本",
+};
+
+/** 一个文件该显示什么描述（"" = 认不出来，不显示副标题） */
+export function describeFile(rel: string, name: string): string {
+  const file = name || rel.split("/").pop() || "";
+  const lower = file.toLowerCase();
+  const res = resPathOf(rel);
+  const ext = (lower.split(".").pop() || "").toLowerCase();
+
+  // 九宫格先判（.9.png 的 ext 是 png）
+  if (/\.9\.png$/i.test(lower)) return "九宫格图片（可拉伸）";
+
+  if (IMAGE_EXT_RE.test(lower)) {
+    if (!res) return "图片";
+    if (/^mipmap/.test(res.dir)) return "应用图标";
+    if (/^drawable/.test(res.dir)) return "图片资源";
+    return "图片";
+  }
+  if (lower.endsWith(".svg")) return "SVG 矢量图";
+
+  if (/^androidmanifest\.xml$/i.test(lower)) return "应用清单";
+
+  if (lower.endsWith(".xml")) {
+    if (!res) return "XML 配置";
+    const d = res.dir;
+    if (/^layout/.test(d)) return "布局文件";
+    if (/^drawable/.test(d)) return "图形 / 矢量资源";
+    if (/^mipmap/.test(d)) return "应用图标";
+    if (/^values/.test(d)) return "资源值（字符串 / 颜色等）";
+    if (/^menu/.test(d)) return "菜单";
+    if (/^anim/.test(d)) return "帧动画";
+    if (/^animator/.test(d)) return "属性动画";
+    if (/^raw/.test(d)) return "原始资源文件";
+    if (/^color/.test(d)) return "颜色选择器";
+    if (/^font/.test(d)) return "字体资源";
+    if (/^navigation/.test(d)) return "导航图";
+    if (/^transition/.test(d)) return "场景转场动画";
+    if (/^interpolator/.test(d)) return "动画插值器";
+    return "资源文件";
+  }
+
+  if (EXT_DESC[ext]) return EXT_DESC[ext];
+  if (/^\.(gitignore|gitattributes)$/i.test(lower)) return "Git 配置";
+  return "";
+}
+
 /** 工作目录里的一个顶层项（文件夹=项目）→ ProjectSource */
 export async function projectSourceFromWorkspaceItem(item: WsProject): Promise<ProjectSource | null> {
   if (nativeBridge()) {

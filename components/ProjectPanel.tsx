@@ -9,8 +9,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import type { BrowseEntry, LibKind, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
+import { isIconDirRel, isImageName, readEntryImageUrl, resDirDescription, describeFile } from "@/lib/xml/project-browse";
+import { parseDrawable, flattenDrawable } from "@/lib/xml/drawable-node";
+import { argbColorsForPreview, specToCss } from "@/lib/xml/shape-gen";
+import { androidColorToCss } from "@/lib/xml/color-argb";
 import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
-import { isIconDirRel, isImageName, readEntryImageUrl, resDirDescription } from "@/lib/xml/project-browse";
 import type { WsInfo, WsProject } from "@/lib/xml/workspace";
 import type { ResourceExtras } from "@/lib/xml/resdir";
 import { resOpenAction } from "@/lib/xml/resource-open";
@@ -81,6 +84,8 @@ export interface ProjectPanelProps {
   projectRev: number;
   currentFileName: string;
   onOpenEntry: (e: BrowseEntry) => void;
+  /** M144：当前打开的文件在项目内的相对路径（面板要高亮并滚动定位到它） */
+  currentRel?: string | null;
   onRefreshProject: () => void;
   onNewProject: (suggestName: string) => void;
 
@@ -118,21 +123,97 @@ function libLabel(lib: LibKind | undefined): string {
   if (lib === "android") return tt("Android 项目");
   return tt("项目");
 }
-/** M31h：文件行图标 —— res/drawable*|mipmap* 里的图片读文件当缩略图，其余用通用图标 */
-function TreeRowIcon(props: { entry: BrowseEntry; isDir: boolean; isOpen: boolean; iconDir: boolean }) {
-  const { entry, isDir, isOpen, iconDir } = props;
-  const wantThumb = !isDir && iconDir && isImageName(entry.name);
-  const [url, setUrl] = useState<string | null>(null);
+/** M144：图标目录里的 xml / svg 也要真显示成图标 —— 模级缓存（rel → 缩略图）避免每帧重读文件 */
+type IconThumb = { url?: string; css?: React.CSSProperties };
+const iconThumbCache = new Map<string, IconThumb>();
+const ICON_THUMB_MAX = 120;
+function cacheThumb(key: string, v: IconThumb): IconThumb {
+  iconThumbCache.delete(key);
+  iconThumbCache.set(key, v);
+  while (iconThumbCache.size > ICON_THUMB_MAX) {
+    const oldest = iconThumbCache.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    iconThumbCache.delete(oldest);
+  }
+  return v;
+}
+
+/** M144：把一份 drawable xml 变成能画的小图标（vector 转 dataURL，shape/selector 转 CSS） */
+function thumbOfDrawableXml(rel: string, text: string, extras: ResourceExtras | null): IconThumb | null {
+  const action = resOpenAction(rel, text, extras);
+  if (action.kind === "vector" || action.kind === "image") {
+    return action.url ? { url: action.url } : null;
+  }
+  if (action.kind !== "drawable") return null;
+  const tree = parseDrawable(action.xml);
+  if (!tree) return null;
+  const layers = flattenDrawable(tree, {});
+  // 从最上层往下找能画的（shape / color）；都没有就返回 null（保持通用图标）
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const l = layers[i];
+    if (l.kind === "shape" && l.spec) {
+      const css = specToCss(argbColorsForPreview(l.spec));
+      return {
+        css: {
+          background: css.background,
+          borderRadius: css.borderRadius,
+          border: css.border,
+          boxShadow: css.boxShadow,
+        },
+      };
+    }
+    if (l.kind === "color") {
+      return { css: { background: androidColorToCss(l.color ?? "#00000000") } };
+    }
+  }
+  return null;
+}
+
+/** M31h + M144：文件行图标 —— 图片读文件当缩略图；图标目录里的 xml/svg 也真画出来 */
+function TreeRowIcon(props: {
+  entry: BrowseEntry;
+  isDir: boolean;
+  isOpen: boolean;
+  iconDir: boolean;
+  source?: ProjectSource;
+  extras?: ResourceExtras | null;
+}) {
+  const { entry, isDir, isOpen, iconDir, source, extras } = props;
+  const isImg = !isDir && isImageName(entry.name);
+  const isSvg = !isDir && /\.svg$/i.test(entry.name);
+  const isXml = !isDir && /\.xml$/i.test(entry.name);
+  const wantThumb = !isDir && iconDir && (isImg || isSvg || isXml);
+  const [thumb, setThumb] = useState<IconThumb | null>(null);
+
   useEffect(() => {
     if (!wantThumb) return;
+    const key = entry.target || entry.rel;
+    const cached = iconThumbCache.get(key);
+    if (cached) {
+      setThumb(cached);
+      return;
+    }
     let alive = true;
-    void readEntryImageUrl(entry).then((u) => {
-      if (alive) setUrl(u);
-    });
+    void (async () => {
+      let out: IconThumb | null = null;
+      if (isImg) {
+        const u = await readEntryImageUrl(entry);
+        out = u ? { url: u } : null;
+      } else if (isSvg) {
+        // svg 本身就能当图片用，不用 base64
+        const text = source ? await source.readText(entry.rel).catch(() => null) : null;
+        out = text ? { url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}` } : null;
+      } else if (isXml) {
+        const text = source ? await source.readText(entry.rel).catch(() => null) : null;
+        out = text ? thumbOfDrawableXml(entry.rel, text, extras ?? null) : null;
+      }
+      if (alive) setThumb(out ? cacheThumb(key, out) : null);
+    })();
     return () => {
       alive = false;
     };
-  }, [wantThumb, entry]);
+  }, [wantThumb, isImg, isSvg, isXml, entry, source, extras]);
+
   if (isDir) {
     return (
       <span className="msr axv-ws-item-icon" aria-hidden="true">
@@ -140,21 +221,50 @@ function TreeRowIcon(props: { entry: BrowseEntry; isDir: boolean; isOpen: boolea
       </span>
     );
   }
-  if (url) {
+  if (thumb?.url) {
     return (
       <span className="axv-ws-item-icon axv-ws-item-thumb" aria-hidden="true">
-        <img src={url} alt="" />
+        <img src={thumb.url} alt="" />
+      </span>
+    );
+  }
+  if (thumb?.css) {
+    return (
+      <span className="axv-ws-item-icon axv-ws-item-thumb" aria-hidden="true">
+        <span className="axv-ws-item-thumb-shape" style={thumb.css} />
       </span>
     );
   }
   return (
     <span className="msr axv-ws-item-icon" aria-hidden="true">
-      {isImageName(entry.name) ? "image" : "description"}
+      {isImg || isSvg ? "image" : isXml && iconDir ? "palette" : "description"}
     </span>
   );
 }
 
 /* ---------------- 懒加载结构树 ---------------- */
+
+/** M144：展开目录的持久化（key = 项目名，值 = 展开的 rel 数组） */
+const OPEN_STATE_PREFIX = "axv.tree.open.";
+function readOpenState(storeKey: string | undefined): string[] | null {
+  if (!storeKey || typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(OPEN_STATE_PREFIX + storeKey);
+    if (!raw) return null;
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : null;
+  } catch {
+    return null;
+  }
+}
+function writeOpenState(storeKey: string | undefined, rels: string[]): void {
+  if (!storeKey || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(OPEN_STATE_PREFIX + storeKey, JSON.stringify(rels));
+  } catch {
+    /* 配额/隐私模式静默 */
+  }
+}
 
 /** M46：导出供 jsdom 测试直接挂载（正式使用走下方 memo 包装） */
 export function LazyTreeInner(props: {
@@ -173,10 +283,32 @@ export function LazyTreeInner(props: {
   checkDeleteImpact?: (
     symbol: string,
   ) => Promise<{ count: number; samples: { rel: string; line: number }[] } | null>;
+  /** M144：当前打开的文件在项目内的相对路径，用来展开祖先并滚动定位 */
+  currentRel?: string | null;
+  /** M144：持久化展开状态的 key（按项目区分，换项目不串） */
+  storeKey?: string;
 }) {
-  const { source, rev, currentFileName, onOpenEntry, extras, onOpenDrawable, onPreviewImage, fileOps, checkDeleteImpact } = props;
+  const {
+    source,
+    rev,
+    currentFileName,
+    onOpenEntry,
+    extras,
+    onOpenDrawable,
+    onPreviewImage,
+    fileOps,
+    checkDeleteImpact,
+    currentRel,
+    storeKey,
+  } = props;
   const [kids, setKids] = useState<Record<string, LoadState>>({});
-  const [open, setOpen] = useState<Set<string>>(new Set([""]));
+  const [open, setOpen] = useState<Set<string>>(() => {
+    // M144：从 localStorage 恢复上次展开的目录（按 storeKey 区分项目）
+    const restored = readOpenState(storeKey);
+    return new Set(restored ? ["", ...restored] : [""]);
+  });
+  /** M144：ul 的 ref，定位当前文件时用 scrollIntoView */
+  const listRef = useRef<HTMLUListElement>(null);
 
   /* ---- M46：长按菜单 / 弹窗状态 ---- */
   const [menu, setMenu] = useState<{ x: number; y: number; target: TreeNodeRef } | null>(null);
@@ -226,7 +358,14 @@ export function LazyTreeInner(props: {
     if (lastSrcRef.current !== source) {
       lastSrcRef.current = source;
       setKids({});
-      setOpen(new Set([""]));
+      // M144：换项目时恢复该项目上次展开的目录（没存过就只开根）
+      const restored = readOpenState(storeKey) || [];
+      setOpen(new Set(["", ...restored]));
+      restored.forEach((rel) => {
+        void source.listChildren(rel).then((items) => {
+          if (alive) setKids((prev) => ({ ...prev, [rel]: items }));
+        });
+      });
     }
     void source.listChildren("").then((items) => {
       if (alive) setKids((prev) => ({ ...prev, "": items }));
@@ -234,7 +373,56 @@ export function LazyTreeInner(props: {
     return () => {
       alive = false;
     };
-  }, [source, rev]);
+  }, [source, rev, storeKey]);
+
+  // M144：展开状态变化就存下来（下次进来还是这几层打开）
+  useEffect(() => {
+    writeOpenState(storeKey, [...open].filter((r) => r !== ""));
+  }, [open, storeKey]);
+
+  // M144：当前文件 → 展开它的祖先目录（没有加载过的逐层拉）
+  useEffect(() => {
+    const rel = currentRel || "";
+    if (!rel) return;
+    const parts = rel.split("/").filter(Boolean);
+    const ancestors: string[] = [];
+    for (let i = 1; i < parts.length; i++) ancestors.push(parts.slice(0, i).join("/"));
+    if (!ancestors.length) return;
+    setOpen((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const a of ancestors) {
+        if (!next.has(a)) {
+          next.add(a);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    for (const a of ancestors) {
+      if (kids[a] === undefined) void load(a);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRel, source]);
+
+  // M144：树里有当前文件那一行后，滚动到可见位置（居中，不抢焦点）
+  useEffect(() => {
+    const ul = listRef.current;
+    if (!ul || !currentRel) return;
+    const rows = Array.from(ul.querySelectorAll("[data-treerel]"));
+    const hit = rows.find((el) => el.getAttribute("data-treerel") === currentRel);
+    if (!hit) return;
+    const scroller = ul.parentElement;
+    if (!scroller) return;
+    const rowRect = hit.getBoundingClientRect();
+    const boxRect = scroller.getBoundingClientRect();
+    const top = rowRect.top - boxRect.top + scroller.scrollTop - scroller.clientHeight / 2 + rowRect.height / 2;
+    if (typeof scroller.scrollTo === "function") {
+      scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    } else {
+      scroller.scrollTop = Math.max(0, top);
+    }
+  }, [currentRel, kids, open]);
 
   const toggle = (rel: string) => {
     setOpen((prev) => {
@@ -642,83 +830,90 @@ export function LazyTreeInner(props: {
       const isDir = n.kind === "dir";
       const isOpen = isDir && open.has(n.rel);
       const editing = !isDir && currentFileName && n.name.toLowerCase() === currentFileName.toLowerCase();
+      // M144：当前文件高亮 —— 有精确 rel 就用 rel，否则退回文件名
+      const isCurrent = !isDir && (currentRel ? n.rel === currentRel : !!editing);
       const nodeRef: TreeNodeRef = { rel: n.rel, name: n.name, isDir };
       rows.push(
-        <li key={n.rel + ":" + n.kind}>
-          <div
-            className={
-              "axv-ws-row" +
-              (moving ? " axv-moving" : "") +
-              (moving && moving.node.rel === n.rel ? " axv-move-src" : "") +
-              (dropHover === n.rel || (dropHover === "" && false) ? " axv-drop" : "")
+        <li
+          key={n.rel + ":" + n.kind}
+          className={
+            "axv-ws-row" +
+            (moving ? " axv-moving" : "") +
+            (moving && moving.node.rel === n.rel ? " axv-move-src" : "") +
+            (dropHover === n.rel || (dropHover === "" && false) ? " axv-drop" : "") +
+            (isCurrent ? " axv-ws-row-on" : "")
+          }
+          data-treerel={n.rel}
+          data-treename={n.name}
+          data-treedir={isDir ? "1" : "0"}
+          style={{ paddingLeft: depth * 14 }}
+          // M144：用户要求「触发放到 li 层」——整行（含缩进空白）都可点、可长按
+          onClick={(e) => {
+            if (moving) return;
+            if (suppressClick.current) {
+              suppressClick.current = false;
+              return;
             }
-            data-treerel={n.rel}
-            data-treename={n.name}
-            data-treedir={isDir ? "1" : "0"}
-            style={{ paddingLeft: depth * 14 }}
-            onClick={(e) => {
-              // M46c：点击/长按统一绑在行上（子元素不自己处理 click）
-              if (moving) return;
-              if (suppressClick.current) {
-                suppressClick.current = false;
-                return;
-              }
-              if ((e.target as HTMLElement).closest(".axv-move-handle")) return;
-              if (isDir) toggle(n.rel);
-              else void openEntry(n);
-            }}
-            onPointerDown={(e) => beginPress(e, nodeRef)}
-            onPointerMove={movePress}
-            onContextMenu={(e) => {
-              if (!fileOps || moving) return;
-              e.preventDefault();
-              setMenu({ x: e.clientX, y: e.clientY, target: nodeRef });
-            }}
-          >
-            {isDir ? (
-              <button
-                className="axv-ws-caret"
-                title={isOpen ? tt("折叠") : tt("展开")}
-                aria-label={isOpen ? tt("折叠") : tt("展开")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggle(n.rel);
-                }}
-              >
-                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
-                  {isOpen ? "expand_more" : "chevron_right"}
-                </span>
-              </button>
-            ) : (
-              <span className="axv-ws-caret" aria-hidden="true" />
-            )}
-            <button className="axv-ws-item" title={n.rel} type="button">
-              <TreeRowIcon entry={n} isDir={isDir} isOpen={isOpen} iconDir={iconDir} />
-              <span className="axv-ws-item-main">
-                <span className="axv-ws-item-name">{n.name}</span>
-                <span className="axv-ws-item-sub">
-                  {isDir
-                    ? resDirDescription(n.rel) ?? tt("文件夹")
-                    : editing
-                      ? tt("正在编辑")
-                      : isImageName(n.name)
-                        ? tt("图片资源")
-                        : tt("布局文件")}
-                </span>
+            if ((e.target as HTMLElement).closest(".axv-move-handle")) return;
+            if (isDir) toggle(n.rel);
+            else void openEntry(n);
+          }}
+          onPointerDown={(e) => beginPress(e, nodeRef)}
+          onPointerMove={movePress}
+          onContextMenu={(e) => {
+            if (!fileOps || moving) return;
+            e.preventDefault();
+            setMenu({ x: e.clientX, y: e.clientY, target: nodeRef });
+          }}
+        >
+          {isDir ? (
+            <button
+              className="axv-ws-caret"
+              title={isOpen ? tt("折叠") : tt("展开")}
+              aria-label={isOpen ? tt("折叠") : tt("展开")}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggle(n.rel);
+              }}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
+                {isOpen ? "expand_more" : "chevron_right"}
               </span>
             </button>
-            {moving ? (
-              <span
-                className="axv-move-handle"
-                title={tt("按住拖动到目标目录")}
-                aria-label={tt("拖动移动")}
-                onPointerDown={(e) => beginDrag(e, nodeRef)}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <span className="msr" aria-hidden="true">drag_indicator</span>
+          ) : (
+            <span className="axv-ws-caret" aria-hidden="true" />
+          )}
+          <button className="axv-ws-item" title={n.rel} type="button">
+            <TreeRowIcon
+              entry={n}
+              isDir={isDir}
+              isOpen={isOpen}
+              iconDir={iconDir}
+              source={source}
+              extras={extras}
+            />
+            <span className="axv-ws-item-main">
+              <span className="axv-ws-item-name">{n.name}</span>
+              <span className="axv-ws-item-sub">
+                {isDir
+                  ? resDirDescription(n.rel) ?? tt("文件夹")
+                  : editing
+                    ? tt("正在编辑")
+                    : tt(describeFile(n.rel, n.name))}
               </span>
-            ) : null}
-          </div>
+            </span>
+          </button>
+          {moving ? (
+            <span
+              className="axv-move-handle"
+              title={tt("按住拖动到目标目录")}
+              aria-label={tt("拖动移动")}
+              onPointerDown={(e) => beginDrag(e, nodeRef)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="msr" aria-hidden="true">drag_indicator</span>
+            </span>
+          ) : null}
         </li>,
       );
       if (isOpen) rows.push(...renderRows(n.rel, depth + 1));
@@ -743,7 +938,7 @@ export function LazyTreeInner(props: {
           </button>
         </div>
       ) : null}
-      <ul className="axv-ws-list axv-proj-tree">{renderRows("", 0)}</ul>
+      <ul className="axv-ws-list axv-proj-tree" ref={listRef}>{renderRows("", 0)}</ul>
       {busy ? <div className="axv-ws-hint">{tt("正在处理…")}</div> : null}
 
       {/* M46c：菜单与弹窗都挂到 .axv-main 下（用户要求），不再留在树内部 */}
@@ -823,6 +1018,8 @@ const LazyTree = memo(LazyTreeInner, (a, b) =>
   a.source === b.source &&
   a.rev === b.rev &&
   a.currentFileName === b.currentFileName &&
+  a.currentRel === b.currentRel &&
+  a.storeKey === b.storeKey &&
   a.extras === b.extras &&
   a.fileOps === b.fileOps,
 );
@@ -1042,6 +1239,8 @@ export function ProjectPanel(p: ProjectPanelProps) {
                 source={projectSource}
                 rev={p.projectRev}
                 currentFileName={p.currentFileName}
+                currentRel={p.currentRel ?? null}
+                storeKey={p.projectName || undefined}
                 onOpenEntry={p.onOpenEntry}
                 extras={p.resExtras}
                 onOpenDrawable={p.onOpenDrawable}

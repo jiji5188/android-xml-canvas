@@ -172,7 +172,29 @@ import {
   wrapSiblings,
   canUnwrap,
 } from "@/lib/xml/clip";
-import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, lsGet, lsSet } from "@/lib/xml/storage";
+import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, LS_KEY_LAST_FILE, lsGet, lsSet, lsGetJson, lsSetJson } from "@/lib/xml/storage";
+/** M144：项目 → 上次打开的文件（按项目记，切项目再回来还是那个文件） */
+const LAST_REL_MAP_KEY = "axv.lastFile.map.v1";
+function readLastRelMap(): Record<string, string> {
+  const raw = lsGetJson<Record<string, string>>(LAST_REL_MAP_KEY);
+  return raw && typeof raw === "object" ? raw : {};
+}
+function readLastRel(projectKey: string): string | null {
+  if (!projectKey) return null;
+  const rel = readLastRelMap()[projectKey];
+  return typeof rel === "string" && rel ? rel : null;
+}
+function writeLastRel(projectKey: string, rel: string): void {
+  if (!projectKey || !rel) return;
+  try {
+    const map = readLastRelMap();
+    map[projectKey] = rel;
+    lsSetJson(LAST_REL_MAP_KEY, map);
+  } catch {
+    /* 静默 */
+  }
+}
+
 import { RunPreview } from "./RunPreview";
 import { Toolbar } from "./Toolbar";
 import { LeftRail, type LeftView } from "./LeftRail";
@@ -2032,6 +2054,22 @@ export function XmlEditor() {
       } catch (e) {
         setWsMsg(tt("打开失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }));
       }
+      // M144：记住「当前项目里打开的文件」，重开 App 直接回到这一页（用户要求：不要每次都重新选）
+      try {
+        const cur = activeProjectRef.current;
+        if (cur?.source && entry.rel) {
+          lsSetJson(LS_KEY_LAST_FILE, {
+            dirPath: cur.dirPath ?? null,
+            rootPath: cur.rootPath ?? null,
+            project: cur.name,
+            rel: entry.rel,
+            name: entry.name,
+          });
+          writeLastRel(cur.dirPath || cur.name, entry.rel);
+        }
+      } catch {
+        /* 静默 */
+      }
     },
     [setXmlAndTrack],
   );
@@ -2053,7 +2091,7 @@ export function XmlEditor() {
 
   /** 激活一个已打开的项目：切到「当前项目」tab，并自动载入主布局（找不到就只显示结构树） */
   const activateProject = useCallback(
-    async (opened: OpenedProject) => {
+    async (opened: OpenedProject, preferRel?: string | null) => {
       // M31：标题显示 app 名称（读 res/values/strings.xml 的 app_name），并取 ic_launcher 做图标
       let name = opened.name;
       let iconUrl: string | null = null;
@@ -2074,12 +2112,40 @@ export function XmlEditor() {
       setProjectRev((n) => n + 1);
       setProjectTab("current");
       setWsActiveName("");
-      const main = await findMainLayout(opened.source);
+      // M144：优先恢复「上次打开的文件」，读不到才退回主布局
+      const prefer = preferRel ?? readLastRel(opened.dirPath || opened.name);
+      let restored = false;
+      if (prefer) {
+        const text = await opened.source.readText(prefer).catch(() => null);
+        if (text !== null) {
+          const bn = prefer.split("/").pop() || prefer;
+          await loadEntry(opened.source, { kind: "file", name: bn, rel: prefer });
+          restored = true;
+        }
+      }
+      const main = restored ? null : await findMainLayout(opened.source);
       if (main) await loadEntry(opened.source, main);
-      else setWsMsg(tt("已打开《{name}》，但里面没找到 layout xml", { name }));
+      else if (!restored) setWsMsg(tt("已打开《{name}》，但里面没找到 layout xml", { name }));
     },
     [loadEntry],
   );
+
+  /* M144：启动时恢复上次打开的项目+文件（仅 native：有绝对路径才能不经用户手势直读）。
+   * 网页端目录句柄拿不到，只能让用户重新选项目，这里静默跳过。 */
+  const lastFileRestored = useRef(false);
+  useEffect(() => {
+    if (lastFileRestored.current) return;
+    lastFileRestored.current = true;
+    const rec = lsGetJson<{ dirPath?: string | null; rootPath?: string | null; project?: string; rel?: string }>(
+      LS_KEY_LAST_FILE,
+    );
+    if (!rec?.rel || !rec.dirPath) return;
+    const src = nativeProjectSource(rec.project || "", [], rec.dirPath);
+    void activateProject(
+      { name: rec.project || "", source: src, dirPath: rec.dirPath ?? undefined, rootPath: rec.rootPath ?? undefined },
+      rec.rel,
+    );
+  }, [activateProject]);
 
   /** M25d：项目列表里点一项 —— 打开这个项目（网页端也能直接读工作目录里的文件夹） */
   const openWsProject = useCallback(
@@ -3918,6 +3984,7 @@ const findResolved = findResolvedNode;
               projectSource={activeProject?.source ?? null}
               projectRev={projectRev}
               currentFileName={wsActiveName || (currentFile?.name ?? "")}
+              currentRel={openRel}
               onOpenEntry={openProjectEntry}
               onRefreshProject={() => void refreshActiveProject()}
               fileOps={activeProject ? fileOpsCtxOf(activeProject) : null}

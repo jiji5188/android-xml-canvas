@@ -9,6 +9,8 @@ export const LS_KEY_DEVICE = "axv.device";
 export const LS_KEY_ZOOM = "axv.zoom";
 /** 多文件项目（文件列表 + 各自的 xml） */
 export const LS_KEY_PROJECT = "axv.project.v1";
+/** M144：上次打开的文件（项目名 + 目录路径 + rel），重开 App 直接定位，不用重新选 */
+export const LS_KEY_LAST_FILE = "axv.autosave.lastFile";
 
 /** 安全读 localStorage 字符串 */
 export function lsGet(key: string): string | null {

@@ -5567,6 +5567,23 @@ button.axv-ws-caret:hover {
   align-items: center;
   justify-content: center;
 }
+/* M144：shape / selector 类型的 xml 图标用 CSS 画出来 */
+.axv-ws-item-thumb-shape {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  display: block;
+  background-size: 100% 100%;
+  filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.35));
+}
+/* M144：当前打开文件所在行的高亮 */
+.axv-ws-row-on > .axv-ws-item {
+  background: var(--axv-primary-soft);
+  border-color: color-mix(in srgb, var(--axv-primary) 45%, transparent);
+}
+.axv-ws-row-on .axv-ws-item-name {
+  color: var(--axv-primary);
+}
 .axv-ws-item-thumb img {
   width: 20px;
   height: 20px;

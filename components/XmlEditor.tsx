@@ -2988,17 +2988,19 @@ const findResolved = findResolvedNode;
         setRealRenderBusy(false);
         if (r.ok) {
           setExportNote(
-            tt("真机渲染：{n} 个文件 → 资源包 {kb} KB（编译 {ms} ms），已打开真控件预览", {
+            tt("真机渲染：{n} 个文件 → 资源包 {kb} KB（编译 {ms} ms），已打开真控件预览\n日志：{log}", {
               n: r.files ?? 0,
               kb: Math.round((r.bytes ?? 0) / 1024),
               ms: r.ms ?? 0,
+              log: r.logFile || tt("（无）"),
             }),
           );
         } else {
           setExportNote(
-            tt("真机渲染失败（{stage}）：{log}", {
+            tt("真机渲染失败（{stage}）：{log}\n完整日志：{file}", {
               stage: r.stage || tt("未知"),
-              log: (r.log || "").slice(0, 600),
+              log: (r.log || "").slice(0, 300),
+              file: r.logFile || tt("（写日志失败）"),
             }),
           );
         }

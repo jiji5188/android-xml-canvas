@@ -26,6 +26,8 @@ export interface RealRenderResult {
   ms?: number;
   /** compile / link */
   stage?: string;
+  /** 完整日志落在 AndroidUIIDE/log/render-*.log 的路径 */
+  logFile?: string;
   log?: string;
 }
 

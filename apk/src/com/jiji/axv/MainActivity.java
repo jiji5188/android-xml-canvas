@@ -448,7 +448,8 @@ public class MainActivity extends Activity {
                     Log.e(TAG, "renderReal fail", t);
                     StringWriter sw = new StringWriter();
                     t.printStackTrace(new PrintWriter(sw));
-                    out = "{\"ok\":false,\"log\":" + quote(sw.toString()) + "}";
+                    String path = writeRenderLog("render-crash", payloadJson, 0, new StringBuilder(), "异常: " + t);
+                    out = "{\"ok\":false,\"logFile\":" + quote(path) + ",\"log\":" + quote(sw.toString()) + "}";
                 }
                 final String json = out;
                 runOnUiThread(() -> {
@@ -2243,26 +2244,27 @@ public class MainActivity extends Activity {
         if (!bin.isFile()) throw new IOException("找不到 aapt2：" + bin);
 
         StringBuilder log = new StringBuilder();
+        File fw = frameworkResForLink(root, log);
         File compiled = new File(root, "compiled.zip");
         int c1 = runAapt2(bin, root, new String[] { "compile", "--dir", resDir.getAbsolutePath(),
                 "-o", compiled.getAbsolutePath() }, log);
         if (c1 != 0) {
-            return "{\"ok\":false,\"stage\":\"compile\",\"files\":" + written
-                    + ",\"log\":" + quote(log.toString()) + "}";
+            return failJson("compile", written, log, payloadJson);
         }
 
         final File outApk = new File(root, "render.apk");
         int c2 = runAapt2(bin, root, new String[] { "link", "-o", outApk.getAbsolutePath(),
-                "-I", "/system/framework/framework-res.apk",
+                "-I", fw.getAbsolutePath(),
                 "--manifest", man.getAbsolutePath(),
                 "--package-id", "0x80",
                 "--min-sdk-version", "24",
                 "--auto-add-overlay",
                 compiled.getAbsolutePath() }, log);
         if (c2 != 0) {
-            return "{\"ok\":false,\"stage\":\"link\",\"files\":" + written
-                    + ",\"log\":" + quote(log.toString()) + "}";
+            return failJson("link", written, log, payloadJson);
         }
+
+        String logPath = writeRenderLog("render-ok", payloadJson, written, log, null);
 
         final String fpkg = pkg;
         final String flayout = layout;
@@ -2281,8 +2283,102 @@ public class MainActivity extends Activity {
 
         return "{\"ok\":true,\"files\":" + written + ",\"bytes\":" + outApk.length()
                 + ",\"ms\":" + (System.currentTimeMillis() - t0)
+                + ",\"logFile\":" + quote(logPath)
                 + ",\"pkg\":" + quote(pkg) + ",\"layout\":" + quote(layout)
                 + ",\"log\":" + quote(log.toString()) + "}";
+    }
+
+    /** M155：给 aapt2 link 找 framework 资源。
+     *  优先用系统里能读到的 framework-res.apk（省得拷 4MB）；读不到就用 assets 里
+     *  从 android.jar 抠出来的 resources.arsc 桩（make-fw-stub.mjs 生成）。 */
+    private File frameworkResForLink(File root, StringBuilder log) {
+        String[] candidates = new String[] {
+                "/system/framework/framework-res.apk",
+                "/system/framework/framework-res/framework-res.apk",
+                "/system_ext/framework/framework-res.apk",
+                "/apex/com.android.framework_res_overlay/framework/framework-res.apk",
+        };
+        for (String c : candidates) {
+            File f = new File(c);
+            if (f.isFile() && f.canRead()) {
+                if (log != null) log.append("framework: ").append(c).append('\n');
+                return f;
+            }
+        }
+        File cached = new File(getCacheDir(), "framework-res-stub.apk");
+        if (cached.isFile() && cached.length() > 100000) {
+            if (log != null) log.append("framework: 缓存的资源桩 ").append(cached.length()).append(" 字节\n");
+            return cached;
+        }
+        try {
+            InputStream in = getAssets().open("fw/framework-res-stub.apk");
+            try (FileOutputStream out = new FileOutputStream(cached)) {
+                byte[] buf = new byte[65536];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            } finally {
+                in.close();
+            }
+            if (log != null) log.append("framework: assets 资源桩 " ).append(cached.length()).append(" 字节\n");
+            return cached;
+        } catch (Throwable t) {
+            if (log != null) log.append("framework 资源桩解包失败: ").append(t).append('\n');
+            return new File("/system/framework/framework-res.apk");
+        }
+    }
+
+    /** M155：真机渲染日志写进 AndroidUIIDE/log/（跟 perf-*.log 同一个目录，用户能直接导出）
+     *  外部存储不可写就退到 cache/log。*/
+    private File renderLogDir() {
+        try {
+            File base = new File(Environment.getExternalStorageDirectory(), "AndroidUIIDE");
+            File d = new File(base, "log");
+            if (!d.exists() && !d.mkdirs()) return new File(getCacheDir(), "log");
+            return d;
+        } catch (Throwable t) {
+            return new File(getCacheDir(), "log");
+        }
+    }
+
+    /** 写一份渲染日志，返回绝对路径（写失败返回空字符串，不影响主线） */
+    private String writeRenderLog(String tag, String payloadJson, int written, StringBuilder aaptLog, String extra) {
+        try {
+            String ts = new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new java.util.Date());
+            File dir = renderLogDir();
+            File f = new File(dir, tag + "-" + ts + ".log");
+            StringBuilder sb = new StringBuilder();
+            sb.append("== AXV 真机渲染 ").append(ts).append(" ==\n");
+            sb.append("SDK ").append(Build.VERSION.SDK_INT).append(" · ").append(Build.MODEL).append('\n');
+            sb.append("写入 res 文件: ").append(written).append(" 个\n");
+            if (extra != null) sb.append(extra).append('\n');
+            try {
+                JSONObject p = new JSONObject(payloadJson);
+                sb.append("pkg=").append(p.optString("pkg")).append("  layout=").append(p.optString("layout")).append('\n');
+                JSONArray arr = p.optJSONArray("files");
+                if (arr != null) {
+                    for (int i = 0; i < arr.length(); i++) {
+                        JSONObject fo = arr.getJSONObject(i);
+                        sb.append("  - ").append(fo.optString("path"))
+                                .append("  ").append(fo.optString("text", "").length()).append(" 字节\n");
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+            sb.append("\n---- aapt2 ----\n").append(aaptLog == null ? "" : aaptLog.toString());
+            writeUtf8(f, sb.toString());
+            return f.getAbsolutePath();
+        } catch (Throwable t) {
+            Log.e(TAG, "writeRenderLog fail", t);
+            return "";
+        }
+    }
+
+    /** 失败统一出口：日志落盘 + 返回带 logFile 的 JSON（提示里就能直接看到路径） */
+    private String failJson(String stage, int written, StringBuilder log, String payloadJson) {
+        String path = writeRenderLog("render-fail-" + stage, payloadJson, written, log, "失败阶段: " + stage);
+        return "{\"ok\":false,\"stage\":" + quote(stage) + ",\"files\":" + written
+                + ",\"logFile\":" + quote(path)
+                + ",\"log\":" + quote(log == null ? "" : log.toString()) + "}";
     }
 
     private void toast(String msg) {

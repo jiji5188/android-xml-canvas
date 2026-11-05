@@ -47,6 +47,9 @@ export type ToolbarProps = {
 
   onRun: () => void;
   onFormat: () => void;
+  /** M140：历史版本快照面板（可选，不传就不画按钮） */
+  onHistory?: () => void;
+  snapCount?: number;
 };
 
 export function Toolbar(props: ToolbarProps) {
@@ -77,6 +80,8 @@ export function Toolbar(props: ToolbarProps) {
     onChangeWorkspace,
     onRun,
     onFormat,
+    onHistory,
+    snapCount,
   } = props;
 
   return (
@@ -123,6 +128,17 @@ export function Toolbar(props: ToolbarProps) {
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save</span>
           </button>
+          {onHistory ? (
+            <button
+              className="axv-tb-btn axv-tb-history"
+              title={tt("历史版本：自动/手动存的文档快照，可以回退")}
+              aria-label={tt("历史版本")}
+              onClick={onHistory}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>history</span>
+              {snapCount ? <span className="axv-tb-badge">{snapCount}</span> : null}
+            </button>
+          ) : null}
           <button
             className="axv-tb-btn"
             title={tt("打开本地 XML 文件（也可直接把文件拖进来）")}

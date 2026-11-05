@@ -6,14 +6,21 @@ import { resolve } from "node:path";
 const read = (f: string) => readFileSync(resolve(process.cwd(), f), "utf8");
 
 describe("M78 接入护栏", () => {
-  it("IconEditor / DrawableEditor 的返回与关闭都走 useOverlayBack 的 close", () => {
+  it("IconEditor / DrawableEditor 的返回与关闭都走 useOverlayBack", () => {
     // M135：ShapeEditor 退化成 DrawableEditor 的薄封装，不再直接持有 overlay
-    for (const f of ["components/IconEditor.tsx", "components/DrawableEditor.tsx"]) {
-      const src = read(f);
-      expect(src, f).toContain('import { useOverlayBack } from "@/lib/overlay-back";');
-      expect(src, f).toContain("const close = useOverlayBack(true, onClose);");
-      expect(src, f).not.toContain('onClick={onClose} aria-label="关闭"');
-      expect(src, f).not.toContain('onClick={onClose} aria-label="返回编辑器"');
+    // M141：DrawableEditor 的 close 要先过未保存提示，所以经 closeRef 转到 guard
+    const icon = read("components/IconEditor.tsx");
+    expect(icon).toContain('import { useOverlayBack } from "@/lib/overlay-back";');
+    expect(icon).toContain("const close = useOverlayBack(true, onClose);");
+
+    const dw = read("components/DrawableEditor.tsx");
+    expect(dw).toContain('import { useOverlayBack } from "@/lib/overlay-back";');
+    expect(dw).toContain("useOverlayBack(true, () => closeRef.current())");
+    expect(dw).toContain("const close = () => guard.requestClose(onClose)");
+
+    for (const src of [icon, dw]) {
+      expect(src).not.toContain('onClick={onClose} aria-label="关闭"');
+      expect(src).not.toContain('onClick={onClose} aria-label="返回编辑器"');
     }
   });
 

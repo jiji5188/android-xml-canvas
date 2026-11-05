@@ -40,8 +40,11 @@ import { moveNodeRaw, scanElements, elementAt } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml, type LintIssue } from "@/lib/xml/lint";
 import { lintCodeDoc } from "@/lib/xml/lint-doc";
+import { loadSnaps, pushSnap, SNAP_LABEL_SAVE } from "@/lib/xml/snapshots";
+import { useUnsavedLeave } from "@/components/UnsavedLeaveDialog";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { sanitizeResName } from "@/lib/xml/resname";
+import { HistoryPanel } from "@/components/HistoryPanel";
 import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
 import { hasIcon } from "@/lib/xml/icon-vectors";
@@ -681,6 +684,10 @@ export function XmlEditor() {
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState("activity_main.xml");
   const [wsBusy, setWsBusy] = useState(false);
+
+  /** M140：历史版本快照面板 */
+  const [histPanelOpen, setHistPanelOpen] = useState(false);
+  const [snapCount, setSnapCount] = useState(0);
   /** M25b：从项目目录打开的文件名（用于结构树里标「正在编辑」；应用内文件为空） */
   const [wsActiveName, setWsActiveName] = useState("");
   const [wsMsg, setWsMsg] = useState<string>("");
@@ -2778,8 +2785,9 @@ const findResolved = findResolvedNode;
       });
   };
 
-  /** 打开 .xml 文件（弹系统文件选择器） */
-  const openProject = () => {
+  /** 打开 .xml 文件（弹系统文件选择器）；M141：有未保存改动先问一句 */
+  const openProject = () => leaveGuard.gate(dirty, () => openProjectFile());
+  const openProjectFile = () => {
     // M21：浏览器支持 File System Access 时带句柄打开 → 之后「保存」能写回原路径
     void (async () => {
       const picked = await pickXmlFile();
@@ -3328,8 +3336,45 @@ const findResolved = findResolvedNode;
   const markSaved = useCallback((text: string) => {
     setSavedMark(text);
     setSavedAt(Date.now());
+    // M140：保存成功 = 一个自然的历史版本，顺手存一条快照（去重）
+    const key = snapFileKey();
+    if (key) {
+      pushSnap(key, text, SNAP_LABEL_SAVE);
+      setSnapCount(loadSnaps(key).length);
+    }
   }, []);
+  const snapFileKey = useCallback(() => {
+    // 快照按文件存：优先工程内相对路径，其次当前打开的文件名，都没有（纯新建）就存 "untitled"
+    if (openRel) return openRel;
+    const n = saveOrigin?.name || wsActiveName || currentFile?.name;
+    if (n) return n;
+    return "untitled";
+  }, [openRel, saveOrigin, wsActiveName, currentFile]);
+
+  // 切文件 / 关面板后徽标数字要跟着变（保存时 markSaved 也会刷）
+  useEffect(() => {
+    setSnapCount(loadSnaps(snapFileKey()).length);
+  }, [snapFileKey, histPanelOpen, savedMark]);
+
   const dirty = xml !== savedMark;
+
+  /** M141：全局离开拦截 —— 切文件 / 打开新文件 / 关浏览器（未保存时） */
+  const leaveGuard = useUnsavedLeave({
+    title: tt("有未保存的内容"),
+    onSave: () => void doSave(),
+    onDiscard: () => setSavedMark(currentXml()),
+  });
+
+  // 关窗口 / 切后台时提示（浏览器原生 beforeunload 只能弹默认框，但必须拦，不然丢文档）
+  useEffect(() => {
+    const onBefore = (e: BeforeUnloadEvent) => {
+      if (!dirty) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBefore);
+    return () => window.removeEventListener("beforeunload", onBefore);
+  }, [dirty]);
   // 切换/打开文件 → 当前内容就是磁盘上的基线（避免一进来就顶着「未保存」）
   useEffect(() => {
     setSavedMark(xmlRef.current);
@@ -4011,8 +4056,28 @@ const findResolved = findResolvedNode;
         }}
         onRun={() => setRunOpen(true)}
         onFormat={doFormat}
+        onHistory={() => setHistPanelOpen(true)}
+        snapCount={snapCount}
       />
       </div>
+
+      {/* M140：历史版本快照面板 */}
+      <HistoryPanel
+        open={histPanelOpen}
+        fileKey={snapFileKey()}
+        fileLabel={saveOrigin?.name || wsActiveName || currentFile?.name || ""}
+        currentXml={xml}
+        onRestore={(next, label) => {
+          // 恢复 = 一次普通编辑：进撤销栈，可再 Ctrl+Z 回 当前版
+          setHistPanelOpen(false);
+          setXmlAndTrack(next);
+          flashNote(tt("已恢复到 {t} 的版本", { t: label }), 2600);
+        }}
+        onClose={() => setHistPanelOpen(false)}
+      />
+
+      {/* M141：离开前的未保存提示 */}
+      {leaveGuard.dialog}
 
       {runOpen ? (
         <RunPreview

@@ -39,6 +39,7 @@ import {
   type Mat,
 } from "@/lib/xml/canvas-shapes";
 import { IconPickerPanel } from "./IconPickerPanel";
+import { useUnsavedGuard } from "./UnsavedGuard";
 import { textToPathData } from "@/lib/xml/text-to-path";
 import { ColorPicker } from "./ColorPicker";
 import { parseColorOr } from "@/lib/xml/color-argb";
@@ -231,7 +232,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
 
   // M78：系统返回键也能关；必须放在任何 early return 之前
-  const close = useOverlayBack(true, onClose);
+  // M141：返回前过一遍未保存提示（closeRef 在拿到 guard 之后回填）
+  const closeRef = useRef<() => void>(() => {});
+  useOverlayBack(true, () => closeRef.current());
 
   /* ---------------- 历史 ---------------- */
   const snapshot = useCallback((): Snapshot => ({ meta, shapes }), [meta, shapes]);
@@ -1074,7 +1077,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       if (e.key === "Escape") {
         e.stopPropagation();
         if (sel.length) setSel([]);
-        else close();
+        else closeRef.current();
         return;
       }
       if (mod && e.key.toLowerCase() === "z") {
@@ -1131,7 +1134,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [close, duplicateSel, groupSel, redo, removeSel, sel, shapes, undo, ungroupSel]);
+  }, [duplicateSel, groupSel, redo, removeSel, sel, shapes, undo, ungroupSel]);
 
   /* ---------------- 输出 ---------------- */
   /** 文字图层 → path 图层：用 canvas 追踪字形轮廓（vector 不支持 <text>）；失败返回 null */
@@ -1212,6 +1215,18 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
     return shapesToModel(withBg, meta);
   }, [bg, shapes, meta]);
   const outXml = useMemo(() => buildVectorXml(model, resName || "ic_icon"), [model, resName]);
+
+  /** M141：未保存提示 —— 画布动过（或改过资源名）就算脏，和初始快照比内容，不拿引用比 */
+  const baseJson = useRef(JSON.stringify(initial));
+  const dirty = JSON.stringify({ meta, shapes }) !== baseJson.current || resName !== name;
+  const guard = useUnsavedGuard({
+    dirty,
+    onSave: () => save(),
+    canSave: Boolean(resName.trim()) && !err,
+    hint: tt("这个图标"),
+  });
+  const close = () => guard.requestClose(onClose);
+  closeRef.current = () => guard.requestClose(onClose);
 
   const save = () => {
     const safe = resName.trim().replace(/[^a-zA-Z0-9_]/g, "_");

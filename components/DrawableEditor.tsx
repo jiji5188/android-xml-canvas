@@ -24,6 +24,7 @@ import { nodeAt, replaceAt, breadcrumb, parentOf, setSlot, slotOf, type Path } f
 import { validateDrawable } from "@/lib/xml/drawable-schema";
 import { DRAWABLE_PRESETS } from "@/lib/xml/drawable-presets";
 import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
+import { useUnsavedGuard } from "@/components/UnsavedGuard";
 import { DrawablePreview } from "./DrawablePreview";
 import { focusDoc } from "@/lib/xml/drawable-focus";
 import { AttrRows } from "./drawable/AttrRows";
@@ -99,6 +100,8 @@ export function DrawableEditor({
   /** 手机端右栏是滑面板，必须给开关，否则 selector 等类型打开后拦住了预览又关不掉（M130） */
   const [formOpen, setFormOpen] = useState(true);
   const [name, setName] = useState<string>(() => resNameFromValue(value) || "bg");
+  /** M141：打开时的资源名，改名也算「有未保存的修改」 */
+  const initialNameRef = useRef(name);
   const [presetOpen, setPresetOpen] = useState(false);
   /** M137：根标签切换菜单（把写错的根改掉，不用整份重写） */
   const [rootMenu, setRootMenu] = useState(false);
@@ -127,9 +130,13 @@ export function DrawableEditor({
     setFormOpen(!narrow);
   }, [narrow]);
 
-  const close = useOverlayBack(true, onClose);
+  // M141：系统返回键也要能拦（closeRef 在拿到 guard 之后回填）
+  const closeRef = useRef<() => void>(() => {});
+  useOverlayBack(true, () => closeRef.current());
 
   const xml = useMemo(() => buildDrawable(root), [root]);
+  /** M141：打开时的 XML 基线 —— 用内容比，不拿对象引用比（撤销回原地不应该算脏） */
+  const baseXml = useRef(xml).current;
   const problems = useMemo(() => validateDrawable(root), [root]);
   const errors = problems.filter((p) => p.level === "error");
   const node = nodeAt(root, path) ?? root;
@@ -139,6 +146,16 @@ export function DrawableEditor({
   const focus = useMemo(() => focusDoc(root, path), [root, path]);
   const focused = path.length > 0;
   const nameConflicts = existingNames.includes(name) && !existingXml;
+
+  /** M141：有未保存改动就拦一下（子页面返回 / 取消 / 系统返回键） */
+  const guard = useUnsavedGuard({
+    dirty: xml !== baseXml || name !== initialNameRef.current,
+    onSave: () => save(),
+    canSave: Boolean(name.trim()) && !nameConflicts && (readonly || errors.length === 0),
+    hint: tt("这个 drawable"),
+  });
+  const close = () => guard.requestClose(onClose);
+  closeRef.current = () => guard.requestClose(onClose);
 
   const mutate = (next: DrawableNode) => {
     setUndoStack((s) => [...s, root]);
@@ -574,6 +591,8 @@ export function DrawableEditor({
           </button>
         </span>
       </div>
+
+      {guard.dialog}
     </div>
   );
 }

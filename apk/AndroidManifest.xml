@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.jiji.axv"
-    android:versionCode="174"
-    android:versionName="1.15.56">
+    android:versionCode="175"
+    android:versionName="1.15.57">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
@@ -23,6 +23,16 @@
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".PreviewActivity"
+            android:label="真渲染预览"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

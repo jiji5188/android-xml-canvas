@@ -44,6 +44,15 @@ if (!fs.existsSync(path.join(outDir, "xml", "index.html"))) {
 const www = path.join(apk, "assets", "www");
 fs.rmSync(path.join(apk, "assets"), { recursive: true, force: true });
 fs.cpSync(outDir, www, { recursive: true });
+// M151：把外部资源包（aapt2 产物）一起放进 assets，供 PreviewActivity 加载。
+// 源头：D:\android-xml-canvas\foundation\out\preview-res.apk（foundation/build.mjs 生成）
+const previewRes = path.join(repoRoot, "..", "foundation", "out", "preview-res.apk");
+if (fs.existsSync(previewRes)) {
+  fs.copyFileSync(previewRes, path.join(www, "preview-res.apk"));
+  console.log("资源包已带入：", fs.statSync(previewRes).size, "字节");
+} else {
+  console.warn("⚠ 未找到 foundation/out/preview-res.apk，PreviewActivity 会报资源缺失");
+}
 console.log("assets 拷贝完成：", fs.readdirSync(www).length, "个顶层项");
 
 // 3) aapt2 compile + link（-A 把 assets 打进去）
@@ -61,11 +70,19 @@ run(btExe("aapt2.exe"), [
   "--target-sdk-version", "34",
 ], apk);
 
-// 4) javac
+// 4) javac（src 下所有 .java 都编，M151 起不止 MainActivity）
+const javaSrc = [];
+(function walkJava(dir) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walkJava(p);
+    else if (e.name.endsWith(".java")) javaSrc.push(p);
+  }
+})(path.join(apk, "src"));
 run(jbrExe("javac"), [
   "--release", "11", "-classpath", path.join(SDK, "platforms", PLATFORM, "android.jar"),
   "-d", "build/classes",
-  "src/com/jiji/axv/MainActivity.java",
+  ...javaSrc,
   "build/gen/com/jiji/axv/R.java",
 ], apk);
 

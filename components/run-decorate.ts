@@ -71,6 +71,9 @@ function attrsOf(ctx: Ctx, path: string | undefined): Record<string, unknown> {
 
 /** 元素背景亮不亮 → 决定涟漪用黑还是白 */
 function rippleColor(el: HTMLElement): string {
+  // M150：<ripple android:color> 优先于自动算出来的亮/暗色
+  const own = el.dataset.axvRipple;
+  if (own) return own;
   const bg = window.getComputedStyle(el).backgroundColor;
   const m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (!m) return "rgba(0,0,0,0.18)";
@@ -148,6 +151,52 @@ function attachRipple(ctx: Ctx, el: HTMLElement, label?: string) {
     window.setTimeout(() => el.classList.remove("axv-run-pressed"), 140);
   });
   ctx.cleanups.push(off, offDownLong, offUpLong, offLeaveLong, offClickLong, clearTimer);
+}
+
+/* ===================== M150：按下态（selector state_pressed） ===================== */
+
+const kebab = (k: string) => k.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
+
+/**
+ * 把「按下应该长什么样」真正贴上去。
+ * 数据来自渲染模型：selector 命中 state_pressed 那一项 → shapeToCss → data-axv-press。
+ * 不复用 CSS 类的原因：常态的圆角/描边/阴影是 inline style，类选择器压不过它，
+ * 而 Android 的按下态是「换一张 drawable」，本来就应该整体替换。
+ */
+function attachPressStyle(ctx: Ctx, el: HTMLElement, label: string) {
+  const raw = el.dataset.axvPress;
+  if (!raw) return;
+  let css: Record<string, string> = {};
+  try {
+    css = JSON.parse(raw) as Record<string, string>;
+  } catch {
+    return;
+  }
+  const keys = Object.keys(css);
+  if (keys.length === 0) return;
+  let saved: Record<string, string> | null = null;
+  const apply = () => {
+    if (saved) return;
+    saved = {};
+    for (const k of keys) saved[k] = el.style.getPropertyValue(kebab(k));
+    for (const k of keys) el.style.setProperty(kebab(k), css[k]);
+    // 这条日志是「按下去没反应」的第一诊断点：有日志 = selector 写对了
+    ctx.hooks.log("D", `${label || el.dataset.tag || "view"}: state_pressed → 命中按下态背景`);
+  };
+  const restore = () => {
+    if (!saved) return;
+    for (const k of keys) {
+      const v = saved[k];
+      if (v) el.style.setProperty(kebab(k), v);
+      else el.style.removeProperty(kebab(k));
+    }
+    saved = null;
+  };
+  const offDown = on(el, "pointerdown", apply);
+  const offUp = on(el, "pointerup", restore);
+  const offCancel = on(el, "pointercancel", restore);
+  const offLeave = on(el, "pointerleave", restore);
+  ctx.cleanups.push(offDown, offUp, offCancel, offLeave);
 }
 
 /* ===================== 输入框 ===================== */
@@ -511,6 +560,8 @@ export function decorateRunScreen(
     const path = el.dataset.path ?? "";
     const label = targetLabel(tag, attrsOf(ctx, path)["id"]);
     el.removeAttribute("title"); // 编辑器的 tooltip 在运行态很碍事
+    // M150：不管控件类型，只要有按下态就挂上（Button/列表项/卡片都可能带 selector）
+    attachPressStyle(ctx, el, label);
     if (role !== "none") interactive += 1;
 
     if (role === "input") {

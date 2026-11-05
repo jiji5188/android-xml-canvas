@@ -3672,11 +3672,15 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: center;
+  /* M149：原来是 align-items:center，手机比容器高时顶部会被裁掉（要么看不到状态栏，
+     要么看不到导航栏，而且滚不动）。改成 flex-start + 子元素 margin:auto：
+     空间够时垂直居中，空间不够时从顶部开始、可以滚动看到全部。 */
+  align-items: flex-start;
   justify-content: center;
   padding: 16px;
   overflow: auto;
 }
+.axv-run-stage > * { margin: auto 0; }
 .axv-run-phone { box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55); overflow: hidden; position: relative; }
 .axv-run-body { overflow: auto; }
 .axv-run-body .axv-node { cursor: pointer; }

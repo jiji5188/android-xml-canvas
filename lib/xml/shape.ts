@@ -3,6 +3,7 @@
 // 不追求像素级还原（Android 的 <shape> 还有 inset/scale/padding 等，此处忽略）。
 
 import { parseLayoutXml } from "./parser";
+import type { XmlNode } from "./types";
 
 export interface ShapeCorners {
   tl: number;
@@ -30,6 +31,10 @@ export interface ShapeStyle {
   insetDp?: { t: number; r: number; b: number; l: number };
   /** layer-list 阴影层（M3h-2）：底层偏移实心块 */
   shadow?: { dx: number; dy: number; blur: number; color: string };
+  /** M150：<ripple> 的点按水波色（按下时叠在形状上） */
+  rippleColor?: string;
+  /** M150：selector 确实选中了一个带 state_ 条件的项（而不是退到常态） */
+  pickedStateful?: boolean;
 }
 
 /** Android 渐变角度 → CSS 角度：Android 0°=左→右，90°=下→上；CSS 0deg=下→上，90deg=左→右 */
@@ -62,11 +67,14 @@ function dp(raw: string | undefined): number | undefined {
 /**
  * 解析 shape drawable 文本。
  * @param resolveColor 颜色解析器（把 @color/x / #AARRGGBB / 命名色 转成 CSS 颜色）
+ * @param state M150：当前视图状态（pressed/checked/focused/selected/enabled）。
+ *        selector 会挑「匹配且条件最多」的那一项，空对象 = 常态。
  * @returns 非 shape（如 selector/vector）返回 null
  */
 export function parseShapeDrawable(
   xmlText: string,
   resolveColor: (raw: string) => string,
+  state: Record<string, boolean> = {},
 ): ShapeStyle | null {
   const parsed = parseCached(xmlText);
   const root = parsed?.root;
@@ -79,18 +87,28 @@ export function parseShapeDrawable(
   let shadow: ShapeStyle["shadow"];
   /** M5c：<inset> 外壳的内缩（空 = 没套 inset） */
   let insetDp: ShapeStyle["insetDp"];
+  /** M150：selector 是否真的选中了「带 state_ 条件」的项 */
+  let pickedStateful = false;
+  /** M150：<ripple> 的点按色 */
+  let rippleColor: string | undefined;
   for (let guard = 0; guard < 6; guard++) {
     if (target.tag === "selector") {
       const items = target.children.filter((c) => c.tag === "item");
       if (items.length === 0) return null;
-      const normal = items.find((it) => !Object.keys(it.attrs).some((k) => /^state_/.test(k))) ?? items[0];
-      const inline = normal.children.find((c) => c.tag === "shape" || c.tag === "ripple" || c.tag === "layer-list" || c.tag === "inset");
+      const picked = pickSelectorItem(items, state);
+      if (!picked) return null;
+      if (Object.keys(picked.attrs).some((k) => /^state_/.test(k))) pickedStateful = true;
+      const inline = picked.children.find((c) => c.tag === "shape" || c.tag === "ripple" || c.tag === "layer-list" || c.tag === "inset");
       if (!inline) return null; // android:drawable="@drawable/other" 需要递归读文件，这里不支持
       target = inline;
       continue;
     }
     if (target.tag === "ripple" || target.tag === "inset") {
-      // M5c：inset 外壳带内缩值（Android: insetLeft/Top/Right/Bottom）；ripple 没有
+      // M150：ripple 的点按色（android:color，支持 @color/#AARRGGBB）
+      if (target.tag === "ripple" && !rippleColor) {
+        const rc2 = target.attrs["color"];
+        if (rc2) rippleColor = resolveColor(rc2);
+      }
       if (target.tag === "inset") {
         const t = dp(target.attrs["insetTop"]) ?? 0;
         const r = dp(target.attrs["insetRight"]) ?? dp(target.attrs["insetEnd"]) ?? 0;
@@ -177,5 +195,23 @@ export function parseShapeDrawable(
   }
   const fin: ShapeStyle = shadow ? { ...out, shadow } : out;
   if (insetDp) fin.insetDp = insetDp;
+  if (pickedStateful) fin.pickedStateful = true;
+  if (rippleColor) fin.rippleColor = rippleColor;
   return fin;
+}
+
+/** M150：selector 枝选——只要 item 声明的每个 state_ 都满足，就算候选；条件多的优先（Android 语义） */
+function pickSelectorItem(items: XmlNode[], state: Record<string, boolean>): XmlNode | null {
+  const stateKeys = (it: { attrs: Record<string, string> }) => Object.keys(it.attrs).filter((k) => /^state_/.test(k));  const match = (it: { attrs: Record<string, string> }) =>
+    stateKeys(it).every((k) => {
+      const name = k.replace(/^state_/, "");
+      const want = it.attrs[k] !== "false";
+      // 没声明的状态一律当 false（Android 默认值），enabled 默认为 true
+      const has = name === "enabled" ? state[name] !== false : !!state[name];
+      return has === want;
+    });
+  const cands = items.filter(match);
+  if (cands.length === 0) return null;
+  cands.sort((a, b) => stateKeys(b).length - stateKeys(a).length);
+  return cands[0];
 }

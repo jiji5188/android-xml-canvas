@@ -496,6 +496,9 @@ export function XmlCanvas({
       ref={selfRef}
       data-path={node.path}
       data-tag={node.tag}
+      data-axv-press={node.pressStyle ? JSON.stringify(node.pressStyle) : undefined}
+      data-axv-check={node.checkStyle ? JSON.stringify(node.checkStyle) : undefined}
+      data-axv-ripple={node.rippleColor || undefined}
       className={
         "axv-node " +
         node.className +

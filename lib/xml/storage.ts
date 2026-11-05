@@ -11,6 +11,8 @@ export const LS_KEY_ZOOM = "axv.zoom";
 export const LS_KEY_PROJECT = "axv.project.v1";
 /** M144：上次打开的文件（项目名 + 目录路径 + rel），重开 App 直接定位，不用重新选 */
 export const LS_KEY_LAST_FILE = "axv.autosave.lastFile";
+/** M149：上次载入的示例项目 key —— 重启后恢复它自带的 values/drawable，否则 @string/@drawable 全裸显示 */
+export const LS_KEY_SAMPLE = "axv.autosave.sample";
 
 /** 安全读 localStorage 字符串 */
 export function lsGet(key: string): string | null {

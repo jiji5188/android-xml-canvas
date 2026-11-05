@@ -668,8 +668,23 @@ export function specToCss(
   }
 
   if (spec.kind === "line") {
-    css.background = undefined;
+    // Android 的 shape="line" 只画一条水平线，高度 = stroke 宽度，位置在竖直居中；
+    // <solid> 不参与绘制。之前这里只清了 background，上面算出来的 css.border 还在，
+    // 四条边一画就成了「镂空方框」——这是用户报的那个 bug 的根因。
+    const w = spec.stroke?.width && spec.stroke.width > 0 ? spec.stroke.width : 0;
+    css.border = undefined;
+    css.borderRadius = undefined;
+    css.boxShadow = undefined;
     css.aspectRatio = "auto";
+    css.background = undefined;
+    if (w > 0) {
+      const c = resolveColor(spec.stroke!.color);
+      const dashed = spec.stroke?.dashWidth && spec.stroke.dashWidth > 0;
+      css.background = dashed
+        ? `repeating-linear-gradient(90deg, ${c} 0 ${spec.stroke!.dashWidth}px, #00000000 ${spec.stroke!.dashWidth}px ${spec.stroke!.dashWidth! * 2}px) center / 100% ${w}px no-repeat`
+        : `linear-gradient(${c}, ${c}) center / 100% ${w}px no-repeat`;
+    }
+    // 没有 stroke（或宽度 0）时什么都不画 —— 跟 Android 一致：line 全靠 stroke，solid 无效
   }
 
   return css;

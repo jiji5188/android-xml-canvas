@@ -127,8 +127,9 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
     const calc = () => {
       const chromeH = Math.round(24 * SCALE) + Math.round(48 * SCALE);
       const chromeW = 4;
-      const availH = window.innerHeight - 56;
-      const availW = window.innerWidth - (window.innerWidth > 1000 && showLog ? 380 : 24);
+      // M149：还要减掉 stage 自己的 padding（上下/左右各 16），否则算出的手机总高比容器大 → 溢出滚动
+      const availH = window.innerHeight - 56 - 32;
+      const availW = window.innerWidth - (window.innerWidth > 1000 && showLog ? 380 : 24) - 32;
       const contentH = dev.h * SCALE + chromeH + chromeW;
       const contentW = dev.w * SCALE + chromeW;
       setFit(Math.min(availH / contentH, availW / contentW, 1));

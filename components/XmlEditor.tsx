@@ -172,7 +172,7 @@ import {
   wrapSiblings,
   canUnwrap,
 } from "@/lib/xml/clip";
-import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, LS_KEY_LAST_FILE, lsGet, lsSet, lsGetJson, lsSetJson } from "@/lib/xml/storage";
+import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, LS_KEY_LAST_FILE, LS_KEY_SAMPLE, lsGet, lsSet, lsGetJson, lsSetJson } from "@/lib/xml/storage";
 /** M144：项目 → 上次打开的文件（按项目记，切项目再回来还是那个文件） */
 const LAST_REL_MAP_KEY = "axv.lastFile.map.v1";
 function readLastRelMap(): Record<string, string> {
@@ -570,12 +570,22 @@ export function XmlEditor() {
   /** 解析用（低优先级）：敲代码时让输入不卡，解析滞后几帧 */
   const parsedXml = useDeferredValue(xml);
   const [resourceFragment, setResourceFragment] = useState("");
+  /** M149：重启后把上次示例项目自带的 values/drawable 也恢复回来。
+   *  不恢复的话 @string/@drawable 会全裸显示（标题直接写 @string/shop_title），一眼就假。 */
+  const sampleBoot = useRef<{ values: string; drawables: Record<string, string> } | null>(null);
+  if (sampleBoot.current === null) {
+    const key = lsGet(LS_KEY_SAMPLE);
+    const p = key ? sampleProjectByKey(key) : undefined;
+    sampleBoot.current = p
+      ? { values: p.values ?? "", drawables: p.drawables }
+      : { values: "", drawables: {} };
+  }
   /** 示例项目自带的 values（@color/@string）——单独存，不抢用户自己贴的片段；用户片段优先 */
-  const [sampleValues, setSampleValues] = useState("");
+  const [sampleValues, setSampleValues] = useState(sampleBoot.current.values);
   /** 上传 res/ 目录解析出的附加资源（drawable/vector/styles/values 原文） */
   const [resExtras, setResExtras] = useState<ResourceExtras | null>(null);
   /** M3g/M3h：本工具生成的 drawable 资源：资源名 → xml 原文（图标 vector + 自定义 shape/ripple 共用） */
-  const [generatedDrawables, setGeneratedDrawables] = useState<Record<string, string>>({});
+  const [generatedDrawables, setGeneratedDrawables] = useState<Record<string, string>>(sampleBoot.current.drawables);
   /** 矢量 → data URL（让画布能真渲染而不是占位框） */
   const generatedDataUrls = useMemo(() => {
     const out: Record<string, string> = {};
@@ -2356,6 +2366,8 @@ export function XmlEditor() {
       setXmlAndTrack(p.layout);
       setGeneratedDrawables((m) => ({ ...p.drawables, ...m }));
       setSampleValues(p.values ?? "");
+      // M149：记住示例项目，重启后恢复它的 values/drawable（不记 key 就全裸显示 @string/@drawable）
+      lsSet(LS_KEY_SAMPLE, key);
       setSelectedPath(null);
       setExportNote(
         tt("已载入示例项目「{name}」· {lib}，自带 {n} 个 drawable", { name: p.name, lib: p.library, n: Object.keys(p.drawables).length }),
@@ -2957,6 +2969,9 @@ const findResolved = findResolvedNode;
   const clearRes = () => {
     setResExtras(null);
     setResourceFragment("");
+    // M149：连示例项目自带的 values/drawable 一起清掉，否则清完还是一堆“幽灵资源”
+    setSampleValues("");
+    lsSet(LS_KEY_SAMPLE, "");
     try {
       window.localStorage.removeItem(LS_KEY_RES);
     } catch {

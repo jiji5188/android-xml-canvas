@@ -87,6 +87,8 @@ export interface ResolvedNode {
   children: ResolvedNode[];
   /** 回写定位用的原始属性 */
   rawAttrs: Record<string, string>;
+  /** M149：解析后的 hint（@string/xxx 已展开成真实文字） */
+  hint?: string;
   /** M2q：子树来自 include 展开的源文件（如 "header.xml"）；存在时 UI 应标记只读 */
   sourceFile?: string;
   /** M4s：图片控件的内容图（android:src）——单独用 <img> 画，保证在 background 之上 */
@@ -101,6 +103,12 @@ export interface ResolvedNode {
   imgBlend?: string;
   /** M11y：TextInputLayout 的浮动 hint 标签（行外绝对定位，压在框线上） */
   label?: string;
+  /** M150：selector 命中 state_pressed 时的样式（运行态按下时贴到元素上，松开还原） */
+  pressStyle?: Record<string, string>;
+  /** M150：selector 命中 state_checked 时的样式（CheckBox/Radio/Switch 勾选态） */
+  checkStyle?: Record<string, string>;
+  /** M150：<ripple> 的点按水波色 */
+  rippleColor?: string;
   /** M5c：<inset> 背景——背景图内缩绘制（不裁子控件，单独画一层） */
   bgInset?: {
     t: number;

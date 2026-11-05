@@ -276,11 +276,27 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
 
   // M2w：background="@drawable/bg_xxx" 且上传的 res 里有 <shape> xml → 还原渐变/圆角/描边
   out["bgShape"] = null;
+  /** M150：按下态 / 勾选态的形状（selector 命中 state_pressed / state_checked） */
+  out["bgPressShape"] = null;
+  out["bgCheckShape"] = null;
+  out["bgRippleColor"] = "";
   if (bgIsDrawable && res.drawableXml) {
     const nm = bgRaw.replace(/^@(?:drawable|mipmap)\//, "");
-    const src = res.drawableXml[nm] ?? res.drawableXml[nm.replace(/\.xml$/i, "")];
-    if (src) {
-      out["bgShape"] = parseShapeDrawable(src, (raw) => resolveColor(raw, res, issues, path, "background"));
+    const src0 = res.drawableXml[nm] ?? res.drawableXml[nm.replace(/\.xml$/i, "")];
+    if (src0) {
+      const rc = (raw: string) => resolveColor(raw, res, issues, path, "background");
+      // M150：selector 里 android:drawable="@drawable/x" 的引用先换回内联（最多 3 层）
+      const src = inlineDrawableRefs(src0, res, 0);
+      out["bgShape"] = parseShapeDrawable(src, rc);
+      if (out["bgShape"]?.rippleColor) out["bgRippleColor"] = out["bgShape"].rippleColor;
+      if (out["bgShape"]?.pickedStateful) out["bgRippleColor"] = out["bgRippleColor"] || "";
+      // 只有真是 selector 才值得多算两遍（普通 shape 算出来跟常态一样，白白浪费）
+      if (/<selector[\s>]/.test(src)) {
+        const pressed = parseShapeDrawable(src, rc, { pressed: true });
+        if (pressed && pressed.pickedStateful) out["bgPressShape"] = pressed;
+        const checked = parseShapeDrawable(src, rc, { checked: true });
+        if (checked && checked.pickedStateful) out["bgCheckShape"] = checked;
+      }
     }
   }
   // 不是 shape 的 drawable：位图 dataURL / vector xml
@@ -500,6 +516,23 @@ export function resolveNodeAttrs(node: XmlNode, res: ResourceTable): { attrs: Re
   return { attrs: out, issues };
 }
 
+
+/** M150：selector item 里的 android:drawable="@drawable/x" 换回内联 XML（最多 3 层）——
+ *  否则 parseShapeDrawable 只能看到空 item，按下去毫无变化。 */
+function inlineDrawableRefs(src: string, res: ResourceTable, depth: number): string {
+  if (depth > 3 || !/android:drawable="@(?:drawable|mipmap)\//.test(src)) return src;
+  const replaced = src.replace(
+    /<item\b([^>]*?)android:drawable="@(?:drawable|mipmap)\/([^"]+)"([^>]*?)(\/?)>/g,
+    (m, pre: string, name: string, post: string, selfClose: string) => {
+      const key = name.replace(/\.xml$/i, "");
+      const inner = res.drawableXml?.[name] ?? res.drawableXml?.[key];
+      if (!inner) return m;
+      if (selfClose === "/") return `<item${pre}${post}>${inner}</item>`;
+      return `<item${pre}${post}>`;
+    },
+  );
+  return replaced === src ? src : inlineDrawableRefs(replaced, res, depth + 1);
+}
 
 /** 图片引用解析：@drawable/x、@mipmap/x 查 res.drawables（上传的 res/ 目录），找不到原样保留（画布显示占位） */
 export function resolveDrawable(

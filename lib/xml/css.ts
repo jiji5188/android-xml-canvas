@@ -12,8 +12,67 @@ import { SCREEN_DP, phoneBodyDp, readableOn } from "./theme";
 import { DEFAULT_RENDER_THEME, type RenderTheme } from "./theme";
 import { buildPalette } from "./theme-palette";
 import { vectorToDataUrl } from "./vector-svg";
+import type { ShapeStyle } from "./shape";
 
 const DP = (n: number, scale = 2) => n * scale;
+
+/** M150：<shape> 样式 → CSS。从 buildNodeStyle 里抽出来，供「按下态」复用（同一条渲染路径，不另写一套） */
+export function shapeToCss(
+  shape: ShapeStyle,
+  scale: number,
+): { css: Record<string, string | number>; inset?: { t: number; r: number; b: number; l: number; fill: string; radius: string; border?: string } } {
+  const css: Record<string, string | number> = {};
+  const radiusOf = (): string => {
+    if (shape.oval) return "50%";
+    if (shape.cornersDp) {
+      const c = shape.cornersDp;
+      return `${DP(c.tl, scale)}px ${DP(c.tr, scale)}px ${DP(c.br, scale)}px ${DP(c.bl, scale)}px`;
+    }
+    if (shape.radiusDp !== undefined) return `${DP(shape.radiusDp, scale)}px`;
+    return "0px";
+  };
+  if (shape.insetDp && (shape.insetDp.t || shape.insetDp.r || shape.insetDp.b || shape.insetDp.l)) {
+    const i = shape.insetDp;
+    return {
+      css,
+      inset: {
+        t: i.t,
+        r: i.r,
+        b: i.b,
+        l: i.l,
+        fill: shape.gradient ?? shape.solid ?? "#E0E0E0",
+        radius: radiusOf(),
+        border:
+          shape.strokeDp && shape.strokeColor ? `${DP(shape.strokeDp, scale)}px solid ${shape.strokeColor}` : undefined,
+      },
+    };
+  }
+  if (shape.gradient) css.backgroundImage = shape.gradient;
+  else if (shape.solid) css.backgroundColor = shape.solid;
+  if (shape.oval || shape.cornersDp || shape.radiusDp !== undefined) css.borderRadius = radiusOf();
+  if (shape.strokeDp && shape.strokeColor) {
+    css.border = `${DP(shape.strokeDp, scale)}px solid ${shape.strokeColor}`;
+    css.boxSizing = "border-box";
+  }
+  if (shape.line) {
+    // M150：shape="line" 只画一条水平线（高度 = stroke 宽，竖直居中），<solid> 不参与。
+    // 不这么处理的话，stroke 会按四条边画成一个框——看起来像「镂空方框」。
+    const w = shape.strokeDp && shape.strokeDp > 0 ? DP(shape.strokeDp, scale) : scale;
+    const c = shape.strokeColor || "transparent";
+    css.backgroundImage = `linear-gradient(${c}, ${c})`;
+    css.backgroundSize = `100% ${w}px`;
+    css.backgroundPosition = "center";
+    css.backgroundRepeat = "no-repeat";
+    css.backgroundColor = "transparent";
+    css.border = "none";
+    css.borderRadius = "0px";
+  }
+  if (shape.shadow) {
+    const sh = shape.shadow;
+    css.boxShadow = `${DP(sh.dx, scale)}px ${DP(sh.dy, scale)}px ${DP(sh.blur, scale)}px ${sh.color}`;
+  }
+  return { css };
+}
 
 /**
  * M20m：预览默认配色改为中性灰白。
@@ -608,51 +667,19 @@ export function buildRenderModel(
     let bgInset: ResolvedNode["bgInset"];
     if (shape) {
       /** M5c：<inset> 背景画到单独的 bgInset 层（不裁子控件），不直接写节点 background */
-      if (shape.insetDp && (shape.insetDp.t || shape.insetDp.r || shape.insetDp.b || shape.insetDp.l)) {
-        const i = shape.insetDp;
-        let radius = "0px";
-        if (shape.oval) radius = "50%";
-        else if (shape.cornersDp) {
-          const c = shape.cornersDp;
-          radius = `${DP(c.tl, scale)}px ${DP(c.tr, scale)}px ${DP(c.br, scale)}px ${DP(c.bl, scale)}px`;
-        } else if (shape.radiusDp !== undefined) radius = `${DP(shape.radiusDp, scale)}px`;
-        bgInset = {
-          t: i.t,
-          r: i.r,
-          b: i.b,
-          l: i.l,
-          fill: shape.gradient ?? shape.solid ?? "#E0E0E0",
-          radius,
-          border:
-            shape.strokeDp && shape.strokeColor
-              ? `${DP(shape.strokeDp, scale)}px solid ${shape.strokeColor}`
-              : undefined,
-        };
+      /** M150：抽成 shapeToCss —— 按下态复用同一条渲染路径 */
+      const sc = shapeToCss(shape, scale);
+      if (sc.inset) {
+        bgInset = sc.inset;
       } else {
-        if (shape.gradient) {
-          style.backgroundImage = shape.gradient;
-        } else if (shape.solid) {
-          style.backgroundColor = shape.solid;
-        }
-        if (shape.oval) {
-          style.borderRadius = "50%";
-        } else if (shape.cornersDp) {
-          const c = shape.cornersDp;
-          style.borderRadius = `${DP(c.tl, scale)}px ${DP(c.tr, scale)}px ${DP(c.br, scale)}px ${DP(c.bl, scale)}px`;
-        } else if (shape.radiusDp !== undefined) {
-          style.borderRadius = `${DP(shape.radiusDp, scale)}px`;
-        }
-        if (shape.strokeDp && shape.strokeColor) {
-          style.border = `${DP(shape.strokeDp, scale)}px solid ${shape.strokeColor}`;
-          style.boxSizing = "border-box";
-        }
-      }
-      // M3h-2：layer-list 阴影层（elevation 没设时才用，否则下面会覆盖）
-      if (shape.shadow) {
-        const sh = shape.shadow;
-        style.boxShadow = `${DP(sh.dx, scale)}px ${DP(sh.dy, scale)}px ${DP(sh.blur, scale)}px ${sh.color}`;
+        Object.assign(style, sc.css);
       }
     }
+    /** M150：按下/勾选态的样式（selector 命中 state_pressed / state_checked）——
+        运行态由 run-decorate 在 pointerdown 时贴上，松开恢复。
+        这里只算不进 resolved（resolved 在调用点才创建），留到节点构建处赋值。 */
+    const pressShape = attrs["bgPressShape"] as ShapeStyle | null | undefined;
+    void pressShape;
     // M4i：background="@drawable/位图或矢量" —— 不是 shape 时按图片铺上去
     const bgVector = (attrs["bgVector"] as string) || "";
     let bgUrl = (attrs["bgImage"] as string) || "";
@@ -1510,6 +1537,9 @@ export function buildRenderModel(
         return rc;
       }),
       rawAttrs: node.attrs,
+      /** M149：解析后的 hint（@string/xxx → 真实文字）——TextInputLayout 的浮动标签要用它，
+          直接读 rawAttrs 会把 @string/shop_search 当标签写出去 */
+      hint: String((attrs as Record<string, unknown>)["hint"] ?? ""),
     };
     if (sourceFile) resolved.sourceFile = sourceFile;
     if (bgInset) resolved.bgInset = bgInset;
@@ -1519,6 +1549,22 @@ export function buildRenderModel(
     if (imgTint) resolved.imgTint = imgTint;
     if (imgTint) resolved.imgTint = imgTint;
     if (imgBlend) resolved.imgBlend = imgBlend;
+    // M150：按下态 / 勾选态 / ripple 点按色
+    const pressShape2 = attrs["bgPressShape"] as ShapeStyle | null | undefined;
+    if (pressShape2) {
+      const pc = shapeToCss(pressShape2, scale);
+      const base: Record<string, string | number> = {
+        backgroundColor: "transparent",
+        backgroundImage: "none",
+        borderRadius: "0px",
+        border: "none",
+      };
+      resolved.pressStyle = { ...base, ...pc.css } as Record<string, string>;
+    }
+    const checkShape2 = attrs["bgCheckShape"] as ShapeStyle | null | undefined;
+    if (checkShape2) resolved.checkStyle = { ...shapeToCss(checkShape2, scale).css } as Record<string, string>;
+    const ripC2 = attrs["bgRippleColor"] as string | undefined;
+    if (ripC2) resolved.rippleColor = ripC2;
     return resolved;
   };
 
@@ -1661,7 +1707,9 @@ export function buildRenderModel(
   // M11y：TextInputLayout 浮动 hint 标签（Android 里 hint 会浮到框线上，占位行里不能少）
   const patchTIL = (n: ResolvedNode): void => {
     if (shortTag(n.tag) === "TextInputLayout") {
-      const own = (n.rawAttrs["hint"] ?? "") as string;
+      // M149：自己节点的 hint 要用「解析后」的值。rawAttrs 里是 @string/shop_search，
+      // 直接当标签写出去 → 预览里看到的是一堆 @string/xxx，一眼就假。
+      const own = String(n.hint ?? n.rawAttrs["hint"] ?? "");
       const childHint = n.children.find((c) => /EditText$/.test(String(c.tag)) && (c.text || "").trim())?.text;
       const lbl = (own || childHint || "").trim();
       if (lbl) n.label = lbl;

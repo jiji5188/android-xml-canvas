@@ -40,11 +40,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -432,6 +435,30 @@ public class MainActivity extends Activity {
 
     /** JS 桥：网页通过 window.AxvNative 调用 */
     public class Bridge {
+        /** M154：真机渲染——把编辑器里的 xml + 资源用设备上的 aapt2 现场编译成资源包，
+         *  再交给 PreviewActivity 用 ResourcesLoader 挂载、LayoutInflater 真渲染。
+         *  JS 侧通过 window.__axvRender(id, json) 拿结果（异步，不堵 JS 线程）。 */
+        @JavascriptInterface
+        public void renderReal(String id, String payloadJson) {
+            new Thread(() -> {
+                String out;
+                try {
+                    out = buildRenderApk(payloadJson);
+                } catch (Throwable t) {
+                    Log.e(TAG, "renderReal fail", t);
+                    StringWriter sw = new StringWriter();
+                    t.printStackTrace(new PrintWriter(sw));
+                    out = "{\"ok\":false,\"log\":" + quote(sw.toString()) + "}";
+                }
+                final String json = out;
+                runOnUiThread(() -> {
+                    if (web == null) return;
+                    web.evaluateJavascript(
+                            "window.__axvRender(" + quote(id) + "," + quote(json) + ")", null);
+                });
+            }, "axv-render").start();
+        }
+
         @JavascriptInterface
         public String saveFile(String name, String mime, String base64) {
             try {
@@ -2134,6 +2161,128 @@ public class MainActivity extends Activity {
             dirCache.put(canon, new Object[]{mt, json});
         }
         return json;
+    }
+
+    /* ---------- M154：设备端 aapt2 渲染管线 ---------- */
+
+    private static String quote(String s) {
+        return JSONObject.quote(s == null ? "" : s);
+    }
+
+    private static void deleteTree(File f) {
+        if (f == null || !f.exists()) return;
+        if (f.isDirectory()) {
+            File[] kids = f.listFiles();
+            if (kids != null) for (File k : kids) deleteTree(k);
+        }
+        //noinspection ResultOfMethodCallIgnored
+        f.delete();
+    }
+
+    private static void writeUtf8(File f, String text) throws IOException {
+        File parent = f.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) throw new IOException("mkdirs 失败: " + parent);
+        try (FileOutputStream fo = new FileOutputStream(f)) {
+            fo.write(text.getBytes("UTF-8"));
+        }
+    }
+
+    /** 跑一次 aapt2，输出全部收进 log；返回 exit code */
+    private static int runAapt2(File bin, File cwd, String[] args, StringBuilder log) throws Exception {
+        String[] cmd = new String[args.length + 1];
+        cmd[0] = bin.getAbsolutePath();
+        System.arraycopy(args, 0, cmd, 1, args.length);
+        ProcessBuilder pb = new ProcessBuilder(cmd).directory(cwd).redirectErrorStream(true);
+        pb.environment().put("TMPDIR", cwd.getAbsolutePath());
+        Process p = pb.start();
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        byte[] b = new byte[8192];
+        int n;
+        while ((n = p.getInputStream().read(b)) > 0) buf.write(b, 0, n);
+        int code = p.waitFor();
+        if (log != null) {
+            log.append("$ aapt2 ").append(args[0]).append(" exit=").append(code).append('\n')
+                    .append(buf.toString("UTF-8")).append('\n');
+        }
+        return code;
+    }
+
+    /** 把 payload 写成 res 树 → aapt2 compile/link → 启 PreviewActivity 真渲染 */
+    private String buildRenderApk(String payloadJson) throws Exception {
+        long t0 = System.currentTimeMillis();
+        JSONObject p = new JSONObject(payloadJson);
+        String pkg = p.optString("pkg", "com.axv.render");
+        String layout = p.optString("layout", "activity_main");
+        JSONArray files = p.optJSONArray("files");
+        if (files == null || files.length() == 0) throw new IOException("payload 里没有文件");
+
+        File root = new File(getCacheDir(), "render");
+        deleteTree(root);
+        File resDir = new File(root, "res");
+        if (!resDir.mkdirs()) throw new IOException("mkdirs 失败: " + resDir);
+
+        int written = 0;
+        for (int i = 0; i < files.length(); i++) {
+            JSONObject f = files.getJSONObject(i);
+            String path = f.optString("path", "");
+            String text = f.optString("text", "");
+            if (path.isEmpty() || text.isEmpty()) continue;
+            if (path.startsWith("/") || path.contains("..")) continue; // 只收 res 内相对路径
+            writeUtf8(new File(resDir, path), text);
+            written++;
+        }
+
+        File man = new File(root, "AndroidManifest.xml");
+        writeUtf8(man, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"" + pkg + "\">\n"
+                + "  <uses-sdk android:minSdkVersion=\"24\" android:targetSdkVersion=\"34\" />\n"
+                + "  <application android:hasCode=\"false\" />\n"
+                + "</manifest>\n");
+
+        File bin = new File(getApplicationInfo().nativeLibraryDir, "libaapt2.so");
+        if (!bin.isFile()) throw new IOException("找不到 aapt2：" + bin);
+
+        StringBuilder log = new StringBuilder();
+        File compiled = new File(root, "compiled.zip");
+        int c1 = runAapt2(bin, root, new String[] { "compile", "--dir", resDir.getAbsolutePath(),
+                "-o", compiled.getAbsolutePath() }, log);
+        if (c1 != 0) {
+            return "{\"ok\":false,\"stage\":\"compile\",\"files\":" + written
+                    + ",\"log\":" + quote(log.toString()) + "}";
+        }
+
+        final File outApk = new File(root, "render.apk");
+        int c2 = runAapt2(bin, root, new String[] { "link", "-o", outApk.getAbsolutePath(),
+                "-I", "/system/framework/framework-res.apk",
+                "--manifest", man.getAbsolutePath(),
+                "--package-id", "0x80",
+                "--min-sdk-version", "24",
+                "--auto-add-overlay",
+                compiled.getAbsolutePath() }, log);
+        if (c2 != 0) {
+            return "{\"ok\":false,\"stage\":\"link\",\"files\":" + written
+                    + ",\"log\":" + quote(log.toString()) + "}";
+        }
+
+        final String fpkg = pkg;
+        final String flayout = layout;
+        runOnUiThread(() -> {
+            try {
+                Intent it = new Intent(MainActivity.this, PreviewActivity.class);
+                it.putExtra("apk", outApk.getAbsolutePath());
+                it.putExtra("pkg", fpkg);
+                it.putExtra("layout", flayout);
+                startActivity(it);
+            } catch (Throwable t) {
+                Log.e(TAG, "open preview fail", t);
+                toast("打开渲染页失败: " + t.getMessage());
+            }
+        });
+
+        return "{\"ok\":true,\"files\":" + written + ",\"bytes\":" + outApk.length()
+                + ",\"ms\":" + (System.currentTimeMillis() - t0)
+                + ",\"pkg\":" + quote(pkg) + ",\"layout\":" + quote(layout)
+                + ",\"log\":" + quote(log.toString()) + "}";
     }
 
     private void toast(String msg) {

@@ -46,6 +46,10 @@ export type ToolbarProps = {
   onChangeWorkspace: () => void;
 
   onRun: () => void;
+  /** M154：设备端 aapt2 真渲染（只有 APK 里桥在才有） */
+  realRenderAvailable?: boolean;
+  realRenderBusy?: boolean;
+  onRealRender?: () => void;
   onFormat: () => void;
   /** M140：历史版本快照面板（可选，不传就不画按钮） */
   onHistory?: () => void;
@@ -79,6 +83,9 @@ export function Toolbar(props: ToolbarProps) {
     workspaceLabel,
     onChangeWorkspace,
     onRun,
+    realRenderAvailable,
+    realRenderBusy,
+    onRealRender,
     onFormat,
     onHistory,
     snapCount,
@@ -191,6 +198,18 @@ export function Toolbar(props: ToolbarProps) {
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>play_arrow</span>
           </button>
+          {realRenderAvailable && onRealRender ? (
+            <button
+              className="axv-tb-btn"
+              title={tt("真机渲染：用设备上的 aapt2 现场编译资源，再用系统 LayoutInflater 渲染（对比 CSS 模拟用）")}
+              aria-label={tt("真机渲染")}
+              aria-busy={realRenderBusy ? true : undefined}
+              disabled={realRenderBusy}
+              onClick={onRealRender}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>android</span>
+            </button>
+          ) : null}
           <button
             className="axv-tb-btn"
             title={tt("格式化代码（重排缩进，保留注释）")}

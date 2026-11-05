@@ -40,9 +40,25 @@ public class PreviewActivity extends Activity {
     private static final String RES_PKG = "com.axv.previewres";
     private static final String ASSET = "www/preview-res.apk";
 
+    /** M154：真机渲染包（由 MainActivity 用设备上的 aapt2 现场编译）传进来的参数 */
+    private String pkgName = RES_PKG;
+    private String layoutName = "preview";
+    private String apkPath = null;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // M154：外部传参优先；没传就是内置那个 demo 资源包（M151/M152 的老路径）
+        if (getIntent() != null) {
+            String p = getIntent().getStringExtra("pkg");
+            String l = getIntent().getStringExtra("layout");
+            String a = getIntent().getStringExtra("apk");
+            if (p != null && !p.isEmpty()) pkgName = p;
+            if (l != null && !l.isEmpty()) layoutName = l;
+            if (a != null && !a.isEmpty()) apkPath = a;
+        }
+        final boolean builtin = RES_PKG.equals(pkgName);
 
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
@@ -51,8 +67,14 @@ public class PreviewActivity extends Activity {
         String info;
         View inflated = null;
         try {
-            File pkg = new File(getCacheDir(), "preview-res.apk");
-            copyAsset(ASSET, pkg);
+            File pkg;
+            if (apkPath != null) {
+                pkg = new File(apkPath);
+                if (!pkg.isFile()) throw new IllegalStateException("资源包不存在: " + apkPath);
+            } else {
+                pkg = new File(getCacheDir(), "preview-res.apk");
+                copyAsset(ASSET, pkg);
+            }
             int sdk = Build.VERSION.SDK_INT;
             String way;
             if (sdk >= 30) {
@@ -63,15 +85,17 @@ public class PreviewActivity extends Activity {
                 way = "AssetManager.addAssetPath(反射)";
             }
             Resources res = getResources();
-            int layoutId = res.getIdentifier("preview", "layout", RES_PKG);
-            int strId = res.getIdentifier("title", "string", RES_PKG);
+            int layoutId = res.getIdentifier(layoutName, "layout", pkgName);
+            int strId = res.getIdentifier("title", "string", pkgName);
             if (layoutId == 0) throw new IllegalStateException("拿不到 layout id（资源包没挂上？）");
             inflated = LayoutInflater.from(this)
                     .inflate(layoutId, page, false);
             // M152：clip / scale 的 level 只能在运行时给（XML 里压根没这个属性），
             // 不设就是 0：clip 完全空白、scale 缩到最小。各给 5000 看“一半”。
-            setBgLevel(inflated, res, "wrap_clip_view", 5000);
-            setBgLevel(inflated, res, "wrap_scale_view", 5000);
+            if (builtin) {
+                setBgLevel(inflated, res, "wrap_clip_view", 5000);
+                setBgLevel(inflated, res, "wrap_scale_view", 5000);
+            }
             info = "SDK " + sdk + " · " + way + "\n"
                     + "layoutId=0x" + Integer.toHexString(layoutId)
                     + "  title=" + (strId == 0 ? "?" : res.getString(strId))
@@ -84,31 +108,35 @@ public class PreviewActivity extends Activity {
             info = "加载失败：\n" + sw;
             Log.e(TAG, info);
         }
-        // M151 自检：跑一遍 aapt2 version，确认 native 库能执行
-        try {
-            File bin = new File(getApplicationInfo().nativeLibraryDir, "libaapt2.so");
-            File work = new File(getCacheDir(), "aapt2-work");
-            if (!work.exists() && !work.mkdirs()) work = getCacheDir();
-            ProcessBuilder pb = new ProcessBuilder(bin.getAbsolutePath(), "version")
-                    .directory(work).redirectErrorStream(true);
-            pb.environment().put("TMPDIR", getCacheDir().getAbsolutePath());
-            Process p = pb.start();
-            String out = new String(p.getInputStream().readAllBytes()).trim();
-            int code = p.waitFor();
-            info += "\n\naapt2 自检: exit=" + code + " " + out;
-        } catch (Throwable t) {
-            info += "\n\naapt2 自检失败: " + t;
-            Log.e(TAG, "aapt2 self-check failed", t);
-        }
+        // M154：真机渲染时把调试头收起来（标题/失败信息才保留）；旧的内置 demo 维持原样
+        final boolean showHead = inflated == null || builtin;
+        if (showHead) {
+            // M151 自检：跑一遍 aapt2 version，确认 native 库能执行
+            try {
+                File bin = new File(getApplicationInfo().nativeLibraryDir, "libaapt2.so");
+                File work = new File(getCacheDir(), "aapt2-work");
+                if (!work.exists() && !work.mkdirs()) work = getCacheDir();
+                ProcessBuilder pb = new ProcessBuilder(bin.getAbsolutePath(), "version")
+                        .directory(work).redirectErrorStream(true);
+                pb.environment().put("TMPDIR", getCacheDir().getAbsolutePath());
+                Process p = pb.start();
+                String out = new String(p.getInputStream().readAllBytes()).trim();
+                int code = p.waitFor();
+                info += "\n\naapt2 自检: exit=" + code + " " + out;
+            } catch (Throwable t) {
+                info += "\n\naapt2 自检失败: " + t;
+                Log.e(TAG, "aapt2 self-check failed", t);
+            }
 
-        TextView head = new TextView(this);
-        head.setText(info);
-        head.setTextSize(11);
-        head.setPadding(dp(12), dp(12), dp(12), dp(8));
-        ScrollView headScroll = new ScrollView(this);
-        headScroll.addView(head);
-        page.addView(headScroll, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(150)));
+            TextView head = new TextView(this);
+            head.setText(info);
+            head.setTextSize(11);
+            head.setPadding(dp(12), dp(12), dp(12), dp(8));
+            ScrollView headScroll = new ScrollView(this);
+            headScroll.addView(head);
+            page.addView(headScroll, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(150)));
+        }
 
         if (inflated != null) {
             ViewGroup host = new FrameLayout(this);
@@ -119,12 +147,12 @@ public class PreviewActivity extends Activity {
         }
 
         setContentView(page);
-        Toast.makeText(this, "PreviewActivity 已启动", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, builtin ? "PreviewActivity 已启动" : "真渲染预览（aapt2 现场编译）", Toast.LENGTH_SHORT).show();
     }
 
     /** M152：按资源包里的 id 名找到 View，给它的背景 Drawable 设 level */
     private void setBgLevel(View root, Resources res, String idName, int level) {
-        int id = res.getIdentifier(idName, "id", RES_PKG);
+        int id = res.getIdentifier(idName, "id", pkgName);
         if (id == 0) return;
         View v = root.findViewById(id);
         if (v == null) return;

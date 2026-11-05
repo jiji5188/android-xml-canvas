@@ -58,6 +58,7 @@ import { createAndroidProject, safeProjectName } from "@/lib/xml/new-project";
 import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/xml/new-project-io";
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, buildSaveFiles, type SaveInput } from "@/lib/xml/save-flow";
+import { hasRealRender, renderReal } from "@/lib/xml/native-render";
 import { projectSaveRoot, saveProjectFile, saveResFiles } from "@/lib/xml/project-save";
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
 import { isValuesPath } from "@/lib/xml/doc-kind";
@@ -624,6 +625,13 @@ export function XmlEditor() {
   /** M115：内部剪贴板（XML 片段；同时尽量写系统剪贴板） */
   const clipRef = useRef<string>("");
  const [exportNote, setExportNote] = useState<string>(" ");
+  /** M154：设备端真渲染（aapt2）——只有 APK 里有桥才能用，且编译要几秒，用 busy 防连点 */
+  const [realRenderAvailable, setRealRenderAvailable] = useState(false);
+  const [realRenderBusy, setRealRenderBusy] = useState(false);
+  useEffect(() => {
+    // 网页版没有 AxvNative，APK 里才有；桥在首次加载时就注册好了，查一次即可
+    setRealRenderAvailable(hasRealRender());
+  }, []);
   /** M101：toast 定时器（连续提示时先清上一个，避免新提示被旧定时器提前抹掉） */
   const noteTimerRef = useRef<number | null>(null);
   /** M11j：正在编辑的生成图标（vector） */
@@ -2966,6 +2974,43 @@ const findResolved = findResolvedNode;
     window.setTimeout(() => setExportNote(""), 4200);
   };
 
+  /** M154：真机渲染——把当前 xml + 依赖资源交给设备端 aapt2 现场编译，
+   *  再用系统 LayoutInflater 渲染（不是 CSS 模拟，能对照出 canvas 的偏差） */
+  const doRealRender = () => {
+    if (realRenderBusy) return;
+    const input = currentSaveInput();
+    const name = (input.name || "activity_main.xml").replace(/\.xml$/i, "");
+    const files = buildSaveFiles(input).map((f) => ({ path: f.path, text: f.text }));
+    setRealRenderBusy(true);
+    setExportNote(tt("正在用设备上的 aapt2 编译资源包…"));
+    void renderReal(name, files)
+      .then((r) => {
+        setRealRenderBusy(false);
+        if (r.ok) {
+          setExportNote(
+            tt("真机渲染：{n} 个文件 → 资源包 {kb} KB（编译 {ms} ms），已打开真控件预览", {
+              n: r.files ?? 0,
+              kb: Math.round((r.bytes ?? 0) / 1024),
+              ms: r.ms ?? 0,
+            }),
+          );
+        } else {
+          setExportNote(
+            tt("真机渲染失败（{stage}）：{log}", {
+              stage: r.stage || tt("未知"),
+              log: (r.log || "").slice(0, 600),
+            }),
+          );
+        }
+        window.setTimeout(() => setExportNote(""), r.ok ? 5200 : 12000);
+      })
+      .catch((e) => {
+        setRealRenderBusy(false);
+        setExportNote(tt("真机渲染失败：{reason}", { reason: String(e) }));
+        window.setTimeout(() => setExportNote(""), 8000);
+      });
+  };
+
   const clearRes = () => {
     setResExtras(null);
     setResourceFragment("");
@@ -4155,6 +4200,9 @@ const findResolved = findResolvedNode;
           }
         }}
         onRun={() => setRunOpen(true)}
+        realRenderAvailable={realRenderAvailable}
+        realRenderBusy={realRenderBusy}
+        onRealRender={doRealRender}
         onFormat={doFormat}
         onHistory={() => setHistPanelOpen(true)}
         snapCount={snapCount}

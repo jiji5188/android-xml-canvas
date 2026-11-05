@@ -619,7 +619,35 @@ const EXT_DESC: Record<string, string> = {
   sh: "Shell 脚本",
   bat: "批处理脚本",
   ps1: "PowerShell 脚本",
+  jar: "JAR 依赖包",
+  aar: "AAR 依赖包",
+  class: "编译后的 class",
+  iml: "IDE 模块配置",
+  pro: "混淆规则",
+  aidl: "AIDL 接口定义",
 };
+
+/** M144b：java/kotlin 文件按类名后缀说清楚「这是什么类」（用户要求 java 目录也要有描述） */
+const CODE_CLASS_RULES: [RegExp, string][] = [
+  [/Activity$/i, "Activity 页面"],
+  [/Fragment$/i, "Fragment 页面片段"],
+  [/Dialog(Fragment)?$/i, "对话框"],
+  [/Adapter$/i, "列表适配器"],
+  [/ViewHolder$/i, "列表项视图"],
+  [/ContentProvider$/i, "内容提供者"],
+  [/BroadcastReceiver$|Receiver$/i, "广播接收器"],
+  [/Application$/i, "Application 入口"],
+  [/Service$/i, "后台服务"],
+  [/ViewModel$/i, "ViewModel"],
+  [/Repository$/i, "数据仓库"],
+  [/Dao$/i, "数据访问对象"],
+  [/Manager$/i, "业务管理器"],
+  [/(Helper|Utils?|Tools)$/i, "工具类"],
+  [/(Config|Settings|Constants?)$/i, "配置 / 常量"],
+  [/(Model|Bean|Entity|Dto|Vo|Pojo)$/i, "数据模型"],
+  [/(Callback|Listener)$/i, "回调接口"],
+  [/Test$/i, "单元测试"],
+];
 
 /** 一个文件该显示什么描述（"" = 认不出来，不显示副标题） */
 export function describeFile(rel: string, name: string): string {
@@ -640,6 +668,16 @@ export function describeFile(rel: string, name: string): string {
   if (lower.endsWith(".svg")) return "SVG 矢量图";
 
   if (/^androidmanifest\.xml$/i.test(lower)) return "应用清单";
+
+  if (ext === "java" || ext === "kt" || ext === "kts") {
+    const base = file.replace(/\.[^.]+$/, "");
+    const inTest = /(^|\/)(test|androidTest)(\/|$)/i.test(rel);
+    for (const [re, label] of CODE_CLASS_RULES) {
+      if (re.test(base)) return inTest ? `测试代码（${label}）` : label;
+    }
+    if (inTest) return "测试代码";
+    return ext === "java" ? "Java 源码" : ext === "kt" ? "Kotlin 源码" : "Kotlin 构建脚本";
+  }
 
   if (lower.endsWith(".xml")) {
     if (!res) return "XML 配置";

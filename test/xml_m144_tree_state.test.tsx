@@ -89,7 +89,13 @@ describe("M144 文件描述", () => {
     expect(describeFile("app/src/main/res/menu/main.xml", "main.xml")).toBe("菜单");
     expect(describeFile("app/src/main/res/mipmap-xhdpi/ic_launcher.png", "ic_launcher.png")).toBe("应用图标");
     expect(describeFile("app/src/main/res/drawable/photo.png", "photo.png")).toBe("图片资源");
-    expect(describeFile("app/src/main/java/com/x/MainActivity.java", "MainActivity.java")).toBe("Java 源码");
+    expect(describeFile("app/src/main/java/com/x/MainActivity.java", "MainActivity.java")).toBe("Activity 页面");
+    expect(describeFile("app/src/main/java/com/x/GoodsAdapter.kt", "GoodsAdapter.kt")).toBe("列表适配器");
+    expect(describeFile("app/src/main/java/com/x/DateUtil.java", "DateUtil.java")).toBe("工具类");
+    expect(describeFile("app/src/main/java/com/x/UserBean.java", "UserBean.java")).toBe("数据模型");
+    expect(describeFile("app/src/main/java/com/x/MainService.java", "MainService.java")).toBe("后台服务");
+    expect(describeFile("app/src/test/java/com/x/CalcTest.java", "CalcTest.java")).toBe("测试代码（单元测试）");
+    expect(describeFile("app/src/main/java/com/x/Other.java", "Other.java")).toBe("Java 源码");
     expect(describeFile("app/src/main/java/com/x/Ui.kt", "Ui.kt")).toBe("Kotlin 源码");
     expect(describeFile("build.gradle", "build.gradle")).toBe("Gradle 构建配置");
     expect(describeFile("unknown.zzz", "unknown.zzz")).toBe("");

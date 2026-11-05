@@ -1280,6 +1280,24 @@ export const SRC_EN: SrcDict = {
   "轴心 Y": "Pivot Y",
   "添加「{name}」": "Add \u201c{name}\u201d",
   "移除「{name}」": "Remove \u201c{name}\u201d",
+
+  // ---- M137 根标签互转 ----
+  "改根标签": "Change root tag",
+  "把这个文件改成别的类型": "Turn this file into another type",
+  "已改成「{name}」，注意：{lost}": "Changed to \u201c{name}\u201d. Heads up: {lost}",
+  "已改成「{name}」": "Changed to \u201c{name}\u201d",
+  "这个根改不了，先保持原样": "This root can't be converted — leaving it as is",
+  "状态条件": "state conditions",
+  "内缩距离": "inset distance",
+  "扩散半径": "spread radius",
+  "各层之间没有状态区分（都成了兜底项，只有第一个会显示）": "Layers have no state conditions (all became fallbacks — only the first one will show)",
+  "第 2 层被当成遮罩（不直接显示，只在按下时参与裁切）": "Layer 2 became the mask (not drawn directly, only clips while pressed)",
+  "所有层整体并进内容层": "All layers merged into the content layer",
+  "转成状态后，同一时刻只画一支：原来的各层会变成独立状态项，需要自己设状态条件": "As a selector, only one branch draws at a time: each layer becomes its own state item, so you'll need to set conditions",
+  "转成图层后，状态条件会失效：各状态项会同时叠在一起，可能需要手动删掉多余的层": "As a layer list, state conditions are lost: every state item now stacks at once, so you may need to delete the extras",
+  "转成水波纹后，原内容整体并进「内容」层，波纹色和遮罩要重新设": "As a ripple, the whole content moves into the content layer; ripple color and mask need to be set again",
+  "转成内缩后，原内容整体包一层内边距，四边数值默认 0，要自己填": "As an inset, the whole content is wrapped with padding; all four sides default to 0",
+  "内缩距离重置为 0": "inset distances reset to 0",
 };
 
 /** 繁體 —— 只登记与简体不同的；没登记的会先试英文兜底 */

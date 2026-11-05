@@ -9525,6 +9525,117 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   vertical-align: middle;
 }
 
+/* M137：根标签改成可点击的下拉（写错根不用整份重写） */
+.axv-dt-roottag {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  border: 1px solid var(--axv-outline-strong);
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.6;
+}
+.axv-dt-roottag:hover {
+  border-color: var(--axv-primary);
+  color: var(--axv-primary);
+}
+.axv-dt-roottag .msr {
+  font-size: 14px;
+}
+.axv-dt-menu-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 69;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+.axv-dt-rootmenu {
+  position: absolute;
+  top: 46px;
+  left: 96px;
+  z-index: 70;
+  width: min(300px, calc(100vw - 32px));
+  max-height: 60vh;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--axv-outline-strong);
+  border-radius: 10px;
+  background: var(--axv-surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+}
+.axv-dt-rootmenu-head {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  color: var(--axv-on-surface-variant);
+}
+.axv-dt-rootopt {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--axv-on-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.axv-dt-rootopt:hover:not(:disabled) {
+  background: var(--axv-surface-sunken);
+}
+.axv-dt-rootopt.is-on {
+  cursor: default;
+  opacity: 0.75;
+}
+.axv-dt-rootopt-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.axv-dt-rootopt-name .msr {
+  font-size: 14px;
+  color: var(--axv-primary);
+}
+.axv-dt-rootopt-hint {
+  display: block;
+  margin-top: 1px;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--axv-on-surface-variant);
+}
+.axv-dt-rootnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 12px 6px;
+  padding: 7px 9px;
+  border: 1px solid var(--axv-outline-strong);
+  border-radius: 8px;
+  background: var(--axv-surface-sunken);
+  color: var(--axv-on-surface-variant);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.axv-dt-rootnote > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.axv-dt-rootnote-x {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.axv-dt-rootnote-x .msr {
+  font-size: 14px;
+}
+
 .axv-dt-summary {
   flex: 0 0 auto;
   color: var(--axv-on-surface-variant);

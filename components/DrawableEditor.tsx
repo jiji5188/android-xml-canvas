@@ -16,7 +16,8 @@ import { t as tt } from "@/lib/i18n-src";
 import { useOverlayBack } from "@/lib/overlay-back";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 import { parseDrawable } from "@/lib/xml/drawable-node";
-import { rootInfo } from "@/lib/xml/drawable-root";
+import { rootInfo, ROOT_TAGS, ROOT_LABELS, ROOT_WARN } from "@/lib/xml/drawable-root";
+import { convertRoot, rootTagOfNode } from "@/lib/xml/drawable-root-convert";
 import { buildDrawable } from "@/lib/xml/drawable-build";
 import { countNodes } from "@/lib/xml/drawable-node";
 import { nodeAt, replaceAt, breadcrumb, parentOf, setSlot, slotOf, type Path } from "@/lib/xml/drawable-edit";
@@ -99,6 +100,12 @@ export function DrawableEditor({
   const [formOpen, setFormOpen] = useState(true);
   const [name, setName] = useState<string>(() => resNameFromValue(value) || "bg");
   const [presetOpen, setPresetOpen] = useState(false);
+  /** M137：根标签切换菜单（把写错的根改掉，不用整份重写） */
+  const [rootMenu, setRootMenu] = useState(false);
+  /** 当前根标签：以树为准（转换后立即反映），认不出才退回 XML 里的标签 */
+  const currentRoot = useMemo(() => rootTagOfNode(root) ?? info.tag, [root, info.tag]);
+  /** 转换后的一句提示（丢了什么） */
+  const [rootNote, setRootNote] = useState("");
   /** 窄屏：底部抽屉里再画一棵结构树；宽屏只在右侧面板画一份 */
   const narrow = useNarrow();
   // M135：宽屏抽屉是浮层，量出它实际占的高度把左右两栏顶上去，
@@ -201,7 +208,20 @@ export function DrawableEditor({
         <span className="axv-shape-title">
           {tt("drawable · {name}", { name: attrName })}
           {info.route !== "empty" && info.tag !== "shape" ? (
-            <span className="axv-dt-head-tag">{tt(info.label)}</span>
+            info.route === "tree" ? (
+              <button
+                type="button"
+                className="axv-dt-head-tag axv-dt-roottag"
+                onClick={() => setRootMenu((v) => !v)}
+                aria-expanded={rootMenu}
+                title={tt("改根标签")}
+              >
+                {tt(ROOT_LABELS[currentRoot as keyof typeof ROOT_LABELS] ?? info.label)}
+                <span className="msr" aria-hidden="true">arrow_drop_down</span>
+              </button>
+            ) : (
+              <span className="axv-dt-head-tag">{tt(info.label)}</span>
+            )
           ) : null}
         </span>
         <span className="axv-cv-head-tools">
@@ -225,6 +245,71 @@ export function DrawableEditor({
           </button>
         </span>
       </div>
+
+      {rootMenu && info.route === "tree" ? (
+        <>
+          <button
+            type="button"
+            className="axv-dt-menu-mask"
+            aria-label={tt("关闭")}
+            onClick={() => setRootMenu(false)}
+          />
+          <div className="axv-dt-rootmenu" role="menu">
+            <div className="axv-dt-rootmenu-head">{tt("把这个文件改成别的类型")}</div>
+            {ROOT_TAGS.map((tag) => {
+              const on = tag === currentRoot;
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  role="menuitem"
+                  className={"axv-dt-rootopt" + (on ? " is-on" : "")}
+                  disabled={on}
+                  onClick={() => {
+                    try {
+                      const res = convertRoot(root, tag);
+                      mutate(res.next);
+                      setPath([]);
+                      setRootMenu(false);
+                      setRootNote(
+                        res.lost.length > 0
+                          ? tt("已改成「{name}」，注意：{lost}", {
+                              name: tt(ROOT_LABELS[tag]),
+                              lost: res.lost.join("、"),
+                            })
+                          : tt("已改成「{name}」", { name: tt(ROOT_LABELS[tag]) }),
+                      );
+                    } catch {
+                      setRootMenu(false);
+                      setRootNote(tt("这个根改不了，先保持原样"));
+                    }
+                  }}
+                >
+                  <span className="axv-dt-rootopt-name">
+                    {tt(ROOT_LABELS[tag])}
+                    {on ? <span className="msr" aria-hidden="true">check</span> : null}
+                  </span>
+                  {!on ? <span className="axv-dt-rootopt-hint">{tt(ROOT_WARN[tag])}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+
+      {rootNote ? (
+        <div className="axv-dt-rootnote" role="status">
+          <span>{rootNote}</span>
+          <button
+            type="button"
+            className="axv-dt-rootnote-x"
+            onClick={() => setRootNote("")}
+            aria-label={tt("知道了")}
+          >
+            <span className="msr" aria-hidden="true">close</span>
+          </button>
+        </div>
+      ) : null}
 
       <div
         className="axv-icon-page-body axv-cv-body"

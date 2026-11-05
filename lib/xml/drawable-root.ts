@@ -10,6 +10,8 @@
 // 为什么要单独一层：以前是「parseDrawable 拿到什么就当什么」，未知根元素会退化成
 // unsupported 节点，用户看到的是一棵空树，保存还会把内容写坏。这里把判断提前，
 // 让每种情况都有明确出口。
+//
+// M137：组合类的四个根支持互转（见 drawable-root-convert.ts），这里只提供目标清单和提醒。
 
 export type RootRoute = "empty" | "shape" | "tree" | "readonly";
 
@@ -116,4 +118,31 @@ export function rootInfo(xml: string | undefined): RootInfo {
 export function isEditableRoot(xml: string | undefined): boolean {
   const r = rootInfo(xml).route;
   return r === "shape" || r === "tree" || r === "empty";
+}
+
+/* ── M137：根标签互转 ── */
+
+/** 可以互转的四个组合类根 */
+export type RootTag = "selector" | "layer-list" | "ripple" | "inset";
+
+export const ROOT_TAGS: RootTag[] = ["selector", "layer-list", "ripple", "inset"];
+
+export const ROOT_LABELS: Record<RootTag, string> = {
+  selector: "状态选择",
+  "layer-list": "图层叠加",
+  ripple: "水波纹",
+  inset: "内缩",
+};
+
+/** 目标根的提醒：告诉用户转换后什么会失效（文案在 UI 层翻译） */
+export const ROOT_WARN: Record<RootTag, string> = {
+  selector: "转成状态后，同一时刻只画一支：原来的各层会变成独立状态项，需要自己设状态条件",
+  "layer-list": "转成图层后，状态条件会失效：各状态项会同时叠在一起，可能需要手动删掉多余的层",
+  ripple: "转成水波纹后，原内容整体并进「内容」层，波纹色和遮罩要重新设",
+  inset: "转成内缩后，原内容整体包一层内边距，四边数值默认 0，要自己填",
+};
+
+/** 根标签能不能转（四个组合类之间都可以，同标签不算转换） */
+export function canConvertRoot(from: string, to: RootTag): boolean {
+  return ROOT_TAGS.includes(from as RootTag) && from !== to;
 }

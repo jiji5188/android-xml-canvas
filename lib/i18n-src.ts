@@ -11,6 +11,15 @@ export type SrcDict = Record<string, string>;
 
 /** 英文 —— 简体中文原文 → English */
 export const SRC_EN: SrcDict = {
+  // ---- M136 drawable 状态预览 / 输入框重做 ----
+  "先设宽或高，对齐才看得出来（不设尺寸时这一层填满父级）": "Set a width or height first — otherwise this layer fills the parent and gravity has no visible effect",
+  "去预览下方切换这些状态，看这个条件命中时画的是哪一支。": "Toggle these states under the preview to see which branch gets drawn.",
+  "引用已有资源时会写成 <item android:drawable=\"@drawable/名称\"/>，图内容由那个文件决定。": "Referencing an existing resource writes <item android:drawable=\"@drawable/name\"/>; the drawing comes from that file.",
+  "没填资源名 = 空引用，导出会报错；点下面的候选或手打名称。": "Empty name = broken reference and the export will fail; pick one below or type a name.",
+  "命中": "Matched",
+  "没有状态命中": "no state matched",
+  "第 {n} 项": "item {n}",
+  "点亮后预览这个状态": "Turn on to preview this state",
   // ---- M117/M118 形状编辑器 + drawable 图层预览 ----
   "预设": "Presets",
   "形状预设": "Shape presets",

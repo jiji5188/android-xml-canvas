@@ -427,7 +427,11 @@ export function DrawableEditor({
                       onChange={(patch) => mutate(setSlot(root, path, patch))}
                     />
                   ) : null}
-                  <AttrRows node={node} onChange={(n) => mutate(replaceAt(root, path, n))} />
+                  <AttrRows
+                    node={node}
+                    onChange={(n) => mutate(replaceAt(root, path, n))}
+                    refNames={existingNames}
+                  />
                   {readonly ? (
                     <div className="axv-dt-ro-note" style={{ marginTop: 8 }}>
                       {tt("只读类型，只能查看。要改内容请直接改 XML，或换支持的根元素。")}

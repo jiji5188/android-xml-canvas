@@ -1,14 +1,23 @@
 "use client";
 
-// components/drawable/SlotRows.tsx — 「这一层」自己的参数（M134）
+// components/drawable/SlotRows.tsx — 「这一层」自己的参数（M134 / M136 重做输入框）
 //
 // 结构树里的每一行其实有两个东西：
 //   1. 子节点本身（shape / color / ref / 子容器）→ 参数页 / 形状页管
 //   2. 父容器给这个位置挂的属性（layer-list 的偏移/宽高/对齐/不透明度、selector 的状态位）
 // 以前第 2 类完全没入口：想改 `android:left="2dp"` 只能手写 XML。
 // 这里把它们放成参数页第一块「这一层」，选中哪层就改哪层。
+//
+// M136 改动：
+//   - 数字框改成「草稿」受控：允许把最后一位删成空（以前空就回写 undefined，光标被抢、删不掉）
+//   - 输入过滤：只留数字/小数点/负号，其余字符直接忽略（不再出现 "1a" 这种脏值）
+//   - 判空兜底：偏移空 = 0（用户要求），宽高空 = 不设（否则 0 会把这一层压没），alpha 空 = 1
+//   - 不透明度换成滑块 + 小数输入（原来只有整数输入框，0.5 打不进去）
+//   - 对齐方式：没设宽/高时给明确提示（Android 里 item 填满父级，gravity 看不出变化）
 
+import { useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
+import { filterNumber, parseNumberField } from "@/lib/xml/num-input";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 import type { SlotValue } from "@/lib/xml/drawable-edit";
 
@@ -23,7 +32,7 @@ const GRAVITY: { v: string; label: string }[] = [
 ];
 
 /** selector 的状态位：常用的排在前面 */
-const STATES: { key: string; label: string }[] = [
+export const STATES: { key: string; label: string }[] = [
   { key: "state_pressed", label: "按下" },
   { key: "state_enabled", label: "启用" },
   { key: "state_focused", label: "聚焦" },
@@ -41,37 +50,98 @@ const EDGES: { k: "l" | "t" | "r" | "b"; label: string }[] = [
   { k: "b", label: "下" },
 ];
 
+/** 只保留数字 / 小数点 / 负号；连续的点也只留第一个（实现在 lib/xml/num-input，有单测） */
+
 function NumBox({
   label,
   value,
   onChange,
   placeholder = "–",
+  unit = "dp",
+  /** 清空时回写什么：偏移 0 / 宽高 undefined（不设） */
+  emptyValue,
+  allowNegative = true,
 }: {
   label: string;
   value: number | undefined;
   onChange: (v: number | undefined) => void;
   placeholder?: string;
+  unit?: string;
+  emptyValue: number | undefined;
+  allowNegative?: boolean;
 }) {
+  /** draft 非 null 时优先显示它：让「删到空」这个中间态能留住，不被 value 立刻顶回去 */
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? (value === undefined ? "" : String(value));
   return (
     <div className="axv-shape-field">
       <label className="axv-shape-label">{tt(label)}</label>
       <div className="axv-attr-num">
         <input
           className="axv-attr-input"
-          value={value === undefined ? "" : String(value)}
+          value={shown}
           inputMode="decimal"
           placeholder={placeholder}
           onChange={(e) => {
-            const raw = e.target.value.trim();
-            if (!raw) {
-              onChange(undefined);
-              return;
-            }
-            const n = parseFloat(raw);
-            onChange(Number.isFinite(n) ? n : undefined);
+            const raw = filterNumber(e.target.value, allowNegative);
+            setDraft(raw);
+            onChange(parseNumberField(raw, emptyValue, { allowNegative }));
+          }}
+          onBlur={() => {
+            // 失焦时收回草稿，让显示回归真实值（比如 "1." → "1"）
+            setDraft(null);
           }}
         />
-        <span className="axv-attr-suffix">dp</span>
+        <span className="axv-attr-suffix">{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+/** 不透明度：滑块（整百分比）+ 小数输入框，两个方向同步 */
+function AlphaField({
+  value,
+  onChange,
+}: {
+  value: number | undefined;
+  onChange: (v: number | undefined) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const cur = value === undefined ? 1 : value;
+  const pct = Math.round(cur * 100);
+  const shown = draft ?? String(Number(cur.toFixed(2)));
+  return (
+    <div className="axv-shape-field">
+      <label className="axv-shape-label">{tt("不透明度")}</label>
+      <div className="axv-attr-slider">
+        <input
+          type="range"
+          className="axv-dp-range"
+          min={0}
+          max={100}
+          step={1}
+          value={pct}
+          aria-label={tt("不透明度")}
+          onChange={(e) => {
+            setDraft(null);
+            onChange(Number(e.target.value) / 100);
+          }}
+        />
+        <div className="axv-attr-num axv-attr-num-sm">
+          <input
+            className="axv-attr-input"
+            value={shown}
+            inputMode="decimal"
+            placeholder="1"
+            onChange={(e) => {
+              const raw = filterNumber(e.target.value, false);
+              setDraft(raw);
+              onChange(parseNumberField(raw, undefined, { allowNegative: false, min: 0, max: 1 }));
+            }}
+            onBlur={() => setDraft(null)}
+          />
+          <span className="axv-attr-suffix">0–1</span>
+        </div>
       </div>
     </div>
   );
@@ -93,6 +163,7 @@ export function SlotRows({
     const size = slot.size ?? {};
     const setOff = (k: "l" | "t" | "r" | "b", v: number | undefined) =>
       onChange({ offset: { ...off, [k]: v } });
+    const sized = size.w !== undefined || size.h !== undefined;
     return (
       <div className="axv-slot">
         <div className="axv-set-label">
@@ -107,6 +178,7 @@ export function SlotRows({
               value={off[e.k]}
               onChange={(v) => setOff(e.k, v)}
               placeholder="0"
+              emptyValue={0}
             />
           ))}
         </div>
@@ -116,11 +188,13 @@ export function SlotRows({
             label="宽"
             value={size.w}
             onChange={(v) => onChange({ size: { ...size, w: v } })}
+            emptyValue={undefined}
           />
           <NumBox
             label="高"
             value={size.h}
             onChange={(v) => onChange({ size: { ...size, h: v } })}
+            emptyValue={undefined}
           />
         </div>
 
@@ -138,29 +212,11 @@ export function SlotRows({
             ))}
           </select>
         </div>
+        {slot.gravity && !sized ? (
+          <div className="axv-shape-hint">{tt("先设宽或高，对齐才看得出来（不设尺寸时这一层填满父级）")}</div>
+        ) : null}
 
-        <div className="axv-shape-field">
-          <label className="axv-shape-label">{tt("不透明度")}</label>
-          <div className="axv-attr-num">
-            <input
-              className="axv-attr-input"
-              value={slot.alpha === undefined ? "" : String(slot.alpha)}
-              inputMode="decimal"
-              placeholder="1"
-              onChange={(e) => {
-                const raw = e.target.value.trim();
-                if (!raw) {
-                  onChange({ alpha: undefined });
-                  return;
-                }
-                const n = parseFloat(raw);
-                if (!Number.isFinite(n)) return;
-                onChange({ alpha: Math.min(1, Math.max(0, n)) });
-              }}
-            />
-            <span className="axv-attr-suffix">0–1</span>
-          </div>
-        </div>
+        <AlphaField value={slot.alpha} onChange={(v) => onChange({ alpha: v })} />
 
         <div className="axv-shape-hint">
           {tt("偏移量不会缩小这一层自己的绘制范围；要留边请内缩上层或给下层加宽高。")}
@@ -205,6 +261,9 @@ export function SlotRows({
           {Object.keys(states).length === 0
             ? tt("所有条件都不设 = 兜底状态（其它状态都没命中时用它）")
             : tt("按顺序取第一个所有条件都成立的状态；条件越少越容易被命中。")}
+        </div>
+        <div className="axv-shape-hint">
+          {tt("去预览下方切换这些状态，看这个条件命中时画的是哪一支。")}
         </div>
       </div>
     );

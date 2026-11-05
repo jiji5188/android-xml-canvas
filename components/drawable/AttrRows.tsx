@@ -12,14 +12,18 @@ import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
 import type { AttrDef } from "@/lib/xml/drawable-schema";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 import { editableAttrs, readAttr, writeAttr } from "@/lib/xml/drawable-attrs";
+import { filterNumber } from "@/lib/xml/num-input";
 import { ColorField } from "../ColorField";
 
 export function AttrRows({
   node,
   onChange,
+  refNames,
 }: {
   node: DrawableNode;
   onChange: (next: DrawableNode) => void;
+  /** M136：已有 drawable 资源名（给「引用资源」提供可点的候选，不用手打） */
+  refNames?: string[];
 }) {
   const attrs = editableAttrs(node);
   if (attrs.length === 0) {
@@ -32,6 +36,7 @@ export function AttrRows({
           key={def.name}
           def={def}
           value={readAttr(node, def.name) ?? ""}
+          refNames={refNames}
           onChange={(v) => onChange(writeAttr(node, def.name, v))}
         />
       ))}
@@ -62,12 +67,59 @@ function AttrRow({
   def,
   value,
   onChange,
+  refNames,
 }: {
   def: AttrDef;
   value: string;
+  refNames?: string[];
   onChange: (v: string) => void;
 }) {
   const id = useId();
+
+  // M136：引用型属性（<item android:drawable="@drawable/x"/>）——以前只能手打资源名，
+  // 打错要到导出才被发现。这里给候选列表，点一下即填；输入框仍然保留随时改名。
+  if (def.type === "reference") {
+    const short = value.replace(/^@(drawable|mipmap|color)\//, "");
+    const names = (refNames ?? []).filter(Boolean);
+    return (
+      <div className="axv-shape-field">
+        <label className="axv-shape-label" htmlFor={id}>
+          {tt(def.label)}
+        </label>
+        <div className="axv-attr-num">
+          <span className="axv-attr-suffix">@drawable/</span>
+          <input
+            id={id}
+            className="axv-attr-input"
+            value={short}
+            spellCheck={false}
+            placeholder={tt("资源名")}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        </div>
+        {names.length > 0 ? (
+          <div className="axv-ref-picks">
+            {names.slice(0, 40).map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={"axv-ref-pick" + (n === short ? " is-on" : "")}
+                onClick={() => onChange(`@drawable/${n}`)}
+                title={`@drawable/${n}`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="axv-shape-hint">
+          {short
+            ? tt("引用已有资源时会写成 <item android:drawable=\"@drawable/名称\"/>，图内容由那个文件决定。")
+            : tt("没填资源名 = 空引用，导出会报错；点下面的候选或手打名称。")}
+        </div>
+      </div>
+    );
+  }
 
   if (def.type === "enum" && def.values?.length) {
     return (
@@ -148,8 +200,9 @@ function AttrRow({
           spellCheck={false}
           inputMode="decimal"
           onChange={(e) => {
-            const raw = e.target.value.trim();
-            if (!raw) {
+            // M136：过滤非数字字符，且允许删成空（以前删到最后一位会被 value 顶回来）
+            const raw = filterNumber(e.target.value, true).trim();
+            if (!raw || raw === "-" || raw === ".") {
               onChange("");
               return;
             }

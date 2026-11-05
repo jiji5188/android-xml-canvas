@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   flattenDrawable,
+  pickStateItem,
   type DrawableNode,
   type RenderLayer,
   type ViewState,
@@ -62,15 +63,22 @@ export function DrawablePreview({
 }: DrawablePreviewProps) {
   const [pressed, setPressed] = useState(false);
   const [disabled, setDisabled] = useState(false);
+  /** M136：手动锁定的状态位（聚焦/悬停/勾选…），以及「锁定按下」 */
+  const [locked, setLocked] = useState<Record<string, boolean>>({});
   /** 松开后保留一小段做淡出 */
   const [fading, setFading] = useState(false);
   const [origin, setOrigin] = useState({ x: 50, y: 50 });
   const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const state: ViewState = useMemo(
-    () => ({ pressed, enabled: !disabled }),
-    [pressed, disabled],
-  );
+  /** 文档里真正用到的状态位：只给这些做开关，不拿没用到的状态凑一排按钮 */
+  const usedStates = useMemo(() => collectUsedStates(doc), [doc]);
+  const livePressed = pressed || !!locked.pressed;
+
+  const state: ViewState = useMemo(() => {
+    const extra: Record<string, boolean> = {};
+    for (const k of usedStates) extra[k] = !!locked[k];
+    return { ...extra, pressed: livePressed, enabled: !disabled };
+  }, [usedStates, locked, livePressed, disabled]);
 
   useEffect(() => {
     onStateChange?.(state);
@@ -123,9 +131,11 @@ export function DrawablePreview({
   const rippleLayer = layers.find((l) => l.kind === "ripple");
   /** 松开后图层会随 pressed=false 消失，但要留住最后那个波纹色做淡出 */
   const lastRippleColor = useRef<string | null>(null);
-  if (pressed && rippleLayer?.color) lastRippleColor.current = rippleLayer.color;
+  if (livePressed && rippleLayer?.color) lastRippleColor.current = rippleLayer.color;
   const showRipple = fading ? lastRippleColor.current !== null : !!rippleLayer;
   const rippleColor = rippleLayer?.color ?? lastRippleColor.current ?? "#33FFFFFF";
+  /** M136：当前状态下每个 selector 命中了第几项（预览下方显示，解释「为什么画的是这个」） */
+  const picks = useMemo(() => (doc ? selectorPicks(doc, state) : []), [doc, state]);
   /** 波纹要贴着最上层的形状裁（近似） */
   const clipRadius = topShapeRadius(layers);
 
@@ -155,11 +165,11 @@ export function DrawablePreview({
       {showRipple ? (
         <div
           className="axv-dp-ripple-mask"
-          style={{ borderRadius: clipRadius, opacity: pressed ? 1 : 0 }}
+          style={{ borderRadius: clipRadius, opacity: livePressed ? 1 : 0 }}
         >
           <span
-            key={pressed ? "on" : "off"}
-            className={"axv-dp-ripple" + (pressed ? " is-on" : " is-fading")}
+            key={livePressed ? "on" : "off"}
+            className={"axv-dp-ripple" + (livePressed ? " is-on" : " is-fading")}
             style={
               {
                 // 注意：Android 的 #AARRGGBB 直接交给 CSS 会被当成 #RRGGBBAA，必须转换
@@ -205,27 +215,156 @@ export function DrawablePreview({
       )}
 
       {showStateBar ? (
-        <div className="axv-dp-state">
-          <span className={"axv-dp-badge" + (pressed ? " on" : "")}>
-            {pressed ? tt("按下") : tt("常态")}
-          </span>
-          {layers.some((l) => l.kind === "ripple") || pressed ? (
-            <span className="axv-dp-hint">{tt("按住看波纹")}</span>
-          ) : (
-            <span className="axv-dp-hint">{tt("点击试效果")}</span>
-          )}
-          <button
-            type="button"
-            className={"axv-dp-toggle" + (disabled ? " on" : "")}
-            onClick={() => setDisabled((v) => !v)}
-            title={tt("预览禁用态")}
-          >
-            {tt("禁用")}
-          </button>
+        <div className="axv-dp-state-wrap">
+          <div className="axv-dp-state">
+            <span className={"axv-dp-badge" + (livePressed ? " on" : "")}>
+              {livePressed ? tt("按下") : tt("常态")}
+            </span>
+            {usedStates.length === 0 ? (
+              <>
+                <span className="axv-dp-hint">
+                  {layers.some((l) => l.kind === "ripple")
+                    ? tt("按住看波纹")
+                    : tt("点击试效果")}
+                </span>
+                <button
+                  type="button"
+                  className={"axv-dp-toggle" + (disabled ? " on" : "")}
+                  onClick={() => setDisabled((v) => !v)}
+                  title={tt("预览禁用态")}
+                >
+                  {tt("禁用")}
+                </button>
+              </>
+            ) : (
+              <div className="axv-dp-chips">
+                {usedStates.map((k) => {
+                  const on = k === "pressed" ? livePressed : !!locked[k];
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      className={"axv-dp-chip" + (on ? " is-on" : "")}
+                      onClick={() => setLocked((prev) => ({ ...prev, [k]: !prev[k] }))}
+                      title={tt("点亮后预览这个状态")}
+                    >
+                      {stateText(k)}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  className={"axv-dp-chip axv-dp-chip-off" + (disabled ? " is-on" : "")}
+                  onClick={() => setDisabled((v) => !v)}
+                  title={tt("预览禁用态")}
+                >
+                  {tt("禁用")}
+                </button>
+              </div>
+            )}
+          </div>
+          {picks.length > 0 ? (
+            <div className="axv-dp-pick">
+              <span className="msr" aria-hidden="true">
+                check_circle
+              </span>
+              <span>
+                {tt("命中")}：
+                {picks
+                  .map((p) =>
+                    p.index < 0
+                      ? tt("没有状态命中")
+                      : tt("第 {n} 项", { n: String(p.index + 1) }),
+                  )
+                  .join(" · ")}
+              </span>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
   );
+}
+
+/** 状态位的展示文案（预览下方的小开关用）；逐条 tt() 便于运行时切语言 */
+function stateText(k: string): string {
+  switch (k) {
+    case "pressed":
+      return tt("按下");
+    case "focused":
+      return tt("聚焦");
+    case "hovered":
+      return tt("悬停");
+    case "checked":
+      return tt("勾选");
+    case "selected":
+      return tt("选中");
+    case "activated":
+      return tt("激活");
+    case "window_focused":
+      return tt("窗口聚焦");
+    case "enabled":
+      return tt("启用");
+    default:
+      return k;
+  }
+}
+
+/** 固定顺序，避免每次渲染开关跳位 */
+const STATE_ORDER = ["pressed", "focused", "hovered", "checked", "selected", "activated", "window_focused"];
+
+/** 这棵树里所有 selector 到底用了哪些状态位（只给用到的做开关） */
+export function collectUsedStates(node: DrawableNode | null): string[] {
+  const used = new Set<string>();
+  const walk = (n: DrawableNode | null | undefined) => {
+    if (!n) return;
+    switch (n.t) {
+      case "selector":
+        for (const it of n.items) {
+          for (const k of Object.keys(it.states)) {
+            const key = k.replace(/^state_/, "");
+            if (key !== "enabled") used.add(key);
+          }
+          walk(it.node);
+        }
+        return;
+      case "layer":
+        n.items.forEach((it) => walk(it.node));
+        return;
+      case "ripple":
+        walk(n.content);
+        walk(n.mask);
+        return;
+      default:
+        return;
+    }
+  };
+  walk(node);
+  return STATE_ORDER.filter((k) => used.has(k));
+}
+
+/** 当前状态下每个 selector 命中第几项（-1 = 都没有命中） */
+export function selectorPicks(
+  node: DrawableNode | null,
+  state: ViewState,
+): { index: number; total: number }[] {
+  const out: { index: number; total: number }[] = [];
+  const walk = (n: DrawableNode | null | undefined) => {
+    if (!n) return;
+    if (n.t === "selector") {
+      const hit = pickStateItem(n.items, state);
+      out.push({ index: hit ? n.items.indexOf(hit) : -1, total: n.items.length });
+      n.items.forEach((it) => walk(it.node));
+      return;
+    }
+    if (n.t === "layer") n.items.forEach((it) => walk(it.node));
+    else if (n.t === "ripple") {
+      walk(n.content);
+      walk(n.mask);
+    }
+  };
+  walk(node);
+  return out;
 }
 
 /** M127：把变换链翻成 CSS（内缩已消化成 inset，只剩旋转/缩放/裁剪） */

@@ -31,8 +31,6 @@ import {
 } from "@codemirror/view";
 import {
   defaultKeymap,
-  history,
-  historyKeymap,
   indentWithTab,
   insertNewlineAndIndent,
 } from "@codemirror/commands";
@@ -523,7 +521,9 @@ export function CodeEditor({
         lineNumbers(),
         highlightActiveLineGutter(),
         highlightSpecialChars(),
-        history(),
+        // M139：不装 CM6 自带的 history —— 撤销栈统一由 XmlEditor 的 diffHistory 管
+        // （原因：外部回灌 value 时 CM6 会把「整篇替换」也当作一步撤销，
+        //   和工具栏/画布的撤销互相覆盖，表现为按一次 Ctrl+Z 倒退两步）
         drawSelection(),
         dropCursor(),
         rectangularSelection(),
@@ -601,7 +601,7 @@ export function CodeEditor({
           // 配对的右括号/右引号要能被 Backspace 一次吃掉
           ...closeBracketsKeymap,
           ...defaultKeymap,
-          ...historyKeymap,
+          // M139：historyKeymap 一并去掉，Ctrl+Z / Ctrl+Shift+Z 冒泡到 window 交给 app 撤销栈
           indentWithTab,
         ]),
         EditorView.contentAttributes.of({

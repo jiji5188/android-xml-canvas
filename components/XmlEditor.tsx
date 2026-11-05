@@ -1289,8 +1289,16 @@ export function XmlEditor() {
 
   const canUndo = histInfo.canUndo;
   const canRedo = histInfo.canRedo;
+  /** M139：把「还没入栈的编辑」先提交（编辑器里 500ms 合并窗口内按 Ctrl+Z 时，
+   *  以前 flushTextTimer 只是丢弃定时器 → 刚敲的那段既没入栈也不在撤销范围，直接蒸发） */
+  const commitPendingText = () => {
+    const pending = liveXmlRef.current;
+    if (pending !== null && pending !== histRef.current.cur) commitHistory(pending);
+  };
+
   const undo = () => {
     flushTextTimer();
+    commitPendingText();
     flushXml();
     liveXmlRef.current = null;
     const r = diffHistoryUndo(histRef.current);
@@ -1302,6 +1310,8 @@ export function XmlEditor() {
   };
   const redo = () => {
     flushTextTimer();
+    // 有未入栈的输入时先提交（会清空 redo 栈），否则重做会跳过刚敲的那段
+    commitPendingText();
     flushXml();
     liveXmlRef.current = null;
     const r = diffHistoryRedo(histRef.current);

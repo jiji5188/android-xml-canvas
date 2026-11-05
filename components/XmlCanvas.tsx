@@ -569,6 +569,27 @@ export function XmlCanvas({
         />
       ) : null}
 
+      {/* M152：<rotate>/<scale> 背景层：也和 inset 一样单独画，避免把子控件一起转 */}
+      {node.bgLayer ? (
+        <span
+          className="axv-bg-inset"
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            ...node.bgLayer.css,
+            transform: node.bgLayer.transform,
+            transformOrigin: node.bgLayer.transformOrigin,
+            boxSizing: "border-box",
+            zIndex: 0,
+            pointerEvents: "none",
+          }}
+        />
+      ) : null}
+
       {node.imgSrc ? (
         node.imgSrc.startsWith("builtin:") ? (
           // @android:drawable/xxx 平台内置图标：中性占位 + 提示，不标错

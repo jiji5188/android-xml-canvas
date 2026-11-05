@@ -119,6 +119,12 @@ export interface ResolvedNode {
     radius?: string;
     border?: string;
   };
+  /** M152：<rotate>/<scale> 背景——背景单独成层再变换（不连带子控件） */
+  bgLayer?: {
+    css: Record<string, string | number>;
+    transform?: string;
+    transformOrigin?: string;
+  };
 }
 
 /** 根结果 */

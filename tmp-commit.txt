@@ -1,0 +1,13 @@
+M152：drawable 渐变互斥/三色中间色 + 画布背景吃 rotate/scale + 包装型内联验证
+
+- ShapeFields：切到渐变时清掉 solid（原来两个都留着 → lint 立刻红），切回纯色清 gradient
+- 渐变中间色：linear/sweep 也能加「＋ 中间色」（Android 原生就是 start/center/end 三点），
+  可清除回到双色；清掉后 XML 不再输出 centerColor
+- lint：渐变+纯色从 error 降为 warn（Android 不会失败，只是忽略纯色）
+- shape.ts：解析 <rotate>/<scale>/<clip> 包装链进 ShapeStyle.xform（clip 按 level=10000 不裁）
+- css.ts：带 xform 的背景单独成 bgLayer 层再变换，避免把子控件一起转了；
+  pivot/scaleGravity 换算成 transform-origin（dp→px 按 SCALE=2）
+- XmlCanvas：新增 bgLayer 渲染层
+- foundation：res-src 增加 wrap_inset / wrap_clip / wrap_scale / wrap_rotate 四个内联子节点样例，
+  PreviewActivity 对 clip/scale 设 level=5000 做运行时可验证（XML 里没有 level 属性）
+- 测试：新增 test/xml_m152_bg_transform.test.ts（5 条）；m120/m122 断言按新语义更新

@@ -35,6 +35,19 @@ export interface ShapeStyle {
   rippleColor?: string;
   /** M150：selector 确实选中了一个带 state_ 条件的项（而不是退到常态） */
   pickedStateful?: boolean;
+  /**
+   * M152：<rotate> / <scale> 包装层。
+   * 画布上不能直接给节点加 transform（那会把子控件也转了），
+   * 所以背景要单独成一层再变——这个字段只是把参数带出去。
+   */
+  xform?: {
+    rotate?: number;
+    pivotX?: string;
+    pivotY?: string;
+    scaleW?: number;
+    scaleH?: number;
+    scaleGravity?: string;
+  };
 }
 
 /** Android 渐变角度 → CSS 角度：Android 0°=左→右，90°=下→上；CSS 0deg=下→上，90deg=左→右 */
@@ -91,14 +104,51 @@ export function parseShapeDrawable(
   let pickedStateful = false;
   /** M150：<ripple> 的点按色 */
   let rippleColor: string | undefined;
+  /** M152：<rotate> / <scale> 变换（链上多层就叠起来，后层覆盖） */
+  let xform: ShapeStyle["xform"];
   for (let guard = 0; guard < 6; guard++) {
+    if (target.tag === "rotate" || target.tag === "scale" || target.tag === "clip") {
+      const wa = target.attrs;
+      if (target.tag === "rotate") {
+        const deg = parseFloat(wa["fromDegrees"] ?? "0");
+        if (Number.isFinite(deg)) {
+          xform = { ...(xform ?? {}), rotate: deg, pivotX: wa["pivotX"], pivotY: wa["pivotY"] };
+        }
+      } else if (target.tag === "scale") {
+        const pct = (v?: string) => {
+          if (!v) return undefined;
+          const m = v.trim().match(/^(-?[\d.]+)\s*%?$/);
+          return m ? parseFloat(m[1]) : undefined;
+        };
+        xform = {
+          ...(xform ?? {}),
+          scaleW: pct(wa["scaleWidth"]),
+          scaleH: pct(wa["scaleHeight"]),
+          scaleGravity: wa["scaleGravity"],
+        };
+      }
+      // clip 的 level 是运行时值，静态预览按 level=10000（完整显示）= 不裁，只往下走
+      const wInner = target.children.find((c) => c.tag !== "#text" && c.tag !== "#comment");
+      if (!wInner) return null;
+      target = wInner;
+      continue;
+    }
     if (target.tag === "selector") {
       const items = target.children.filter((c) => c.tag === "item");
       if (items.length === 0) return null;
       const picked = pickSelectorItem(items, state);
       if (!picked) return null;
       if (Object.keys(picked.attrs).some((k) => /^state_/.test(k))) pickedStateful = true;
-      const inline = picked.children.find((c) => c.tag === "shape" || c.tag === "ripple" || c.tag === "layer-list" || c.tag === "inset");
+      const inline = picked.children.find(
+        (c) =>
+          c.tag === "shape" ||
+          c.tag === "ripple" ||
+          c.tag === "layer-list" ||
+          c.tag === "inset" ||
+          c.tag === "rotate" ||
+          c.tag === "scale" ||
+          c.tag === "clip",
+      );
       if (!inline) return null; // android:drawable="@drawable/other" 需要递归读文件，这里不支持
       target = inline;
       continue;
@@ -197,6 +247,7 @@ export function parseShapeDrawable(
   if (insetDp) fin.insetDp = insetDp;
   if (pickedStateful) fin.pickedStateful = true;
   if (rippleColor) fin.rippleColor = rippleColor;
+  if (xform) fin.xform = xform;
   return fin;
 }
 

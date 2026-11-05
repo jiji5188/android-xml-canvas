@@ -27,6 +27,25 @@ const GRAD_LABEL: Record<string, string> = {
   sweep: "扫描",
 };
 
+/** 加中间色时的默认值：起止色取中，用户一眼能看出变化 */
+function mixAndroidHex(a?: string, b?: string): string {
+  const p = (s?: string) => {
+    const h = (s ?? "").replace(/^#/, "");
+    if (h.length === 8) return { a: h.slice(0, 2), r: h.slice(2, 4), g: h.slice(4, 6), b: h.slice(6, 8) };
+    if (h.length === 6) return { a: "FF", r: h.slice(0, 2), g: h.slice(2, 4), b: h.slice(4, 6) };
+    return null;
+  };
+  const x = p(a);
+  const y = p(b);
+  if (!x || !y) return "#FF888888";
+  const m = (u: string, v: string) =>
+    Math.round((parseInt(u, 16) + parseInt(v, 16)) / 2)
+      .toString(16)
+      .padStart(2, "0")
+      .toUpperCase();
+  return `#${m(x.a, y.a)}${m(x.r, y.r)}${m(x.g, y.g)}${m(x.b, y.b)}`;
+}
+
 /** 数字输入：空串 = 未设置（不写进 XML） */
 function NumField({
   label,
@@ -150,6 +169,8 @@ export function ShapeFields({
                           o.v
                             ? {
                                 ...spec,
+                                // 互斥：Android 里 gradient 会盖掉 solid，两个都留着只会让 lint 报错
+                                solid: undefined,
                                 gradient: grad ?? {
                                   type: "linear",
                                   start: spec.solid ?? "#FF888888",
@@ -194,13 +215,45 @@ export function ShapeFields({
                     value={grad.end}
                     onChange={(v) => v && onChange({ ...spec, gradient: { ...grad, end: v } })}
                   />
-                  {grad.type === "radial" ? (
-                    <ColorRow
-                      label="中心色"
-                      value={grad.center}
-                      onChange={(v) => v && onChange({ ...spec, gradient: { ...grad, center: v } })}
-                    />
-                  ) : null}
+                  {/* 中间色：Android 原生 <gradient> 只有 start/center/end 三个色点，
+                      所以这里既不是「只有一个」也不是「随便加」，就第三点这一个位置 */}
+                  {grad.center ? (
+                    <>
+                      <ColorRow
+                        label={grad.type === "radial" ? "中心色" : "中间色"}
+                        value={grad.center}
+                        onChange={(v) => v && onChange({ ...spec, gradient: { ...grad, center: v } })}
+                      />
+                      <div className="axv-shape-field">
+                        <button
+                          type="button"
+                          className="axv-shape-link"
+                          onClick={() => onChange({ ...spec, gradient: { ...grad, center: undefined } })}
+                        >
+                          {tt("清除中间色（回到双色渐变）")}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="axv-shape-field">
+                      <button
+                        type="button"
+                        className="axv-shape-link"
+                        onClick={() =>
+                          onChange({
+                            ...spec,
+                            gradient: { ...grad, center: mixAndroidHex(grad.start, grad.end) },
+                          })
+                        }
+                      >
+                        {tt("＋ 中间色（三色渐变）")}
+                      </button>
+                      <span className="axv-shape-hint">
+                        {" "}
+                        {tt("Android 的 <gradient> 只有 起始 / 中间 / 结束 三个色点")}
+                      </span>
+                    </div>
+                  )}
                   {grad.type === "linear" ? (
                     <NumField
                       label="角度"

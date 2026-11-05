@@ -662,14 +662,47 @@ export function buildRenderModel(
     const r = (attrs["radius"] as number) || 0;
     if (r) style.borderRadius = `${DP(r, scale)}px`;
     // M2w：<shape> 背景（@drawable/bg_xxx 引用的渐变/圆角/描边），覆盖上面的纯色
-    const shape = attrs["bgShape"] as { gradient?: string; solid?: string; radiusDp?: number; cornersDp?: { tl: number; tr: number; br: number; bl: number }; strokeDp?: number; strokeColor?: string; oval?: boolean; shadow?: { dx: number; dy: number; blur: number; color: string }; insetDp?: { t: number; r: number; b: number; l: number } } | null;
+    const shape = attrs["bgShape"] as { gradient?: string; solid?: string; radiusDp?: number; cornersDp?: { tl: number; tr: number; br: number; bl: number }; strokeDp?: number; strokeColor?: string; oval?: boolean; shadow?: { dx: number; dy: number; blur: number; color: string }; insetDp?: { t: number; r: number; b: number; l: number }; xform?: { rotate?: number; pivotX?: string; pivotY?: string; scaleW?: number; scaleH?: number; scaleGravity?: string } } | null;
     /** M5c：<inset> 背景：单独画一层（内缩 t/r/b/l），不裁子控件 */
     let bgInset: ResolvedNode["bgInset"];
+    /** M152：<rotate>/<scale> 背景：也单独成一层再变换，否则子控件会跟着转 */
+    let bgLayer: ResolvedNode["bgLayer"];
     if (shape) {
       /** M5c：<inset> 背景画到单独的 bgInset 层（不裁子控件），不直接写节点 background */
       /** M150：抽成 shapeToCss —— 按下态复用同一条渲染路径 */
       const sc = shapeToCss(shape, scale);
-      if (sc.inset) {
+      const xf = shape.xform;
+      if (xf) {
+        const parts: string[] = [];
+        /** Android 的 pivot 可能是 50% / 10dp / 裸数字，统一换成 CSS transform-origin */
+        const pos = (v?: string): string | null => {
+          if (!v) return null;
+          const s = v.trim();
+          if (/%$/.test(s)) return s;
+          const m = /^(-?[\d.]+)\s*(dp|dip|px)?$/i.exec(s);
+          if (!m) return null;
+          const n = parseFloat(m[1]);
+          const unit = (m[2] || "dp").toLowerCase();
+          return unit === "px" ? `${n}px` : `${DP(n, scale)}px`;
+        };
+        let origin = "50% 50%";
+        if (xf.rotate !== undefined) {
+          parts.push(`rotate(${xf.rotate}deg)`);
+          const px = pos(xf.pivotX);
+          const py = pos(xf.pivotY);
+          if (px || py) origin = `${px ?? "50%"} ${py ?? "50%"}`;
+        }
+        if (xf.scaleW !== undefined || xf.scaleH !== undefined) {
+          parts.push(`scale(${(xf.scaleW ?? 100) / 100}, ${(xf.scaleH ?? 100) / 100})`);
+          const g = (xf.scaleGravity ?? "center").toLowerCase();
+          if (!xf.rotate && g !== "center") {
+            const hz = /left|start/.test(g) ? "0%" : /right|end/.test(g) ? "100%" : "50%";
+            const vt = /top/.test(g) ? "0%" : /bottom/.test(g) ? "100%" : "50%";
+            origin = `${hz} ${vt}`;
+          }
+        }
+        bgLayer = { css: sc.css, transform: parts.join(" ") || undefined, transformOrigin: origin };
+      } else if (sc.inset) {
         bgInset = sc.inset;
       } else {
         Object.assign(style, sc.css);
@@ -1543,6 +1576,7 @@ export function buildRenderModel(
     };
     if (sourceFile) resolved.sourceFile = sourceFile;
     if (bgInset) resolved.bgInset = bgInset;
+    if (bgLayer) resolved.bgLayer = bgLayer;
     if (imgSrc) resolved.imgSrc = imgSrc;
     if (imgFit) resolved.imgFit = imgFit;
     if (imgPos) resolved.imgPos = imgPos;

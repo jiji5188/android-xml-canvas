@@ -234,12 +234,13 @@ describe("M120 schema 校验", () => {
     expect(problems.some((p) => p.level === "error")).toBe(true);
   });
 
-  it("渐变 + 纯色同时存在 → 错误", () => {
+  it("渐变 + 纯色同时存在 → 警告（Android 只是忽略纯色，不报错）", () => {
     const problems = validateDrawable({
       t: "shape",
       spec: { kind: "rectangle", solid: "#FF000000", gradient: { type: "linear", start: "#FF000000", end: "#FFFFFFFF" } },
     });
-    expect(problems.some((p) => p.level === "error" && p.message.includes("渐变"))).toBe(true);
+    expect(problems.some((p) => p.level === "warn" && p.message.includes("渐变"))).toBe(true);
+    expect(problems.some((p) => p.level === "error")).toBe(false);
   });
 
   it("ref 空名 → 错误；line 没 stroke → 警告", () => {

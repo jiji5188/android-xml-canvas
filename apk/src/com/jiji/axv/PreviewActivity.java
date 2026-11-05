@@ -68,6 +68,10 @@ public class PreviewActivity extends Activity {
             if (layoutId == 0) throw new IllegalStateException("拿不到 layout id（资源包没挂上？）");
             inflated = LayoutInflater.from(this)
                     .inflate(layoutId, page, false);
+            // M152：clip / scale 的 level 只能在运行时给（XML 里压根没这个属性），
+            // 不设就是 0：clip 完全空白、scale 缩到最小。各给 5000 看“一半”。
+            setBgLevel(inflated, res, "wrap_clip_view", 5000);
+            setBgLevel(inflated, res, "wrap_scale_view", 5000);
             info = "SDK " + sdk + " · " + way + "\n"
                     + "layoutId=0x" + Integer.toHexString(layoutId)
                     + "  title=" + (strId == 0 ? "?" : res.getString(strId))
@@ -116,6 +120,16 @@ public class PreviewActivity extends Activity {
 
         setContentView(page);
         Toast.makeText(this, "PreviewActivity 已启动", Toast.LENGTH_SHORT).show();
+    }
+
+    /** M152：按资源包里的 id 名找到 View，给它的背景 Drawable 设 level */
+    private void setBgLevel(View root, Resources res, String idName, int level) {
+        int id = res.getIdentifier(idName, "id", RES_PKG);
+        if (id == 0) return;
+        View v = root.findViewById(id);
+        if (v == null) return;
+        android.graphics.drawable.Drawable d = v.getBackground();
+        if (d != null) d.setLevel(level);
     }
 
     /** API 30+：公开 API，把外部 arsc/apk 挂到当前 Resources 上 */

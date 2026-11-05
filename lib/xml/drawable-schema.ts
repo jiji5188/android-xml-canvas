@@ -344,7 +344,7 @@ function visit(node: DrawableNode, path: string, out: Problem[]): void {
         out.push({ path: here, level: "warn", message: "线条没有 stroke 就是空的" });
       }
       if (s.gradient && s.solid) {
-        out.push({ path: here, level: "error", message: "渐变和纯色同时存在，Android 只会用渐变" });
+        out.push({ path: here, level: "warn", message: "渐变和纯色同时存在，Android 只会用渐变" });
       }
       return;
     }

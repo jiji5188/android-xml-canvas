@@ -93,14 +93,16 @@ describe("M122 ShapeFields", () => {
     expect(st.spec.solid).toBeTruthy();
   });
 
-  it("径向渐变才出现中心色与角度：径向没有角度，线性有", async () => {
+  it("径向没有角度，线性有；中间色两种都给（三色渐变的第三点）", async () => {
     const st = await mount({ ...base, gradient: { type: "linear", start: "#FF000000", end: "#FFFFFFFF" } });
     expect(host!.textContent).toContain("角度");
+    expect(host!.textContent).toContain("中间色");
     click("径向");
     await flush();
     expect(st.spec.gradient?.type).toBe("radial");
-    expect(host!.textContent).toContain("中心色");
     expect(host!.textContent).not.toContain("角度");
+    // 没设中间色时给的是「＋ 中间色」入口，设了才出现颜色行（标签随类型变）
+    expect(host!.textContent).toContain("中间色");
   });
 
   it("四角独立：切过去把统一圆角铺成四份，切回来取左上角", async () => {

@@ -686,6 +686,11 @@ export function AttrPanel({
         <ShapeEditor
           attrName={shapeEdit}
           value={String(node.rawAttrs[shapeEdit] ?? "")}
+          res={{
+            drawableXml: { ...(resExtras?.drawableXml ?? {}), ...(generatedXml ?? {}) },
+            drawables: resExtras?.drawables,
+            vectorNames: resExtras?.vectorNames,
+          }}
           existingXml={shapeEditRef.current ?? generatedXml?.[String(node.rawAttrs[shapeEdit] ?? "").replace(/^@(?:drawable|mipmap)\//, "").replace(/\.xml$/, "")]}
           existingNames={Object.keys(generatedXml ?? {})}
           onClose={() => { setShapeEdit(null); shapeEditRef.current = undefined; }}

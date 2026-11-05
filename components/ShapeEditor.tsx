@@ -17,7 +17,7 @@
 //
 // 保留这个文件与同名导出，是为了不再动所有历史调用点（XmlEditor / AttrPanel 十多处）。
 
-import { DrawableEditor } from "./DrawableEditor";
+import { DrawableEditor, type DrawableResSource } from "./DrawableEditor";
 
 export interface ShapeEditorProps {
   /** 正在编辑的属性名（background / foreground …） */
@@ -33,6 +33,8 @@ export interface ShapeEditorProps {
   onSave: (name: string, xml: string) => void;
   /** @deprecated M135 起始终是结构树视图，这个参数保留只为兼容老调用点 */
   forceTree?: boolean;
+  /** M143：项目 res 资源，用来把 @drawable 引用真渲染出来（形状 xml / 位图 / svg） */
+  res?: DrawableResSource | null;
 }
 
 export function ShapeEditor({
@@ -42,6 +44,7 @@ export function ShapeEditor({
   existingNames,
   onClose,
   onSave,
+  res,
 }: ShapeEditorProps) {
   return (
     <DrawableEditor
@@ -51,6 +54,7 @@ export function ShapeEditor({
       existingNames={existingNames}
       onClose={onClose}
       onSave={onSave}
+      res={res}
     />
   );
 }

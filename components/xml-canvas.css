@@ -9296,6 +9296,16 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-dw-preset-name { font-size: 13px; color: var(--axv-title); }
 .axv-dw-preset-hint { font-size: 11px; line-height: 1.5; color: var(--axv-sub); }
 
+/* M143：预设分组（基础样式 / 控件样式） */
+.axv-dw-preset-group { display: flex; flex-direction: column; gap: 6px; }
+.axv-dw-preset-group-title {
+  padding: 4px 4px 0;
+  font-size: 11px;
+  color: var(--axv-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 
 /* ── M124 drawable 结构树（和左侧图层面板同一套视觉语言） ── */
 .axv-dt {

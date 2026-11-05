@@ -11,7 +11,7 @@
 //   结构（面包屑 + 子节点列表 + 添加菜单）
 //   参数（schema 驱动的属性行 + 形状的常用参数）
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { useOverlayBack } from "@/lib/overlay-back";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
@@ -42,6 +42,16 @@ export interface DrawableEditorProps {
   onSave: (resourceName: string, xml: string) => void;
   /** 从形状编辑器切过来时带上当前 XML，省一次解析 */
   initialXml?: string;
+  /** M143：项目里的 res 资源，用来把 <item android:drawable="@drawable/x"/> 
+   *  真的画出来（xml 形状/selector 走 drawableXml，位图与 svg 走 drawables 的 dataURL） */
+  res?: DrawableResSource | null;
+}
+
+/** 预览需要的三类资源：事项（名 → xml 原文）/ 图片（名 → dataURL）/ 矢量名 */
+export interface DrawableResSource {
+  drawableXml?: Record<string, string>;
+  drawables?: Record<string, string>;
+  vectorNames?: string[];
 }
 
 /** 空工程的默认骨架：一层灰底圆角矩形 */
@@ -80,10 +90,42 @@ export function DrawableEditor({
   existingNames,
   onClose,
   onSave,
+  res,
 }: DrawableEditorProps) {
   const [root, setRoot] = useState<DrawableNode>(() => parseDrawable(existingXml ?? "") ?? defaultTree());
   /** 初始树引用：没动过任何编辑时保存原样写回（注释、换行、声明全保留，一个字节都不碰） */
   const initialRef = useRef(root);
+  /** M143：@drawable/xxx → xml 原文（项目 res 里能读到的形状/selector/vector 文件）
+   *  同名以项目内文件为准；当前正在编辑的这份也算（自引用时不至于变空白） */
+  const resolveRefForPreview = useCallback(
+    (nm: string): string | null => {
+      const key = nm.replace(/\.xml$/i, "");
+      const proj = res?.drawableXml?.[key] ?? res?.drawableXml?.[nm];
+      if (proj) return proj;
+      // 当前资源自己（导出的 XML 里的引用名与编辑中的名字相同）
+      if (key === resNameFromValue(value)) return buildDrawable(root);
+      return null;
+    },
+    [res, value, root],
+  );
+  /** M143：@drawable/xxx → 图片地址（png / jpg / bmp / webp / svg 都在 drawables 里存成 dataURL） */
+  const resolveImageForPreview = useCallback(
+    (nm: string): string | null => {
+      const key = nm.replace(/\.xml$/i, "");
+      return res?.drawables?.[key] ?? res?.drawables?.[nm] ?? null;
+    },
+    [res],
+  );
+  /** M143：「引用资源」候选 = 已生成名 + 项目 drawable xml 名 + 位图/svg 名（去重排序） */
+  const allRefNames = useMemo(() => {
+    const set = new Set<string>([
+      ...existingNames,
+      ...Object.keys(res?.drawableXml ?? {}),
+      ...Object.keys(res?.drawables ?? {}),
+      ...(res?.vectorNames ?? []),
+    ]);
+    return [...set].map((n) => n.replace(/\.xml$/i, "")).filter(Boolean).sort((a, b) => a.localeCompare(b));
+  }, [existingNames, res]);
   /** existingXml 是否解析成功（解析失败 = 别拿默认树去覆盖用户文件） */
   const parsedOk = useMemo(() => (existingXml ? parseDrawable(existingXml) !== null : true), [existingXml]);
   /** 根元素识别：决定是「能编辑」还是「只读但原样保存」（M124） */
@@ -363,17 +405,26 @@ export function DrawableEditor({
 
           {presetOpen ? (
             <div className="axv-dw-presets">
-              {DRAWABLE_PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="axv-dw-preset-item"
-                  onClick={() => applyPreset(p.xml)}
-                >
-                  <span className="axv-dw-preset-name">{tt(p.name)}</span>
-                  <span className="axv-dw-preset-hint">{tt(p.hint)}</span>
-                </button>
-              ))}
+              {([["base", tt("基础样式")], ["widget", tt("控件样式")]] as const).map(([g, label]) => {
+                const list = DRAWABLE_PRESETS.filter((p) => (p.group ?? "base") === g);
+                if (list.length === 0) return null;
+                return (
+                  <div key={g} className="axv-dw-preset-group">
+                    <div className="axv-dw-preset-group-title">{label}</div>
+                    {list.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="axv-dw-preset-item"
+                        onClick={() => applyPreset(p.xml)}
+                      >
+                        <span className="axv-dw-preset-name">{tt(p.name)}</span>
+                        <span className="axv-dw-preset-hint">{tt(p.hint)}</span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           ) : null}
 
@@ -387,6 +438,8 @@ export function DrawableEditor({
               showBounds
               backdrop="none"
               frame={previewBgStyle}
+              resolveRef={resolveRefForPreview}
+              resolveImage={resolveImageForPreview}
             />
           </div>
 
@@ -532,7 +585,7 @@ export function DrawableEditor({
                   <AttrRows
                     node={node}
                     onChange={(n) => mutate(replaceAt(root, path, n))}
-                    refNames={existingNames}
+                    refNames={allRefNames}
                   />
                   {readonly ? (
                     <div className="axv-dt-ro-note" style={{ marginTop: 8 }}>

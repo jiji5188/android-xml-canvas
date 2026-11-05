@@ -31,6 +31,8 @@ export interface DrawablePreviewProps {
   scale?: number;
   /** @drawable/x → xml 文本 */
   resolveRef?: (name: string) => string | null;
+  /** M143：@drawable/x → 图片 dataURL（png / jpg / bmp / webp / svg） */
+  resolveImage?: (name: string) => string | null;
   /** 允许按下预览 */
   interactive?: boolean;
   /** 显示底部的状态提示/开关 */
@@ -53,6 +55,7 @@ export function DrawablePreview({
   height = 120,
   scale = 1,
   resolveRef,
+  resolveImage,
   interactive = true,
   showStateBar = true,
   showBounds = false,
@@ -92,8 +95,8 @@ export function DrawablePreview({
   );
 
   const layers = useMemo(
-    () => (doc ? flattenDrawable(doc, { state, resolveRef }) : []),
-    [doc, state, resolveRef],
+    () => (doc ? flattenDrawable(doc, { state, resolveRef, resolveImage }) : []),
+    [doc, state, resolveRef, resolveImage],
   );
 
   const down = useCallback(
@@ -484,6 +487,26 @@ function LayerView({
         data-kind="color"
         data-path={layer.path}
         style={{ ...style, background: androidColorToCss(layer.color ?? "#00000000"), ...(tf ?? {}) }}
+      />
+    );
+  }
+
+  if (layer.kind === "image" && layer.dataUrl) {
+    const tf = transformToCssStyle(layer);
+    return (
+      <img
+        className="axv-dp-layer"
+        data-kind="image"
+        data-path={layer.path}
+        src={layer.dataUrl}
+        alt=""
+        draggable={false}
+        style={{
+          ...style,
+          // 图片按层盒子铺满（Android 的 bitmap 默认就是拉伸到 item 尺寸）
+          objectFit: "fill",
+          ...(tf ?? {}),
+        }}
       />
     );
   }

@@ -366,10 +366,13 @@ export interface RenderLayer {
   key: string;
   /** 面包屑，如 "layer-list#2 › shape" */
   path: string;
-  /** 层类型：shape 走 specToCss，color 直接用色值，ripple 是波纹高亮层 */
-  kind: "shape" | "color" | "ripple" | "vector" | "bitmap" | "unsupported";
+  /** 层类型：shape 走 specToCss，color 直接用色值，ripple 是波纹高亮层，
+   *  image 是 @drawable/png|jpg|bmp|svg 这类位图/矢量图（浏览器直接 img 渲染） */
+  kind: "shape" | "color" | "ripple" | "vector" | "bitmap" | "image" | "unsupported";
   spec?: ShapeSpec;
   color?: string;
+  /** M143：图片层的地址（dataURL / blobURL），kind === "image" 时一定有 */
+  dataUrl?: string;
   /** 四边内缩/偏移（dp，累加后的绝对值） */
   inset: { l: number; t: number; r: number; b: number };
   /** 固定尺寸（dp） */
@@ -384,6 +387,10 @@ export interface FlattenOptions {
   state?: ViewState;
   /** @drawable/x → 该资源的 XML 文本；返回 null 表示读不到 */
   resolveRef?: (name: string) => string | null;
+  /** M143：@drawable/x → 图片地址（png/jpg/bmp/webp/svg 的 dataURL）；
+   *  resolveRef 读不到 XML 时再试它。Android 不允许 vector 代码内嵌在 drawable 里，
+   *  但预览层可以直接 img 显示 —— 编辑器只负责还原「像什么」。 */
+  resolveImage?: (name: string) => string | null;
   /** 递归保护 */
   maxDepth?: number;
 }
@@ -403,6 +410,7 @@ export function flattenDrawable(node: DrawableNode, opts: FlattenOptions = {}): 
     out,
     state,
     resolveRef: opts.resolveRef,
+    resolveImage: opts.resolveImage,
     maxDepth: opts.maxDepth ?? 8,
     depth: 0,
     path: [],
@@ -417,6 +425,7 @@ interface WalkCtx {
   out: RenderLayer[];
   state: ViewState;
   resolveRef?: (name: string) => string | null;
+  resolveImage?: (name: string) => string | null;
   maxDepth: number;
   depth: number;
   path: string[];
@@ -531,22 +540,40 @@ function walk(node: DrawableNode, ctxIn: WalkCtx): void {
     case "ref": {
       const xml = ctx.resolveRef?.(node.name);
       const parsed = xml ? parseDrawable(xml) : null;
-      if (!parsed) {
-        ctx.out.push({
-          key: `${ctx.keyPrefix}.ref`,
-          path: label(`@drawable/${node.name}`),
-          kind: "unsupported",
-          inset: { ...ctx.inset },
-          alpha: ctx.alpha,
-          ...(ctx.transform?.length ? { transform: [...ctx.transform] } : {}),
+      if (parsed) {
+        walk(parsed, {
+          ...ctx,
+          depth: ctx.depth + 1,
+          path: [...ctx.path, `@drawable/${node.name}`],
+          keyPrefix: `${ctx.keyPrefix}.r`,
         });
         return;
       }
-      walk(parsed, {
-        ...ctx,
-        depth: ctx.depth + 1,
-        path: [...ctx.path, `@drawable/${node.name}`],
-        keyPrefix: `${ctx.keyPrefix}.r`,
+      // M143：读不到 XML 就试图片（png / jpg / bmp / webp / svg 的 dataURL）
+      const img = ctx.resolveImage?.(node.name);
+      if (img) {
+        const out: RenderLayer = {
+          key: `${ctx.keyPrefix}.img`,
+          path: label(`@drawable/${node.name}`),
+          kind: "image",
+          dataUrl: img,
+          inset: { ...ctx.inset },
+          alpha: ctx.alpha,
+          ...(ctx.transform?.length ? { transform: [...ctx.transform] } : {}),
+        };
+        const size = ctx.layerSize;
+        if (size?.w !== undefined || size?.h !== undefined) out.size = size;
+        if (ctx.layerGravity) out.gravity = ctx.layerGravity;
+        ctx.out.push(out);
+        return;
+      }
+      ctx.out.push({
+        key: `${ctx.keyPrefix}.ref`,
+        path: label(`@drawable/${node.name}`),
+        kind: "unsupported",
+        inset: { ...ctx.inset },
+        alpha: ctx.alpha,
+        ...(ctx.transform?.length ? { transform: [...ctx.transform] } : {}),
       });
       return;
     }

@@ -39,6 +39,7 @@ import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag,
 import { moveNodeRaw, scanElements, elementAt } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml, type LintIssue } from "@/lib/xml/lint";
+import { lintJava } from "@/lib/xml/java-lint";
 import { lintCodeDoc } from "@/lib/xml/lint-doc";
 import { loadSnaps, pushSnap, SNAP_LABEL_SAVE } from "@/lib/xml/snapshots";
 import { useUnsavedLeave } from "@/components/UnsavedLeaveDialog";
@@ -1794,17 +1795,27 @@ export function XmlEditor() {
     try {
       if (lintSrc === "") return [] as LintIssue[];
       const t = perfTimer("xml.lint", "len=" + lintSrc.length);
-      // M138：非布局文件走 lint-doc（结构 + 清单/values/drawable 等类型规则）
-      const out = codeOnly
-        ? lintCodeDoc(lintSrc, openRel || saveOrigin?.name || currentFile?.name || "")
-        : lintXml(lintSrc);
+      // M142：.java / .kt 是 Java 语法，不能拿 XML 规则跑（`if (a<1) {` 里的 `<1` 会被当成标签 → 误报「未闭合」）
+      let out: LintIssue[];
+      if (isJavaFile) {
+        out = lintJava(lintSrc, { isKotlin: /\.kt(s)?$/i.test(codeFileName) }).map((j) => ({
+          line: j.line,
+          level: j.sev,
+          message: j.msg,
+        }));
+      } else if (codeOnly) {
+        // M138：非布局文件走 lint-doc（结构 + 清单/values/drawable 等类型规则）
+        out = lintCodeDoc(lintSrc, openRel || saveOrigin?.name || currentFile?.name || "");
+      } else {
+        out = lintXml(lintSrc);
+      }
       t.end("issues=" + out.length);
       return out;
     } catch (e) {
       console.error("[axv] 结构检查失败", e); // i18n-ignore
       return [] as LintIssue[];
     }
-  }, [lintSrc, codeOnly, openRel, saveOrigin?.name, currentFile?.name]);
+  }, [lintSrc, codeOnly, isJavaFile, codeFileName, openRel, saveOrigin?.name, currentFile?.name]);
   /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
   const lintErrCount = useMemo(() => {
     try {

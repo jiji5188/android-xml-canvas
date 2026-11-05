@@ -11,6 +11,25 @@ export type SrcDict = Record<string, string>;
 
 /** 英文 —— 简体中文原文 → English */
 export const SRC_EN: SrcDict = {
+  // ---- M143 drawable 预设（控件样式）----
+  "基础样式": "Basic",
+  "控件样式": "Widgets",
+  "滑块条（轨道 + 进度）": "Slider track (rail + fill)",
+  "layer-list：灰轨道 + 蓝色进度条，2dp 圆角，做 SeekBar 的 progressDrawable": "layer-list: grey rail + blue fill, 2dp radius — use as SeekBar progressDrawable",
+  "滑块条（圆形拖柄）": "Slider thumb",
+  "圆形白底 + 蓝边 + 外阴影，做 SeekBar 的 android:thumb": "White circle with blue ring and soft shadow — use as SeekBar android:thumb",
+  "进度条（横向）": "Progress bar (horizontal)",
+  "layer-list：浅灰底槽 + 圆头蓝进度，做 ProgressBar 的 progressDrawable": "layer-list: light-grey trough + rounded blue fill — use as ProgressBar progressDrawable",
+  "输入框（聚焦变蓝边）": "Input field (focus ring)",
+  "selector：常态灰边、focused 蓝边 2dp，8dp 圆角，做 EditText 背景": "selector: grey 1dp border by default, 2dp blue border when focused, 8dp radius — EditText background",
+  "复选框（勾选变实心）": "Checkbox (solid when checked)",
+  "selector：未选白底灰边，勾选是实心蓝色方块，4dp 圆角": "selector: white with grey border when unchecked, solid blue square when checked, 4dp radius",
+  "单选框（圆点）": "Radio button (dot)",
+  "selector：勾选是蓝色粗环留白心，未勾是灰细环，做 RadioButton 的 button": "selector: thick blue ring when checked, thin grey ring when not — RadioButton button",
+  "开关轨道（打开变蓝）": "Switch track (blue when on)",
+  "selector：开=蓝色胶囊，关=灰色胶囊，24dp 高，做 Switch 的 track": "selector: blue pill when on, grey pill when off, 24dp tall — Switch track",
+  "列表项（点按水波纹）": "List item (ripple)",
+  "ripple：白底 + 涟漪，做 RecyclerView 条目的 background / 前景": "ripple: white base with touch ripple — RecyclerView row background/foreground",
   // ---- M142 组件目录（widget-catalog）----
   "线性布局（竖）": "Linear layout (vertical)",
   "线性布局（横）": "Linear layout (horizontal)",

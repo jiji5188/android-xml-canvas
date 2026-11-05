@@ -12,12 +12,13 @@ export interface DrawablePreset {
   hint: string;
   /** 完整 XML（带 xmlns，可直接写进 res/drawable/*.xml） */
   xml: string;
+  /** M143：菜单分组（基础样式 / 控件样式），不写算基础 */
+  group?: "base" | "widget";
 }
 
 const NS = `<selector xmlns:android="http://schemas.android.com/apk/res/android">`;
 const NS_LAYER = `<layer-list xmlns:android="http://schemas.android.com/apk/res/android">`;
 const NS_RIPPLE = `<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#33000000">`;
-
 export const DRAWABLE_PRESETS: DrawablePreset[] = [
   {
     id: "card",
@@ -113,6 +114,177 @@ export const DRAWABLE_PRESETS: DrawablePreset[] = [
         </shape>
     </item>
 </layer-list>`,
+  },
+
+  // ---- M143：复杂控件用的绘制样式 ----
+  // 说明：真机上 SeekBar/ProgressBar 的进度是 <clip>/<scale> 动态裁出来的，
+  // 那两个在结构树里是只读类型（preset 写进去用户就改不动了）。
+  // 所以预设用「两层 shapes 叠」表达轨道和进度——看着一致、参数全可改，
+  // 真要上真机再自己换成 clip（参数页能看到提醒）。
+  {
+    id: "seekbar-track",
+    group: "widget",
+    name: "滑块条（轨道 + 进度）",
+    hint: "layer-list：灰轨道 + 蓝色进度条，2dp 圆角，做 SeekBar 的 progressDrawable",
+    xml: `${NS_LAYER}
+    <item android:gravity="center_vertical">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFE5E7EB"/>
+            <corners android:radius="2dp"/>
+            <size android:height="4dp"/>
+        </shape>
+    </item>
+    <item android:gravity="center_vertical">
+        <shape android:shape="rectangle">
+            <solid android:color="#FF3B82F6"/>
+            <corners android:radius="2dp"/>
+            <size android:height="4dp"/>
+        </shape>
+    </item>
+</layer-list>`,
+  },
+  {
+    id: "seekbar-thumb",
+    group: "widget",
+    name: "滑块条（圆形拖柄）",
+    hint: "圆形白底 + 蓝边 + 外阴影，做 SeekBar 的 android:thumb",
+    xml: `${NS_LAYER}
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#33000000"/>
+            <size android:width="20dp" android:height="20dp"/>
+        </shape>
+    </item>
+    <item android:left="1dp" android:top="1dp" android:right="1dp" android:bottom="1dp">
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFFFF"/>
+            <stroke android:width="2dp" android:color="#FF3B82F6"/>
+            <size android:width="18dp" android:height="18dp"/>
+        </shape>
+    </item>
+</layer-list>`,
+  },
+  {
+    id: "progress-bar",
+    group: "widget",
+    name: "进度条（横向）",
+    hint: "layer-list：浅灰底槽 + 圆头蓝进度，做 ProgressBar 的 progressDrawable",
+    xml: `${NS_LAYER}
+    <item android:gravity="center_vertical">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFF1F5F9"/>
+            <corners android:radius="4dp"/>
+            <size android:height="8dp"/>
+        </shape>
+    </item>
+    <item android:right="60dp" android:gravity="center_vertical">
+        <shape android:shape="rectangle">
+            <solid android:color="#FF3B82F6"/>
+            <corners android:radius="4dp"/>
+            <size android:height="8dp"/>
+        </shape>
+    </item>
+</layer-list>`,
+  },
+  {
+    id: "input-field",
+    group: "widget",
+    name: "输入框（聚焦变蓝边）",
+    hint: "selector：常态灰边、focused 蓝边 2dp，8dp 圆角，做 EditText 背景",
+    xml: `${NS}
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF"/>
+            <corners android:radius="8dp"/>
+            <stroke android:width="2dp" android:color="#FF3B82F6"/>
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF"/>
+            <corners android:radius="8dp"/>
+            <stroke android:width="1dp" android:color="#FFD1D5DB"/>
+        </shape>
+    </item>
+</selector>`,
+  },
+  {
+    id: "checkbox",
+    group: "widget",
+    name: "复选框（勾选变实心）",
+    hint: "selector：未选白底灰边，勾选是实心蓝色方块，4dp 圆角",
+    xml: `${NS}
+    <item android:state_checked="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FF3B82F6"/>
+            <corners android:radius="4dp"/>
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF"/>
+            <corners android:radius="4dp"/>
+            <stroke android:width="2dp" android:color="#FF9CA3AF"/>
+        </shape>
+    </item>
+</selector>`,
+  },
+  {
+    id: "radio",
+    group: "widget",
+    name: "单选框（圆点）",
+    hint: "selector：勾选是蓝色粗环留白心，未勾是灰细环，做 RadioButton 的 button",
+    xml: `${NS}
+    <item android:state_checked="true">
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFFFF"/>
+            <stroke android:width="6dp" android:color="#FF3B82F6"/>
+            <size android:width="22dp" android:height="22dp"/>
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFFFF"/>
+            <stroke android:width="2dp" android:color="#FF9CA3AF"/>
+            <size android:width="22dp" android:height="22dp"/>
+        </shape>
+    </item>
+</selector>`,
+  },
+  {
+    id: "switch-track",
+    group: "widget",
+    name: "开关轨道（打开变蓝）",
+    hint: "selector：开=蓝色胶囊，关=灰色胶囊，24dp 高，做 Switch 的 track",
+    xml: `${NS}
+    <item android:state_checked="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FF3B82F6"/>
+            <corners android:radius="12dp"/>
+            <size android:height="24dp"/>
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFE5E7EB"/>
+            <corners android:radius="12dp"/>
+            <size android:height="24dp"/>
+        </shape>
+    </item>
+</selector>`,
+  },
+  {
+    id: "list-item",
+    group: "widget",
+    name: "列表项（点按水波纹）",
+    hint: "ripple：白底 + 涟漪，做 RecyclerView 条目的 background / 前景",
+    xml: `${NS_RIPPLE}
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFFFF"/>
+        </shape>
+    </item>
+</ripple>`,
   },
 ];
 

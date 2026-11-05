@@ -2298,13 +2298,9 @@ public class MainActivity extends Activity {
                 "/system_ext/framework/framework-res.apk",
                 "/apex/com.android.framework_res_overlay/framework/framework-res.apk",
         };
-        for (String c : candidates) {
-            File f = new File(c);
-            if (f.isFile() && f.canRead()) {
-                if (log != null) log.append("framework: ").append(c).append('\n');
-                return f;
-            }
-        }
+        // 先用自带的资源桩：系统里那个 framework-res.apk 能 stat/access 不代表 aapt2 子进程真能读
+        // （实测 SDK36 上 canRead() 返回 true，aapt2 却报 failed to load include path），
+        // 所以不复探系统路径，直接用确定能读的桩。
         File cached = new File(getCacheDir(), "framework-res-stub.apk");
         if (cached.isFile() && cached.length() > 100000) {
             if (log != null) log.append("framework: 缓存的资源桩 ").append(cached.length()).append(" 字节\n");
@@ -2319,11 +2315,39 @@ public class MainActivity extends Activity {
             } finally {
                 in.close();
             }
-            if (log != null) log.append("framework: assets 资源桩 " ).append(cached.length()).append(" 字节\n");
+            if (log != null) log.append("framework: assets 资源桩 ").append(cached.length()).append(" 字节\n");
             return cached;
         } catch (Throwable t) {
             if (log != null) log.append("framework 资源桩解包失败: ").append(t).append('\n');
-            return new File("/system/framework/framework-res.apk");
+        }
+        // 实在不行再试系统路径（真能 open 的才算）
+        for (String c : candidates) {
+            File f = new File(c);
+            if (f.isFile() && canReallyOpen(f)) {
+                if (log != null) log.append("framework: 系统 ").append(c).append('\n');
+                return f;
+            }
+        }
+        return new File("/system/framework/framework-res.apk");
+    }
+
+    /** access() 过了不代表真能读（SELinux 可能拦 open），这里实际打开读 4 字节验证 */
+    private static boolean canReallyOpen(File f) {
+        java.io.FileInputStream in = null;
+        try {
+            in = new java.io.FileInputStream(f);
+            byte[] b = new byte[4];
+            int n = in.read(b);
+            return n == 4 && b[0] == 'P' && b[1] == 'K';
+        } catch (Throwable t) {
+            return false;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (Throwable ignored) {
+                }
+            }
         }
     }
 

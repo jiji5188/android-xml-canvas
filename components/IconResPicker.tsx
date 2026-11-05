@@ -11,6 +11,7 @@ import {
   ICON_CATS,
   decompressIconSet,
   type IconItem,
+  type LazyLibKey,
 } from "@/lib/xml/icon-libs";
 import { parsePastedSvg } from "@/lib/xml/svg-paste";
 import {
@@ -34,15 +35,21 @@ export interface IconResPickerProps {
   onPick: (resourceName: string, vectorXml: string, iconName: string) => void;
 }
 
-type Tab = "material" | "lucide" | "tabler" | "geo" | "paste";
+type Tab = "material" | "lucide" | "tabler" | "hero" | "mingcute" | "remix" | "geo" | "paste";
 
 const TAB_LABELS: Array<[Tab, string]> = [
   ["material", "Material"],
   ["lucide", "Lucide"],
   ["tabler", "Tabler"],
+  ["hero", "Heroicons"],
+  ["mingcute", "MingCute"],
+  ["remix", "Remix"],
   ["geo", "几何"], // i18n-ignore
   ["paste", "粘贴 SVG"], // i18n-ignore
 ];
+
+/** M145：懒加载库（含动态 chunk 的 hero/mingcute/remix） */
+const LAZY_TABS: LazyLibKey[] = ["lucide", "tabler", "hero", "mingcute", "remix"];
 
 /** 每页图标数（svg-board 是 24，这里带名字，48 少翻几页） */
 const ICON_PAGE = 48;
@@ -51,6 +58,8 @@ const ICON_PAGE = 48;
 export function iconToVectorXml(it: IconItem): string {
   const st = it.st === 1;
   const attrs = [`android:pathData="${it.d}"`, `android:fillColor="${st ? "#00000000" : "#1D1B20"}"`];
+  /* M145：带挖孔的实心图标（fill-rule=evenodd）→ android:fillType="evenOdd"（API 24+） */
+  if (!st && it.fr === 1) attrs.push('android:fillType="evenOdd"');
   if (st) {
     attrs.push('android:strokeColor="#1D1B20"');
     attrs.push('android:strokeWidth="2"');
@@ -71,23 +80,24 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
   const [cat, setCat] = React.useState("all");
   const [q, setQ] = React.useState("");
   const [page, setPage] = React.useState(1);
-  const [lazy, setLazy] = React.useState<Partial<Record<"lucide" | "tabler", IconItem[]>>>({});
+  const [lazy, setLazy] = React.useState<Partial<Record<LazyLibKey, IconItem[]>>>({});
   const [err, setErr] = React.useState("");
   const [paste, setPaste] = React.useState("");
   const [resName, setResName] = React.useState("ic_icon");
   const [pasteErr, setPasteErr] = React.useState("");
 
   React.useEffect(() => {
-    if (tab !== "lucide" && tab !== "tabler") return;
-    if (lazy[tab]) return;
-    const p = decompressIconSet(tab);
+    const lazyTab: LazyLibKey | null = LAZY_TABS.includes(tab as LazyLibKey) ? (tab as LazyLibKey) : null;
+    if (!lazyTab) return;
+    if (lazy[lazyTab]) return;
+    const p = decompressIconSet(lazyTab);
     if (!p) {
       setErr(tt("当前环境不支持 gzip 解压"));
       return;
     }
     let alive = true;
     p.then((arr) => {
-      if (alive) setLazy((prev) => ({ ...prev, [tab]: arr }));
+      if (alive) setLazy((prev) => ({ ...prev, [lazyTab]: arr }));
     }).catch(() => {
       if (alive) setErr(tt("图标库解压失败"));
     });
@@ -98,13 +108,17 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
 
   React.useEffect(() => setPage(1), [tab, cat, q]);
 
+  const lazyTab: LazyLibKey | null = LAZY_TABS.includes(tab as LazyLibKey) ? (tab as LazyLibKey) : null;
+  const isLazy = !!lazyTab;
   const pool: IconItem[] =
     tab === "material"
       ? ICON_MATERIAL
       : tab === "geo"
         ? ICON_BUILTIN
-        : lazy[tab as "lucide" | "tabler"] ?? [];
-  const loading = (tab === "lucide" || tab === "tabler") && !lazy[tab] && !err;
+        : lazyTab
+          ? lazy[lazyTab] ?? []
+          : [];
+  const loading = isLazy && !lazy[lazyTab!] && !err;
 
   const list = React.useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -115,7 +129,10 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
     });
   }, [pool, cat, q]);
 
-  const cats = tab === "geo" ? ICON_CATS.filter(([k]) => k === "all" || k === "geo") : ICON_CATS;
+  const cats =
+    tab === "geo"
+      ? ICON_CATS.filter(([k]) => k === "all" || k === "geo")
+      : ICON_CATS.filter(([k]) => k === "all" || pool.some((it) => it.c === k));
   const pages = Math.max(1, Math.ceil(list.length / ICON_PAGE));
   const pg = Math.min(Math.max(1, page), pages);
   const pageItems = list.slice((pg - 1) * ICON_PAGE, pg * ICON_PAGE);
@@ -270,6 +287,7 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
                     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
                       <path
                         d={it.d}
+                        fillRule={it.fr === 1 ? "evenodd" : undefined}
                         fill={it.st === 1 ? "none" : "currentColor"}
                         stroke={it.st === 1 ? "currentColor" : "none"}
                         strokeWidth={it.st === 1 ? 2 : 0}

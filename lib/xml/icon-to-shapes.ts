@@ -19,6 +19,8 @@ export function iconToShapes(it: IconItem, vw: number, vh: number): DrawShape[] 
     stroke: st ? "#1D1B20" : "none",
     strokeWidth: st ? Math.max(0.4, 1.6 * k) : 0,
     alpha: 1,
+    /* M145：实心图标带挖孔（fill-rule=evenodd）时保留规则，否则孔会被填实 */
+    ...(!st && it.fr === 1 ? { fillType: "evenOdd" as const } : {}),
   };
   return [translateShape(base, ox, oy)];
 }

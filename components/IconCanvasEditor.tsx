@@ -1341,6 +1341,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       <path
         key={s.id}
         d={shapeD(s)}
+        fillRule={s.type === "path" && s.fillType === "evenOdd" ? "evenodd" : undefined}
         fill={isRenderableColor(s.fill) ? toCss(s.fill) : "none"}
         fillOpacity={s.alpha}
         stroke={isRenderableColor(s.stroke) ? toCss(s.stroke) : "none"}

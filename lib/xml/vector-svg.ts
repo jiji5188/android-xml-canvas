@@ -8,7 +8,7 @@ export interface VectorSpec {
   /** 视口宽高（Android viewport，通常 24） */
   vw: number;
   vh: number;
-  paths: { d: string; fill: string; alpha?: number; stroke?: string; strokeWidth?: number; strokeAlpha?: number }[];
+  paths: { d: string; fill: string; alpha?: number; stroke?: string; strokeWidth?: number; strokeAlpha?: number; fillType?: string }[];
   /** M11j：<group> 的旋转 / 缩放（镜像）；没有 group 时为 undefined */
   group?: { rotation: number; scaleX: number; scaleY: number; pivotX: number; pivotY: number };
 }
@@ -36,6 +36,7 @@ export function parseVectorXml(xml: string): VectorSpec | null {
       alpha: alphaRaw == null ? undefined : alphaRaw,
       stroke: stroke || undefined,
       strokeWidth: sw == null ? undefined : sw,
+      fillType: attrFrom(head, "fillType"),
       strokeAlpha: sa == null ? undefined : sa,
     });
   }
@@ -70,6 +71,7 @@ export function vectorToSvg(xml: string): string | null {
   const body = spec.paths
     .map((p) => {
       const parts = [`d="${esc(p.d)}"`, `fill="${esc(androidColorToCss(p.fill))}"`];
+      if (p.fillType && /even-?odd/i.test(p.fillType)) parts.push(`fill-rule="evenodd"`);
       if (p.alpha != null) parts.push(`fill-opacity="${p.alpha}"`);
       if (p.stroke) parts.push(`stroke="${esc(androidColorToCss(p.stroke))}"`);
       if (p.strokeWidth != null) parts.push(`stroke-width="${p.strokeWidth}"`);

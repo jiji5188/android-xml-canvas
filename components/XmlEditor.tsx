@@ -750,6 +750,7 @@ export function XmlEditor() {
   const [exportAction, setExportAction] = useState<"download" | "copy">("download");
   const [dropHint, setDropHint] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
+
   /** M5b：已生成资源管理面板 */
   // M11：设置 / 关于面板
   // M16h：界面主题改成「预设配色方案 + 亮/暗」，token 见 lib/xml/theme-presets.ts
@@ -3511,6 +3512,12 @@ const findResolved = findResolvedNode;
     truncated: boolean;
     loading: boolean;
   } | null>(null);
+  /* M146：右滑面板 + 运行预览 + 历史面板 + 引用列表 —— 返回键先关浮层再谈退出 */
+  useBackGuard(isMobile && rightOpen, () => setRightOpen(false), "right-panel");
+  useBackGuard(runOpen, () => setRunOpen(false), "run-preview");
+  useBackGuard(histPanelOpen, () => setHistPanelOpen(false), "history-panel");
+  useBackGuard(usesPanel !== null, () => setUsesPanel(null), "usages-panel");
+
 
   const openUsages = useCallback(
     async (value: string) => {

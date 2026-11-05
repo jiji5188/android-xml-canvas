@@ -86,6 +86,8 @@ export interface PolygonShape extends BaseShape {
 export interface PathShape extends BaseShape {
   type: "path";
   d: string;
+  /** M145：填充规则（搬运自 SVG fill-rule；evenOdd 用于带挖孔的图标），缺省 nonZero */
+  fillType?: "evenOdd" | "nonZero";
 }
 
 export interface TextShape extends BaseShape {
@@ -330,6 +332,7 @@ function toVectorPath(s: DrawShape): VectorPath | null {
   const hasStroke = stroke && stroke !== "none" && s.strokeWidth > 0;
 
   const out: VectorPath = { d, fill: "#00000000" };
+  if (s.type === "path" && s.fillType === "evenOdd") out.fillType = "evenOdd";
   if (hasFill) {
     out.fill = fill;
     if (s.alpha !== 1) out.alpha = r3(s.alpha);
@@ -468,6 +471,7 @@ export function modelToShapes(model: VectorModel): DrawShape[] {
       strokeWidth: p.strokeWidth ?? 0,
       alpha,
       rot: p.rotation ?? 0,
+      ...(p.fillType ? { fillType: p.fillType } : {}),
       ...(group ? { group } : {}),
     } satisfies PathShape;
   };

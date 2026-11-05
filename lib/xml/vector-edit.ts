@@ -16,6 +16,8 @@ export interface VectorPath {
   rotation?: number;
   pivotX?: number;
   pivotY?: number;
+  /** M145：填充规则（android:fillType）；缺省按 nonzero 处理 */
+  fillType?: "evenOdd" | "nonZero";
 }
 
 export interface VectorGroup {
@@ -116,6 +118,7 @@ function pathFromAttrs(raw: string): VectorPath | null {
     stroke: attrOf(raw, "strokeColor") || undefined,
     strokeWidth: swRaw == null ? undefined : num(swRaw, 1),
     strokeAlpha: saRaw == null ? undefined : num(saRaw, 1),
+    ...(/even-?odd/i.test(attrOf(raw, "fillType") || "") ? { fillType: "evenOdd" as const } : {}),
   };
 }
 
@@ -301,6 +304,7 @@ function emitPath(p: VectorPath, pad: string, lines: string[]): void {
   }
   lines.push(`${q}<path`);
   lines.push(`${q}    android:fillColor="${p.fill}"`);
+  if (p.fillType === "evenOdd") lines.push(`${q}    android:fillType="evenOdd"`);
   if (p.alpha != null && p.alpha !== 1) lines.push(`${q}    android:fillAlpha="${round(p.alpha)}"`);
   if (p.stroke) lines.push(`${q}    android:strokeColor="${p.stroke}"`);
   if (p.strokeWidth != null) lines.push(`${q}    android:strokeWidth="${round(p.strokeWidth)}"`);

@@ -5,20 +5,26 @@
 // 单击图标 = 替换整块画布；双击 / 底部按钮 = 追加成新图层。
 import * as React from "react";
 import { t as tt } from "@/lib/i18n-src";
-import { ICON_MATERIAL, ICON_BUILTIN, ICON_CATS, decompressIconSet, type IconItem } from "@/lib/xml/icon-libs";
+import { ICON_MATERIAL, ICON_BUILTIN, ICON_CATS, decompressIconSet, type IconItem, type LazyLibKey } from "@/lib/xml/icon-libs";
 import { parsePastedSvg } from "@/lib/xml/svg-paste";
 import { scalePath, scaleShapeLite, translateShape, type DrawShape } from "@/lib/xml/canvas-shapes";
 import { iconToShapes } from "@/lib/xml/icon-to-shapes";
 
-type TabKey = "material" | "lucide" | "tabler" | "geo" | "paste";
+type TabKey = "material" | "lucide" | "tabler" | "hero" | "mingcute" | "remix" | "geo" | "paste";
 
 const TAB_LABELS: Array<[TabKey, string]> = [
   ["material", "Material"],
   ["lucide", "Lucide"],
   ["tabler", "Tabler"],
+  ["hero", "Heroicons"],
+  ["mingcute", "MingCute"],
+  ["remix", "Remix"],
   ["geo", "几何"], // i18n-ignore
   ["paste", "粘贴 SVG"], // i18n-ignore
 ];
+
+/** M145：走动态 chunk 的懒加载库（lucide/tabler 是内联的，也复用同一套解压逻辑） */
+const LAZY_TABS: LazyLibKey[] = ["lucide", "tabler", "hero", "mingcute", "remix"];
 
 let seq = 0;
 const nextId = () => `ic${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -44,7 +50,7 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = tt("图标�
   const [tab, setTab] = React.useState<TabKey>("material");
   const [cat, setCat] = React.useState("all");
   const [q, setQ] = React.useState("");
-  const [lazy, setLazy] = React.useState<Partial<Record<"lucide" | "tabler", IconItem[]>>>({});
+  const [lazy, setLazy] = React.useState<Partial<Record<LazyLibKey, IconItem[]>>>({});
   const [err, setErr] = React.useState("");
   const [paste, setPaste] = React.useState("");
   const [pasteErr, setPasteErr] = React.useState("");
@@ -53,28 +59,30 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = tt("图标�
   React.useEffect(() => setPage(1), [tab, cat, q]);
 
   // 切到懒加载库时首次解压（结果缓存，来回切 tab 不再解）
+  const lazyTab: LazyLibKey | null = LAZY_TABS.includes(tab as LazyLibKey) ? (tab as LazyLibKey) : null;
   React.useEffect(() => {
-    if (tab !== "lucide" && tab !== "tabler") return;
-    if (lazy[tab]) return;
+    if (!lazyTab) return;
+    if (lazy[lazyTab]) return;
     let alive = true;
-    const p = decompressIconSet(tab);
+    const p = decompressIconSet(lazyTab);
     if (!p) {
       setErr(tt("当前环境不支持 gzip 解压，该图标库不可用"));
       return;
     }
     p.then((arr) => {
-      if (alive) setLazy((prev) => ({ ...prev, [tab]: arr }));
+      if (alive) setLazy((prev) => ({ ...prev, [lazyTab]: arr }));
     }).catch(() => {
       if (alive) setErr(tt("图标库解压失败（可能是浏览器不支持 DecompressionStream）"));
     });
     return () => {
       alive = false;
     };
-  }, [tab, lazy]);
+  }, [lazyTab, lazy]);
 
+  const isLazy = !!lazyTab;
   const pool: IconItem[] =
-    tab === "material" ? ICON_MATERIAL : tab === "geo" ? ICON_BUILTIN : lazy[tab as "lucide" | "tabler"] ?? [];
-  const loading = (tab === "lucide" || tab === "tabler") && !lazy[tab] && !err;
+    tab === "material" ? ICON_MATERIAL : tab === "geo" ? ICON_BUILTIN : lazyTab ? lazy[lazyTab] ?? [] : [];
+  const loading = isLazy && !lazy[lazyTab!] && !err;
 
   const list = React.useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -85,7 +93,11 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = tt("图标�
     });
   }, [pool, cat, q]);
 
-  const cats = tab === "geo" ? ICON_CATS.filter(([k]) => k === "all" || k === "geo") : ICON_CATS;
+  /* M145：分类筛选只显示该库真实存在的分类（hero/mingcute 全 common，不凑 9 个空标签） */
+  const cats =
+    tab === "geo"
+      ? ICON_CATS.filter(([k]) => k === "all" || k === "geo")
+      : ICON_CATS.filter(([k]) => k === "all" || pool.some((it) => it.c === k));
 
   const pages = Math.max(1, Math.ceil(list.length / ICON_PAGE));
   const pg = Math.min(Math.max(1, page), pages);
@@ -220,6 +232,7 @@ export function IconPickerPanel({ onPick, onClose, viewport, title = tt("图标�
                     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
                       <path
                         d={it.d}
+                        fillRule={it.fr === 1 ? "evenodd" : undefined}
                         fill={it.st === 1 ? "none" : "currentColor"}
                         stroke={it.st === 1 ? "currentColor" : "none"}
                         strokeWidth={it.st === 1 ? 2 : 0}

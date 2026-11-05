@@ -43,11 +43,13 @@ export function parsePastedSvg(src: string): PastedShape[] | null {
     const strokeV = stroke && stroke !== "none" ? stroke : "#1a1f28";
     const sw = attrOf(tag, "stroke-width");
     const strokeWidth = sw ? num(sw, 1.5) : 1.5;
+    /* M145：fill-rule=evenodd 的路径（带挖孔的图标）保留规则，否则孔会被填实 */
+    const fr = /even-?odd/i.test(attrOf(tag, "fill-rule") || "") ? { fillType: "evenOdd" as const } : {};
     const base = { fill: fillV, stroke: strokeV, strokeWidth, alpha: 1, vw, vh };
 
     if (kind === "path") {
       const d = attrOf(tag, "d");
-      if (d) out.push({ type: "path", d, ...base });
+      if (d) out.push({ type: "path", d, ...base, ...fr });
     } else if (kind === "circle") {
       const r = num(attrOf(tag, "r"), 0);
       if (r > 0) out.push({ type: "circle", cx: num(attrOf(tag, "cx")), cy: num(attrOf(tag, "cy")), r, ...base });

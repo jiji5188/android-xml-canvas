@@ -39,6 +39,7 @@ import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag,
 import { moveNodeRaw, scanElements, elementAt } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml, type LintIssue } from "@/lib/xml/lint";
+import { lintCodeDoc } from "@/lib/xml/lint-doc";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { sanitizeResName } from "@/lib/xml/resname";
 import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
@@ -1766,26 +1767,27 @@ export function XmlEditor() {
    *  这里再加一道闸：400ms 内不再输入才计算） */
   const [lintSrc, setLintSrc] = useState("");
   useEffect(() => {
-    if (codeOnly) return;
+    // M138：非布局文件也跑校验（lint-doc 按文件类型叠领域规则），只是规则不同
     const t = window.setTimeout(() => setLintSrc(parsedXml), 400);
     return () => window.clearTimeout(t);
-  }, [parsedXml, codeOnly]);
+  }, [parsedXml]);
 
   /** 代码视图的结构检查（带行号，标红用） */
   const lints = useMemo(() => {
     try {
-      // M37b：非布局文件不做布局结构校验
-      if (codeOnly) return [] as ReturnType<typeof lintXml>;
       if (lintSrc === "") return [] as LintIssue[];
       const t = perfTimer("xml.lint", "len=" + lintSrc.length);
-      const out = lintXml(lintSrc);
+      // M138：非布局文件走 lint-doc（结构 + 清单/values/drawable 等类型规则）
+      const out = codeOnly
+        ? lintCodeDoc(lintSrc, openRel || saveOrigin?.name || currentFile?.name || "")
+        : lintXml(lintSrc);
       t.end("issues=" + out.length);
       return out;
     } catch (e) {
       console.error("[axv] 结构检查失败", e); // i18n-ignore
       return [] as LintIssue[];
     }
-  }, [lintSrc, codeOnly]);
+  }, [lintSrc, codeOnly, openRel, saveOrigin?.name, currentFile?.name]);
   /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
   const lintErrCount = useMemo(() => {
     try {

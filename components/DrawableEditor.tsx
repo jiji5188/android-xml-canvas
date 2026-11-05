@@ -508,8 +508,8 @@ export function DrawableEditor({
               <div className="axv-dw-problems">
                 {problems.slice(0, 6).map((p, i) => (
                   <div key={i} className={"axv-dw-problem" + (p.level === "error" ? " is-error" : "")}>
-                    <span className="axv-dw-problem-path">{p.path}</span>
-                    <span>{p.message}</span>
+                    <span className="axv-dw-problem-path">{tt(p.path)}</span>
+                    <span>{tt(p.message)}</span>
                   </div>
                 ))}
               </div>

@@ -197,7 +197,7 @@ export function SettingsPanel(p: SettingsPanelProps) {
         >
           {LANG_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
-              {o.value === "auto" ? `${o.label}（${o.native}）` : o.label}
+              {o.value === "auto" ? `${tt(o.label)}（${o.native}）` : tt(o.label)}
             </option>
           ))}
         </select>

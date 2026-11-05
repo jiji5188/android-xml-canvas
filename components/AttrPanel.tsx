@@ -488,8 +488,8 @@ export function AttrPanel({
 
       {tab === "docs" ? (
         <div className="axv-doc-body">          <div className="axv-doc-title">
-            {wdoc.title}
-            <span className="axv-doc-cat">{wdoc.category}</span>
+            {tt(wdoc.title)}
+            <span className="axv-doc-cat">{tt(wdoc.category)}</span>
           </div>
           {(() => {
             const url = wdoc.officialDoc ?? officialDocUrl(node.tag);
@@ -506,11 +506,11 @@ export function AttrPanel({
               </a>
             ) : null;
           })()}
-          <div className="axv-doc-summary">{wdoc.summary}</div>
+          <div className="axv-doc-summary">{tt(wdoc.summary)}</div>
           {wdoc.notes?.length ? (
             <ul className="axv-doc-notes">
               {wdoc.notes.map((n) => (
-                <li key={n}>{n}</li>
+                <li key={n}>{tt(n)}</li>
               ))}
             </ul>
           ) : null}
@@ -519,10 +519,10 @@ export function AttrPanel({
               <div className={"axv-doc-item" + (owned.has(a.name) ? " is-set" : "")} key={a.name}>
                 <div className="axv-doc-row">
                   <code className="axv-doc-name">{a.name}</code>
-                  <span className="axv-doc-type">{a.type}</span>
+                  <span className="axv-doc-type">{tt(a.type)}</span>
                   {owned.has(a.name) ? <span className="axv-doc-badge">{tt("已设")}</span> : null}
                 </div>
-                <div className="axv-doc-desc">{a.desc}</div>
+                <div className="axv-doc-desc">{tt(a.desc)}</div>
                 {a.values?.length ? (
                   <div className="axv-doc-values">
                     {a.values.slice(0, 4).map((v) => (
@@ -599,7 +599,7 @@ export function AttrPanel({
                 {hint ? (
                   <button
                     className="axv-attr-info"
-                    title={hint}
+                    title={hint ? tt(hint) : undefined}
                     aria-label={tt("{name} 说明", { name })}
                     onClick={() => setHintOpen((h) => (h === name ? null : name))}
                   >
@@ -615,7 +615,7 @@ export function AttrPanel({
                   ✕
                 </button>
               </div>
-              {hintOpen === name && hint ? <div className="axv-attr-note">{hint}</div> : null}
+              {hintOpen === name && hint ? <div className="axv-attr-note">{tt(hint)}</div> : null}
             </div>
           );
         })}

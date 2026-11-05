@@ -118,7 +118,7 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
         return (
           <div className="axv-constraint-side" key={s.side}>
             <div className="axv-constraint-row">
-              <label className="axv-attr-name">{s.title}</label>
+              <label className="axv-attr-name">{tt(s.title)}</label>
               <div className="axv-constraint-ctl">
                 <select
                   className="axv-attr-select"
@@ -140,7 +140,7 @@ export function ConstraintPanel({ node, siblings, onCommitMany, onAuto, onClear,
                     aria-label={tt("{title} 对齐方式", { title: s.title })}
                   >
                     {s.variants.map((v) => (
-                      <option key={v.mode} value={v.mode}>{v.label}</option>
+                      <option key={v.mode} value={v.mode}>{tt(v.label)}</option>
                     ))}
                   </select>
                 )}

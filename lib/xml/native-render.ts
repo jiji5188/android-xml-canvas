@@ -78,6 +78,10 @@ function install(): void {
 
 const PKG = "com.axv.render";
 
+export function renderableFiles(files: RenderFile[]): RenderFile[] {
+  return files.filter((f) => f && f.path && (f.text || f.base64));
+}
+
 /**
  * 把 res 文件丢给原生编译 + 渲染。
  * @param layoutName 布局名（不带 .xml），必须是 files 里 layout/<name>.xml 的那个
@@ -92,7 +96,7 @@ export function renderReal(
     return Promise.resolve({ ok: false, log: "当前环境不支持真机渲染（网页版 / 旧 APK）" });
   }
   const name = layoutName.replace(/\.xml$/i, "");
-  const list = files.filter((f) => f && f.path && (f.text || f.base64));
+  const list = renderableFiles(files);
   if (!list.some((f) => f.path === `layout/${name}.xml`)) {
     return Promise.resolve({ ok: false, log: `文件清单里没有 layout/${name}.xml` });
   }

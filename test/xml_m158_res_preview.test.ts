@@ -3,6 +3,7 @@ import { applyResNamePrefix, defaultResName } from "@/lib/xml/resname";
 import { cloneDrawableNode } from "@/lib/xml/drawable-edit";
 import { buildResourcePreviewFiles } from "@/lib/xml/res-preview";
 import { collectProjectRes } from "@/lib/xml/res-collect";
+import { renderableFiles } from "@/lib/xml/native-render";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 
@@ -82,22 +83,26 @@ describe("M158 资源真预览的文件清单", () => {
   });
 });
 
-function fakeIo(root: string, files: Record<string, string>): AiFileIo {
+function fakeIo(root: string, files: Record<string, string>, images: Record<string, string> = {}): AiFileIo {
+  const all = { ...files, ...images };
   return {
     rootLabel: () => root,
     async list(rel) {
       if (rel === "app/src/main/res") {
-        const dirs = [...new Set(Object.keys(files).map((p) => p.split("/")[4]))];
+        const dirs = [...new Set(Object.keys(all).map((p) => p.split("/")[4]))];
         return { ok: true, items: dirs.map((d) => ({ name: d, kind: "dir" as const, rel: `${rel}/${d}` })) };
       }
       const prefix = `${rel}/`;
-      const items = Object.keys(files)
+      const items = Object.keys(all)
         .filter((p) => p.startsWith(prefix) && !p.slice(prefix.length).includes("/"))
         .map((p) => ({ name: p.slice(prefix.length), kind: "file" as const, rel: p }));
       return { ok: true, items };
     },
     async read(rel) {
       return rel in files ? { ok: true, text: files[rel] } : { ok: false, error: "ENOENT" };
+    },
+    async readBase64(rel) {
+      return rel in images ? { ok: true, base64: images[rel] } : { ok: false, error: "ENOENT" };
     },
     async write() {
       return { ok: false, error: "readonly" };
@@ -195,6 +200,26 @@ describe("M158 真机渲染补齐项目资源", () => {
     expect(byPath.get("values/axv_attrs.xml")).toContain('name="colorPrimary"');
     expect(byPath.get("values/axv_stub.xml")).not.toContain('name="ok"');
     expect(byPath.get("layout/missing.xml")).toContain("FrameLayout");
+    expect(r.missing).toEqual([]);
+  });
+
+  it("图片资源以 base64 收进清单，且不被 text 过滤掉", async () => {
+    const io = fakeIo(
+      `t-${Math.random()}`,
+      {
+        "app/src/main/res/layout/activity_main.xml":
+          '<ImageView android:src="@drawable/ic_menu" />',
+      },
+      { "app/src/main/res/drawable/ic_menu.png": "UE5HREFUQQ==" },
+    );
+    const r = await collectProjectRes(io, "app/src/main/res/layout/activity_main.xml", [
+      { path: "layout/activity_main.xml", text: '<ImageView android:src="@drawable/ic_menu" />' },
+    ]);
+    const png = r.files.find((f) => f.path === "drawable/ic_menu.png");
+    expect(png?.base64).toBe("UE5HREFUQQ==");
+    expect(png?.text).toBe("");
+    // 真实渲染前的过滤不能把只带 base64 的文件丢掉
+    expect(renderableFiles(r.files).some((f) => f.path === "drawable/ic_menu.png")).toBe(true);
     expect(r.missing).toEqual([]);
   });
 

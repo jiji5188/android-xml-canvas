@@ -86,7 +86,7 @@ export function AddAttrModal({ open, existing, tag, onClose, onPick }: Props) {
                     key={s.name}
                     className={"axv-modal-item" + (added ? " axv-modal-item-added" : "")}
                     disabled={added}
-                    title={s.desc}
+                    title={s.desc ? tt(s.desc) : undefined}
                     onClick={() => {
                       onPick(s.name);
                       onClose();
@@ -96,7 +96,7 @@ export function AddAttrModal({ open, existing, tag, onClose, onPick }: Props) {
                     {added ? (
                       <span className="axv-modal-item-tag">{tt("已存在")}</span>
                     ) : (
-                      s.desc ? <span className="axv-modal-item-desc">{s.desc}</span> : null
+                      s.desc ? <span className="axv-modal-item-desc">{tt(s.desc)}</span> : null
                     )}
                   </button>
                 );

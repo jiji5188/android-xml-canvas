@@ -11,6 +11,32 @@ export type SrcDict = Record<string, string>;
 
 /** 英文 —— 简体中文原文 → English */
 export const SRC_EN: SrcDict = {
+  "跟随系统": "Follow system",
+  "宽度": "Width",
+  "高度": "Height",
+  "四周边距": "Margins around the view",
+  "四边内边距": "Padding inside the view",
+  "LinearLayout 权重": "LinearLayout weight",
+  "自身在父容器中的位置（FrameLayout/LinearLayout）": "Position within the parent (FrameLayout/LinearLayout)",
+  "控件 id（@+id/xxx）": "View id (@+id/xxx)",
+  "内容/文字对齐": "Content / text alignment",
+  "背景色": "Background color",
+  "瞬时抬升（与 elevation 相加）": "Ephemeral elevation (added to elevation)",
+  "点光源阴影颜色（API 28+）": "Ambient shadow color (API 28+)",
+  "环境光阴影颜色（API 28+）": "Spot shadow color (API 28+)",
+  "文字阴影颜色（TextView 文字投影，不是 elevation 阴影）": "Text shadow color (TextView projection, not elevation shadow)",
+  "文字阴影水平偏移": "Text shadow horizontal offset",
+  "文字阴影垂直偏移": "Text shadow vertical offset",
+  "着色（图片框/图片按钮特有，颜色值或 @color/xxx）": "Tint (ImageView/ImageButton only; color value or @color/xxx)",
+  "着色混合模式": "Tint blending mode",
+  "Switch / CheckBox / RadioButton": "Switch / CheckBox / RadioButton",
+  "include 引用的布局": "Layout referenced by <include>",
+  "约束": "Constraints",
+  "外观": "Appearance",
+  "简体中文": "Simplified Chinese",
+  "繁體中文": "Traditional Chinese",
+  "系统语言": "System language",
+  "界面语言": "Interface language",
   // ---- M147 控件文档（widget-docs：属性说明 / 控件介绍 / 分类）----
   "容器": "Container",
   "其他": "Other",
@@ -1705,7 +1731,6 @@ export const SRC_EN: SrcDict = {
   "填充颜色": "Fill color",
   "复位缩放": "Reset zoom",
   "复制一条（选中优先）": "Duplicate one (selected first)",
-  "外观": "Appearance",
   "多边形": "Polygon",
   "大小": "Size",
   "宽": "W",
@@ -2128,6 +2153,9 @@ export const SRC_EN: SrcDict = {
 
 /** 繁體 —— 只登记与英文不同的；没登记的先走英文兜底（见 t()） */
 export const SRC_HANT: SrcDict = {
+  "跟随系统": "跟隨系統",
+  "简体中文": "簡體中文",
+  "系统语言": "系統語言",
   // ---- M142 zh-Hant（高频界面词；其余走英文兜底）----
   "视图": "檢視",
   "代码": "程式碼",
@@ -2168,6 +2196,9 @@ export const SRC_HANT: SrcDict = {
 
 /** 日本語 —— 只登记与英文不同的；没登记的先走英文兜底（见 t()） */
 export const SRC_JA: SrcDict = {
+  "跟随系统": "システムに従う",
+  "简体中文": "簡体字",
+  "系统语言": "システム言語",
   // ---- M142 ja（高频界面词；其余走英文兜底）----
   "视图": "ビュー",
   "代码": "コード",

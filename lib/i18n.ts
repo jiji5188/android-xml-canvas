@@ -10,6 +10,7 @@ export type LangPref = "auto" | "zh-Hans" | "zh-Hant" | "en" | "ja";export type 
 export const LS_KEY_LANG = "axv.lang";
 
 export const LANG_OPTIONS: { value: LangPref; label: string; native: string }[] = [
+  // M164：label 保持中文原文，由界面层 tt() 翻译（这里不能用 t()，模块加载时语言还没确定）
   { value: "auto", label: "跟随系统", native: "系统语言" },
   { value: "zh-Hans", label: "简体中文", native: "简体中文" },
   { value: "zh-Hant", label: "繁體中文", native: "繁體中文" },

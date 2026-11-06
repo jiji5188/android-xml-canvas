@@ -590,6 +590,8 @@ export function XmlEditor() {
   const [resExtras, setResExtras] = useState<ResourceExtras | null>(null);
   /** M3g/M3h：本工具生成的 drawable 资源：资源名 → xml 原文（图标 vector + 自定义 shape/ripple 共用） */
   const [generatedDrawables, setGeneratedDrawables] = useState<Record<string, string>>(sampleBoot.current.drawables);
+  /** M171：应用图标生成的额外资源（mipmap-anydpi-v26/ic_launcher.xml 等，路径相对 res/） */
+  const [appIconRes, setAppIconRes] = useState<Record<string, string>>({});
   /** 矢量 → data URL（让画布能真渲染而不是占位框） */
   const generatedDataUrls = useMemo(() => {
     const out: Record<string, string> = {};
@@ -1596,10 +1598,24 @@ export function XmlEditor() {
         // 通过 commitAttr 把属性改成 @drawable/<资源名>
         commitAttrRef.current(attrName, `@drawable/${safe}`);
       }
-      setExportNote(tt("已生成 res/drawable/{file}，属性指向它（导出 res 包时会自动包含）", { file: safe + ".xml" }));
+      const file = safe + ".xml";
+      const root = projectSaveRoot(activeProject);
+      // M172：有打开的项目就直接写进 res/drawable，不只存内存
+      if (root) {
+        void saveResFiles(root, [{ path: `drawable/${file}`, text: vectorXml }]).then((r) => {
+          setExportNote(
+            r.ok
+              ? tt("已写入 res/drawable/{file}，属性指向它", { file })
+              : tt("已生成 drawable/{file}（内存），但写入项目失败：{reason}", { file, reason: r.failed[0] || tt("目录不可写") }),
+          );
+          window.setTimeout(() => setExportNote(""), 4200);
+        });
+        return;
+      }
+      setExportNote(tt("已生成 res/drawable/{file}，属性指向它（导出 res 包时会自动包含）", { file }));
       window.setTimeout(() => setExportNote(""), 3600);
     },
-    [selectedPath],
+    [selectedPath, activeProject],
   );
 
   /** M3h：形状 → 存 xml + 把属性写成 @drawable/资源名（与图标同一存储） */
@@ -1608,10 +1624,30 @@ export function XmlEditor() {
       const safe = sanitizeResName(resourceName, "bg");
       setGeneratedDrawables((m) => ({ ...m, [safe]: shapeXml }));
       if (selectedPath) commitAttrRef.current(attrName, `@drawable/${safe}`);
-      setExportNote(tt("已生成 res/drawable/{file}（含水波纹？{yn}），属性指向它", { file: safe + ".xml", yn: shapeXml.includes("<ripple") ? tt("是") : tt("否") }));
+      const file = safe + ".xml";
+      const root = projectSaveRoot(activeProject);
+      // M172：有打开的项目就直接写进 res/drawable，不只存内存
+      if (root) {
+        void saveResFiles(root, [{ path: `drawable/${file}`, text: shapeXml }]).then((r) => {
+          setExportNote(
+            r.ok
+              ? tt("已写入 res/drawable/{file}，属性指向它（水波纹？{yn}）", {
+                  file,
+                  yn: shapeXml.includes("<ripple") ? tt("是") : tt("否"),
+                })
+              : tt("已生成 drawable/{file}（内存），但写入项目失败：{reason}", {
+                  file,
+                  reason: r.failed[0] || tt("目录不可写"),
+                }),
+          );
+          window.setTimeout(() => setExportNote(""), 4200);
+        });
+        return;
+      }
+      setExportNote(tt("已生成 res/drawable/{file}（含水波纹？{yn}），属性指向它", { file, yn: shapeXml.includes("<ripple") ? tt("是") : tt("否") }));
       window.setTimeout(() => setExportNote(""), 3600);
     },
-    [selectedPath],
+    [selectedPath, activeProject],
   );
 
   const resources: ResourceTable = useMemo(() => {
@@ -3337,6 +3373,7 @@ const findResolved = findResolvedNode;
     name: name || saveOrigin?.name || activeFile(project)?.name || "activity_main.xml",
     generatedDrawables,
     extras: resExtrasAll,
+    extraRes: appIconRes,
   });
 
   /** M36：当前打开项目的可写根（有则保存一律落进 <项目>/app/src/main/res/） */
@@ -4582,8 +4619,23 @@ const findResolved = findResolvedNode;
             const safe = sanitizeResName(resourceName, "bg");
             setGeneratedDrawables((m) => ({ ...m, [safe]: shapeXml }));
             setResShape(null);
-            setExportNote(tt("已保存 res/drawable/{file}", { file: safe + ".xml" }));
-            window.setTimeout(() => setExportNote(" "), 3200);
+            const file = safe + ".xml";
+            // M172：有打开的项目就直接写进它的 res/drawable，不只存内存
+            if (projRoot) {
+              void saveResFiles(projRoot, [{ path: `drawable/${file}`, text: shapeXml }]).then((r) => {
+                flashNote(
+                  r.ok
+                    ? tt("已保存 res/drawable/{file}，已写入项目 res 目录", { file })
+                    : tt("已保存到内存，但写入项目失败：{reason}", {
+                        reason: r.failed[0] || tt("目录不可写"),
+                      }),
+                  4200,
+                );
+              });
+            } else {
+              setExportNote(tt("已保存 res/drawable/{file}", { file }));
+              window.setTimeout(() => setExportNote(" "), 3200);
+            }
           }}
         />
       ) : null}
@@ -4595,6 +4647,40 @@ const findResolved = findResolvedNode;
           xml={resIcon.xml}
           existingNames={allDrawableNames}
           onClose={() => setResIcon(null)}
+          onAppIcon={({ files, bgColor }) => {
+            // M171：把 4 个图标文件存起来（给 res.zip / 真机渲染用），有项目就直接写进它的 res/
+            const map: Record<string, string> = {};
+            for (const f of files) map[f.path] = f.text;
+            setAppIconRes(map);
+            const total = files.length;
+            if (projRoot) {
+              void saveResFiles(
+                projRoot,
+                files.map((f) => ({ path: f.path, text: f.text })),
+              ).then((r) => {
+                setExportNote(
+                  r.ok
+                    ? tt("已设为应用图标：{n}/{total} 个文件写入 res/（背景 {color}）", {
+                        n: r.written,
+                        total: r.total,
+                        color: bgColor,
+                      })
+                    : tt("生成成功但写入失败：{reason}", {
+                        reason: r.failed[0] || tt("目录不可写"),
+                      }),
+                );
+                window.setTimeout(() => setExportNote(""), 6000);
+              });
+            } else {
+              setExportNote(
+                tt("已生成 {n} 个图标文件（背景 {color}），导 res.zip 或真机渲染时一起带走", {
+                  n: total,
+                  color: bgColor,
+                }),
+              );
+              window.setTimeout(() => setExportNote(""), 6000);
+            }
+          }}
           onSave={(safeName, iconXml) => {
             const oldName = resIcon.name;
             setGeneratedDrawables((m) => {
@@ -4607,8 +4693,23 @@ const findResolved = findResolvedNode;
             // M11p：从属性面板「图标编辑」进来的话，保存后把属性指向这个资源
             if (resIcon.attr) commitAttr(resIcon.attr, "@drawable/" + safeName);
             setResIcon(null);
-            setExportNote(tt("已保存 res/drawable/{file}", { file: safeName + ".xml" }));
-            window.setTimeout(() => setExportNote(" "), 3200);
+            const file = safeName + ".xml";
+            // M172：有打开的项目就直接写进它的 res/drawable，不只存内存
+            if (projRoot) {
+              void saveResFiles(projRoot, [{ path: `drawable/${file}`, text: iconXml }]).then((r) => {
+                setExportNote(
+                  r.ok
+                    ? tt("已保存 res/drawable/{file}，已写入项目 res 目录", { file })
+                    : tt("已保存到内存，但写入项目失败：{reason}", {
+                        reason: r.failed[0] || tt("目录不可写"),
+                      }),
+                );
+                window.setTimeout(() => setExportNote(""), 4200);
+              });
+            } else {
+              setExportNote(tt("已保存 res/drawable/{file}", { file }));
+              window.setTimeout(() => setExportNote(" "), 3200);
+            }
           }}
         />
       ) : null}

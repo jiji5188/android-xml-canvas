@@ -11,6 +11,8 @@ import { t as tt } from "@/lib/i18n-src";
 import { cleanResNameInput, sanitizeResName, applyResNamePrefix } from "@/lib/xml/resname";
 import { hasRealRender, renderReal } from "@/lib/xml/native-render";
 import { buildResourcePreviewFiles } from "@/lib/xml/res-preview";
+import { buildAppIcon } from "@/lib/xml/app-icon";
+import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOverlayBack } from "@/lib/overlay-back";
@@ -55,6 +57,13 @@ interface Props {
   onClose: () => void;
   onSave: (name: string, xml: string) => void;
   existingNames?: string[];
+  /** M171：把当前图标设为应用图标（前景 vector + 背景色）→ 父组件落盘 mipmap/ */
+  onAppIcon?: (payload: {
+    files: { path: string; text: string }[];
+    bgColor: string;
+    contentDp: number;
+    sourceName: string;
+  }) => void;
 }
 
 type Tool =
@@ -145,7 +154,7 @@ function inspect(xml?: string): "vector" | "bitmap" | "other-xml" | "empty" {
   return "other-xml";
 }
 
-export default function IconCanvasEditor({ name, xml, onClose, onSave, existingNames = [] }: Props) {
+export default function IconCanvasEditor({ name, xml, onClose, onSave, existingNames = [], onAppIcon }: Props) {
   const kind = useMemo(() => inspect(xml), [xml]);
 
   const initial = useMemo<Snapshot>(() => {
@@ -178,6 +187,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [picking, setPicking] = useState(false);
   /** 插入图标（多图标拼合）：不替换现有图形，而是把选中的图标追加成新图层 */
   const [inserting, setInserting] = useState(false);
+  /** M171：设为应用图标（前景 + 背景色 + 安全区尺寸） */
+  const [appIconOpen, setAppIconOpen] = useState(false);
+  const [appIconBg, setAppIconBg] = useState("#3FBFA0");
+  const [appIconDp, setAppIconDp] = useState(72);
+  const [appIconErr, setAppIconErr] = useState("");
   const [colorTarget, setColorTarget] = useState<{ kind: "fill" | "stroke" | "bg" } | null>(null);
   const [zoom, setZoom] = useState(1);
   /** 网格 / 背景（背景会导出成最底层矩形） */
@@ -1318,6 +1332,28 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       });
   };
 
+  /* ===== M171：设为应用图标 =====
+     前景 = 当前画布的 vector（不含画布背景色），背景 = 单独选的颜色。
+     生成 4 个文件：drawable/ic_launcher_foreground、drawable/ic_launcher_background、
+     mipmap-anydpi-v26/ic_launcher(.round)。 */
+  const appIconPreviewUrl = useMemo(() => vectorToDataUrl(outXml), [outXml]);
+  const openAppIcon = () => {
+    setAppIconErr("");
+    if (bg && /^#[0-9a-fA-F]{3,8}$/.test(bg)) setAppIconBg(bg);
+    setAppIconOpen(true);
+  };
+  const confirmAppIcon = () => {
+    if (!onAppIcon) return;
+    const safe = sanitizeResName(applyResNamePrefix(resName, "vector"), "ic");
+    const r = buildAppIcon({ fgSourceXml: outXml, bgColor: appIconBg, contentDp: appIconDp });
+    if (r.error) {
+      setAppIconErr(r.error);
+      return;
+    }
+    onAppIcon({ files: r.files, bgColor: r.bgColor, contentDp: appIconDp, sourceName: safe });
+    setAppIconOpen(false);
+  };
+
   /* ---------------- 从图标库换字形（M88：图标库直接给已换算好的 shapes） ---------------- */
   const applyIcon = (next: DrawShape[]) => {
     setPicking(false);
@@ -2438,6 +2474,15 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
           <span className="axv-icon-page-foot-note">{realNote || tt("保存后立即写回 drawable/{name}.xml，布局里所有引用同步生效。", { name: resName || "…" })}</span>
         </span>
         <span style={{ display: "flex", gap: 8 }}>
+          {onAppIcon ? (
+            <button
+              className="axv-btn axv-ghost"
+              onClick={openAppIcon}
+              title={tt("把当前图形做成桌面图标（前景 + 背景色 + 自适应裁剪）")}
+            >
+              {tt("设为应用图标")}
+            </button>
+          ) : null}
           {hasRealRender() ? (
             <button
               className="axv-btn axv-ghost"
@@ -2499,6 +2544,97 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
             setColorTarget(null);
           }}
         />
+      ) : null}
+
+      {/* M171：应用图标设置 */}
+      {appIconOpen ? (
+        <div className="axv-ai-check" role="dialog" aria-label={tt("设为应用图标")}>
+          <div className="axv-ai-check-card">
+            <div className="axv-ai-check-head">
+              <span className="axv-shape-title">{tt("设为应用图标")}</span>
+              <button className="axv-icon-btn" onClick={() => setAppIconOpen(false)} aria-label={tt("关闭")}>
+                <span className="msr" aria-hidden="true">close</span>
+              </button>
+            </div>
+
+            <div className="axv-ai-masks">
+              {([
+                { key: "circle", label: tt("圆形"), radius: "50%" },
+                { key: "squircle", label: tt("方圆"), radius: "28%" },
+                { key: "square", label: tt("方形"), radius: "10%" },
+              ] as const).map((m) => (
+                <div key={m.key} className="axv-ai-mask">
+                  <div
+                    className="axv-ai-mask-view"
+                    style={{ background: appIconBg, borderRadius: m.radius, overflow: "hidden" }}
+                  >
+                    {appIconPreviewUrl ? (
+                      <img
+                        src={appIconPreviewUrl}
+                        alt=""
+                        style={{
+                          position: "absolute",
+                          left: "50%",
+                          top: "50%",
+                          width: `${(appIconDp / 108) * 100}%`,
+                          height: `${(appIconDp / 108) * 100}%`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                  <span className="axv-ai-mask-name">{m.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="axv-ai-row">
+              <span className="axv-set-label">{tt("背景色")}</span>
+              <div className="axv-ai-swatches">
+                {["#3FBFA0", "#2F6BFF", "#7C4DFF", "#F2542D", "#111827", "#FFFFFF"].map((c) => (
+                  <button
+                    key={c}
+                    className="axv-ai-swatch"
+                    style={{ background: c, outline: appIconBg.toLowerCase() === c.toLowerCase() ? "2px solid #2F6BFF" : "1px solid rgba(0,0,0,.15)" }}
+                    onClick={() => setAppIconBg(c)}
+                    aria-label={c}
+                  />
+                ))}
+                <input
+                  className="axv-ai-color"
+                  value={appIconBg}
+                  onChange={(e) => setAppIconBg(e.target.value)}
+                  spellCheck={false}
+                />
+              </div>
+            </div>
+
+            <div className="axv-ai-row">
+              <span className="axv-set-label">{tt("前景尺寸 {dp}dp", { dp: appIconDp })}</span>
+              <input
+                type="range"
+                min={40}
+                max={108}
+                step={2}
+                value={appIconDp}
+                onChange={(e) => setAppIconDp(Number(e.target.value))}
+                style={{ flex: 1 }}
+              />
+            </div>
+            <div className="axv-ai-hint">
+              {tt("安全区 72dp：系统按厂商遮罩裁切，超出部分可能被切掉。画布底色不会进前景，底色请在上面的背景色里选。")}
+            </div>
+            <div className="axv-ai-hint">
+              {tt("将生成：drawable/ic_launcher_foreground.xml、drawable/ic_launcher_background.xml、mipmap-anydpi-v26/ic_launcher.xml、mipmap-anydpi-v26/ic_launcher_round.xml")}
+            </div>
+            {appIconErr ? <div className="axv-ai-err">{appIconErr}</div> : null}
+
+            <div className="axv-ai-btns">
+              <button className="axv-btn axv-ghost" onClick={() => setAppIconOpen(false)}>{tt("取消")}</button>
+              <button className="axv-btn axv-btn-primary" onClick={confirmAppIcon}>{tt("生成应用图标")}</button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {/* 换字形 */}

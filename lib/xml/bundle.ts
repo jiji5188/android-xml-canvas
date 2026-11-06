@@ -13,6 +13,8 @@ export interface BundleInput {
   generatedDrawables?: Record<string, string>;
   /** 已上传的 res 目录解析结果（要一并带走 shape/vector/values） */
   extras?: ResourceExtras | null;
+  /** M171：额外资源文件（res 内相对路径 → 正文），如 mipmap-anydpi-v26/ic_launcher.xml */
+  extraRes?: Record<string, string> | null;
 }
 
 /** 组装 zip 条目（路径相对 res/）：layout/ + drawable/ + values/ */
@@ -65,6 +67,12 @@ export function buildResBundle(input: BundleInput): ZipEntry[] {  const entries:
   // 3) values：把上传的 values 片段拆回文件太脆，统一写 values/res_values.xml（可被 Android 读取）
   if (extras?.valuesXml && extras.valuesXml.trim()) {
     push("values/res_values.xml", wrapValues(extras.valuesXml));
+  }
+
+  // 3.5) M171：工具生成的非 drawable 资源（mipmap-anydpi-v26 的应用图标）按原路径写
+  for (const [p, t] of Object.entries(input.extraRes ?? {})) {
+    if (!/^[a-z][a-z0-9-]*(-[a-z0-9-]+)?\//i.test(p)) continue;
+    push(p, t);
   }
 
   // 排序：layout → drawable → values，方便人看

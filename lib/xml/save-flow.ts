@@ -29,6 +29,8 @@ export interface SaveInput {
   name: string;
   generatedDrawables: Record<string, string>;
   extras: ResourceExtras | null;
+  /** M171：额外资源文件（res 内相对路径 → 正文），如 mipmap-anydpi-v26 的应用图标 */
+  extraRes?: Record<string, string> | null;
 }
 
 /** 当前文件「从哪来」——决定保存时写哪 */
@@ -67,6 +69,7 @@ export function buildSaveFiles(input: SaveInput): SaveFileSpec[] {
     layoutName: input.name,
     generatedDrawables: input.generatedDrawables,
     extras: input.extras,
+    extraRes: input.extraRes,
   });
   return entries.map((e) => ({ path: e.path, text: e.text }));
 }
@@ -79,6 +82,7 @@ export function buildRealRenderFiles(input: SaveInput): SaveFileSpec[] {
     layoutName: input.name,
     generatedDrawables: input.generatedDrawables,
     extras: input.extras,
+    extraRes: input.extraRes,
   });
   return entries.map((e) => ({ path: e.path, text: e.text }));
 }

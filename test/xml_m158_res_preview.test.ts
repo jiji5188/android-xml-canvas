@@ -161,6 +161,21 @@ describe("M158 真机渲染补齐项目资源", () => {
     expect(r.stubbed).toEqual([]);
   });
 
+  it("res_values.xml 与项目 values 同名时去重，不重复定义", async () => {
+    const io = fakeIo(`t-${Math.random()}`, {
+      "app/src/main/res/values/colors.xml": '<resources><color name="brand">#123456</color></resources>',
+    });
+    const merged =
+      '<?xml version="1.0" encoding="utf-8"?>\n<resources><color name="brand">#fff</color><color name="only_mine">#000</color></resources>';
+    const r = await collectProjectRes(io, "app/src/main/res/layout/a.xml", [
+      { path: "layout/a.xml", text: '<View android:background="@color/brand"/>' },
+      { path: "values/res_values.xml", text: merged },
+    ]);
+    const out = r.files.find((f) => f.path === "values/res_values.xml")!;
+    expect(out.text).toContain('name="only_mine"');
+    expect(out.text).not.toContain('name="brand"');
+  });
+
   it("没有 IO 时原样返回", async () => {
     const r = await collectProjectRes(null, null, [{ path: "layout/a.xml", text: "<L/>" }]);
     expect(r.files).toHaveLength(1);

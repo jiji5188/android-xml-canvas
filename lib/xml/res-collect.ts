@@ -66,6 +66,52 @@ export interface CollectResult {
   stubbed?: string[];
 }
 
+/* M159：res_values.xml 是「上传/合并的 values」的落地文件；现在项目自己的 values/*.xml
+ * 也会一起带去真机，同名资源会被 aapt2 判 duplicate。这里按「项目优先」去重，
+ * 只保留项目里没有的定义；全被覆盖就整份文件丢掉。 */
+const VALUE_ELEM_RE =
+  /<(string|color|dimen|style|integer|bool|fraction|plurals|array|string-array|integer-array)\b[^>]*(?:\/>|>[\s\S]*?<\/\1>)/g;
+
+function definedValueKeys(xml: string): Set<string> {
+  const out = new Set<string>();
+  const re = new RegExp(VALUE_ELEM_RE.source, "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(xml)) !== null) {
+    const head = m[0].slice(0, m[0].indexOf(">") + 1);
+    const name = (head.match(/\bname\s*=\s*"([^"]+)"/) || [])[1];
+    if (name) out.add(`${m[1]}/${name}`);
+  }
+  return out;
+}
+
+export function dedupeValuesFiles(files: RenderFile[], projectDefs?: Set<string>): RenderFile[] {
+  const mergedPath = "values/res_values.xml";
+  const merged = files.find((f) => f.path === mergedPath);
+  if (!merged || !merged.text) return files;
+  const defineNonMerged = new Set<string>(projectDefs ?? []);
+  for (const f of files) {
+    if (f === merged || !/^values(\/|$)/.test(f.path) || !/\.xml$/i.test(f.path) || !f.text) continue;
+    for (const k of definedValueKeys(f.text)) defineNonMerged.add(k);
+  }
+  if (defineNonMerged.size === 0) return files;
+
+  const re = new RegExp(VALUE_ELEM_RE.source, "g");
+  const kept: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(merged.text)) !== null) {
+    const head = m[0].slice(0, m[0].indexOf(">") + 1);
+    const name = (head.match(/\bname\s*=\s*"([^"]+)"/) || [])[1];
+    if (!name) continue;
+    if (defineNonMerged.has(`${m[1]}/${name}`)) continue;
+    kept.push(`    ${m[0].trim()}`);
+  }
+  if (kept.length === 0) {
+    return files.filter((f) => f !== merged);
+  }
+  const text = `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${kept.join("\n")}\n</resources>\n`;
+  return files.map((f) => (f === merged ? { ...f, text } : f));
+}
+
 /**
  * 把 files 里引用但没定义的资源从项目 res 递归补齐。
  * @param io     项目 IO（APK native bridge / 浏览器 FSA），为空则原样返回
@@ -111,6 +157,41 @@ export async function collectProjectRes(
     added++;
     return true;
   };
+
+  /** M159：项目自己的 values/*.xml 先全带上（true render 依赖样式/主题/颜色），
+   *  同时记下它们定义了哪些资源 —— 合并来的 values/res_values.xml 要按它们去重。 */
+  const projectValueDefs = new Set<string>();
+  for (const dir of dirs.filter((d) => /^values/.test(d))) {
+    let items: { name: string; kind: "file" | "dir" }[] = [];
+    try {
+      const r = await io.list(`${resRel}/${dir}`);
+      if (r.ok && r.items) items = r.items.map((it) => ({ name: it.name, kind: it.kind }));
+    } catch {
+      continue;
+    }
+    for (const it of items) {
+      if (it.kind !== "file" || !/\.xml$/i.test(it.name) || reads > 400) continue;
+      reads++;
+      const rel = `${dir}/${it.name}`;
+      if (have.has(rel)) continue;
+      const r = await io.read(`${resRel}/${rel}`);
+      const text = r.ok ? r.text || "" : "";
+      valuesCache.set(`${resRel}/${rel}`, text || null);
+      if (!text) continue;
+      if (addFile(rel, text)) {
+        for (const k of definedValueKeys(text)) {
+          projectValueDefs.add(k);
+          defs.add(k);
+        }
+        const attrRe = /<attr\b[^>]*?\bname="([^"]+)"/g;
+        let am: RegExpExecArray | null;
+        while ((am = attrRe.exec(text)) !== null) {
+          projectValueDefs.add(`attr/${am[1]}`);
+          defs.add(`attr/${am[1]}`);
+        }
+      }
+    }
+  }
 
   /** 扫一遍 values 目录，建「资源 → 定义文件」索引（只做一次） */
   const scanValues = async () => {
@@ -277,5 +358,5 @@ export async function collectProjectRes(
     );
   }
 
-  return { files, missing: [...missing].sort(), added, stubbed };
+  return { files: dedupeValuesFiles(files, projectValueDefs), missing: [...missing].sort(), added, stubbed };
 }

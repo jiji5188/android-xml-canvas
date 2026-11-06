@@ -2,506 +2,95 @@
 ▲ Next.js 16.4.2 (Turbopack)
 - Local:         http://localhost:3000
 - Network:       http://192.168.31.101:3000
-✓ Ready in 1741ms
-✓ Running next.config.ts took 28ms
+✓ Ready in 2.1s
+✓ Running next.config.ts took 2.1s
 
-○ Compiling /xml ...
- GET /xml/?r=m101b 200 in 410ms (next.js: 256ms, application-code: 153ms)
-✓ Compiled in 299ms
-✓ Compiled in 106ms
-✓ Compiled in 112ms
-✓ Compiled in 113ms
-✓ Compiled in 202ms
-✓ Compiled in 770ms
-✓ Compiled in 136ms
-✓ Compiled in 741ms
-✓ Compiled in 6.9s
-✓ Compiled in 5.2s
-✓ Compiled in 123ms
-✓ Compiled in 95ms
-✓ Compiled in 396ms
-✓ Compiled in 118ms
-✓ Compiled in 1323ms
-✓ Compiled in 1612ms
-✓ Compiled in 131ms
-✓ Compiled in 98ms
-✓ Compiled in 96ms
-✓ Compiled in 813ms
-✓ Compiled in 93ms
-✓ Compiled in 551ms
-✓ Compiled in 169ms
-✓ Compiled in 99ms
-✓ Compiled in 127ms
-✓ Compiled in 100ms
-✓ Compiled in 1425ms
-✓ Compiled in 130ms
-✓ Compiled in 99ms
-✓ Compiled in 534ms
-✓ Compiled in 241ms
-✓ Compiled in 176ms
-✓ Compiled in 88ms
-✓ Compiled in 101ms
-✓ Compiled in 1049ms
-[browser] Uncaught ReferenceError: tt is not defined
-    at ProjectsTab (components/ProjectPanel.tsx:855:24)
-    at Set.forEach (<anonymous>)
-    at ProjectPanel (components/ProjectPanel.tsx:960:85)
-    at XmlEditor (components/XmlEditor.tsx:3557:13)
-    at XmlPage (app/xml/page.tsx:8:10)
-  853 |                 className="axv-rail-mini-btn"
-  854 |                 onClick={() => void p.onOpenDir()}
-> 855 |                 title={tt("打开其他项目文件夹（含 layout/*.xml），作为当前项目")}
-      |                        ^
-  856 |               >
-  857 |                 <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>folder_open</span>
-  858 |                 {tr("proj.open", "打开项目")}
-⚠ Fast Refresh had to perform a full reload due to a runtime error.
-✓ Compiled in 284ms
- GET /xml/?r=m101b 200 in 90ms (next.js: 1.2ms, application-code: 88ms)
-✓ Compiled in 152ms
-✓ Compiled in 402ms
-[browser] ./lib/i18n-src.ts:59:61
-Error: Unexpected character '“'
-  57 | ...源目录内部。": "The target location is inside the source folder.",
-  58 | ... "Name conflict",
-> 59 | ...有「{name}」，请改名后再粘贴": “{name}” already exists under {parent} — rename it befor...
-     |                                   ^
-  60 | ... "Paste failed",
-  61 | ...asted",
-  62 | ...parent}/": "Copied to {parent}/",
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./lib/i18n-src.ts [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-[browser] ./lib/i18n-src.ts:59:61
-Error: Unexpected character '“'
-  57 | ...源目录内部。": "The target location is inside the source folder.",
-  58 | ... "Name conflict",
-> 59 | ...有「{name}」，请改名后再粘贴": “{name}” already exists under {parent} — rename it befor...
-     |                                   ^
-  60 | ... "Paste failed",
-  61 | ...asted",
-  62 | ...parent}/": "Copied to {parent}/",
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./lib/i18n-src.ts [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-[browser] ./lib/i18n-src.ts:59:61
-Error: Unexpected character '“'
-  57 | ...源目录内部。": "The target location is inside the source folder.",
-  58 | ... "Name conflict",
-> 59 | ...有「{name}」，请改名后再粘贴": “{name}” already exists under {parent} — rename it befor...
-     |                                   ^
-  60 | ... "Paste failed",
-  61 | ...asted",
-  62 | ...parent}/": "Copied to {parent}/",
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./lib/i18n-src.ts [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-[browser] ./lib/i18n-src.ts:59:61
-Error: Unexpected character '“'
-  57 | ...源目录内部。": "The target location is inside the source folder.",
-  58 | ... "Name conflict",
-> 59 | ...有「{name}」，请改名后再粘贴": “{name}” already exists under {parent} — rename it befor...
-     |                                   ^
-  60 | ... "Paste failed",
-  61 | ...asted",
-  62 | ...parent}/": "Copied to {parent}/",
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./lib/i18n-src.ts [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-[browser] ./lib/i18n-src.ts:59:61
-Error: Unexpected character '“'
-  57 | ...源目录内部。": "The target location is inside the source folder.",
-  58 | ... "Name conflict",
-> 59 | ...有「{name}」，请改名后再粘贴": “{name}” already exists under {parent} — rename it befor...
-     |                                   ^
-  60 | ... "Paste failed",
-  61 | ...asted",
-  62 | ...parent}/": "Copied to {parent}/",
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./lib/i18n-src.ts [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-✓ Compiled in 97ms
- GET /xml/?r=m101b 200 in 24ms (next.js: 3ms, application-code: 21ms)
-✓ Compiled in 117ms
-✓ Compiled in 981ms
-✓ Compiled in 244ms
-✓ Compiled in 126ms
-✓ Compiled in 533ms
-✓ Compiled in 93ms
-✓ Compiled in 135ms
-✓ Compiled in 92ms
-✓ Compiled in 96ms
-✓ Compiled in 644ms
-✓ Compiled in 162ms
-✓ Compiled in 109ms
-✓ Compiled in 136ms
-✓ Compiled in 91ms
-✓ Compiled in 114ms
-✓ Compiled in 696ms
-✓ Compiled in 125ms
-✓ Compiled in 232ms
-✓ Compiled in 1075ms
-[browser] ./components/RunPreview.tsx:217:57
-Error: Expected ',', got '{'
-  215 |       }
-  216 |       if (BACK_WORDS.has(action)) {
-> 217 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
-      |                                                         ^
-  218 |         back();
-  219 |         return;
-  220 |       }
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./components/RunPreview.tsx [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-[browser] ./components/RunPreview.tsx:218:57
-Error: Expected ',', got '{'
-  216 |       }
-  217 |       if (BACK_WORDS.has(action)) {
-> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
-      |                                                         ^
-  219 |         back();
-  220 |         return;
-  221 |       }
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./components/RunPreview.tsx [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-✓ Compiled in 365ms
-[browser] ./components/RunPreview.tsx:218:57
-Error: Expected ',', got '{'
-  216 |       }
-  217 |       if (BACK_WORDS.has(action)) {
-> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
-      |                                                         ^
-  219 |         back();
-  220 |         return;
-  221 |       }
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./components/RunPreview.tsx [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-✓ Compiled in 122ms
-[browser] ./components/RunPreview.tsx:218:57
-Error: Expected ',', got '{'
-  216 |       }
-  217 |       if (BACK_WORDS.has(action)) {
-> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
-      |                                                         ^
-  219 |         back();
-  220 |         return;
-  221 |       }
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./components/RunPreview.tsx [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-✓ Compiled in 90ms
-[browser] ./components/RunPreview.tsx:218:57
-Error: Expected ',', got '{'
-  216 |       }
-  217 |       if (BACK_WORDS.has(action)) {
-> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
-      |                                                         ^
-  219 |         back();
-  220 |         return;
-  221 |       }
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./components/RunPreview.tsx [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-[browser] ./components/RunPreview.tsx:218:57
-Error: Expected ',', got '{'
-  216 |       }
-  217 |       if (BACK_WORDS.has(action)) {
-> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
-      |                                                         ^
-  219 |         back();
-  220 |         return;
-  221 |       }
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./components/RunPreview.tsx [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-✓ Compiled in 102ms
-[browser] ./components/RunPreview.tsx:218:57
-Error: Expected ',', got '{'
-  216 |       }
-  217 |       if (BACK_WORDS.has(action)) {
-> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
-      |                                                         ^
-  219 |         back();
-  220 |         return;
-  221 |       }
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./components/RunPreview.tsx [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-[browser] ./components/RunPreview.tsx:218:57
-Error: Expected ',', got '{'
-  216 |       }
-  217 |       if (BACK_WORDS.has(action)) {
-> 218 |         log("I", eventText("click", label, tt("onClick="{action}" → 返回", { action })));
-      |                                                         ^
-  219 |         back();
-  220 |         return;
-  221 |       }
-
-Parsing ecmascript source code failed
-
-Import trace:
-  Client Component Browser:
-    ./components/RunPreview.tsx [Client Component Browser]
-    ./components/XmlEditor.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Client Component Browser]
-    ./app/xml/page.tsx [Server Component] 
-✓ Compiled in 190ms
- GET /xml/?r=m101b 200 in 29ms (next.js: 1.3ms, application-code: 27ms)
-✓ Compiled in 142ms
-✓ Compiled in 660ms
-✓ Compiled in 113ms
-✓ Compiled in 500ms
-✓ Compiled in 3.1s
-✓ Compiled in 370ms
 ○ Compiling / ...
- GET / 200 in 33ms (next.js: 4ms, application-code: 29ms)
- GET /xml/ 200 in 31ms (next.js: 1.2ms, application-code: 29ms)
-✓ Compiled in 264ms
-✓ Compiled in 124ms
-✓ Compiled in 460ms
-✓ Compiled in 170ms
-✓ Compiled in 253ms
-✓ Compiled in 334ms
-✓ Compiled in 93ms
-✓ Compiled in 91ms
-✓ Compiled in 104ms
-✓ Compiled in 107ms
-✓ Compiled in 940ms
-✓ Compiled in 137ms
-✓ Compiled in 1807ms
-[browser] Uncaught ReferenceError: tt is not defined
-    at CodeEditor (components/CodeEditor.tsx:877:63)
-    at Set.forEach (<anonymous>)
-    at XmlCodeView (components/XmlCodeEditor.tsx:434:60)
-    at XmlEditor (components/XmlEditor.tsx:3417:7)
-    at XmlPage (app/xml/page.tsx:8:10)
-  875 |       )}
-  876 |
-> 877 |       <div className="axv-sym-bar" role="toolbar" aria-label={tt("常用符号")}>
-      |                                                               ^
-  878 |         {onFormat ? (
-  879 |           <button
-  880 |             type="button"
-⚠ Fast Refresh had to perform a full reload due to a runtime error.
- GET /xml/?r=m101b 200 in 29ms (next.js: 0.8ms, application-code: 28ms)
-✓ Compiled in 1026ms
-✓ Compiled in 120ms
-✓ Compiled in 1660ms
-[browser] Uncaught ReferenceError: tt is not defined
-    at WidgetPalette (components/WidgetPalette.tsx:75:24)
-    at Set.forEach (<anonymous>)
-    at XmlEditor (components/XmlEditor.tsx:3469:15)
-    at XmlPage (app/xml/page.tsx:8:10)
-  73 |       <div className="axv-pp-search">
-  74 |         <input
-> 75 |           placeholder={tt("搜索控件名 / 类名")}
-     |                        ^
-  76 |           value={q}
-  77 |           onChange={(e) => setQ(e.target.value)}
-  78 |           aria-label={tt("搜索组件")}
- GET /xml/?r=m101b 200 in 47ms (next.js: 0.9ms, application-code: 46ms)
-[browser] Uncaught ReferenceError: tt is not defined
-    at module evaluation (components/CanvasBoundary.tsx:27:10)
-    at module evaluation (components/CanvasStage.tsx:10:1)
-    at module evaluation (components/XmlEditor.tsx:136:1)
-    at module evaluation (components/widget-catalog.ts:1023:33)
-    at <unknown> (.next\dev\static\chunks\components_XmlEditor_tsx_1kug7hoaa0dz4._.js:26:16)
-    at XmlPage (app/xml/page.tsx:8:10)
-  25 |
-  26 | const DEFAULT_LABELS: Labels = {
-> 27 |   title: tt("画布渲染出错了"),
-     |          ^
-  28 |   hint: tt("这不是你操作的问题，多半是某段布局数据超出了支持范围。到「代码」面板改一下（哪怕加个空格再删掉）画布会自动重试。"),
-  29 |   fix: tt("去代码面板修正"),
-  30 |   retry: tt("重试渲染"),
-⚠ Fast Refresh had to perform a full reload due to a runtime error.
-✓ Compiled in 317ms
- GET /xml/?r=m101b 200 in 56ms (next.js: 1.8ms, application-code: 55ms)
-✓ Compiled in 111ms
-✓ Compiled in 103ms
-[browser] Uncaught ReferenceError: tt is not defined
-    at Inspector (components/Inspector.tsx:62:39)
-    at Set.forEach (<anonymous>)
-    at XmlEditor (components/XmlEditor.tsx:3634:7)
-    at XmlPage (app/xml/page.tsx:8:10)
-  60 |     <aside className={"axv-slide-right" + (open ? " axv-open" : "")}>
-  61 |       <div className="axv-slide-head">
-> 62 |         <span>{isOutline ? tt("函数") : tt("属性")}</span>
-     |                                     ^
-  63 |         <button className="axv-icon-btn" title={tt("关闭面板")} aria-label={tt("关闭面板")} onClick={onClose}>
-  64 |           <span className="msr" aria-hidden="true" style={{ fontSize: 24 }}>
-  65 |             right_panel_close
-✓ Compiled in 292ms
-⚠ Fast Refresh had to perform a full reload due to a runtime error.
- GET /xml/?r=m101b 200 in 40ms (next.js: 1.0ms, application-code: 39ms)
-✓ Compiled in 117ms
-✓ Compiled in 94ms
-✓ Compiled in 100ms
-✓ Compiled in 105ms
- GET / 200 in 28ms (next.js: 1.1ms, application-code: 27ms)
- GET /xml/ 200 in 35ms (next.js: 0.9ms, application-code: 34ms)
-✓ Compiled in 1148ms
- GET /xml/ 200 in 41ms (next.js: 1.4ms, application-code: 39ms)
-[browser] Uncaught ReferenceError: tt is not defined
-    at module evaluation (components/XmlEditor.tsx:184:15)
-    at module evaluation (components/widget-catalog.ts:1023:33)
-    at <unknown> (.next\dev\static\chunks\components_XmlEditor_tsx_1kug7hoaa0dz4._.js:26:16)
-    at XmlPage (app/xml/page.tsx:8:10)
-  182 | const SAMPLES: Record<string, string> = {
-  183 |   /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
-> 184 |   "blank-cl": `<?xml version="1.0" encoding="utf-8"?>
-      |               ^
-  185 | <androidx.constraintlayout.widget.ConstraintLayout
-  186 |     xmlns:android="http://schemas.android.com/apk/res/android"
-  187 |     xmlns:app="http://schemas.android.com/apk/res-auto"
-✓ Compiled in 1832ms
-[browser] ./components/XmlEditor.tsx:3755:16
-Error: Unterminated regexp literal
-  3753 |                   ? tt("扫描中…")
-  3754 |                   : tt("{n} 处 · 扫了 {files} 个文件{mode}", { n: usesPanel.hits.length,...
-> 3755 |               </span>
-       |                ^^^^^^
-  3756 |               <span style={{ flex: 1 }} />
-  3757 |               <button className="axv-uses-x" aria-label={tt("关闭")} onClick={() => setU...
-  3758 |                 ✕
+ GET / 200 in 354ms (next.js: 250ms, application-code: 103ms)
+ GET /xml/ 200 in 79ms (next.js: 5ms, application-code: 74ms)
+ GET /xml/ 200 in 30ms (next.js: 1.6ms, application-code: 28ms)
+✓ Compiled in 1816ms
+[browser] ./components/drawable/TransformTabs.tsx:46:85
+Error: Expected ':', got ';'
+  44 |             ? k === "rotate"
+  45 |               ? { fromDegrees: "0", pivotX: "50%", pivotY: "50%" }
+> 46 |               : { fromDegrees: "0", toDegrees: "360", pivotX: "50%", pivotY: "50%" };
+     |                                                                                     ^
+  47 |     // 按默认顺序插入
+  48 |     const order: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
+  49 |     const idx = order.indexOf(k);
 
 Parsing ecmascript source code failed
 
 Import trace:
   Client Component Browser:
+    ./components/drawable/TransformTabs.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
     ./components/XmlEditor.tsx [Client Component Browser]
     ./app/xml/page.tsx [Client Component Browser]
     ./app/xml/page.tsx [Server Component] 
-[browser] ./components/XmlEditor.tsx:3755:16
-Error: Unterminated regexp literal
-  3753 |                   ? tt("扫描中…")
-  3754 |                   : tt("{n} 处 · 扫了 {files} 个文件{mode}", { n: usesPanel.hits.length,...
-> 3755 |               </span>
-       |                ^^^^^^
-  3756 |               <span style={{ flex: 1 }} />
-  3757 |               <button className="axv-uses-x" aria-label={tt("关闭")} onClick={() => setU...
-  3758 |                 ✕
+[browser] ./components/drawable/TransformTabs.tsx:46:85
+Error: Expected ':', got ';'
+  44 |             ? k === "rotate"
+  45 |               ? { fromDegrees: "0", pivotX: "50%", pivotY: "50%" }
+> 46 |               : { fromDegrees: "0", toDegrees: "360", pivotX: "50%", pivotY: "50%" };
+     |                                                                                     ^
+  47 |     // 按默认顺序插入
+  48 |     const order: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
+  49 |     const idx = order.indexOf(k);
 
 Parsing ecmascript source code failed
 
 Import trace:
   Client Component Browser:
+    ./components/drawable/TransformTabs.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
     ./components/XmlEditor.tsx [Client Component Browser]
     ./app/xml/page.tsx [Client Component Browser]
     ./app/xml/page.tsx [Server Component] 
-[browser] ./components/XmlEditor.tsx:3755:16
-Error: Unterminated regexp literal
-  3753 |                   ? tt("扫描中…")
-  3754 |                   : tt("{n} 处 · 扫了 {files} 个文件{mode}", { n: usesPanel.hits.length,...
-> 3755 |               </span>
-       |                ^^^^^^
-  3756 |               <span style={{ flex: 1 }} />
-  3757 |               <button className="axv-uses-x" aria-label={tt("关闭")} onClick={() => setU...
-  3758 |                 ✕
+[browser] ./components/drawable/TransformTabs.tsx:46:85
+Error: Expected ':', got ';'
+  44 |             ? k === "rotate"
+  45 |               ? { fromDegrees: "0", pivotX: "50%", pivotY: "50%" }
+> 46 |               : { fromDegrees: "0", toDegrees: "360", pivotX: "50%", pivotY: "50%" };
+     |                                                                                     ^
+  47 |     // 按默认顺序插入
+  48 |     const order: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
+  49 |     const idx = order.indexOf(k);
 
 Parsing ecmascript source code failed
 
 Import trace:
   Client Component Browser:
+    ./components/drawable/TransformTabs.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
     ./components/XmlEditor.tsx [Client Component Browser]
     ./app/xml/page.tsx [Client Component Browser]
     ./app/xml/page.tsx [Server Component] 
-⚠ Fast Refresh had to perform a full reload due to a runtime error.
-✓ Compiled in 282ms
- GET /xml/ 200 in 121ms (next.js: 1.8ms, application-code: 119ms)
-[browser] Uncaught ReferenceError: tt is not defined
-    at module evaluation (components/XmlEditor.tsx:184:15)
-    at module evaluation (components/widget-catalog.ts:1023:33)
-    at <unknown> (.next\dev\static\chunks\components_XmlEditor_tsx_1kug7hoaa0dz4._.js:26:16)
-    at XmlPage (app/xml/page.tsx:8:10)
-  182 | const SAMPLES: Record<string, string> = {
-  183 |   /** M2s：新建空白 ConstraintLayout 骨架（一行注释 + 空 CL，拖控件进来即可开建） */
-> 184 |   "blank-cl": `<?xml version="1.0" encoding="utf-8"?>
-      |               ^
-  185 | <androidx.constraintlayout.widget.ConstraintLayout
-  186 |     xmlns:android="http://schemas.android.com/apk/res/android"
-  187 |     xmlns:app="http://schemas.android.com/apk/res-auto"
-⚠ Fast Refresh had to perform a full reload due to a runtime error.
-✓ Compiled in 209ms
- GET /xml/ 200 in 61ms (next.js: 0.9ms, application-code: 60ms)
-✓ Compiled in 1165ms
-✓ Compiled in 130ms
-✓ Compiled in 179ms
-✓ Compiled in 480ms
-✓ Compiled in 126ms
-✓ Compiled in 110ms
-✓ Compiled in 663ms
+[browser] ./components/drawable/TransformTabs.tsx:46:85
+Error: Expected ':', got ';'
+  44 |             ? k === "rotate"
+  45 |               ? { fromDegrees: "0", pivotX: "50%", pivotY: "50%" }
+> 46 |               : { fromDegrees: "0", toDegrees: "360", pivotX: "50%", pivotY: "50%" };
+     |                                                                                     ^
+  47 |     // 按默认顺序插入
+  48 |     const order: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
+  49 |     const idx = order.indexOf(k);
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/TransformTabs.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 856ms
+ GET /xml/ 200 in 27ms (next.js: 4ms, application-code: 22ms)
+ GET /xml/ 200 in 31ms (next.js: 0.9ms, application-code: 30ms)
+[?25h

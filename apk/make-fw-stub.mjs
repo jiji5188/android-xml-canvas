@@ -65,21 +65,23 @@ function readZipEntry(buf, want) {
 
 const DOS = { time: 0x0021, date: 0x4f0b };
 
-/** 写一个「只有一个条目」的 zip：内容 DEFLATE 压缩 */
-function writeZip(outPath, name, data) {
+/** 写一个「只有一个条目」的 zip。压缩方式必须 STORE（不压缩）：
+ *  设备端 aapt2 用 AssetManager2 加载 -I 包，resources.arsc 一旦被压缩就报
+ *  failed to load include path（实测：deflate 版在电脑 aapt2 上过，在手机上不过）。
+ *  代价是 16.4MB，所以外层再用 gzip 包一层，进 assets 只有 4.4MB。 */
+function writeZipStore(outPath, name, data) {
   const nameBuf = Buffer.from(name, "utf8");
-  const deflated = zlib.deflateRawSync(data, { level: 9 });
   const crc = crc32(data);
 
   const local = Buffer.alloc(30);
   local.writeUInt32LE(0x04034b50, 0);
   local.writeUInt16LE(20, 4); // version needed
   local.writeUInt16LE(0, 6); // flags
-  local.writeUInt16LE(8, 8); // deflate
+  local.writeUInt16LE(0, 8); // store！
   local.writeUInt16LE(DOS.time, 10);
   local.writeUInt16LE(DOS.date, 12);
   local.writeUInt32LE(crc, 14);
-  local.writeUInt32LE(deflated.length, 18);
+  local.writeUInt32LE(data.length, 18);
   local.writeUInt32LE(data.length, 22);
   local.writeUInt16LE(nameBuf.length, 26);
   local.writeUInt16LE(0, 28);
@@ -89,11 +91,11 @@ function writeZip(outPath, name, data) {
   central.writeUInt16LE(20, 4);
   central.writeUInt16LE(20, 6);
   central.writeUInt16LE(0, 8);
-  central.writeUInt16LE(8, 10);
+  central.writeUInt16LE(0, 10); // store
   central.writeUInt16LE(DOS.time, 12);
   central.writeUInt16LE(DOS.date, 14);
   central.writeUInt32LE(crc, 16);
-  central.writeUInt32LE(deflated.length, 20);
+  central.writeUInt32LE(data.length, 20);
   central.writeUInt32LE(data.length, 24);
   central.writeUInt16LE(nameBuf.length, 28);
   central.writeUInt16LE(0, 30);
@@ -103,7 +105,7 @@ function writeZip(outPath, name, data) {
   central.writeUInt32LE(0, 38);
   central.writeUInt32LE(0, 42);
 
-  const cdOffset = local.length + nameBuf.length + deflated.length;
+  const cdOffset = local.length + nameBuf.length + data.length;
   const cdSize = central.length + nameBuf.length;
   const eocd = Buffer.alloc(22);
   eocd.writeUInt32LE(0x06054b50, 0);
@@ -116,21 +118,28 @@ function writeZip(outPath, name, data) {
   eocd.writeUInt16LE(0, 20);
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, Buffer.concat([local, nameBuf, deflated, central, nameBuf, eocd]));
+  return Buffer.concat([local, nameBuf, data, central, nameBuf, eocd]);
 }
 
 function main() {
-  const [jar, out] = process.argv.slice(2);
-  if (!jar || !out) {
-    console.error("用法: node apk/make-fw-stub.mjs <android.jar> <out.apk>");
+  const [jar, gzOut, rawOut] = process.argv.slice(2);
+  if (!jar || !gzOut) {
+    console.error("用法: node apk/make-fw-stub.mjs <android.jar> <out.apk.gz> [raw.apk]");
     process.exit(2);
   }
   const buf = fs.readFileSync(jar);
   const arsc = readZipEntry(buf, "resources.arsc");
   if (!arsc) throw new Error("android.jar 里没有 resources.arsc：" + jar);
-  writeZip(out, "resources.arsc", arsc);
-  const sz = fs.statSync(out).size;
-  console.log(`framework 资源桩: ${out}  ${(sz / 1048576).toFixed(2)} MB（原始 ${(arsc.length / 1048576).toFixed(2)} MB）`);
+  const apk = writeZipStore(gzOut, "resources.arsc", arsc);
+  if (rawOut) {
+    fs.mkdirSync(path.dirname(rawOut), { recursive: true });
+    fs.writeFileSync(rawOut, apk);
+    console.log(`  raw: ${rawOut}  ${(apk.length / 1048576).toFixed(2)} MB（STORE）`);
+  }
+  const gz = zlib.gzipSync(apk, { level: 9 });
+  fs.mkdirSync(path.dirname(gzOut), { recursive: true });
+  fs.writeFileSync(gzOut, gz);
+  console.log(`framework 资源桩: ${gzOut}  ${(gz.length / 1048576).toFixed(2)} MB gz（内容 ${(apk.length / 1048576).toFixed(2)} MB，arsc ${(arsc.length / 1048576).toFixed(2)} MB）`);
 }
 
 main();

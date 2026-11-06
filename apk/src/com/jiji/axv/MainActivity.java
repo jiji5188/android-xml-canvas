@@ -2302,14 +2302,17 @@ public class MainActivity extends Activity {
         // （实测 SDK36 上 canRead() 返回 true，aapt2 却报 failed to load include path），
         // 所以不复探系统路径，直接用确定能读的桩。
         File cached = new File(getCacheDir(), "framework-res-stub.apk");
-        if (cached.isFile() && cached.length() > 100000) {
+        // M155c：必须用 STORE 版（arsc 不压缩）——压缩的 arsc 手机端 aapt2 读不了。
+        // 旧的 deflate 桩只有 ~4.6MB，用长度区分并删掉重解。
+        if (cached.isFile() && cached.length() > 12000000L) {
             if (log != null) log.append("framework: 缓存的资源桩 ").append(cached.length()).append(" 字节\n");
             return cached;
         }
+        if (cached.isFile()) cached.delete();
         try {
-            InputStream in = getAssets().open("fw/framework-res-stub.apk");
+            InputStream in = new java.util.zip.GZIPInputStream(getAssets().open("fw/framework-res-stub.apk.gz"));
             try (FileOutputStream out = new FileOutputStream(cached)) {
-                byte[] buf = new byte[65536];
+                byte[] buf = new byte[131072];
                 int n;
                 while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
             } finally {

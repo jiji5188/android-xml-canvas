@@ -33,6 +33,8 @@ export interface DrawablePreviewProps {
   resolveRef?: (name: string) => string | null;
   /** M143：@drawable/x → 图片 dataURL（png / jpg / bmp / webp / svg） */
   resolveImage?: (name: string) => string | null;
+  /** M166：引用资源不存在（resolveRef/resolveImage 都失败）时显示警告 + 更换入口 */
+  onMissingRef?: (name: string) => void;
   /** 允许按下预览 */
   interactive?: boolean;
   /** 显示底部的状态提示/开关 */
@@ -56,6 +58,7 @@ export function DrawablePreview({
   scale = 1,
   resolveRef,
   resolveImage,
+  onMissingRef,
   interactive = true,
   showStateBar = true,
   showBounds = false,
@@ -98,6 +101,23 @@ export function DrawablePreview({
     () => (doc ? flattenDrawable(doc, { state, resolveRef, resolveImage }) : []),
     [doc, state, resolveRef, resolveImage],
   );
+
+  /** M166：把 preview 里画出来的所有 ref 层（含递归展开后）中 resolve 失败的那几项列出来，
+   *  打开文件/切状态/换引用时都会重算，用户能立刻看到"哪个引用找不到了" */
+  const missing = useMemo(
+    () =>
+      layers.filter(
+        (l) =>
+          l.kind === "unsupported" &&
+          l.path?.includes("@drawable/") &&
+          (l.key?.endsWith(".ref") ?? false),
+      ),
+    [layers],
+  );
+  const missingSet = useMemo(() => new Set(missing.map((l) => l.path ?? "")), [missing]);
+  useEffect(() => {
+    for (const m of missing) onMissingRef?.(m.path ?? "");
+  }, [missing, onMissingRef]);
 
   const down = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -183,6 +203,18 @@ export function DrawablePreview({
               } as React.CSSProperties
             }
           />
+        </div>
+      ) : null}
+
+      {missing.length > 0 ? (
+        <div className="axv-dp-missing">
+          <span className="axv-dp-missing-title">{tt("以下引用资源找不到，无法预览：")}</span>
+          {missing.map((l) => (
+            <span key={l.key} className="axv-dp-missing-item" title={l.path}>
+              {l.path?.split("/").pop()}
+            </span>
+          ))}
+          <span className="axv-dp-missing-hint">{tt("请更换为已存在的资源")}</span>
         </div>
       ) : null}
 

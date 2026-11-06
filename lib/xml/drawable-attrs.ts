@@ -66,7 +66,9 @@ function canWrite(node: DrawableNode, name: string): boolean {
     case "color":
       return name === "color";
     case "ref":
-      return name === "drawable";
+      // M166：ref 节点的参数由 SlotRows 里的「引用资源」输入框管（带搜索过滤），
+      // 这里不再有可写属性，避免参数面板重复出现一条「资源」
+      return false;
     case "ripple":
       return name === "color" || name === "radius";
     default:

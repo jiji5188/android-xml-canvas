@@ -9923,3 +9923,40 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-vs-compare-btn:hover {
   filter: brightness(0.97);
 }
+
+/* M166：引用资源不存在时的预览内警告条 */
+.axv-dp-missing {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #fff3cd;
+  border-top: 1px solid #f0d48a;
+  color: #7a5c00;
+  font-size: 11px;
+}
+.axv-dp-missing-title {
+  font-weight: 600;
+}
+.axv-dp-missing-item {
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.06);
+  font-family: var(--axv-mono, monospace);
+  font-size: 10px;
+}
+.axv-dp-missing-hint {
+  opacity: 0.8;
+}
+/* M166：RefField 的搜索框 + 候选列表容器 */
+.axv-ref-search {
+  margin-top: 8px;
+}
+.axv-ref-search .axv-attr-input {
+  width: 100%;
+  margin-bottom: 6px;
+}

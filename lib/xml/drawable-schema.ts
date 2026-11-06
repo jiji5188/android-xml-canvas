@@ -232,7 +232,9 @@ export const NODE_DEFS: Record<string, NodeDef> = {
     tag: "item",
     label: "引用资源",
     role: "leaf",
-    attrs: [{ name: "drawable", type: "reference", label: "资源" }],
+    // M166：节点自己的参数就是 SlotRows 里那个「引用资源」输入框，
+    // 这里不再重复出一条，否则参数面板里会同时出现「引用资源」和「资源」两行
+    attrs: [],
     editable: true,
     note: "写出来是 <item android:drawable=\"@drawable/x\"/>，没有内嵌内容",
   },

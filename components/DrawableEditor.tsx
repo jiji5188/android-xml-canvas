@@ -112,7 +112,8 @@ export function DrawableEditor({
       const proj = res?.drawableXml?.[key] ?? res?.drawableXml?.[nm];
       if (proj) return proj;
       // 当前资源自己（导出的 XML 里的引用名与编辑中的名字相同）
-      if (key === resNameFromValue(value)) return buildDrawable(root);
+      // M166：key 为空时不能当成自引用，否则空引用会把整棵树画两遍、看不出“资源缺失”
+      if (key && key === resNameFromValue(value)) return buildDrawable(root);
       return null;
     },
     [res, value, root],
@@ -147,7 +148,7 @@ export function DrawableEditor({
   const [sheetOpen, setSheetOpen] = useState(true);
   /** M135：XML 代码框不再可收起，默认一直显示（只读类型也只读展示） */
   const showRaw = true;
-  const [previewBg, setPreviewBg] = useState<"checker" | "white" | "dark">("checker");
+  const [previewBg, setPreviewBg] = useState<"checker" | "white" | "gray" | "dark">("checker");
   /** 手机端右栏是滑面板，必须给开关，否则 selector 等类型打开后拦住了预览又关不掉（M130） */
   const [formOpen, setFormOpen] = useState(true);
   const [name, setName] = useState<string>(() => resNameFromValue(value) || defaultResName(info.tag));
@@ -327,7 +328,9 @@ export function DrawableEditor({
         }
       : previewBg === "white"
         ? { background: "#ffffff" }
-        : { background: "#1a1a22" };
+        : previewBg === "gray"
+          ? { background: "#d7d7d7" }
+          : { background: "#1a1a22" };
 
   return (
     <div className="axv-icon-page axv-cv-page" role="dialog" aria-label={tt("drawable 编辑器")}>
@@ -461,6 +464,7 @@ export function DrawableEditor({
                 [
                   ["checker", tt("透明")],
                   ["white", tt("白底")],
+                  ["gray", tt("浅灰")],
                   ["dark", tt("深色")],
                 ] as const
               ).map(([k, label]) => (
@@ -520,6 +524,15 @@ export function DrawableEditor({
               frame={previewBgStyle}
               resolveRef={resolveRefForPreview}
               resolveImage={resolveImageForPreview}
+              onMissingRef={(nm) => {
+                // nm 是渲染层路径（如 item#0 › @drawable/bg_avatar），提示里只显示资源名更好读
+                const m = /@drawable\/([^\s›]*)/.exec(nm);
+                setRootNote(
+                  tt("引用资源找不到：{n}，请更换为已存在的资源", {
+                    n: m ? `@drawable/${m[1] || ""}` : nm,
+                  }),
+                );
+              }}
             />
           </div>
 
@@ -677,6 +690,7 @@ export function DrawableEditor({
                       slot={slotOf(root, path)}
                       onChange={(patch) => mutate(setSlot(root, path, patch))}
                       onNodeChange={(next) => mutate(replaceAt(root, path, next))}
+                      refNames={allRefNames}
                     />
                   ) : null}
                   <AttrRows

@@ -15,7 +15,7 @@
 //   - 不透明度换成滑块 + 小数输入（原来只有整数输入框，0.5 打不进去）
 //   - 对齐方式：没设宽/高时给明确提示（Android 里 item 填满父级，gravity 看不出变化）
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { filterNumber, parseNumberField } from "@/lib/xml/num-input";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
@@ -154,11 +154,29 @@ function itemRefOf(node: DrawableNode): string {
   return "";
 }
 
-function RefField({ node, onChange }: { node: DrawableNode; onChange: (n: DrawableNode) => void }) {
+function RefField({
+  node,
+  onChange,
+  refNames,
+}: {
+  node: DrawableNode;
+  onChange: (n: DrawableNode) => void;
+  /** M166：已有 drawable 资源名候选（支持关键词搜索过滤） */
+  refNames?: string[];
+}) {
   const cur = itemRefOf(node);
   const [draft, setDraft] = useState<string | null>(null);
   const [err, setErr] = useState("");
+  /** M166：关键词过滤 */
+  const [q, setQ] = useState("");
   const shown = draft ?? cur;
+
+  const candidates = useMemo(() => {
+    const names = (refNames ?? []).filter(Boolean);
+    if (!q.trim()) return names;
+    const kw = q.trim().toLowerCase();
+    return names.filter((n) => n.toLowerCase().includes(kw));
+  }, [refNames, q]);
 
   const commit = () => {
     if (draft === null) return;
@@ -211,6 +229,39 @@ function RefField({ node, onChange }: { node: DrawableNode; onChange: (n: Drawab
           ? tt("这一项现在是引用，它会取代内联内容")
           : tt("填了就改写这一项的内联内容（可用 @drawable/、@color/、@mipmap/ 或颜色值）")}
       </div>
+      {/* M166：关键词搜索 + 候选列表，点即填 */}
+      {refNames && refNames.length > 0 ? (
+        <div className="axv-ref-search">
+          <input
+            className="axv-attr-input"
+            placeholder={tt("搜索资源名…")}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            spellCheck={false}
+          />
+          {candidates.length > 0 ? (
+            <div className="axv-ref-picks">
+              {candidates.slice(0, 40).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={"axv-ref-pick" + (n.replace(/\.xml$/i, "") === shown ? " is-on" : "")}
+                  onClick={() => {
+                    setDraft(null);
+                    onChange({ t: "ref", name: n.replace(/\.xml$/i, "") });
+                    setErr("");
+                  }}
+                  title={`@drawable/${n}`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          ) : q ? (
+            <div className="axv-shape-hint">{tt("没有匹配的资源")}</div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -221,6 +272,7 @@ export function SlotRows({
   slot,
   onChange,
   onNodeChange,
+  refNames,
 }: {
   parent: DrawableNode;
   index: number;
@@ -228,6 +280,8 @@ export function SlotRows({
   onChange: (patch: Partial<SlotValue>) => void;
   /** M157：把这一项换成引用/颜色（或恢复默认形状） */
   onNodeChange?: (next: DrawableNode) => void;
+  /** M166：已有 drawable 资源名候选（给 RefField 的搜索过滤） */
+  refNames?: string[];
 }) {
   // 这一项自己的节点（引用输入框要看它现在是 ref / color / 内联内容）
   const child: DrawableNode | null =
@@ -248,7 +302,9 @@ export function SlotRows({
           {tt("这一层 · 第 {n} 层", { n: String(index + 1) })}
         </div>
 
-        {onNodeChange && child ? <RefField node={child} onChange={onNodeChange} /> : null}
+        {onNodeChange && child ? (
+          <RefField node={child} onChange={onNodeChange} refNames={refNames} />
+        ) : null}
 
         <div className="axv-slot-grid">
           {EDGES.map((e) => (
@@ -318,7 +374,9 @@ export function SlotRows({
     return (
       <div className="axv-slot">
         <div className="axv-set-label">{tt("这个状态生效的条件")}</div>
-        {onNodeChange && child ? <RefField node={child} onChange={onNodeChange} /> : null}
+        {onNodeChange && child ? (
+          <RefField node={child} onChange={onNodeChange} refNames={refNames} />
+        ) : null}
         {STATES.map((s) => {
           const cur = states[s.key];
           const val = cur === "true" ? "on" : cur === "false" ? "off" : "any";
@@ -360,7 +418,9 @@ export function SlotRows({
         <div className="axv-set-label">
           {index === 1 ? tt("遮罩层") : tt("内容层")}
         </div>
-        {onNodeChange && child ? <RefField node={child} onChange={onNodeChange} /> : null}
+        {onNodeChange && child ? (
+          <RefField node={child} onChange={onNodeChange} refNames={refNames} />
+        ) : null}
         <div className="axv-shape-hint">
           {index === 1
             ? tt("遮罩只决定波纹被裁成什么形状，自己不绘制。")

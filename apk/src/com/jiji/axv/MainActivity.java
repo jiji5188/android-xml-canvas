@@ -2306,10 +2306,12 @@ public class MainActivity extends Activity {
         // 先用自带的资源桩：系统里那个 framework-res.apk 能 stat/access 不代表 aapt2 子进程真能读
         // （实测 SDK36 上 canRead() 返回 true，aapt2 却报 failed to load include path），
         // 所以不复探系统路径，直接用确定能读的桩。
-        File cached = new File(getCacheDir(), "framework-res-stub-v2.apk");
+        File cached = externalStubDir().isDirectory()
+                ? new File(externalStubDir(), "framework-res-stub-v2.apk")
+                : new File(getCacheDir(), "framework-res-stub-v2.apk");
         File legacy = new File(getCacheDir(), "framework-res-stub.apk");
         if (legacy.isFile()) legacy.delete();
-        // M155d：v2 = 4 字节对齐版（旧的非对齐/压缩版都作废）
+        // M155e：桩改放 AndroidUIIDE/tmp/（用户能自己看到/验证），写不了再退 cache
         if (cached.isFile() && cached.length() > 12000000L) {
             if (log != null) log.append("framework: 缓存的资源桩 ").append(cached.length()).append(" 字节\n");
             return cached;
@@ -2324,10 +2326,30 @@ public class MainActivity extends Activity {
             } finally {
                 in.close();
             }
-            if (log != null) log.append("framework: assets 资源桩 ").append(cached.length()).append(" 字节\n");
+            if (log != null) log.append("framework: assets 资源桩 → ").append(cached.getAbsolutePath())
+                    .append(" ").append(cached.length()).append(" 字节\n");
             return cached;
         } catch (Throwable t) {
             if (log != null) log.append("framework 资源桩解包失败: ").append(t).append('\n');
+            // 外部存储写不了 → 退 App cache 再试一次
+            File alt = new File(getCacheDir(), "framework-res-stub-v2.apk");
+            if (!alt.equals(cached)) {
+                try {
+                    InputStream in = new java.util.zip.GZIPInputStream(getAssets().open("fw/framework-res-stub.apk.gz"));
+                    try (FileOutputStream out = new FileOutputStream(alt)) {
+                        byte[] buf = new byte[131072];
+                        int n;
+                        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                    } finally {
+                        in.close();
+                    }
+                    if (log != null) log.append("framework: assets 资源桩 → ").append(alt.getAbsolutePath())
+                            .append(" ").append(alt.length()).append(" 字节\n");
+                    return alt;
+                } catch (Throwable t2) {
+                    if (log != null) log.append("framework 资源桩解包失败(cache): ").append(t2).append('\n');
+                }
+            }
         }
         // 实在不行再试系统路径（真能 open 的才算）
         for (String c : candidates) {
@@ -2358,6 +2380,17 @@ public class MainActivity extends Activity {
                 }
             }
         }
+    }
+
+    /** 外部存储 AndroidUIIDE/tmp（不存在就建；建不了返回不存在的 File，调用方退 cache） */
+    private File externalStubDir() {
+        File d = new File(new File(Environment.getExternalStorageDirectory(), "AndroidUIIDE"), "tmp");
+        try {
+            if (!d.isDirectory() && !d.mkdirs()) return new File("/nonexistent");
+        } catch (Throwable t) {
+            return new File("/nonexistent");
+        }
+        return d;
     }
 
     /** M155：真机渲染日志写进 AndroidUIIDE/log/（跟 perf-*.log 同一个目录，用户能直接导出）

@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue, st
 import { parseLayoutXml, findNode, serialize, nodeAtLine } from "@/lib/xml/parser";
 import { pathChainOf } from "@/lib/xml/path-chain";
 import { buildRenderModel } from "@/lib/xml/css";
+import { ComparePreview, COMPARE_DEFAULTS } from "./ComparePreview";
 import type { MeasuredMap } from "@/lib/xml/constraints";
 import {
   EMPTY_MARK,
@@ -737,6 +738,32 @@ export function XmlEditor() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   /** M2s：导出前检查面板 */
   const [exportOpen, setExportOpen] = useState(false);
+  // M165 并排对比：开/关 + 勾选的设备（localStorage 记住）
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>(() => {
+    try {
+      const raw = window.localStorage.getItem("axv.compareIds");
+      if (raw) {
+        const arr = JSON.parse(raw) as string[];
+        if (Array.isArray(arr) && arr.length > 0) return arr;
+      }
+    } catch {
+      /* 静默 */
+    }
+    return COMPARE_DEFAULTS;
+  });
+  const toggleCompareDevice = (id: string, on: boolean) => {
+    setCompareIds((cur) => {
+      const next = on ? [...cur, id] : cur.filter((x) => x !== id);
+      const list = next.length > 0 ? next : COMPARE_DEFAULTS;
+      try {
+        window.localStorage.setItem("axv.compareIds", JSON.stringify(list));
+      } catch {
+        /* 静默 */
+      }
+      return list;
+    });
+  };
   const [exportReport, setExportReport] = useState<ExportReport | null>(null);
   /** M13：导出模式（localStorage 记住），compat = 纯平台控件、AIDE 可编译 */
   const [exportMode, setExportMode] = useState<ExportMode>(() => {
@@ -4200,11 +4227,23 @@ const findResolved = findResolvedNode;
         compatNotes={compatNotes}
         onClose={() => setExportOpen(false)}
         onConfirm={exportAction === "copy" ? doCopy : doDownload}
-        onJumpLine={(line) => {
-          setExportOpen(false);
-          gotoLine(line);
-        }}
-      />
+          onJumpLine={(line) => {
+            setExportOpen(false);
+            gotoLine(line);
+          }}
+        />
+
+        {/* M165 并排对比覆盖层 */}
+        <ComparePreview
+          open={compareOpen}
+          onClose={() => setCompareOpen(false)}
+          root={parsedDoc.root ?? null}
+          resources={resources}
+          layouts={resExtras?.layouts}
+          theme={renderTheme}
+          deviceIds={compareIds}
+          onToggleDevice={(id, on) => toggleCompareDevice(id, on)}
+        />
 
       {/* 顶部工具栏（桌面端只占两侧面板之间的画布区，不重叠侧栏） */}
       <Toolbar
@@ -4217,6 +4256,7 @@ const findResolved = findResolvedNode;
         onChangeDevice={changeDevice}
         scale={scale}
         onScale={setScale}
+        onCompare={() => setCompareOpen(true)}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={undo}

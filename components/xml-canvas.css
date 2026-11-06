@@ -9812,3 +9812,114 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-unsaved-drop { color: #dc2626; }
 .axv-btn.axv-primary { background: #2f6bff; color: #fff; border-color: #2f6bff; }
 .axv-btn.axv-primary:disabled { opacity: .5; }
+
+/* M165：并排对比（同一份布局在多台设备上的只读渲染，覆盖层） */
+.axv-cmp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.62);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  box-sizing: border-box;
+  color: #fff;
+}
+.axv-cmp-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.axv-cmp-head strong {
+  font-size: 14px;
+}
+.axv-cmp-pool {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+}
+.axv-cmp-pool-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  user-select: none;
+}
+.axv-cmp-pool-item input {
+  margin: 0;
+}
+.axv-cmp-pool-item.is-on {
+  background: #4f8cff;
+}
+.axv-cmp-close {
+  border: 0;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.axv-cmp-close:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+.axv-cmp-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  padding-bottom: 12px;
+}
+.axv-cmp-col {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.axv-cmp-col-label {
+  font-size: 12px;
+  text-align: center;
+  opacity: 0.9;
+}
+.axv-cmp-phone {
+  position: relative;
+}
+.axv-cmp-empty,
+.axv-cmp-err {
+  color: #ffd2d2;
+  font-size: 13px;
+  padding: 24px;
+}
+/* 「显示与设备」菜单里的并排对比入口 */
+.axv-vs-compare {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+.axv-vs-compare-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--axv-primary);
+  color: var(--axv-primary);
+  background: var(--axv-primary-soft);
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.axv-vs-compare-btn:hover {
+  filter: brightness(0.97);
+}

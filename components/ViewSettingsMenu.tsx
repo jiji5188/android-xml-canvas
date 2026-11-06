@@ -22,9 +22,11 @@ export type ViewSettingsMenuProps = {
   onDevice: (id: string) => void;
   scale: number;
   onScale: (n: number) => void;
+  /** M165：打开并排对比覆盖层 */
+  onCompare?: () => void;
 };
 
-export function ViewSettingsMenu({ deviceId, onDevice, scale, onScale }: ViewSettingsMenuProps) {
+export function ViewSettingsMenu({ deviceId, onDevice, scale, onScale, onCompare }: ViewSettingsMenuProps) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -151,6 +153,24 @@ export function ViewSettingsMenu({ deviceId, onDevice, scale, onScale }: ViewSet
                   {tt("复位 100%")}
                 </button>
               </div>
+
+              {onCompare ? (
+                <div className="axv-vs-compare">
+                  <button
+                    type="button"
+                    className="axv-vs-compare-btn"
+                    onClick={() => {
+                      setOpen(false);
+                      onCompare();
+                    }}
+                  >
+                    <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
+                      grid_view
+                    </span>
+                    {tt("并排对比多台设备")}
+                  </button>
+                </div>
+              ) : null}
             </div>,
             document.body,
           )

@@ -23,6 +23,8 @@ export type ToolbarProps = {
   onChangeDevice: (id: string) => void;
   scale: number;
   onScale: (n: number) => void;
+  /** M165：并排对比 */
+  onCompare?: () => void;
 
   canUndo: boolean;
   canRedo: boolean;
@@ -67,6 +69,7 @@ export function Toolbar(props: ToolbarProps) {
     onChangeDevice,
     scale,
     onScale,
+    onCompare,
     canUndo,
     canRedo,
     onUndo,
@@ -120,7 +123,7 @@ export function Toolbar(props: ToolbarProps) {
       <div className="axv-tb-scroll">
         <div className="axv-tb-group">
           {/* M6c/M10：设备 + 缩放收进这个按钮，并与其它工具同处一个工具组 */}
-          <ViewSettingsMenu deviceId={deviceId} onDevice={onChangeDevice} scale={scale} onScale={onScale} />
+          <ViewSettingsMenu deviceId={deviceId} onDevice={onChangeDevice} scale={scale} onScale={onScale} onCompare={onCompare} />
           <button className="axv-tb-btn" title={tt("撤销")} aria-label={tt("撤销")} disabled={!canUndo} onClick={onUndo}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>undo</span>
           </button>

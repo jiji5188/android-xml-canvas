@@ -180,6 +180,36 @@ export function dedupeSameNameRes(files: RenderFile[]): RenderFile[] {
 }
 
 /**
+ * M170：`<adaptive-icon>` 只能住在 `mipmap-anydpi-v26/` 这类带 -v26 的目录里。
+ * 一旦被摆到 drawable/（不同限定符），aapt2 link 会在 --min-sdk-version 24 下报
+ *   drawable/ic_launcher.xml: error: <adaptive-icon> elements require a sdk version of at least 26.
+ * 这里把描错的文件搬回 mipmap-anydpi-v26/（资源名不变，引用 @mipmap/x 仍可用）。
+ */
+export function relocateAdaptiveIcons(files: RenderFile[]): RenderFile[] {
+  const have = new Set(files.map((f) => f.path));
+  const out: RenderFile[] = [];
+  for (const f of files) {
+    if (!f.text || !/<adaptive-icon\b/.test(f.text)) {
+      out.push(f);
+      continue;
+    }
+    const seg = f.path.split("/")[0] || "";
+    // 已带 v26+ 限定符就没事
+    if (/^mipmap/.test(seg) && /-v(2[6-9]|[3-9][0-9])/.test(seg)) {
+      out.push(f);
+      continue;
+    }
+    const base = f.path.split("/").pop() || "";
+    const to = `mipmap-anydpi-v26/${base}`;
+    // 目标已有同名同目录的，直接丢掉这份，避免 link 报 duplicate value
+    if (have.has(to)) continue;
+    have.add(to);
+    out.push({ ...f, path: to });
+  }
+  return out;
+}
+
+/**
  * M160：发给设备前最后一道兵——把清单里确实缺的资源就地生成占位。
  * 不依赖收集阶段（收集可能因预算/IO 失败漏掉），否则 aapt2 一句 not found 就整包失败。
  */
@@ -350,6 +380,8 @@ export function renderReal(
   filled = dedupeValuesFiles(filled, projectDefs);
   // M170：同名同目录（drawable/x.xml 与 drawable/x.png）会让 link 报 duplicate value
   filled = dedupeSameNameRes(filled);
+  // M170：adaptive-icon 摆错目录 → link 报 require sdk >= 26
+  filled = relocateAdaptiveIcons(filled);
   // M169b：所有发下去的布局文本再过一道 include 命名空间纠正。
   // 目标布局已经过 exportLayoutXml（serialize 里会去前缀），但从项目磁盘直接补进来的
   // 被 include 的子布局（collectProjectRes 按原文读）可能还是 android:layout="@layout/x"，

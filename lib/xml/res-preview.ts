@@ -148,7 +148,11 @@ export function buildResourcePreviewFiles(
     if (!xml) continue;
     const n = rawName.replace(/\.xml$/i, "").toLowerCase();
     if (!/^[a-z][a-z0-9_]*$/.test(n) || n === name) continue;
-    const path = `drawable/${n}.xml`;
+    // M170：adaptive-icon 只能待在 mipmap-anydpi-v26/。放在 drawable/ 里会丢掉 -v26 限定符，
+    // aapt2 link 直接报 "<adaptive-icon> elements require a sdk version of at least 26"。
+    const path = /<adaptive-icon\b/.test(xml)
+      ? `mipmap-anydpi-v26/${n}.xml`
+      : `drawable/${n}.xml`;
     if (seen.has(path)) continue;
     seen.add(path);
     files.push({ path, text: xml });

@@ -1,11 +1,13 @@
 package com.jiji.axv;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
+import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -88,8 +90,7 @@ public class PreviewActivity extends Activity {
             int layoutId = res.getIdentifier(layoutName, "layout", pkgName);
             int strId = res.getIdentifier("title", "string", pkgName);
             if (layoutId == 0) throw new IllegalStateException("拿不到 layout id（资源包没挂上？）");
-            inflated = LayoutInflater.from(this)
-                    .inflate(layoutId, page, false);
+            inflated = inflateWithFallback(layoutId, page);
             // M152：clip / scale 的 level 只能在运行时给（XML 里压根没这个属性），
             // 不设就是 0：clip 完全空白、scale 缩到最小。各给 5000 看“一半”。
             if (builtin) {
@@ -99,8 +100,9 @@ public class PreviewActivity extends Activity {
             info = "SDK " + sdk + " · " + way + "\n"
                     + "layoutId=0x" + Integer.toHexString(layoutId)
                     + "  title=" + (strId == 0 ? "?" : res.getString(strId))
-                    + "\n资源包 " + pkg.length() + " 字节 · inflate OK\n"
-                    + "下面就是系统真控件：按下去看状态切换和涟漪";
+                    + "\n资源包 " + pkg.length() + " 字节 · inflate OK"
+                    + (stubCount > 0 ? "（" + stubCount + " 个第三方控件用平台控件代替）" : "")
+                    + "\n下面就是系统真控件：按下去看状态切换和涟漪";
             Log.i(TAG, info);
         } catch (Throwable t) {
             StringWriter sw = new StringWriter();
@@ -148,6 +150,83 @@ public class PreviewActivity extends Activity {
 
         setContentView(page);
         Toast.makeText(this, builtin ? "PreviewActivity 已启动" : "真渲染预览（aapt2 现场编译）", Toast.LENGTH_SHORT).show();
+    }
+
+    /** M152：按资源包里的 id 名找到 View，给它的背景 Drawable 设 level */
+    /** M159：第三方控件（MaterialCardView / androidx…）不在这个 APK 的 classpath 里，
+     *  正常 inflate 会 ClassNotFoundException。首次失败后挂一个 Factory2，
+     *  按名字找平台类；找不到就用最接近的平台控件代替（FrameLayout / TextView …），
+     *  这样至少能看到真机布局和资源，而不是一片“加载失败”。*/
+    private int stubCount = 0;
+
+    private View inflateWithFallback(int layoutId, ViewGroup parent) {
+        LayoutInflater base = LayoutInflater.from(this);
+        try {
+            return base.inflate(layoutId, parent, false);
+        } catch (Throwable t) {
+            if (!isMissingClass(t)) throw t;
+            Log.w(TAG, "inflate 遇到缺失控件类，改走平台控件代替", t);
+            stubCount = 0;
+            LayoutInflater inf = base.cloneInContext(this);
+            inf.setFactory2(new LayoutInflater.Factory2() {
+                @Override
+                public View onCreateView(View p, String name, Context ctx, AttributeSet attrs) {
+                    return createOrStub(name, ctx, attrs);
+                }
+
+                @Override
+                public View onCreateView(String name, Context ctx, AttributeSet attrs) {
+                    return createOrStub(name, ctx, attrs);
+                }
+            });
+            return inf.inflate(layoutId, parent, false);
+        }
+    }
+
+    private boolean isMissingClass(Throwable t) {
+        for (Throwable c = t; c != null; c = c.getCause()) {
+            if (c instanceof ClassNotFoundException) return true;
+            String m = c.getMessage();
+            if (m != null && (m.contains("ClassNotFound") || m.contains("Unable to instantiate") || m.contains("Error inflating class"))) return true;
+        }
+        return false;
+    }
+
+    private View createOrStub(String name, Context ctx, AttributeSet attrs) {
+        View v = tryCreate(name, ctx, attrs);
+        if (v != null) return v;
+        stubCount++;
+        try {
+            if (name.endsWith("ImageView") || name.endsWith("ImageButton")) return new android.widget.ImageView(ctx, attrs);
+            if (name.endsWith("Button")) return new android.widget.Button(ctx, attrs);
+            if (name.endsWith("TextView") || name.endsWith("EditText")) return new android.widget.TextView(ctx, attrs);
+            if (name.endsWith("ScrollView")) return new ScrollView(ctx, attrs);
+            if (name.endsWith("LinearLayout")) return new LinearLayout(ctx);
+        } catch (Throwable ignore) {
+            /* 退回 FrameLayout */
+        }
+        return new FrameLayout(ctx);
+    }
+
+    private View tryCreate(String name, Context ctx, AttributeSet attrs) {
+        String[] prefixes = { "android.widget.", "android.view.", "android.webkit.", "android.app." };
+        try {
+            if (name.contains(".")) {
+                Class<?> c = Class.forName(name);
+                return (View) c.getConstructor(Context.class, AttributeSet.class).newInstance(ctx, attrs);
+            }
+            for (String p : prefixes) {
+                try {
+                    Class<?> c = Class.forName(p + name);
+                    return (View) c.getConstructor(Context.class, AttributeSet.class).newInstance(ctx, attrs);
+                } catch (Throwable ignore) {
+                    /* 下一个前缀 */
+                }
+            }
+        } catch (Throwable ignore) {
+            /* 交给 stub */
+        }
+        return null;
     }
 
     /** M152：按资源包里的 id 名找到 View，给它的背景 Drawable 设 level */

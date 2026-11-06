@@ -126,15 +126,39 @@ describe("M158 真机渲染补齐项目资源", () => {
     expect(r.added).toBe(3);
   });
 
-  it("项目里真没有的资源记进 missing，不静默吞掉", async () => {
+  it("项目里真没有的资源用占位顶住，并记进 stubbed", async () => {
     const io = fakeIo(`t-${Math.random()}`, {
       "app/src/main/res/values/strings.xml": "<resources/>",
     });
     const r = await collectProjectRes(io, "app/src/main/res/layout/a.xml", [
       { path: "layout/a.xml", text: '<View android:background="@drawable/nope"/>' },
     ]);
-    expect(r.missing).toEqual(["drawable/nope"]);
-    expect(r.files).toHaveLength(1);
+    // M159：不能因一个缺图就整包 link 失败→ 生成透明占位 shape，同时如实回报
+    expect(r.missing).toEqual([]);
+    expect(r.stubbed).toEqual(["drawable/nope"]);
+    expect(r.files.map((f) => f.path)).toContain("drawable/nope.xml");
+  });
+
+  it("自定义控件属性自动声明，图片资源走 base64", async () => {
+    const io = fakeIo(`t-${Math.random()}`, {
+      "app/src/main/res/values/strings.xml": "<resources/>",
+      "app/src/main/res/drawable/ic_menu.png": "PNGDATA",
+    });
+    (io as unknown as { readBase64: (rel: string) => Promise<{ ok: boolean; base64?: string }> }).readBase64 =
+      async (rel: string) =>
+        rel.endsWith("ic_menu.png") ? { ok: true, base64: "UE5HREFUQQ==" } : { ok: false };
+
+    const r = await collectProjectRes(io, "app/src/main/res/layout/a.xml", [
+      {
+        path: "layout/a.xml",
+        text: '<com.google.android.material.card.MaterialCardView app:cardCornerRadius="8dp"><ImageView android:src="@drawable/ic_menu"/></com.google.android.material.card.MaterialCardView>',
+      },
+    ]);
+    const byPath = new Map(r.files.map((f) => [f.path, f]));
+    const attrs = byPath.get("values/axv_attrs.xml");
+    expect(attrs?.text).toContain('<attr name="cardCornerRadius" />');
+    expect(byPath.get("drawable/ic_menu.png")?.base64).toBe("UE5HREFUQQ==");
+    expect(r.stubbed).toEqual([]);
   });
 
   it("没有 IO 时原样返回", async () => {

@@ -13,7 +13,7 @@
 
 import type { AiFileEntry, AiFileIo } from "./ai-tools";
 import type { ProjectSource } from "./project-browse";
-import { hasAsyncIo, listDirQueued, readTextQueued } from "./native-async";
+import { hasAsyncIo, listDirQueued, readBase64Queued, readTextQueued } from "./native-async";
 import { nativeBridge, writeTextNative } from "./native-save";
 import { isUnder } from "./ai-paths";
 import { prepareWriteText, styleNote } from "./text-style";
@@ -21,6 +21,7 @@ import { prepareWriteText, styleNote } from "./text-style";
 interface NativeFsBridge {
   listDir?(path: string): string | null;
   readText?(target: string): string | null;
+  readBase64?(target: string): string | null;
 }
 
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e ?? "未知错误"));
@@ -59,6 +60,16 @@ export function ioFromProjectSource(
         const text = await source.readText(rel);
         if (text === null || text === undefined) return { ok: false, error: "读不到（文件不存在或没有权限）" };
         return { ok: true, text };
+      } catch (e) {
+        return { ok: false, error: errText(e) };
+      }
+    },
+    async readBase64(rel) {
+      if (!source.readBase64) return { ok: false, error: "当前通道不支持读二进制" };
+      try {
+        const base64 = await source.readBase64(rel);
+        if (!base64) return { ok: false, error: "读不到（文件不存在或没有权限）" };
+        return { ok: true, base64 };
       } catch (e) {
         return { ok: false, error: errText(e) };
       }
@@ -106,6 +117,22 @@ export function ioFromRootPath(rootPath: string | null | undefined, label?: stri
         const t = b?.readText?.(target) ?? null;
         if (t === null) return { ok: false, error: "读不到（文件不存在或没有权限）" };
         return { ok: true, text: t };
+      } catch (e) {
+        return { ok: false, error: errText(e) };
+      }
+    },
+    async readBase64(rel) {
+      const target = absOf(root, rel);
+      if (!isUnder(root, target)) return { ok: false, error: "路径非法：跳出了项目目录" };
+      try {
+        if (hasAsyncIo()) {
+          const b64 = await readBase64Queued(target);
+          if (!b64) return { ok: false, error: "读不到（文件不存在或没有权限）" };
+          return { ok: true, base64: b64 };
+        }
+        const b64 = b?.readBase64?.(target) ?? null;
+        if (!b64) return { ok: false, error: "读不到（文件不存在或没有权限）" };
+        return { ok: true, base64: b64 };
       } catch (e) {
         return { ok: false, error: errText(e) };
       }

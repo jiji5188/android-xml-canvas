@@ -28,7 +28,7 @@ const VALUE_TYPES = new Set([
   "fraction",
 ]);
 
-function refsIn(text: string): { type: string; name: string }[] {
+export function refsIn(text: string): { type: string; name: string }[] {
   const out: { type: string; name: string }[] = [];
   let m: RegExpExecArray | null;
   REF_RE.lastIndex = 0;
@@ -46,6 +46,8 @@ function definedIn(files: RenderFile[]): Set<string> {
       const re = /<(string|color|dimen|style|integer|bool|fraction|array|string-array|integer-array|plurals)\b[^>]*?\bname="([^"]+)"/g;
       let m: RegExpExecArray | null;
       while ((m = re.exec(f.text || "")) !== null) defs.add(`${m[1]}/${m[2]}`);
+      const attrRe = /<attr\b[^>]*?\bname="([^"]+)"/g;
+      while ((m = attrRe.exec(f.text || "")) !== null) defs.add(`attr/${m[1]}`);
       continue;
     }
     const d = f.path.match(/^(drawable|mipmap|layout|menu|anim|animator|xml|font|interpolator|color)(-[^/]+)?\/([^/]+?)(\.[a-z0-9]+)?$/i);
@@ -60,6 +62,8 @@ export interface CollectResult {
   missing: string[];
   /** 补了多少个文件 */
   added: number;
+  /** M159：找不到、已用占位实现顶上的资源（能编译，但看不到原图） */
+  stubbed?: string[];
 }
 
 /**
@@ -100,10 +104,10 @@ export async function collectProjectRes(
   let reads = 0;
   let added = 0;
 
-  const addFile = (path: string, text: string) => {
-    if (!text || have.has(path) || added >= budget) return false;
+  const addFile = (path: string, text: string, base64?: string) => {
+    if ((!text && !base64) || have.has(path) || added >= budget) return false;
     have.add(path);
-    files.push({ path, text });
+    files.push(base64 ? { path, text: "", base64 } : { path, text });
     added++;
     return true;
   };
@@ -148,6 +152,22 @@ export async function collectProjectRes(
     return null;
   };
 
+  /** M159：图片（png/webp）——读 base64，真机侧写字节，不再当成缺资源 */
+  const findDirImage = async (type: string, name: string): Promise<{ path: string; base64: string } | null> => {
+    if (!io.readBase64) return null;
+    const dirs2 = dirs.filter((d) => d === type || d.startsWith(`${type}-`)).sort();
+    for (const dir of dirs2) {
+      for (const ext of ["png", "webp", "jpg", "jpeg"]) {
+        const path = `${dir}/${name}.${ext}`;
+        if (have.has(path)) return null;
+        reads++;
+        const r = await io.readBase64(`${resRel}/${path}`);
+        if (r.ok && r.base64) return { path, base64: r.base64 };
+      }
+    }
+    return null;
+  };
+
   let queue = files.flatMap((f) => refsIn(f.text));
   const seenRef = new Set<string>();
 
@@ -181,7 +201,13 @@ export async function collectProjectRes(
 
       const hit = await findDirFile(ref.type, ref.name);
       if (!hit) {
-        missing.add(key);
+        const img = await findDirImage(ref.type, ref.name);
+        if (img) {
+          if (addFile(img.path, "", img.base64)) defs.add(key);
+          else missing.add(key);
+        } else {
+          missing.add(key);
+        }
         continue;
       }
       if (addFile(hit.path, hit.text)) {
@@ -192,5 +218,64 @@ export async function collectProjectRes(
     queue = next;
   }
 
-  return { files, missing: [...missing].sort(), added };
+  // M159：自定义 View 的 app:/cardview: 属性（MaterialCardView 的 cardCornerRadius 等）
+  // 不声明 aapt2 link 会直接报 attribute not found；无 format 的 <attr> 就能过链。
+  const customAttrs = new Set<string>();
+  const attrScan = /\s([A-Za-z][\w-]*):([A-Za-z_][\w.-]*)\s*=/g;
+  for (const f of files) {
+    if (!f.text) continue;
+    attrScan.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = attrScan.exec(f.text)) !== null) {
+      const prefix = m[1];
+      if (prefix === "android" || prefix === "xmlns" || prefix === "tools" || prefix === "xml") continue;
+      if (defs.has(`attr/${m[2]}`)) continue;
+      customAttrs.add(m[2]);
+    }
+  }
+  if (customAttrs.size > 0) {
+    const decl = [...customAttrs].sort().map((n) => `    <attr name="${n}" />`).join("\n");
+    addFile(
+      "values/axv_attrs.xml",
+      `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${decl}\n</resources>\n`,
+    );
+  }
+
+  // M159：真缺的资源给占位实现——否则 aapt2 一个 @drawable 缺失就整包 link 失败，
+  // 预览全黑。占位会记进 stubbed，界面照旧提示“这些资源项目里没有”。
+  const stubbed: string[] = [];
+  const stubValues: string[] = [];
+  for (const key of [...missing]) {
+    const slash = key.indexOf("/");
+    if (slash < 0) continue;
+    const type = key.slice(0, slash);
+    const name = key.slice(slash + 1);
+    if (type === "drawable" || type === "mipmap") {
+      const ok = addFile(
+        `drawable/${name}.xml`,
+        `<?xml version="1.0" encoding="utf-8"?>\n<shape xmlns:android="http://schemas.android.com/apk/res/android">\n    <solid android:color="#00000000" />\n</shape>\n`,
+      );
+      if (ok) {
+        missing.delete(key);
+        stubbed.push(key);
+      }
+      continue;
+    }
+    if (type === "color") stubValues.push(`    <color name="${name}">#00000000</color>`);
+    else if (type === "string") stubValues.push(`    <string name="${name}" />`);
+    else if (type === "dimen") stubValues.push(`    <dimen name="${name}">0dp</dimen>`);
+    else if (type === "bool") stubValues.push(`    <bool name="${name}">false</bool>`);
+    else if (type === "integer") stubValues.push(`    <integer name="${name}">0</integer>`);
+    else continue;
+    missing.delete(key);
+    stubbed.push(key);
+  }
+  if (stubValues.length > 0) {
+    addFile(
+      "values/axv_stub.xml",
+      `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${stubValues.join("\n")}\n</resources>\n`,
+    );
+  }
+
+  return { files, missing: [...missing].sort(), added, stubbed };
 }

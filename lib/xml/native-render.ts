@@ -14,6 +14,8 @@ export interface RenderFile {
   /** res 内相对路径，例如 layout/activity_main.xml、drawable/bg.xml */
   path: string;
   text: string;
+  /** M159：二进制资源（png/webp）走 base64；有它时 text 可为空 */
+  base64?: string;
 }
 
 export interface RealRenderResult {

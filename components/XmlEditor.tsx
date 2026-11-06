@@ -33,6 +33,7 @@ import {
 } from "@/lib/xml/history";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
+import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras } from "@/lib/xml/project-res";
 import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild, childLimitOf } from "@/lib/xml/insert";
@@ -1694,6 +1695,28 @@ export function XmlEditor() {
   // M64b（B2）：AI 的文件通道跟着「当前项目」走，不再拼默认目录 + 项目名
   const aiFileIo = useMemo(() => ioForProject(activeProject), [activeProject]);
 
+  // M159：打开文件就把它引用的项目资源读进来（values + @drawable 递归 → 再后台扫全套）
+  // 这样不用每次手动传 res；项目资源优先级高于上次缓存的上传结果
+  useEffect(() => {
+    if (!aiFileIo || !openRel || codeOnly) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const quick = await loadProjectResForDoc(aiFileIo, openRel, currentXml());
+        if (cancelled) return;
+        if (quick) setResExtras((prev) => mergeProjectExtras(prev, quick) ?? quick);
+        const full = await loadProjectResIndexCached(aiFileIo, openRel);
+        if (cancelled || !full) return;
+        setResExtras((prev) => mergeProjectExtras(prev, full) ?? full);
+      } catch {
+        /* 资源拿不到不影响编辑，预览按已有资源降级 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [aiFileIo, openRel, codeOnly, currentXml]);
+
   const hasViewTabRef = useRef(hasViewTab);
   hasViewTabRef.current = hasViewTab;
   useEffect(() => {
@@ -2982,15 +3005,18 @@ const findResolved = findResolvedNode;
     if (realRenderBusy) return;
     const input = currentSaveInput();
     const name = (input.name || "activity_main.xml").replace(/\.xml$/i, "");
-    const base = buildRealRenderFiles(input).map((f) => ({ path: f.path, text: f.text }));
+    const base = buildRealRenderFiles(input);
     setRealRenderBusy(true);
     setExportNote(tt("正在收集布局引用的资源…"));
     void collectProjectRes(aiFileIo, openRel, base)
       .then((collected) => {
+        const stubNote = collected.stubbed?.length
+          ? tt("；{n} 个资源项目里没有，已用透明占位顶住", { n: collected.stubbed.length })
+          : "";
         setExportNote(
-          collected.added
+          (collected.added
             ? tt("已补齐 {n} 个项目资源，正在用设备上的 aapt2 编译…", { n: collected.added })
-            : tt("正在用设备上的 aapt2 编译资源包…"),
+            : tt("正在用设备上的 aapt2 编译资源包…")) + stubNote,
         );
         return renderReal(name, collected.files);
       })

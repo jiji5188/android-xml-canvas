@@ -48,6 +48,8 @@ export interface ProjectSource {
   listChildren(rel: string): Promise<BrowseEntry[]>;
   /** 读一个 xml 文件内容 */
   readText(rel: string): Promise<string | null>;
+  /** M159：读二进制文件（图片等）→ base64（不带 data: 前缀）；不支持就省略 */
+  readBase64?(rel: string): Promise<string | null>;
   /** M31：读项目图标（res/mipmap*|drawable* 里的 ic_launcher* 图片）→ 可直接给 <img src> 的 URL */
   appIconUrl?(): Promise<string | null>;
 }
@@ -68,6 +70,16 @@ type FileLike = {
 
 function nameOf(rel: string): string {
   return rel.split("/").filter(Boolean).pop() ?? rel;
+}
+
+/** M159：Uint8Array → base64（分块，避免大图把调用栈撑爆） */
+function bytesToBase64(bytes: Uint8Array): string {
+  let s = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    s += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return typeof btoa === "function" ? btoa(s) : "";
 }
 
 function parentOf(rel: string): string {
@@ -248,6 +260,17 @@ export function webProjectSource(root: unknown, name: string): ProjectSource {
         return null;
       }
     },
+    async readBase64(rel: string) {
+      try {
+        const parent = rel ? await resolveDir(dir, parentOf(rel)) : dir;
+        if (!parent) return null;
+        const fh = await parent.getFileHandle(nameOf(rel));
+        const file = await fh.getFile();
+        return bytesToBase64(new Uint8Array(await file.arrayBuffer()));
+      } catch {
+        return null;
+      }
+    },
     async appIconUrl() {
       return await webIconUrl(dir);
     },
@@ -355,6 +378,20 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
       try {
         if (hasAsyncIo()) return (await readTextQueued(target)) || null;
         return b?.readText ? b.readText(target) || null : null;
+      } catch {
+        return null;
+      }
+    },
+    /** M159：项目图片（png/webp）→ base64，给预览和真机渲染读资源用 */
+    async readBase64(rel: string) {
+      const hit = all.find((it) => it.rel === rel && it.kind === "file");
+      let target = hit?.target;
+      if (!target && rootDir) target = `${rootDir.replace(/\/+$/, "")}/${rel}`;
+      if (!target) return null;
+      const b = nativeBridge();
+      try {
+        if (hasAsyncIo()) return (await readBase64Queued(target)) || null;
+        return b?.readBase64 ? b.readBase64(target) || null : null;
       } catch {
         return null;
       }

@@ -2188,6 +2188,15 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** M159：二进制文件（图片），目录同上 */
+    private static void writeBytes(File f, byte[] data) throws IOException {
+        File parent = f.getParentFile();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) throw new IOException("mkdirs 失败: " + parent);
+        try (FileOutputStream fo = new FileOutputStream(f)) {
+            fo.write(data);
+        }
+    }
+
     /** 跑一次 aapt2，输出全部收进 log；返回 exit code */
     private static int runAapt2(File bin, File cwd, String[] args, StringBuilder log) throws Exception {
         String[] cmd = new String[args.length + 1];
@@ -2227,8 +2236,16 @@ public class MainActivity extends Activity {
             JSONObject f = files.getJSONObject(i);
             String path = f.optString("path", "");
             String text = f.optString("text", "");
-            if (path.isEmpty() || text.isEmpty()) continue;
+            String b64 = f.optString("base64", "");
+            if (path.isEmpty()) continue;
             if (path.startsWith("/") || path.contains("..")) continue; // 只收 res 内相对路径
+            if (!b64.isEmpty()) {
+                // M159：图片等二进制资源（aapt2 直接读字节，不能当 UTF-8 文本写）
+                writeBytes(new File(resDir, path), Base64.decode(b64, Base64.NO_WRAP));
+                written++;
+                continue;
+            }
+            if (text.isEmpty()) continue;
             writeUtf8(new File(resDir, path), text);
             written++;
         }

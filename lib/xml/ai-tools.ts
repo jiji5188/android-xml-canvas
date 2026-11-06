@@ -68,6 +68,8 @@ export interface AiFileIo {
   staging?: boolean;
   list(rel: string): Promise<{ ok: boolean; items?: AiFileEntry[]; error?: string }>;
   read(rel: string): Promise<{ ok: boolean; text?: string; error?: string }>;
+  /** M159：读二进制（图片等）→ base64；不支持的通道省略 */
+  readBase64?(rel: string): Promise<{ ok: boolean; base64?: string; error?: string }>;
   write(
     rel: string,
     text: string,

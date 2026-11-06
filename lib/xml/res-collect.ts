@@ -126,6 +126,14 @@ export async function collectProjectRes(
   const files = input.map((f) => ({ ...f }));
   if (!io) return { files, missing: [], added: 0 };
 
+  // 空文本 / 无内容的条目不能算“资源已存在”：它们出现在上传缓存里但实际没内容，
+  // 会让后续查找和占位全部跳过，最后 aapt2 报 xxx not found
+  const alive = (f: RenderFile) =>
+    Boolean((f.text && f.text.trim()) || (f as { base64?: string }).base64);
+  if (files.some((f) => !alive(f))) {
+    for (let i = files.length - 1; i >= 0; i--) if (!alive(files[i])) files.splice(i, 1);
+  }
+
   let info: { resRel: string; dirs: string[] };
   try {
     info = await scanResDirs(io, docRel);

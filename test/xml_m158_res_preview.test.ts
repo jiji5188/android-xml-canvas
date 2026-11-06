@@ -3,7 +3,13 @@ import { applyResNamePrefix, defaultResName } from "@/lib/xml/resname";
 import { cloneDrawableNode } from "@/lib/xml/drawable-edit";
 import { buildResourcePreviewFiles } from "@/lib/xml/res-preview";
 import { collectProjectRes } from "@/lib/xml/res-collect";
-import { cleanBase64, renderableFiles, unresolvedRefs, withPlaceholders } from "@/lib/xml/native-render";
+import {
+  cleanBase64,
+  renderableFiles,
+  sniffImageKind,
+  unresolvedRefs,
+  withPlaceholders,
+} from "@/lib/xml/native-render";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 
@@ -276,6 +282,17 @@ describe("M158 真机渲染补齐项目资源", () => {
     const a = out.find((f) => f.path === "layout/a.xml");
     expect(a?.text).not.toContain("<include");
     expect(a?.text).toContain("<TextView");
+  });
+
+  it("按内容识别图片格式：jpg 存成 .png 会被改名，非图片则丢掉", () => {
+    const b64 = (bytes: number[]) => btoa(String.fromCharCode(...bytes));
+    const png = b64([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+    const jpg = b64([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0]);
+    const txt = btoa('<shape />');
+    expect(sniffImageKind(png)).toBe("png");
+    expect(sniffImageKind(jpg)).toBe("jpg");
+    expect(sniffImageKind(txt)).toBe("xml");
+    expect(sniffImageKind(b64([0, 0, 0, 0, 0, 0]))).toBeNull();
   });
 
   it("没有 IO 时原样返回", async () => {

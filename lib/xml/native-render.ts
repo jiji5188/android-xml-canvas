@@ -105,6 +105,26 @@ export function cleanBase64(s: string | undefined | null): string | null {
 }
 
 /**
+ * M162：根据 base64 开头字节判断真实图片格式。
+ * 用户工程里经常把 jpg/webp 存成 .png，aapt2 按扩展名校验签名 →
+ * “file does not start with PNG signature” 直接整包失败。
+ */
+export function sniffImageKind(b64: string): "png" | "jpg" | "webp" | "xml" | null {
+  try {
+    const head = atob(b64.slice(0, 32));
+    const c = (i: number) => head.charCodeAt(i) & 0xff;
+    if (c(0) === 0x89 && c(1) === 0x50 && c(2) === 0x4e && c(3) === 0x47) return "png";
+    if (c(0) === 0xff && c(1) === 0xd8 && c(2) === 0xff) return "jpg";
+    if (head.startsWith("RIFF") && head.slice(8, 12) === "WEBP") return "webp";
+    const t = head.replace(/^\uFEFF/, "").trimStart();
+    if (t.startsWith("<?xml") || t.startsWith("<")) return "xml";
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/**
  * M160：发给设备前最后一道兵——把清单里确实缺的资源就地生成占位。
  * 不依赖收集阶段（收集可能因预算/IO 失败漏掉），否则 aapt2 一句 not found 就整包失败。
  */
@@ -241,6 +261,23 @@ export function renderReal(
       const m = f.path.match(/^(drawable|mipmap)(-[^/]+)?\/(.+?)\.(png|webp|jpg|jpeg)$/i);
       if (m) broken.push(`${m[1]}/${m[3]}`);
       continue;
+    }
+    // M162：扩展名和真实内容对不上就按内容改名（jpg 存成 .png 是常见事）
+    const em = f.path.match(/^(.*)\.(png|webp|jpg|jpeg)$/i);
+    if (em) {
+      const kind = sniffImageKind(v);
+      if (!kind) {
+        const m = f.path.match(/^(drawable|mipmap)(-[^/]+)?\/(.+?)\.(png|webp|jpg|jpeg)$/i);
+        if (m) broken.push(`${m[1]}/${m[3]}`);
+        continue;
+      }
+      const want = kind === "jpg" ? "jpg" : kind;
+      const cur = em[2].toLowerCase();
+      const same = cur === want || (cur === "jpeg" && want === "jpg");
+      if (!same) {
+        cleaned.push({ ...f, path: `${em[1]}.${want}`, base64: v });
+        continue;
+      }
     }
     cleaned.push({ ...f, base64: v });
   }

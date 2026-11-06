@@ -2455,8 +2455,12 @@ public class MainActivity extends Activity {
                 if (arr != null) {
                     for (int i = 0; i < arr.length(); i++) {
                         JSONObject fo = arr.getJSONObject(i);
+                        int tlen = fo.optString("text", "").length();
+                        int blen = fo.optString("base64", "").length();
+                        // M162：text 长度对二进制资源永远是 0，旧日志里“0 字节”把排查带偏了
                         sb.append("  - ").append(fo.optString("path"))
-                                .append("  ").append(fo.optString("text", "").length()).append(" 字节\n");
+                                .append("  ").append(tlen > 0 ? tlen + " 字节" : (blen > 0 ? (blen / 4 * 3) + " 字节(b64)" : "0 字节"))
+                                .append('\n');
                     }
                 }
             } catch (Throwable ignored) {

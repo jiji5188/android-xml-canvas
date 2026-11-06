@@ -2245,6 +2245,11 @@ public class MainActivity extends Activity {
 
         StringBuilder log = new StringBuilder();
         File fw = frameworkResForLink(root, log);
+        // 诊断：先看 aapt2 能不能把框架包当普通 apk 读出来（读不出 = 文件/mmap 问题，
+        // 读得出但 link 还报 include path = 另一类问题），日志里留一行好定位
+        StringBuilder probe = new StringBuilder();
+        int cP = runAapt2(bin, root, new String[] { "dump", "packagename", fw.getAbsolutePath() }, probe);
+        log.append("probe(dump packagename) exit=").append(cP).append(' ').append(probe.toString().trim()).append('\n');
         File compiled = new File(root, "compiled.zip");
         int c1 = runAapt2(bin, root, new String[] { "compile", "--dir", resDir.getAbsolutePath(),
                 "-o", compiled.getAbsolutePath() }, log);
@@ -2301,9 +2306,10 @@ public class MainActivity extends Activity {
         // 先用自带的资源桩：系统里那个 framework-res.apk 能 stat/access 不代表 aapt2 子进程真能读
         // （实测 SDK36 上 canRead() 返回 true，aapt2 却报 failed to load include path），
         // 所以不复探系统路径，直接用确定能读的桩。
-        File cached = new File(getCacheDir(), "framework-res-stub.apk");
-        // M155c：必须用 STORE 版（arsc 不压缩）——压缩的 arsc 手机端 aapt2 读不了。
-        // 旧的 deflate 桩只有 ~4.6MB，用长度区分并删掉重解。
+        File cached = new File(getCacheDir(), "framework-res-stub-v2.apk");
+        File legacy = new File(getCacheDir(), "framework-res-stub.apk");
+        if (legacy.isFile()) legacy.delete();
+        // M155d：v2 = 4 字节对齐版（旧的非对齐/压缩版都作废）
         if (cached.isFile() && cached.length() > 12000000L) {
             if (log != null) log.append("framework: 缓存的资源桩 ").append(cached.length()).append(" 字节\n");
             return cached;

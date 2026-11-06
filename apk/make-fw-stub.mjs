@@ -73,6 +73,17 @@ function writeZipStore(outPath, name, data) {
   const nameBuf = Buffer.from(name, "utf8");
   const crc = crc32(data);
 
+  // 数据区必须 4 字节对齐（真 APK 都要 zipalign）：手机端 AssetManager2 靠 mmap 读
+  // 未压缩的 resources.arsc，偏移不对齐就直接“failed to load include path”。
+  let extraLen = 0;
+  let pad = (4 - ((30 + nameBuf.length) % 4)) % 4;
+  if (pad > 0) extraLen = pad + 4; // 至少一条扩展记录（4 字节头）
+  const extraBuf = Buffer.alloc(extraLen);
+  if (extraLen > 0) {
+    extraBuf.writeUInt16LE(0x0000, 0); // header id
+    extraBuf.writeUInt16LE(pad, 2); // data size
+  }
+
   const local = Buffer.alloc(30);
   local.writeUInt32LE(0x04034b50, 0);
   local.writeUInt16LE(20, 4); // version needed
@@ -84,7 +95,7 @@ function writeZipStore(outPath, name, data) {
   local.writeUInt32LE(data.length, 18);
   local.writeUInt32LE(data.length, 22);
   local.writeUInt16LE(nameBuf.length, 26);
-  local.writeUInt16LE(0, 28);
+  local.writeUInt16LE(extraLen, 28);
 
   const central = Buffer.alloc(46);
   central.writeUInt32LE(0x02014b50, 0);
@@ -98,14 +109,14 @@ function writeZipStore(outPath, name, data) {
   central.writeUInt32LE(data.length, 20);
   central.writeUInt32LE(data.length, 24);
   central.writeUInt16LE(nameBuf.length, 28);
-  central.writeUInt16LE(0, 30);
+  central.writeUInt16LE(0, 30); // extra（中央目录留空不影响读取）
   central.writeUInt16LE(0, 32);
   central.writeUInt16LE(0, 34);
   central.writeUInt16LE(0, 36);
   central.writeUInt32LE(0, 38);
   central.writeUInt32LE(0, 42);
 
-  const cdOffset = local.length + nameBuf.length + data.length;
+  const cdOffset = 30 + nameBuf.length + extraLen + data.length;
   const cdSize = central.length + nameBuf.length;
   const eocd = Buffer.alloc(22);
   eocd.writeUInt32LE(0x06054b50, 0);
@@ -118,7 +129,7 @@ function writeZipStore(outPath, name, data) {
   eocd.writeUInt16LE(0, 20);
 
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  return Buffer.concat([local, nameBuf, data, central, nameBuf, eocd]);
+  return Buffer.concat([local, nameBuf, extraBuf, data, central, nameBuf, eocd]);
 }
 
 function main() {

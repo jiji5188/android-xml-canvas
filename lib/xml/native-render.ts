@@ -149,6 +149,37 @@ export function fixIncludeLayoutNs(text: string): string {
 }
 
 /**
+ * M170：同名同目录的不同文件会让 aapt2 link 报
+ *   drawable/x.xml: error: duplicate value for resource 'drawable/x' with config ''
+ * （同一资源名 + 同一 config 只能有一次定义）。常见场景：项目里既有 drawable/x.png
+ * 又有工具生成的 drawable/x.xml。这里同目录同名的只留一个，xml 优先。
+ * 注意限定符目录（drawable-hdpi / drawable-anydpi-v26）算不同目录，各自保留。
+ */
+export function dedupeSameNameRes(files: RenderFile[]): RenderFile[] {
+  const RES_DIR = /^(drawable|mipmap|layout|anim|animator|menu|xml|raw|font|interpolator|color|values|navigation|transition)(-[^/]*)?$/i;
+  const seen = new Map<string, number>();
+  const out: RenderFile[] = [];
+  for (const f of files) {
+    const m = f.path.match(/^([^/]+)\/([^/]+)$/);
+    if (!m || !RES_DIR.test(m[1])) {
+      out.push(f);
+      continue;
+    }
+    const base = m[2].replace(/\.[^.]*$/, "");
+    const key = `${m[1]}/${base}`;
+    const prev = seen.get(key);
+    if (prev === undefined) {
+      seen.set(key, out.length);
+      out.push(f);
+      continue;
+    }
+    // 同名同目录：xml 优先（xml 才是用户/工具编辑的那份）
+    if (/\.xml$/i.test(m[2]) && !/\.xml$/i.test(out[prev].path)) out[prev] = f;
+  }
+  return out;
+}
+
+/**
  * M160：发给设备前最后一道兵——把清单里确实缺的资源就地生成占位。
  * 不依赖收集阶段（收集可能因预算/IO 失败漏掉），否则 aapt2 一句 not found 就整包失败。
  */
@@ -317,6 +348,8 @@ export function renderReal(
     for (const k of definedValueKeys(f.text)) projectDefs.add(k);
   }
   filled = dedupeValuesFiles(filled, projectDefs);
+  // M170：同名同目录（drawable/x.xml 与 drawable/x.png）会让 link 报 duplicate value
+  filled = dedupeSameNameRes(filled);
   // M169b：所有发下去的布局文本再过一道 include 命名空间纠正。
   // 目标布局已经过 exportLayoutXml（serialize 里会去前缀），但从项目磁盘直接补进来的
   // 被 include 的子布局（collectProjectRes 按原文读）可能还是 android:layout="@layout/x"，

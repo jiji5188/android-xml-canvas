@@ -3069,7 +3069,9 @@ const findResolved = findResolvedNode;
           setExportNote(
             tt("真机渲染失败（{stage}）：{log}\n完整日志：{file}", {
               stage: r.stage || tt("未知"),
-              log: (r.log || "").slice(0, 300),
+              // M170：错误正文都在日志尾部（前面是 framework/compile 的例行行），
+              // 显示尾部 700 字比显示前 300 字有用得多
+              log: "…" + (r.log || "").slice(-700),
               file: r.logFile || tt("（写日志失败）"),
             }),
           );

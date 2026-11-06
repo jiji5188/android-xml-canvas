@@ -4572,6 +4572,7 @@ const findResolved = findResolvedNode;
           existingXml={resShape.xml}
           existingNames={allDrawableNames}
           forceTree={resShape.forceTree}
+          res={resExtrasAll}
           io={aiFileIo}
           docRel={openRel}
           onClose={() => setResShape(null)}

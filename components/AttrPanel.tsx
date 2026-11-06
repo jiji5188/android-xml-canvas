@@ -717,7 +717,7 @@ export function AttrPanel({
             vectorNames: resExtras?.vectorNames,
           }}
           existingXml={shapeEditRef.current ?? generatedXml?.[String(node.rawAttrs[shapeEdit] ?? "").replace(/^@(?:drawable|mipmap)\//, "").replace(/\.xml$/, "")]}
-          existingNames={Object.keys(generatedXml ?? {})}
+          existingNames={[...new Set([...Object.keys(resExtras?.drawableXml ?? {}).map((n) => n.replace(/\.xml$/i, "")), ...Object.keys(generatedXml ?? {})])].sort((a, b) => a.localeCompare(b))}
           onClose={() => { setShapeEdit(null); shapeEditRef.current = undefined; }}
           onSave={(resourceName, xml) => {
             onSaveShape?.(shapeEdit, resourceName, xml);

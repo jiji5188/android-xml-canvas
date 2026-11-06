@@ -109,11 +109,11 @@ export function DrawableEditor({
   const resolveRefForPreview = useCallback(
     (nm: string): string | null => {
       const key = nm.replace(/\.xml$/i, "");
+      // M166c：正在编辑的这份自己优先用内存里的树（不然预览拿到的是磁盘上的旧版本）
+      const self = resNameFromValue(value);
+      if (key && self && key === self) return buildDrawable(root);
       const proj = res?.drawableXml?.[key] ?? res?.drawableXml?.[nm];
       if (proj) return proj;
-      // 当前资源自己（导出的 XML 里的引用名与编辑中的名字相同）
-      // M166：key 为空时不能当成自引用，否则空引用会把整棵树画两遍、看不出“资源缺失”
-      if (key && key === resNameFromValue(value)) return buildDrawable(root);
       return null;
     },
     [res, value, root],

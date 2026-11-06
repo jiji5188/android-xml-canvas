@@ -97,12 +97,18 @@ export function dedupeValuesFiles(files: RenderFile[], projectDefs?: Set<string>
 
   const re = new RegExp(VALUE_ELEM_RE.source, "g");
   const kept: string[] = [];
+  const seenInMerged = new Set<string>();
   let m: RegExpExecArray | null;
   while ((m = re.exec(merged.text)) !== null) {
     const head = m[0].slice(0, m[0].indexOf(">") + 1);
     const name = (head.match(/\bname\s*=\s*"([^"]+)"/) || [])[1];
     if (!name) continue;
-    if (defineNonMerged.has(`${m[1]}/${name}`)) continue;
+    const key = `${m[1]}/${name}`;
+    if (defineNonMerged.has(key)) continue;
+    // M167b：res_values.xml 自己也可能是多次合并累积出来的（上传两次、颜色表重复导入），
+    // 同一个 key 在本文件里出现两次 aapt2 compile 同样报 duplicate，这里一并去掉。
+    if (seenInMerged.has(key)) continue;
+    seenInMerged.add(key);
     kept.push(`    ${m[0].trim()}`);
   }
   if (kept.length === 0) {

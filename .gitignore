@@ -81,3 +81,6 @@ tmp-*.cjs
 tmp-*.mjs
 
 *.log
+
+app-*.apk
+app.apk

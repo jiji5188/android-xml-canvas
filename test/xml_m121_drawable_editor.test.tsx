@@ -315,9 +315,12 @@ describe("M134：「这一层」面板（item 上的属性）", () => {
     inputs[1].dispatchEvent(new Event("input", { bubbles: true }));
     await flush();
 
-    const sel = panel!.querySelector<HTMLSelectElement>("select.axv-attr-input");
-    sel!.value = "center";
-    sel!.dispatchEvent(new Event("change", { bubbles: true }));
+    // M163c：对齐改成了可输入下拉，找 gravity 专用的那个 input[list]
+    const g = [...panel!.querySelectorAll<HTMLInputElement>("input.axv-attr-input[list]")]
+      .find((i) => i.getAttribute("list")!.includes("gravity"));
+    expect(g).toBeTruthy();
+    setter?.call(g!, "center");
+    g!.dispatchEvent(new Event("input", { bubbles: true }));
     await flush();
 
     const allIn = panel!.querySelectorAll<HTMLInputElement>(".axv-attr-input");

@@ -72,7 +72,7 @@ export interface CollectResult {
 const VALUE_ELEM_RE =
   /<(string|color|dimen|style|integer|bool|fraction|plurals|array|string-array|integer-array)\b[^>]*(?:\/>|>[\s\S]*?<\/\1>)/g;
 
-function definedValueKeys(xml: string): Set<string> {
+export function definedValueKeys(xml: string): Set<string> {
   const out = new Set<string>();
   const re = new RegExp(VALUE_ELEM_RE.source, "g");
   let m: RegExpExecArray | null;

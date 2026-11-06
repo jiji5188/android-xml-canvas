@@ -18,6 +18,8 @@ export interface RenderFile {
   base64?: string;
 }
 
+import { dedupeValuesFiles, definedValueKeys } from "./res-collect";
+
 export interface RealRenderResult {
   ok: boolean;
   /** 写进去的文件数 */
@@ -282,7 +284,18 @@ export function renderReal(
     cleaned.push({ ...f, base64: v });
   }
   const missingAll = broken.length ? [...new Set([...missing, ...broken])] : missing;
-  const filled = withPlaceholders(cleaned, missingAll);
+  // M166：项目自己的 values 文件和 res_values.xml（工具合并落地）里同名资源会撞 aapt2 的
+  // “duplicate value”（如 color/primary 在 colors.xml 和 res_values.xml 各定义一次）。
+  // 发设备前按「项目优先」把 res_values.xml 里的重复项去掉，全被覆盖就整份丢掉。
+  let filled = withPlaceholders(cleaned, missingAll);
+  const projectDefs = new Set<string>();
+  for (const f of filled) {
+    if (f.path === "values/res_values.xml" || !/^values(\/|$)/.test(f.path) || !/\.xml$/i.test(f.path) || !f.text) continue;
+    // 收集除 res_values.xml 外所有 values 文件里定义的资源名，作为去重基准
+    // 这里直接用 res-collect 的导出，不重写正则
+    for (const k of definedValueKeys(f.text)) projectDefs.add(k);
+  }
+  filled = dedupeValuesFiles(filled, projectDefs);
   seq += 1;
   const id = `r${Date.now().toString(36)}${seq}`;
   return new Promise<RealRenderResult>((resolve) => {

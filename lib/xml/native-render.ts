@@ -92,7 +92,7 @@ export function renderReal(
     return Promise.resolve({ ok: false, log: "当前环境不支持真机渲染（网页版 / 旧 APK）" });
   }
   const name = layoutName.replace(/\.xml$/i, "");
-  const list = files.filter((f) => f && f.path && f.text);
+  const list = files.filter((f) => f && f.path && (f.text || f.base64));
   if (!list.some((f) => f.path === `layout/${name}.xml`)) {
     return Promise.resolve({ ok: false, log: `文件清单里没有 layout/${name}.xml` });
   }

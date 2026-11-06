@@ -70,6 +70,18 @@ function NumField({
   const [draft, setDraft] = useState(value === undefined ? "" : String(value));
   const focusRef = useRef(false);
   const shown = focusRef.current ? draft : value === undefined ? "" : String(value);
+  // 输入中就实时提交（能填一个字符就看到效果）；只在「删到空」时保留草稿不提交，
+  // 否则调用方的 v ?? 1 会把 1 立刻填回来，最后一个字符删不掉。
+  const type = (raw: string) => {
+    setDraft(raw);
+    const s = raw.trim();
+    if (!s) {
+      onChange(undefined);
+      return;
+    }
+    const n = parseFloat(s);
+    if (Number.isFinite(n)) onChange(Math.max(min, n));
+  };
   const commit = () => {
     focusRef.current = false;
     const raw = draft.trim();
@@ -94,7 +106,7 @@ function NumField({
             focusRef.current = true;
             setDraft(value === undefined ? "" : String(value));
           }}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => type(e.target.value)}
           onBlur={commit}
         />
         <span className="axv-attr-suffix">{suffix}</span>

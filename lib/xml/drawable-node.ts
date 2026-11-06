@@ -70,6 +70,8 @@ export interface ColorLeaf extends WithTransform {
 export interface RefLeaf extends WithTransform {
   t: "ref";
   name: string;
+  /** M157：原写法是 @mipmap/x（默认 @drawable/x） */
+  mipmap?: boolean;
 }
 
 /** layer-list 的一层 */
@@ -345,8 +347,11 @@ export function withTransform(node: DrawableNode, t: Transform): DrawableNode {
 }
 
 function toRefOrColor(raw: string): DrawableNode {
-  const name = refName(raw);
-  if (name) return { t: "ref", name };
+  const t = raw.trim();
+  // M157：@color/x 必须留在 color 节点上，否则会被当成 @drawable/x 写回去（资源类型串了）
+  if (/^@color\//.test(t)) return { t: "color", color: t };
+  const name = refName(t);
+  if (name) return { t: "ref", name, ...(/^@mipmap\//.test(t) ? { mipmap: true } : {}) };
   return { t: "color", color: raw };
 }
 

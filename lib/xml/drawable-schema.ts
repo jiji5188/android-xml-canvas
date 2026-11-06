@@ -289,6 +289,17 @@ export function validateDrawable(node: DrawableNode): Problem[] {
 function visit(node: DrawableNode, path: string, out: Problem[]): void {
   const here = path || defOf(node).label;
 
+  // M156：<scale> / <clip> 是靠 level（0~10000）驱动的，静态背景里没人给 level，
+  // level=0 时 scale 会把内容缩成 0 尺寸 → 真机上整块什么都不显示（画布看起来是有的）。
+  const chain = (node as { transform?: { kind: string }[] }).transform;
+  if (chain?.some((t) => t.kind === "scale" || t.kind === "clip")) {
+    out.push({
+      path: here,
+      level: "warn",
+      message: "scale / clip 靠 level 驱动：静态背景的 level 恒为 0，内容会被缩成 0 尺寸看不到（改用 inset、item 的宽度/偏移）",
+    });
+  }
+
   switch (node.t) {
     case "layer": {
       if (node.items.length === 0) {

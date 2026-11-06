@@ -580,6 +580,7 @@ export function DrawableEditor({
                       index={path[path.length - 1]}
                       slot={slotOf(root, path)}
                       onChange={(patch) => mutate(setSlot(root, path, patch))}
+                      onNodeChange={(next) => mutate(replaceAt(root, path, next))}
                     />
                   ) : null}
                   <AttrRows

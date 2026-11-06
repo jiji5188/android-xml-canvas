@@ -31,6 +31,19 @@ const joinAttrs = (parts: (string | null)[]): string => {
 
 const dpNum = (n: number): string => `${Math.round(n * 100) / 100}dp`;
 
+/** M157：ref 节点的完整引用（区分 drawable / mipmap / color） */
+const refValue = (node: DrawableNode): string =>
+  node.t === "ref"
+    ? (node.mipmap ? "@mipmap/" : "@drawable/") + node.name.replace(/^@(?:drawable|mipmap)\//, "")
+    : "";
+
+/** 能直接写成 <item android:drawable="…"/> 的节点（引用 / @color 引用） */
+const inlineItemRef = (node: DrawableNode): string | null => {
+  if (node.t === "ref") return refValue(node);
+  if (node.t === "color" && /^@color\//.test(node.color)) return node.color;
+  return null;
+};
+
 /** 主入口：树 → 完整 XML 文本（末尾带换行） */
 export function buildDrawable(node: DrawableNode): string {
   const lines = emit(node, 0);
@@ -85,7 +98,7 @@ function emit(node: DrawableNode, level: number): string[] {
     case "ref": {
       // 只有出现在容器子位才有意义；根位置也按 item 输出，且交给校验去报错
       const pad = IND.repeat(level);
-      const line = `${pad}<item${joinAttrs([attr("drawable", `@drawable/${node.name.replace(/^@drawable\//, "")}`)])}/>`;
+      const line = `${pad}<item${joinAttrs([attr("drawable", refValue(node))])}/>`;
       return wrapTransforms(node, [line], level);
     }
 
@@ -111,16 +124,18 @@ function emit(node: DrawableNode, level: number): string[] {
       const out: string[] = [
         `${IND.repeat(level)}<ripple${joinAttrs([attr("color", node.color), attr("radius", node.radius)])}>`,
       ];
-      if (node.content) {
-        out.push(`${IND.repeat(level + 1)}<item>`);
-        out.push(...emit(node.content, level + 2));
-        out.push(`${IND.repeat(level + 1)}</item>`);
-      }
-      if (node.mask) {
-        out.push(`${IND.repeat(level + 1)}<item android:id="@android:id/mask">`);
-        out.push(...emit(node.mask, level + 2));
-        out.push(`${IND.repeat(level + 1)}</item>`);
-      }
+      // M157：ripple 的 item 也能写 android:drawable（引用），不能套成一个 item 里再包 item
+      const rippleItem = (child: DrawableNode, extra: (string | null)[]) => {
+        const ref = inlineItemRef(child);
+        if (ref) return [`${IND.repeat(level + 1)}<item${joinAttrs([...extra, attr("drawable", ref)])}/>`];
+        return [
+          `${IND.repeat(level + 1)}<item${joinAttrs(extra)}>`,
+          ...emit(child, level + 2),
+          `${IND.repeat(level + 1)}</item>`,
+        ];
+      };
+      if (node.content) out.push(...rippleItem(node.content, []));
+      if (node.mask) out.push(...rippleItem(node.mask, [attr("id", "@android:id/mask")]));
       out.push(`${IND.repeat(level)}</ripple>`);
       return wrapTransforms(node, out, level);
     }
@@ -161,8 +176,8 @@ function emitItem(
   void key;
   const pad = IND.repeat(level);
   const node = item.node;
-  if (node.t === "ref") {
-    const ref = `@drawable/${node.name.replace(/^@drawable\//, "")}`;
+  const ref = inlineItemRef(node);
+  if (ref) {
     return [`${pad}<item${joinAttrs([attr("drawable", ref), ...slotAttrs])}/>`];
   }
   const out = [`${pad}<item${joinAttrs(slotAttrs)}>`];

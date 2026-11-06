@@ -147,17 +147,99 @@ function AlphaField({
   );
 }
 
+/**
+ * M157：item 的 android:drawable —— 引用外部资源（@drawable/x、@color/x、#RRGGBB）。
+ * layer-list 的每一层、selector 的每个状态都能这么写，比内联 <shape> 省重复代码。
+ * 以前只能手写 XML，参数 tab 里没入口。
+ */
+function itemRefOf(node: DrawableNode): string {
+  if (node.t === "ref") return `@drawable/${node.name}`;
+  if (node.t === "color") return node.color;
+  return "";
+}
+
+function RefField({ node, onChange }: { node: DrawableNode; onChange: (n: DrawableNode) => void }) {
+  const cur = itemRefOf(node);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [err, setErr] = useState("");
+  const shown = draft ?? cur;
+
+  const commit = () => {
+    if (draft === null) return;
+    const raw = draft.trim();
+    setDraft(null);
+    if (!raw || raw === cur) {
+      setErr("");
+      return;
+    }
+    // 不带 @ 的当 drawable 名（手机上手敲 @drawable/ 太麻烦）
+    const v = raw.startsWith("@") || raw.startsWith("#") ? raw : `@drawable/${raw}`;
+    const m = /^@(drawable|mipmap|color)\/([A-Za-z0-9_.]+)$/.exec(v);
+    if (m) {
+      onChange(
+        m[1] === "color"
+          ? { t: "color", color: v }
+          : { t: "ref", name: m[2].replace(/\.xml$/i, "") },
+      );
+      setErr("");
+      return;
+    }
+    if (/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)) {
+      onChange({ t: "color", color: v });
+      setErr("");
+      return;
+    }
+    setErr(tt("只能填 @drawable/名字、@color/名字、@mipmap/名字 或 #RRGGBB"));
+  };
+
+  return (
+    <div className="axv-shape-field">
+      <label className="axv-shape-label">{tt("引用资源")}</label>
+      <input
+        className="axv-attr-input"
+        value={shown}
+        spellCheck={false}
+        placeholder="@drawable/bg_card"
+        onChange={(e) => {
+          setDraft(e.target.value);
+          setErr("");
+        }}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+      />
+      {err ? <div className="axv-shape-warn">{err}</div> : null}
+      <div className="axv-shape-hint">
+        {cur
+          ? tt("这一项现在是引用，它会取代内联内容")
+          : tt("填了就改写这一项的内联内容（可用 @drawable/、@color/、@mipmap/ 或颜色值）")}
+      </div>
+    </div>
+  );
+}
+
 export function SlotRows({
   parent,
   index,
   slot,
   onChange,
+  onNodeChange,
 }: {
   parent: DrawableNode;
   index: number;
   slot: SlotValue;
   onChange: (patch: Partial<SlotValue>) => void;
+  /** M157：把这一项换成引用/颜色（或恢复默认形状） */
+  onNodeChange?: (next: DrawableNode) => void;
 }) {
+  // 这一项自己的节点（引用输入框要看它现在是 ref / color / 内联内容）
+  const child: DrawableNode | null =
+    parent.t === "layer" || parent.t === "selector"
+      ? (parent.items[index]?.node ?? null)
+      : parent.t === "ripple"
+        ? (index === 1 ? (parent.mask ?? null) : (parent.content ?? null))
+        : null;
   if (parent.t === "layer") {
     const off = slot.offset ?? {};
     const size = slot.size ?? {};
@@ -169,6 +251,8 @@ export function SlotRows({
         <div className="axv-set-label">
           {tt("这一层 · 第 {n} 层", { n: String(index + 1) })}
         </div>
+
+        {onNodeChange && child ? <RefField node={child} onChange={onNodeChange} /> : null}
 
         <div className="axv-slot-grid">
           {EDGES.map((e) => (
@@ -234,6 +318,7 @@ export function SlotRows({
     return (
       <div className="axv-slot">
         <div className="axv-set-label">{tt("这个状态生效的条件")}</div>
+        {onNodeChange && child ? <RefField node={child} onChange={onNodeChange} /> : null}
         {STATES.map((s) => {
           const cur = states[s.key];
           const val = cur === "true" ? "on" : cur === "false" ? "off" : "any";
@@ -275,6 +360,7 @@ export function SlotRows({
         <div className="axv-set-label">
           {index === 1 ? tt("遮罩层") : tt("内容层")}
         </div>
+        {onNodeChange && child ? <RefField node={child} onChange={onNodeChange} /> : null}
         <div className="axv-shape-hint">
           {index === 1
             ? tt("遮罩只决定波纹被裁成什么形状，自己不绘制。")

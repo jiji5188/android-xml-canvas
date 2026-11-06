@@ -319,6 +319,31 @@ export function AttrPanel({
             ))}
           </select>
         );
+      case "enum_input": {
+        // M163：可编辑枚举（对齐方式等）——既能从完整组合里选，也能直接输 Android 支持的任意写法
+        const listId = `axv-enum-${name}`;
+        return (
+          <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
+            <input
+              className="axv-attr-input"
+              style={{ width: "100%" }}
+              value={draft ?? value}
+              list={listId}
+              placeholder={(options?.[0] ?? "center") + " / top|start / …"}
+              spellCheck={false}
+              onChange={(e) => setDrafts((d) => ({ ...d, [name]: e.target.value }))}
+              onBlur={() => {
+                if (draft !== undefined) commit(name, draft);
+                setDrafts((d) => { const n = { ...d }; delete n[name]; return n; });
+              }}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            />
+            <datalist id={listId}>
+              {(options ?? []).map((o) => <option key={o} value={o} />)}
+            </datalist>
+          </div>
+        );
+      }
       case "size_input": {
         // 可编辑：input + datalist 预设过滤
         const listId = "axv-size-" + name;

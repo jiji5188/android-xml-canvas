@@ -5,6 +5,7 @@ export type AttrEditor =
   | "enum" // 下拉选择
   | "size" // match_parent / wrap_content / 0dp / 自定义 dp
   | "size_input" // 可编辑尺寸输入（input + datalist 预设过滤），替代纯 select
+  | "enum_input" // 可编辑枚举：input + datalist 预设，既能选也能自由输
   | "dimen" // 带单位数值（8dp / 16sp）
   | "number"
   | "color"
@@ -24,6 +25,40 @@ export interface AttrSpec {
   tags?: string[];
 }
 
+/**
+ * M163：gravity / layout_gravity 的完整组合。
+ * 用户反馈“只有上下左右和 center，选不了左中、右中、上中、下中”。
+ * 这里把 3×5 的交叉组合全列（纵 top/center_vertical/bottom × 横 left/start/center_horizontal/end/right），
+ * 属性面板改成可输入 + datalist，冷门写法（如 fill_vertical）也能直接敲。
+ */
+export const GRAVITY_OPTIONS: string[] = (() => {
+  const v = ["top", "center_vertical", "bottom"];
+  const h = ["left", "start", "center_horizontal", "end", "right"];
+  const first = [
+    "center",
+    "center_vertical",
+    "center_horizontal",
+    "top",
+    "bottom",
+    "left",
+    "right",
+    "start",
+    "end",
+    "fill",
+    "fill_vertical",
+    "fill_horizontal",
+  ];
+  const combos: string[] = [];
+  for (const vv of v) {
+    for (const hh of h) {
+      // 单项组合已在开头列过（center_vertical / center_horizontal / top / bottom / left / right / start / end）
+      if (vv === "center_vertical" && hh === "center_horizontal") continue;
+      combos.push(`${vv}|${hh}`);
+    }
+  }
+  return [...first, ...combos];
+})();
+
 export const ATTR_CATALOG: AttrSpec[] = [
   // ===== 布局 =====
   { name: "layout_width", editor: "size_input", options: ["match_parent", "wrap_content", "0dp"], default: "wrap_content", group: "布局", desc: "宽度" },
@@ -42,7 +77,7 @@ export const ATTR_CATALOG: AttrSpec[] = [
   { name: "paddingEnd", editor: "dimen", default: "8dp", group: "布局" },
   { name: "layout_weight", editor: "number", default: "1", group: "布局", desc: "LinearLayout 权重", tags: ["LinearLayout"] },
   { name: "orientation", editor: "enum", options: ["horizontal", "vertical"], default: "vertical", group: "布局", tags: ["LinearLayout"] },
-  { name: "layout_gravity", editor: "enum", options: ["top", "bottom", "left", "right", "start", "end", "center", "top|start", "top|end", "bottom|start", "bottom|end", "center_vertical", "center_horizontal"], default: "center", group: "布局", desc: "自身在父容器中的位置（FrameLayout/LinearLayout）" },
+  { name: "layout_gravity", editor: "enum_input", options: GRAVITY_OPTIONS, default: "center", group: "布局", desc: "自身在父容器中的位置（FrameLayout/LinearLayout）" },
   { name: "visibility", editor: "enum", options: ["visible", "invisible", "gone"], default: "visible", group: "布局" },
   { name: "id", editor: "string", default: "@+id/", group: "布局", desc: "控件 id（@+id/xxx）" },
 
@@ -65,7 +100,7 @@ export const ATTR_CATALOG: AttrSpec[] = [
   { name: "textColor", editor: "color", default: "#1D1B20", group: "文本" },
   { name: "textStyle", editor: "enum", options: ["normal", "bold", "italic", "bolditalic"], default: "normal", group: "文本" },
   { name: "textAllCaps", editor: "bool", default: "false", group: "文本" },
-  { name: "gravity", editor: "enum", options: ["start", "end", "center", "top", "bottom", "center_vertical", "center_horizontal", "left", "right", "center_vertical|start", "center_vertical|end", "top|start", "bottom|end"], default: "center", group: "文本", desc: "内容/文字对齐" },
+  { name: "gravity", editor: "enum_input", options: GRAVITY_OPTIONS, default: "center", group: "文本", desc: "内容/文字对齐" },
   { name: "maxLines", editor: "number", default: "1", group: "文本" },
   { name: "ellipsize", editor: "enum", options: ["end", "start", "middle", "marquee"], default: "end", group: "文本" },
 

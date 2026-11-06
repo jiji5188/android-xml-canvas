@@ -99,14 +99,17 @@ export function renderReal(
   // M156：先查布局里引用的 @string/@color… 在不在文件清单里。
   // 不查的话设备端 aapt2 只会丢一句 "resource string/xxx not found"，看不出是「没定义」还是「没上传」。
   const missing = unresolvedRefs(list, name);
-  if (missing.length > 0) {
+  // M159：现在收集阶段会给缺失资源生成占位（能编译），所以这里不再“发现缺失就不让渲染”，
+  // 否则永远卡在资源检查、根本看不到真实效果。只有确实无法造假的二进制资源才拦。
+  const hard = missing.filter((m) => /^(font|interpolator)\//.test(m));
+  if (hard.length > 0) {
     return Promise.resolve({
       ok: false,
       stage: "资源检查",
       log:
-        `布局引用了 ${missing.length} 个未包含的资源：${missing.slice(0, 8).join("、")}` +
-        (missing.length > 8 ? " …" : "") +
-        "。要么在 values/ 里定义它，要么把带这些资源的 res 目录上传（或打开对应项目）。",
+        `布局引用了 ${hard.length} 个无法自动占位的资源：${hard.slice(0, 8).join("、")}` +
+        (hard.length > 8 ? " …" : "") +
+        "。字体/插值器需要真实的二进制文件，请把对应 res 目录上传。",
     });
   }
   install();

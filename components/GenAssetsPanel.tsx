@@ -18,7 +18,7 @@ import {
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { parseShapeSpec, specToCss, argbColorsForPreview } from "@/lib/xml/shape-gen";
 import { flattenDrawable, parseDrawable } from "@/lib/xml/drawable-node";
-import { sanitizeResName } from "@/lib/xml/resname";
+import { sanitizeResName, cleanResNameInput } from "@/lib/xml/resname";
 import { saveTextNative } from "@/lib/xml/native-save";
 import { saveResFiles, type ProjectSaveRoot } from "@/lib/xml/project-save";
 
@@ -137,12 +137,15 @@ export function GenAssetsPanel({
 
   const submitRename = () => {
     if (!editing) return;
-    const safe = sanitizeResName(draft, "ic");
-    if (!safe) {
+    // M156：先把输入里的非法字符清一遍（保留 _），再走 sanitizeResName（补数字前缀/去首尾）。
+    // sanitizeResName 对「空/全下划线」兜底成 ic_xxx 会吃掉用户「想改名」的意图，这里先判空。
+    const cleaned = cleanResNameInput(draft);
+    if (!cleaned) {
       setErr(t("资源名不能为空（只能用 a-z 0-9 _，且字母开头）"));
       return;
     }
-    if (safe !== draft.trim()) {
+    const safe = sanitizeResName(cleaned, "ic");
+    if (safe !== cleaned) {
       // 允许自动纠正，但要说清楚
       setDraft(safe);
       setErr(t("已按 aapt 规则纠正为 {name}，再点一次「确定」", { name: safe }));

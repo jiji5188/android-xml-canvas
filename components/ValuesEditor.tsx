@@ -9,6 +9,7 @@
 
 import { useMemo, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
+import { isValidResName } from "@/lib/xml/resname";
 import { ColorField } from "./ColorField";
 import { parseColorOr, toArgbHex, toRgbHex } from "@/lib/xml/color-argb";
 import {
@@ -98,8 +99,8 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
       if (el && el.value !== it.name) el.value = it.name;
       return;
     }
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(next)) {
-      note(tt("名称只能用字母/数字/下划线，且不能以数字开头"));
+    if (!isValidResName(next)) {
+      note(tt("名称只能用小写字母/数字/下划线，且不能以数字开头"));
       if (el) el.value = it.name;
       return;
     }

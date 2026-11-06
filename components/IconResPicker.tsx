@@ -22,7 +22,7 @@ import {
   type DrawShape,
 } from "@/lib/xml/canvas-shapes";
 import { buildVectorXml } from "@/lib/xml/vector-edit";
-import { isValidResName } from "@/lib/xml/resname";
+import { isValidResName, cleanResNameInput } from "@/lib/xml/resname";
 
 export interface IconResPickerProps {
   /** 当前属性值（如 @drawable/ic_xxx），仅用于展示 */
@@ -234,7 +234,7 @@ export function IconResPicker({ value, attrName, existing = [], onClose, onPick 
               <input
                 value={resName}
                 spellCheck={false}
-                onChange={(e) => setResName(e.target.value)}
+                onChange={(e) => setResName(cleanResNameInput(e.target.value))}
                 placeholder="ic_custom"
               />
             </div>

@@ -15,6 +15,7 @@ import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { IconResPicker, iconToVectorXml } from "./IconResPicker";
 import { ColorPicker } from "./ColorPicker";
 import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
+import { cleanResNameInput, sanitizeResName } from "@/lib/xml/resname";
 
 interface Props {
   name: string;
@@ -142,7 +143,7 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
   };
 
   const save = () => {
-    const safe = resName.trim().replace(/[^a-zA-Z0-9_]/g, "_");
+    const safe = sanitizeResName(resName, "ic");
     if (!safe) {
       setErr(tt("资源名不能为空"));
       return;
@@ -191,8 +192,9 @@ export default function IconEditor({ name, xml, onClose, onSave, existingNames =
               <input
                 className="axv-icon-ed-input"
                 value={resName}
+                spellCheck={false}
                 onChange={(e) => {
-                  setResName(e.target.value);
+                  setResName(cleanResNameInput(e.target.value));
                   setErr("");
                 }}
               />

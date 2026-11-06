@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { t as tt } from "@/lib/i18n-src";
+import { isValidResName, cleanResNameInput } from "@/lib/xml/resname";
 import { createPortal } from "react-dom";
 
 /** M46c：所有浮层挂到 .axv-main 下（用户要求），拿不到就回 body */
@@ -153,7 +154,20 @@ export function NewEntryDialog(p: NewEntryDialogProps) {
   const parentRel = inThisDir && p.target.isDir ? p.target.rel : parentOf(p.target.rel);
   const finalName = isDir ? name.trim() : name.trim();
   const dup = !!finalName && p.takenNames.has(finalName);
-  const canSubmit = finalName.length > 0 && !dup && !/[/\\]/.test(finalName);
+  // M156：res/ 下的文件名也要遵守 aapt2 规则（BgRound.xml / btn-bg.xml / 1_bg.xml / 背景.xml 都会被拒），
+  // 只查 stem（去掉 .xml 之类扩展名），其它目录（src/、docs/）不管。
+  const inRes = /(^|\/)res(\/|$)/.test(parentRel);
+  const resBad =
+    inRes && !isDir && finalName
+      ? (() => {
+          const dot = finalName.lastIndexOf(".");
+          const stem = dot > 0 ? finalName.slice(0, dot) : finalName;
+          return isValidResName(stem)
+            ? ""
+            : tt("Android 资源名只能用小写字母、数字、下划线，且不能以数字开头（例：bg_round.xml）");
+        })()
+      : "";
+  const canSubmit = finalName.length > 0 && !dup && !/[/\\]/.test(finalName) && !resBad;
 
   return (
     <div className="axv-tfm-mask">
@@ -165,8 +179,18 @@ export function NewEntryDialog(p: NewEntryDialogProps) {
             className="axv-dlg-input"
             autoFocus
             value={name}
+            spellCheck={false}
             placeholder={isDir ? tt("新文件夹名") : tt("新文件名，如 detail.xml")}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (!inRes || isDir) {
+                setName(raw);
+                return;
+              }
+              // res 下：只清洗扩展名之前的部分，保留 .xml
+              const dot = raw.lastIndexOf(".");
+              setName(dot > 0 ? cleanResNameInput(raw.slice(0, dot)) + raw.slice(dot) : cleanResNameInput(raw));
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && canSubmit) p.onSubmit({ name: finalName, isDir, parentRel });
             }}
@@ -198,7 +222,11 @@ export function NewEntryDialog(p: NewEntryDialogProps) {
         ) : null}
 
         <div className="axv-dlg-hint">
-          {dup ? tt("「{name}」已存在，请换个名字", { name: finalName }) : tt("将创建到：{p}/", { p: parentRel || tt("项目根") })}
+          {resBad
+            ? resBad
+            : dup
+              ? tt("「{name}」已存在，请换个名字", { name: finalName })
+              : tt("将创建到：{p}/", { p: parentRel || tt("项目根") })}
         </div>
 
         <div className="axv-dlg-actions">
@@ -239,8 +267,20 @@ export function RenameDialog(p: {
   const trimmed = name.trim();
   const same = trimmed === start;
   const dup = !same && p.takenNames.has(trimmed);
-  const canSubmit = trimmed.length > 0 && !dup && !/[/\\]/.test(trimmed) && !same;
   const isDir = p.target?.isDir ?? false;
+  // M156：res/ 下重命名同样限死小写字母/数字/下划线、小写开头
+  const inRes = /(^|\/)res(\/|$)/.test(p.target?.rel ?? "");
+  const resBad =
+    inRes && !isDir && trimmed
+      ? (() => {
+          const dot = trimmed.lastIndexOf(".");
+          const stem = dot > 0 ? trimmed.slice(0, dot) : trimmed;
+          return isValidResName(stem)
+            ? ""
+            : tt("Android 资源名只能用小写字母、数字、下划线，且不能以数字开头（例：bg_round.xml）");
+        })()
+      : "";
+  const canSubmit = trimmed.length > 0 && !dup && !/[/\\]/.test(trimmed) && !same && !resBad;
 
   return (
     <div className="axv-tfm-mask">
@@ -252,7 +292,16 @@ export function RenameDialog(p: {
             className="axv-dlg-input"
             autoFocus
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            spellCheck={false}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (!inRes || isDir) {
+                setName(raw);
+                return;
+              }
+              const dot = raw.lastIndexOf(".");
+              setName(dot > 0 ? cleanResNameInput(raw.slice(0, dot)) + raw.slice(dot) : cleanResNameInput(raw));
+            }}
             onFocus={(e) => {
               // 选中不含扩展名的部分，方便只改前缀
               const dot = e.target.value.lastIndexOf(".");
@@ -265,7 +314,11 @@ export function RenameDialog(p: {
           />
         </label>
         <div className="axv-dlg-hint">
-          {dup ? tt("「{name}」已存在，请换个名字", { name: trimmed }) : (p.desc ?? tt("原名称：{name}", { name: start }))}
+          {resBad
+            ? resBad
+            : dup
+              ? tt("「{name}」已存在，请换个名字", { name: trimmed })
+              : (p.desc ?? tt("原名称：{name}", { name: start }))}
         </div>
         <div className="axv-dlg-actions">
           <button className="axv-btn axv-ghost" onClick={p.onClose}>

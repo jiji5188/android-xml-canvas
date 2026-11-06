@@ -6,6 +6,7 @@
 // 但 DrawableEditor 只负责树与保存，不应该把形状字段写死在页面里。
 // 这里只改 ShapeSpec，不改 XML —— 预览与保存都走同一个树。
 
+import React, { useEffect, useRef, useState } from "react";
 import type { ShapeSpec } from "@/lib/xml/shape-gen";
 import { ColorField } from "@/components/ColorField";
 import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
@@ -64,24 +65,37 @@ function NumField({
   min?: number;
   step?: number;
 }) {
+  // M156：输入中用本地草稿（否则「描边宽度 1 删不掉」——敲空 → onChange(undefined) →
+  // 调用方 v ?? 1 立刻填回 1，永远删不到空）。失焦时提交，提交不上就回弹成原值
+  const [draft, setDraft] = useState(value === undefined ? "" : String(value));
+  const focusRef = useRef(false);
+  const shown = focusRef.current ? draft : value === undefined ? "" : String(value);
+  const commit = () => {
+    focusRef.current = false;
+    const raw = draft.trim();
+    if (!raw) {
+      onChange(undefined);
+      return;
+    }
+    const n = parseFloat(raw);
+    if (Number.isFinite(n)) onChange(Math.max(min, n));
+    else setDraft(value === undefined ? "" : String(value)); // 提交不上 → 回弹
+  };
   return (
     <div className="axv-shape-field">
       <label className="axv-shape-label">{tt(label)}</label>
       <div className="axv-attr-num">
         <input
           className="axv-attr-input"
-          value={value === undefined ? "" : String(value)}
+          value={shown}
           inputMode="decimal"
           placeholder={placeholder ?? "–"}
-          onChange={(e) => {
-            const raw = e.target.value.trim();
-            if (!raw) {
-              onChange(undefined);
-              return;
-            }
-            const n = parseFloat(raw);
-            onChange(Number.isFinite(n) ? Math.max(min, n) : undefined);
+          onFocus={() => {
+            focusRef.current = true;
+            setDraft(value === undefined ? "" : String(value));
           }}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
         />
         <span className="axv-attr-suffix">{suffix}</span>
       </div>

@@ -8,6 +8,7 @@
 // 打开已有图标时反向：xml ──parseVectorModel──> VectorModel ──modelToShapes──> 每条 path 一个可编辑图元。
 
 import { t as tt } from "@/lib/i18n-src";
+import { cleanResNameInput, sanitizeResName } from "@/lib/xml/resname";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOverlayBack } from "@/lib/overlay-back";
@@ -1229,7 +1230,7 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   closeRef.current = () => guard.requestClose(onClose);
 
   const save = () => {
-    const safe = resName.trim().replace(/[^a-zA-Z0-9_]/g, "_");
+    const safe = sanitizeResName(resName, "ic");
     if (!safe) {
       setErr(tt("资源名不能为空"));
       return;
@@ -1874,8 +1875,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
                     <input
                       className="axv-icon-ed-input"
                       value={resName}
+                      spellCheck={false}
                       onChange={(e) => {
-                        setResName(e.target.value);
+                        setResName(cleanResNameInput(e.target.value));
                         setErr("");
                       }}
                     />

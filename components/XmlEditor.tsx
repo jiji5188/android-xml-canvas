@@ -57,7 +57,7 @@ import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
 import { createAndroidProject, safeProjectName } from "@/lib/xml/new-project";
 import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/xml/new-project-io";
 import { pickXmlFile } from "@/lib/xml/save-as";
-import { downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, buildSaveFiles, type SaveInput } from "@/lib/xml/save-flow";
+import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { hasRealRender, renderReal } from "@/lib/xml/native-render";
 import { projectSaveRoot, saveProjectFile, saveResFiles } from "@/lib/xml/project-save";
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
@@ -2980,7 +2980,7 @@ const findResolved = findResolvedNode;
     if (realRenderBusy) return;
     const input = currentSaveInput();
     const name = (input.name || "activity_main.xml").replace(/\.xml$/i, "");
-    const files = buildSaveFiles(input).map((f) => ({ path: f.path, text: f.text }));
+    const files = buildRealRenderFiles(input).map((f) => ({ path: f.path, text: f.text }));
     setRealRenderBusy(true);
     setExportNote(tt("正在用设备上的 aapt2 编译资源包…"));
     void renderReal(name, files)

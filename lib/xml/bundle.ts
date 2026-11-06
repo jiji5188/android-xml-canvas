@@ -16,8 +16,7 @@ export interface BundleInput {
 }
 
 /** 组装 zip 条目（路径相对 res/）：layout/ + drawable/ + values/ */
-export function buildResBundle(input: BundleInput): ZipEntry[] {
-  const entries: ZipEntry[] = [];
+export function buildResBundle(input: BundleInput): ZipEntry[] {  const entries: ZipEntry[] = [];
   const seen = new Set<string>();
   const push = (path: string, text: string) => {
     if (!text || seen.has(path)) return;
@@ -67,6 +66,40 @@ export function buildResBundle(input: BundleInput): ZipEntry[] {
 
   // 排序：layout → drawable → values，方便人看
   return entries.sort((a, b) => rank(a.path) - rank(b.path) || a.path.localeCompare(b.path));
+}
+
+/** 真机渲染用：把布局 + 项目里能找到的全部 res 文件都带上
+ * （布局里 @string/@color/@dimen/@style/@anim/@animator/@xml 的引用需要真实资源才能通过 aapt2 link） */
+export function buildRealRenderBundle(input: BundleInput): ZipEntry[] {
+  const base = buildResBundle(input);
+  const seen = new Set(base.map((e) => e.path));
+  const out = [...base];
+  const push = (p: string, t: string) => {
+    if (!t || seen.has(p)) return;
+    seen.add(p);
+    out.push({ path: p, text: t });
+  };
+  const tree = input.extras?.tree;
+  if (tree) {
+    const walk = (dir: ResTreeDir) => {
+      for (const child of Object.values(dir.children)) {
+        if ("children" in child) {
+          walk(child as ResTreeDir);
+        } else {
+          const f = child as ResTreeFile;
+          if (!f.text) continue;
+          if (!/\.xml$/i.test(f.rel)) continue;
+          const top = f.rel.split(/[\/]/)[0] || "";
+          // 带上 res/ 下的 xml 资源；png/jpg 等二进制走不了文本通道，先不支持
+          if (/^(values|xml|color|anim|animator|menu|interpolator|font|layout|drawable|mipmap)/i.test(top)) {
+            push(f.rel, f.text);
+          }
+        }
+      }
+    };
+    walk(tree);
+  }
+  return out.sort((a, b) => rank(a.path) - rank(b.path) || a.path.localeCompare(b.path));
 }
 
 function rank(p: string): number {

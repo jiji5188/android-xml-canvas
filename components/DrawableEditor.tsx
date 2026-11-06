@@ -23,7 +23,7 @@ import { countNodes } from "@/lib/xml/drawable-node";
 import { nodeAt, replaceAt, breadcrumb, parentOf, setSlot, slotOf, type Path } from "@/lib/xml/drawable-edit";
 import { validateDrawable } from "@/lib/xml/drawable-schema";
 import { DRAWABLE_PRESETS } from "@/lib/xml/drawable-presets";
-import { resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
+import { cleanResNameInput, resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
 import { useUnsavedGuard } from "@/components/UnsavedGuard";
 import { DrawablePreview } from "./DrawablePreview";
 import { focusDoc } from "@/lib/xml/drawable-focus";
@@ -486,7 +486,7 @@ export function DrawableEditor({
                 value={name}
                 spellCheck={false}
                 placeholder="bg_card"
-                onChange={(e) => setName(sanitizeResName(e.target.value, ""))}
+                onChange={(e) => setName(cleanResNameInput(e.target.value))}
               />
             </div>
             {nameConflicts ? <div className="axv-shape-warn">{tt("这个名字已被占用，换一个或改已有资源")}</div> : null}

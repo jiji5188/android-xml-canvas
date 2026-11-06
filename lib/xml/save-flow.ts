@@ -13,7 +13,7 @@
 //
 // React 侧只负责弹提示 / 开关对话框，不再碰文件 IO。
 
-import { buildResBundle, missingDrawables } from "./bundle";
+import { buildResBundle, buildRealRenderBundle, missingDrawables } from "./bundle";
 import { exportLayoutXml, type ExportMode } from "./export";
 import type { ResourceExtras } from "./resdir";
 import { saveBundleAnywhere, type SaveBundleResult, type SaveFileSpec } from "./save-as";
@@ -63,6 +63,18 @@ const defaultIO: SaveIO = {
 export function buildSaveFiles(input: SaveInput): SaveFileSpec[] {
   const layoutXml = exportLayoutXml(input.xml, { mode: input.mode });
   const entries = buildResBundle({
+    layoutXml,
+    layoutName: input.name,
+    generatedDrawables: input.generatedDrawables,
+    extras: input.extras,
+  });
+  return entries.map((e) => ({ path: e.path, text: e.text }));
+}
+
+/** M156：真机渲染 → 要带上设备端 aapt2 能过的全部资源（布局 + res/ 下的 xml） */
+export function buildRealRenderFiles(input: SaveInput): SaveFileSpec[] {
+  const layoutXml = exportLayoutXml(input.xml, { mode: input.mode });
+  const entries = buildRealRenderBundle({
     layoutXml,
     layoutName: input.name,
     generatedDrawables: input.generatedDrawables,

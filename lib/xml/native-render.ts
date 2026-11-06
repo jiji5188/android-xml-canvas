@@ -94,6 +94,19 @@ export function renderReal(
   if (!list.some((f) => f.path === `layout/${name}.xml`)) {
     return Promise.resolve({ ok: false, log: `文件清单里没有 layout/${name}.xml` });
   }
+  // M156：先查布局里引用的 @string/@color… 在不在文件清单里。
+  // 不查的话设备端 aapt2 只会丢一句 "resource string/xxx not found"，看不出是「没定义」还是「没上传」。
+  const missing = unresolvedRefs(list, name);
+  if (missing.length > 0) {
+    return Promise.resolve({
+      ok: false,
+      stage: "资源检查",
+      log:
+        `布局引用了 ${missing.length} 个未包含的资源：${missing.slice(0, 8).join("、")}` +
+        (missing.length > 8 ? " …" : "") +
+        "。要么在 values/ 里定义它，要么把带这些资源的 res 目录上传（或打开对应项目）。",
+    });
+  }
   install();
   seq += 1;
   const id = `r${Date.now().toString(36)}${seq}`;
@@ -113,4 +126,44 @@ export function renderReal(
       resolve({ ok: false, log: "调用原生失败: " + String(e) });
     }
   });
+}
+
+/**
+ * 扫布局里引用的 app 内资源，返回「文件清单里找不到定义」的引用。
+ * 只查确定能在 res 里定义的类；@android: / @+id / @id / ?attr 不动。
+ */
+export function unresolvedRefs(files: RenderFile[], layoutName?: string): string[] {
+  // 只查目标布局（其它布局可能是项目的半成品，不参与本次渲染）
+  const target = (layoutName || "").replace(/\.xml$/i, "");
+  const layoutFiles = target
+    ? files.filter((f) => {
+        const m = f.path.match(/^layout(-[^/]+)?\/([^/]+)\.xml$/i);
+        return !!m && m[2] === target;
+      })
+    : files.filter((f) => /^layout(-[^/]+)?\/.*\.xml$/i.test(f.path));
+  if (layoutFiles.length === 0) return [];
+
+  // 1) 已定义资源索引
+  const defs = new Set<string>();
+  for (const f of files) {
+    const p = f.path;
+    if (/^values(-[^/]+)?\//i.test(p)) {
+      const tagRe = /<(string|color|dimen|style|integer|bool|fraction|array|string-array|integer-array|plurals|attr|item)\b[^>]*?\bname="([^"]+)"/g;
+      let tm: RegExpExecArray | null;
+      while ((tm = tagRe.exec(f.text || "")) !== null) defs.add(`${tm[1]}/${tm[2]}`);
+      // <string-array>/<array> 里的 <item> 不单独算；@array/xxx 的 key 就是外层 name
+      continue;
+    }
+    const d = p.match(/^(drawable|mipmap|anim|animator|color|menu|xml|font|interpolator)(-[^/]+)?\/([^/]+?)(\.[a-z0-9]+)?$/i);
+    if (d) defs.add(`${d[1]}/${d[3]}`);
+  }
+
+  // 2) 布局里的引用
+  const want = new Set<string>();
+  const refRe = /@(?!\+)(?!\*?android:)(string|color|dimen|style|integer|bool|fraction|array|string-array|integer-array|plurals|drawable|mipmap|anim|animator|menu|xml|font)\/([A-Za-z0-9_.]+)/g;
+  for (const f of layoutFiles) {
+    let rm: RegExpExecArray | null;
+    while ((rm = refRe.exec(f.text || "")) !== null) want.add(`${rm[1]}/${rm[2].replace(/\.\w+$/, "")}`);
+  }
+  return [...want].filter((w) => !defs.has(w)).sort();
 }

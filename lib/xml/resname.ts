@@ -14,6 +14,18 @@ export function isValidResName(name: string): boolean {
   return /^[a-z][a-z0-9_]*$/.test(name);
 }
 
+/**
+ * 输入框在敲字时的清洗（跟提交时的 sanitizeResName 不同）：
+ * 保留结尾的 _（否则永远敲不出 bg_round：敲完 bg_ 就被 trim 掉了），
+ * 非法字符 → _，连续 _ 压成一个，全程小写，不截断 40 之后的输入。
+ */
+export function cleanResNameInput(raw: string): string {
+  return (raw || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_{2,}/g, "_");
+}
+
 /** 宽松判断：属性值是否整个就是「合法的 @drawable/名字」引用（带不带 .xml 都行） */
 export function isDrawableRef(v: string): boolean {
   const m = /^@(?:drawable|mipmap)\/([A-Za-z0-9_]+)(?:\.xml)?$/.exec(v.trim());

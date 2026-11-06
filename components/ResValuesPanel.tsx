@@ -10,6 +10,7 @@
 "use client";
 
 import { t as tt } from "@/lib/i18n-src";
+import { isValidResName } from "@/lib/xml/resname";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
 import { scanResDirs } from "@/lib/xml/res-index";
@@ -227,8 +228,8 @@ export function ResValuesPanel({ io, docRel, onNote, onJump }: ResValuesPanelPro
   /** 新建条目：优先落在同名约定文件，其次落在已有同类型条目的文件，最后现建 */
   const addItem = async () => {
     const name = newName.trim();
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-      note(tt("资源名只能用字母/数字/下划线，且不能以数字开头"));
+    if (!isValidResName(name)) {
+      note(tt("资源名只能用小写字母/数字/下划线，且不能以数字开头"));
       return;
     }
     const value = newValue.trim();

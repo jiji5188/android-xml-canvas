@@ -11,7 +11,8 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { describe, it, expect } from "vitest";
-import { exportLayoutXml } from "../lib/xml/export";
+import { exportLayoutXml, exportChecks } from "../lib/xml/export";
+import { fixIncludeLayoutNs } from "../lib/xml/native-render";
 
 const AAPT2_CANDIDATES = [
   process.env.AAPT2,
@@ -62,6 +63,57 @@ describe("M169 · include 的 layout 属性命名空间", () => {
     const out = exportLayoutXml(SRC_NO_PREFIX);
     expect(out).toContain('layout="@layout/toolbar"');
     expect(out).not.toContain("android:layout=");
+  });
+
+  it("没写 layout 的 include 导出时被剔除（真机必崩）", () => {
+    const src = `<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+  <TextView
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content" />
+  <include
+      android:id="@+id/header"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content" />
+</LinearLayout>`;
+    const out = exportLayoutXml(src);
+    expect(out).not.toContain("<include");
+    expect(out).toContain("<TextView");
+    // exportChecks 要给用户提示
+    const chk = exportChecks(src);
+    expect(chk.notes.join("\n")).toContain("include");
+  });
+
+  it("layout 写成 @layout/（空名）也算无效", () => {
+    const src = `<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+  <include layout="@layout/" />
+</LinearLayout>`;
+    expect(exportLayoutXml(src)).not.toContain("<include");
+  });
+
+  it("fixIncludeLayoutNs 只纠正 include 里的 layout，不碰 layout_width/margin", () => {
+    const src =
+      '<include android:layout="@layout/x" android:layout_width="1dp" android:layout_margin="2dp" />';
+    const out = fixIncludeLayoutNs(src);
+    expect(out).toContain('layout="@layout/x"');
+    expect(out).not.toContain('android:layout="');
+    expect(out).toContain('android:layout_width="1dp"');
+    expect(out).toContain('android:layout_margin="2dp"');
+    // 普通控件里的 android:layout_width 不动
+    const plain = '<TextView android:layout_width="1dp" />';
+    expect(fixIncludeLayoutNs(plain)).toBe(plain);
+  });
+
+  it("fixIncludeLayoutNs 删掉没写 layout 的自闭合 include", () => {
+    const src = '<LinearLayout>\n  <include android:id="@+id/h" />\n  <include layout="@layout/ok" />\n</LinearLayout>';
+    const out = fixIncludeLayoutNs(src);
+    expect(out).not.toContain('@+id/h');
+    expect(out).toContain('layout="@layout/ok"');
   });
 
   it("aapt2 编译后 include 的 layout 属性确实落在无命名空间上", () => {

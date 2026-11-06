@@ -7,6 +7,42 @@ import { fixNamespacePrefixes } from "./namespace";
 import { toCompatXml } from "./compat";
 import type { XmlNode } from "./types";
 
+/** <include> 指向的布局引用是否合法（必须是 @layout/x 或裸名） */
+function includeRefOk(n: XmlNode): boolean {
+  const raw = (n.attrs["layout"] ?? "").trim();
+  if (!raw) return false;
+  const s = raw.startsWith("@") ? raw.slice(1) : raw;
+  const slash = s.indexOf("/");
+  const name = slash >= 0 ? s.slice(slash + 1) : s;
+  if (!name || name === "@") return false;
+  if (slash >= 0 && !/^layout(-[a-z0-9-]+)?$/i.test(s.slice(0, slash))) return false;
+  return true;
+}
+
+/**
+ * M169b：删掉没有合法 layout 引用的 <include>。
+ * Android 里这种 include 在 inflate 时必定抛
+ * "You must specify a layout in the include tag"（LayoutInflater.parseInclude：
+ * getAttributeResourceValue(null, "layout", 0) 拿到 0，getAttributeValue 是 null）。
+ * 宁可导出的 XML 里不出现这个节点，也不能让真机崩。返回删掉的个数。
+ */
+export function pruneBrokenIncludes(root: XmlNode): number {
+  let removed = 0;
+  const walk = (n: XmlNode) => {
+    for (let i = n.children.length - 1; i >= 0; i--) {
+      const c = n.children[i];
+      if (c.tag === "include" && !includeRefOk(c)) {
+        n.children.splice(i, 1);
+        removed++;
+        continue;
+      }
+      walk(c);
+    }
+  };
+  walk(root);
+  return removed;
+}
+
 export type ExportMode = "modern" | "compat";
 
 export interface ExportOptions {
@@ -42,6 +78,8 @@ export function exportLayoutXml(src: string, opts: ExportOptions = {}): string {
     const body = fixed.trim().replace(/^<\?xml[\s\S]*?\?>/i, "").trim();
     return `${declLine}\n${body}\n`;
   }
+  // M169b：没写 layout 的 include 真机必崩，导出前直接剔掉
+  pruneBrokenIncludes(root);
   return `${declLine}\n${serialize(root)}\n`;
 }
 
@@ -60,6 +98,9 @@ export function exportChecks(src: string): ExportCheck {
     };
     const walk = (n: XmlNode, inCL: boolean) => {
       const st = n.tag.includes(".") ? n.tag.slice(n.tag.lastIndexOf(".") + 1) : n.tag;
+      if (st === "include" && !includeRefOk(n)) {
+        notes.push(`<include>（#${n.path}）没指定要引入的布局，导出时会自动移除（否则真机 inflate 直接崩）`);
+      }
       if (inCL && !isCL(n.tag) && st !== "Guideline" && st !== "Barrier" && st !== "include") {
         const id = n.attrs["id"];
         if (!id) notes.push(`${st}（#${n.path}）缺 android:id，约束与代码引用都需要它`);

@@ -127,11 +127,32 @@ export function sniffImageKind(b64: string): "png" | "jpg" | "webp" | "xml" | nu
 }
 
 /**
+ * M169b：把 <include> 标签里的 android:layout="@layout/x" 改成无前缀的 layout="@layout/x"
+ *
+ * AOSP LayoutInflater.parseInclude：
+ *   int layout = attrs.getAttributeResourceValue(null, ATTR_LAYOUT, 0);
+ * 命名空间参数是 null，带 android: 前缀真机一律取不到 → 抛
+ * "You must specify a layout in the include tag: <include layout=\"@layout/layoutID\" />"。
+ * 只动 include 标签内部的 layout= 本身，不碰 android:layout_width / layout_margin 等。
+ */
+export function fixIncludeLayoutNs(text: string): string {
+  if (!/<include\b/i.test(text)) return text;
+  return (
+    text
+      // 1) 去掉 android: 前缀
+      .replace(/<include\b[^>]*>/gi, (tag) => tag.replace(/\bandroid\s*:\s*layout\s*=/gi, "layout="))
+      // 2) 根本没写 layout 的自闭合 include 直接删（真机必崩）
+      .replace(/<include\b[^>]*\/>/gi, (tag) =>
+        /\slayout\s*=\s*"\s*@?layout\/[^"\s]+"/i.test(tag) ? tag : "",
+      )
+  );
+}
+
+/**
  * M160：发给设备前最后一道兵——把清单里确实缺的资源就地生成占位。
  * 不依赖收集阶段（收集可能因预算/IO 失败漏掉），否则 aapt2 一句 not found 就整包失败。
  */
-export function withPlaceholders(files: RenderFile[], missing: string[]): RenderFile[] {
-  // 注意不能在这里 missing 为空就直接 return：即使没有缺失资源，也要处理
+export function withPlaceholders(files: RenderFile[], missing: string[]): RenderFile[] {  // 注意不能在这里 missing 为空就直接 return：即使没有缺失资源，也要处理
   // 收集阶段已经生成的占位布局（把指向它们的 <include> 删掉）。
   const have = new Set(files.map((f) => f.path));
   const out = [...files];
@@ -296,6 +317,14 @@ export function renderReal(
     for (const k of definedValueKeys(f.text)) projectDefs.add(k);
   }
   filled = dedupeValuesFiles(filled, projectDefs);
+  // M169b：所有发下去的布局文本再过一道 include 命名空间纠正。
+  // 目标布局已经过 exportLayoutXml（serialize 里会去前缀），但从项目磁盘直接补进来的
+  // 被 include 的子布局（collectProjectRes 按原文读）可能还是 android:layout="@layout/x"，
+  // 真机 LayoutInflater.parseInclude 用 getAttributeResourceValue(null, "layout", 0) 取
+  // ——带前缀就取到 0，直接抛 You must specify a layout in the include tag。
+  filled = filled.map((f) =>
+    f.text && /^layout(-[^/]+)?\//.test(f.path) ? { ...f, text: fixIncludeLayoutNs(f.text) } : f,
+  );
   seq += 1;
   const id = `r${Date.now().toString(36)}${seq}`;
   return new Promise<RealRenderResult>((resolve) => {

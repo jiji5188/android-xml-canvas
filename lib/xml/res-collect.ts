@@ -12,7 +12,7 @@ import { scanResDirs } from "./res-index";
 import type { RenderFile } from "./native-render";
 
 const REF_RE =
-  /@(?!\+)(?!\*?android:)(drawable|mipmap|layout|color|string|dimen|bool|integer|style|plurals|array|string-array|integer-array|fraction|menu|anim|animator|xml|font|interpolator)\/([A-Za-z0-9_.]+)/g;
+  /@(?!\+)(?!\*?android:)(drawable|mipmap|layout|color|string|dimen|bool|integer|style|plurals|array|string-array|integer-array|fraction|menu|anim|animator|xml|font|interpolator|id)\/([A-Za-z0-9_.]+)/g;
 
 const VALUE_TYPES = new Set([
   "string",
@@ -303,6 +303,7 @@ export async function collectProjectRes(
   // 不声明 aapt2 link 会直接报 attribute not found；无 format 的 <attr> 就能过链。
   const customAttrs = new Set<string>();
   const attrScan = /\s([A-Za-z][\w-]*):([A-Za-z_][\w.-]*)\s*=/g;
+  const attrRefScan = /\?attr\/([A-Za-z0-9_]+)|\?([A-Za-z][A-Za-z0-9_]*)(?![\w:.])/g;
   for (const f of files) {
     if (!f.text) continue;
     attrScan.lastIndex = 0;
@@ -313,24 +314,99 @@ export async function collectProjectRes(
       if (defs.has(`attr/${m[2]}`)) continue;
       customAttrs.add(m[2]);
     }
-  }
-  if (customAttrs.size > 0) {
-    const decl = [...customAttrs].sort().map((n) => `    <attr name="${n}" />`).join("\n");
-    addFile(
-      "values/axv_attrs.xml",
-      `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${decl}\n</resources>\n`,
-    );
+    // ?attr/colorPrimary、?colorAccent 这类主题属性引用：库里定义的属性要自己补声明
+    attrRefScan.lastIndex = 0;
+    while ((m = attrRefScan.exec(f.text)) !== null) {
+      const name = m[1] || m[2];
+      if (!name || defs.has(`attr/${name}`)) continue;
+      customAttrs.add(name);
+    }
   }
 
   // M159：真缺的资源给占位实现——否则 aapt2 一个 @drawable 缺失就整包 link 失败，
   // 预览全黑。占位会记进 stubbed，界面照旧提示“这些资源项目里没有”。
   const stubbed: string[] = [];
   const stubValues: string[] = [];
+  const stubSeen = new Set<string>();
+
+  // @+id/xxx 在布局里已经声明过的 id，不需要再补 <item type="id">（会重复定义）
+  for (const f of files) {
+    if (!f.text) continue;
+    const plusId = /@\+id\/([A-Za-z0-9_]+)/g;
+    let pm: RegExpExecArray | null;
+    while ((pm = plusId.exec(f.text)) !== null) defs.add(`id/${pm[1]}`);
+  }
+  for (const key of [...missing]) if (defs.has(key)) missing.delete(key);
+
+  const stubValue = (line: string, key: string) => {
+    if (stubSeen.has(key)) return;
+    stubSeen.add(key);
+    stubValues.push(`    ${line}`);
+    missing.delete(key);
+    stubbed.push(key);
+  };
+
+  // 样式：显式 parent + 带点号的隐式父级（Theme.AppCompat.Light → Theme.AppCompat），
+  // 项目里没有的逐级补空样式，否则 link 报 style not found
+  const styleInfo: { name: string; parent?: string }[] = [];
+  {
+    const docRe = /<style\b([^>]*)(?:\/>|>([\s\S]*?)<\/style>)/g;
+    for (const f of files) {
+      if (!f.text || !/^values/.test(f.path)) continue;
+      docRe.lastIndex = 0;
+      let dm: RegExpExecArray | null;
+      while ((dm = docRe.exec(f.text)) !== null) {
+        const head = dm[1];
+        const name = (head.match(/\bname="([^"]+)"/) || [])[1];
+        if (!name) continue;
+        const parent = (head.match(/\bparent="([^"]*)"/) || [])[1] || undefined;
+        styleInfo.push({ name, parent });
+      }
+    }
+  }
+  const ensureStyle = (raw?: string) => {
+    if (!raw) return;
+    let p = raw.trim();
+    if (!p || p.startsWith("@android:") || p.startsWith("android:") || p.startsWith("@*android:")) return;
+    p = p.replace(/^@style\//, "");
+    if (defs.has(`style/${p}`) || stubSeen.has(`style/${p}`)) return;
+    stubSeen.add(`style/${p}`);
+    defs.add(`style/${p}`);
+    stubValues.push(`    <style name="${p}" parent="" />`);
+    stubbed.push(`style/${p}`);
+  };
+  const ensureParentChain = (raw: string) => {
+    const parts = raw.split(".");
+    for (let i = parts.length - 1; i > 0; i--) ensureStyle(parts.slice(0, i).join("."));
+  };
+  for (const s of styleInfo) {
+    ensureStyle(s.parent);
+    ensureParentChain(s.name);
+    if (s.parent && s.parent.includes(".")) {
+      ensureParentChain(s.parent.replace(/^@style\//, ""));
+    }
+  }
+
+  // M159：<item name="xxx"> 写在 style 里时，xxx 会被解析成 attr/xxx，
+  // 库的主题属性（colorPrimary 等）要一并声明，否则 link 报 style attribute not found。
+  const itemAttrRe = /<item\b[^>]*\bname="([^"]+)"/g;
+  for (const f of files) {
+    if (!f.text || !/^values/.test(f.path)) continue;
+    itemAttrRe.lastIndex = 0;
+    let im: RegExpExecArray | null;
+    while ((im = itemAttrRe.exec(f.text)) !== null) {
+      const n = im[1];
+      if (!n || defs.has(`attr/${n}`)) continue;
+      customAttrs.add(n);
+    }
+  }
+
   for (const key of [...missing]) {
     const slash = key.indexOf("/");
     if (slash < 0) continue;
     const type = key.slice(0, slash);
     const name = key.slice(slash + 1);
+
     if (type === "drawable" || type === "mipmap") {
       const ok = addFile(
         `drawable/${name}.xml`,
@@ -342,19 +418,63 @@ export async function collectProjectRes(
       }
       continue;
     }
-    if (type === "color") stubValues.push(`    <color name="${name}">#00000000</color>`);
-    else if (type === "string") stubValues.push(`    <string name="${name}" />`);
-    else if (type === "dimen") stubValues.push(`    <dimen name="${name}">0dp</dimen>`);
-    else if (type === "bool") stubValues.push(`    <bool name="${name}">false</bool>`);
-    else if (type === "integer") stubValues.push(`    <integer name="${name}">0</integer>`);
-    else continue;
-    missing.delete(key);
-    stubbed.push(key);
+    if (type === "layout") {
+      const ok = addFile(
+        `layout/${name}.xml`,
+        `<?xml version="1.0" encoding="utf-8"?>\n<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"\n    android:layout_width="match_parent" android:layout_height="match_parent" />\n`,
+      );
+      if (ok) {
+        missing.delete(key);
+        stubbed.push(key);
+      }
+      continue;
+    }
+    if (type === "menu" || type === "anim" || type === "animator" || type === "xml") {
+      const root = type === "menu" ? "menu" : type === "xml" ? "x" : "set";
+      const ok = addFile(
+        `${type}/${name}.xml`,
+        `<?xml version="1.0" encoding="utf-8"?>\n<${root} xmlns:android="http://schemas.android.com/apk/res/android" />\n`,
+      );
+      if (ok) {
+        missing.delete(key);
+        stubbed.push(key);
+      }
+      continue;
+    }
+    if (type === "raw") {
+      if (addFile(`raw/${name}.txt`, "placeholder")) {
+        missing.delete(key);
+        stubbed.push(key);
+      }
+      continue;
+    }
+
+    if (type === "color") stubValue(`<color name="${name}">#00000000</color>`, key);
+    else if (type === "string") stubValue(`<string name="${name}" />`, key);
+    else if (type === "dimen") stubValue(`<dimen name="${name}">0dp</dimen>`, key);
+    else if (type === "bool") stubValue(`<bool name="${name}">false</bool>`, key);
+    else if (type === "integer") stubValue(`<integer name="${name}">0</integer>`, key);
+    else if (type === "fraction") stubValue(`<fraction name="${name}">50%</fraction>`, key);
+    else if (type === "style") stubValue(`<style name="${name}" parent="" />`, key);
+    else if (type === "id") stubValue(`<item type="id" name="${name}" />`, key);
+    else if (type === "array" || type === "string-array" || type === "integer-array")
+      stubValue(`<${type} name="${name}" />`, key);
+    else if (type === "plurals")
+      stubValue(`<plurals name="${name}"><item quantity="other">%s</item></plurals>`, key);
   }
+
   if (stubValues.length > 0) {
     addFile(
       "values/axv_stub.xml",
       `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${stubValues.join("\n")}\n</resources>\n`,
+    );
+  }
+
+  if (customAttrs.size > 0) {
+    const decl = [...customAttrs].sort().map((n) => `    <attr name="${n}" />`).join("\n");
+    addFile(
+      "values/axv_attrs.xml",
+      `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${decl}\n</resources>\n`,
     );
   }
 

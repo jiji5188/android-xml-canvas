@@ -176,6 +176,28 @@ describe("M158 真机渲染补齐项目资源", () => {
     expect(out.text).not.toContain('name="brand"');
   });
 
+  it("样式父级 / ?attr / 缺失布局都有占位，且 @+id 不重复补", async () => {
+    const io = fakeIo(`t-${Math.random()}`, {
+      "app/src/main/res/values/strings.xml": "<resources/>",
+    });
+    const r = await collectProjectRes(io, "app/src/main/res/layout/a.xml", [
+      {
+        path: "layout/a.xml",
+        text: '<LinearLayout><include layout="@layout/missing" /><View android:id="@+id/ok" android:textColor="?attr/colorPrimary" android:background="@drawable/x" /></LinearLayout>',
+      },
+      {
+        path: "values/styles.xml",
+        text: '<resources><style name="AppTheme" parent="Theme.AppCompat.Light" /></resources>',
+      },
+    ]);
+    const byPath = new Map(r.files.map((f) => [f.path, f.text]));
+    expect(byPath.get("values/axv_stub.xml")).toContain('name="Theme.AppCompat.Light"');
+    expect(byPath.get("values/axv_attrs.xml")).toContain('name="colorPrimary"');
+    expect(byPath.get("values/axv_stub.xml")).not.toContain('name="ok"');
+    expect(byPath.get("layout/missing.xml")).toContain("FrameLayout");
+    expect(r.missing).toEqual([]);
+  });
+
   it("没有 IO 时原样返回", async () => {
     const r = await collectProjectRes(null, null, [{ path: "layout/a.xml", text: "<L/>" }]);
     expect(r.files).toHaveLength(1);

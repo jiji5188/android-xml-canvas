@@ -20,15 +20,11 @@ import { t as tt } from "@/lib/i18n-src";
 import { filterNumber, parseNumberField } from "@/lib/xml/num-input";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 import type { SlotValue } from "@/lib/xml/drawable-edit";
+import { GRAVITY_LABELS, GRAVITY_OPTIONS } from "@/lib/xml/gravity";
 
 const GRAVITY: { v: string; label: string }[] = [
   { v: "", label: "不设（填满）" },
-  { v: "center", label: "居中" },
-  { v: "center_horizontal", label: "水平居中" },
-  { v: "center_vertical", label: "垂直居中" },
-  { v: "right", label: "靠右" },
-  { v: "bottom", label: "靠下" },
-  { v: "bottom|right", label: "右下" },
+  ...GRAVITY_OPTIONS.map((v) => ({ v, label: GRAVITY_LABELS[v] ?? v })),
 ];
 
 /** selector 的状态位：常用的排在前面 */
@@ -284,17 +280,21 @@ export function SlotRows({
 
         <div className="axv-shape-field">
           <label className="axv-shape-label">{tt("对齐")}</label>
-          <select
+          {/* M163c：下拉改成可输入 + 预设（item 的 android:gravity 支持任意组合写法） */}
+          <input
             className="axv-attr-input"
+            style={{ width: "100%" }}
+            list="axv-slot-gravity-opts"
             value={slot.gravity ?? ""}
+            placeholder={tt("center / top|start / 留空 = 填满")}
+            spellCheck={false}
             onChange={(e) => onChange({ gravity: e.target.value || undefined })}
-          >
+          />
+          <datalist id="axv-slot-gravity-opts">
             {GRAVITY.map((g) => (
-              <option key={g.v} value={g.v}>
-                {tt(g.label)}
-              </option>
+              <option key={g.v} value={g.v} label={g.label ? tt(g.label) : tt("不设（填满）")} />
             ))}
-          </select>
+          </datalist>
         </div>
         {slot.gravity && !sized ? (
           <div className="axv-shape-hint">{tt("先设宽或高，对齐才看得出来（不设尺寸时这一层填满父级）")}</div>

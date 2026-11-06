@@ -278,6 +278,13 @@ export function serialize(node: XmlNode, indent = ""): string {
   const attrsStr = Object.entries(node.attrs)
     // M12：优先还原原始前缀；新增的属性（没有原始前缀）才按白名单猜
     .map(([k, v]) => {
+      // M169：<include> 的 layout 属性必须是「无命名空间」的
+      // LayoutInflater.parseInclude 用 attrs.getAttributeResourceValue(null, "layout", 0)
+      // 取值，带 android: 前缀就取不到 → 真机报
+      // "You must specify a layout in the include tag"。
+      const tagLocal = node.tag.includes(".") ? node.tag.slice(node.tag.lastIndexOf(".") + 1) : node.tag;
+      const bare = k.includes(":") ? k.slice(k.indexOf(":") + 1) : k;
+      if (tagLocal === "include" && bare === "layout") return `    layout="${v}"`;
       const p = node.attrNs?.[k] ?? attrPrefixFor(k);
       return `    ${p ? `${p}:` : ""}${k}="${v}"`;
     })

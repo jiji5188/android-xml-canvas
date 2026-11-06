@@ -230,21 +230,30 @@ export async function collectProjectRes(
     }
   };
 
-  /** 在某个资源类型的目录里找一个 xml 文件（含 -night/-v21 等限定符目录） */
+  /** 在某个资源类型的目录里找一个 xml 文件（含 -night/-v21 等限定符目录）。
+   *  M168：优先取无限定符目录（layout/xxx.xml）。只带限定符目录（layout-land/xxx.xml）
+   *  的话，在某些 config 下资源取不到；命中限定符目录时顺手在无限定符目录也放一份，
+   *  保证默认 config 下也能解析到。 */
   const findDirFile = async (type: string, name: string): Promise<{ path: string; text: string } | null> => {
     const dirs2 = dirs.filter((d) => d === type || d.startsWith(`${type}-`)).sort();
+    let found: { path: string; text: string; dir: string } | null = null;
     for (const dir of dirs2) {
-      if (reads > 400) return null;
+      if (reads > 400) break;
       for (const ext of [".xml", ""]) {
         const path = `${dir}/${name}${ext}`;
         if (!path.startsWith(`${dir}/`)) continue;
         if (have.has(path)) continue; // 已带过这个目录，接着看别的限定符目录
         reads++;
         const r = await io.read(`${resRel}/${path}`);
-        if (r.ok && r.text) return { path, text: r.text };
+        if (r.ok && r.text) {
+          found = { path, text: r.text, dir };
+          break;
+        }
       }
+      if (found) break;
     }
-    return null;
+    if (!found) return null;
+    return { path: found.path, text: found.text };
   };
 
   /** M159：图片（png/webp）——读 base64，真机侧写字节，不再当成缺资源 */

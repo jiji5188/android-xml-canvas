@@ -14,6 +14,7 @@
 // build 时由 drawable-build 自动补出 <item> 包装。
 
 import type { DrawableNode } from "./drawable-node";
+import { GRAVITY_OPTIONS } from "./gravity";
 
 export type NodeKind = DrawableNode["t"] | "level-list" | "clip" | "scale" | "rotate" | "unsupported";
 
@@ -127,7 +128,7 @@ export const STATE_ATTR_DEFS: AttrDef[] = STATE_ATTRS.map((name) => ({
   label: name.replace(/^state_/, "").replace(/_/g, " "),
 }));
 
-const OFFSET_ATTRS: AttrDef[] = [
+export const OFFSET_ATTRS: AttrDef[] = [
   { name: "left", type: "dimension", label: "左偏移", note: "负值往外" },
   { name: "top", type: "dimension", label: "上偏移" },
   { name: "right", type: "dimension", label: "右偏移" },
@@ -138,7 +139,9 @@ const OFFSET_ATTRS: AttrDef[] = [
     name: "gravity",
     type: "enum",
     label: "对齐",
-    values: ["center", "center_vertical", "center_horizontal", "top", "bottom", "left", "right", "fill"],
+    // M163：完整组合（左中/右中/上中/下中/四角），与布局属性面板共用同一份。
+    // 选项很多，AttrRows 会自动改成「可输入 + datalist」而非一排按钮。
+    values: GRAVITY_OPTIONS,
   },
   { name: "alpha", type: "fraction", label: "不透明度" },
 ];

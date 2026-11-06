@@ -10,6 +10,7 @@ import { useId } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { parseColorOr, toAndroidHex } from "@/lib/xml/color-argb";
 import type { AttrDef } from "@/lib/xml/drawable-schema";
+import { GRAVITY_LABELS } from "@/lib/xml/gravity";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 import { editableAttrs, readAttr, writeAttr } from "@/lib/xml/drawable-attrs";
 import { filterNumber } from "@/lib/xml/num-input";
@@ -61,7 +62,8 @@ const ENUM_LABEL: Record<string, string> = {
   vertical: "垂直",
 };
 
-const enumLabel = (v: string) => (ENUM_LABEL[v] ? tt(ENUM_LABEL[v]) : tt(v));
+const enumLabel = (v: string) =>
+  ENUM_LABEL[v] ? tt(ENUM_LABEL[v]) : GRAVITY_LABELS[v] ? tt(GRAVITY_LABELS[v]) : tt(v);
 
 function AttrRow({
   def,
@@ -122,6 +124,30 @@ function AttrRow({
   }
 
   if (def.type === "enum" && def.values?.length) {
+    // M163：选项太多（对齐方式现在有 3x5 全组合）不再排一排按钮，改成可输入 + 预设下拉
+    if (def.values.length > 8) {
+      const listId = `axv-dw-${def.name}-opts`;
+      return (
+        <div className="axv-shape-field">
+          <label className="axv-shape-label" htmlFor={id}>{tt(def.label)}</label>
+          <input
+            id={id}
+            className="axv-attr-input"
+            style={{ width: "100%" }}
+            list={listId}
+            value={value}
+            placeholder="center / top|start / 任意值"
+            spellCheck={false}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          <datalist id={listId}>
+            {def.values.map((v) => (
+              <option key={v} value={v} label={enumLabel(v)} />
+            ))}
+          </datalist>
+        </div>
+      );
+    }
     return (
       <div className="axv-shape-field">
         <label className="axv-shape-label">{tt(def.label)}</label>

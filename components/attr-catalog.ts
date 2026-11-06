@@ -25,39 +25,9 @@ export interface AttrSpec {
   tags?: string[];
 }
 
-/**
- * M163：gravity / layout_gravity 的完整组合。
- * 用户反馈“只有上下左右和 center，选不了左中、右中、上中、下中”。
- * 这里把 3×5 的交叉组合全列（纵 top/center_vertical/bottom × 横 left/start/center_horizontal/end/right），
- * 属性面板改成可输入 + datalist，冷门写法（如 fill_vertical）也能直接敲。
- */
-export const GRAVITY_OPTIONS: string[] = (() => {
-  const v = ["top", "center_vertical", "bottom"];
-  const h = ["left", "start", "center_horizontal", "end", "right"];
-  const first = [
-    "center",
-    "center_vertical",
-    "center_horizontal",
-    "top",
-    "bottom",
-    "left",
-    "right",
-    "start",
-    "end",
-    "fill",
-    "fill_vertical",
-    "fill_horizontal",
-  ];
-  const combos: string[] = [];
-  for (const vv of v) {
-    for (const hh of h) {
-      // 单项组合已在开头列过（center_vertical / center_horizontal / top / bottom / left / right / start / end）
-      if (vv === "center_vertical" && hh === "center_horizontal") continue;
-      combos.push(`${vv}|${hh}`);
-    }
-  }
-  return [...first, ...combos];
-})();
+// M163：gravity 完整组合（实现见 lib/xml/gravity.ts，与 drawable item 的 android:gravity 共用）
+export { GRAVITY_OPTIONS } from "@/lib/xml/gravity";
+import { GRAVITY_OPTIONS } from "@/lib/xml/gravity";
 
 export const ATTR_CATALOG: AttrSpec[] = [
   // ===== 布局 =====

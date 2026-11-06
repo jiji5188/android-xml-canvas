@@ -1,6 +1,9 @@
 // M163：对齐方式（gravity / layout_gravity）完整组合 + 可输入
 import { describe, expect, it } from "vitest";
 import { ATTR_CATALOG, GRAVITY_OPTIONS } from "@/components/attr-catalog";
+import { GRAVITY_LABELS } from "@/lib/xml/gravity";
+import { OFFSET_ATTRS } from "@/lib/xml/drawable-schema";
+import { parseGravity } from "@/components/DrawablePreview";
 
 const spec = (n: string) => ATTR_CATALOG.find((a) => a.name === n)!;
 
@@ -29,5 +32,28 @@ describe("M163 gravity 完整组合", () => {
 
   it("无重复项", () => {
     expect(new Set(GRAVITY_OPTIONS).size).toBe(GRAVITY_OPTIONS.length);
+  });
+});
+
+describe("M163 drawable item 的 android:gravity", () => {
+  it("schema 里 item 的 gravity 也用了全组合", () => {
+    const def = OFFSET_ATTRS.find((a) => a.name === "gravity")!;
+    expect(def.type).toBe("enum");
+    expect(def.values).toBe(GRAVITY_OPTIONS);
+    expect(def.values).toContain("center_vertical|left");
+    expect(def.values).toContain("top|center_horizontal");
+  });
+
+  it("组合值的中文标签", () => {
+    expect(GRAVITY_LABELS["center_vertical|left"]).toBe("左中");
+    expect(GRAVITY_LABELS["top|center_horizontal"]).toBe("上中");
+    expect(GRAVITY_LABELS["bottom|center_horizontal"]).toBe("下中");
+  });
+
+  it("预览能解析组合值（左中 = 横 0 纵 0.5）", () => {
+    expect(parseGravity("center_vertical|left")).toEqual({ hz: 0, vt: 0.5 });
+    expect(parseGravity("center_vertical|right")).toEqual({ hz: 1, vt: 0.5 });
+    expect(parseGravity("top|center_horizontal")).toEqual({ hz: 0.5, vt: 0 });
+    expect(parseGravity("bottom|center_horizontal")).toEqual({ hz: 0.5, vt: 1 });
   });
 });

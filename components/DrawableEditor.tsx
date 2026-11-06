@@ -20,10 +20,14 @@ import { rootInfo, ROOT_TAGS, ROOT_LABELS, ROOT_WARN } from "@/lib/xml/drawable-
 import { convertRoot, rootTagOfNode } from "@/lib/xml/drawable-root-convert";
 import { buildDrawable } from "@/lib/xml/drawable-build";
 import { countNodes } from "@/lib/xml/drawable-node";
-import { nodeAt, replaceAt, breadcrumb, parentOf, setSlot, slotOf, type Path } from "@/lib/xml/drawable-edit";
+import { nodeAt, replaceAt, breadcrumb, parentOf, setSlot, slotOf, addChild, cloneDrawableNode, type Path } from "@/lib/xml/drawable-edit";
 import { validateDrawable } from "@/lib/xml/drawable-schema";
 import { DRAWABLE_PRESETS } from "@/lib/xml/drawable-presets";
-import { cleanResNameInput, resNameFromValue, sanitizeResName } from "@/lib/xml/resname";
+import { cleanResNameInput, resNameFromValue, sanitizeResName, applyResNamePrefix, defaultResName, resNamePrefix } from "@/lib/xml/resname";
+import { hasRealRender, renderReal } from "@/lib/xml/native-render";
+import { buildResourcePreviewFiles } from "@/lib/xml/res-preview";
+import { collectProjectRes } from "@/lib/xml/res-collect";
+import type { AiFileIo } from "@/lib/xml/ai-tools";
 import { useUnsavedGuard } from "@/components/UnsavedGuard";
 import { DrawablePreview } from "./DrawablePreview";
 import { focusDoc } from "@/lib/xml/drawable-focus";
@@ -45,6 +49,9 @@ export interface DrawableEditorProps {
   /** M143：项目里的 res 资源，用来把 <item android:drawable="@drawable/x"/> 
    *  真的画出来（xml 形状/selector 走 drawableXml，位图与 svg 走 drawables 的 dataURL） */
   res?: DrawableResSource | null;
+  /** M158：真预览时从项目 res 递归补齐嵌套引用 */
+  io?: AiFileIo | null;
+  docRel?: string | null;
 }
 
 /** 预览需要的三类资源：事项（名 → xml 原文）/ 图片（名 → dataURL）/ 矢量名 */
@@ -91,6 +98,8 @@ export function DrawableEditor({
   onClose,
   onSave,
   res,
+  io,
+  docRel,
 }: DrawableEditorProps) {
   const [root, setRoot] = useState<DrawableNode>(() => parseDrawable(existingXml ?? "") ?? defaultTree());
   /** 初始树引用：没动过任何编辑时保存原样写回（注释、换行、声明全保留，一个字节都不碰） */
@@ -141,7 +150,11 @@ export function DrawableEditor({
   const [previewBg, setPreviewBg] = useState<"checker" | "white" | "dark">("checker");
   /** 手机端右栏是滑面板，必须给开关，否则 selector 等类型打开后拦住了预览又关不掉（M130） */
   const [formOpen, setFormOpen] = useState(true);
-  const [name, setName] = useState<string>(() => resNameFromValue(value) || "bg");
+  const [name, setName] = useState<string>(() => resNameFromValue(value) || defaultResName(info.tag));
+  /** M158：结构树剪贴板（复制整层，可反复粘贴） */
+  const [clip, setClip] = useState<DrawableNode | null>(null);
+  /** M158：aapt2 真预览的进行中 / 结果提示 */
+  const [realBusy, setRealBusy] = useState(false);
   /** M141：打开时的资源名，改名也算「有未保存的修改」 */
   const initialNameRef = useRef(name);
   const [presetOpen, setPresetOpen] = useState(false);
@@ -204,6 +217,62 @@ export function DrawableEditor({
     setRedoStack([]);
     setRoot(next);
   };
+
+  /* ===== M158：结构树复制 / 粘贴 ===== */
+  /** 复制某一行（整棵子树）；key 重新发号，连续粘贴多份不冲突 */
+  const copyPath = (p: Path) => {
+    const n = nodeAt(root, p);
+    if (!n) return;
+    setClip(cloneDrawableNode(n));
+    const label = breadcrumb(root, p).slice(-1)[0]?.label ?? tt("这一层");
+    setRootNote(tt("已复制「{name}」，到目标容器点粘贴", { name: tt(label) }));
+  };
+  /** 粘贴到某个容器末尾（layer 越靠后越在上；selector 追加到优先级最低） */
+  const pasteInto = (parent: Path) => {
+    if (!clip) return;
+    const res = addChild(root, parent, cloneDrawableNode(clip));
+    if (!res) {
+      setRootNote(tt("粘贴失败：这个位置放不下（容器已满或不是容器）"));
+      return;
+    }
+    mutate(res.root);
+    setPath(res.path);
+    setRootNote(tt("已粘贴到「{name}」", { name: tt(breadcrumb(root, parent).slice(-1)[0]?.label ?? tt("根")) }));
+  };
+
+  /* ===== M158：资源真预览（设备端 aapt2 → ResourcesLoader → LayoutInflater） ===== */
+  const doRealPreview = () => {
+    if (realBusy) return;
+    const useName = existingXml ? name : applyResNamePrefix(name, currentRoot);
+    const preview = buildResourcePreviewFiles(useName, buildDrawable(root), "drawable", res?.drawableXml ?? null);
+    setRealBusy(true);
+    setRootNote(tt("正在收集嵌套引用，然后用设备上的 aapt2 编译…"));
+    void collectProjectRes(io ?? null, docRel ?? null, preview.files)
+      .then((c) => renderReal(preview.layoutName, c.files))
+      .then((r) => {
+        setRealBusy(false);
+        if (r.ok) {
+          setRootNote(
+            tt("真机预览：{n} 个文件 → 资源包 {kb} KB（编译 {ms} ms），已打开真控件页", {
+              n: r.files ?? 0,
+              kb: Math.round((r.bytes ?? 0) / 1024),
+              ms: r.ms ?? 0,
+            }),
+          );
+        } else {
+          setRootNote(
+            tt("真机预览失败（{stage}）：{log}", {
+              stage: r.stage || tt("未知"),
+              log: (r.log || "").slice(0, 260),
+            }),
+          );
+        }
+      })
+      .catch((e) => {
+        setRealBusy(false);
+        setRootNote(tt("真机预览失败：{reason}", { reason: String(e) }));
+      });
+  };
   const undo = () => {
     if (undoStack.length === 0) return;
     setRedoStack((s) => [...s, root]);
@@ -227,7 +296,9 @@ export function DrawableEditor({
   };
 
   const save = () => {
-    const safe = sanitizeResName(name);
+    // M158：新建资源保存时补类型前缀（selector → bg_select_xxx），已有资源改名尊重原文件名
+    const useName = existingXml ? name : applyResNamePrefix(name, currentRoot);
+    const safe = sanitizeResName(useName, resNamePrefix(currentRoot).replace(/_+$/, "") || "bg");
     if (!safe || nameConflicts) return;
     // 只读类型：原样写回，一个字节都不改（格式化、属性顺序、未知标签全保留）
     if (readonly) {
@@ -330,6 +401,15 @@ export function DrawableEditor({
                       mutate(res.next);
                       setPath([]);
                       setRootMenu(false);
+                      // M158：新建资源跟着根类型换前缀（已有资源不动名）
+                      if (!existingXml) {
+                        const oldP = resNamePrefix(currentRoot);
+                        const newP = resNamePrefix(tag);
+                        if (name === defaultResName(currentRoot)) setName(defaultResName(tag));
+                        else if (oldP !== newP && name.startsWith(oldP)) {
+                          setName(sanitizeResName(newP + name.slice(oldP.length), newP.replace(/_+$/, "") || "bg"));
+                        }
+                      }
                       setRootNote(
                         res.lost.length > 0
                           ? tt("已改成「{name}」，注意：{lost}", {
@@ -496,7 +576,15 @@ export function DrawableEditor({
             <div className="axv-set-group axv-dt-group">
               <div className="axv-set-label">{tt("结构")}</div>
               <div className="axv-dt-inline">
-                <DrawableTree root={root} path={path} onSelect={setPath} onChange={mutate} />
+                <DrawableTree
+                  root={root}
+                  path={path}
+                  onSelect={setPath}
+                  onChange={mutate}
+                  hasClip={!!clip}
+                  onCopy={copyPath}
+                  onPaste={pasteInto}
+                />
               </div>
             </div>
           )}
@@ -550,7 +638,15 @@ export function DrawableEditor({
                       <div className="axv-dt-ro-note">{tt(info.note)}</div>
                     </div>
                   ) : narrow ? (
-                    <DrawableTree root={root} path={path} onSelect={setPath} onChange={mutate} />
+                    <DrawableTree
+                      root={root}
+                      path={path}
+                      onSelect={setPath}
+                      onChange={mutate}
+                      hasClip={!!clip}
+                      onCopy={copyPath}
+                      onPaste={pasteInto}
+                    />
                   ) : (
                     <div className="axv-dt-ro">
                       <div className="axv-dt-ro-title">{tt("结构树在右侧面板里")}</div>
@@ -629,10 +725,22 @@ export function DrawableEditor({
       <div className="axv-icon-page-foot">
         <span>
           <span className="axv-icon-page-foot-note">
-            {tt("保存后生成 res/drawable/{name}.xml，导出 res 包时一并带走。", { name: name || "…" })}
+            {tt("保存后生成 res/drawable/{name}.xml，导出 res 包时一并带走。", {
+              name: (existingXml ? name : applyResNamePrefix(name, currentRoot)) || "…",
+            })}
           </span>
         </span>
         <span style={{ display: "flex", gap: 8 }}>
+          {hasRealRender() ? (
+            <button
+              className="axv-btn axv-ghost"
+              onClick={doRealPreview}
+              disabled={realBusy || readonly}
+              title={tt("用设备上的 aapt2 真编译这个资源，再用系统控件渲染（不是 CSS 近似）")}
+            >
+              {realBusy ? tt("编译中…") : tt("真机预览")}
+            </button>
+          ) : null}
           <button className="axv-btn axv-ghost" onClick={close}>
             {tt("取消")}
           </button>

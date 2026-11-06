@@ -8,7 +8,9 @@
 // 打开已有图标时反向：xml ──parseVectorModel──> VectorModel ──modelToShapes──> 每条 path 一个可编辑图元。
 
 import { t as tt } from "@/lib/i18n-src";
-import { cleanResNameInput, sanitizeResName } from "@/lib/xml/resname";
+import { cleanResNameInput, sanitizeResName, applyResNamePrefix } from "@/lib/xml/resname";
+import { hasRealRender, renderReal } from "@/lib/xml/native-render";
+import { buildResourcePreviewFiles } from "@/lib/xml/res-preview";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useOverlayBack } from "@/lib/overlay-back";
@@ -168,6 +170,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [tool, setTool] = useState<Tool>("select");
   const [resName, setResName] = useState(name);
   const [err, setErr] = useState("");
+  /** M158：aapt2 真预览进行中 / 结果 */
+  const [realBusy, setRealBusy] = useState(false);
+  const [realNote, setRealNote] = useState("");
   /** M135：XML 代码框默认一直展开 */
   const showRaw = true;
   const [picking, setPicking] = useState(false);
@@ -1230,7 +1235,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   closeRef.current = () => guard.requestClose(onClose);
 
   const save = () => {
-    const safe = sanitizeResName(resName, "ic");
+    // M158：图标资源统一带 ic_ 前缀（已有 ic_xxx 不重复叠加）
+    const safe = sanitizeResName(applyResNamePrefix(resName, "vector"), "ic");
     if (!safe) {
       setErr(tt("资源名不能为空"));
       return;
@@ -1282,6 +1288,34 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
       return;
     }
     onSave(safe, buildVectorXml(finalModel, safe));
+  };
+
+  /* ===== M158：aapt2 真预览（图标 = 24/48/96dp 三档 ImageView） ===== */
+  const doRealPreview = () => {
+    if (realBusy) return;
+    const safe = sanitizeResName(applyResNamePrefix(resName, "vector"), "ic");
+    const preview = buildResourcePreviewFiles(safe, outXml, "icon");
+    setRealBusy(true);
+    setRealNote(tt("正在用设备上的 aapt2 编译…"));
+    void renderReal(preview.layoutName, preview.files)
+      .then((r) => {
+        setRealBusy(false);
+        setRealNote(
+          r.ok
+            ? tt("真机预览：资源包 {kb} KB（编译 {ms} ms），已打开真控件页", {
+                kb: Math.round((r.bytes ?? 0) / 1024),
+                ms: r.ms ?? 0,
+              })
+            : tt("真机预览失败（{stage}）：{log}", {
+                stage: r.stage || tt("未知"),
+                log: (r.log || "").slice(0, 260),
+              }),
+        );
+      })
+      .catch((e) => {
+        setRealBusy(false);
+        setRealNote(tt("真机预览失败：{reason}", { reason: String(e) }));
+      });
   };
 
   /* ---------------- 从图标库换字形（M88：图标库直接给已换算好的 shapes） ---------------- */
@@ -2401,9 +2435,19 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
 
       <div className="axv-icon-page-foot">
         <span>
-          <span className="axv-icon-page-foot-note">{tt("保存后立即写回 drawable/{name}.xml，布局里所有引用同步生效。", { name: resName || "…" })}</span>
+          <span className="axv-icon-page-foot-note">{realNote || tt("保存后立即写回 drawable/{name}.xml，布局里所有引用同步生效。", { name: resName || "…" })}</span>
         </span>
         <span style={{ display: "flex", gap: 8 }}>
+          {hasRealRender() ? (
+            <button
+              className="axv-btn axv-ghost"
+              onClick={doRealPreview}
+              disabled={realBusy}
+              title={tt("用设备上的 aapt2 真编译这个图标，再用系统 ImageView 渲染")}
+            >
+              {realBusy ? tt("编译中…") : tt("真机预览")}
+            </button>
+          ) : null}
           <button className="axv-btn axv-ghost" onClick={close}>{tt("取消")}</button>
           <button className="axv-btn axv-btn-primary" onClick={save}>{tt("保存")}</button>
         </span>

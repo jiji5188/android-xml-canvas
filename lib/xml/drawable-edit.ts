@@ -17,6 +17,29 @@ export type Path = number[];
 let keySeq = 0;
 const nextKey = (path: Path, i: number) => `${path.join(".") || "0"}:${i}:${++keySeq}`;
 
+/**
+ * M158：复制节点用的深拷贝。
+ * LayerItem / StateItem 的 key 只是 React 列表 key，复制出来必须重新发号，
+ * 否则一层里出现两个同 key，React 会复用错行（看起来像“粘贴没生效”）。
+ */
+let pasteKeySeq = 0;
+export function cloneDrawableNode(node: DrawableNode): DrawableNode {
+  const copy = JSON.parse(JSON.stringify(node)) as DrawableNode;
+  const restamp = (n: DrawableNode): DrawableNode => {
+    if (n.t === "layer" || n.t === "selector") {
+      for (const it of n.items) {
+        it.key = `paste${++pasteKeySeq}`;
+        restamp(it.node);
+      }
+    } else if (n.t === "ripple") {
+      if (n.content) restamp(n.content);
+      if (n.mask) restamp(n.mask);
+    }
+    return n;
+  };
+  return restamp(copy);
+}
+
 /** 这个容器有几个子节点 */
 export function childCount(node: DrawableNode): number {
   switch (node.t) {

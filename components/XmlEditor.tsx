@@ -59,6 +59,7 @@ import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { hasRealRender, renderReal } from "@/lib/xml/native-render";
+import { collectProjectRes } from "@/lib/xml/res-collect";
 import { projectSaveRoot, saveProjectFile, saveResFiles } from "@/lib/xml/project-save";
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
 import { isValuesPath } from "@/lib/xml/doc-kind";
@@ -2975,15 +2976,24 @@ const findResolved = findResolvedNode;
   };
 
   /** M154：真机渲染——把当前 xml + 依赖资源交给设备端 aapt2 现场编译，
-   *  再用系统 LayoutInflater 渲染（不是 CSS 模拟，能对照出 canvas 的偏差） */
+   *  再用系统 LayoutInflater 渲染（不是 CSS 模拟，能对照出 canvas 的偏差）。
+   *  M158：编译前先从项目 res 里按引用递归补齐（资源列表里有的文件，之前没进文件清单）。 */
   const doRealRender = () => {
     if (realRenderBusy) return;
     const input = currentSaveInput();
     const name = (input.name || "activity_main.xml").replace(/\.xml$/i, "");
-    const files = buildRealRenderFiles(input).map((f) => ({ path: f.path, text: f.text }));
+    const base = buildRealRenderFiles(input).map((f) => ({ path: f.path, text: f.text }));
     setRealRenderBusy(true);
-    setExportNote(tt("正在用设备上的 aapt2 编译资源包…"));
-    void renderReal(name, files)
+    setExportNote(tt("正在收集布局引用的资源…"));
+    void collectProjectRes(aiFileIo, openRel, base)
+      .then((collected) => {
+        setExportNote(
+          collected.added
+            ? tt("已补齐 {n} 个项目资源，正在用设备上的 aapt2 编译…", { n: collected.added })
+            : tt("正在用设备上的 aapt2 编译资源包…"),
+        );
+        return renderReal(name, collected.files);
+      })
       .then((r) => {
         setRealRenderBusy(false);
         if (r.ok) {
@@ -4489,6 +4499,8 @@ const findResolved = findResolvedNode;
           existingXml={resShape.xml}
           existingNames={Object.keys(generatedDrawables)}
           forceTree={resShape.forceTree}
+          io={aiFileIo}
+          docRel={openRel}
           onClose={() => setResShape(null)}
           onSave={(resourceName, shapeXml) => {
             const safe = sanitizeResName(resourceName, "bg");

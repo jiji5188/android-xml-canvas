@@ -52,6 +52,58 @@ export function sanitizeResName(raw: string, fallback = "bg"): string {
   return n.slice(0, 40);
 }
 
+/**
+ * M158：按 drawable 根类型给资源名加类型前缀（用户要求：保存时体现资源类型）。
+ *   selector   → bg_select_
+ *   layer-list → bg_layer_
+ *   ripple     → bg_ripple_
+ *   inset      → bg_inset_
+ *   vector     → ic_
+ *   其它 shape → bg_
+ */
+export function resNamePrefix(tag: string): string {
+  switch ((tag || "").toLowerCase()) {
+    case "selector":
+      return "bg_select_";
+    case "layer-list":
+      return "bg_layer_";
+    case "ripple":
+      return "bg_ripple_";
+    case "inset":
+      return "bg_inset_";
+    case "vector":
+      return "ic_";
+    default:
+      return "bg_";
+  }
+}
+
+/** 新建资源时的默认名（保留类型前缀，用户可直接改后面那段） */
+export function defaultResName(tag: string): string {
+  const p = resNamePrefix(tag);
+  return p ? `${p}new` : "bg_new";
+}
+
+/**
+ * M158：保存前补类型前缀。
+ * - 已经带同类前缀（bg_select_ / bg_layer_ / bg_ / ic_ …）→ 原样保留，不重复叠加；
+ * - 用户自定义名（login_btn）→ 补成 bg_select_login_btn / ic_login_btn；
+ * - 空名 → ""（调用方按错误处理，不要瞎造资源）。
+ */
+export function applyResNamePrefix(name: string, tag: string): string {
+  const n = (name || "").trim();
+  if (!n) return "";
+  const p = resNamePrefix(tag);
+  if (!p) return n;
+  if (n.startsWith(p)) return n;
+  // 同族前缀（用户自己写了 bg_xxx / ic_xxx）就尊重原意，只补「类型」这一层
+  if (/^(bg|ic)_/.test(n)) {
+    if (p === "bg_" || p === "ic_") return n;
+    return p + n.replace(/^(bg|ic)_/, "");
+  }
+  return p + n;
+}
+
 /** 属性值是不是颜色（#RGB / #ARGB / #RRGGBB / #AARRGGBB，也接受 0x 前缀） */
 export function isColorValue(v: string): boolean {
   return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v.trim());

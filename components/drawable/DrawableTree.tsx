@@ -99,11 +99,18 @@ export function DrawableTree({
   path,
   onSelect,
   onChange,
+  hasClip = false,
+  onCopy,
+  onPaste,
 }: {
   root: DrawableNode;
   path: Path;
   onSelect: (p: Path) => void;
   onChange: (next: DrawableNode) => void;
+  /** M158：剪贴板里有没有可粘贴的节点（有才显示粘贴按钮） */
+  hasClip?: boolean;
+  onCopy?: (p: Path) => void;
+  onPaste?: (parentPath: Path) => void;
 }) {
   /** M125：默认只展开顶层（根），更深的先折叠，避免手机上内容满屏 */
   const [opened, setOpened] = useState<Set<string>>(() => new Set([""]));
@@ -134,6 +141,23 @@ export function DrawableTree({
     <div className="axv-dt-add" style={{ marginLeft: 24 + depth * 8 }}>
       <div className="axv-dt-add-title">{tt("往「{name}」里加", { name: nodeTitle(node) })}</div>
       <div className="axv-dt-add-list">
+        {hasClip && onPaste ? (
+          <button
+            type="button"
+            className="axv-dt-add-item"
+            aria-label={tt("粘贴到这里")}
+            title={tt("粘贴到这里")}
+            onClick={() => {
+              onPaste(here);
+              setAddAt(null);
+            }}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 15 }}>
+              content_paste
+            </span>
+            <span>{tt("粘贴复制的内容")}</span>
+          </button>
+        ) : null}
         {childChoices(node).map((c) => (
           <button
             key={c.kind}
@@ -289,6 +313,35 @@ export function DrawableTree({
               </button>
             ) : null}
 
+            {hasClip && onPaste && isContainerNode(node) ? (
+              <button
+                className="axv-dt-op"
+                title={tt("粘贴到这里")}
+                aria-label={tt("粘贴到这里")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect(here);
+                  onPaste(here);
+                }}
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>content_paste</span>
+              </button>
+            ) : null}
+
+            {isRoot || !onCopy ? null : (
+              <button
+                className="axv-dt-op"
+                title={tt("复制这一层")}
+                aria-label={tt("复制这一层")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopy(here);
+                }}
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>content_copy</span>
+              </button>
+            )}
+
             {sibOps}
 
             {isRoot ? null : (
@@ -377,5 +430,24 @@ export function DrawableTree({
     );
   };
 
-  return <div className="axv-dt">{renderNode(root, [], 0)}</div>;
+  return (
+    <div
+      className="axv-dt"
+      tabIndex={-1}
+      onKeyDown={(e) => {
+        // M158：树里 Ctrl/Cmd+C / +V（焦点在树内任意按钮上时都冒泡到这里）
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const k = e.key.toLowerCase();
+        if (k === "c" && onCopy && path.length > 0) {
+          e.preventDefault();
+          onCopy(path);
+        } else if (k === "v" && onPaste) {
+          e.preventDefault();
+          onPaste(path);
+        }
+      }}
+    >
+      {renderNode(root, [], 0)}
+    </div>
+  );
 }

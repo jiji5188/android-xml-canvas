@@ -18,6 +18,7 @@
 // 保留这个文件与同名导出，是为了不再动所有历史调用点（XmlEditor / AttrPanel 十多处）。
 
 import { DrawableEditor, type DrawableResSource } from "./DrawableEditor";
+import type { AiFileIo } from "@/lib/xml/ai-tools";
 
 export interface ShapeEditorProps {
   /** 正在编辑的属性名（background / foreground …） */
@@ -35,6 +36,9 @@ export interface ShapeEditorProps {
   forceTree?: boolean;
   /** M143：项目 res 资源，用来把 @drawable 引用真渲染出来（形状 xml / 位图 / svg） */
   res?: DrawableResSource | null;
+  /** M158：真预览时从项目 res 递归补齐嵌套引用 */
+  io?: AiFileIo | null;
+  docRel?: string | null;
 }
 
 export function ShapeEditor({
@@ -45,6 +49,8 @@ export function ShapeEditor({
   onClose,
   onSave,
   res,
+  io,
+  docRel,
 }: ShapeEditorProps) {
   return (
     <DrawableEditor
@@ -55,6 +61,8 @@ export function ShapeEditor({
       onClose={onClose}
       onSave={onSave}
       res={res}
+      io={io}
+      docRel={docRel}
     />
   );
 }

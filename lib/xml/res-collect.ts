@@ -463,7 +463,7 @@ export async function collectProjectRes(
     if (type === "layout") {
       const ok = addFile(
         `layout/${name}.xml`,
-        `<?xml version="1.0" encoding="utf-8"?>\n<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"\n    android:layout_width="match_parent" android:layout_height="match_parent" />\n`,
+        `<?xml version="1.0" encoding="utf-8"?>\n<!--axv-stub-->\n<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"\n    android:layout_width="match_parent" android:layout_height="match_parent" />\n`,
       );
       if (ok) {
         missing.delete(key);

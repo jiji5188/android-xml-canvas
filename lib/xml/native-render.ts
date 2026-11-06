@@ -83,14 +83,38 @@ export function renderableFiles(files: RenderFile[]): RenderFile[] {
 }
 
 /**
+ * M161：图片 base64 清洗。设备侧出现“png 0 字节 / 不是 PNG 签名”就是因为拿到了空串、
+ * 只含换行的串，或被包成 data URL —— Java 那边 Base64.decode 对空白串返回空数组不报错，
+ * 结果写出 0 字节文件，aapt2 一读就爆。这里统一归一化，无效就返回 null。
+ */
+export function cleanBase64(s: string | undefined | null): string | null {
+  if (!s) return null;
+  let v = String(s).trim();
+  const m = /^data:[^,]*;base64,/i.exec(v);
+  if (m) v = v.slice(m[0].length);
+  v = v.replace(/\s+/g, "");
+  if (!v) return null;
+  try {
+    // 校验：既要能解，也要真的解出字节（atob 在浏览器/Node 都有）
+    const bin = atob(v);
+    if (!bin.length) return null;
+  } catch {
+    return null;
+  }
+  return v;
+}
+
+/**
  * M160：发给设备前最后一道兵——把清单里确实缺的资源就地生成占位。
  * 不依赖收集阶段（收集可能因预算/IO 失败漏掉），否则 aapt2 一句 not found 就整包失败。
  */
 export function withPlaceholders(files: RenderFile[], missing: string[]): RenderFile[] {
-  if (missing.length === 0) return files;
+  // 注意不能在这里 missing 为空就直接 return：即使没有缺失资源，也要处理
+  // 收集阶段已经生成的占位布局（把指向它们的 <include> 删掉）。
   const have = new Set(files.map((f) => f.path));
   const out = [...files];
   const valueLines: string[] = [];
+  const stubLayouts: string[] = [];
   const push = (path: string, text: string) => {
     if (have.has(path)) return;
     have.add(path);
@@ -107,9 +131,10 @@ export function withPlaceholders(files: RenderFile[], missing: string[]): Render
         `<?xml version="1.0" encoding="utf-8"?>\n<shape xmlns:android="http://schemas.android.com/apk/res/android"><solid android:color="#00000000" /></shape>\n`,
       );
     } else if (type === "layout") {
+      stubLayouts.push(name);
       push(
         `layout/${name}.xml`,
-        `<?xml version="1.0" encoding="utf-8"?>\n<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" />\n`,
+        `<?xml version="1.0" encoding="utf-8"?>\n<!--axv-stub-->\n<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" />\n`,
       );
     } else if (type === "menu" || type === "anim" || type === "animator" || type === "xml") {
       const root = type === "menu" ? "menu" : type === "xml" ? "x" : "set";
@@ -135,6 +160,34 @@ export function withPlaceholders(files: RenderFile[], missing: string[]): Render
       "values/axv_auto.xml",
       `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${valueLines.join("\n")}\n</resources>\n`,
     );
+  }
+  // M161：占位布局虽然能过 aapt2 link，但运行时 <include layout="@layout/x"> 仍可能拿到
+  // 资源 id 0（真机报 “You must specify a layout in the include tag”）。
+  // 收集阶段产生的占位布局也一并识别（带 <!--axv-stub--> 标记），统一把这些 include 删掉：
+  // 预览少一块，总比整页白屏加报错强。
+  for (const f of out) {
+    const m = f.path.match(/^layout(-[^/]+)?\/([^/]+)\.xml$/i);
+    if (m && (f.text || "").includes("axv-stub")) stubLayouts.push(m[2]);
+  }
+  const uniqStubLayouts = [...new Set(stubLayouts)];
+  if (uniqStubLayouts.length > 0) {
+    for (let i = 0; i < out.length; i++) {
+      const f = out[i];
+      if (!f.text) continue;
+      let t = f.text;
+      let changed = false;
+      for (const n of uniqStubLayouts) {
+        const re = new RegExp(
+          `<include\\b[^>]*\\blayout\\s*=\\s*"@layout/${n}"[^>]*?/?>`,
+          "g",
+        );
+        if (re.test(t)) {
+          t = t.replace(re, "");
+          changed = true;
+        }
+      }
+      if (changed) out[i] = { ...f, text: t };
+    }
   }
   return out;
 }
@@ -174,7 +227,25 @@ export function renderReal(
     });
   }
   install();
-  const filled = withPlaceholders(list, missing);
+  // M161：先洗一遍 base64，洗坏的 png 直接丢掉，改由 withPlaceholders 出透明占位，
+  // 否则设备端写出 0 字节 png，aapt2 compile 直接失败（20:14 那份日志）
+  const cleaned: RenderFile[] = [];
+  const broken: string[] = [];
+  for (const f of list) {
+    if (!f.base64) {
+      cleaned.push(f);
+      continue;
+    }
+    const v = cleanBase64(f.base64);
+    if (!v) {
+      const m = f.path.match(/^(drawable|mipmap)(-[^/]+)?\/(.+?)\.(png|webp|jpg|jpeg)$/i);
+      if (m) broken.push(`${m[1]}/${m[3]}`);
+      continue;
+    }
+    cleaned.push({ ...f, base64: v });
+  }
+  const missingAll = broken.length ? [...new Set([...missing, ...broken])] : missing;
+  const filled = withPlaceholders(cleaned, missingAll);
   seq += 1;
   const id = `r${Date.now().toString(36)}${seq}`;
   return new Promise<RealRenderResult>((resolve) => {

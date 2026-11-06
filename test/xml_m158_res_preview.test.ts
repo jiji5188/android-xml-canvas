@@ -3,7 +3,7 @@ import { applyResNamePrefix, defaultResName } from "@/lib/xml/resname";
 import { cloneDrawableNode } from "@/lib/xml/drawable-edit";
 import { buildResourcePreviewFiles } from "@/lib/xml/res-preview";
 import { collectProjectRes } from "@/lib/xml/res-collect";
-import { renderableFiles, unresolvedRefs, withPlaceholders } from "@/lib/xml/native-render";
+import { cleanBase64, renderableFiles, unresolvedRefs, withPlaceholders } from "@/lib/xml/native-render";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 
@@ -239,6 +239,43 @@ describe("M158 真机渲染补齐项目资源", () => {
     const filled = withPlaceholders(files, missing);
     const stub = filled.find((f) => f.path === "drawable/ic_close.xml");
     expect(stub?.text).toContain("shape");
+  });
+
+  it("base64 清洗：空串 / 空白 / dataURL 开头 / 非法字符都要能处理", () => {
+    expect(cleanBase64(" ")).toBeNull();
+    expect(cleanBase64("\n\r\t")).toBeNull();
+    expect(cleanBase64("data:image/png;base64,")).toBeNull();
+    expect(cleanBase64("!!!not-base64!!!")).toBeNull();
+    expect(cleanBase64("data:image/png;base64,iVBORw0KGgo=")).toBe("iVBORw0KGgo=");
+    expect(cleanBase64("iVBOR\nw0KGgo=")).toBe("iVBORw0KGgo=");
+  });
+
+  it("include 引用了不存在的布局也会补占位（layoutID 这种模板残文）", async () => {
+    const io = fakeIo(`t-${Math.random()}`, {
+      "app/src/main/res/values/strings.xml": "<resources/>",
+    });
+    const r = await collectProjectRes(io, "app/src/main/res/layout/activity_home.xml", [
+      {
+        path: "layout/activity_home.xml",
+        text: '<LinearLayout><include layout="@layout/layoutID" /></LinearLayout>',
+      },
+    ]);
+    expect(r.files.map((f) => f.path)).toContain("layout/layoutID.xml");
+    expect(r.missing).toEqual([]);
+  });
+
+  it("占位布局的 include 会被删掉，避免运行时 id=0 报错", () => {
+    const files = [
+      { path: "layout/a.xml", text: '<LinearLayout><include layout="@layout/layoutID" /><TextView /></LinearLayout>' },
+      {
+        path: "layout/layoutID.xml",
+        text: '<?xml version="1.0" encoding="utf-8"?>\n<!--axv-stub-->\n<FrameLayout />',
+      },
+    ];
+    const out = withPlaceholders(files, []);
+    const a = out.find((f) => f.path === "layout/a.xml");
+    expect(a?.text).not.toContain("<include");
+    expect(a?.text).toContain("<TextView");
   });
 
   it("没有 IO 时原样返回", async () => {

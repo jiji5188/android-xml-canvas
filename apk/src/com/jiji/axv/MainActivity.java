@@ -2241,7 +2241,19 @@ public class MainActivity extends Activity {
             if (path.startsWith("/") || path.contains("..")) continue; // 只收 res 内相对路径
             if (!b64.isEmpty()) {
                 // M159：图片等二进制资源（aapt2 直接读字节，不能当 UTF-8 文本写）
-                writeBytes(new File(resDir, path), Base64.decode(b64, Base64.NO_WRAP));
+                // M161：base64 脏数据（空白串 / 非法字符）不要写出 0 字节文件，直接跳过并记日志
+                byte[] data;
+                try {
+                    data = Base64.decode(b64, Base64.NO_WRAP);
+                } catch (IllegalArgumentException bad) {
+                    Log.w("AXV", "跳过非法 base64: " + path);
+                    continue;
+                }
+                if (data == null || data.length == 0) {
+                    Log.w("AXV", "跳过空内容资源: " + path);
+                    continue;
+                }
+                writeBytes(new File(resDir, path), data);
                 written++;
                 continue;
             }

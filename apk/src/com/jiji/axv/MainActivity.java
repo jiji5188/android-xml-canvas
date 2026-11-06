@@ -2312,8 +2312,10 @@ public class MainActivity extends Activity {
         File legacy = new File(getCacheDir(), "framework-res-stub.apk");
         if (legacy.isFile()) legacy.delete();
         // M155e：桩改放 AndroidUIIDE/tmp/（用户能自己看到/验证），写不了再退 cache
-        if (cached.isFile() && cached.length() > 12000000L) {
-            if (log != null) log.append("framework: 缓存的资源桩 ").append(cached.length()).append(" 字节\n");
+        // M155f：桩从 17MB 的 arsc 换成 ~164KB 的最小 attr 包，尺寸区间也相应调整
+        if (cached.isFile() && cached.length() > 100000L && cached.length() < 2000000L) {
+            if (log != null) log.append("framework: 已解包的资源桩 ").append(cached.getAbsolutePath())
+                    .append(" ").append(cached.length()).append(" 字节\n");
             return cached;
         }
         if (cached.isFile()) cached.delete();

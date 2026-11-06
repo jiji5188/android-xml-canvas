@@ -114,11 +114,12 @@ run(jbrExe("jar"), ["uf", "build/base.apk", "-C", "build/dex", "classes.dex"], a
 
 // 6.5) assets 必须用正斜杠：aapt2 在 Windows 上会写成反斜杠（AssetManager 读不到，白屏），
 //      .NET ZipArchive 追加又会写 data descriptor（启动闪退）——用 append-assets.mjs 纯手写 STORE
-// M155：顺手把 framework 资源桩（android.jar 里的 resources.arsc）也打进去，
-//      设备端 aapt2 link 的 -I 用它 —— 手机上 framework-res.apk 常常读不到。
+// M155：顺手把 framework 资源桩（只含 attr 的最小 android 包）也打进去，
+//      设备端 aapt2 link 的 -I 用它 —— 手机上 framework-res.apk 常常读不到，
+//      android.jar 里的 resources.arsc 又会被手机版 aapt2 判为非法。
 const fwStub = path.join(apk, "build", "framework-res-stub.apk.gz");
 const fwRaw = path.join(apk, "build", "framework-res-stub.apk");
-run(process.execPath, [path.join(apk, "make-fw-stub.mjs"), path.join(SDK, "platforms", PLATFORM, "android.jar"), fwStub, fwRaw], apk);
+run(process.execPath, [path.join(apk, "make-fw-stub.mjs"), path.join(SDK, "platforms", PLATFORM), fwStub, fwRaw, btExe("aapt2.exe")], apk);
 run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "build", "base.apk"), path.join(apk, "assets", "www"),
   "--add", path.join(apk, "lib", "arm64-v8a", "libaapt2.so"), "lib/arm64-v8a/libaapt2.so",
   "--add", fwStub, "assets/fw/framework-res-stub.apk.gz"], apk);

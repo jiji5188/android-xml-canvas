@@ -1659,6 +1659,13 @@ export function XmlEditor() {
     };
   }, [resExtras, generatedDrawables, generatedDataUrls]);
 
+/** M166：drawable 编辑器搜索候选 = 项目 res/drawable 下的文件名（resExtras）
+ *  + 工具已生成/上传的 generatedDrawables。只传 generated 会把磁盘上的资源全漏掉 */
+const allDrawableNames = useMemo(() => {
+  const set = new Set<string>([...Object.keys(resExtras?.drawableXml ?? {}), ...Object.keys(generatedDrawables)]);
+  return [...set].map((n) => n.replace(/\.xml$/i, "")).filter(Boolean).sort((a, b) => a.localeCompare(b));
+}, [resExtras, generatedDrawables]);
+
   const [measured, setMeasured] = useState<MeasuredMap | null>(null);
   /** M2t：实测收敛计数器（避免 auto ↔ px 互推无限循环） */
   const measurePass = useRef(0);
@@ -4563,7 +4570,7 @@ const findResolved = findResolvedNode;
           attrName="background"
           value={`@drawable/${resShape.name}`}
           existingXml={resShape.xml}
-          existingNames={Object.keys(generatedDrawables)}
+          existingNames={allDrawableNames}
           forceTree={resShape.forceTree}
           io={aiFileIo}
           docRel={openRel}
@@ -4583,7 +4590,7 @@ const findResolved = findResolvedNode;
         <IconCanvasEditor
           name={resIcon.name}
           xml={resIcon.xml}
-          existingNames={Object.keys(generatedDrawables)}
+          existingNames={allDrawableNames}
           onClose={() => setResIcon(null)}
           onSave={(safeName, iconXml) => {
             const oldName = resIcon.name;

@@ -2,95 +2,598 @@
 ▲ Next.js 16.4.2 (Turbopack)
 - Local:         http://localhost:3000
 - Network:       http://192.168.31.101:3000
-✓ Ready in 2.1s
-✓ Running next.config.ts took 2.1s
+✓ Ready in 3.0s
+✓ Running next.config.ts took 1887ms
 
 ○ Compiling / ...
- GET / 200 in 354ms (next.js: 250ms, application-code: 103ms)
- GET /xml/ 200 in 79ms (next.js: 5ms, application-code: 74ms)
- GET /xml/ 200 in 30ms (next.js: 1.6ms, application-code: 28ms)
-✓ Compiled in 1816ms
-[browser] ./components/drawable/TransformTabs.tsx:46:85
-Error: Expected ':', got ';'
-  44 |             ? k === "rotate"
-  45 |               ? { fromDegrees: "0", pivotX: "50%", pivotY: "50%" }
-> 46 |               : { fromDegrees: "0", toDegrees: "360", pivotX: "50%", pivotY: "50%" };
-     |                                                                                     ^
-  47 |     // 按默认顺序插入
-  48 |     const order: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
-  49 |     const idx = order.indexOf(k);
+ GET / 200 in 699ms (next.js: 463ms, application-code: 236ms)
+○ Compiling /xml ...
+ GET /xml/ 200 in 87ms (next.js: 5ms, application-code: 82ms)
+✓ Compiled in 8.9s
+ GET / 200 in 129ms (next.js: 19ms, application-code: 110ms)
+ GET /xml/ 200 in 137ms (next.js: 1.4ms, application-code: 136ms)
+✓ Compiled in 600ms
+✓ Compiled in 2s
+✓ Compiled in 138ms
+✓ Compiled in 111ms
+✓ Compiled in 105ms
+✓ Compiled in 114ms
+✓ Compiled in 282ms
+✓ Compiled in 177ms
+✓ Compiled in 187ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 235ms
+ GET /xml/ 200 in 31ms (next.js: 1.9ms, application-code: 29ms)
+✓ Compiled in 135ms
+✓ Compiled in 204ms
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
 
 Parsing ecmascript source code failed
 
 Import trace:
   Client Component Browser:
-    ./components/drawable/TransformTabs.tsx [Client Component Browser]
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
     ./components/DrawableEditor.tsx [Client Component Browser]
     ./components/ShapeEditor.tsx [Client Component Browser]
     ./components/XmlEditor.tsx [Client Component Browser]
     ./app/xml/page.tsx [Client Component Browser]
     ./app/xml/page.tsx [Server Component] 
-[browser] ./components/drawable/TransformTabs.tsx:46:85
-Error: Expected ':', got ';'
-  44 |             ? k === "rotate"
-  45 |               ? { fromDegrees: "0", pivotX: "50%", pivotY: "50%" }
-> 46 |               : { fromDegrees: "0", toDegrees: "360", pivotX: "50%", pivotY: "50%" };
-     |                                                                                     ^
-  47 |     // 按默认顺序插入
-  48 |     const order: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
-  49 |     const idx = order.indexOf(k);
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
 
 Parsing ecmascript source code failed
 
 Import trace:
   Client Component Browser:
-    ./components/drawable/TransformTabs.tsx [Client Component Browser]
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
     ./components/DrawableEditor.tsx [Client Component Browser]
     ./components/ShapeEditor.tsx [Client Component Browser]
     ./components/XmlEditor.tsx [Client Component Browser]
     ./app/xml/page.tsx [Client Component Browser]
     ./app/xml/page.tsx [Server Component] 
-[browser] ./components/drawable/TransformTabs.tsx:46:85
-Error: Expected ':', got ';'
-  44 |             ? k === "rotate"
-  45 |               ? { fromDegrees: "0", pivotX: "50%", pivotY: "50%" }
-> 46 |               : { fromDegrees: "0", toDegrees: "360", pivotX: "50%", pivotY: "50%" };
-     |                                                                                     ^
-  47 |     // 按默认顺序插入
-  48 |     const order: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
-  49 |     const idx = order.indexOf(k);
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
 
 Parsing ecmascript source code failed
 
 Import trace:
   Client Component Browser:
-    ./components/drawable/TransformTabs.tsx [Client Component Browser]
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
     ./components/DrawableEditor.tsx [Client Component Browser]
     ./components/ShapeEditor.tsx [Client Component Browser]
     ./components/XmlEditor.tsx [Client Component Browser]
     ./app/xml/page.tsx [Client Component Browser]
     ./app/xml/page.tsx [Server Component] 
-[browser] ./components/drawable/TransformTabs.tsx:46:85
-Error: Expected ':', got ';'
-  44 |             ? k === "rotate"
-  45 |               ? { fromDegrees: "0", pivotX: "50%", pivotY: "50%" }
-> 46 |               : { fromDegrees: "0", toDegrees: "360", pivotX: "50%", pivotY: "50%" };
-     |                                                                                     ^
-  47 |     // 按默认顺序插入
-  48 |     const order: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
-  49 |     const idx = order.indexOf(k);
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
 
 Parsing ecmascript source code failed
 
 Import trace:
   Client Component Browser:
-    ./components/drawable/TransformTabs.tsx [Client Component Browser]
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
     ./components/DrawableEditor.tsx [Client Component Browser]
     ./components/ShapeEditor.tsx [Client Component Browser]
     ./components/XmlEditor.tsx [Client Component Browser]
     ./app/xml/page.tsx [Client Component Browser]
     ./app/xml/page.tsx [Server Component] 
-✓ Compiled in 856ms
- GET /xml/ 200 in 27ms (next.js: 4ms, application-code: 22ms)
- GET /xml/ 200 in 31ms (next.js: 0.9ms, application-code: 30ms)
-[?25h
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 106ms
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 311ms
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 172ms
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 126ms
+ GET /xml/ 200 in 59ms (next.js: 12ms, application-code: 48ms)
+ GET /xml/ 200 in 39ms (next.js: 2ms, application-code: 37ms)
+ GET /xml/ 200 in 80ms (next.js: 1.1ms, application-code: 79ms)
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:312:14
+Error: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  310 |               placeholder="0"
+  311 |               emptyValue={0}
+> 312 |             />
+      |              ^
+  313 |           ))}
+  314 |         </div>
+  315 |
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/drawable/SlotRows.tsx:313:13
+Error: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  311 |               emptyValue={0}
+  312 |             />
+> 313 |           ))}
+      |             ^
+  314 |         </div>
+  315 |
+  316 |         <div className="axv-slot-grid">
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/drawable/SlotRows.tsx [Client Component Browser]
+    ./components/DrawableEditor.tsx [Client Component Browser]
+    ./components/ShapeEditor.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 112ms
+✓ Compiled in 205ms
+✓ Compiled in 2.6s
+✓ Compiled in 7.2s

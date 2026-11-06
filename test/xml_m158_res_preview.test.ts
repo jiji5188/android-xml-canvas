@@ -3,7 +3,7 @@ import { applyResNamePrefix, defaultResName } from "@/lib/xml/resname";
 import { cloneDrawableNode } from "@/lib/xml/drawable-edit";
 import { buildResourcePreviewFiles } from "@/lib/xml/res-preview";
 import { collectProjectRes } from "@/lib/xml/res-collect";
-import { renderableFiles } from "@/lib/xml/native-render";
+import { renderableFiles, unresolvedRefs, withPlaceholders } from "@/lib/xml/native-render";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 
@@ -221,6 +221,24 @@ describe("M158 真机渲染补齐项目资源", () => {
     // 真实渲染前的过滤不能把只带 base64 的文件丢掉
     expect(renderableFiles(r.files).some((f) => f.path === "drawable/ic_menu.png")).toBe(true);
     expect(r.missing).toEqual([]);
+  });
+
+  it("发送前兜底：drawable 内部引用的图标也会被占位", () => {
+    const files = [
+      {
+        path: "layout/a.xml",
+        text: '<LinearLayout><ImageView android:src="@drawable/icon" /></LinearLayout>',
+      },
+      {
+        path: "drawable/icon.xml",
+        text: '<selector><item android:drawable="@drawable/ic_close" /></selector>',
+      },
+    ];
+    const missing = unresolvedRefs(files, "a");
+    expect(missing).toContain("drawable/ic_close");
+    const filled = withPlaceholders(files, missing);
+    const stub = filled.find((f) => f.path === "drawable/ic_close.xml");
+    expect(stub?.text).toContain("shape");
   });
 
   it("没有 IO 时原样返回", async () => {

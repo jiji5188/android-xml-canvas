@@ -83,6 +83,63 @@ export function renderableFiles(files: RenderFile[]): RenderFile[] {
 }
 
 /**
+ * M160：发给设备前最后一道兵——把清单里确实缺的资源就地生成占位。
+ * 不依赖收集阶段（收集可能因预算/IO 失败漏掉），否则 aapt2 一句 not found 就整包失败。
+ */
+export function withPlaceholders(files: RenderFile[], missing: string[]): RenderFile[] {
+  if (missing.length === 0) return files;
+  const have = new Set(files.map((f) => f.path));
+  const out = [...files];
+  const valueLines: string[] = [];
+  const push = (path: string, text: string) => {
+    if (have.has(path)) return;
+    have.add(path);
+    out.push({ path, text });
+  };
+  for (const key of missing) {
+    const slash = key.indexOf("/");
+    if (slash < 0) continue;
+    const type = key.slice(0, slash);
+    const name = key.slice(slash + 1);
+    if (type === "drawable" || type === "mipmap") {
+      push(
+        `drawable/${name}.xml`,
+        `<?xml version="1.0" encoding="utf-8"?>\n<shape xmlns:android="http://schemas.android.com/apk/res/android"><solid android:color="#00000000" /></shape>\n`,
+      );
+    } else if (type === "layout") {
+      push(
+        `layout/${name}.xml`,
+        `<?xml version="1.0" encoding="utf-8"?>\n<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" />\n`,
+      );
+    } else if (type === "menu" || type === "anim" || type === "animator" || type === "xml") {
+      const root = type === "menu" ? "menu" : type === "xml" ? "x" : "set";
+      push(
+        `${type}/${name}.xml`,
+        `<?xml version="1.0" encoding="utf-8"?>\n<${root} xmlns:android="http://schemas.android.com/apk/res/android" />\n`,
+      );
+    } else if (type === "color") valueLines.push(`    <color name="${name}">#00000000</color>`);
+    else if (type === "string") valueLines.push(`    <string name="${name}" />`);
+    else if (type === "dimen") valueLines.push(`    <dimen name="${name}">0dp</dimen>`);
+    else if (type === "bool") valueLines.push(`    <bool name="${name}">false</bool>`);
+    else if (type === "integer") valueLines.push(`    <integer name="${name}">0</integer>`);
+    else if (type === "fraction") valueLines.push(`    <fraction name="${name}">50%</fraction>`);
+    else if (type === "style") valueLines.push(`    <style name="${name}" parent="" />`);
+    else if (type === "id") valueLines.push(`    <item type="id" name="${name}" />`);
+    else if (type === "array" || type === "string-array" || type === "integer-array")
+      valueLines.push(`    <${type} name="${name}" />`);
+    else if (type === "plurals")
+      valueLines.push(`    <plurals name="${name}"><item quantity="other">%s</item></plurals>`);
+  }
+  if (valueLines.length > 0) {
+    push(
+      "values/axv_auto.xml",
+      `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${valueLines.join("\n")}\n</resources>\n`,
+    );
+  }
+  return out;
+}
+
+/**
  * 把 res 文件丢给原生编译 + 渲染。
  * @param layoutName 布局名（不带 .xml），必须是 files 里 layout/<name>.xml 的那个
  */
@@ -117,6 +174,7 @@ export function renderReal(
     });
   }
   install();
+  const filled = withPlaceholders(list, missing);
   seq += 1;
   const id = `r${Date.now().toString(36)}${seq}`;
   return new Promise<RealRenderResult>((resolve) => {
@@ -128,7 +186,7 @@ export function renderReal(
       resolve(r);
     });
     try {
-      b.renderReal!(id, JSON.stringify({ pkg: PKG, layout: name, files: list }));
+      b.renderReal!(id, JSON.stringify({ pkg: PKG, layout: name, files: filled }));
     } catch (e) {
       window.clearTimeout(timer);
       pending.delete(id);
@@ -167,10 +225,26 @@ export function unresolvedRefs(files: RenderFile[], layoutName?: string): string
     if (d) defs.add(`${d[1]}/${d[3]}`);
   }
 
+  // M160：不只看目标布局——layout 里 include 的布局、以及所有要一起编的 drawable/mipmap xml
+  // 内部也会引用图标（selector/layer-list），漏扫就会在 aapt2 阶段报 not found
+  const includedLayouts = new Set<string>();
+  for (const f of layoutFiles) {
+    const inc = /@layout\/([A-Za-z0-9_]+)/g;
+    let im: RegExpExecArray | null;
+    while ((im = inc.exec(f.text || "")) !== null) includedLayouts.add(im[1]);
+  }
+  const scanFiles = files.filter((f) => {
+    const p = f.path;
+    if (layoutFiles.includes(f)) return true;
+    const lm = p.match(/^layout(-[^/]+)?\/([^/]+)\.xml$/i);
+    if (lm && includedLayouts.has(lm[2])) return true;
+    return /^(drawable|mipmap)(-[^/]+)?\/.*\.xml$/i.test(p);
+  });
+
   // 2) 布局里的引用
   const want = new Set<string>();
   const refRe = /@(?!\+)(?!\*?android:)(string|color|dimen|style|integer|bool|fraction|array|string-array|integer-array|plurals|drawable|mipmap|anim|animator|menu|xml|font)\/([A-Za-z0-9_.]+)/g;
-  for (const f of layoutFiles) {
+  for (const f of scanFiles) {
     let rm: RegExpExecArray | null;
     while ((rm = refRe.exec(f.text || "")) !== null) want.add(`${rm[1]}/${rm[2].replace(/\.\w+$/, "")}`);
   }

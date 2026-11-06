@@ -224,7 +224,7 @@ export async function collectProjectRes(
       for (const ext of [".xml", ""]) {
         const path = `${dir}/${name}${ext}`;
         if (!path.startsWith(`${dir}/`)) continue;
-        if (have.has(path)) return null; // 已经带过
+        if (have.has(path)) continue; // 已带过这个目录，接着看别的限定符目录
         reads++;
         const r = await io.read(`${resRel}/${path}`);
         if (r.ok && r.text) return { path, text: r.text };
@@ -240,7 +240,7 @@ export async function collectProjectRes(
     for (const dir of dirs2) {
       for (const ext of ["png", "webp", "jpg", "jpeg"]) {
         const path = `${dir}/${name}.${ext}`;
-        if (have.has(path)) return null;
+        if (have.has(path)) continue;
         reads++;
         const r = await io.readBase64(`${resRel}/${path}`);
         if (r.ok && r.base64) return { path, base64: r.base64 };
@@ -297,6 +297,40 @@ export async function collectProjectRes(
       }
     }
     queue = next;
+  }
+
+  // M159：最后扫一遍最终清单里所有引用——递归时可能因 have/预算提前 return 漏记，
+  // 导致 aapt2 报 xxx not found 却连占位都没生成。
+  for (const f of files) {
+    for (const ref of refsIn(f.text || "")) {
+      const key = `${ref.type}/${ref.name}`;
+      if (!defs.has(key)) missing.add(key);
+    }
+  }
+  // 再试一次真文件（限定符目录 / 多模块 res 里的图片、布局）
+  for (const key of [...missing]) {
+    const slash = key.indexOf("/");
+    if (slash < 0) continue;
+    const type = key.slice(0, slash);
+    const name = key.slice(slash + 1);
+    if (type !== "drawable" && type !== "mipmap" && type !== "layout") continue;
+    const direct = files.some((f) => new RegExp(`^${type}(-[^/]+)?/${name}\\.`).test(f.path));
+    if (direct) {
+      defs.add(key);
+      missing.delete(key);
+      continue;
+    }
+    const hit = await findDirFile(type, name);
+    if (hit && addFile(hit.path, hit.text)) {
+      defs.add(key);
+      missing.delete(key);
+      continue;
+    }
+    const img = await findDirImage(type, name);
+    if (img && addFile(img.path, "", img.base64)) {
+      defs.add(key);
+      missing.delete(key);
+    }
   }
 
   // M159：自定义 View 的 app:/cardview: 属性（MaterialCardView 的 cardCornerRadius 等）

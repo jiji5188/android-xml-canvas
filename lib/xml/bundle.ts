@@ -41,6 +41,9 @@ export function buildResBundle(input: BundleInput): ZipEntry[] {  const entries:
     for (const [name, xml] of Object.entries(extras.drawableXml ?? {})) {
       if (!xml) continue;
       if (/<vector[\s>]/.test(xml)) continue; // vector 走下面的树遍历（保原文件名）
+      // adaptive-icon 必须待在 mipmap-anydpi-v26/ 里，写成 drawable/xxx.xml 会让
+      // aapt2 报 “<adaptive-icon> requires a sdk version of at least 26”；交给树遍历原路径
+      if (/<adaptive-icon[\s>]/.test(xml)) continue;
       push(`drawable/${name}.xml`, xml);
     }
     // 树里的 drawable/mipmap xml 全文（保原始路径，含 -night 等限定符目录）

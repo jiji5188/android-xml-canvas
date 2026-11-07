@@ -9,6 +9,7 @@
  */
 
 import { ViewSettingsMenu } from "./ViewSettingsMenu";
+import { ToolbarMoreMenu, type MoreItem } from "./ToolbarMoreMenu";
 import { t as tt } from "@/lib/i18n-src";
 
 export type ToolbarProps = {
@@ -94,6 +95,39 @@ export function Toolbar(props: ToolbarProps) {
     snapCount,
   } = props;
 
+  /* M173：低频操作收进「更多」弹出菜单（渲染在 ToolbarMoreMenu 里，portal 到 .axv-main，避免被工具栏裁剪） */
+  const moreItems: MoreItem[] = [
+    {
+      key: "open",
+      icon: "file_open",
+      label: tt("打开 XML 文件"),
+      hint: tt("也可直接把文件拖进来"),
+      onClick: onOpenFile,
+    },
+    { key: "copy", icon: "content_copy", label: tt("复制 XML"), onClick: onCopyXml },
+  ];
+  if (showResZip) {
+    moreItems.push({
+      key: "reszip",
+      icon: "folder_zip",
+      label: tt("导出 res 包"),
+      hint: tt("布局 + 图标矢量 + shape/values"),
+      onClick: onExportRes,
+    });
+  }
+  if (hasRes) {
+    moreItems.push({ key: "clearres", icon: "hide_image", label: tt("清除 res"), onClick: onClearRes });
+  }
+  if (nativeAvailable) {
+    moreItems.push({
+      key: "workspace",
+      icon: "save_location",
+      label: tt("更换保存位置"),
+      hint: workspaceLabel || tt("默认目录"),
+      title: tt("保存位置：{path}（点击更换）", { path: workspaceLabel || tt("默认目录") }),
+      onClick: onChangeWorkspace,
+    });
+  }
   return (
     <div
       className="axv-toolbar-v2"
@@ -151,48 +185,12 @@ export function Toolbar(props: ToolbarProps) {
           ) : null}
           <button
             className="axv-tb-btn"
-            title={tt("打开本地 XML 文件（也可直接把文件拖进来）")}
-            aria-label={tt("打开 XML 文件")}
-            onClick={onOpenFile}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>file_open</span>
-          </button>
-          <button className="axv-tb-btn" title={tt("复制生成的 XML")} aria-label={tt("复制 XML")} onClick={onCopyXml}>
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>content_copy</span>
-          </button>
-          {showResZip ? (
-            <button
-              className="axv-tb-btn"
-              title={tt("导出 res 目录（zip：布局 + 图标矢量 + shape/values）")}
-              aria-label={tt("导出 res 包")}
-              onClick={onExportRes}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>folder_zip</span>
-            </button>
-          ) : null}
-          <button
-            className="axv-tb-btn"
             title={tt("导出预览图（PNG / SVG）")}
             aria-label={tt("导出预览图")}
             onClick={onExportImage}
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>image</span>
           </button>
-          {hasRes ? (
-            <button className="axv-tb-btn" title={tt("清除已上传的 res 资源")} aria-label={tt("清除 res")} onClick={onClearRes}>
-              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>hide_image</span>
-            </button>
-          ) : null}
-          {nativeAvailable ? (
-            <button
-              className="axv-tb-btn"
-              title={tt("保存位置：{path}（点击更换）", { path: workspaceLabel || tt("默认目录") })}
-              aria-label={tt("更换保存位置")}
-              onClick={onChangeWorkspace}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>save_location</span>
-            </button>
-          ) : null}
           <button
             className="axv-tb-btn axv-tb-run"
             title={tt("运行调试：全屏交互预览，可点控件跳布局（Esc 退出）")}
@@ -219,8 +217,11 @@ export function Toolbar(props: ToolbarProps) {
             aria-label={tt("格式化")}
             onClick={onFormat}
           >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 22 }}>format_shapes</span>
+            <span className="msr" aria-hidden="true" style={{ fontSize: 22 }}>code</span>
           </button>
+
+          {/* M173：低频操作收进这个菜单 */}
+          <ToolbarMoreMenu items={moreItems} />
         </div>
       </div>
 

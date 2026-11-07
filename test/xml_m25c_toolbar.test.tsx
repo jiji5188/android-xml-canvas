@@ -41,6 +41,21 @@ function props(over: Partial<ToolbarProps> = {}): ToolbarProps {
 
 type El = { type: unknown; props: Record<string, unknown> };
 
+/** M173：菜单项现在是 ToolbarMoreMenu 的 props.items，不再直接展开成按钮 */
+function menuItems(node: ReactNode): Array<{ key: string; label: string; title?: string; onClick: () => void }> {
+  let out: Array<{ key: string; label: string; title?: string; onClick: () => void }> = [];
+  const walk = (n: ReactNode) => {
+    if (Array.isArray(n)) return n.forEach((c) => walk(c as ReactNode));
+    if (!isValidElement(n)) return;
+    const el = n as unknown as El;
+    const p = el.props as Record<string, unknown>;
+    if (Array.isArray(p.items)) out = p.items as typeof out;
+    walk(p.children as ReactNode);
+  };
+  walk(node);
+  return out;
+}
+
 /** 深度遍历元素树，收集所有带 aria-label 的节点 */
 function collect(node: ReactNode, out: El[] = []): El[] {
   if (Array.isArray(node)) {
@@ -60,7 +75,9 @@ function render(over: Partial<ToolbarProps> = {}) {
   const all = collect(tree as unknown as ReactNode);
   const by = (label: string) => all.find((e) => e.props["aria-label"] === label);
   const labels = all.map((e) => String(e.props["aria-label"]));
-  return { p, tree, all, by, labels };
+  const items = menuItems(tree as unknown as ReactNode);
+  const item = (label: string) => items.find((it) => it.label === label);
+  return { p, tree, all, by, labels, items, item };
 }
 
 describe("Toolbar — 侧栏按钮", () => {
@@ -97,54 +114,59 @@ describe("Toolbar — 侧栏按钮", () => {
   });
 });
 
-describe("Toolbar — res / 原生容器相关按钮的显隐", () => {
+describe("Toolbar — res / 原生容器相关按钮的显隐（M173 起在「更多」菜单里）", () => {
   it("无 res 资源时既没有导出 res 包也没有清除 res", () => {
-    const { by } = render({ showResZip: false, hasRes: false });
-    expect(by("导出 res 包")).toBeUndefined();
-    expect(by("清除 res")).toBeUndefined();
+    const { item, items } = render({ showResZip: false, hasRes: false });
+    expect(item("导出 res 包")).toBeUndefined();
+    expect(item("清除 res")).toBeUndefined();
+    // 「更多」菜单始终存在（ToolbarMoreMenu 的 items 还会带上打开 / 复制）
+    expect(items.map((it) => it.label)).toEqual(["打开 XML 文件", "复制 XML"]);
   });
 
-  it("有 res 资源时两个按钮都出现，点击各自回调", () => {
-    const { by, p } = render({ showResZip: true, hasRes: true });
-    (by("导出 res 包")!.props.onClick as () => void)();
-    (by("清除 res")!.props.onClick as () => void)();
+  it("有 res 资源时两个菜单项都出现，点击各自回调", () => {
+    const { item, p } = render({ showResZip: true, hasRes: true });
+    item("导出 res 包")!.onClick();
+    item("清除 res")!.onClick();
     expect(p.onExportRes).toHaveBeenCalledTimes(1);
     expect(p.onClearRes).toHaveBeenCalledTimes(1);
   });
 
-  it("只有生成 drawable（showResZip=true 但 hasRes=false）时只显示导出，不显示清除", () => {
-    const { by } = render({ showResZip: true, hasRes: false });
-    expect(by("导出 res 包")).toBeDefined();
-    expect(by("清除 res")).toBeUndefined();
+  it("只有生成 drawable（showResZip=true 但 hasRes=false）时只有导出项", () => {
+    const { item } = render({ showResZip: true, hasRes: false });
+    expect(item("导出 res 包")).toBeDefined();
+    expect(item("清除 res")).toBeUndefined();
   });
 
   it("Web 端（非原生容器）不显示「更换保存位置」", () => {
-    const { by } = render({ nativeAvailable: false });
-    expect(by("更换保存位置")).toBeUndefined();
+    const { item } = render({ nativeAvailable: false });
+    expect(item("更换保存位置")).toBeUndefined();
   });
 
   it("原生容器显示「更换保存位置」，title 里带当前目录名，点击触发 onChangeWorkspace", () => {
-    const { by, p } = render({ nativeAvailable: true, workspaceLabel: "Download/AXV" });
-    const b = by("更换保存位置")!;
-    expect(String(b.props.title)).toContain("Download/AXV");
-    (b.props.onClick as () => void)();
+    const { item, p } = render({ nativeAvailable: true, workspaceLabel: "Download/AXV" });
+    const it0 = item("更换保存位置")!;
+    expect(String(it0.title)).toContain("Download/AXV");
+    it0.onClick();
     expect(p.onChangeWorkspace).toHaveBeenCalledTimes(1);
   });
 
   it("原生容器未设置目录时 title 回落到「默认目录」", () => {
-    const { by } = render({ nativeAvailable: true, workspaceLabel: "" });
-    expect(String(by("更换保存位置")!.props.title)).toContain("默认目录");
+    const { item } = render({ nativeAvailable: true, workspaceLabel: "" });
+    expect(String(item("更换保存位置")!.title)).toContain("默认目录");
   });
 });
 
 describe("Toolbar — 主要动作接线", () => {
   it("保存 / 打开 / 复制 / 导出预览图 / 运行 / 格式化 各自触发对应回调", () => {
-    const { by, p } = render();
-    for (const label of ["保存", "打开 XML 文件", "复制 XML", "导出预览图", "运行", "格式化"]) {
+    const { by, item, p } = render();
+    for (const label of ["保存", "导出预览图", "运行", "格式化"]) {
       const b = by(label);
       expect(b, label).toBeDefined();
       (b!.props.onClick as () => void)();
     }
+    // M173：打开 / 复制 移到了「更多」菜单
+    item("打开 XML 文件")!.onClick();
+    item("复制 XML")!.onClick();
     expect(p.onSave).toHaveBeenCalledTimes(1);
     expect(p.onOpenFile).toHaveBeenCalledTimes(1);
     expect(p.onCopyXml).toHaveBeenCalledTimes(1);

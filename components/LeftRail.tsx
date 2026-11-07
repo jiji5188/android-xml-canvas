@@ -67,14 +67,32 @@ export function LeftRail(props: LeftRailProps) {
         data-rail-index={idx}
         onClick={() => onPick(it.view)}
       >
-        <span
-          className="msr"
-          aria-hidden="true"
-          data-fill={on ? "1" : "0"}
-          style={{ fontSize: 24 }}
-        >
-          {it.icon}
-        </span>
+        {it.view === "ai" ? (
+          // M173：AI 助手换成自定义描边矢量（不再用 Material 的 auto_awesome）
+          <svg
+            className="axv-rail-svg"
+            viewBox="0 0 24 24"
+            width={24}
+            height={24}
+            aria-hidden="true"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.28}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M8 8.8l-3.2 3.2l3.2 3.2M16 8.8l2.489 2.489M13.6 5.6l-1.74 6.96M13.6 19.2v-3.2a1.6 1.6 0 1 1 3.2 0v3.2M13.6 17.6h3.2M19.2 14.4v4.8" />
+          </svg>
+        ) : (
+          <span
+            className="msr"
+            aria-hidden="true"
+            data-fill={on ? "1" : "0"}
+            style={{ fontSize: 24 }}
+          >
+            {it.icon}
+          </span>
+        )}
       </button>
     );
   };

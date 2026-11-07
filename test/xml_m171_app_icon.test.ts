@@ -11,6 +11,7 @@ import {
   buildAppIcon,
   buildAdaptiveIcon,
   checkManifestIcon,
+  parseAppIconConfig,
 } from "../lib/xml/app-icon";
 import { buildResBundle } from "../lib/xml/bundle";
 
@@ -112,6 +113,43 @@ describe("M171 bundle.extraRes", () => {
     expect(paths).toContain("drawable/ic_launcher_background.xml");
     const ad = entries.find((e) => e.path === "mipmap-anydpi-v26/ic_launcher.xml")!.text;
     expect(ad).toContain("<adaptive-icon");
+  });
+});
+
+/* ---- M174：生成的配置能反读回来（刷新/重开后面板回填） ---- */
+describe("M174 parseAppIconConfig", () => {
+  const toRes = (bg: string, dp?: number) => {
+    const r = buildAppIcon({ fgSourceXml: SRC, bgColor: bg, contentDp: dp });
+    expect(r.error).toBeUndefined();
+    const res: Record<string, string> = {};
+    for (const f of r.files) res[f.path] = f.text;
+    return { res, gen: r };
+  };
+
+  it("读回背景色与尺寸", () => {
+    const { res } = toRes("#3FBFA0", 64);
+    expect(parseAppIconConfig(res)).toEqual({ bgColor: "#ff3fbfa0", contentDp: 64 });
+  });
+
+  it("前景里带 axv:contentDp 标记，缺标记时回落 72", () => {
+    const fg = buildLauncherForeground(SRC, 96)!;
+    expect(fg).toContain("axv:contentDp=96");
+    const { res } = toRes("#ffffff", 72);
+    const noMark: Record<string, string> = {};
+    for (const [k, v] of Object.entries(res)) noMark[k] = v.replace(/<!-- axv:contentDp=\d+ -->\n?/, "");
+    expect(parseAppIconConfig(noMark)).toEqual({ bgColor: "#ffffffff", contentDp: 72 });
+  });
+
+  it("没有 adaptive-icon / 背景不是纯色 → 返回 null（不报错）", () => {
+    expect(parseAppIconConfig(null)).toBeNull();
+    expect(parseAppIconConfig({})).toBeNull();
+    expect(parseAppIconConfig({ "mipmap-anydpi-v26/ic_launcher.xml": "<adaptive-icon/>" })).toBeNull();
+  });
+
+  it("生成结果带上实际 clamp 后的 contentDp", () => {
+    expect(buildAppIcon({ fgSourceXml: SRC, bgColor: "#fff", contentDp: 5 }).contentDp).toBe(40);
+    expect(buildAppIcon({ fgSourceXml: SRC, bgColor: "#fff", contentDp: 500 }).contentDp).toBe(108);
+    expect(buildAppIcon({ fgSourceXml: SRC, bgColor: "#fff" }).contentDp).toBe(72);
   });
 });
 

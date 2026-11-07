@@ -6,6 +6,7 @@
 //   1. Toolbar 本身要保持无 state（test/xml_m25c_toolbar.test.tsx 直接调用 Toolbar(props) 拿元素树）；
 //   2. 菜单必须画到 .axv-main 层。工具栏中区 .axv-tb-scroll 是 overflow-x: auto，
 //      菜单挂在按钮下面会被它裁掉（用户反馈「菜单被遮挡」），所以走 portal 到 .axv-main。
+//   3. M174c：宽度自适应（min(224, 容器宽-16)），下方放不下时翻到按钮上方。
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -20,12 +21,12 @@ export type MoreItem = {
   onClick: () => void;
 };
 
-const MENU_W = 224;
+const MENU_MAX_W = 224;
 
 export function ToolbarMoreMenu({ items }: { items: MoreItem[] }) {
   const [open, setOpen] = useState(false);
   const [host, setHost] = useState<HTMLElement | null>(null);
-  const [pos, setPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
+  const [pos, setPos] = useState<{ left: number; top: number; width: number }>({ left: 0, top: 0, width: MENU_MAX_W });
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -37,11 +38,26 @@ export function ToolbarMoreMenu({ items }: { items: MoreItem[] }) {
     const br = btn.getBoundingClientRect();
     const hr = target === document.body ? null : target.getBoundingClientRect();
     const hostW = hr ? target.clientWidth || hr.width : window.innerWidth;
-    // 右对齐按钮，但不越过容器右边界
-    const left = Math.max(8, Math.min(br.right - (hr?.left ?? 0) - MENU_W, hostW - MENU_W - 8));
+    const hostLeft = hr?.left ?? 0;
+    const hostTop = hr?.top ?? 0;
+    const hostBottom = hr?.bottom ?? window.innerHeight;
+
+    // 宽度：理想 224，窄容器里收窄（至少 160 才放得下图标+两行文字）
+    const width = Math.max(160, Math.min(MENU_MAX_W, hostW - 16));
+    const left = Math.max(8, Math.min(br.right - hostLeft - width, hostW - width - 8));
+
+    // 高度估算：每项约 44px（图标 19 + 两行字）+ 菜单上下 padding 12
+    const estH = Math.min(items.length, 10) * 44 + 12;
+    const spaceBelow = hostBottom - br.bottom;
+    // 下方不够且上方有空间（按钮不在视口顶部）→ 翻到按钮上方
+    const flip = estH > spaceBelow && br.top - hostTop > estH + 8;
+    const top = flip
+      ? br.top - hostTop - estH - 6
+      : br.bottom - hostTop + 6;
+
     setHost(target);
-    setPos({ left, top: br.bottom - (hr?.top ?? 0) + 6 });
-  }, []);
+    setPos({ left, top: Math.max(4, top), width });
+  }, [items.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,7 +99,7 @@ export function ToolbarMoreMenu({ items }: { items: MoreItem[] }) {
             ref={menuRef}
             className="axv-tb-menu"
             role="menu"
-            style={{ left: pos.left, top: pos.top, width: MENU_W }}
+            style={{ left: pos.left, top: pos.top, width: pos.width }}
           >
             {items.map((it) => (
               <button

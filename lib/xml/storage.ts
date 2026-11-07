@@ -13,6 +13,8 @@ export const LS_KEY_PROJECT = "axv.project.v1";
 export const LS_KEY_LAST_FILE = "axv.autosave.lastFile";
 /** M149：上次载入的示例项目 key —— 重启后恢复它自带的 values/drawable，否则 @string/@drawable 全裸显示 */
 export const LS_KEY_SAMPLE = "axv.autosave.sample";
+/** M174：应用图标参数（背景色 + 前景尺寸），刷新/重开 App 后图标编辑器「设为应用图标」面板直接显示上次的值 */
+export const LS_KEY_APP_ICON = "axv.appicon.v1";
 
 /** 安全读 localStorage 字符串 */
 export function lsGet(key: string): string | null {

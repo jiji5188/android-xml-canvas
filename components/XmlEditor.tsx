@@ -62,7 +62,9 @@ import { pickXmlFile } from "@/lib/xml/save-as";
 import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { hasRealRender, renderReal } from "@/lib/xml/native-render";
 import { collectProjectRes } from "@/lib/xml/res-collect";
-import { projectSaveRoot, saveProjectFile, saveResFiles } from "@/lib/xml/project-save";
+import { projectSaveRoot, saveProjectFile, saveResFiles, resAbs } from "@/lib/xml/project-save";
+import { parseAppIconConfig } from "@/lib/xml/app-icon";
+import { nativeBridge } from "@/lib/xml/native-save";
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
 import { isValuesPath } from "@/lib/xml/doc-kind";
 import { looksLikeValuesDoc } from "@/lib/xml/values-edit";
@@ -176,7 +178,7 @@ import {
   wrapSiblings,
   canUnwrap,
 } from "@/lib/xml/clip";
-import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, LS_KEY_LAST_FILE, LS_KEY_SAMPLE, lsGet, lsSet, lsGetJson, lsSetJson } from "@/lib/xml/storage";
+import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, LS_KEY_LAST_FILE, LS_KEY_SAMPLE, LS_KEY_APP_ICON, lsGet, lsSet, lsGetJson, lsSetJson } from "@/lib/xml/storage";
 /** M144：项目 → 上次打开的文件（按项目记，切项目再回来还是那个文件） */
 const LAST_REL_MAP_KEY = "axv.lastFile.map.v1";
 function readLastRelMap(): Record<string, string> {
@@ -3379,6 +3381,38 @@ const findResolved = findResolvedNode;
   /** M36：当前打开项目的可写根（有则保存一律落进 <项目>/app/src/main/res/） */
   const projRoot = useMemo(() => projectSaveRoot(activeProject), [activeProject]);
 
+  /** M174：「设为应用图标」面板初始值：
+   *  1) localStorage 里上次的参数（生成过就写进去）
+   *  2) 没有则从项目 res 读回（native 壳里读 mipmap-anydpi-v26 + drawable 背景色） */
+  const appIconInit = useMemo(() => {
+    try {
+      const saved = lsGetJson<{ bgColor?: string; contentDp?: number }>(LS_KEY_APP_ICON);
+      if (saved?.bgColor) {
+        return { bgColor: saved.bgColor, contentDp: saved.contentDp ?? 72 };
+      }
+      if (projRoot?.kind === "native") {
+        const b = nativeBridge();
+        if (b?.readText) {
+          const collect: Record<string, string> = {};
+          for (const rel of [
+            "mipmap-anydpi-v26/ic_launcher.xml",
+            "mipmap-anydpi-v26/ic_launcher_round.xml",
+            "drawable/ic_launcher_background.xml",
+            "drawable/ic_launcher_foreground.xml",
+          ]) {
+            try {
+              const t = b.readText(resAbs(projRoot.base, rel));
+              if (t) collect[rel] = t;
+            } catch { /* 读不到就跳过 */ }
+          }
+          const cfg = parseAppIconConfig(collect);
+          if (cfg) return cfg;
+        }
+      }
+    } catch { /* 回落到默认值 */ }
+    return null;
+  }, [projRoot]);
+
   /** 把当前内容整包写进当前项目的 res 目录（layout + 依赖 drawable/values） */
   const saveIntoProject = async (name?: string): Promise<boolean> => {
     if (!projRoot) return false;
@@ -4647,11 +4681,14 @@ const findResolved = findResolvedNode;
           xml={resIcon.xml}
           existingNames={allDrawableNames}
           onClose={() => setResIcon(null)}
-          onAppIcon={({ files, bgColor }) => {
+          initialAppIcon={appIconInit ?? undefined}
+          onAppIcon={({ files, bgColor, contentDp }) => {
             // M171：把 4 个图标文件存起来（给 res.zip / 真机渲染用），有项目就直接写进它的 res/
             const map: Record<string, string> = {};
             for (const f of files) map[f.path] = f.text;
             setAppIconRes(map);
+            // M174：记住上次的参数，刷新/重开后面板直接显示
+            lsSet(LS_KEY_APP_ICON, JSON.stringify({ bgColor, contentDp }));
             const total = files.length;
             if (projRoot) {
               void saveResFiles(

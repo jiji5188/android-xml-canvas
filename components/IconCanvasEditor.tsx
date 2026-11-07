@@ -64,6 +64,8 @@ interface Props {
     contentDp: number;
     sourceName: string;
   }) => void;
+  /** M174：「设为应用图标」面板初始值（上次的参数 或 从项目 res 读回的） */
+  initialAppIcon?: { bgColor: string; contentDp: number };
 }
 
 type Tool =
@@ -154,7 +156,7 @@ function inspect(xml?: string): "vector" | "bitmap" | "other-xml" | "empty" {
   return "other-xml";
 }
 
-export default function IconCanvasEditor({ name, xml, onClose, onSave, existingNames = [], onAppIcon }: Props) {
+export default function IconCanvasEditor({ name, xml, onClose, onSave, existingNames = [], onAppIcon, initialAppIcon }: Props) {
   const kind = useMemo(() => inspect(xml), [xml]);
 
   const initial = useMemo<Snapshot>(() => {
@@ -187,10 +189,10 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [picking, setPicking] = useState(false);
   /** 插入图标（多图标拼合）：不替换现有图形，而是把选中的图标追加成新图层 */
   const [inserting, setInserting] = useState(false);
-  /** M171：设为应用图标（前景 + 背景色 + 安全区尺寸） */
+  /** M171：设为应用图标（前景 + 背景色 + 安全区尺寸）；M174：初始值从 props 或默认取 */
   const [appIconOpen, setAppIconOpen] = useState(false);
-  const [appIconBg, setAppIconBg] = useState("#3FBFA0");
-  const [appIconDp, setAppIconDp] = useState(72);
+  const [appIconBg, setAppIconBg] = useState(initialAppIcon?.bgColor || "#3FBFA0");
+  const [appIconDp, setAppIconDp] = useState(initialAppIcon?.contentDp ?? 72);
   const [appIconErr, setAppIconErr] = useState("");
   const [colorTarget, setColorTarget] = useState<{ kind: "fill" | "stroke" | "bg" } | null>(null);
   const [zoom, setZoom] = useState(1);

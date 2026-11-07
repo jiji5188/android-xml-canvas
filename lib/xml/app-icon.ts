@@ -39,7 +39,61 @@ export interface AppIconResult {
   files: AppIconFile[];
   /** 规范化后的背景色；输入非法时为空 */
   bgColor: string;
+  /** 生成前 clamp 后的实际尺寸 */
+  contentDp: number;
   error?: string;
+}
+
+/** 从 res 包里读回应用图标配置（bg 色 + 前景尺寸），给「设为应用图标」面板做回填 */
+export interface AppIconConfig {
+  bgColor: string;
+  contentDp: number;
+}
+
+/**
+ * 从 res 相对路径 → 文件内容 的映射里读回配置。
+ * 找 mipmap-anydpi-v26/ic_launcher.xml（或 _round）→ background 引用的 drawable → 读 <solid> 颜色；
+ * 前景尺寸读生成器写入的标记注释（axv:contentDp=xx），读不到就默认 72。
+ */
+export function parseAppIconConfig(
+  res: Record<string, string> | null | undefined,
+): AppIconConfig | null {
+  if (!res) return null;
+  const adaptiveKeys = Object.keys(res).filter(
+    (k) => /(^|\/)mipmap-anydpi-v26\//.test(k) && /ic_launcher(_round)?\.xml$/.test(k),
+  );
+  if (!adaptiveKeys.length) return null;
+  const adaptive = res[adaptiveKeys[0]];
+  if (!adaptive) return null;
+  const bgMatch = adaptive.match(/<background\s+android:drawable="([^"]+)"/);
+  if (!bgMatch) return null;
+  const bgRef = bgMatch[1]; // 例如 @drawable/ic_launcher_background
+  const key = refToResKey(bgRef, res);
+  const bgXml = key ? res[key] : null;
+  if (!bgXml) return null;
+  const solid = bgXml.match(/<solid[^>]*android:color="([^"]+)"/i);
+  if (!solid) return null;
+  const color = normalizeColor(solid[1]);
+  if (!color) return null;
+  let dp = 72;
+  // 前景文件：adaptive 引用 @drawable/xxx → 找 xxx.xml 里的 axv:contentDp 标记
+  const fgMatch = adaptive.match(/<foreground\s+android:drawable="([^"]+)"/);
+  const fgKey = fgMatch ? refToResKey(fgMatch[1], res) : null;
+  const fg = fgKey ? res[fgKey] : null;
+  if (fg) {
+    const m = fg.match(/axv:contentDp=(\d+(?:\.\d+)?)/);
+    if (m) dp = Math.round(Number.parseFloat(m[1]));
+  }
+  if (!Number.isFinite(dp) || dp < 40 || dp > 108) dp = 72;
+  return { bgColor: color, contentDp: dp };
+}
+
+/** @drawable/ic_x → 在 res 映射里找对应的 key（可能带 drawable/ 前缀也可能不带） */
+function refToResKey(ref: string, res: Record<string, string>): string | null {
+  const name = ref.replace(/^@drawable\//, "");
+  const full = Object.keys(res).find((k) => k.replace(/^\/+/i, "") === `drawable/${name}.xml`);
+  if (full) return full;
+  return Object.keys(res).find((k) => k.replace(/^\/+/i, "") === name) ?? null;
 }
 
 const NS = "http://schemas.android.com/apk/res/android";
@@ -103,6 +157,7 @@ export function buildLauncherForeground(src: string, contentDp = 72): string | n
     `    android:height="108dp"`,
     `    android:viewportWidth="108"`,
     `    android:viewportHeight="108">`,
+    `    <!-- axv:contentDp=${box} -->`,
     `    <group android:scaleX="${r(s)}" android:scaleY="${r(s)}"`,
     `        android:translateX="${r(tx)}" android:translateY="${r(ty)}">`,
     parsed.inner
@@ -149,18 +204,21 @@ export function buildAppIcon(input: AppIconInput): AppIconResult {
     ["图标", iconName],
   ] as const) {
     if (!LEGAL.test(name)) {
-      return { files: [], bgColor: "", error: `${label}资源名不合法：${name}` };
+      return { files: [], bgColor: "", contentDp: 72, error: `${label}资源名不合法：${name}` };
     }
   }
   const color = normalizeColor(input.bgColor);
-  if (!color) return { files: [], bgColor: "", error: `背景色不合法：${input.bgColor}` };
+  if (!color) return { files: [], bgColor: "", contentDp: 72, error: `背景色不合法：${input.bgColor}` };
   const fg = buildLauncherForeground(input.fgSourceXml, input.contentDp ?? 72);
   if (!fg) {
-    return { files: [], bgColor: color, error: "前景不是合法的 vector（缺 viewportWidth/Height？）" };
+    return { files: [], bgColor: color, contentDp: 72, error: "前景不是合法的 vector（缺 viewportWidth/Height？）" };
   }
+  const wantDp = Number.isFinite(input.contentDp ?? NaN) ? (input.contentDp as number) : 72;
+  const usedDp = Math.min(108, Math.max(40, wantDp));
   const adaptive = buildAdaptiveIcon(`@drawable/${bgName}`, `@drawable/${fgName}`);
   return {
     bgColor: color,
+    contentDp: usedDp,
     files: [
       { path: `drawable/${fgName}.xml`, text: fg },
       { path: `drawable/${bgName}.xml`, text: buildColorBackground(color) },

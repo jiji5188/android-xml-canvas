@@ -43,6 +43,7 @@ import { formatXml } from "@/lib/xml/format";
 import { lintXml, type LintIssue } from "@/lib/xml/lint";
 import { lintJava } from "@/lib/xml/java-lint";
 import { collectResEnv } from "@/lib/xml/java-res-env";
+import { checkApiTypos, formatApiIssue } from "@/lib/xml/java-api-check";
 import { lintCodeDoc } from "@/lib/xml/lint-doc";
 import { loadSnaps, pushSnap, SNAP_LABEL_SAVE } from "@/lib/xml/snapshots";
 import { useUnsavedLeave } from "@/components/UnsavedLeaveDialog";
@@ -1987,6 +1988,10 @@ const allDrawableNames = useMemo(() => {
           level: j.sev,
           message: j.msg,
         }));
+        // M178：控件方法名拼写错误（setTxt → setText），只报编辑距离 1 的
+        for (const a of checkApiTypos(lintSrc)) {
+          out.push({ line: a.line, level: "warn", message: formatApiIssue(a) });
+        }
       } else if (codeOnly) {
         // M138：非布局文件走 lint-doc（结构 + 清单/values/drawable 等类型规则）
         out = lintCodeDoc(lintSrc, openRel || saveOrigin?.name || currentFile?.name || "");

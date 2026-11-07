@@ -9963,17 +9963,15 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 
 /* M171：应用图标设置面板 */
 .axv-ai-check {
-  /* M173b：不再做全屏遮罩（会挡住画布）；不写 position: fixed 也是因为它本来就挂在
-     全屏的 .axv-icon-page 里 —— 用 absolute 占住页头/页脚之间的区域居中显示，
-     否则静态布局会被页脚顶到屏幕外（实测卡片被截断）。 */
-  position: absolute;
-  inset: 56px 0 72px 0;
+  /* M174b：按用户要求 position: revert（等同 static）+ padding: 6px */
+  position: revert;
+  inset: 0;
   z-index: 80;
   background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 16px;
+  padding: 6px;
   overflow: auto;
   box-sizing: border-box;
 }

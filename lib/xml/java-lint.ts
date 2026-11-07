@@ -12,13 +12,14 @@
 export type JavaLintSeverity = "error" | "warn";
 
 import { TAG_TO_CLASS, isAssignableTo } from "./java-res-env";
+import { findMethodTypos } from "./java-methods";
 
 export interface JavaLintIssue {
   /** 1 起行号 */
   line: number;
   sev: JavaLintSeverity;
   /** 机器可读的小标记，方便测试与后续分组 */
-  code: "brace" | "quote" | "rid" | "import" | "override" | "rtype" | "ridtype";
+  code: "brace" | "quote" | "rid" | "import" | "override" | "rtype" | "ridtype" | "method";
   msg: string;
 }
 
@@ -449,6 +450,18 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
           msg: "@Override 后面没有紧跟方法声明（多写了一个 @Override？）",
         });
       }
+    }
+  }
+
+  // 6) M178：方法名拼错（setTxt → setText）
+  if (!opts.isKotlin) {
+    for (const t of findMethodTypos(masked.code)) {
+      issues.push({
+        line: t.line,
+        sev: "warn",
+        code: "method",
+        msg: `没有 ${t.name}() 这个方法，是不是想写 ${t.suggestion}()？`,
+      });
     }
   }
 

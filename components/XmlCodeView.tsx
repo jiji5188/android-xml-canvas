@@ -30,6 +30,8 @@ export interface XmlCodeViewProps {
 
   /** 格式化（重排缩进，保留注释） */
   onFormat: () => void;
+  /** M179：一键修复可自动修的问题（资源引用拼错/方法名拼错） */
+  onFixAll?: () => void;
 
   /** M38：当前文件语法（xml / java） */
   lang?: EditorLang;
@@ -85,6 +87,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           value={props.value}
           onChange={props.onChange}
           errors={props.errors}
+          onFixAll={props.onFixAll}
           focusLine={props.focusLine}
           focusTick={props.focusTick}
           onCursorLine={props.onCursorLine}

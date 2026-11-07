@@ -13,6 +13,10 @@ export type JavaLintSeverity = "error" | "warn";
 
 import { TAG_TO_CLASS, isAssignableTo } from "./java-res-env";
 import { findMethodTypos } from "./java-methods";
+import { nearestName } from "./nearest-name";
+
+// M179：输出侧复用了这个方法（XML 资源引用检查也用），从 shared 模块 re-export 兼容旧引用
+export { nearestName };
 
 export interface JavaLintIssue {
   /** 1 起行号 */
@@ -21,6 +25,8 @@ export interface JavaLintIssue {
   /** 机器可读的小标记，方便测试与后续分组 */
   code: "brace" | "quote" | "rid" | "import" | "override" | "rtype" | "ridtype" | "method";
   msg: string;
+  /** M179：能自动修复时给出 from → to */
+  fix?: { from: string; to: string };
 }
 
 export interface JavaLintOpts {
@@ -348,11 +354,13 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
       const name = m[1];
       if (ids.has(name) || seen.has(name)) continue;
       seen.add(name);
+      const sug = nearestName(name, ids);
       issues.push({
         line: lineOf(starts, m.index || 0),
         sev: "warn",
         code: "rid",
-        msg: `R.id.${name} 在项目布局里不存在（拼错？或者还没在 xml 里声明 @+id/${name}）`,
+        msg: `R.id.${name} 在项目布局里不存在（拼错？或者还没在 xml 里声明 @+id/${name}）${sug ? `（是不是想写 ${sug}）` : ""}`,
+        fix: sug ? { from: `R.id.${name}`, to: `R.id.${sug}` } : undefined,
       });
     }
   }
@@ -378,11 +386,13 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
       const name = m[1];
       if (set.has(name) || seen.has(name)) continue;
       seen.add(name);
+      const sug = nearestName(name, set);
       issues.push({
         line: lineOf(starts, m.index || 0),
         sev: "warn",
         code: "rtype",
-        msg: `R.${kind}.${name} 不存在（项目里没有这个${RES_LABEL[kind]}资源，检查拼写或资源名）`,
+        msg: `R.${kind}.${name} 不存在（项目里没有这个${RES_LABEL[kind]}资源，检查拼写或资源名）${sug ? `（是不是想写 ${sug}）` : ""}`,
+        fix: sug ? { from: `R.${kind}.${name}`, to: `R.${kind}.${sug}` } : undefined,
       });
     }
   }
@@ -461,6 +471,7 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
         sev: "warn",
         code: "method",
         msg: `没有 ${t.name}() 这个方法，是不是想写 ${t.suggestion}()？`,
+        fix: { from: t.name, to: t.suggestion },
       });
     }
   }

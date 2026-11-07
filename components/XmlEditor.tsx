@@ -43,6 +43,7 @@ import { formatXml } from "@/lib/xml/format";
 import { lintXml, type LintIssue } from "@/lib/xml/lint";
 import { lintJava } from "@/lib/xml/java-lint";
 import { collectResEnv } from "@/lib/xml/java-res-env";
+import { checkXmlResRefs, applyFixToLine } from "@/lib/xml/xml-res-check";
 import { checkApiTypos, formatApiIssue } from "@/lib/xml/java-api-check";
 import { lintCodeDoc } from "@/lib/xml/lint-doc";
 import { loadSnaps, pushSnap, SNAP_LABEL_SAVE } from "@/lib/xml/snapshots";
@@ -1953,13 +1954,47 @@ const allDrawableNames = useMemo(() => {
       ...(resExtras?.vectorNames ?? []),
       ...Object.keys(generatedDrawables ?? {}),
     ];
+    // M179：示例项目/资源片段的 values 也参与渲染，检查时同源带上，否则 string/color 引用查不到真名
+    const valuesText = [resExtras?.valuesXml ?? "", sampleValues].filter((x) => x.trim()).join("\n");
     return collectResEnv({
       layouts,
       currentLayoutXml: docKind === "layout" ? xml : null,
-      valuesFiles: resExtras?.valuesXml ? { "values.xml": resExtras.valuesXml } : undefined,
+      valuesFiles: valuesText.trim() ? { "values.xml": valuesText } : undefined,
       drawables,
     });
-  }, [resExtras, generatedDrawables, docKind, xml]);
+  }, [resExtras, generatedDrawables, docKind, xml, sampleValues]);
+
+  /** M179：XML 资源引用检查用的清单（名字集合；某类为空时不检查该类） */
+  const xmlResEnv = useMemo(
+    () => ({
+      layout: javaResEnv.layout,
+      drawable: javaResEnv.drawable,
+      mipmap: javaResEnv.mipmap,
+      string: javaResEnv.string,
+      color: javaResEnv.color,
+      dimen: javaResEnv.dimen,
+      style: javaResEnv.style,
+      id: javaResEnv.ids,
+    }),
+    [javaResEnv],
+  );
+  /** 资源清单的指纹：只有名字真变了才重跑 lint（打字时不变，保住 M57 的 debounce） */
+  const xmlResSig = useMemo(
+    () =>
+      [
+        xmlResEnv.layout,
+        xmlResEnv.drawable,
+        xmlResEnv.mipmap,
+        xmlResEnv.string,
+        xmlResEnv.color,
+        xmlResEnv.dimen,
+        xmlResEnv.style,
+        xmlResEnv.id,
+      ]
+        .map((xs) => (xs ?? []).join(","))
+        .join("|"),
+    [xmlResEnv],
+  );
 
   /** 代码视图的结构检查（带行号，标红用） */
   const lints = useMemo(() => {
@@ -1987,6 +2022,8 @@ const allDrawableNames = useMemo(() => {
           line: j.line,
           level: j.sev,
           message: j.msg,
+          // M179：能自动修复的带上 from/to，编辑器给「一键修复」
+          ...(j.fix ? { fix: { from: j.fix.from, to: j.fix.to, label: `${j.fix.from} → ${j.fix.to}` } } : {}),
         }));
         // M178：控件方法名拼写错误（setTxt → setText），只报编辑距离 1 的
         for (const a of checkApiTypos(lintSrc)) {
@@ -1995,16 +2032,22 @@ const allDrawableNames = useMemo(() => {
       } else if (codeOnly) {
         // M138：非布局文件走 lint-doc（结构 + 清单/values/drawable 等类型规则）
         out = lintCodeDoc(lintSrc, openRel || saveOrigin?.name || currentFile?.name || "");
+        // M179：drawable / menu / values / 清单 里也会引用资源，名字拼错一样给提示
+        out.push(...checkXmlResRefs(lintSrc, xmlResEnv));
       } else {
         out = lintXml(lintSrc);
+        // M179：布局里的 @drawable/ @string/ @color/ … 引用，拼错且能猜出来 → 带 fix
+        out.push(...checkXmlResRefs(lintSrc, xmlResEnv));
       }
+      // M179：资源引用的问题按行号排进去（排序稳定，错误条取第一条才合理）
+      out.sort((a, b) => a.line - b.line);
       t.end("issues=" + out.length);
       return out;
     } catch (e) {
       console.error("[axv] 结构检查失败", e); // i18n-ignore
       return [] as LintIssue[];
     }
-  }, [lintSrc, codeOnly, isJavaFile, codeFileName, openRel, saveOrigin?.name, currentFile?.name]);
+  }, [lintSrc, codeOnly, isJavaFile, codeFileName, openRel, saveOrigin?.name, currentFile?.name, xmlResSig]);
   /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
   const lintErrCount = useMemo(() => {
     try {
@@ -2034,6 +2077,36 @@ const allDrawableNames = useMemo(() => {
     const cur = currentXml();
     const next = formatXml(cur, 2);
     if (next !== cur) setXmlAndTrack(next);
+  };
+
+  /** M179：一键修复：把 lints 里所有能修的（资源引用拼错/方法名拼错）就地替换。
+   *  - 同一行可能有多处：逐条改，每改一次就把结果写回 lines
+   *  - 用 applyFixToLine 做「整词」替换：@drawable/ic_hom 不能把 @drawable/ic_home 改坏
+   *  - 修完重新跑检查自然收敛（lintSrc 会跟着 xml 重新 debounce） */
+  const doFixAll = () => {
+    flushXml();
+    const cur = currentXml();
+    const lines = cur.split("\n");
+    const done = new Set<string>();
+    let fixed = 0;
+    for (const iss of lints) {
+      const fx = iss.fix;
+      if (!fx) continue;
+      const key = `${iss.line}|${fx.from}|${fx.to}`;
+      if (done.has(key)) continue;
+      done.add(key);
+      const idx = Math.max(0, Math.min(iss.line - 1, lines.length - 1));
+      const L = lines[idx];
+      if (L === undefined) continue;
+      const r = applyFixToLine(L, fx.from, fx.to);
+      if (!r.count) continue;
+      lines[idx] = r.text;
+      fixed += r.count;
+    }
+    if (!fixed) return;
+    setXmlAndTrack(lines.join("\n"));
+    setExportNote(tt("已修复 {n} 处（可撤销）", { n: fixed }));
+    window.setTimeout(() => setExportNote(""), 2400);
   };
 
   /* ===== ConstraintLayout 约束编辑（一期：表单 + 自动推断） ===== */
@@ -4237,6 +4310,7 @@ const findResolved = findResolvedNode;
         focusTick={focusTick}
         onCursorLine={onCodeCursorLine}
         onFormat={doFormat}
+        onFixAll={doFixAll}
         onRefClick={onGotoRef}
         lang={editorLang}
         indent={editorTheme.indent}

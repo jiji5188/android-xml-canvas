@@ -63,6 +63,8 @@ export interface CodeEditorProps {
   focusTick?: number;
   onCursorLine?: (line: number) => void;
   onFormat?: () => void;
+  /** M179：一键修复（把 errors 里带 fix 的替换掉） */
+  onFixAll?: () => void;
   /** M38：语法（默认 xml） */
   lang?: EditorLang;
   /** M40：缩进宽度（空格数，默认 4） */
@@ -291,6 +293,7 @@ export function CodeEditor({
   focusTick,
   onCursorLine,
   onFormat,
+  onFixAll,
   lang = "xml",
   indent = 4,
   resNames,
@@ -754,6 +757,14 @@ export function CodeEditor({
     return list[0] || null;
   }, [errors]);
 
+  /** M179：可自动修复的问题数量（带 fix 的） */
+  const fixCount = useMemo(() => (errors || []).filter((e) => e.fix).length, [errors]);
+  const fixTitle = useMemo(() => {
+    const list = (errors || []).filter((e) => e.fix).slice(0, 4);
+    const head = list.map((e) => e.fix!.label).join("  |  ");
+    return fixCount > 4 ? `${head}  …+${fixCount - 4}` : head;
+  }, [errors, fixCount]);
+
   return (
     <div className={"axv-code" + (className ? " " + className : "")}>
       <div className="axv-code-body" ref={bodyRef}>
@@ -876,13 +887,28 @@ export function CodeEditor({
         ) : null}
       </div>
 
-      {firstErr && (
-        <div className="axv-code-errbar">
-          <span className="axv-err-dot" aria-hidden="true" />
-          <span>
-            {tt("第 {n} 行 · {msg}", { n: firstErr.line, msg: firstErr.message })}
-            {errors && errors.length > 1 ? tt("　（共 {n} 处）", { n: errors.length }) : ""}
+      {(firstErr || fixCount > 0) && (
+        <div className="axv-code-errbar" style={firstErr ? undefined : { background: "color-mix(in srgb, var(--axv-warn, #d97706) 14%, var(--axv-surface))", borderTopColor: "var(--axv-warn, #d97706)", color: "var(--axv-on-surface)" }}>
+          <span className="axv-err-dot" aria-hidden="true" style={firstErr ? undefined : { background: "var(--axv-warn, #d97706)" }} />
+          <span className="axv-err-text">
+            {firstErr
+              ? tt("第 {n} 行 · {msg}", { n: firstErr.line, msg: firstErr.message })
+              : tt("有 {n} 处可自动修复", { n: fixCount })}
+            {errors && errors.length > 1 && firstErr ? tt("　（共 {n} 处）", { n: errors.length }) : ""}
           </span>
+          {onFixAll && fixCount > 0 ? (
+            <button
+              type="button"
+              className="axv-err-fix"
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
+              onClick={onFixAll}
+              title={fixTitle}
+            >
+              <span className="msr" aria-hidden="true">build</span>
+              {tt("修复 {n} 处", { n: fixCount })}
+            </button>
+          ) : null}
         </div>
       )}
 

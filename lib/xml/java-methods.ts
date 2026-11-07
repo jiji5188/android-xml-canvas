@@ -43,26 +43,10 @@ export const KNOWN_METHODS: string[] = [
 
 const KNOWN = new Set(KNOWN_METHODS);
 
-/** 编辑距离（只算替换/插入/删除，带上限提前退出） */
-export function editDistance(a: string, b: string, cap = 3): number {
-  if (a === b) return 0;
-  if (Math.abs(a.length - b.length) > cap) return cap + 1;
-  const prev = new Array<number>(b.length + 1);
-  const cur = new Array<number>(b.length + 1);
-  for (let j = 0; j <= b.length; j++) prev[j] = j;
-  for (let i = 1; i <= a.length; i++) {
-    cur[0] = i;
-    let rowMin = cur[0];
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-      if (cur[j] < rowMin) rowMin = cur[j];
-    }
-    if (rowMin > cap) return cap + 1;
-    for (let j = 0; j <= b.length; j++) prev[j] = cur[j];
-  }
-  return prev[b.length];
-}
+// M179：editDistance 挪到 nearest-name.ts 共用；这里 re-export 保持既有 import 路径可用
+import { editDistance } from "./nearest-name";
+
+export { editDistance };
 
 /** 找最接近的已知方法（距离 ≤ maxDist 才算） */
 export function suggestMethod(name: string, maxDist = 2): string | null {

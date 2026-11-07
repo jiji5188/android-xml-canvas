@@ -9,6 +9,8 @@ export interface LintIssue {
   line: number;
   level: "error" | "warn";
   message: string;
+  /** M179：可自动修复（from → to 的替换）；有值时编辑器工具条上出现「一键修复」 */
+  fix?: { from: string; to: string; label: string };
 }
 
 /**

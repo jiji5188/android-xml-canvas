@@ -2390,6 +2390,38 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 0 0 auto;
 }
 
+/* M179：错误条右侧的「修复 N 处」按钮 */
+.axv-err-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.axv-err-fix {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid currentColor;
+  border-radius: 13px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-err-fix .msr {
+  font-size: 15px;
+}
+.axv-err-fix:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.axv-err-fix:active {
+  transform: scale(0.97);
+}
+
 /* ===== 约束面板（ConstraintLayout） ===== */
 .axv-panel-stack {
   display: flex;

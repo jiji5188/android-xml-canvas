@@ -12,6 +12,7 @@ import {
   buildAdaptiveIcon,
   checkManifestIcon,
   parseAppIconConfig,
+  fixManifestIcon,
 } from "../lib/xml/app-icon";
 import { buildResBundle } from "../lib/xml/bundle";
 
@@ -150,6 +151,61 @@ describe("M174 parseAppIconConfig", () => {
     expect(buildAppIcon({ fgSourceXml: SRC, bgColor: "#fff", contentDp: 5 }).contentDp).toBe(40);
     expect(buildAppIcon({ fgSourceXml: SRC, bgColor: "#fff", contentDp: 500 }).contentDp).toBe(108);
     expect(buildAppIcon({ fgSourceXml: SRC, bgColor: "#fff" }).contentDp).toBe(72);
+  });
+});
+
+/* ---- M174 B：一键修复 manifest 图标声明 ---- */
+describe("M174 fixManifestIcon", () => {
+  const mk = (appAttrs: string) =>
+    `<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.app">
+  <application ${appAttrs}>
+    <activity android:name=".MainActivity" />
+  </application>\n</manifest>\n`;
+
+  it("补上缺失的 icon + roundIcon", () => {
+    const xml = mk(`android:label="${"应用名"}" android:theme="@style/AppTheme"`);
+    const r = fixManifestIcon(xml);
+    expect(r.ok).toBe(true);
+    expect(r.nextXml).toContain('android:icon="@mipmap/ic_launcher"');
+    expect(r.nextXml).toContain('android:roundIcon="@mipmap/ic_launcher_round"');
+    expect(r.actions.length).toBe(2);
+    // 注释/顺序保留：activity 仍在
+    expect(r.nextXml).toContain("<activity android:name=\".MainActivity\" />");
+    // 再跑 check 应无问题
+    expect(checkManifestIcon(r.nextXml)).toEqual([]);
+  });
+
+  it("把错的 icon 值改成标准写法，roundIcon 已经是标准则不动", () => {
+    const xml = mk(`android:icon="@mipmap/old_logo" android:roundIcon="@mipmap/ic_launcher_round"`);
+    const r = fixManifestIcon(xml);
+    expect(r.ok).toBe(true);
+    expect(r.nextXml).toContain('android:icon="@mipmap/ic_launcher"');
+    expect(r.actions.length).toBe(1);
+    // 只改 icon 那一处，原 @mipmap/old_logo 应消失
+    expect(r.nextXml).not.toContain("old_logo");
+    expect(checkManifestIcon(r.nextXml)).toEqual([]);
+  });
+
+  it("已经完全规范 → actions 为空、原文不动", () => {
+    const xml = mk(`android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"`);
+    const r = fixManifestIcon(xml);
+    expect(r.ok).toBe(true);
+    expect(r.actions).toEqual([]);
+    expect(r.nextXml).toBe(xml);
+  });
+
+  it("非 manifest 文本 → 报错不改", () => {
+    const r = fixManifestIcon("<LinearLayout/>");
+    expect(r.ok).toBe(false);
+    expect(r.error).toBeTruthy();
+    expect(r.nextXml).toBe("<LinearLayout/>");
+  });
+
+  it("支持自定义图标名", () => {
+    const xml = mk("");
+    const r = fixManifestIcon(xml, "ic_brand");
+    expect(r.nextXml).toContain("@mipmap/ic_brand");
+    expect(r.nextXml).toContain("@mipmap/ic_brand_round");
   });
 });
 

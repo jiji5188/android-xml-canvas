@@ -14,6 +14,8 @@
  *   放进 drawable/ 会让 aapt2 在 minSdk 24 下报 requires sdk version of at least 26（M170 踩过）。
  */
 
+import { parseManifest, setElementAttr, attrOfElement } from "./manifest-edit";
+
 export interface AppIconFile {
   /** res 内相对路径，例如 mipmap-anydpi-v26/ic_launcher.xml */
   path: string;
@@ -238,10 +240,57 @@ export function checkManifestIcon(manifest: string, iconName = "ic_launcher"): s
   const icon = manifest.match(/android:icon\s*=\s*"([^"]*)"/);
   if (!icon) {
     out.push(`清单里没有 android:icon，装出来的图标会是系统默认图标`);
-  } else if (!icon[1].includes(`/mipmap/${iconName}`) && !icon[1].includes(`/mipmap-`)) {
+  } else if (!icon[1].includes(`mipmap/${iconName}`) && !icon[1].includes("mipmap-")) {
     out.push(`清单里 android:icon="${icon[1]}"，不是 @mipmap/${iconName}`);
   }
   const round = manifest.match(/android:roundIcon\s*=\s*"([^"]*)"/);
   if (!round) out.push(`清单里没有 android:roundIcon，部分厂商桌面圆形图标会用 icon 顶替`);
   return out;
+}
+
+/**
+ * M174 B：一键把 <application> 的图标声明补成 ic_launcher 系列。
+ * 外科手术式改写（保留注释/缩进）：
+ *   - android:icon 值不含 @mipmap/ic_launcher → 改为 @mipmap/ic_launcher
+ *   - android:roundIcon 缺失或值不对 → 改为 @mipmap/ic_launcher_round
+ * actions 里列出实际动过的地方（全没动则 actions 为空）。
+ */
+export function fixManifestIcon(manifest: string, iconName = "ic_launcher"): {
+  ok: boolean;
+  nextXml: string;
+  actions: string[];
+  error?: string;
+} {
+  if (!/<manifest\b/i.test(manifest ?? "")) {
+    return { ok: false, nextXml: manifest, actions: [], error: "不是 AndroidManifest.xml" };
+  }
+  const doc = parseManifest(manifest);
+  if (!doc.ok || !doc.application) {
+    return { ok: false, nextXml: manifest, actions: [], error: "没找到 <application> 节点" };
+  }
+  const wantIcon = `@mipmap/${iconName}`;
+  const wantRound = `@mipmap/${iconName}_round`;
+  let next = manifest;
+  const actions: string[] = [];
+  // 改/补 android:icon（改完重新 parse，避免 span 偏移）
+  {
+    const d1 = parseManifest(next);
+    const app1 = d1.application!;
+    const curIcon = attrOfElement(next, app1, "android:icon");
+    if (curIcon !== wantIcon) {
+      next = setElementAttr(next, app1, "android:icon", wantIcon);
+      actions.push(curIcon ? `android:icon 改成 ${wantIcon}（原来是 ${curIcon}）` : `补上 android:icon=${wantIcon}`);
+    }
+  }
+  // 再改/补 android:roundIcon（再 parse 一次拿最新区间）
+  {
+    const d2 = parseManifest(next);
+    const app2 = d2.application!;
+    const curRound = attrOfElement(next, app2, "android:roundIcon");
+    if (curRound !== wantRound) {
+      next = setElementAttr(next, app2, "android:roundIcon", wantRound);
+      actions.push(curRound ? `android:roundIcon 改成 ${wantRound}（原来是 ${curRound}）` : `补上 android:roundIcon=${wantRound}`);
+    }
+  }
+  return { ok: true, nextXml: next, actions };
 }

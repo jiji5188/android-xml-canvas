@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
+import { checkManifestIcon, fixManifestIcon } from "@/lib/xml/app-icon";
 import {
   COMPONENT_LABEL,
   appendComponent,
@@ -57,6 +58,10 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
   const [compType, setCompType] = useState<(typeof COMPONENT_TYPES)[number]>("activity");
   const [compName, setCompName] = useState("");
   const [msg, setMsg] = useState("");
+  /** M174 B：图标声明问题（空数组 = 正常）；修复前的原文（有值才显示「撤销」） */
+  const iconIssues = useMemo(() => checkManifestIcon(xml), [xml]);
+  const [iconBackup, setIconBackup] = useState("");
+  const [iconFixedHint, setIconFixedHint] = useState("");
 
   const note = (s: string) => {
     setMsg(s);
@@ -89,6 +94,31 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
     }
     onChange(setElementAttr(xml, manifest, name, next));
     note(tt("已改 {field}", { field: name.replace("android:", "") }));
+  };
+
+  /* M174 B：图标声明一键修复（改前存一份原文，可撤销） */
+  const doFixIcon = () => {
+    const r = fixManifestIcon(xml);
+    if (!r.ok) {
+      note(r.error || tt("修复失败"));
+      return;
+    }
+    if (!r.actions.length) {
+      note(tt("图标声明已经是标准写法"));
+      return;
+    }
+    setIconBackup(xml);
+    setIconFixedHint(r.actions.join("；"));
+    onChange(r.nextXml);
+    note(tt("已修好 {n} 处图标声明", { n: String(r.actions.length) }));
+  };
+
+  const doUndoIconFix = () => {
+    if (!iconBackup) return;
+    onChange(iconBackup);
+    setIconBackup("");
+    setIconFixedHint("");
+    note(tt("已撤销图标修复"));
   };
 
   const commitNumberAttr = (name: string, raw: string, el?: HTMLInputElement) => {
@@ -316,6 +346,35 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
               }}
             />
+            {/* M174 B：图标声明不规范时的提示 + 一键修复（外科手术式改，保留注释/顺序） */}
+            {iconIssues.length ? (
+              <div className="axv-mf-fix">
+                <div className="axv-mf-fix-head">
+                  <span className="msr" aria-hidden="true">build</span>
+                  <b>{tt("图标声明不规范")}</b>
+                  <button type="button" className="axv-mf-fix-btn" onClick={doFixIcon}>
+                    {tt("一键修复")}
+                  </button>
+                </div>
+                <ul className="axv-mf-fix-list">
+                  {iconIssues.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ul>
+                <div className="axv-mf-fix-hint">
+                  {tt("只改 application 上的 android:icon / android:roundIcon 这两行，注释和顺序保持原样。")}
+                </div>
+              </div>
+            ) : null}
+            {iconBackup ? (
+              <div className="axv-mf-fix-done">
+                <span className="msr" aria-hidden="true">check_circle</span>
+                <span>{iconFixedHint}</span>
+                <button type="button" className="axv-mf-fix-undo" onClick={doUndoIconFix}>
+                  {tt("撤销")}
+                </button>
+              </div>
+            ) : null}
             <span className="axv-mf-label">{tt("主题")}</span>
             <input
               className="axv-mf-input mono"

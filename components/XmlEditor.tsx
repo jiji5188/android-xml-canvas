@@ -42,6 +42,7 @@ import { moveNodeRaw, scanElements, elementAt } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
 import { lintXml, type LintIssue } from "@/lib/xml/lint";
 import { lintJava } from "@/lib/xml/java-lint";
+import { collectResEnv } from "@/lib/xml/java-res-env";
 import { lintCodeDoc } from "@/lib/xml/lint-doc";
 import { loadSnaps, pushSnap, SNAP_LABEL_SAVE } from "@/lib/xml/snapshots";
 import { useUnsavedLeave } from "@/components/UnsavedLeaveDialog";
@@ -1942,6 +1943,23 @@ const allDrawableNames = useMemo(() => {
     return () => window.clearTimeout(t);
   }, [parsedXml]);
 
+  /** M177：把工程里的布局/values/图片汇总成资源清单，供 Java 代码检查 */
+  const javaResEnv = useMemo(() => {
+    const layouts: Record<string, string> = { ...(resExtras?.layouts ?? {}) };
+    const drawables = [
+      ...Object.keys(resExtras?.drawables ?? {}),
+      ...Object.keys(resExtras?.drawableXml ?? {}),
+      ...(resExtras?.vectorNames ?? []),
+      ...Object.keys(generatedDrawables ?? {}),
+    ];
+    return collectResEnv({
+      layouts,
+      currentLayoutXml: docKind === "layout" ? xml : null,
+      valuesFiles: resExtras?.valuesXml ? { "values.xml": resExtras.valuesXml } : undefined,
+      drawables,
+    });
+  }, [resExtras, generatedDrawables, docKind, xml]);
+
   /** 代码视图的结构检查（带行号，标红用） */
   const lints = useMemo(() => {
     try {
@@ -1950,7 +1968,21 @@ const allDrawableNames = useMemo(() => {
       // M142：.java / .kt 是 Java 语法，不能拿 XML 规则跑（`if (a<1) {` 里的 `<1` 会被当成标签 → 误报「未闭合」）
       let out: LintIssue[];
       if (isJavaFile) {
-        out = lintJava(lintSrc, { isKotlin: /\.kt(s)?$/i.test(codeFileName) }).map((j) => ({
+        out = lintJava(lintSrc, {
+          isKotlin: /\.kt(s)?$/i.test(codeFileName),
+          // M177：把项目里真实存在的资源喂进去，R.id / R.layout / findViewById 类型才能真校验
+          ids: javaResEnv.ids,
+          res: {
+            layout: javaResEnv.layout,
+            string: javaResEnv.string,
+            drawable: javaResEnv.drawable,
+            color: javaResEnv.color,
+            dimen: javaResEnv.dimen,
+            mipmap: javaResEnv.mipmap,
+            style: javaResEnv.style,
+          },
+          idTag: javaResEnv.idTag,
+        }).map((j) => ({
           line: j.line,
           level: j.sev,
           message: j.msg,

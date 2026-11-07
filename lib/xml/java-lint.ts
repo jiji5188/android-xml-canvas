@@ -11,12 +11,14 @@
 
 export type JavaLintSeverity = "error" | "warn";
 
+import { TAG_TO_CLASS, isAssignableTo } from "./java-res-env";
+
 export interface JavaLintIssue {
   /** 1 起行号 */
   line: number;
   sev: JavaLintSeverity;
   /** 机器可读的小标记，方便测试与后续分组 */
-  code: "brace" | "quote" | "rid" | "import" | "override";
+  code: "brace" | "quote" | "rid" | "import" | "override" | "rtype" | "ridtype";
   msg: string;
 }
 
@@ -24,6 +26,18 @@ export interface JavaLintOpts {
   isKotlin?: boolean;
   /** 项目里真实存在的 id 名（不含 @+id/ 前缀）。传了才查 R.id */
   ids?: Iterable<string>;
+  /** M177：项目里各类资源名。传了对应类型才查 R.string / R.layout / R.drawable … */
+  res?: {
+    layout?: Iterable<string>;
+    string?: Iterable<string>;
+    drawable?: Iterable<string>;
+    color?: Iterable<string>;
+    dimen?: Iterable<string>;
+    mipmap?: Iterable<string>;
+    style?: Iterable<string>;
+  };
+  /** M177：id → 控件标签（TextView…），用于 findViewById 赋值类型校验 */
+  idTag?: Record<string, string>;
   /** 允许「用了但不 import」的名字（同包类、内部类） */
   allowNames?: Iterable<string>;
 }
@@ -338,6 +352,56 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
         sev: "warn",
         code: "rid",
         msg: `R.id.${name} 在项目布局里不存在（拼错？或者还没在 xml 里声明 @+id/${name}）`,
+      });
+    }
+  }
+
+  // 3b) M177：R.string / R.layout / R.drawable / R.color / R.dimen / R.mipmap / R.style 是否真存在
+  const RES_KINDS = ["layout", "string", "drawable", "color", "dimen", "mipmap", "style"] as const;
+  const RES_LABEL: Record<string, string> = {
+    layout: "布局",
+    string: "字符串",
+    drawable: "图片/drawable",
+    color: "颜色",
+    dimen: "尺寸",
+    mipmap: "启动图标",
+    style: "样式",
+  };
+  for (const kind of RES_KINDS) {
+    const given = opts.res?.[kind];
+    if (!given) continue;
+    const set = new Set(Array.from(given));
+    if (!set.size) continue;
+    const seen = new Set<string>();
+    for (const m of masked.code.matchAll(new RegExp(`\\bR\\s*\\.\\s*${kind}\\s*\\.\\s*([A-Za-z_]\\w*)`, "g"))) {
+      const name = m[1];
+      if (set.has(name) || seen.has(name)) continue;
+      seen.add(name);
+      issues.push({
+        line: lineOf(starts, m.index || 0),
+        sev: "warn",
+        code: "rtype",
+        msg: `R.${kind}.${name} 不存在（项目里没有这个${RES_LABEL[kind]}资源，检查拼写或资源名）`,
+      });
+    }
+  }
+
+  // 3c) M177：findViewById 的赋值类型与布局里的控件对不上
+  const idTag = opts.idTag && Object.keys(opts.idTag).length ? opts.idTag : null;
+  if (idTag) {
+    for (const m of masked.code.matchAll(/\b([A-Z]\w*)\s+([a-z_]\w*)\s*=\s*(?:\([^()]*?\)\s*)?[\w.]*?findViewById\s*\(\s*R\s*\.\s*id\s*\.\s*([A-Za-z_]\w*)\s*\)/g)) {
+      const declType = m[1];
+      const idName = m[3];
+      const actual = idTag[idName];
+      if (!actual) continue;
+      const want = TAG_TO_CLASS[actual];
+      if (!want) continue;
+      if (isAssignableTo(want, declType)) continue;
+      issues.push({
+        line: lineOf(starts, m.index || 0),
+        sev: "warn",
+        code: "ridtype",
+        msg: `findViewById(R.id.${idName}) 拿到的是 ${actual}（${want}），赋给 ${declType} 会 ClassCastException`,
       });
     }
   }

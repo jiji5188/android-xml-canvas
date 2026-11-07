@@ -74,6 +74,8 @@ export interface ProjectPanelProps {
   onRefresh: () => void;
   onOpenDir: () => void;
   onRequestAllFiles: () => void;
+  /** M176：改项目名（目录名）/ app 名称 */
+  onRenameProject?: (p: WsProject, dirName: string, appName: string) => Promise<{ ok: boolean; msg: string }>;
 
   /** 当前项目 */
   projectName: string;
@@ -1031,6 +1033,10 @@ const LazyTree = memo(LazyTreeInner, (a, b) =>
 function ProjectsTab({ p }: { p: ProjectPanelProps }) {
   const { tr, wsState, wsBusy, wsMsg, projects, metaOf } = p;
   const [projQuery, setProjQuery] = useState("");
+  /** M176：改名弹窗（项目名 / app 名称） */
+  const [ren, setRen] = useState<{ item: WsProject; dir: string; app: string } | null>(null);
+  const [renBusy, setRenBusy] = useState(false);
+  const [renMsg, setRenMsg] = useState("");
   const shownProjects = useMemo(() => {
     const k = projQuery.trim().toLowerCase();
     if (!k) return projects;
@@ -1157,6 +1163,21 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
                           </span>
                           <span className="msr axv-proj-card-go" aria-hidden="true">chevron_right</span>
                         </button>
+                        {p.onRenameProject && it.kind === "dir" ? (
+                          <button
+                            type="button"
+                            className="axv-proj-card-edit"
+                            title={tt("改项目名 / app 名称")}
+                            aria-label={tt("改项目名 / app 名称")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRenMsg("");
+                              setRen({ item: it, dir: it.name, app: meta?.name || it.name });
+                            }}
+                          >
+                            <span className="msr" aria-hidden="true">edit</span>
+                          </button>
+                        ) : null}
                       </div>
                     </li>
                   );
@@ -1173,6 +1194,68 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
             ) : null}
     
             {wsMsg ? <div className="axv-ws-hint">{wsMsg}</div> : null}
+
+            {/* M176：改名弹窗 */}
+            {ren ? (
+              <div
+                className="axv-saveas-mask"
+                role="dialog"
+                aria-modal="true"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget && !renBusy) setRen(null);
+                }}
+              >
+                <div className="axv-saveas-card" role="dialog" aria-modal="true">
+                  <div className="axv-saveas-title">{tt("改项目名 / 应用名")}</div>
+                  <div className="axv-saveas-hint">
+                    {tt("项目名 = 文件夹名（工作目录/{name}/app/src/...），改它会重命名目录并同步 gradle / 主题名。应用名 = 桌面图标下显示的名字。", { name: ren.dir })}
+                  </div>
+                  <label className="axv-saveas-field">
+                    <span>{tt("项目名（目录）")}</span>
+                    <input
+                      className="axv-saveas-input"
+                      value={ren.dir}
+                      spellCheck={false}
+                      onChange={(e) => setRen({ ...ren, dir: e.target.value })}
+                    />
+                  </label>
+                  <label className="axv-saveas-field">
+                    <span>{tt("应用名（app_name）")}</span>
+                    <input
+                      className="axv-saveas-input"
+                      value={ren.app}
+                      spellCheck={false}
+                      onChange={(e) => setRen({ ...ren, app: e.target.value })}
+                    />
+                  </label>
+                  {renMsg ? <div className="axv-saveas-hint">{renMsg}</div> : null}
+                  <div className="axv-saveas-btns">
+                    <button className="axv-set-btn" disabled={renBusy} onClick={() => setRen(null)}>
+                      {tt("取消")}
+                    </button>
+                    <button
+                      className="axv-set-btn axv-saveas-ok"
+                      disabled={renBusy}
+                      onClick={() => {
+                        if (!p.onRenameProject || !ren) return;
+                        setRenBusy(true);
+                        setRenMsg("");
+                        void p
+                          .onRenameProject(ren.item, ren.dir, ren.app)
+                          .then((r) => {
+                            if (r.ok) setRen(null);
+                            setRenMsg(r.msg);
+                            if (r.ok) void p.onRefresh();
+                          })
+                          .finally(() => setRenBusy(false));
+                      }}
+                    >
+                      {renBusy ? tt("保存中…") : tt("保存")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
   );
 }

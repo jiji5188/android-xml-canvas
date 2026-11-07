@@ -7009,6 +7009,7 @@ button.axv-ws-caret:hover {
 .axv-saveas-hint code { background: var(--axv-surface-sunken); border-radius: 4px; padding: 0 4px; }
 .axv-saveas-field { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
 .axv-saveas-field > span { font-size: 12px; color: var(--axv-on-surface-variant); }
+.axv-saveas-subhint { font-size: 11px; color: var(--axv-on-surface-variant); opacity: .8; }
 .axv-saveas-input {
   border: 1px solid var(--axv-outline);
   border-radius: 9px;
@@ -7187,9 +7188,12 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   border-radius: 12px;
   background: var(--axv-surface-2, #ffffff0a);
   overflow: hidden;
+  display: flex;
+  align-items: stretch;
 }
 .axv-proj-card-btn {
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -7199,6 +7203,20 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   text-align: left;
   cursor: pointer;
 }
+/* M176：卡片右侧的「改名」笔形按钮 */
+.axv-proj-card-edit {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  border: none;
+  border-left: 1px solid var(--axv-outline-variant, #00000014);
+  background: transparent;
+  color: var(--axv-desc);
+  cursor: pointer;
+}
+.axv-proj-card-edit:hover { background: var(--axv-hover); color: var(--axv-on-surface); }
 .axv-proj-card-btn:hover { background: var(--axv-hover); }
 .axv-proj-card-ico {
   flex: 0 0 auto;

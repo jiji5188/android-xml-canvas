@@ -35,6 +35,19 @@ export function packageOf(name: string): string {
   return `com.example.${seg || "myapp"}`;
 }
 
+/** Java 包名：至少两段小写标识符（com.example.app）；段内只许 a-z0-9_，且不能以数字开头 */
+const PKG_RE = /^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)+$/;
+
+/** 校验包名，合法返 null，否则返回原因 */
+export function validatePackageName(raw: string): string | null {
+  const p = (raw ?? "").trim();
+  if (!p) return "包名不能为空";
+  if (!PKG_RE.test(p)) {
+    return "包名形如 com.example.app（小写字母/数字/下划线，至少两段）";
+  }
+  return null;
+}
+
 const XML_HEAD = '<?xml version="1.0" encoding="utf-8"?>';
 
 function adaptiveLauncher(): string {
@@ -101,10 +114,13 @@ export interface SkeletonOptions {
   adaptiveIcon?: boolean;
 }
 
-/** 完整工程骨架（不含二进制图标）。顺序固定，方便测试与进度显示 */
-export function androidSkeleton(name: string, opts: SkeletonOptions = {}): SkeletonFile[] {
+/** 完整工程骨架。pkg 缺省 = com.example.<项目名>。顺序固定，方便测试与进度显示 */
+export function androidSkeleton(
+  name: string,
+  opts: SkeletonOptions & { pkg?: string } = {},
+): SkeletonFile[] {
   const proj = safeProjectName(name);
-  const pkg = packageOf(name);
+  const pkg = opts.pkg ?? packageOf(name);
   const pkgPath = pkg.replace(/\./g, "/");
   const theme = `Theme.${proj}`;
   const adaptive = opts.adaptiveIcon !== false;
@@ -320,7 +336,7 @@ export interface CreateResult {
 export async function createAndroidProject(
   io: NewProjectIO,
   name: string,
-  opts: SkeletonOptions & { iconBase64?: string; iconMime?: string } = {},
+  opts: SkeletonOptions & { iconBase64?: string; iconMime?: string; pkg?: string } = {},
 ): Promise<CreateResult> {
   const files = androidSkeleton(name, opts);
   const failed: string[] = [];

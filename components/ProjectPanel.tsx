@@ -31,6 +31,12 @@ import {
   suggestUniqueName,
 } from "@/lib/xml/file-ops";
 import {
+  fileOpsCtxOf,
+  projectSourceFromWorkspaceItem,
+} from "@/lib/xml/project-browse";
+import { saveProjectFile, type ProjectSaveRoot } from "@/lib/xml/project-save";
+import { ProjectPropsDialog } from "@/components/ProjectPropsDialog";
+import {
   ConfirmDialog,
   MessageDialog,
   NewEntryDialog,
@@ -1259,10 +1265,108 @@ const LazyTree = memo(LazyTreeInner, (a, b) =>
 function ProjectsTab({ p }: { p: ProjectPanelProps }) {
   const { tr, wsState, wsBusy, wsMsg, projects, metaOf } = p;
   const [projQuery, setProjQuery] = useState("");
+  const [cardMsgLocal, setCardMsgLocal] = useState("");
   /** M176：改名弹窗（项目名 / app 名称） */
   const [ren, setRen] = useState<{ item: WsProject; dir: string; app: string } | null>(null);
   const [renBusy, setRenBusy] = useState(false);
   const [renMsg, setRenMsg] = useState("");
+  /** M181：项目卡片长按菜单 + 属性弹窗 */
+  const [cardMenu, setCardMenu] = useState<{ x: number; y: number; item: WsProject } | null>(null);
+  const [propsFor, setPropsFor] = useState<{
+    item: WsProject;
+    source: ProjectSource;
+    saveRoot: ProjectSaveRoot | null;
+    iconUrl: string | null;
+  } | null>(null);
+  const pressRef = useRef<{ timer: number | null; x: number; y: number; moved: boolean }>({
+    timer: null,
+    x: 0,
+    y: 0,
+    moved: false,
+  });
+  const cancelCardPress = () => {
+    const st = pressRef.current;
+    if (st.timer !== null) {
+      window.clearTimeout(st.timer);
+      st.timer = null;
+    }
+  };
+  useEffect(() => cancelCardPress, []);
+
+  /** 把 ops ctx 转成 ProjectSaveRoot（native 绝对路径 / web handle） */
+  const opsRootOf = (ops: FileOpsCtx | null): ProjectSaveRoot | null => {
+    if (!ops) return null;
+    if (ops.backend === "native") {
+      const base = String(ops.root).replace(/\/+$/, "");
+      if (!base.startsWith("/")) return null;
+      return { kind: "native", base };
+    }
+    return { kind: "handle", handle: ops.root };
+  };
+
+  /** 长按 / 右键弹卡片菜单（手机上 450ms，鼠标右键立刻） */
+  const beginCardPress = (e: React.PointerEvent, item: WsProject) => {
+    if (e.button === 2) {
+      e.preventDefault();
+      setCardMenu({ x: e.clientX, y: e.clientY, item });
+      return;
+    }
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const st = pressRef.current;
+    cancelCardPress();
+    st.x = e.clientX;
+    st.y = e.clientY;
+    st.moved = false;
+    st.timer = window.setTimeout(() => {
+      st.timer = null;
+      if (st.moved) return;
+      setCardMenu({ x: st.x, y: st.y, item });
+    }, 450);
+    window.addEventListener("pointerup", cancelCardPress, { once: true });
+  };
+
+  const openProps = async (item: WsProject) => {
+    setCardMenu(null);
+    const src = await projectSourceFromWorkspaceItem(item);
+    if (!src) {
+      setCardMsgLocal(tt("这个项目读不了（可能不是目录，或权限已失效）"));
+      return;
+    }
+    const ops = fileOpsCtxOf({ dirPath: item.dirPath, handle: item.handle });
+    setPropsFor({
+      item,
+      source: src,
+      saveRoot: opsRootOf(ops),
+      iconUrl: metaOf(item)?.iconUrl ?? null,
+    });
+  };
+
+  /** 删除整个项目目录（仅 native：需要绝对路径的父目录作为操作根） */
+  const deleteProject = async (item: WsProject) => {
+    setCardMenu(null);
+    if (!item.dirPath) {
+      setCardMsgLocal(tt("网页版不支持删项目，请用 APK。"));
+      return;
+    }
+    const clean = item.dirPath.replace(/[/\\]+$/, "");
+    const parent = clean.replace(/[/\\][^/\\]+$/, "");
+    const base = clean.split(/[/\\]/).pop() || item.name;
+    if (!window.confirm(tt("确定删除项目「{name}」？整个目录连同源码一起删，不能撤销。", { name: item.name }))) return;
+    const r = await deleteEntry({ backend: "native", root: parent }, base, true);
+    if (!r.ok) {
+      setCardMsgLocal(tt("删除失败：{msg}", { msg: r.reason || tt("未知错误") }));
+      return;
+    }
+    setCardMsgLocal(tt("已删除 {name}", { name: item.name }));
+    void p.onRefresh();
+  };
+
+  /** M181：卡片菜单位置 clamp（视口内留 6px 边） */
+  const clampPos = (v: number, est: number, estH: number) =>
+    Math.max(6, Math.min(v, window.innerWidth - est - 6));
+
+  const canDelete = (it: WsProject) => !!it.dirPath;
+
   const shownProjects = useMemo(() => {
     const k = projQuery.trim().toLowerCase();
     if (!k) return projects;
@@ -1364,9 +1468,24 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
               <ul className="axv-ws-list">
                 {shownProjects.map((it) => {
                   const meta = metaOf(it);
+                  const canDelete = !!it.dirPath;
                   return (
                     <li key={it.rel + ":" + it.kind}>
-                      <div className="axv-proj-card">
+                      <div
+                        className="axv-proj-card"
+                        onPointerDown={(e) => beginCardPress(e, it)}
+                        onPointerMove={(e) => {
+                          const st = pressRef.current;
+                          if (st.timer !== null && (Math.abs(e.clientX - st.x) > 10 || Math.abs(e.clientY - st.y) > 10)) {
+                            st.moved = true;
+                            cancelCardPress();
+                          }
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setCardMenu({ x: e.clientX, y: e.clientY, item: it });
+                        }}
+                      >
                         <button
                           className="axv-proj-card-btn"
                           title={it.rel}
@@ -1420,6 +1539,47 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
             ) : null}
     
             {wsMsg ? <div className="axv-ws-hint">{wsMsg}</div> : null}
+            {cardMsgLocal ? <div className="axv-ws-hint">{cardMsgLocal}</div> : null}
+
+            {/* M181：卡片长按菜单（打开 / 属性 / 删除） */}
+            {cardMenu ? (
+              <Overlay>
+                <div className="axv-tfm-mask" role="presentation" onClick={() => setCardMenu(null)}>
+                  <div
+                    className="axv-tfm axv-cpm"
+                    style={{ left: clampPos(cardMenu.x, 170, 6 * 40), top: clampPos(cardMenu.y, 170, 6 * 40) }}
+                    role="menu"
+                  >
+                    <button className="axv-tfm-item" onClick={() => { setCardMenu(null); void p.onOpenProject(cardMenu.item); }}>
+                      <span className="axv-tfm-label">{tr("proj.open", "打开")}</span>
+                    </button>
+                    <button className="axv-tfm-item" onClick={() => void openProps(cardMenu.item)}>
+                      <span className="axv-tfm-label">{tt("属性")}</span>
+                    </button>
+                    <button className="axv-tfm-item danger" disabled={!canDelete(cardMenu.item)} onClick={() => void deleteProject(cardMenu.item)}>
+                      <span className="axv-tfm-label">{tt("删除")}</span>
+                      {!canDelete(cardMenu.item) ? <span className="axv-tfm-hint">{tt("网页版不支持，请用 APK")}</span> : null}
+                    </button>
+                  </div>
+                </div>
+              </Overlay>
+            ) : null}
+
+            {/* M181：项目属性弹窗 */}
+            {propsFor ? (
+              <ProjectPropsDialog
+                item={propsFor.item}
+                source={propsFor.source}
+                saveRoot={propsFor.saveRoot}
+                iconUrl={propsFor.iconUrl}
+                onRenameProject={p.onRenameProject}
+                onSaved={() => {
+                  setPropsFor(null);
+                  void p.onRefresh();
+                }}
+                onClose={() => setPropsFor(null)}
+              />
+            ) : null}
 
             {/* M176：改名弹窗 */}
             {ren ? (

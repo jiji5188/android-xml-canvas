@@ -1,9 +1,7 @@
-/* Android 可视化布局编辑器 — 画布节点基础样式（M1a）
-   覆盖 M3E 未使用的 axv-* 命名空间，避免与 M3E 自身样式冲突 */
+/* Android 鍙鍖栧竷灞€缂栬緫鍣?鈥?鐢诲竷鑺傜偣鍩虹鏍峰紡锛圡1a锛?   瑕嗙洊 M3E 鏈娇鐢ㄧ殑 axv-* 鍛藉悕绌洪棿锛岄伩鍏嶄笌 M3E 鑷韩鏍峰紡鍐茬獊 */
 
-/* ===== 主题色（唯一来源，M4j）=====
-   规则：弹窗/面板/按钮不写字面色值，统一取这组变量。
-   换主题只改这一块；深色主题给 <html data-axv-theme="dark"> 即可全局切换。 */
+/* ===== 涓婚鑹诧紙鍞竴鏉ユ簮锛孧4j锛?====
+   瑙勫垯锛氬脊绐?闈㈡澘/鎸夐挳涓嶅啓瀛楅潰鑹插€硷紝缁熶竴鍙栬繖缁勫彉閲忋€?   鎹富棰樺彧鏀硅繖涓€鍧楋紱娣辫壊涓婚缁?<html data-axv-theme="dark"> 鍗冲彲鍏ㄥ眬鍒囨崲銆?*/
 :root {
   --axv-primary: #04409f;
   --axv-on-primary: #ffffff;
@@ -20,7 +18,7 @@
   --axv-scrim: rgba(20, 18, 32, 0.55);
   --axv-danger: #b3261e;
   --axv-ok: #1f7a3d;
-  /* M16h：外壳配色 token（主题预设会覆盖这些值，见 lib/xml/theme-presets.ts） */
+  /* M16h锛氬澹抽厤鑹?token锛堜富棰橀璁句細瑕嗙洊杩欎簺鍊硷紝瑙?lib/xml/theme-presets.ts锛?*/
 
   --axv-app-bg: #F5F4F7;
   --axv-toolbar-bg: #F3F3F9;
@@ -53,9 +51,8 @@
   position: relative;
   font-family: system-ui, "Segoe UI", Roboto, sans-serif;
   overflow: visible;
-  /* M12：滚动容器不显示滚动条。桌面 Chrome 的经典滚动条会吃掉 15px 内容宽度，
-     而 Android 的滚动条是浮动（fade）的、不占布局 → 模型按 824px 算出来的 match_parent 宽度
-     会超出真正内容区 15px，肉眼就是「左右间距不一致、右边偏窄」。*/
+  /* M12锛氭粴鍔ㄥ鍣ㄤ笉鏄剧ず婊氬姩鏉°€傛闈?Chrome 鐨勭粡鍏告粴鍔ㄦ潯浼氬悆鎺?15px 鍐呭瀹藉害锛?     鑰?Android 鐨勬粴鍔ㄦ潯鏄诞鍔紙fade锛夌殑銆佷笉鍗犲竷灞€ 鈫?妯″瀷鎸?824px 绠楀嚭鏉ョ殑 match_parent 瀹藉害
+     浼氳秴鍑虹湡姝ｅ唴瀹瑰尯 15px锛岃倝鐪煎氨鏄€屽乏鍙抽棿璺濅笉涓€鑷淬€佸彸杈瑰亸绐勩€嶃€?/
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -66,7 +63,7 @@
   display: none;
 }
 
-/* 文本类 */
+/* 鏂囨湰绫?*/
 .axv-node.axv-text {
   display: inline-flex;
   align-items: center;
@@ -75,7 +72,7 @@
   word-break: break-word;
 }
 
-/* ImageView 占位 */
+/* ImageView 鍗犱綅 */
 .axv-node.axv-image {
   display: flex;
   align-items: center;
@@ -84,44 +81,44 @@
   font-size: 12px;
 }
 
-/* ProgressBar 水平细条 */
+/* ProgressBar 姘村钩缁嗘潯 */
 .axv-node.axv-progress::after {
   content: "";
   position: absolute;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  /* M11t：宽度跟 android:progress / max 走（原来写死 40%） */
+  /* M11t锛氬搴﹁窡 android:progress / max 璧帮紙鍘熸潵鍐欐 40%锛?*/
   width: calc(var(--axv-progress, 0.4) * 100%);
   height: 100%;
   background: var(--axv-progress-color, #757575);
   border-radius: inherit;
 }
 
-/* 通用 View / Space 占位 */
+/* 閫氱敤 View / Space 鍗犱綅 */
 .axv-node.axv-view {
   background: rgba(120, 120, 160, 0.12);
   border: 1px dashed rgba(120, 120, 160, 0.35);
   border-radius: 2px;
 }
 
-/* 容器 */
+/* 瀹瑰櫒 */
 .axv-node.axv-container {
   display: flex;
 }
 
-/* 选中态 */
+/* 閫変腑鎬?*/
 .axv-node.axv-selected {
   z-index: 5;
 }
 
-/* M115：多选附加项 —— 紫色虚线一圈，和主选（玫瑰色实线 + 手柄）区分开 */
+/* M115锛氬閫夐檮鍔犻」 鈥斺€?绱壊铏氱嚎涓€鍦堬紝鍜屼富閫夛紙鐜懓鑹插疄绾?+ 鎵嬫焺锛夊尯鍒嗗紑 */
 .axv-node.axv-multi {
   outline: 1.5px dashed var(--axv-multi-ink, #7C3AED) !important;
   outline-offset: 1px;
 }
 
-/* M115：多选工具条（画布左下悬浮） */
+/* M115锛氬閫夊伐鍏锋潯锛堢敾甯冨乏涓嬫偓娴級 */
 .axv-multibar {
   position: fixed;
   left: 50%;
@@ -166,7 +163,7 @@
 .axv-mb-btn:hover { background: var(--axv-primary-soft, #00000010); color: var(--axv-primary); }
 .axv-mb-x { padding: 0 8px; }
 
-/* 图层行：多选附加项 */
+/* 鍥惧眰琛岋細澶氶€夐檮鍔犻」 */
 .axv-lt-row.multi {
   background: var(--axv-primary-soft, #00000010);
   background: color-mix(in srgb, var(--axv-primary) 14%, transparent);
@@ -174,7 +171,7 @@
   outline-offset: -1px;
 }
 
-/* M6a：导出图片时去掉一切编辑态装饰（选中虚线框 / tag 标签头 / 拖拽高亮 / 尺寸手柄） */
+/* M6a锛氬鍑哄浘鐗囨椂鍘绘帀涓€鍒囩紪杈戞€佽楗帮紙閫変腑铏氱嚎妗?/ tag 鏍囩澶?/ 鎷栨嫿楂樹寒 / 灏哄鎵嬫焺锛?*/
 .axv-exporting .axv-node.axv-selected {
   outline: none !important;
 }
@@ -190,13 +187,12 @@
   display: none !important;
 }
 
-/* M3e：选中态要高过所有 elevation，但不能高过弹窗/整页子页面（M4n：从 9999 降到 900，
-   否则选中框会盖住 DrawablePicker / ShapeEditor 这类弹层） */
+/* M3e锛氶€変腑鎬佽楂樿繃鎵€鏈?elevation锛屼絾涓嶈兘楂樿繃寮圭獥/鏁撮〉瀛愰〉闈紙M4n锛氫粠 9999 闄嶅埌 900锛?   鍚﹀垯閫変腑妗嗕細鐩栦綇 DrawablePicker / ShapeEditor 杩欑被寮瑰眰锛?*/
 .axv-node.axv-selected {
   z-index: 900 !important;
 }
 
-/* M3b / M11u：选中高亮强化 —— 虚线框 + 左上角 tag 标签头（真实 DOM，见 XmlCanvas） */
+/* M3b / M11u锛氶€変腑楂樹寒寮哄寲 鈥斺€?铏氱嚎妗?+ 宸︿笂瑙?tag 鏍囩澶达紙鐪熷疄 DOM锛岃 XmlCanvas锛?*/
 .axv-node.axv-selected {
   outline: 2px dashed #04409F;
   outline-offset: -2px;
@@ -216,12 +212,12 @@
   white-space: nowrap;
   pointer-events: none;
   line-height: 1.4;
-  /* 标签头不该被父级的 flex 居中/拉伸影响 */
+  /* 鏍囩澶翠笉璇ヨ鐖剁骇鐨?flex 灞呬腑/鎷変几褰卞搷 */
   flex: 0 0 auto;
   margin: 0;
   transform: none;
 }
-/* ===== M2c：约束拖拽手柄 ===== */
+/* ===== M2c锛氱害鏉熸嫋鎷芥墜鏌?===== */
 .axv-handle {
   position: absolute;
   width: 12px;
@@ -240,7 +236,7 @@
 .axv-handle-bottom { bottom: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
 .axv-handle:hover { background: #BE123C; transform: scale(1.25); }
 
-/* ===== M2d/M2k：自由拖动 + 四边拉伸手柄（不用四角，避免宽高混在一起） ===== */
+/* ===== M2d/M2k锛氳嚜鐢辨嫋鍔?+ 鍥涜竟鎷変几鎵嬫焺锛堜笉鐢ㄥ洓瑙掞紝閬垮厤瀹介珮娣峰湪涓€璧凤級 ===== */
 .axv-geom-move {
   position: absolute;
   left: 50%;
@@ -259,7 +255,7 @@
   box-shadow: 0 1px 5px rgba(0,0,0,0.4);
   user-select: none;
   touch-action: none;
-  /* 半透明：不抢视觉，但仍在中间方便抓；悬停/按下恢复不透明 */
+  /* 鍗婇€忔槑锛氫笉鎶㈣瑙夛紝浣嗕粛鍦ㄤ腑闂存柟渚挎姄锛涙偓鍋?鎸変笅鎭㈠涓嶉€忔槑 */
   opacity: 0.68;
   transition: opacity 120ms;
 }
@@ -282,11 +278,11 @@
 .axv-geom-right { right: -6px; top: 50%; margin-top: -5.5px; cursor: ew-resize; }
 .axv-geom-top { top: -6px; left: 50%; margin-left: -5.5px; cursor: ns-resize; }
 .axv-geom-bottom { bottom: -6px; left: 50%; margin-left: -5.5px; cursor: ns-resize; }
-/* 四边手柄略加高/加宽，便于点中（宽/高按方向调） */
+/* 鍥涜竟鎵嬫焺鐣ュ姞楂?鍔犲锛屼究浜庣偣涓紙瀹?楂樻寜鏂瑰悜璋冿級 */
 .axv-geom-left, .axv-geom-right { height: 16px; margin-top: -8px; border-radius: 3px; }
 .axv-geom-top, .axv-geom-bottom { width: 16px; margin-left: -8px; border-radius: 3px; }
 
-/* CL 子项专用：画在边内侧，避免和外侧的约束圆点（拖约束用）抢点击 */
+/* CL 瀛愰」涓撶敤锛氱敾鍦ㄨ竟鍐呬晶锛岄伩鍏嶅拰澶栦晶鐨勭害鏉熷渾鐐癸紙鎷栫害鏉熺敤锛夋姠鐐瑰嚮 */
 .axv-geom-cl {
   background: var(--axv-primary);
   border-color: var(--axv-surface);
@@ -299,9 +295,9 @@
 .axv-geom-cl-top { top: 10px; left: 50%; margin-left: -8px; width: 16px; height: 8px; cursor: ns-resize; }
 .axv-geom-cl-bottom { bottom: 10px; left: 50%; margin-left: -8px; width: 16px; height: 8px; cursor: ns-resize; }
 
-/* ===== 资源树（M30c：axv-restree 树形框已删，点击行为合并到 axv-ws-list axv-proj-tree）==== */
+/* ===== 璧勬簮鏍戯紙M30c锛歛xv-restree 鏍戝舰妗嗗凡鍒狅紝鐐瑰嚮琛屼负鍚堝苟鍒?axv-ws-list axv-proj-tree锛?=== */
 
-/* 左侧资源面板 mini 操作按钮（M30c：「选择res目录」按钮行已删，保留 axv-rail-mini-btn 备用） */
+/* 宸︿晶璧勬簮闈㈡澘 mini 鎿嶄綔鎸夐挳锛圡30c锛氥€岄€夋嫨res鐩綍銆嶆寜閽宸插垹锛屼繚鐣?axv-rail-mini-btn 澶囩敤锛?*/
 .axv-rail-mini-btn {
   flex: 1;
   min-width: 0;
@@ -324,10 +320,10 @@
 .axv-rail-mini-btn-danger { color: var(--axv-danger); border-color: var(--axv-outline); }
 .axv-rail-mini-btn-danger:hover { background: var(--axv-hover); border-color: var(--axv-danger); }
 
-/* 颜色 swatch 触发 color picker */
+/* 棰滆壊 swatch 瑙﹀彂 color picker */
 .axv-attr-sw { position: relative; display: inline-block; width: 28px; height: 28px; border-radius: 4px; flex: 0 0 28px; }
 
-/* 拖拽中的临时连线（fixed 全屏，坐标 = 视口 px） */
+/* 鎷栨嫿涓殑涓存椂杩炵嚎锛坒ixed 鍏ㄥ睆锛屽潗鏍?= 瑙嗗彛 px锛?*/
 .axv-constraint-drag {
   position: fixed;
   inset: 0;
@@ -346,13 +342,13 @@
   fill: var(--axv-danger);
 }
 
-/* 拖组件到画布上的落点高亮（容器 = 会变成子节点；普通控件 = 插到它后面） */
+/* 鎷栫粍浠跺埌鐢诲竷涓婄殑钀界偣楂樹寒锛堝鍣?= 浼氬彉鎴愬瓙鑺傜偣锛涙櫘閫氭帶浠?= 鎻掑埌瀹冨悗闈級 */
 .axv-node.axv-drop-hit {
   box-shadow: inset 0 0 0 2px #04409F;
   background-color: color-mix(in srgb, var(--axv-primary) 6%, transparent);
 }
 
-/* 画布舞台（旧版规则已移除，见下方 v3 骨架） */
+/* 鐢诲竷鑸炲彴锛堟棫鐗堣鍒欏凡绉婚櫎锛岃涓嬫柟 v3 楠ㄦ灦锛?*/
 
 .axv-canvas-empty {
   color: var(--axv-on-surface-variant);
@@ -362,8 +358,7 @@
 }
 
 /* ============================================================
-   编辑器骨架（M3E 风格三栏：左滑 320 / 中间画布 / 右滑 320）
-   ============================================================ */
+   缂栬緫鍣ㄩ鏋讹紙M3E 椋庢牸涓夋爮锛氬乏婊?320 / 涓棿鐢诲竷 / 鍙虫粦 320锛?   ============================================================ */
 .axv-editor {
   position: relative;
   height: 100vh;
@@ -375,7 +370,7 @@
   inset: 0;
 }
 
-/* 画布舞台 */
+/* 鐢诲竷鑸炲彴 */
 .axv-stage {
   position: absolute;
   inset: 0;
@@ -383,26 +378,24 @@
   overflow: auto;
   display: flex;
   align-items: flex-start;
-  /* safe center：手机屏比可见区宽时从左侧对齐，不会被裁掉左边 */
+  /* safe center锛氭墜鏈哄睆姣斿彲瑙佸尯瀹芥椂浠庡乏渚у榻愶紝涓嶄細琚鎺夊乏杈?*/
   justify-content: safe center;
-  /* M11f：顶部留白交给 margin-top（92）统一控制，padding 四边 24 */
+  /* M11f锛氶《閮ㄧ暀鐧戒氦缁?margin-top锛?2锛夌粺涓€鎺у埗锛宲adding 鍥涜竟 24 */
   margin-top: 89px;
   padding: 24px;
   box-sizing: border-box;
-  /* M30b：底部留白 24 */
+  /* M30b锛氬簳閮ㄧ暀鐧?24 */
   margin-bottom: 24px;
   transition: padding 0.22s cubic-bezier(0.2, 0, 0, 1);
-  /* M6f：画布自成层叠上下文。
-     选中态是 z-index:900（要高过所有 elevation），但画布节点都是 stage 的后代，
-     不隔离的话 900 会参与根层叠上下文，比 .axv-slide-left/.axv-slide-right（30）还高
-     → 手机上屏比可见区宽、拖到面板底下时，选中的控件会盖在侧边栏上面。 */
+  /* M6f锛氱敾甯冭嚜鎴愬眰鍙犱笂涓嬫枃銆?     閫変腑鎬佹槸 z-index:900锛堣楂樿繃鎵€鏈?elevation锛夛紝浣嗙敾甯冭妭鐐归兘鏄?stage 鐨勫悗浠ｏ紝
+     涓嶉殧绂荤殑璇?900 浼氬弬涓庢牴灞傚彔涓婁笅鏂囷紝姣?.axv-slide-left/.axv-slide-right锛?0锛夎繕楂?     鈫?鎵嬫満涓婂睆姣斿彲瑙佸尯瀹姐€佹嫋鍒伴潰鏉垮簳涓嬫椂锛岄€変腑鐨勬帶浠朵細鐩栧湪渚ц竟鏍忎笂闈€?*/
   isolation: isolate;
   z-index: 1;
-  /* M6g：允许双指捻合自己接管（拦 page 缩放），滚动仍然原生 */
+  /* M6g锛氬厑璁稿弻鎸囨嵒鍚堣嚜宸辨帴绠★紙鎷?page 缂╂斁锛夛紝婊氬姩浠嶇劧鍘熺敓 */
   touch-action: pan-x pan-y;
 }
 
-/* M6g：缩放百分比浮层（Ctrl+滚轮 / 双指捻合时短暂出现） */
+/* M6g锛氱缉鏀剧櫨鍒嗘瘮娴眰锛圕trl+婊氳疆 / 鍙屾寚鎹诲悎鏃剁煭鏆傚嚭鐜帮級 */
 .axv-zoom-hud {
   position: fixed;
   left: 50%;
@@ -425,33 +418,32 @@
   padding-right: 340px;
 }
 .axv-phone {
-  /* M11：加厚边框 + 更夸张的落地阴影，更像真机 */
+  /* M11锛氬姞鍘氳竟妗?+ 鏇村じ寮犵殑钀藉湴闃村奖锛屾洿鍍忕湡鏈?*/
   border: 8px solid #52525d;
   border-radius: 24px;
   overflow: hidden;
   box-shadow: 10px 20px 60px #0000007d;
   flex: 0 0 auto;
-  /* 竖向三段：状态栏 / 应用内容区 / 导航栏。显式 flex 列布局 +
-     明确高度，根布局的 height:100% 才有参照物（之前父级只有 min-height，
-     percentage 高度父级无确定高度 → 根布局高度塔缩到内容高，底部留空）。 */
+  /* 绔栧悜涓夋锛氱姸鎬佹爮 / 搴旂敤鍐呭鍖?/ 瀵艰埅鏍忋€傛樉寮?flex 鍒楀竷灞€ +
+     鏄庣‘楂樺害锛屾牴甯冨眬鐨?height:100% 鎵嶆湁鍙傜収鐗╋紙涔嬪墠鐖剁骇鍙湁 min-height锛?     percentage 楂樺害鐖剁骇鏃犵‘瀹氶珮搴?鈫?鏍瑰竷灞€楂樺害濉旂缉鍒板唴瀹归珮锛屽簳閮ㄧ暀绌猴級銆?*/
   display: flex;
   flex-direction: column;
 }
 
-/* ===== 模拟系统状态栏（时间 + 信号/WiFi/电池）===== */
+/* ===== 妯℃嫙绯荤粺鐘舵€佹爮锛堟椂闂?+ 淇″彿/WiFi/鐢垫睜锛?==== */
 .axv-statusbar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* M11：横向留白 20（纵向留 0：高度由内联 height 定死，给纵向 padding 会把字压没） */
+  /* M11锛氭í鍚戠暀鐧?20锛堢旱鍚戠暀 0锛氶珮搴︾敱鍐呰仈 height 瀹氭锛岀粰绾靛悜 padding 浼氭妸瀛楀帇娌★級 */
   padding: 0 20px;
   font-size: 30px;
   font-weight: 600;
   letter-spacing: 0.2px;
   user-select: none;
   pointer-events: none;
-  /* 颜色由内联 color 控制（按根布局背景推导） */
+  /* 棰滆壊鐢卞唴鑱?color 鎺у埗锛堟寜鏍瑰竷灞€鑳屾櫙鎺ㄥ锛?*/
 }
 .axv-sb-time {
   font-variant-numeric: tabular-nums;
@@ -460,12 +452,12 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  /* M11：状态栏图标放大到 30 */
+  /* M11锛氱姸鎬佹爮鍥炬爣鏀惧ぇ鍒?30 */
   font-size: 30px;
   line-height: 1;
 }
 
-/* ===== 应用内容区（根布局填满这里）===== */
+/* ===== 搴旂敤鍐呭鍖猴紙鏍瑰竷灞€濉弧杩欓噷锛?==== */
 .axv-phone-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -473,13 +465,12 @@
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  /* 不裁切：选中描边/手柄/约束线可以露出来 */
+  /* 涓嶈鍒囷細閫変腑鎻忚竟/鎵嬫焺/绾︽潫绾垮彲浠ラ湶鍑烘潵 */
   overflow: visible;
 }
-/* 注：不给根节点加 flex:1 —— 否则 wrap_content 的根会被拉伸。
-   match_parent 由模型给出的 width/height:100% 生效（父级已有确定高）。 */
+/* 娉細涓嶇粰鏍硅妭鐐瑰姞 flex:1 鈥斺€?鍚﹀垯 wrap_content 鐨勬牴浼氳鎷変几銆?   match_parent 鐢辨ā鍨嬬粰鍑虹殑 width/height:100% 鐢熸晥锛堢埗绾у凡鏈夌‘瀹氶珮锛夈€?*/
 
-/* ===== 模拟三键导航栏 ===== */
+/* ===== 妯℃嫙涓夐敭瀵艰埅鏍?===== */
 .axv-navbar {
   flex: 0 0 auto;
   display: flex;
@@ -488,7 +479,7 @@
   padding: 0 24px;
   user-select: none;
   pointer-events: none;
-  /* 与状态栏同色系：跟随内联 color */
+  /* 涓庣姸鎬佹爮鍚岃壊绯伙細璺熼殢鍐呰仈 color */
   background: rgba(0, 0, 0, 0.04);
 }
 .axv-nav-btn {
@@ -496,43 +487,43 @@
   place-items: center;
   opacity: 0.75;
 }
-/* M20e：返回按钮换成像素风 SVG（RunPreview.tsx 内联），尺寸跟导航栏图标协调 */
-/* M11：导航栏图标放大 2 倍；M20e：返回 1.6 倍（36 → 57.6），主页/多任务 1.3 倍（36 → 46.8） */
+/* M20e锛氳繑鍥炴寜閽崲鎴愬儚绱犻 SVG锛圧unPreview.tsx 鍐呰仈锛夛紝灏哄璺熷鑸爮鍥炬爣鍗忚皟 */
+/* M11锛氬鑸爮鍥炬爣鏀惧ぇ 2 鍊嶏紱M20e锛氳繑鍥?1.6 鍊嶏紙36 鈫?57.6锛夛紝涓婚〉/澶氫换鍔?1.3 鍊嶏紙36 鈫?46.8锛?*/
 .axv-nav-btn svg { width: 36px; height: 36px; display: block; }
-.axv-nav-btn[title='返回'] svg { width: 57.6px; height: 57.6px; }
-.axv-nav-btn[title^='主页'] svg,
-.axv-nav-btn[title^='多任务'] svg { width: 46.8px; height: 46.8px; }
+.axv-nav-btn[title='杩斿洖'] svg { width: 57.6px; height: 57.6px; }
+.axv-nav-btn[title^='涓婚〉'] svg,
+.axv-nav-btn[title^='澶氫换鍔?] svg { width: 46.8px; height: 46.8px; }
 
-/* ===== 顶部悬浮工具栏（M6b 三栏布局） ===== */
+/* ===== 椤堕儴鎮诞宸ュ叿鏍忥紙M6b 涓夋爮甯冨眬锛?===== */
 .axv-toolbar-v2 {
   position: absolute;
   left: 0;
   right: 0;
-  /* M11d：贴顶（原来是 14px 悬浮） */
+  /* M11d锛氳创椤讹紙鍘熸潵鏄?14px 鎮诞锛?*/
   top: 0px;
   display: flex;
   align-items: center;
-  /* M6b：左按钮 | 中间可滚工具栏（吃满剩余宽度）| 右按钮；
-     M10：gap 3px + 主题背景填充（整条工具栏） */
+  /* M6b锛氬乏鎸夐挳 | 涓棿鍙粴宸ュ叿鏍忥紙鍚冩弧鍓╀綑瀹藉害锛墊 鍙虫寜閽紱
+     M10锛歡ap 3px + 涓婚鑳屾櫙濉厖锛堟暣鏉″伐鍏锋爮锛?*/
   gap: 3px;
   padding: 3px 6px;
-  /* M20c：恢复主题变量背景（浅色主题下为 #F3F3F9） */
+  /* M20c锛氭仮澶嶄富棰樺彉閲忚儗鏅紙娴呰壊涓婚涓嬩负 #F3F3F9锛?*/
   background: var(--axv-toolbar-bg);
-  /* M11：工具栏 9，标签栏 10（标签栏压在工具栏之上） */
+  /* M11锛氬伐鍏锋爮 9锛屾爣绛炬爮 10锛堟爣绛炬爮鍘嬪湪宸ュ叿鏍忎箣涓婏級 */
   z-index: 9;
   pointer-events: none;
   flex-wrap: nowrap;
 }
-/* 侧滑展开按钮（M10：直接放在工具栏层，不再套 axv-tb-group） */
+/* 渚ф粦灞曞紑鎸夐挳锛圡10锛氱洿鎺ユ斁鍦ㄥ伐鍏锋爮灞傦紝涓嶅啀濂?axv-tb-group锛?*/
 .axv-tb-side-btn {
   flex: 0 0 auto;
   pointer-events: auto;
 }
-/* 中间的工具栏容器：M11 桌面也改成横向滚动（内容超出就滚，不再换行压到 tab 行） */
+/* 涓棿鐨勫伐鍏锋爮瀹瑰櫒锛歁11 妗岄潰涔熸敼鎴愭í鍚戞粴鍔紙鍐呭瓒呭嚭灏辨粴锛屼笉鍐嶆崲琛屽帇鍒?tab 琛岋級 */
 .axv-tb-scroll {
   display: flex;
   align-items: center;
-  /* M10：gap 3px，与工具栏一致 */
+  /* M10锛歡ap 3px锛屼笌宸ュ叿鏍忎竴鑷?*/
   gap: 3px;
   row-gap: 3px;
   flex: 1 1 auto;
@@ -543,11 +534,11 @@
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
-  /* M20c：中区底色改半透明深灰；M31k：改成跟工具栏头同色系混白 */
+  /* M20c锛氫腑鍖哄簳鑹叉敼鍗婇€忔槑娣辩伆锛汳31k锛氭敼鎴愯窡宸ュ叿鏍忓ご鍚岃壊绯绘贩鐧?*/
   background-color: color-mix(in srgb, var(--axv-surface-head) 10%, #a1a1a130);
-  /* M11h：中区圆角胶囊 */
+  /* M11h锛氫腑鍖哄渾瑙掕兌鍥?*/
   border-radius: 20px;
-  /* 圆角会裁掉首尾按钮的两端，左右给 4px 缓冲 */
+  /* 鍦嗚浼氳鎺夐灏炬寜閽殑涓ょ锛屽乏鍙崇粰 4px 缂撳啿 */
   padding: 0 4px;
   pointer-events: auto;
 }
@@ -557,7 +548,7 @@
 .axv-tb-scroll > .axv-tb-group {
   flex: 0 0 auto;
 }
-/* M10：组背景透明 + 圆角 0（整条工具栏统一由 .axv-toolbar-v2 填充） */
+/* M10锛氱粍鑳屾櫙閫忔槑 + 鍦嗚 0锛堟暣鏉″伐鍏锋爮缁熶竴鐢?.axv-toolbar-v2 濉厖锛?*/
 .axv-tb-group {
   display: flex;
   align-items: center;
@@ -622,7 +613,7 @@
   padding: 0 8px;
   color: var(--axv-on-surface);
 }
-/* M2r：设备选择器（工具栏「设备」下拉，切横屏/平板等布局变体预览尺寸） */
+/* M2r锛氳澶囬€夋嫨鍣紙宸ュ叿鏍忋€岃澶囥€嶄笅鎷夛紝鍒囨í灞?骞虫澘绛夊竷灞€鍙樹綋棰勮灏哄锛?*/
 .axv-device {
   display: inline-flex;
   align-items: center;
@@ -653,8 +644,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* M6c：「显示与设备」弹出面板（工具栏一个按钮 → 设备 + 缩放）
-   走 createPortal 到 body，position: fixed 由组件按按钮位置算 */
+/* M6c锛氥€屾樉绀轰笌璁惧銆嶅脊鍑洪潰鏉匡紙宸ュ叿鏍忎竴涓寜閽?鈫?璁惧 + 缂╂斁锛?   璧?createPortal 鍒?body锛宲osition: fixed 鐢辩粍浠舵寜鎸夐挳浣嶇疆绠?*/
 .axv-tb-btn.is-on {
   background: var(--axv-primary-soft);
   color: var(--axv-primary);
@@ -765,7 +755,7 @@
   background: var(--axv-primary-soft);
 }
 
-/* M6e：编辑器内查找条（Ctrl/Cmd+F） */
+/* M6e锛氱紪杈戝櫒鍐呮煡鎵炬潯锛圕trl/Cmd+F锛?*/
 .axv-find {
   position: absolute;
   top: 8px;
@@ -824,7 +814,7 @@
   cursor: default;
 }
 
-/* M45：输入关键词检索弹窗（光标下方/上方，x 跟随光标） */
+/* M45锛氳緭鍏ュ叧閿瘝妫€绱㈠脊绐楋紙鍏夋爣涓嬫柟/涓婃柟锛寈 璺熼殢鍏夋爣锛?*/
 .axv-sug {
   position: absolute;
   z-index: 12;
@@ -833,7 +823,7 @@
   min-width: 180px;
   overflow-y: auto;
   overflow-x: hidden;
-  /* M98：列表自己滑（不传给编辑器），并阻止滑到头后连着滚页面 */
+  /* M98锛氬垪琛ㄨ嚜宸辨粦锛堜笉浼犵粰缂栬緫鍣級锛屽苟闃绘婊戝埌澶村悗杩炵潃婊氶〉闈?*/
   touch-action: pan-y;
   overscroll-behavior: contain;
   padding: 4px;
@@ -867,8 +857,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* M99：候选词分类角标（声/类/方/变/常/引/属）——单字 + 淡底色，
-   26px 行高里不挤掉候选词；颜色只做区分，不抢主文 */
+/* M99锛氬€欓€夎瘝鍒嗙被瑙掓爣锛堝０/绫?鏂?鍙?甯?寮?灞烇級鈥斺€斿崟瀛?+ 娣″簳鑹诧紝
+   26px 琛岄珮閲屼笉鎸ゆ帀鍊欓€夎瘝锛涢鑹插彧鍋氬尯鍒嗭紝涓嶆姠涓绘枃 */
 .axv-sug-kind {
   flex: 0 0 auto;
   font-size: 10px;
@@ -893,7 +883,7 @@
 .axv-sug-kind.is-ref { color: #be185d; background: rgba(236, 72, 153, 0.18); }
 .axv-sug-kind.is-prop { color: #475569; background: rgba(100, 116, 139, 0.18); }
 
-/* 分段控件：胶囊内 3px 缝，首尾圆角（M3E 同款） */
+/* 鍒嗘鎺т欢锛氳兌鍥婂唴 3px 缂濓紝棣栧熬鍦嗚锛圡3E 鍚屾锛?*/
 .axv-seg {
   display: flex;
   gap: 3px;
@@ -931,7 +921,7 @@
   font-weight: 600;
 }
 
-/* ===== 左侧滑面板：52px 图标条 + 内容列 ===== */
+/* ===== 宸︿晶婊戦潰鏉匡細52px 鍥炬爣鏉?+ 鍐呭鍒?===== */
 .axv-slide-left {
   position: absolute;
   top: 0;
@@ -962,7 +952,7 @@
   background: var(--axv-rail-bg);
 }
 .axv-slide-left .axv-rail-btn {
-  /* M11c：占满 rail 宽度，朝画布那侧（右）做成直角，像标签页探出来 */
+  /* M11c锛氬崰婊?rail 瀹藉害锛屾湞鐢诲竷閭ｄ晶锛堝彸锛夊仛鎴愮洿瑙掞紝鍍忔爣绛鹃〉鎺㈠嚭鏉?*/
   width: 100%;
   border-radius: 18px 0px 0px 18px;
 }
@@ -985,7 +975,7 @@
 .axv-rail-btn.on {
   background: var(--axv-primary);
   color: var(--axv-on-primary);
-  /* M11c：选中标签向左投阴影，强化「浮出」感 */
+  /* M11c锛氶€変腑鏍囩鍚戝乏鎶曢槾褰憋紝寮哄寲銆屾诞鍑恒€嶆劅 */
   box-shadow: -2px 1px 6px 1px #0000008a;
 }
 .axv-rail-gap {
@@ -994,11 +984,11 @@
 .axv-rail-body {
   flex: 1;
   min-width: 0;
-  /* M60c：min-height:0 让内部列表能自己滚，而不是被撑高后裁掉 */
+  /* M60c锛歮in-height:0 璁╁唴閮ㄥ垪琛ㄨ兘鑷繁婊氾紝鑰屼笉鏄鎾戦珮鍚庤鎺?*/
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* M91d：改为不透明主题面，半透明在深色主题下会透出浅底 */
+  /* M91d锛氭敼涓轰笉閫忔槑涓婚闈紝鍗婇€忔槑鍦ㄦ繁鑹蹭富棰樹笅浼氶€忓嚭娴呭簳 */
   background-color: var(--axv-surface);
 }
 .axv-rail-head {
@@ -1041,7 +1031,7 @@
   background: var(--axv-hover);
 }
 
-/* ===== 右侧滑面板：属性 ===== */
+/* ===== 鍙充晶婊戦潰鏉匡細灞炴€?===== */
 .axv-slide-right {
   position: absolute;
   top: 0;
@@ -1078,11 +1068,11 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  /* M91d：改为不透明主题面，半透明在深色主题下会透出浅底 */
+  /* M91d锛氭敼涓轰笉閫忔槑涓婚闈紝鍗婇€忔槑鍦ㄦ繁鑹蹭富棰樹笅浼氶€忓嚭娴呭簳 */
   background-color: var(--axv-surface);
 }
 
-/* 代码 / 资源 编辑器 */
+/* 浠ｇ爜 / 璧勬簮 缂栬緫鍣?*/
 .axv-pane {
   flex: 1;
   min-height: 0;
@@ -1099,9 +1089,9 @@
   line-height: 1.6;
   tab-size: 2;
 }
-/* M31g：axv-res-box（手写 <resources> 兜底输入框）及其样式已删除 */
+/* M31g锛歛xv-res-box锛堟墜鍐?<resources> 鍏滃簳杈撳叆妗嗭級鍙婂叾鏍峰紡宸插垹闄?*/
 
-/* ===== 组件面板（M3E 浅色系磁贴）===== */
+/* ===== 缁勪欢闈㈡澘锛圡3E 娴呰壊绯荤璐达級===== */
 .axv-pp {
   display: flex;
   flex-direction: column;
@@ -1144,7 +1134,7 @@
 .axv-pp-group {
   margin-bottom: 6px;
 }
-/* M14：第一层「库」分类（平台 / AndroidX / Material） */
+/* M14锛氱涓€灞傘€屽簱銆嶅垎绫伙紙骞冲彴 / AndroidX / Material锛?*/
 .axv-pp-lib {
   margin-bottom: 8px;
   padding-bottom: 2px;
@@ -1286,7 +1276,7 @@
   text-align: center;
 }
 
-/* ===== 图层树 ===== */
+/* ===== 鍥惧眰鏍?===== */
 .axv-lt {
   padding: 2px 8px 14px;
   color: var(--axv-on-surface);
@@ -1306,7 +1296,7 @@
   border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
-  /* M31j：拖拽是 pointer 实现，行内禁止选中/长按菜单，否则手机长按会弹系统菜单 */
+  /* M31j锛氭嫋鎷芥槸 pointer 瀹炵幇锛岃鍐呯姝㈤€変腑/闀挎寜鑿滃崟锛屽惁鍒欐墜鏈洪暱鎸変細寮圭郴缁熻彍鍗?*/
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
@@ -1354,7 +1344,7 @@
   align-items: center;
   gap: 2px;
 }
-/* M35c：锁定/删除也只在选中行显示（+ JS 侧二次判断），避免手指位置刚好落上去误操作 */
+/* M35c锛氶攣瀹?鍒犻櫎涔熷彧鍦ㄩ€変腑琛屾樉绀猴紙+ JS 渚т簩娆″垽鏂級锛岄伩鍏嶆墜鎸囦綅缃垰濂借惤涓婂幓璇搷浣?*/
 .axv-lt-row.sel .axv-lt-actions {
   display: inline-flex;
 }
@@ -1378,12 +1368,12 @@
   background: color-mix(in srgb, var(--axv-danger) 14%, var(--axv-surface));
   color: var(--axv-danger);
 }
-/* M3b：已在顶/底时按钮置灰（看一眼就知道不能再移） */
+/* M3b锛氬凡鍦ㄩ《/搴曟椂鎸夐挳缃伆锛堢湅涓€鐪煎氨鐭ラ亾涓嶈兘鍐嶇Щ锛?*/
 .axv-lt-actions button:disabled {
   color: var(--axv-on-surface-variant);
   cursor: default;
 }
-/* M34：拖拽手柄：始终可见（手机上没有 hover，靠它才知道能拖）、按下/拖拽中变色、锁定置灰；touch-action none 保证长按 220ms 后能拖而不是滚列表 */
+/* M34锛氭嫋鎷芥墜鏌勶細濮嬬粓鍙锛堟墜鏈轰笂娌℃湁 hover锛岄潬瀹冩墠鐭ラ亾鑳芥嫋锛夈€佹寜涓?鎷栨嫿涓彉鑹层€侀攣瀹氱疆鐏帮紱touch-action none 淇濊瘉闀挎寜 220ms 鍚庤兘鎷栬€屼笉鏄粴鍒楄〃 */
 .axv-lt-handle {
   flex: 0 0 auto;
   width: 22px;
@@ -1397,8 +1387,7 @@
   color: var(--axv-on-surface-variant);
   cursor: grab;
   touch-action: none;
-  /* M35b：默认隐藏（只有选中行才显示），但**占位不让位** → 删除按钮位置不挪，
-     避免「点行选中 → 删除按钮刚出现在手指下 → 抬手就删」的误删 */
+  /* M35b锛氶粯璁ら殣钘忥紙鍙湁閫変腑琛屾墠鏄剧ず锛夛紝浣?*鍗犱綅涓嶈浣?* 鈫?鍒犻櫎鎸夐挳浣嶇疆涓嶆尓锛?     閬垮厤銆岀偣琛岄€変腑 鈫?鍒犻櫎鎸夐挳鍒氬嚭鐜板湪鎵嬫寚涓?鈫?鎶墜灏卞垹銆嶇殑璇垹 */
   visibility: hidden;
   pointer-events: none;
 }
@@ -1426,7 +1415,7 @@
 .axv-lt-actions button:disabled:hover {
   background: transparent;
 }
-/* M20m：锁定开关 + 锁定行的观感 */
+/* M20m锛氶攣瀹氬紑鍏?+ 閿佸畾琛岀殑瑙傛劅 */
 .axv-lt-actions button.axv-lt-lock.on {
   color: var(--axv-primary, #5b5b66);
   background: var(--axv-hover);
@@ -1446,7 +1435,7 @@
   cursor: default;
 }
 
-/* ===== M3d：拖拽排序的落点提示 ===== */
+/* ===== M3d锛氭嫋鎷芥帓搴忕殑钀界偣鎻愮ず ===== */
 .axv-lt-hint {
   font-size: 11px;
   color: var(--axv-on-surface-variant);
@@ -1455,7 +1444,7 @@
   border-bottom: 1px dashed var(--axv-outline);
   margin-bottom: 4px;
 }
-/* M31j：不再用 draggable 属性，改用可按压状态给 grab 光标 */
+/* M31j锛氫笉鍐嶇敤 draggable 灞炴€э紝鏀圭敤鍙寜鍘嬬姸鎬佺粰 grab 鍏夋爣 */
 .axv-lt-row {
   cursor: grab;
 }
@@ -1468,28 +1457,28 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-lt-row.dragging {
   opacity: 0.4;
 }
-/* 拖到行上方：蓝线在上边 */
+/* 鎷栧埌琛屼笂鏂癸細钃濈嚎鍦ㄤ笂杈?*/
 .axv-lt-row.drop-before {
   box-shadow: inset 0 2px 0 0 #04409F;
 }
-/* 拖到行下方：蓝线在下边 */
+/* 鎷栧埌琛屼笅鏂癸細钃濈嚎鍦ㄤ笅杈?*/
 .axv-lt-row.drop-after {
   box-shadow: inset 0 -2px 0 0 #04409F;
 }
-/* 拖到行中间：整个行变蓝框，表示「放进这个容器」 */
+/* 鎷栧埌琛屼腑闂达細鏁翠釜琛屽彉钃濇锛岃〃绀恒€屾斁杩涜繖涓鍣ㄣ€?*/
 .axv-lt-row.drop-inside {
   background: color-mix(in srgb, var(--axv-primary) 10%, transparent);
   box-shadow: inset 0 0 0 2px #04409F;
   border-radius: 6px;
 }
 
-/* 拖放目标高亮 */
+/* 鎷栨斁鐩爣楂樹寒 */
 .axv-phone.axv-drop-target {
   outline: 2px dashed #04409F;
   outline-offset: -6px;
 }
 
-/* issue 提示（浮在画布下方） */
+/* issue 鎻愮ず锛堟诞鍦ㄧ敾甯冧笅鏂癸級 */
 .axv-issues {
   position: absolute;
   left: 16px;
@@ -1505,9 +1494,9 @@ body.axv-lt-dragging .axv-lt-row {
   border-radius: 8px;
 }
 
-/* ===== 右侧属性面板 ===== */
+/* ===== 鍙充晶灞炴€ч潰鏉?===== */
 
-/* M3e：层级（elevation）控件 */
+/* M3e锛氬眰绾э紙elevation锛夋帶浠?*/
 .axv-elev {
   margin-bottom: 10px;
   padding: 8px 10px 9px;
@@ -1572,7 +1561,7 @@ body.axv-lt-dragging .axv-lt-row {
   font-weight: 700;
 }
 
-/* M3a：属性 / 文档 页签 */
+/* M3a锛氬睘鎬?/ 鏂囨。 椤电 */
 .axv-attr-tabs {
   display: flex;
   gap: 4px;
@@ -1595,14 +1584,14 @@ body.axv-lt-dragging .axv-lt-row {
   border-bottom-color: var(--axv-primary);
 }
 
-/* 文档页 */
+/* 鏂囨。椤?*/
 .axv-doc-body {
   max-height: 50vh;
   overflow-y: auto;
   padding-right: 4px;
   font-size: 12.5px;
 }
-/* M6h：文档面板里的官方文档入口 */
+/* M6h锛氭枃妗ｉ潰鏉块噷鐨勫畼鏂规枃妗ｅ叆鍙?*/
 .axv-doc-link {
   display: inline-flex;
   align-items: center;
@@ -1714,7 +1703,7 @@ body.axv-lt-dragging .axv-lt-row {
   padding: 1px 6px;
 }
 
-/* 属性行上的 ? 说明按钮 + 展开的说明气泡 */
+/* 灞炴€ц涓婄殑 ? 璇存槑鎸夐挳 + 灞曞紑鐨勮鏄庢皵娉?*/
 .axv-attr-info {
   flex: 0 0 18px;
   width: 18px;
@@ -1761,7 +1750,7 @@ body.axv-lt-dragging .axv-lt-row {
   margin-bottom: 10px;
   flex-wrap: wrap;
 }
-/* M16e：层级链（ScrollView > LinearLayout > TextView），横向可滚，不折行 */
+/* M16e锛氬眰绾ч摼锛圫crollView > LinearLayout > TextView锛夛紝妯悜鍙粴锛屼笉鎶樿 */
 .axv-attr-chain {
   display: flex;
   align-items: center;
@@ -1835,7 +1824,7 @@ body.axv-lt-dragging .axv-lt-row {
   border-radius: 6px;
   padding: 1px 8px;
 }
-/* 删除当前选中节点（控件）按钮，头部靠右 */
+/* 鍒犻櫎褰撳墠閫変腑鑺傜偣锛堟帶浠讹級鎸夐挳锛屽ご閮ㄩ潬鍙?*/
 .axv-attr-del-node {
   margin-left: auto;
   padding: 3px 10px;
@@ -1924,7 +1913,7 @@ body.axv-lt-dragging .axv-lt-row {
   color: var(--axv-danger);
 }
 
-/* M65：资源引用 → 跳到定义行 */
+/* M65锛氳祫婧愬紩鐢?鈫?璺冲埌瀹氫箟琛?*/
 .axv-attr-jump {
   flex: 0 0 22px;
   width: 22px;
@@ -1967,7 +1956,7 @@ body.axv-lt-dragging .axv-lt-row {
   border-color: var(--axv-primary);
 }
 
-/* ===== 添加属性弹窗（M4j：颜色全部走主题变量，默认浅色面） ===== */
+/* ===== 娣诲姞灞炴€у脊绐楋紙M4j锛氶鑹插叏閮ㄨ蛋涓婚鍙橀噺锛岄粯璁ゆ祬鑹查潰锛?===== */
 .axv-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -2003,7 +1992,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-modal-head .axv-icon-btn {
   border-color: var(--axv-outline);
 }
-/* M31b：弹窗标题 —— 最小 100px，超长时隐藏**开头**（省略号在左侧，尾部文件名保持可见） */
+/* M31b锛氬脊绐楁爣棰?鈥斺€?鏈€灏?100px锛岃秴闀挎椂闅愯棌**寮€澶?*锛堢渷鐣ュ彿鍦ㄥ乏渚э紝灏鹃儴鏂囦欢鍚嶄繚鎸佸彲瑙侊級 */
 .axv-modal-title {
   min-width: 100px;
   overflow: hidden;
@@ -2079,7 +2068,7 @@ body.axv-lt-dragging .axv-lt-row {
   text-align: center;
 }
 
-/* ===== M2s：导出前检查面板（M7c 改独立类名，避免和导出预览图弹窗抢 width） ===== */
+/* ===== M2s锛氬鍑哄墠妫€鏌ラ潰鏉匡紙M7c 鏀圭嫭绔嬬被鍚嶏紝閬垮厤鍜屽鍑洪瑙堝浘寮圭獥鎶?width锛?===== */
 .axv-check-modal {
   width: min(560px, 92vw);
   max-height: 78vh;
@@ -2196,7 +2185,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-btn-danger:hover {
   background: var(--axv-danger);}
 
-/* 移动端：两侧滑面板背后蒙版（点蒙版关闭面板） */
+/* 绉诲姩绔細涓や晶婊戦潰鏉胯儗鍚庤挋鐗堬紙鐐硅挋鐗堝叧闂潰鏉匡級 */
 .axv-backdrop {
   position: absolute;
   inset: 0;
@@ -2205,11 +2194,11 @@ body.axv-lt-dragging .axv-lt-row {
   transition: opacity 0.18s ease;
 }
 
-/* 移动端：画布区顶部 XML 代码 / 预览 tab
-   M10：宽度按视口填满一行（不再居中浮动），圆角 0，背景同主题工具栏 */
+/* 绉诲姩绔細鐢诲竷鍖洪《閮?XML 浠ｇ爜 / 棰勮 tab
+   M10锛氬搴︽寜瑙嗗彛濉弧涓€琛岋紙涓嶅啀灞呬腑娴姩锛夛紝鍦嗚 0锛岃儗鏅悓涓婚宸ュ叿鏍?*/
 .axv-mob-tabs {
   position: absolute;
-  /* M11f：工具栏贴顶后（0~46），标签栏 48 紧贴 */
+  /* M11f锛氬伐鍏锋爮璐撮《鍚庯紙0~46锛夛紝鏍囩鏍?48 绱ц创 */
   top: 48px;
   left: 0;
   right: 0;
@@ -2222,12 +2211,12 @@ body.axv-lt-dragging .axv-lt-row {
   box-shadow: 0px 8px 8px #00000014;
   overflow-x: visible;
 }
-/* M10：内部容器横向滚动（外层填满视口、背景铺满；滚动发生在内层，边缘可加 mask） */
+/* M10锛氬唴閮ㄥ鍣ㄦí鍚戞粴鍔紙澶栧眰濉弧瑙嗗彛銆佽儗鏅摵婊★紱婊氬姩鍙戠敓鍦ㄥ唴灞傦紝杈圭紭鍙姞 mask锛?*/
 .axv-mob-tabs-inner {
   display: flex;
   align-items: center;
   gap: 3px;
-  /* M20b：左右留 8px 内边距 + 半透明灰背景 */
+  /* M20b锛氬乏鍙崇暀 8px 鍐呰竟璺?+ 鍗婇€忔槑鐏拌儗鏅?*/
   padding: 0px 8px;
   background-color: #d1cdcd26;
   overflow-x: auto;
@@ -2261,7 +2250,7 @@ body.axv-lt-dragging .axv-lt-row {
   background: var(--axv-primary);
   color: var(--axv-on-primary);
 }
-/* tab 之间的示例下拉框 */
+/* tab 涔嬮棿鐨勭ず渚嬩笅鎷夋 */
 .axv-tab-sample {
   height: 24px;
   padding: 0 16px 0px 8px;
@@ -2279,12 +2268,12 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-tab-sample:focus { outline: 2px solid var(--axv-primary); }
 .axv-mob-xml {
   position: absolute;
-  /* M11d：工具栏贴顶后整体上移（0~46 工具栏 + 52~92 标签栏 → 100 起） */
+  /* M11d锛氬伐鍏锋爮璐撮《鍚庢暣浣撲笂绉伙紙0~46 宸ュ叿鏍?+ 52~92 鏍囩鏍?鈫?100 璧凤級 */
   inset: 100px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  /* M30b：抵消父层的 12px 边距，代码面板吃满到屏幕边缘 */
+  /* M30b锛氭姷娑堢埗灞傜殑 12px 杈硅窛锛屼唬鐮侀潰鏉垮悆婊″埌灞忓箷杈圭紭 */
   margin: -12px -12px 12px -12px;
 }
 .axv-mob-xml .axv-pane {
@@ -2295,7 +2284,7 @@ body.axv-lt-dragging .axv-lt-row {
   background: var(--axv-surface-head);
 }
 
-/* ===== XML 代码高亮编辑器（textarea + 高亮层叠） ===== */
+/* ===== XML 浠ｇ爜楂樹寒缂栬緫鍣紙textarea + 楂樹寒灞傚彔锛?===== */
 .axv-code {
   position: relative;
   min-height: 0;
@@ -2312,7 +2301,7 @@ body.axv-lt-dragging .axv-lt-row {
   min-height: 0;
   position: relative;
 }
-/* 行号栏 */
+/* 琛屽彿鏍?*/
 .axv-gutter {
   flex: 0 0 52px;
   width: 52px;
@@ -2345,7 +2334,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 1;
   min-width: 0;
 }
-/* 错误行色带（跟着滚动走） */
+/* 閿欒琛岃壊甯︼紙璺熺潃婊氬姩璧帮級 */
 .axv-code-bands {
   position: absolute;
   inset: 0;
@@ -2360,7 +2349,7 @@ body.axv-lt-dragging .axv-lt-row {
   background: color-mix(in srgb, var(--axv-danger) 7%, transparent);
   border-left: 3px solid color-mix(in srgb, var(--axv-danger) 55%, transparent);
 }
-/* M37b：当前行背景（在错误行带之前渲染，错误行会盖在上面） */
+/* M37b锛氬綋鍓嶈鑳屾櫙锛堝湪閿欒琛屽甫涔嬪墠娓叉煋锛岄敊璇浼氱洊鍦ㄤ笂闈級 */
 .axv-code-cur {
   position: absolute;
   left: 0;
@@ -2369,7 +2358,7 @@ body.axv-lt-dragging .axv-lt-row {
   background: var(--axv-code-cur-bg, color-mix(in srgb, var(--axv-primary) 8%, transparent));
   pointer-events: none;
 }
-/* 底部错误提示条 */
+/* 搴曢儴閿欒鎻愮ず鏉?*/
 .axv-code-errbar {
   display: flex;
   align-items: center;
@@ -2390,7 +2379,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 0 0 auto;
 }
 
-/* M179：错误条右侧的「修复 N 处」按钮 */
+/* M179锛氶敊璇潯鍙充晶鐨勩€屼慨澶?N 澶勩€嶆寜閽?*/
 .axv-err-text {
   flex: 1 1 auto;
   min-width: 0;
@@ -2422,13 +2411,13 @@ body.axv-lt-dragging .axv-lt-row {
   transform: scale(0.97);
 }
 
-/* ===== 约束面板（ConstraintLayout） ===== */
+/* ===== 绾︽潫闈㈡澘锛圕onstraintLayout锛?===== */
 .axv-panel-stack {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-/* M2q：include 展开节点的只读提示条 */
+/* M2q锛歩nclude 灞曞紑鑺傜偣鐨勫彧璇绘彁绀烘潯 */
 .axv-include-readonly {
   font-size: 12px;
   color: var(--axv-warn);
@@ -2545,7 +2534,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 1;
   min-height: 0;
 }
-/* M42：切换条（.axv-code-switch）已删——「视图 / 代码」搬进顶部 .axv-mob-tabs-inner 了 */
+/* M42锛氬垏鎹㈡潯锛?axv-code-switch锛夊凡鍒犫€斺€斻€岃鍥?/ 浠ｇ爜銆嶆惉杩涢《閮?.axv-mob-tabs-inner 浜?*/
 .axv-val {
   display: flex;
   flex-direction: column;
@@ -2795,7 +2784,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-val-tip {
   opacity: 0.7;
 }
-/* M43：AndroidManifest.xml 视图 */
+/* M43锛欰ndroidManifest.xml 瑙嗗浘 */
 .axv-mf .axv-mf-body {
   flex: 1;
   min-height: 0;
@@ -2924,7 +2913,7 @@ body.axv-lt-dragging .axv-lt-row {
   font-size: 12px;
 }
 
-/* M174 B：图标声明不规范提示 + 一键修复 */
+/* M174 B锛氬浘鏍囧０鏄庝笉瑙勮寖鎻愮ず + 涓€閿慨澶?*/
 .axv-mf-fix,
 .axv-mf-fix-done {
   grid-column: 1 / -1;
@@ -3014,7 +3003,7 @@ body.axv-lt-dragging .axv-lt-row {
     flex-basis: 78px;
   }
 }
-/* M38：CodeMirror 6 容器（取代 textarea + pre 叠层） */
+/* M38锛欳odeMirror 6 瀹瑰櫒锛堝彇浠?textarea + pre 鍙犲眰锛?*/
 .axv-cm {
   flex: 1;
   min-width: 0;
@@ -3030,8 +3019,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-cm .cm-line {
   padding: 0 14px;
 }
-/* M41：安卓 WebView 会把原生选区用系统强调色（紫）画一层，和 CM 自绘选区叠在一起
-   就出现双色块 + 手柄错位。这里把原生选区高亮压掉，只留 .cm-selectionBackground（配置色）。 */
+/* M41锛氬畨鍗?WebView 浼氭妸鍘熺敓閫夊尯鐢ㄧ郴缁熷己璋冭壊锛堢传锛夌敾涓€灞傦紝鍜?CM 鑷粯閫夊尯鍙犲湪涓€璧?   灏卞嚭鐜板弻鑹插潡 + 鎵嬫焺閿欎綅銆傝繖閲屾妸鍘熺敓閫夊尯楂樹寒鍘嬫帀锛屽彧鐣?.cm-selectionBackground锛堥厤缃壊锛夈€?*/
 .axv-cm .cm-content::selection,
 .axv-cm .cm-content *::selection,
 .axv-cm .cm-line::selection,
@@ -3051,15 +3039,14 @@ body.axv-lt-dragging .axv-lt-row {
   padding: 12px 14px;
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
   font-size: var(--axv-code-font-size, 13px);
-  line-height: 21px; /* 必须与 XmlCodeEditor 的 CODE_LINE_HEIGHT 一致（行号/错误色带定位靠它） */
+  line-height: 21px; /* 蹇呴』涓?XmlCodeEditor 鐨?CODE_LINE_HEIGHT 涓€鑷达紙琛屽彿/閿欒鑹插甫瀹氫綅闈犲畠锛?*/
   tab-size: 2;
-  /* 禁用连字：Cascadia/JetBrains Mono 的编程连字（::, =>, # 等）会两字合一、
-     宽度小于两字符，导致 pre 高亮层与 textarea 光标逐字累积偏移（~2 字符） */
+  /* 绂佺敤杩炲瓧锛欳ascadia/JetBrains Mono 鐨勭紪绋嬭繛瀛楋紙::, =>, # 绛夛級浼氫袱瀛楀悎涓€銆?     瀹藉害灏忎簬涓ゅ瓧绗︼紝瀵艰嚧 pre 楂樹寒灞備笌 textarea 鍏夋爣閫愬瓧绱Н鍋忕Щ锛垀2 瀛楃锛?*/
   font-variant-ligatures: none;
   font-feature-settings: "liga" 0, "calt" 0;
   white-space: pre;
   word-wrap: normal;
-  /* 两侧始终预留相同的滚动槽宽度，避免 overflow:auto 与 hidden 的 gutter 差异让两层错位 */
+  /* 涓や晶濮嬬粓棰勭暀鐩稿悓鐨勬粴鍔ㄦЫ瀹藉害锛岄伩鍏?overflow:auto 涓?hidden 鐨?gutter 宸紓璁╀袱灞傞敊浣?*/
   scrollbar-gutter: stable;
   position: absolute;
   inset: 0;
@@ -3071,9 +3058,7 @@ body.axv-lt-dragging .axv-lt-row {
   background: var(--axv-code-bg, var(--axv-surface));
   overflow: hidden;
 }
-/* 关键：<pre> 里的 <code> 会被浏览器 UA 样式表强制 font-family: monospace，
-   直接声明优先于从 pre 继承的值 → 高亮层字体与透明 textarea 不一致 →
-   字符宽度逐字累积偏差（选中位置偏移 ~2 字符）。font: inherit 把它拉回同一字体。 */
+/* 鍏抽敭锛?pre> 閲岀殑 <code> 浼氳娴忚鍣?UA 鏍峰紡琛ㄥ己鍒?font-family: monospace锛?   鐩存帴澹版槑浼樺厛浜庝粠 pre 缁ф壙鐨勫€?鈫?楂樹寒灞傚瓧浣撲笌閫忔槑 textarea 涓嶄竴鑷?鈫?   瀛楃瀹藉害閫愬瓧绱Н鍋忓樊锛堥€変腑浣嶇疆鍋忕Щ ~2 瀛楃锛夈€俧ont: inherit 鎶婂畠鎷夊洖鍚屼竴瀛椾綋銆?*/
 .axv-code-hl code,
 .axv-code-code {
   font: inherit;
@@ -3088,7 +3073,7 @@ body.axv-lt-dragging .axv-lt-row {
   outline: none;
   resize: none;
   background: transparent;
-  /* 文字透明，只留光标（高亮层负责显示） */
+  /* 鏂囧瓧閫忔槑锛屽彧鐣欏厜鏍囷紙楂樹寒灞傝礋璐ｆ樉绀猴級 */
   color: transparent;
   caret-color: var(--axv-code-cursor, #24292F);
   overflow: auto;
@@ -3098,28 +3083,25 @@ body.axv-lt-dragging .axv-lt-row {
   color: var(--axv-code-sel-fg, transparent);
 }
 
-/* 高亮色（浅色主题） */
+/* 楂樹寒鑹诧紙娴呰壊涓婚锛?*/
 .x-p {
   color: var(--axv-x-tag, var(--axv-primary));
-} /* 标签名 */
+} /* 鏍囩鍚?*/
 .x-a {
   color: var(--axv-x-attr, #953800);
-} /* 属性名 */
+} /* 灞炴€у悕 */
 .x-s {
   color: var(--axv-x-str, var(--axv-ok));
-} /* 字符串值 */
+} /* 瀛楃涓插€?*/
 .x-c {
   color: var(--axv-x-comm, var(--axv-on-surface-variant));
   font-style: italic;
-} /* 注释 */
+} /* 娉ㄩ噴 */
 .x-m {
   color: var(--axv-x-decl, #8250DF);
-} /* XML 声明 */
+} /* XML 澹版槑 */
 
-/* M37b/M50：当前行背景不再用 .cm-activeLine 自带的 background。
-   原因：那是内容层颜色，会盖住选区（CodeMirror 选区层是 z-index:-2）。
-   改成独立的背景层（.cm-curline-hl，z-index:-4），层级从下到上：
-     当前行背景(-4) → 选区背景(-2) → 正文文字（内容层）→ 光标(150) */
+/* M37b/M50锛氬綋鍓嶈鑳屾櫙涓嶅啀鐢?.cm-activeLine 鑷甫鐨?background銆?   鍘熷洜锛氶偅鏄唴瀹瑰眰棰滆壊锛屼細鐩栦綇閫夊尯锛圕odeMirror 閫夊尯灞傛槸 z-index:-2锛夈€?   鏀规垚鐙珛鐨勮儗鏅眰锛?cm-curline-hl锛寊-index:-4锛夛紝灞傜骇浠庝笅鍒颁笂锛?     褰撳墠琛岃儗鏅?-4) 鈫?閫夊尯鑳屾櫙(-2) 鈫?姝ｆ枃鏂囧瓧锛堝唴瀹瑰眰锛夆啋 鍏夋爣(150) */
 .axv-cm .cm-scroller {
   position: relative;
   z-index: 0;
@@ -3127,7 +3109,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-cm .cm-curline-hl {
   position: absolute;
   left: 0;
-  /* M90：宽度由 JS 按最长行设置（width style），不再用 right:0 钉在可视区上 */
+  /* M90锛氬搴︾敱 JS 鎸夋渶闀胯璁剧疆锛坵idth style锛夛紝涓嶅啀鐢?right:0 閽夊湪鍙鍖轰笂 */
   top: 0;
   height: 0;
   width: 100%;
@@ -3137,7 +3119,7 @@ body.axv-lt-dragging .axv-lt-row {
   will-change: transform, width;
 }
 
-/* M49：带 alpha 的颜色选择器（ColorField） */
+/* M49锛氬甫 alpha 鐨勯鑹查€夋嫨鍣紙ColorField锛?*/
 .axv-cf {
   display: inline-flex;
   align-items: center;
@@ -3162,7 +3144,7 @@ body.axv-lt-dragging .axv-lt-row {
   position: absolute;
   inset: 0;
 }
-/* 棋盘格：透明色能在色块上看出来 */
+/* 妫嬬洏鏍硷細閫忔槑鑹茶兘鍦ㄨ壊鍧椾笂鐪嬪嚭鏉?*/
 .axv-cf-checker {
   background-image: linear-gradient(45deg, #d8d8d8 25%, transparent 25%),
     linear-gradient(-45deg, #d8d8d8 25%, transparent 25%),
@@ -3231,7 +3213,7 @@ body.axv-lt-dragging .axv-lt-row {
   cursor: pointer;
 }
 
-/* 桌面端：代码 tab 也占满画布区（在 tab 条下方） */
+/* 妗岄潰绔細浠ｇ爜 tab 涔熷崰婊＄敾甯冨尯锛堝湪 tab 鏉′笅鏂癸級 */
 @media (min-width: 841px) {
   .axv-mob-xml {
     inset: 100px 20px 20px;
@@ -3258,19 +3240,19 @@ body.axv-lt-dragging .axv-lt-row {
   background: var(--axv-surface-sunken);
 }
 
-/* 移动端：与 M3E 原版同口径（≤840px 或 粗指针且 ≤1024px）：
-   两侧滑面板宽 75vw，舞台不再让位 */
+/* 绉诲姩绔細涓?M3E 鍘熺増鍚屽彛寰勶紙鈮?40px 鎴?绮楁寚閽堜笖 鈮?024px锛夛細
+   涓や晶婊戦潰鏉垮 75vw锛岃垶鍙颁笉鍐嶈浣?*/
 @media (max-width: 840px), (pointer: coarse) and (max-width: 1024px) {
   .axv-slide-left,
   .axv-slide-right {
     width: 75vw;
-    /* 工具栏层级已降到蒙版之下，面板从顶覆盖全高，不再给它让位 */
+    /* 宸ュ叿鏍忓眰绾у凡闄嶅埌钂欑増涔嬩笅锛岄潰鏉夸粠椤惰鐩栧叏楂橈紝涓嶅啀缁欏畠璁╀綅 */
     top: 0;
   }
   .axv-rail {
     padding-top: 10px;
   }
-  /* 手机上不需要缩放滑条，隐掉腾出位置（M6c：已收进「显示与设备」按钮，此规则作废） */
+  /* 鎵嬫満涓婁笉闇€瑕佺缉鏀炬粦鏉★紝闅愭帀鑵惧嚭浣嶇疆锛圡6c锛氬凡鏀惰繘銆屾樉绀轰笌璁惧銆嶆寜閽紝姝よ鍒欎綔搴燂級 */
   .axv-vs-panel {
     width: min(280px, calc(100vw - 16px));
   }
@@ -3278,16 +3260,16 @@ body.axv-lt-dragging .axv-lt-row {
     top: 8px;
     padding: 3px 6px;
     gap: 3px;
-    /* 层级低于蒙版（25）：面板打开时工具栏一起被遮罩盖住 */
+    /* 灞傜骇浣庝簬钂欑増锛?5锛夛細闈㈡澘鎵撳紑鏃跺伐鍏锋爮涓€璧疯閬僵鐩栦綇 */
     z-index: 9;
   }
-  /* 侧滑展开按钮（M10）：手机上同样直接放工具栏层 */
+  /* 渚ф粦灞曞紑鎸夐挳锛圡10锛夛細鎵嬫満涓婂悓鏍风洿鎺ユ斁宸ュ叿鏍忓眰 */
   .axv-tb-side-btn {
     width: 38px;
     height: 38px;
     border-radius: 19px;
   }
-  /* 中间区：手机上改成横向滚动（桌面是换行） */
+  /* 涓棿鍖猴細鎵嬫満涓婃敼鎴愭í鍚戞粴鍔紙妗岄潰鏄崲琛岋級 */
   .axv-tb-scroll {
     flex-wrap: nowrap;
     justify-content: flex-start;
@@ -3296,7 +3278,7 @@ body.axv-lt-dragging .axv-lt-row {
     overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    /* 溢出时左右边缘淡出，提示还能滑 */
+    /* 婧㈠嚭鏃跺乏鍙宠竟缂樻贰鍑猴紝鎻愮ず杩樿兘婊?*/
     -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 5px, #000 calc(100% - 5px), transparent 100%);
     mask-image: linear-gradient(90deg, transparent 0, #000 5px, #000 calc(100% - 5px), transparent 100%);
   }
@@ -3318,7 +3300,7 @@ body.axv-lt-dragging .axv-lt-row {
     padding: 3px 6px 0px 3px;
     gap: 3px;
     border-radius: 0;
-    /* 窄屏下 tab + 示例下拉可能超出屏宽，横向滚动在内层 .axv-mob-tabs-inner */
+    /* 绐勫睆涓?tab + 绀轰緥涓嬫媺鍙兘瓒呭嚭灞忓锛屾í鍚戞粴鍔ㄥ湪鍐呭眰 .axv-mob-tabs-inner */
     overflow-x: visible;
   }
   .axv-mob-tabs-inner {
@@ -3332,8 +3314,7 @@ body.axv-lt-dragging .axv-lt-row {
     display: none;
   }
   .axv-stage {
-    /* M11d：顶部偏移由 margin-top:100 提供（工具栏 8~54 + tab 56~96 都在它后面），
-       这里只留四边呼吸空间 */
+    /* M11d锛氶《閮ㄥ亸绉荤敱 margin-top:100 鎻愪緵锛堝伐鍏锋爮 8~54 + tab 56~96 閮藉湪瀹冨悗闈級锛?       杩欓噷鍙暀鍥涜竟鍛煎惛绌洪棿 */
     padding: 24px 8px 16px;
   }
   .axv-stage.pad-l,
@@ -3348,7 +3329,7 @@ body.axv-lt-dragging .axv-lt-row {
     width: 48px;
   }
   .axv-slide-left .axv-rail-btn {
-    /* M11c：宽度跟 rail 一致，只缩高度 */
+    /* M11c锛氬搴﹁窡 rail 涓€鑷达紝鍙缉楂樺害 */
     width: 100%;
     height: 36px;
     border-radius: 16px 0px 0px 16px;
@@ -3360,7 +3341,7 @@ body.axv-lt-dragging .axv-lt-row {
   box-sizing: border-box;
 }
 
-/* RecyclerView / ListView：无子项时用横条纹画占位行 */
+/* RecyclerView / ListView锛氭棤瀛愰」鏃剁敤妯潯绾圭敾鍗犱綅琛?*/
 .axv-node.axv-list:empty {
   background-image: repeating-linear-gradient(
     to bottom,
@@ -3371,7 +3352,7 @@ body.axv-lt-dragging .axv-lt-row {
   );
 }
 
-/* M14d：DatePicker / TimePicker 占位框（平台控件的日历/时钟 UI 无法用 DOM 复原） */
+/* M14d锛欴atePicker / TimePicker 鍗犱綅妗嗭紙骞冲彴鎺т欢鐨勬棩鍘?鏃堕挓 UI 鏃犳硶鐢?DOM 澶嶅師锛?*/
 .axv-node.axv-datepicker,
 .axv-node.axv-timepicker {
   display: flex;
@@ -3388,16 +3369,16 @@ body.axv-lt-dragging .axv-lt-row {
   padding: 8px;
 }
 
-/* Switch：track + thumb */
+/* Switch锛歵rack + thumb */
 .axv-node.axv-switch {
   position: relative;
 }
-/* M11t：旧图形已移除，改由 globals.css 的 --axv-ctl-* 变量统一绘制 */
+/* M11t锛氭棫鍥惧舰宸茬Щ闄わ紝鏀圭敱 globals.css 鐨?--axv-ctl-* 鍙橀噺缁熶竴缁樺埗 */
 
-/* CheckBox：勾选显示对勾 */
-/* M11t：旧图形已移除，改由 globals.css 的 --axv-ctl-* 变量统一绘制 */
+/* CheckBox锛氬嬀閫夋樉绀哄鍕?*/
+/* M11t锛氭棫鍥惧舰宸茬Щ闄わ紝鏀圭敱 globals.css 鐨?--axv-ctl-* 鍙橀噺缁熶竴缁樺埗 */
 
-/* SeekBar：细轨道（::before，含已选段）+ 圆形滑块（::after） */
+/* SeekBar锛氱粏杞ㄩ亾锛?:before锛屽惈宸查€夋锛? 鍦嗗舰婊戝潡锛?:after锛?*/
 .axv-node.axv-seek {
   position: relative;
 }
@@ -3422,7 +3403,7 @@ body.axv-lt-dragging .axv-lt-row {
   content: "";
   position: absolute;
   top: 50%;
-  /* 滑块中心在轨道两端内缩半个滑块，0%/100% 时不会跑到轨道外 */
+  /* 婊戝潡涓績鍦ㄨ建閬撲袱绔唴缂╁崐涓粦鍧楋紝0%/100% 鏃朵笉浼氳窇鍒拌建閬撳 */
   left: calc(
     var(--axv-seek-thumb-d, 40px) / 2 + var(--axv-progress, 0.4) * (100% - var(--axv-seek-thumb-d, 40px))
   );
@@ -3439,7 +3420,7 @@ body.axv-lt-dragging .axv-lt-row {
   pointer-events: none;
 }
 
-/* Spinner：右侧下拉箭头 */
+/* Spinner锛氬彸渚т笅鎷夌澶?*/
 .axv-node.axv-spinner {
   position: relative;
   display: flex;
@@ -3456,7 +3437,7 @@ body.axv-lt-dragging .axv-lt-row {
   pointer-events: none;
 }
 
-/* include：虚线占位 */
+/* include锛氳櫄绾垮崰浣?*/
 .axv-node.axv-include {
   display: flex;
   align-items: center;
@@ -3472,7 +3453,7 @@ body.axv-lt-dragging .axv-lt-row {
   );
 }
 
-/* 窄屏（手机/平板竖屏）：旧版分栏堆叠（保留兼容；v2 滑面板版有自己的媒体查询） */
+/* 绐勫睆锛堟墜鏈?骞虫澘绔栧睆锛夛細鏃х増鍒嗘爮鍫嗗彔锛堜繚鐣欏吋瀹癸紱v2 婊戦潰鏉跨増鏈夎嚜宸辩殑濯掍綋鏌ヨ锛?*/
 @media (max-width: 900px) {
   .axv-split {
     flex-direction: column;
@@ -3535,7 +3516,7 @@ body.axv-lt-dragging .axv-lt-row {
   color: var(--axv-on-surface);
 }
 
-/* M3 导出提示浮层（M7c 从 .axv-export-note 拆出来：那个类名被导出弹窗的说明块占用，两者风格冲突） */
+/* M3 瀵煎嚭鎻愮ず娴眰锛圡7c 浠?.axv-export-note 鎷嗗嚭鏉ワ細閭ｄ釜绫诲悕琚鍑哄脊绐楃殑璇存槑鍧楀崰鐢紝涓よ€呴鏍煎啿绐侊級 */
 .axv-toast {
   background: color-mix(in srgb, var(--axv-title) 88%, transparent);
   color: var(--axv-surface);
@@ -3546,10 +3527,10 @@ body.axv-lt-dragging .axv-lt-row {
   pointer-events: none;
 }
 
-/* M3b 上传 res 资源按钮激活态 */
+/* M3b 涓婁紶 res 璧勬簮鎸夐挳婵€娲绘€?*/
 .axv-tb-btn.axv-tb-active { background: var(--axv-primary); color: var(--axv-on-primary); }
 
-/* ===== M3g 图标选择器 ===== */
+/* ===== M3g 鍥炬爣閫夋嫨鍣?===== */
 .axv-icon-modal {
   width: min(720px, 92vw);
   max-height: 84vh;
@@ -3661,7 +3642,7 @@ body.axv-lt-dragging .axv-lt-row {
   font-size: 11px;
 }
 
-/* ===== M3h 自定义形状编辑器 ===== */
+/* ===== M3h 鑷畾涔夊舰鐘剁紪杈戝櫒 ===== */
 .axv-shape-modal { width: min(880px, 94vw); max-height: 88vh; display: flex; flex-direction: column; }
 .axv-shape-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 .axv-shape-form { flex: 1 1 52%; min-width: 0; overflow-y: auto; padding: 12px 16px; border-left: 1px solid var(--axv-outline); background-color: #d5d5d517; }
@@ -3673,15 +3654,15 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-shape-seg-btn { flex: 1; height: 30px; border: 1px solid var(--axv-outline); background: var(--axv-surface); border-radius: 8px; font-size: 12px; cursor: pointer; color: var(--axv-title); }
 .axv-shape-seg-btn.is-on { background: var(--axv-primary); border-color: var(--axv-primary); color: var(--axv-on-primary); }
 .axv-shape-color { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-/* M89n：色块 + 色值输入框同一行（input 默认 100% 宽会被挤到下一行） */
+/* M89n锛氳壊鍧?+ 鑹插€艰緭鍏ユ鍚屼竴琛岋紙input 榛樿 100% 瀹戒細琚尋鍒颁笅涓€琛岋級 */
 .axv-shape-color .axv-attr-input { flex: 1 1 140px; width: auto; min-width: 0; }
 .axv-shape-color .axv-shape-alpha { flex: 1 1 100%; }
-/* M52：填充色 / 涟漪色旁边直接拖透明度 */
+/* M52锛氬～鍏呰壊 / 娑熸吉鑹叉梺杈圭洿鎺ユ嫋閫忔槑搴?*/
 .axv-shape-alpha { flex: 1 1 120px; min-width: 110px; display: flex; align-items: center; gap: 6px; }
 .axv-shape-alpha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--axv-primary, var(--axv-primary)); }
 .axv-shape-alpha > b { font-size: 11px; min-width: 32px; text-align: right; color: var(--axv-desc); font-variant-numeric: tabular-nums; }
 .axv-shape-color input[type="color"] { flex: 0 0 34px; width: 34px; height: 30px; border: 1px solid var(--axv-outline); border-radius: 6px; padding: 0; background: var(--axv-surface); cursor: pointer; }
-/* M63g：形状页取色按钮换成自定义 ColorField → 压到跟旧 input[type=color] 一样大 */
+/* M63g锛氬舰鐘堕〉鍙栬壊鎸夐挳鎹㈡垚鑷畾涔?ColorField 鈫?鍘嬪埌璺熸棫 input[type=color] 涓€鏍峰ぇ */
 .axv-shape-color .axv-cf-swatch,
 .axv-shape-row .axv-cf-swatch { flex: 0 0 34px; width: 34px; height: 30px; border-radius: 6px; }
 .axv-shape-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
@@ -3724,7 +3705,7 @@ body.axv-lt-dragging .axv-lt-row {
   .axv-shape-form { border-right: none; border-bottom: 1px solid var(--axv-outline); }
 }
 
-/* ===== M4a 运行调试 ===== */
+/* ===== M4a 杩愯璋冭瘯 ===== */
 .axv-run-backdrop {
   position: fixed;
   inset: 0;
@@ -3764,7 +3745,7 @@ body.axv-lt-dragging .axv-lt-row {
   white-space: nowrap;
 }
 .axv-run-crumb.is-on { color: #fff; background: rgba(124, 77, 255, 0.35); }
-.axv-run-crumb + .axv-run-crumb::before { content: "›"; margin-right: 4px; color: #6a6a80; }
+.axv-run-crumb + .axv-run-crumb::before { content: "鈥?; margin-right: 4px; color: #6a6a80; }
 .axv-run-actions { display: inline-flex; gap: 4px; }
 .axv-run-btn {
   display: inline-flex;
@@ -3784,9 +3765,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 1;
   min-width: 0;
   display: flex;
-  /* M149：原来是 align-items:center，手机比容器高时顶部会被裁掉（要么看不到状态栏，
-     要么看不到导航栏，而且滚不动）。改成 flex-start + 子元素 margin:auto：
-     空间够时垂直居中，空间不够时从顶部开始、可以滚动看到全部。 */
+  /* M149锛氬師鏉ユ槸 align-items:center锛屾墜鏈烘瘮瀹瑰櫒楂樻椂椤堕儴浼氳瑁佹帀锛堣涔堢湅涓嶅埌鐘舵€佹爮锛?     瑕佷箞鐪嬩笉鍒板鑸爮锛岃€屼笖婊氫笉鍔級銆傛敼鎴?flex-start + 瀛愬厓绱?margin:auto锛?     绌洪棿澶熸椂鍨傜洿灞呬腑锛岀┖闂翠笉澶熸椂浠庨《閮ㄥ紑濮嬨€佸彲浠ユ粴鍔ㄧ湅鍒板叏閮ㄣ€?*/
   align-items: flex-start;
   justify-content: center;
   padding: 16px;
@@ -3889,7 +3868,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-mob-run { color: #a8c7fa; }
 .axv-tb-run { color: #1cbc1b; }
 
-/* ===== M4b drawable 选择对话框（background 一行 = 输入框 + 一个按钮）===== */
+/* ===== M4b drawable 閫夋嫨瀵硅瘽妗嗭紙background 涓€琛?= 杈撳叆妗?+ 涓€涓寜閽級===== */
 .axv-dp-row { align-items: center; }
 .axv-dp-btn {
   flex: 0 0 auto;
@@ -3925,14 +3904,14 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-dp-body { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px 14px; }
 .axv-dp-pickrow { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .axv-dp-pickrow input[type="color"] { width: 56px; height: 36px; border: none; background: none; cursor: pointer; }
-/* M52：取色器旁边直接拖透明度（不弹浮层） */
+/* M52锛氬彇鑹插櫒鏃佽竟鐩存帴鎷栭€忔槑搴︼紙涓嶅脊娴眰锛?*/
 .axv-dp-alpha { flex: 1 1 180px; min-width: 150px; display: flex; align-items: center; gap: 8px; }
 .axv-dp-alpha > span { font-size: 11.5px; color: var(--axv-on-surface-variant); white-space: nowrap; }
 .axv-dp-alpha input[type="range"] { flex: 1; min-width: 0; accent-color: var(--axv-primary, var(--axv-primary)); }
 .axv-dp-alpha > b { font-size: 11.5px; min-width: 34px; text-align: right; color: var(--axv-on-surface); font-variant-numeric: tabular-nums; }
 .axv-dp-alpha input[type="range"]:disabled { opacity: 0.45; }
 .axv-dp-hint { font-size: 11.5px; color: var(--axv-on-surface-variant); }
-/* M89e：颜色 tab 的头（大色块 + 当前值 + 选择按钮） */
+/* M89e锛氶鑹?tab 鐨勫ご锛堝ぇ鑹插潡 + 褰撳墠鍊?+ 閫夋嫨鎸夐挳锛?*/
 .axv-dp-color-head {
   display: flex;
   align-items: center;
@@ -4025,13 +4004,13 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-dp-shape { display: flex; flex-direction: column; gap: 12px; }
 .axv-dp-shape p { margin: 0; line-height: 1.7; }
 
-/* M4c：export-note 挪进状态栏时间后面，水平居中；无提示时画前置摄像头小圆 */
+/* M4c锛歟xport-note 鎸繘鐘舵€佹爮鏃堕棿鍚庨潰锛屾按骞冲眳涓紱鏃犳彁绀烘椂鐢诲墠缃憚鍍忓ご灏忓渾 */
 .axv-statusbar { position: relative; }
 .axv-sb-camera {
   position: absolute;
   left: 50%;
   top: 50%;
-  /* M11q：药丸形刘海挖孔 */
+  /* M11q锛氳嵂涓稿舰鍒樻捣鎸栧瓟 */
   width: 68px;
   height: 20px;
   transform: translate(-50%, -50%);
@@ -4044,7 +4023,7 @@ body.axv-lt-dragging .axv-lt-row {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  /* M11：状态栏提示条放大 */
+  /* M11锛氱姸鎬佹爮鎻愮ず鏉℃斁澶?*/
   padding: 8px 36px;
   font-size: 9px;
   line-height: 1.5;
@@ -4055,7 +4034,7 @@ body.axv-lt-dragging .axv-lt-row {
   white-space: nowrap;
 }
 
-/* ===== M4d 形状编辑器：axv-editor 层内的整页子页面 ===== */
+/* ===== M4d 褰㈢姸缂栬緫鍣細axv-editor 灞傚唴鐨勬暣椤靛瓙椤甸潰 ===== */
 .axv-shape-page {
   position: fixed;
   inset: 0;
@@ -4071,7 +4050,7 @@ body.axv-lt-dragging .axv-lt-row {
   gap: 12px;
   height: 52px;
   padding: 0 16px;
-  /* M20e：半透明白底 */
+  /* M20e锛氬崐閫忔槑鐧藉簳 */
   background: #ffffff24;
   border-bottom: 1px solid var(--axv-outline);
 }
@@ -4093,7 +4072,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-shape-title { font-size: 13.5px; font-weight: 600; color: var(--axv-title); }
 .axv-shape-head .axv-icon-btn { margin-left: auto; }
 
-/* 页面内两栏：左参数 / 右预览+XML，各自滚动 */
+/* 椤甸潰鍐呬袱鏍忥細宸﹀弬鏁?/ 鍙抽瑙?XML锛屽悇鑷粴鍔?*/
 .axv-shape-page .axv-shape-body {
   flex: 1;
   min-height: 0;
@@ -4125,7 +4104,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex: 0 0 auto;
   background: var(--axv-surface);
 }
-/* 表单两列，宽屏下少滚动 */
+/* 琛ㄥ崟涓ゅ垪锛屽灞忎笅灏戞粴鍔?*/
 @media (min-width: 1200px) {
   .axv-shape-page .axv-shape-form { column-count: 2; column-gap: 24px; }
   .axv-shape-page .axv-shape-form > * { break-inside: avoid; }
@@ -4137,7 +4116,7 @@ body.axv-lt-dragging .axv-lt-row {
   .axv-shape-page .axv-shape-preview-box { min-height: 150px; }
 }
 
-/* ===== M4e background 行：输入框 + 一个「预览按钮」（背景 = 当前颜色/形状/图标） ===== */
+/* ===== M4e background 琛岋細杈撳叆妗?+ 涓€涓€岄瑙堟寜閽€嶏紙鑳屾櫙 = 褰撳墠棰滆壊/褰㈢姸/鍥炬爣锛?===== */
 .axv-dp-btn {
   flex: 0 0 26px;
   width: 26px;
@@ -4160,13 +4139,13 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-dp-btn:active { transform: scale(0.97); }
 .axv-dp-btn.is-empty { color: var(--axv-on-surface-variant); font-size: 11px; }
 
-/* ===== M4g 叶子控件（继承自 View，非 ViewGroup）不该有子节点：画布上打个警示框 ===== */
+/* ===== M4g 鍙跺瓙鎺т欢锛堢户鎵胯嚜 View锛岄潪 ViewGroup锛変笉璇ユ湁瀛愯妭鐐癸細鐢诲竷涓婃墦涓绀烘 ===== */
 .axv-node.axv-leaf-invalid {
   outline: 1px dashed #b3261e;
   outline-offset: 1px;
 }
 .axv-node.axv-leaf-invalid::before {
-  content: "⛔ 不是 ViewGroup，不能有子控件";
+  content: "鉀?涓嶆槸 ViewGroup锛屼笉鑳芥湁瀛愭帶浠?;
   position: absolute;
   left: 0;
   top: 0;
@@ -4182,7 +4161,7 @@ body.axv-lt-dragging .axv-lt-row {
   pointer-events: none;
 }
 
-/* 预览按钮内部的绘制层：颜色 / 形状 / 图标都画在这里，避免和按钮自身背景冲突 */
+/* 棰勮鎸夐挳鍐呴儴鐨勭粯鍒跺眰锛氶鑹?/ 褰㈢姸 / 鍥炬爣閮界敾鍦ㄨ繖閲岋紝閬垮厤鍜屾寜閽嚜韬儗鏅啿绐?*/
 .axv-dp-btn {
   position: relative;
   display: inline-grid;
@@ -4204,9 +4183,9 @@ body.axv-lt-dragging .axv-lt-row {
   line-height: 1;
 }
 
-/* ===== M4s：图片控件的内容图层（android:src）=====
-   放在节点内部 absolute 铺满，保证「background 在下、src 在上」，
-   点击事件仍归节点本身（pointer-events: none）。 */
+/* ===== M4s锛氬浘鐗囨帶浠剁殑鍐呭鍥惧眰锛坅ndroid:src锛?====
+   鏀惧湪鑺傜偣鍐呴儴 absolute 閾烘弧锛屼繚璇併€宐ackground 鍦ㄤ笅銆乻rc 鍦ㄤ笂銆嶏紝
+   鐐瑰嚮浜嬩欢浠嶅綊鑺傜偣鏈韩锛坧ointer-events: none锛夈€?*/
 .axv-node.axv-image {
   position: relative;
 }
@@ -4215,7 +4194,7 @@ body.axv-lt-dragging .axv-lt-row {
   display: block;
 }
 
-/* ===== M11x：NumberPicker（上下淡字 + 中间选中值 + 两条分割线） ===== */
+/* ===== M11x锛歂umberPicker锛堜笂涓嬫贰瀛?+ 涓棿閫変腑鍊?+ 涓ゆ潯鍒嗗壊绾匡級 ===== */
 .axv-node.axv-numberpicker::before,
 .axv-node.axv-numberpicker::after {
   content: "";
@@ -4233,21 +4212,21 @@ body.axv-lt-dragging .axv-lt-row {
   bottom: 33%;
 }
 
-/* Chip 文字不换行 */
+/* Chip 鏂囧瓧涓嶆崲琛?*/
 .axv-node.axv-chip {
   white-space: nowrap;
 }
 
-/* M11y：Chip 带 closeIcon 时右侧画个小叉（Android 是图标，这里用文字叉占位） */
+/* M11y锛欳hip 甯?closeIcon 鏃跺彸渚х敾涓皬鍙夛紙Android 鏄浘鏍囷紝杩欓噷鐢ㄦ枃瀛楀弶鍗犱綅锛?*/
 .axv-node.axv-chip-close::after {
-  content: "✕";
+  content: "鉁?;
   font-size: 0.78em;
   line-height: 1;
   margin-left: 0.5em;
   opacity: 0.75;
 }
 
-/* M11y：SearchView 左侧放大镜（Material Symbols 图标字体） */
+/* M11y锛歋earchView 宸︿晶鏀惧ぇ闀滐紙Material Symbols 鍥炬爣瀛椾綋锛?*/
 .axv-node.axv-search::before {
   content: "search";
   font-family: "Material Symbols Rounded", "Material Icons", sans-serif;
@@ -4266,7 +4245,7 @@ body.axv-lt-dragging .axv-lt-row {
   overflow: hidden;
 }
 
-/* M11y：TextInputLayout 浮动 hint —— 压在描边框上，底色遮住边线 */
+/* M11y锛歍extInputLayout 娴姩 hint 鈥斺€?鍘嬪湪鎻忚竟妗嗕笂锛屽簳鑹查伄浣忚竟绾?*/
 .axv-til-label {
   position: absolute;
   top: -0.62em;
@@ -4284,12 +4263,12 @@ body.axv-lt-dragging .axv-lt-row {
   text-overflow: ellipsis;
 }
 
-/* Toolbar 副标题（用 attr 占位不划算，这里只保主标题居中左对齐已由内联样式给） */
+/* Toolbar 鍓爣棰橈紙鐢?attr 鍗犱綅涓嶅垝绠楋紝杩欓噷鍙繚涓绘爣棰樺眳涓乏瀵归綈宸茬敱鍐呰仈鏍峰紡缁欙級 */
 .axv-node.axv-toolbar {
   overflow: hidden;
 }
 
-/* ===== M4u：资源树里的图片预览框 ===== */
+/* ===== M4u锛氳祫婧愭爲閲岀殑鍥剧墖棰勮妗?===== */
 .axv-imgprev {
   width: min(760px, 92vw);
   max-height: 86vh;
@@ -4345,7 +4324,7 @@ body.axv-lt-dragging .axv-lt-row {
   color: var(--axv-title);
 }
 
-/* ===== M5b 已生成资源管理面板 ===== */
+/* ===== M5b 宸茬敓鎴愯祫婧愮鐞嗛潰鏉?===== */
 .axv-assets-modal {
   width: min(680px, 94vw);
   max-height: 82vh;
@@ -4441,10 +4420,10 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-assets-swatch {
   width: 26px;
   height: 26px;
-  /* M91c：不要强加圆角——形状自己的 borderRadius 从 specToCss 内联进来，直角矩形就该是直角 */
+  /* M91c锛氫笉瑕佸己鍔犲渾瑙掆€斺€斿舰鐘惰嚜宸辩殑 borderRadius 浠?specToCss 鍐呰仈杩涙潵锛岀洿瑙掔煩褰㈠氨璇ユ槸鐩磋 */
   border-radius: 0;
   display: block;
-  /* M129：白色/浅色形状在浅底上看不见，加一圈 inset 细边保证「有内容」可见 */
+  /* M129锛氱櫧鑹?娴呰壊褰㈢姸鍦ㄦ祬搴曚笂鐪嬩笉瑙侊紝鍔犱竴鍦?inset 缁嗚竟淇濊瘉銆屾湁鍐呭銆嶅彲瑙?*/
   box-shadow: inset 0 0 0 1px rgba(16, 24, 40, 0.14);
 }
 .axv-assets-main {
@@ -4543,7 +4522,7 @@ body.axv-lt-dragging .axv-lt-row {
   }
 }
 
-/* ===== M6a 导出预览图弹窗 ===== */
+/* ===== M6a 瀵煎嚭棰勮鍥惧脊绐?===== */
 .axv-export-modal {
   width: min(460px, 92vw);
 }
@@ -4588,13 +4567,13 @@ body.axv-lt-dragging .axv-lt-row {
   justify-content: flex-end;
 }
 
-/* ===== M11：设置 / 关于面板 ===== */
+/* ===== M11锛氳缃?/ 鍏充簬闈㈡澘 ===== */
 .axv-set-group {
   padding: 6px 8px;
   border-bottom: 1px solid var(--axv-outline);
 }
-/* M50：分组可折叠。默认全部折叠（.open 由组件按点击加上），
-   未展开时把除标题以外的子元素全部藏掉 —— 不改变现有 JSX 结构。 */
+/* M50锛氬垎缁勫彲鎶樺彔銆傞粯璁ゅ叏閮ㄦ姌鍙狅紙.open 鐢辩粍浠舵寜鐐瑰嚮鍔犱笂锛夛紝
+   鏈睍寮€鏃舵妸闄ゆ爣棰樹互澶栫殑瀛愬厓绱犲叏閮ㄨ棌鎺?鈥斺€?涓嶆敼鍙樼幇鏈?JSX 缁撴瀯銆?*/
 .axv-settings .axv-set-group:not(.open) > *:not(.axv-set-label) {
   display: none;
 }
@@ -4606,7 +4585,7 @@ body.axv-lt-dragging .axv-lt-row {
   color: var(--axv-on-surface-variant);
   margin-bottom: 8px;
 }
-/* 折叠标题（button）：占满整行，小箭头指示展开状态 */
+/* 鎶樺彔鏍囬锛坆utton锛夛細鍗犳弧鏁磋锛屽皬绠ご鎸囩ず灞曞紑鐘舵€?*/
 .axv-settings .axv-set-group > button.axv-set-label {
   display: flex;
   align-items: center;
@@ -4674,7 +4653,7 @@ body.axv-lt-dragging .axv-lt-row {
   accent-color: var(--axv-primary);
   cursor: pointer;
 }
-/* M37：设置面板里的颜色/滑杆控件 */
+/* M37锛氳缃潰鏉块噷鐨勯鑹?婊戞潌鎺т欢 */
 .axv-set-color {
   width: 44px;
   height: 26px;
@@ -4746,7 +4725,7 @@ body.axv-lt-dragging .axv-lt-row {
   margin-top: 2px;
 }
 
-/* M16g：关于页的项目 logo（圆角一点，跟应用图标同观感） */
+/* M16g锛氬叧浜庨〉鐨勯」鐩?logo锛堝渾瑙掍竴鐐癸紝璺熷簲鐢ㄥ浘鏍囧悓瑙傛劅锛?*/
 .axv-about-logo {
   width: 44px;
   height: 44px;
@@ -4760,7 +4739,7 @@ body.axv-lt-dragging .axv-lt-row {
   line-height: 1.7;
   color: var(--axv-on-surface-variant);
 }
-/* M16f：关于页的致谢（项目来源 + 开源致谢列表） */
+/* M16f锛氬叧浜庨〉鐨勮嚧璋紙椤圭洰鏉ユ簮 + 寮€婧愯嚧璋㈠垪琛級 */
 .axv-credit-upstream {
   padding: 0 14px 12px;
   font-size: 12.5px;
@@ -4835,7 +4814,7 @@ body.axv-lt-dragging .axv-lt-row {
   margin-left: auto;
 }
 
-/* ===== M11：已生成资源内嵌版（左侧 tab 面板内，不用弹窗） ===== */
+/* ===== M11锛氬凡鐢熸垚璧勬簮鍐呭祵鐗堬紙宸︿晶 tab 闈㈡澘鍐咃紝涓嶇敤寮圭獥锛?===== */
 .axv-assets-inline {
   display: flex;
   flex-direction: column;
@@ -4865,7 +4844,7 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-assets-inline .axv-assets-sub {
   font-size: 10.5px;
 }
-/* 窄栏里 4 个操作按钮放一行会挤爆 → 允许换行，按钮缩到 26 */
+/* 绐勬爮閲?4 涓搷浣滄寜閽斁涓€琛屼細鎸ょ垎 鈫?鍏佽鎹㈣锛屾寜閽缉鍒?26 */
 .axv-assets-inline .axv-assets-actions {
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -4895,7 +4874,7 @@ body.axv-lt-dragging .axv-lt-row {
   line-height: 1.6;
 }
 
-/* M11i：可双击编辑的形状资源行 */
+/* M11i锛氬彲鍙屽嚮缂栬緫鐨勫舰鐘惰祫婧愯 */
 .axv-assets-row-editable {
   cursor: pointer;
 }
@@ -4903,7 +4882,7 @@ body.axv-lt-dragging .axv-lt-row {
   background: var(--axv-primary-soft, var(--axv-primary-soft));
 }
 
-/* ===== M11j：图标编辑器（生成的 vector drawable）===== */
+/* ===== M11j锛氬浘鏍囩紪杈戝櫒锛堢敓鎴愮殑 vector drawable锛?==== */
 .axv-icon-editor {
   width: min(860px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
@@ -4924,7 +4903,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex-direction: column;
   gap: 8px;
   align-items: center;
-  /* M20e：底色 + 收紧内边距 */
+  /* M20e锛氬簳鑹?+ 鏀剁揣鍐呰竟璺?*/
   background-color: #ffffff14;
   padding: 6px;
 }
@@ -4933,7 +4912,7 @@ body.axv-lt-dragging .axv-lt-row {
   height: 200px;
   border-radius: 14px;
   border: 1px solid var(--axv-line, var(--axv-outline));
-  /* 棋盘格底：透明区域看得清 */
+  /* 妫嬬洏鏍煎簳锛氶€忔槑鍖哄煙鐪嬪緱娓?*/
   background-image: linear-gradient(45deg, var(--axv-surface-sunken) 25%, transparent 25%),
     linear-gradient(-45deg, #e8e8ee 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, #e8e8ee 75%),
@@ -4989,7 +4968,7 @@ body.axv-lt-dragging .axv-lt-row {
   display: flex;
   gap: 8px;
 }
-/* M11k：尺寸输入框收窄到 30px（用户指定） */
+/* M11k锛氬昂瀵歌緭鍏ユ鏀剁獎鍒?30px锛堢敤鎴锋寚瀹氾級 */
 .axv-icon-ed-two .axv-icon-ed-input {
   flex: 0 0 75px;
   width: 75px;
@@ -5021,7 +5000,7 @@ body.axv-lt-dragging .axv-lt-row {
   background: none;
   cursor: pointer;
 }
-/* M63h：图标编辑器取色也换成自定义 ColorField → 尺寸对齐旧按钮 */
+/* M63h锛氬浘鏍囩紪杈戝櫒鍙栬壊涔熸崲鎴愯嚜瀹氫箟 ColorField 鈫?灏哄瀵归綈鏃ф寜閽?*/
 .axv-icon-ed-swatches .axv-cf-swatch { width: 30px; height: 24px; border-radius: 6px; }
 .axv-icon-ed-btns {
   display: flex;
@@ -5029,7 +5008,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex-wrap: wrap;
   margin: 4px 0;
 }
-/* M11l：旋转 / 水平镜像 / 垂直镜像 三个按钮固定 90px */
+/* M11l锛氭棆杞?/ 姘村钩闀滃儚 / 鍨傜洿闀滃儚 涓変釜鎸夐挳鍥哄畾 90px */
 .axv-icon-ed-btns > .axv-set-btn {
   flex: 0 0 90px;
   width: 90px;
@@ -5108,7 +5087,7 @@ body.axv-lt-dragging .axv-lt-row {
   resize: vertical;
 }
 .axv-icon-ed-pathdata {
-  /* M11l：用户指定 150px */
+  /* M11l锛氱敤鎴锋寚瀹?150px */
   min-height: 150px;
   color: var(--axv-title);
 }
@@ -5143,7 +5122,7 @@ body.axv-lt-dragging .axv-lt-row {
   }
 }
 
-/* ===== M11k：图标编辑器改成整页全屏（与形状编辑器同一套观感）===== */
+/* ===== M11k锛氬浘鏍囩紪杈戝櫒鏀规垚鏁撮〉鍏ㄥ睆锛堜笌褰㈢姸缂栬緫鍣ㄥ悓涓€濂楄鎰燂級===== */
 .axv-icon-page {
   position: fixed;
   inset: 0;
@@ -5152,7 +5131,7 @@ body.axv-lt-dragging .axv-lt-row {
   flex-direction: column;
   background: var(--axv-surface-sunken, var(--axv-surface-head));
 }
-/* M88：返回按钮桌面端 + 移动端都显示（左上），不再有右上 ✕ —— 与 svg-board 的方块按钮同款 */
+/* M88锛氳繑鍥炴寜閽闈㈢ + 绉诲姩绔兘鏄剧ず锛堝乏涓婏級锛屼笉鍐嶆湁鍙充笂 鉁?鈥斺€?涓?svg-board 鐨勬柟鍧楁寜閽悓娆?*/
 .axv-icon-back {
   position: relative;
   flex: none;
@@ -5167,7 +5146,7 @@ body.axv-lt-dragging .axv-lt-row {
   cursor: pointer;
   transition: background 0.15s, transform 0.12s;
 }
-/* 36px 视觉尺寸，但命中区补到 44px（Android 最小触摸尺寸） */
+/* 36px 瑙嗚灏哄锛屼絾鍛戒腑鍖鸿ˉ鍒?44px锛圓ndroid 鏈€灏忚Е鎽稿昂瀵革級 */
 .axv-icon-back::after {
   content: "";
   position: absolute;
@@ -5177,11 +5156,11 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-icon-back:hover { background: #ffffff54; }
 .axv-icon-back:active { transform: scale(0.94); }
 .axv-icon-back .msr { font-size: 22px; }
-/* 移动端：头部只留返回按钮 + 标题，撤销/重做仍在（工具条里也有） */
+/* 绉诲姩绔細澶撮儴鍙暀杩斿洖鎸夐挳 + 鏍囬锛屾挙閿€/閲嶅仛浠嶅湪锛堝伐鍏锋潯閲屼篃鏈夛級 */
 @media (max-width: 840px), (pointer: coarse) and (max-width: 1024px) {
   .axv-icon-page .axv-icon-back { display: grid; }
   .axv-icon-page .axv-shape-head .axv-shape-title { font-size: 15px; }
-  /* 底部「保存后立即写回…」说明：位置不够就截断，最多 2 行（写在内层，避免被 flex 块化） */
+  /* 搴曢儴銆屼繚瀛樺悗绔嬪嵆鍐欏洖鈥︺€嶈鏄庯細浣嶇疆涓嶅灏辨埅鏂紝鏈€澶?2 琛岋紙鍐欏湪鍐呭眰锛岄伩鍏嶈 flex 鍧楀寲锛?*/
   .axv-icon-page .axv-icon-page-foot-note {
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -5202,13 +5181,13 @@ body.axv-lt-dragging .axv-lt-row {
   gap: 16px;
   padding: 16px;
   align-items: flex-start;
-  /* M20e：半透明白底 */
+  /* M20e锛氬崐閫忔槑鐧藉簳 */
   background: #ffffff14;
 }
 .axv-icon-page-foot {
   flex: 0 0 auto;
   display: flex;
-  /* M11l：竖排（说明在上、按钮在下），高度自适应 */
+  /* M11l锛氱珫鎺掞紙璇存槑鍦ㄤ笂銆佹寜閽湪涓嬶級锛岄珮搴﹁嚜閫傚簲 */
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
@@ -5243,7 +5222,7 @@ body.axv-lt-dragging .axv-lt-row {
   border-color: var(--axv-primary, var(--axv-primary));
   color: var(--axv-primary, var(--axv-primary));
 }
-/* 全屏页里表单不再挤在 860px 弹窗内 */
+/* 鍏ㄥ睆椤甸噷琛ㄥ崟涓嶅啀鎸ゅ湪 860px 寮圭獥鍐?*/
 .axv-icon-page .axv-icon-ed-preview {
   flex: 0 0 240px;
   position: sticky;
@@ -5264,7 +5243,7 @@ body.axv-lt-dragging .axv-lt-row {
   .axv-icon-page .axv-icon-ed-preview {
     flex: 0 0 auto;
     position: static;
-    /* M20e：移动端改成竖排（与桌面一致，不并排挤） */
+    /* M20e锛氱Щ鍔ㄧ鏀规垚绔栨帓锛堜笌妗岄潰涓€鑷达紝涓嶅苟鎺掓尋锛?*/
     flex-direction: column;
     justify-content: center;
     width: 100%;
@@ -5279,7 +5258,7 @@ body.axv-lt-dragging .axv-lt-row {
   }
 }
 
-/* M11o：图片预览框里的「编辑」（矢量图专用） */
+/* M11o锛氬浘鐗囬瑙堟閲岀殑銆岀紪杈戙€嶏紙鐭㈤噺鍥句笓鐢級 */
 .axv-imgprev-edit {
   display: inline-flex;
   align-items: center;
@@ -5287,7 +5266,7 @@ body.axv-lt-dragging .axv-lt-row {
   min-width: 80px;
 }
 
-/* M11p：图标编辑器的提示条（空内容 / 传进来的不是 vector） */
+/* M11p锛氬浘鏍囩紪杈戝櫒鐨勬彁绀烘潯锛堢┖鍐呭 / 浼犺繘鏉ョ殑涓嶆槸 vector锛?*/
 .axv-icon-ed-warn {
   display: flex;
   align-items: flex-start;
@@ -5311,12 +5290,12 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   color: #f2d79a;
 }
 
-/* ===== M11t：RatingBar 星星 / 不确定进度条 / SeekBar 滑块色 ===== */
+/* ===== M11t锛歊atingBar 鏄熸槦 / 涓嶇‘瀹氳繘搴︽潯 / SeekBar 婊戝潡鑹?===== */
 .axv-node.axv-rating {
   position: relative;
   display: inline-flex;
   align-items: center;
-  /* 星形 mask（白色五角星，靠 background-color 上色） */
+  /* 鏄熷舰 mask锛堢櫧鑹蹭簲瑙掓槦锛岄潬 background-color 涓婅壊锛?*/
   --axv-star-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/%3E%3C/svg%3E");
 }
 .axv-node.axv-rating::before,
@@ -5344,7 +5323,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   background-color: var(--axv-star-on, #f5a524);
 }
 
-/* 不确定进度条：40% 宽的小条来回跑 */
+/* 涓嶇‘瀹氳繘搴︽潯锛?0% 瀹界殑灏忔潯鏉ュ洖璺?*/
 .axv-node.axv-indet::after {
   animation: axv-indet-run 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
@@ -5353,7 +5332,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   100% { transform: translateX(250%); }
 }
 
-/* 进度条前景色 / SeekBar 滑块色改成变量（原来硬写 #6750A4） */
+/* 杩涘害鏉″墠鏅壊 / SeekBar 婊戝潡鑹叉敼鎴愬彉閲忥紙鍘熸潵纭啓 #6750A4锛?*/
 .axv-node.axv-progress::after {
   background-color: var(--axv-progress-color, #757575);
 }
@@ -5361,7 +5340,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   background-color: var(--axv-seek-thumb, #757575);
 }
 
-/* M11w：圆形 ProgressBar（没有 horizontal 样式）= 转圈环，不是细条 */
+/* M11w锛氬渾褰?ProgressBar锛堟病鏈?horizontal 鏍峰紡锛? 杞湀鐜紝涓嶆槸缁嗘潯 */
 .axv-node.axv-progress-ring {
   border-radius: 50%;
   border: var(--axv-ring-w, 6px) solid #e0d9e3;
@@ -5380,7 +5359,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   }
 }
 
-/* ===== M16b：系统接管 UI 的控件 —— 占位渲染 ===== */
+/* ===== M16b锛氱郴缁熸帴绠?UI 鐨勬帶浠?鈥斺€?鍗犱綅娓叉煋 ===== */
 .axv-node.axv-webview,
 .axv-node.axv-video,
 .axv-node.axv-calendar {
@@ -5398,7 +5377,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 }
 
 .axv-node.axv-webview::before {
-  content: "WebView 网页";
+  content: "WebView 缃戦〉";
 }
 
 .axv-node.axv-video {
@@ -5408,7 +5387,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 }
 
 .axv-node.axv-video::before {
-  content: "▶ 视频画面";
+  content: "鈻?瑙嗛鐢婚潰";
 }
 
 .axv-node.axv-calendar {
@@ -5419,10 +5398,10 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 }
 
 .axv-node.axv-calendar::before {
-  content: "CalendarView 日历（系统 UI）";
+  content: "CalendarView 鏃ュ巻锛堢郴缁?UI锛?;
 }
 
-/* 计时器：画成普通文本的样子 */
+/* 璁℃椂鍣細鐢绘垚鏅€氭枃鏈殑鏍峰瓙 */
 .axv-node.axv-clock {
   display: inline-block;
   box-sizing: border-box;
@@ -5434,9 +5413,9 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   content: "00:00";
 }
 
-/* ================= M16i：项目管理 tab / 工作目录 / 配色方案 ================= */
+/* ================= M16i锛氶」鐩鐞?tab / 宸ヤ綔鐩綍 / 閰嶈壊鏂规 ================= */
 
-/* 项目管理：横向 tab 标签（工作目录 | 当前项目） */
+/* 椤圭洰绠＄悊锛氭í鍚?tab 鏍囩锛堝伐浣滅洰褰?| 褰撳墠椤圭洰锛?*/
 .axv-proj-tabs {
   display: flex;
   gap: 3px;
@@ -5466,7 +5445,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-/* M31i：新建项目对话框的项目图标行 */
+/* M31i锛氭柊寤洪」鐩璇濇鐨勯」鐩浘鏍囪 */
 .axv-newproj-iconrow .axv-newproj-iconbox {
   display: flex;
   align-items: center;
@@ -5513,17 +5492,17 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   flex: 0 0 auto;
 }
 
-/* M31i：项目管理面板要撑满剩余高度（rail-scroll 默认 block + overflow:auto，会把 flex 子项的 flex:1 废掉） */
+/* M31i锛氶」鐩鐞嗛潰鏉胯鎾戞弧鍓╀綑楂樺害锛坮ail-scroll 榛樿 block + overflow:auto锛屼細鎶?flex 瀛愰」鐨?flex:1 搴熸帀锛?*/
 .axv-rail-scroll.axv-rail-fill {
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-/* 工作目录面板 */
+/* 宸ヤ綔鐩綍闈㈡澘 */
 .axv-ws-panel {
   padding: 2px 10px 14px;
-  /* M31i：吃满左栏剩余高度，内部列表自己滚（不再写死 max-height） */
+  /* M31i锛氬悆婊″乏鏍忓墿浣欓珮搴︼紝鍐呴儴鍒楄〃鑷繁婊氾紙涓嶅啀鍐欐 max-height锛?*/
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -5548,7 +5527,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   color: var(--axv-on-surface);
   font-weight: 600;
 }
-/* M31c：操作按钮直接作为路径条的子项排开（.axv-rail-mini-btn 自带 flex:1 会撑满，刷新按钮随其后） */
+/* M31c锛氭搷浣滄寜閽洿鎺ヤ綔涓鸿矾寰勬潯鐨勫瓙椤规帓寮€锛?axv-rail-mini-btn 鑷甫 flex:1 浼氭拺婊★紝鍒锋柊鎸夐挳闅忓叾鍚庯級 */
 .axv-ws-path .axv-rail-mini-btn {
   height: 26px;
 }
@@ -5607,7 +5586,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
   flex-direction: column;
   gap: 2px;
 }
-/* M20n：多级列表（文件夹可折叠，缩进表示层级） */
+/* M20n锛氬绾у垪琛紙鏂囦欢澶瑰彲鎶樺彔锛岀缉杩涜〃绀哄眰绾э級 */
 .axv-ws-row {
   display: flex;
   align-items: center;
@@ -5674,7 +5653,7 @@ button.axv-ws-caret:hover {
   font-size: 20px;
   color: var(--axv-primary);
 }
-/* M31h：drawable/mipmap 里的图片行 —— 直接用文件本身当图标 */
+/* M31h锛歞rawable/mipmap 閲岀殑鍥剧墖琛?鈥斺€?鐩存帴鐢ㄦ枃浠舵湰韬綋鍥炬爣 */
 .axv-ws-item-thumb {
   width: 20px;
   height: 20px;
@@ -5683,7 +5662,7 @@ button.axv-ws-caret:hover {
   align-items: center;
   justify-content: center;
 }
-/* M144：shape / selector 类型的 xml 图标用 CSS 画出来 */
+/* M144锛歴hape / selector 绫诲瀷鐨?xml 鍥炬爣鐢?CSS 鐢诲嚭鏉?*/
 .axv-ws-item-thumb-shape {
   width: 18px;
   height: 18px;
@@ -5692,7 +5671,7 @@ button.axv-ws-caret:hover {
   background-size: 100% 100%;
   filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.35));
 }
-/* M144：当前打开文件所在行的高亮 */
+/* M144锛氬綋鍓嶆墦寮€鏂囦欢鎵€鍦ㄨ鐨勯珮浜?*/
 .axv-ws-row-on > .axv-ws-item {
   background: var(--axv-primary-soft);
   border-color: color-mix(in srgb, var(--axv-primary) 45%, transparent);
@@ -5727,7 +5706,7 @@ button.axv-ws-caret:hover {
   color: var(--axv-desc);
 }
 
-/* 配色方案卡片 */
+/* 閰嶈壊鏂规鍗＄墖 */
 .axv-theme-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5738,7 +5717,7 @@ button.axv-ws-caret:hover {
   align-items: center;
   gap: 7px;
   padding: 6px 7px;
-  /* M31l：对比度加强一点点——描边用 strong，底色调进 10% 文字色，卡片从面板里凸显出来 */
+  /* M31l锛氬姣斿害鍔犲己涓€鐐圭偣鈥斺€旀弿杈圭敤 strong锛屽簳鑹茶皟杩?10% 鏂囧瓧鑹诧紝鍗＄墖浠庨潰鏉块噷鍑告樉鍑烘潵 */
   border: 1px solid var(--axv-outline-strong);
   border-radius: 10px;
   background: color-mix(in srgb, var(--axv-surface) 90%, var(--axv-on-surface) 10%);
@@ -5755,7 +5734,7 @@ button.axv-ws-caret:hover {
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  /* M31l：色块也加一圈可见描边，浅色主题下不至于和白底粘在一起 */
+  /* M31l锛氳壊鍧椾篃鍔犱竴鍦堝彲瑙佹弿杈癸紝娴呰壊涓婚涓嬩笉鑷充簬鍜岀櫧搴曠矘鍦ㄤ竴璧?*/
   border: 1px solid color-mix(in srgb, var(--axv-on-surface) 24%, transparent);
   display: flex;
   align-items: flex-end;
@@ -5775,7 +5754,7 @@ button.axv-ws-caret:hover {
   font-weight: 600;
   color: var(--axv-title);
   text-align: left;
-  /* M90：卡片里还有调色板按钮，名字必须单行不换行 */
+  /* M90锛氬崱鐗囬噷杩樻湁璋冭壊鏉挎寜閽紝鍚嶅瓧蹇呴』鍗曡涓嶆崲琛?*/
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5785,7 +5764,7 @@ button.axv-ws-caret:hover {
   color: var(--axv-primary);
 }
 
-/* 配色明细 token 列表 */
+/* 閰嶈壊鏄庣粏 token 鍒楄〃 */
 .axv-token-list {
   display: flex;
   flex-direction: column;
@@ -5815,7 +5794,7 @@ button.axv-ws-caret:hover {
   color: var(--axv-on-surface-variant);
 }
 
-/* 设置：键值行 / 按钮组 */
+/* 璁剧疆锛氶敭鍊艰 / 鎸夐挳缁?*/
 .axv-set-kv {
   display: flex;
   align-items: center;
@@ -5848,7 +5827,7 @@ button.axv-ws-caret:hover {
   margin-top: 0;
 }
 
-/* ===== M17：AI 助手面板（全走主题 token，深浅色自适应） ===== */
+/* ===== M17锛欰I 鍔╂墜闈㈡澘锛堝叏璧颁富棰?token锛屾繁娴呰壊鑷€傚簲锛?===== */
 .axv-ai {
   display: flex;
   flex-direction: column;
@@ -5936,7 +5915,7 @@ button.axv-ws-caret:hover {
   color: var(--axv-on-surface-variant);
   cursor: pointer;
 }
-/* M114：带文字的按钮（重试 / 重新生成）不能吃 22px 固定宽，否则文字被挤成竖排 */
+/* M114锛氬甫鏂囧瓧鐨勬寜閽紙閲嶈瘯 / 閲嶆柊鐢熸垚锛変笉鑳藉悆 22px 鍥哄畾瀹斤紝鍚﹀垯鏂囧瓧琚尋鎴愮珫鎺?*/
 .axv-ai-retry .axv-ai-mini,
 .axv-ai-mini.axv-ai-retry-btn {
   width: auto;
@@ -5982,12 +5961,12 @@ button.axv-ws-caret:hover {
   max-width: 230px;
 }
 .axv-ai-empty > .msr { color: var(--axv-primary); }
-/* M97：display:block —— 之前是 grid，正文文本会被拆成逐字一行（截图中「重代码见下」竖排） */
+/* M97锛歞isplay:block 鈥斺€?涔嬪墠鏄?grid锛屾鏂囨枃鏈細琚媶鎴愰€愬瓧涓€琛岋紙鎴浘涓€岄噸浠ｇ爜瑙佷笅銆嶇珫鎺掞級 */
 .axv-ai-msg { display: block; }
 .axv-ai-msg > .axv-ai-bubble, .axv-ai-msg > .axv-ai-code, .axv-ai-msg > .axv-ai-retry { margin-top: 6px; }
 .axv-ai-msg > .axv-ai-think { margin-bottom: 6px; }
 
-/* ===== M97：思考过程独立框（自己滚，不抢正文） ===== */
+/* ===== M97锛氭€濊€冭繃绋嬬嫭绔嬫锛堣嚜宸辨粴锛屼笉鎶㈡鏂囷級 ===== */
 .axv-ai-think {
   border: 1px dashed color-mix(in srgb, var(--axv-on-surface) 20%, transparent);
   border-radius: 8px;
@@ -6034,7 +6013,7 @@ button.axv-ws-caret:hover {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
-/* 气泡：失败态 */
+/* 姘旀场锛氬け璐ユ€?*/
 .axv-ai-bubble.is-failed {
   border-color: color-mix(in srgb, #e5484d 55%, transparent);
   background: color-mix(in srgb, #e5484d 10%, transparent);
@@ -6060,7 +6039,7 @@ button.axv-ws-caret:hover {
   word-break: break-word;
 }
 .axv-ai-typing { color: var(--axv-on-surface-variant); }
-/* M32：流式光标的闪烁 */
+/* M32锛氭祦寮忓厜鏍囩殑闂儊 */
 .axv-ai-cursor {
   display: inline-block;
   margin-left: 1px;
@@ -6072,7 +6051,7 @@ button.axv-ws-caret:hover {
   100% { opacity: 1; }
   50% { opacity: 0; }
 }
-/* M32：当前走的通道（原生直连 / 浏览器） */
+/* M32锛氬綋鍓嶈蛋鐨勯€氶亾锛堝師鐢熺洿杩?/ 娴忚鍣級 */
 .axv-ai-badge {
   flex: 0 0 auto;
   padding: 1px 6px;
@@ -6085,19 +6064,19 @@ button.axv-ws-caret:hover {
   white-space: nowrap;
 }
 
-/* M64d（B1）：AI 文件能力角标（读写 / 只读） */
+/* M64d锛圔1锛夛細AI 鏂囦欢鑳藉姏瑙掓爣锛堣鍐?/ 鍙锛?*/
 .axv-ai-cap {
   border-color: color-mix(in srgb, var(--axv-primary) 45%, transparent);
   color: var(--axv-primary);
 }
 
-/* M64i（A6）：项目事实已加载角标 */
+/* M64i锛圓6锛夛細椤圭洰浜嬪疄宸插姞杞借鏍?*/
 .axv-ai-facts {
   opacity: 0.75;
   font-size: 10.5px;
 }
 
-/* ===== M68（C3）：属性面板「查引用」按钮 + 引用列表浮层 ===== */
+/* ===== M68锛圕3锛夛細灞炴€ч潰鏉裤€屾煡寮曠敤銆嶆寜閽?+ 寮曠敤鍒楄〃娴眰 ===== */
 .axv-attr-uses {
   flex: 0 0 20px;
   width: 20px;
@@ -6228,7 +6207,7 @@ button.axv-ws-caret:hover {
   color: var(--axv-on-surface-variant);
 }
 
-/* ===== M66（C1）：资源值面板（res/values* 一页管完） ===== */
+/* ===== M66锛圕1锛夛細璧勬簮鍊奸潰鏉匡紙res/values* 涓€椤电瀹岋級 ===== */
 .axv-rv {
   display: flex;
   flex-direction: column;
@@ -6420,7 +6399,7 @@ button.axv-ws-caret:hover {
   text-overflow: ellipsis;
 }
 
-/* ===== M64l（D2）：工具日志行（一行一条，点开看结果） ===== */
+/* ===== M64l锛圖2锛夛細宸ュ叿鏃ュ織琛岋紙涓€琛屼竴鏉★紝鐐瑰紑鐪嬬粨鏋滐級 ===== */
 .axv-ai-tool {
   margin: 2px 8px;
   border-radius: 8px;
@@ -6501,7 +6480,7 @@ button.axv-ws-caret:hover {
   }
 }
 
-/* ===== M64e（B3）：AI 改动待确认卡片 ===== */
+/* ===== M64e锛圔3锛夛細AI 鏀瑰姩寰呯‘璁ゅ崱鐗?===== */
 .axv-ai-diffcard {
   margin: 6px 8px 0;
   border: 1px solid var(--axv-outline);
@@ -6613,7 +6592,7 @@ button.axv-ws-caret:hover {
   border-top: 1px solid var(--axv-outline);
 }
 
-/* M64g（D4）：AI 改动历史 */
+/* M64g锛圖4锛夛細AI 鏀瑰姩鍘嗗彶 */
 .axv-ai-hist {
   margin: 6px 8px 0;
   border: 1px solid var(--axv-outline);
@@ -6723,7 +6702,7 @@ button.axv-ws-caret:hover {
 }
 .axv-ai-chip:hover:not(:disabled) { border-color: var(--axv-primary); color: var(--axv-primary); }
 .axv-ai-chip:disabled { opacity: 0.5; cursor: default; }
-/* ===== M148：调试日志面板（工具调用/模型原始输出/报错都在这里，不进聊天框） ===== */
+/* ===== M148锛氳皟璇曟棩蹇楅潰鏉匡紙宸ュ叿璋冪敤/妯″瀷鍘熷杈撳嚭/鎶ラ敊閮藉湪杩欓噷锛屼笉杩涜亰澶╂锛?===== */
 .axv-ai-log { flex: 0 0 auto; border-top: 1px solid var(--axv-outline); background: var(--axv-surface-head); }
 .axv-ai-log-head {
   display: flex;
@@ -6780,7 +6759,7 @@ button.axv-ws-caret:hover {
   max-height: 120px;
   overflow: auto;
 }
-/* 分类颜色（需求：日志带分类颜色） */
+/* 鍒嗙被棰滆壊锛堥渶姹傦細鏃ュ織甯﹀垎绫婚鑹诧級 */
 .axv-ai-log-row.k-system { border-left-color: var(--axv-primary, #5b9dff); }
 .axv-ai-log-row.k-system .axv-ai-log-kind { color: var(--axv-primary, #5b9dff); }
 .axv-ai-log-row.k-tool_call { border-left-color: #ff9d3c; }
@@ -6848,23 +6827,20 @@ button.axv-ws-caret:hover {
   opacity: 0.8;
 }
 @media (max-width: 1400px) {
-  /* 窄了就把快捷键提示藏掉，别把两个开关挤成竖排 */
+  /* 绐勪簡灏辨妸蹇嵎閿彁绀鸿棌鎺夛紝鍒妸涓や釜寮€鍏虫尋鎴愮珫鎺?*/
   .axv-ai-keys { display: none; }
   .axv-ai-send { margin-left: auto; }
 }
 .axv-ai-send { min-width: 72px; display: inline-flex; align-items: center; gap: 4px; justify-content: center; }
 .axv-ai-send:disabled { opacity: 0.5; cursor: default; }
 
-/* ===== M18：运行调试的可交互模拟 =====
-   ⚠ 画布 SCALE = 2（1dp = 2px）：这里所有长度都按 2 倍写。
-   例如 Android 的 56dp 列表行 → 112px；14sp 正文 → 28px。 */
+/* ===== M18锛氳繍琛岃皟璇曠殑鍙氦浜掓ā鎷?=====
+   鈿?鐢诲竷 SCALE = 2锛?dp = 2px锛夛細杩欓噷鎵€鏈夐暱搴﹂兘鎸?2 鍊嶅啓銆?   渚嬪 Android 鐨?56dp 鍒楄〃琛?鈫?112px锛?4sp 姝ｆ枃 鈫?28px銆?*/
 .axv-run-body { position: relative; overflow: hidden; }
 .axv-run-screen { position: relative; height: 100%; }
 
 .axv-run-pressed { filter: brightness(0.94); }
-/* M20k：涟漪改成伪元素，天然被控件自己的 overflow:hidden 裁掉；
-   不再往 DOM 插 span（旧做法半径 max(w,h)*2，全宽按钮会盖住整屏，
-   看起来像“所有控件都被按下”）。 */
+/* M20k锛氭稛婕敼鎴愪吉鍏冪礌锛屽ぉ鐒惰鎺т欢鑷繁鐨?overflow:hidden 瑁佹帀锛?   涓嶅啀寰€ DOM 鎻?span锛堟棫鍋氭硶鍗婂緞 max(w,h)*2锛屽叏瀹芥寜閽細鐩栦綇鏁村睆锛?   鐪嬭捣鏉ュ儚鈥滄墍鏈夋帶浠堕兘琚寜涓嬧€濓級銆?*/
 .axv-run-rippleable {
   position: relative;
   overflow: hidden;
@@ -6910,7 +6886,7 @@ button.axv-ws-caret:hover {
 }
 .axv-run-body [data-tag="Button"] { transition: filter 0.12s ease; }
 
-/* 输入框 */
+/* 杈撳叆妗?*/
 .axv-run-input {
   cursor: text;
   outline: none !important;
@@ -6926,7 +6902,7 @@ button.axv-ws-caret:hover {
 }
 .axv-run-input[data-single="1"] { white-space: nowrap; overflow: hidden; }
 
-/* 列表 / 网格：演示行（56dp = 112px） */
+/* 鍒楄〃 / 缃戞牸锛氭紨绀鸿锛?6dp = 112px锛?*/
 .axv-run-list { display: block; overflow: auto; }
 .axv-run-grid {
   display: grid;
@@ -6965,7 +6941,7 @@ button.axv-ws-caret:hover {
 .axv-run-row-static { cursor: pointer; }
 .axv-run-row-static.on { background: rgba(0, 0, 0, 0.08); }
 
-/* 下拉候选菜单（Android Spinner 弹窗） */
+/* 涓嬫媺鍊欓€夎彍鍗曪紙Android Spinner 寮圭獥锛?*/
 .axv-run-popup {
   position: absolute;
   z-index: 30;
@@ -6996,7 +6972,7 @@ button.axv-ws-caret:hover {
   background: rgba(0, 0, 0, 0.06);
 }
 
-/* Android 风格 Toast */
+/* Android 椋庢牸 Toast */
 .axv-run-toast {
   position: absolute;
   left: 50%;
@@ -7020,7 +6996,7 @@ button.axv-ws-caret:hover {
 }
 /* M18-END */
 
-/* ===== M21：另存对话框（文件名 + 选文件夹） ===== */
+/* ===== M21锛氬彟瀛樺璇濇锛堟枃浠跺悕 + 閫夋枃浠跺す锛?===== */
 .axv-saveas-mask {
   position: fixed; inset: 0;
   background: var(--axv-scrim);
@@ -7056,7 +7032,7 @@ button.axv-ws-caret:hover {
 .axv-saveas-btns .axv-set-btn { padding: 7px 14px; font-size: 12.5px; }
 .axv-saveas-ok { background: var(--axv-primary); color: var(--axv-on-primary); border-color: var(--axv-primary); }
 
-/* M22：结构问题提示条（能渲染但有错，可一键跳代码面板） */
+/* M22锛氱粨鏋勯棶棰樻彁绀烘潯锛堣兘娓叉煋浣嗘湁閿欙紝鍙竴閿烦浠ｇ爜闈㈡澘锛?*/
 .axv-struct-warn {
   position: absolute;
   top: 8px;
@@ -7093,7 +7069,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   color: #f2d789;
 }
 
-/* ===== M22：解析/渲染失败卡片（不白屏，直接引到代码面板） ===== */
+/* ===== M22锛氳В鏋?娓叉煋澶辫触鍗＄墖锛堜笉鐧藉睆锛岀洿鎺ュ紩鍒颁唬鐮侀潰鏉匡級 ===== */
 .axv-parse-fail {
   margin: 14px 10px;
   padding: 16px 14px 14px;
@@ -7108,7 +7084,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   max-width: 340px;
 }
 .axv-parse-fail-icon { font-size: 30px; color: var(--axv-danger); }
-/* M37b：非布局文件提示卡（蓝色调，不是错误） */
+/* M37b锛氶潪甯冨眬鏂囦欢鎻愮ず鍗★紙钃濊壊璋冿紝涓嶆槸閿欒锛?*/
 .axv-codeonly-card .axv-parse-fail-icon { color: var(--axv-primary); }
 .axv-codeonly-card { border-style: dashed; }
 .axv-parse-fail-title { font-size: 13.5px; font-weight: 700; color: var(--axv-title); }
@@ -7140,7 +7116,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
 }
 .axv-parse-fail-btn:hover { filter: brightness(1.06); }
 
-/* M23：设置里的语言下拉 */
+/* M23锛氳缃噷鐨勮瑷€涓嬫媺 */
 .axv-lang-select {
   width: 100%;
   height: auto;
@@ -7153,14 +7129,14 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   font-size: 12px;
 }
 
-/* ===== M24：当前项目面板（项目结构树） ===== */
+/* ===== M24锛氬綋鍓嶉」鐩潰鏉匡紙椤圭洰缁撴瀯鏍戯級 ===== */
 .axv-proj-now {
   margin: 8px 10px 4px;
   border: 1px solid var(--axv-outline-variant, #0000001f);
   border-radius: 10px;
   background: var(--axv-surface-2, #ffffff0f);
   overflow: hidden;
-  /* M31i：原来靠子列表 max-height:42vh 限制，窗口一变高就空一大块；改成撑满剩余高度 */
+  /* M31i锛氬師鏉ラ潬瀛愬垪琛?max-height:42vh 闄愬埗锛岀獥鍙ｄ竴鍙橀珮灏辩┖涓€澶у潡锛涙敼鎴愭拺婊″墿浣欓珮搴?*/
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -7181,7 +7157,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* M31：项目图标（ic_launcher 图片） */
+/* M31锛氶」鐩浘鏍囷紙ic_launcher 鍥剧墖锛?*/
 .axv-proj-now-icon {
   width: 18px;
   height: 18px;
@@ -7195,7 +7171,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   margin-left: auto;
 }
 .axv-proj-now .axv-ws-list {
-  /* M31i：不再固定 42vh，改成占满 axv-proj-now 里剩下的高度 */
+  /* M31i锛氫笉鍐嶅浐瀹?42vh锛屾敼鎴愬崰婊?axv-proj-now 閲屽墿涓嬬殑楂樺害 */
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
@@ -7214,7 +7190,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   text-transform: none;
 }
 
-/* M25d: 项目列表卡片（扁平，一层） */
+/* M25d: 椤圭洰鍒楄〃鍗＄墖锛堟墎骞筹紝涓€灞傦級 */
 .axv-proj-card {
   border: 1px solid var(--axv-outline-variant, #00000014);
   border-radius: 12px;
@@ -7235,7 +7211,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   text-align: left;
   cursor: pointer;
 }
-/* M176：卡片右侧的「改名」笔形按钮 */
+/* M176锛氬崱鐗囧彸渚х殑銆屾敼鍚嶃€嶇瑪褰㈡寜閽?*/
 .axv-proj-card-edit {
   flex: 0 0 auto;
   display: inline-flex;
@@ -7267,15 +7243,15 @@ html[data-axv-theme="dark"] .axv-struct-warn {
 .axv-proj-card-btn .axv-ws-item-main { flex: 1 1 auto; }
 .axv-proj-card-go { flex: 0 0 auto; font-size: 18px; color: var(--axv-desc); opacity: 0.6; }
 
-/* M25d: 懒加载结构树 */
+/* M25d: 鎳掑姞杞界粨鏋勬爲 */
 .axv-proj-tree { max-height: 46vh; overflow: auto; margin-top: 6px; }
-/* M46: 横向滚动 —— 深目录名不截断，超出时可左右滑 */
+/* M46: 妯悜婊氬姩 鈥斺€?娣辩洰褰曞悕涓嶆埅鏂紝瓒呭嚭鏃跺彲宸﹀彸婊?*/
 .axv-ws-row { min-width: max-content; }
 .axv-ws-item-main { min-width: 0; }
 .axv-ws-item-name { white-space: nowrap; }
 .axv-ws-row { user-select: none; -webkit-user-select: none; touch-action: manipulation; }
 
-/* M46: 长按操作菜单 */
+/* M46: 闀挎寜鎿嶄綔鑿滃崟 */
 .axv-tfm-mask {
   position: fixed;
   inset: 0;
@@ -7316,7 +7292,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
 .axv-tfm-label { font-weight: 600; }
 .axv-tfm-hint { font-size: 11px; color: var(--axv-desc, #888); font-weight: 400; }
 
-/* M46: 弹窗（新建/重命名/删除/消息） */
+/* M46: 寮圭獥锛堟柊寤?閲嶅懡鍚?鍒犻櫎/娑堟伅锛?*/
 .axv-dlg {
   position: fixed;
   left: 50%;
@@ -7361,7 +7337,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
 .axv-btn-danger { background: var(--axv-danger); color: var(--axv-on-primary); }
 .axv-btn-danger:hover { background: #c22; }
 
-/* M46b: 移动模式工具条 + 拖拽手柄 + 落点高亮 */
+/* M46b: 绉诲姩妯″紡宸ュ叿鏉?+ 鎷栨嫿鎵嬫焺 + 钀界偣楂樹寒 */
 .axv-move-bar {
   display: flex;
   align-items: center;
@@ -7408,7 +7384,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
 }
 @keyframes axv-spin { to { transform: rotate(360deg); } }
 
-/* ===== M27：底部状态条 ===== */
+/* ===== M27锛氬簳閮ㄧ姸鎬佹潯 ===== */
 .axv-appstatus {
   position: absolute;
   left: 0;
@@ -7525,7 +7501,7 @@ button.axv-sb-item:hover {
     max-width: 55%;
   }
 }
-/* M28：属性面板搜索 + 只看已修改 */
+/* M28锛氬睘鎬ч潰鏉挎悳绱?+ 鍙湅宸蹭慨鏀?*/
 .axv-attr-filter {
   display: flex;
   gap: 6px;
@@ -7583,7 +7559,7 @@ button.axv-sb-item:hover {
   font-size: 12px;
   cursor: pointer;
 }
-/* M29：图层树搜索 */
+/* M29锛氬浘灞傛爲鎼滅储 */
 .axv-lt-search {
   display: flex;
   gap: 4px;
@@ -7624,7 +7600,7 @@ button.axv-sb-item:hover {
   color: var(--axv-primary);
   font-weight: 700;
 }
-/* M30：常用符号快捷条 + 工具按钮收矮 */
+/* M30锛氬父鐢ㄧ鍙峰揩鎹锋潯 + 宸ュ叿鎸夐挳鏀剁煯 */
 .axv-sym-bar {
   flex: 0 0 auto;
   display: flex;
@@ -7662,7 +7638,7 @@ button.axv-sb-item:hover {
   border-color: var(--axv-primary);
   color: var(--axv-on-primary);
 }
-/* M30b：符号条最前面的「格式化」动作按钮（非符号，用正文字体） */
+/* M30b锛氱鍙锋潯鏈€鍓嶉潰鐨勩€屾牸寮忓寲銆嶅姩浣滄寜閽紙闈炵鍙凤紝鐢ㄦ鏂囧瓧浣擄級 */
 .axv-sym-btn.axv-sym-action {
   font-family: inherit;
   font-weight: 600;
@@ -7676,7 +7652,7 @@ button.axv-sb-item:hover {
   }
 }
 
-/* ===== M60c：项目管理列表自己滚（项目多时超出屏幕看不到后面） ===== */
+/* ===== M60c锛氶」鐩鐞嗗垪琛ㄨ嚜宸辨粴锛堥」鐩鏃惰秴鍑哄睆骞曠湅涓嶅埌鍚庨潰锛?===== */
 .axv-ws-panel > .axv-ws-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -7686,7 +7662,7 @@ button.axv-sb-item:hover {
   padding-bottom: 10px;
 }
 
-/* ===== M61：Java/Kotlin 函数列表（右侧面板） ===== */
+/* ===== M61锛欽ava/Kotlin 鍑芥暟鍒楄〃锛堝彸渚ч潰鏉匡級 ===== */
 .axv-outline {
   display: flex;
   flex-direction: column;
@@ -7794,7 +7770,7 @@ button.axv-sb-item:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* ===== M62：项目列表筛选框 ===== */
+/* ===== M62锛氶」鐩垪琛ㄧ瓫閫夋 ===== */
 .axv-proj-filter {
   flex: 0 0 auto;
   display: flex;
@@ -7838,13 +7814,13 @@ button.axv-sb-item:hover {
 .axv-proj-filter-clear .msr { font-size: 14px; }
 
 
-/* M63i：右侧属性面板的颜色属性也用同一套 ColorField → 尺寸对齐旧色块 */
+/* M63i锛氬彸渚у睘鎬ч潰鏉跨殑棰滆壊灞炴€т篃鐢ㄥ悓涓€濂?ColorField 鈫?灏哄瀵归綈鏃ц壊鍧?*/
 .axv-attr-color .axv-cf-swatch { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 4px; }
 
-/* ===== M63c：颜色取色器改成「蒙版 + 居中弹层」（不再算 x/y） ===== */
-/* 弹窗（如选择资源）里的取色器：盖过 .axv-modal-backdrop 的 20000 */
+/* ===== M63c锛氶鑹插彇鑹插櫒鏀规垚銆岃挋鐗?+ 灞呬腑寮瑰眰銆嶏紙涓嶅啀绠?x/y锛?===== */
+/* 寮圭獥锛堝閫夋嫨璧勬簮锛夐噷鐨勫彇鑹插櫒锛氱洊杩?.axv-modal-backdrop 鐨?20000 */
 
-/* ===== M63d：values 资源表的取色块换成 ColorField（保持 26px 紧凑） ===== */
+/* ===== M63d锛歷alues 璧勬簮琛ㄧ殑鍙栬壊鍧楁崲鎴?ColorField锛堜繚鎸?26px 绱у噾锛?===== */
 .axv-val-row .axv-cf {
   flex: 0 0 auto;
 }
@@ -7855,7 +7831,7 @@ button.axv-sb-item:hover {
   border: 1px solid var(--axv-outline);
 }
 
-/* M88：多图标库选择弹窗（移植 svg-board iconModal：Material/Lucide/Tabler/几何/粘贴 SVG） */
+/* M88锛氬鍥炬爣搴撻€夋嫨寮圭獥锛堢Щ妞?svg-board iconModal锛歁aterial/Lucide/Tabler/鍑犱綍/绮樿创 SVG锛?*/
 .axv-iconlib {
   width: min(560px, calc(100vw - 32px));
   max-height: min(720px, calc(100vh - 96px));
@@ -7987,7 +7963,7 @@ button.axv-sb-item:hover {
 }
 .axv-iconlib-count { font-size: 12px; color: var(--axv-desc); }
 
-/* M89k：分页（移植 svg-board 图标库弹窗的 ipager） */
+/* M89k锛氬垎椤碉紙绉绘 svg-board 鍥炬爣搴撳脊绐楃殑 ipager锛?*/
 .axv-iconlib-pager {
   display: flex;
   align-items: center;
@@ -8015,7 +7991,7 @@ button.axv-sb-item:hover {
 .axv-iconlib-pager button:not(:disabled):active { transform: scale(0.95); }
 .axv-iconlib-pager .msr { font-size: 18px; }
 
-/* M89k：粘贴 SVG 时的资源名输入行 */
+/* M89k锛氱矘璐?SVG 鏃剁殑璧勬簮鍚嶈緭鍏ヨ */
 .axv-iconlib-namerow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--axv-desc); }
 .axv-iconlib-namerow input {
   flex: 1;
@@ -8029,7 +8005,7 @@ button.axv-sb-item:hover {
 }
 .axv-iconlib-namerow input:focus { border-color: var(--axv-title); }
 
-/* M79：来自 colorpicker.html 的“弹窗式”颜色选择器（Canvas HSV 面板） */
+/* M79锛氭潵鑷?colorpicker.html 鐨勨€滃脊绐楀紡鈥濋鑹查€夋嫨鍣紙Canvas HSV 闈㈡澘锛?*/
 .axv-cp-mask {
   position: fixed;
   inset: 0;
@@ -8040,7 +8016,7 @@ button.axv-sb-item:hover {
   justify-content: center;
   padding: 0 16px;
 }
-/* 在整页编辑器（z 3000）和弹窗（z 20000）里都要压得住 */
+/* 鍦ㄦ暣椤电紪杈戝櫒锛坺 3000锛夊拰寮圭獥锛坺 20000锛夐噷閮借鍘嬪緱浣?*/
 .axv-cp-mask.is-above-page { z-index: 20150; }
 
 .axv-cp {
@@ -8168,7 +8144,7 @@ button.axv-sb-item:hover {
   align-items: center;
   margin: 14px 0 10px;
 }
-/* M89e：色值输入框要能放下 rgba(255,255,255,0.50)，预览块收窄一点 */
+/* M89e锛氳壊鍊艰緭鍏ユ瑕佽兘鏀句笅 rgba(255,255,255,0.50)锛岄瑙堝潡鏀剁獎涓€鐐?*/
 .cp-preview-box {
   width: 64px;
   height: 52px;
@@ -8234,7 +8210,7 @@ button.axv-sb-item:hover {
 .cp-copy { background: var(--axv-desc); }
 .cp-confirm { background: #3498db; }
 
-/* 图标编辑器里的“取色”按钮和色块 */
+/* 鍥炬爣缂栬緫鍣ㄩ噷鐨勨€滃彇鑹测€濇寜閽拰鑹插潡 */
 .axv-icon-ed-cp {
   display: inline-flex;
   align-items: center;
@@ -8269,7 +8245,7 @@ button.axv-sb-item:hover {
 }
 .axv-icon-ed-cp-inline:hover { background: rgba(255,255,255,0.14); }
 
-/* ===== M81：画布式图标编辑器（IconCanvasEditor） ===== */
+/* ===== M81锛氱敾甯冨紡鍥炬爣缂栬緫鍣紙IconCanvasEditor锛?===== */
 .axv-cv-page .axv-shape-head {
   gap: 8px;
 }
@@ -8288,7 +8264,7 @@ button.axv-sb-item:hover {
   position: relative;
 }
 
-/* 左栏：工具条 + 画布 */
+/* 宸︽爮锛氬伐鍏锋潯 + 鐢诲竷 */
 .axv-cv-left {
   flex: 1 1 auto;
   min-width: 0;
@@ -8350,7 +8326,7 @@ button.axv-sb-item:hover {
   aspect-ratio: 1 / 1;
   max-width: 100%;
   max-height: 100%;
-  /* 透明棋盘底：让无填充的矢量图形看得见边界 */
+  /* 閫忔槑妫嬬洏搴曪細璁╂棤濉厖鐨勭煝閲忓浘褰㈢湅寰楄杈圭晫 */
   background-color: var(--axv-surface);
   background-image:
     linear-gradient(45deg, #ccc 25%, #0000 25% 75%, #ccc 75%, #ccc),
@@ -8379,7 +8355,7 @@ button.axv-sb-item:hover {
   user-select: none;
 }
 
-/* 右栏：参数 */
+/* 鍙虫爮锛氬弬鏁?*/
 .axv-cv-form {
   flex: 0 0 288px;
   max-width: 288px;
@@ -8387,7 +8363,7 @@ button.axv-sb-item:hover {
   border-left: 1px solid var(--axv-outline);
   padding: 10px 12px 18px;
 }
-/* M135：三个编辑器共用右栏，统一内边距（用户指定 10px 12px） */
+/* M135锛氫笁涓紪杈戝櫒鍏辩敤鍙虫爮锛岀粺涓€鍐呰竟璺濓紙鐢ㄦ埛鎸囧畾 10px 12px锛?*/
 .axv-icon-ed-form.axv-cv-form {
   padding: 10px 12px;
 }
@@ -8451,7 +8427,7 @@ button.axv-sb-item:hover {
   font-size: 12px;
   text-align: center;
 }
-/* 只读数值（分组变换的 30° / 150%）：和输入框同宽同字号，但不画边框 */
+/* 鍙鏁板€硷紙鍒嗙粍鍙樻崲鐨?30掳 / 150%锛夛細鍜岃緭鍏ユ鍚屽鍚屽瓧鍙凤紝浣嗕笉鐢昏竟妗?*/
 .axv-cv-val {
   flex: 0 0 75px;
   width: 75px;
@@ -8467,7 +8443,7 @@ button.axv-sb-item:hover {
   margin-top: 4px;
 }
 
-/* 图层列表 */
+/* 鍥惧眰鍒楄〃 */
 .axv-cv-layers {
   display: flex;
   flex-direction: column;
@@ -8485,7 +8461,7 @@ button.axv-sb-item:hover {
   cursor: pointer;
   user-select: none;
 }
-/* ===== M89b：图层分组行 ===== */
+/* ===== M89b锛氬浘灞傚垎缁勮 ===== */
 .axv-cv-grp {
   display: flex;
   align-items: center;
@@ -8523,7 +8499,7 @@ button.axv-sb-item:hover {
   border-color: var(--axv-primary);
   background: var(--axv-surface);
 }
-/* 组内成员行缩进一点，层级一眼能看出来 */
+/* 缁勫唴鎴愬憳琛岀缉杩涗竴鐐癸紝灞傜骇涓€鐪艰兘鐪嬪嚭鏉?*/
 .axv-cv-layers > .axv-cv-layer[data-layer-id] { margin-left: 0; }
 .axv-cv-grp-panel {
   border: 1px solid color-mix(in srgb, var(--axv-primary) 25%, transparent);
@@ -8531,7 +8507,7 @@ button.axv-sb-item:hover {
   padding: 8px 10px;
   background: color-mix(in srgb, var(--axv-primary) 5%, transparent);
 }
-/* 旧的分组数值标签规则已并入上面的 .axv-cv-val */
+/* 鏃х殑鍒嗙粍鏁板€兼爣绛捐鍒欏凡骞跺叆涓婇潰鐨?.axv-cv-val */
 .axv-cv-layer:hover { background: rgba(0, 0, 0, 0.05); }
 .axv-cv-layer.on { background: color-mix(in srgb, var(--axv-primary) 12%, transparent); }
 .axv-cv-layer-dot {
@@ -8562,7 +8538,7 @@ button.axv-sb-item:hover {
 }
 
 @media (max-width: 720px) {
-  /* M88l：6 个 tab 在 390px 宽下要能放下，收紧横向内边距 */
+  /* M88l锛? 涓?tab 鍦?390px 瀹戒笅瑕佽兘鏀句笅锛屾敹绱фí鍚戝唴杈硅窛 */
   .axv-cv-sheet-tab { padding: 0 6px; }
   .axv-cv-body { flex-direction: column; }
   .axv-cv-form {
@@ -8573,15 +8549,14 @@ button.axv-sb-item:hover {
   }
   .axv-cv-stage { padding: 12px; }
 }
-﻿
-/* M81 修正：让画布撑满高度、底部按钮横排 */
+锘?/* M81 淇锛氳鐢诲竷鎾戞弧楂樺害銆佸簳閮ㄦ寜閽í鎺?*/
 .axv-icon-page-body.axv-cv-body {
   align-items: stretch;
   overflow: hidden;
 }
 .axv-cv-form { min-height: 0; }
 .axv-cv-form-toggle { display: none; }
-/* align-items 被旧规则压住，改用子项 align-self 拉伸（不依赖容器） */
+/* align-items 琚棫瑙勫垯鍘嬩綇锛屾敼鐢ㄥ瓙椤?align-self 鎷変几锛堜笉渚濊禆瀹瑰櫒锛?*/
 .axv-cv-left, .axv-cv-form { align-self: stretch; }
 .axv-cv-page .axv-icon-page-foot {
   flex-direction: row;
@@ -8596,11 +8571,11 @@ button.axv-sb-item:hover {
   min-width: 0;
   line-height: 1.5;
 }
-/* 按钮不许被说明文字挤成竖排（窄屏下会变成三个字一行） */
+/* 鎸夐挳涓嶈琚鏄庢枃瀛楁尋鎴愮珫鎺掞紙绐勫睆涓嬩細鍙樻垚涓変釜瀛椾竴琛岋級 */
 .axv-cv-page .axv-icon-page-foot > span:last-child { flex: 0 0 auto; }
 .axv-cv-page .axv-icon-page-foot .axv-btn { white-space: nowrap; }
 
-/* ===== M82：图标画布补齐 svg-board 能力 ===== */
+/* ===== M82锛氬浘鏍囩敾甯冭ˉ榻?svg-board 鑳藉姏 ===== */
 .axv-cv-layer-d {
   flex: 0 1 auto;
   max-width: 96px;
@@ -8629,7 +8604,7 @@ button.axv-sb-item:hover {
 .axv-cv-layer-btn .msr { font-size: 15px; }
 .axv-cv-layer.is-hidden .axv-cv-layer-name,
 .axv-cv-layer.is-hidden .axv-cv-layer-d { opacity: 0.4; text-decoration: line-through; }
-.axv-cv-layer.is-locked .axv-cv-layer-name::after { content: " 🔒"; font-size: 10px; }
+.axv-cv-layer.is-locked .axv-cv-layer-name::after { content: " 馃敀"; font-size: 10px; }
 
 .axv-cv-align {
   display: flex;
@@ -8692,13 +8667,13 @@ button.axv-sb-item:hover {
   opacity: 0.6;
 }
 
-/* ================= M83 底部样式抽屉（移植 svg-board 的 sheet） ================= */
+/* ================= M83 搴曢儴鏍峰紡鎶藉眽锛堢Щ妞?svg-board 鐨?sheet锛?================= */
 .axv-cv-sheet {
   position: absolute;
   left: 8px;
   right: 8px;
   bottom: 0px;
-  /* M135：抽屉压到右栏蒙版（z 8）/ 滑面板（z 9）之下，手机端展开右栏时不会盖住蒙版 */
+  /* M135锛氭娊灞夊帇鍒板彸鏍忚挋鐗堬紙z 8锛? 婊戦潰鏉匡紙z 9锛変箣涓嬶紝鎵嬫満绔睍寮€鍙虫爮鏃朵笉浼氱洊浣忚挋鐗?*/
   z-index: 7;
   max-height: 42vh;
   display: flex;
@@ -8742,14 +8717,14 @@ button.axv-sb-item:hover {
   opacity: 0.8;
 }
 .axv-cv-sheet-tabs {
-  /* M88m：tabs 紧跟标题，chev 独占右侧（不再和 tab 贴在一起） */
+  /* M88m锛歵abs 绱ц窡鏍囬锛宑hev 鐙崰鍙充晶锛堜笉鍐嶅拰 tab 璐村湪涓€璧凤級 */
   margin-left: 8px;
   display: flex;
   gap: 2px;
   padding: 2px 2px 0px 2px;
   border-radius: 8px 8px 0px 0px;
   background: var(--axv-hover);
-  /* M88l：tab 变多了（样式/属性/排列/图层/资源/画布），窄屏横向滚动而不是挤爆 */
+  /* M88l锛歵ab 鍙樺浜嗭紙鏍峰紡/灞炴€?鎺掑垪/鍥惧眰/璧勬簮/鐢诲竷锛夛紝绐勫睆妯悜婊氬姩鑰屼笉鏄尋鐖?*/
   flex: 0 1 auto;
   min-width: 0;
   overflow-x: auto;
@@ -8793,7 +8768,7 @@ button.axv-sb-item:hover {
   gap: 8px;
   overscroll-behavior: contain;
 }
-/* 收起时本体不占高度，再用 -1px 把底边那 1px 缝隙吃掉（height 不能为负） */
+/* 鏀惰捣鏃舵湰浣撲笉鍗犻珮搴︼紝鍐嶇敤 -1px 鎶婂簳杈归偅 1px 缂濋殭鍚冩帀锛坔eight 涓嶈兘涓鸿礋锛?*/
 .axv-cv-sheet.is-collapsed .axv-cv-sheet-body {
   height: 0;
   min-height: 0;
@@ -8804,27 +8779,27 @@ button.axv-sb-item:hover {
 }
 .axv-cv-sheet-pane { display: flex; flex-direction: column; gap: 6px; }
 
-/* 抽屉里的 set-group 不再需要外边距/分隔线 */
+/* 鎶藉眽閲岀殑 set-group 涓嶅啀闇€瑕佸杈硅窛/鍒嗛殧绾?*/
 .axv-cv-sheet-pane .axv-set-group { margin: 0; padding: 0; border: 0; }
 .axv-cv-sheet-pane .axv-cv-layers { max-height: none; }
 
-/* 抽屉展开时画布上移，避免挡住图标 */
+/* 鎶藉眽灞曞紑鏃剁敾甯冧笂绉伙紝閬垮厤鎸′綇鍥炬爣 */
 .axv-cv-body:has(.axv-cv-sheet:not(.is-collapsed)) .axv-cv-stage {
   padding-bottom: 132px;
 }
 
-/* ===== M84：移动端资源面板改成右侧滑出 ===== */
+/* ===== M84锛氱Щ鍔ㄧ璧勬簮闈㈡澘鏀规垚鍙充晶婊戝嚭 ===== */
 .axv-cv-body { position: relative; }
 
 @media (max-width: 840px) {
-  /* 移动端：右栏不隐藏、不进抽屉，直接堆在画布下方，整块纵向滚动 */
+  /* 绉诲姩绔細鍙虫爮涓嶉殣钘忋€佷笉杩涙娊灞夛紝鐩存帴鍫嗗湪鐢诲竷涓嬫柟锛屾暣鍧楃旱鍚戞粴鍔?*/
   .axv-cv-body {
     flex-direction: column;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
   .axv-cv-left { flex: 0 0 auto; min-height: 320px; }
-  /* M88c：右栏改成靠右悬浮的滑面板（占满可用高度，宽度 75vw） */
+  /* M88c锛氬彸鏍忔敼鎴愰潬鍙虫偓娴殑婊戦潰鏉匡紙鍗犳弧鍙敤楂樺害锛屽搴?75vw锛?*/
   .axv-cv-body .axv-icon-ed-form.axv-cv-form {
     position: absolute;
     top: 0;
@@ -8837,7 +8812,7 @@ button.axv-sb-item:hover {
     max-width: 75vw;
     height: 100%;
     max-height: none;
-    /* 底部样式抽屉浮在上面；M135 依用户要求收成 10px 12px，不再额外垫 150px */
+    /* 搴曢儴鏍峰紡鎶藉眽娴湪涓婇潰锛汳135 渚濈敤鎴疯姹傛敹鎴?10px 12px锛屼笉鍐嶉澶栧灚 150px */
     padding: 10px 12px;
     border-left: 1px solid var(--axv-outline);
     border-top: none;
@@ -8849,8 +8824,8 @@ button.axv-sb-item:hover {
     overscroll-behavior: contain;
     transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
-  /* 收起：整块滑到视口右侧之外 */
-  /* 收起：宽度和内边距都归零（-1px 是非法值），再滑出 1px 把贴边缝藏掉 */
+  /* 鏀惰捣锛氭暣鍧楁粦鍒拌鍙ｅ彸渚т箣澶?*/
+  /* 鏀惰捣锛氬搴﹀拰鍐呰竟璺濋兘褰掗浂锛?1px 鏄潪娉曞€硷級锛屽啀婊戝嚭 1px 鎶婅创杈圭紳钘忔帀 */
   .axv-cv-body .axv-icon-ed-form.axv-cv-form.is-closed {
     width: 0;
     max-width: 0;
@@ -8861,7 +8836,7 @@ button.axv-sb-item:hover {
     transform: translateX(calc(100% + 1px));
     pointer-events: none;
   }
-  /* 面板左缘的箭头开关：展开时贴着面板左侧，收起后落到视口右缘 */
+  /* 闈㈡澘宸︾紭鐨勭澶村紑鍏筹細灞曞紑鏃惰创鐫€闈㈡澘宸︿晶锛屾敹璧峰悗钀藉埌瑙嗗彛鍙崇紭 */
   .axv-cv-form-toggle {
     display: grid;
     place-items: center;
@@ -8884,27 +8859,26 @@ button.axv-sb-item:hover {
   .axv-cv-form-toggle.is-closed { right: 0; }
   .axv-cv-form-toggle .msr { font-size: 18px; opacity: 0.7; }
   .axv-cv-form-toggle:active { transform: scale(0.96); }
-  /* M131：右栏展开时铺一层蒙版，点蒙版也能收起（桌面端不显示）
-     M135：基础规则 .axv-cv-form-mask{display:none} 在文件里更靠后，同优先级会盖掉这里 → 提高一级选择器 */
+  /* M131锛氬彸鏍忓睍寮€鏃堕摵涓€灞傝挋鐗堬紝鐐硅挋鐗堜篃鑳芥敹璧凤紙妗岄潰绔笉鏄剧ず锛?     M135锛氬熀纭€瑙勫垯 .axv-cv-form-mask{display:none} 鍦ㄦ枃浠堕噷鏇撮潬鍚庯紝鍚屼紭鍏堢骇浼氱洊鎺夎繖閲?鈫?鎻愰珮涓€绾ч€夋嫨鍣?*/
   .axv-cv-body .axv-cv-form-mask { display: block; }
 }
 
-/* M135：宽屏下抽屉占的高度由 DrawableEditor 用 ResizeObserver 量出来，
-   已改成行内 style 给 .axv-cv-body 加 padding-bottom；这里不再写死数值 */
+/* M135锛氬灞忎笅鎶藉眽鍗犵殑楂樺害鐢?DrawableEditor 鐢?ResizeObserver 閲忓嚭鏉ワ紝
+   宸叉敼鎴愯鍐?style 缁?.axv-cv-body 鍔?padding-bottom锛涜繖閲屼笉鍐嶅啓姝绘暟鍊?*/
 
 @media (max-width: 840px) {
-  .axv-cv-sheet { left: 4px; right: 4px; bottom: 0px; max-height: 46vh; border-radius: 14px 14px 0px 0px; }  /* M135：窄屏预览框收一圈留白，220×140 在 360~420px 宽的屏上也能完整站稳 */
+  .axv-cv-sheet { left: 4px; right: 4px; bottom: 0px; max-height: 46vh; border-radius: 14px 14px 0px 0px; }  /* M135锛氱獎灞忛瑙堟鏀朵竴鍦堢暀鐧斤紝220脳140 鍦?360~420px 瀹界殑灞忎笂涔熻兘瀹屾暣绔欑ǔ */
   .axv-dp-frame { padding: 12px; }
   .axv-cv-sheet-tab { padding: 0 8px; font-size: 12px; }
   .axv-cv-sheet-title { display: none; }
   .axv-cv-sheet-tabs { margin-left: 0; }
   .axv-cv-body:has(.axv-cv-sheet:not(.is-collapsed)) .axv-cv-stage { padding-bottom: 118px; }
-  /* 窄屏底栏位置紧：说明整段让给按钮 */
+  /* 绐勫睆搴曟爮浣嶇疆绱э細璇存槑鏁存璁╃粰鎸夐挳 */
   .axv-cv-page .axv-icon-page-foot-note { display: none; }
   .axv-cv-page .axv-icon-page-foot { padding: 10px 12px; }
 }
 
-/* ===== M86：画布尺寸段选 + 图层拖拽排序 ===== */
+/* ===== M86锛氱敾甯冨昂瀵告閫?+ 鍥惧眰鎷栨嫿鎺掑簭 ===== */
 .axv-cv-sizes {
   display: flex;
   flex-wrap: wrap;
@@ -8951,8 +8925,7 @@ button.axv-sb-item:hover {
 .axv-cv-layer.is-dragging { opacity: 0.55; }
 .axv-cv-layer.is-drop { outline: 2px dashed var(--axv-primary); outline-offset: -2px; }
 
-/* ===== M89c：全局输入框统一样式（边框/底色/focus）
-   只作用于文本类 input，checkbox/radio/range/color/file 保持原生外观 ===== */
+/* ===== M89c锛氬叏灞€杈撳叆妗嗙粺涓€鏍峰紡锛堣竟妗?搴曡壊/focus锛?   鍙綔鐢ㄤ簬鏂囨湰绫?input锛宑heckbox/radio/range/color/file 淇濇寔鍘熺敓澶栬 ===== */
 input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="submit"], [type="button"], [type="reset"])) {
   border: 1px solid var(--axv-outline);
   background: var(--axv-surface);
@@ -8963,7 +8936,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   outline: none;
 }
 
-/* ===== M90：配色方案卡片编辑图标 ===== */
+/* ===== M90锛氶厤鑹叉柟妗堝崱鐗囩紪杈戝浘鏍?===== */
 .axv-theme-card { position: relative; }
 .axv-theme-pick { display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0; border: none; background: transparent; padding: 0; cursor: pointer; text-align: left; font: inherit; color: inherit; }
 .axv-theme-edit { flex: 0 0 auto; width: 22px; height: 22px; margin-left: 2px; display: grid; place-items: center; border: none; border-radius: 6px; background: transparent; color: var(--axv-desc, #7a7a85); cursor: pointer; opacity: 0.55; }
@@ -8972,11 +8945,11 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-theme-edit:active { background: var(--axv-primary-soft); }
 .axv-theme-card.on .axv-theme-edit { opacity: 0.9; }
 
-/* ===== M90：配色方案编辑子页 ===== */
+/* ===== M90锛氶厤鑹叉柟妗堢紪杈戝瓙椤?===== */
 .axv-thm-page { background: var(--axv-app-bg, var(--axv-surface)); }
 .axv-thm-count { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 600; color: var(--axv-primary); background: var(--axv-primary-soft, rgba(0,0,0,0.06)); padding: 2px 8px; border-radius: 999px; vertical-align: 2px; }
 .axv-thm-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 14px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
-/* 关键：列容器里的子项不许被压缩，否则列表会被裁掉大半（overflow:hidden 把行吃掉） */
+/* 鍏抽敭锛氬垪瀹瑰櫒閲岀殑瀛愰」涓嶈琚帇缂╋紝鍚﹀垯鍒楄〃浼氳瑁佹帀澶у崐锛坥verflow:hidden 鎶婅鍚冩帀锛?*/
 .axv-thm-body > * { flex: 0 0 auto; }
 .axv-thm-mode { display: flex; flex-direction: column; gap: 6px; }
 .axv-thm-sect { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--axv-title, var(--axv-title)); display: flex; align-items: baseline; gap: 8px; }
@@ -9001,10 +8974,10 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   .axv-thm-foot { flex-wrap: wrap; gap: 8px; }
 }
 
-/* ===== M90b：设置项里的小标签（当前编辑的是浅色还是深色） ===== */
+/* ===== M90b锛氳缃」閲岀殑灏忔爣绛撅紙褰撳墠缂栬緫鐨勬槸娴呰壊杩樻槸娣辫壊锛?===== */
 .axv-set-tag { margin-left: 6px; padding: 1px 6px; font-size: 10px; font-style: normal; font-weight: 600; line-height: 15px; color: var(--axv-primary); background: var(--axv-primary-soft, rgba(0,0,0,0.06)); border-radius: 999px; vertical-align: 1px; }
 
-/* M101：代码面板里的操作反馈提示（exportNote 原先只在画布状态条处渲染） */
+/* M101锛氫唬鐮侀潰鏉块噷鐨勬搷浣滃弽棣堟彁绀猴紙exportNote 鍘熷厛鍙湪鐢诲竷鐘舵€佹潯澶勬覆鏌擄級 */
 .axv-code-toast {
   position: fixed;
   left: 50%;
@@ -9016,7 +8989,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   box-shadow: 0 6px 18px rgba(0,0,0,0.18);
 }
 
-/* M117：形状编辑器优化 */
+/* M117锛氬舰鐘剁紪杈戝櫒浼樺寲 */
 .axv-shape-preset-row { display: flex; gap: 4px; flex-wrap: wrap; }
 .axv-shape-preset {
   border: 1px solid var(--axv-outline);
@@ -9056,13 +9029,13 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-shape-pv-bg-btn.is-on { border-color: var(--axv-primary); color: var(--axv-primary); background: var(--axv-primary-soft); }
 
 
-/* M118：drawable 图层预览 + 按下演示 */
+/* M118锛歞rawable 鍥惧眰棰勮 + 鎸変笅婕旂ず */
 .axv-dp { display: flex; flex-direction: column; gap: 6px; align-items: center; }
 .axv-dp-box {
   position: relative;
   overflow: hidden;
   border-radius: 2px;
-  /* M132：不再自己铺底色（透明=露出外层背景） */
+  /* M132锛氫笉鍐嶈嚜宸遍摵搴曡壊锛堥€忔槑=闇插嚭澶栧眰鑳屾櫙锛?*/
   background: none;
   touch-action: manipulation;
   user-select: none;
@@ -9103,7 +9076,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   to   { transform: translate(-50%, -50%) scale(1); opacity: 0; }
 }
 .axv-dp-state { display: flex; align-items: center; gap: 6px; font-size: 11px; }
-/* M136：状态模拟区（多行：状态开关 / 命中提示） */
+/* M136锛氱姸鎬佹ā鎷熷尯锛堝琛岋細鐘舵€佸紑鍏?/ 鍛戒腑鎻愮ず锛?*/
 .axv-dp-state-wrap {
   display: flex;
   flex-direction: column;
@@ -9140,7 +9113,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   color: var(--axv-desc);
 }
 .axv-dp-pick .msr { font-size: 13px; line-height: 1; opacity: 0.7; }
-/* 不透明度滑块 */
+/* 涓嶉€忔槑搴︽粦鍧?*/
 .axv-attr-slider { display: flex; align-items: center; gap: 8px; }
 .axv-dp-range {
   flex: 1 1 auto;
@@ -9151,7 +9124,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   cursor: pointer;
 }
 .axv-attr-num-sm { flex: 0 0 auto; width: 88px; }
-/* 引用资源候选 */
+/* 寮曠敤璧勬簮鍊欓€?*/
 .axv-ref-picks {
   display: flex;
   flex-wrap: wrap;
@@ -9206,7 +9179,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   opacity: 0.5;
 }
 
-/* M119：形状编辑器图层（layer-list） */
+/* M119锛氬舰鐘剁紪杈戝櫒鍥惧眰锛坙ayer-list锛?*/
 .axv-layer-target {
   display: flex;
   align-items: center;
@@ -9283,9 +9256,9 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 }
 .axv-layer-ops button:hover:not(:disabled) { background: var(--axv-outline); color: var(--axv-title); }
 .axv-layer-ops button:disabled { opacity: 0.35; cursor: default; }
-.axv-layer-ops button[title="删除这层"]:hover { color: var(--axv-danger, #e5484d); }
+.axv-layer-ops button[title="鍒犻櫎杩欏眰"]:hover { color: var(--axv-danger, #e5484d); }
 
-/* ── M121 drawable 树编辑：面包屑 / 子节点 / 添加菜单 / schema 属性行 ── */
+/* 鈹€鈹€ M121 drawable 鏍戠紪杈戯細闈㈠寘灞?/ 瀛愯妭鐐?/ 娣诲姞鑿滃崟 / schema 灞炴€ц 鈹€鈹€ */
 .axv-tree-crumbs {
   display: flex;
   flex-wrap: wrap;
@@ -9328,10 +9301,10 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-attr-num .axv-attr-input { flex: 1 1 auto; min-width: 0; }
 .axv-attr-suffix { flex: 0 0 auto; font-size: 11px; color: var(--axv-muted); }
 
-/* ── M121 drawable 结构树编辑器 ── */
+/* 鈹€鈹€ M121 drawable 缁撴瀯鏍戠紪杈戝櫒 鈹€鈹€ */
 .axv-dw-bar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; margin-bottom: 8px; }
 .axv-dw-bar .axv-shape-seg { flex: 0 0 auto; }
-/* M131：手机端右栏滑面板背后的蒙版（桌面端不显示，点一下收起面板） */
+/* M131锛氭墜鏈虹鍙虫爮婊戦潰鏉胯儗鍚庣殑钂欑増锛堟闈㈢涓嶆樉绀猴紝鐐逛竴涓嬫敹璧烽潰鏉匡級 */
 .axv-cv-form-mask {
   display: none;
   position: absolute;
@@ -9343,7 +9316,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   -webkit-tap-highlight-color: transparent;
 }
 
-/* M131：形状/边距页顶部显示当前节点路径 */
+/* M131锛氬舰鐘?杈硅窛椤甸《閮ㄦ樉绀哄綋鍓嶈妭鐐硅矾寰?*/
 .axv-dw-who {
   display: flex;
   align-items: center;
@@ -9358,8 +9331,8 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   white-space: nowrap;
 }
 
-/* M135：预览框改由 DrawablePreview 内部的 .axv-dp-frame 画（框只包住 drawable），
-   外面这层 .axv-dw-stage 只负责水平居中 */
+/* M135锛氶瑙堟鏀圭敱 DrawablePreview 鍐呴儴鐨?.axv-dp-frame 鐢伙紙妗嗗彧鍖呬綇 drawable锛夛紝
+   澶栭潰杩欏眰 .axv-dw-stage 鍙礋璐ｆ按骞冲眳涓?*/
 .axv-dw-stage {
   display: flex;
   justify-content: center;
@@ -9376,8 +9349,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   overflow: hidden;
   box-sizing: border-box;
 }
-/* M132：预览背景层 = 外层 .axv-dw-preview（棋盘格 / 纯色由内联 style 给），
-   内层 .axv-dp-box 只负责画 drawable 内容，自己不铺底色。 */
+/* M132锛氶瑙堣儗鏅眰 = 澶栧眰 .axv-dw-preview锛堟鐩樻牸 / 绾壊鐢卞唴鑱?style 缁欙級锛?   鍐呭眰 .axv-dp-box 鍙礋璐ｇ敾 drawable 鍐呭锛岃嚜宸变笉閾哄簳鑹层€?*/
 .axv-dw-preview {
   border-radius: 12px;
   padding: 14px;
@@ -9385,13 +9357,12 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  /* M135：预览框不再拉满整行（拉满会让棋盘格比 drawable 大一圈，看着像画布尺寸），
-     改为收缩到内容宽度 + 水平居中；窄屏时再缩一圈内边距，保证 220×140 不被裁 */
+  /* M135锛氶瑙堟涓嶅啀鎷夋弧鏁磋锛堟媺婊′細璁╂鐩樻牸姣?drawable 澶т竴鍦堬紝鐪嬬潃鍍忕敾甯冨昂瀵革級锛?     鏀逛负鏀剁缉鍒板唴瀹瑰搴?+ 姘村钩灞呬腑锛涚獎灞忔椂鍐嶇缉涓€鍦堝唴杈硅窛锛屼繚璇?220脳140 涓嶈瑁?*/
   align-self: center;
   max-width: 100%;
 }
 .axv-dw-canvas { border-radius: 8px; overflow: hidden; }
-/* M132：预览里四周留 20px，让外层背景（棋盘格）露一圈当边框；flex:none 防止被压扁 */
+/* M132锛氶瑙堥噷鍥涘懆鐣?20px锛岃澶栧眰鑳屾櫙锛堟鐩樻牸锛夐湶涓€鍦堝綋杈规锛沠lex:none 闃叉琚帇鎵?*/
 .axv-dw-preview .axv-dp-box { margin: 20px; flex: 0 0 auto; }
 .axv-dw-meta { display: flex; gap: 10px; font-size: 11px; color: var(--axv-muted); margin-top: 8px; justify-content: center; }
 .axv-dw-problems { display: flex; flex-direction: column; gap: 6px; }
@@ -9409,7 +9380,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-dw-quick { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--axv-outline); }
 .axv-dw-raw { max-height: 220px; overflow: auto; margin-top: 8px; }
 
-/* M127 变换 4 tab（内缩/裁剪/缩放/旋转） */
+/* M127 鍙樻崲 4 tab锛堝唴缂?瑁佸壀/缂╂斁/鏃嬭浆锛?*/
 .axv-transform-tabs { margin-top: 12px; }
 .axv-transform-tab-row {
   display: flex;
@@ -9471,13 +9442,11 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-transform-remove { align-self: flex-start; padding: 6px 12px; font-size: 12px; }
 
 
-/* M128 结构树内联到资源表单（axv-set-group 剩余空间）
-   右栏整体变 flex 列：资源名/检查/XML 保持自然高度，结构组吃掉剩余空间，
-   树形框自己内部滚动，不再和底部抽屉抢位置。 */
+/* M128 缁撴瀯鏍戝唴鑱斿埌璧勬簮琛ㄥ崟锛坅xv-set-group 鍓╀綑绌洪棿锛?   鍙虫爮鏁翠綋鍙?flex 鍒楋細璧勬簮鍚?妫€鏌?XML 淇濇寔鑷劧楂樺害锛岀粨鏋勭粍鍚冩帀鍓╀綑绌洪棿锛?   鏍戝舰妗嗚嚜宸卞唴閮ㄦ粴鍔紝涓嶅啀鍜屽簳閮ㄦ娊灞夋姠浣嶇疆銆?*/
 .axv-cv-form-drawable {
   display: flex;
   flex-direction: column;
-  /* 结构组 flex:1 吃掉剩余空间；XML 原样块打开时总高超过视口，整栏滚动（树盒子自身不跟着被截断） */
+  /* 缁撴瀯缁?flex:1 鍚冩帀鍓╀綑绌洪棿锛沊ML 鍘熸牱鍧楁墦寮€鏃舵€婚珮瓒呰繃瑙嗗彛锛屾暣鏍忔粴鍔紙鏍戠洅瀛愯嚜韬笉璺熺潃琚埅鏂級 */
   overflow-y: auto;
 }
 .axv-dt-group {
@@ -9505,19 +9474,19 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   padding: 2px 0;
 }
 
-/* M127 树行变换摘要 */
+/* M127 鏍戣鍙樻崲鎽樿 */
 .axv-dt-transform {
   color: var(--axv-primary, #3b82f6);
   font-size: 11px;
   margin-right: 6px;
 }
 
-/* M122：形状完整参数面板 */
+/* M122锛氬舰鐘跺畬鏁村弬鏁伴潰鏉?*/
 .axv-dw-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .axv-dw-grid2 .axv-shape-field { min-width: 0; }
 .axv-dw-hint { margin-top: 10px; font-size: 11px; line-height: 1.6; color: var(--axv-sub); }
 
-/* M123：drawable 预设 */
+/* M123锛歞rawable 棰勮 */
 .axv-dw-bar { display: flex; align-items: center; gap: 8px; }
 .axv-dw-bar .axv-shape-seg { flex: 1 1 auto; }
 .axv-dw-preset-btn { flex: 0 0 auto; height: 30px; padding: 0 12px; font-size: 12px; border-radius: 8px; }
@@ -9528,7 +9497,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-dw-preset-name { font-size: 13px; color: var(--axv-title); }
 .axv-dw-preset-hint { font-size: 11px; line-height: 1.5; color: var(--axv-sub); }
 
-/* M143：预设分组（基础样式 / 控件样式） */
+/* M143锛氶璁惧垎缁勶紙鍩虹鏍峰紡 / 鎺т欢鏍峰紡锛?*/
 .axv-dw-preset-group { display: flex; flex-direction: column; gap: 6px; }
 .axv-dw-preset-group-title {
   padding: 4px 4px 0;
@@ -9539,7 +9508,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 }
 
 
-/* ── M124 drawable 结构树（和左侧图层面板同一套视觉语言） ── */
+/* 鈹€鈹€ M124 drawable 缁撴瀯鏍戯紙鍜屽乏渚у浘灞傞潰鏉垮悓涓€濂楄瑙夎瑷€锛?鈹€鈹€ */
 .axv-dt {
   display: flex;
   flex-direction: column;
@@ -9637,7 +9606,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   opacity: 0.28;
   cursor: default;
 }
-/* M134：「这一层」插槽参数（offset / 宽高 / 对齐 / 不透明度 / 状态位） */
+/* M134锛氥€岃繖涓€灞傘€嶆彃妲藉弬鏁帮紙offset / 瀹介珮 / 瀵归綈 / 涓嶉€忔槑搴?/ 鐘舵€佷綅锛?*/
 .axv-slot {
   margin-top: 12px;
   padding: 10px;
@@ -9692,7 +9661,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   flex-wrap: wrap;
   gap: 5px;
 }
-/* M133：drawable 边界参照框（选区之外的位置，看图层往哪偏移） */
+/* M133锛歞rawable 杈圭晫鍙傜収妗嗭紙閫夊尯涔嬪鐨勪綅缃紝鐪嬪浘灞傚線鍝亸绉伙級 */
 .axv-dp-bounds {
   position: absolute;
   left: 0;
@@ -9703,7 +9672,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   pointer-events: none;
   z-index: 5;
 }
-/* M133：同级插入（上方 / 下方）方向切换 */
+/* M133锛氬悓绾ф彃鍏ワ紙涓婃柟 / 涓嬫柟锛夋柟鍚戝垏鎹?*/
 .axv-dt-add-dir {
   display: flex;
   gap: 4px;
@@ -9767,7 +9736,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   vertical-align: middle;
 }
 
-/* M137：根标签改成可点击的下拉（写错根不用整份重写） */
+/* M137锛氭牴鏍囩鏀规垚鍙偣鍑荤殑涓嬫媺锛堝啓閿欐牴涓嶇敤鏁翠唤閲嶅啓锛?*/
 .axv-dt-roottag {
   display: inline-flex;
   align-items: center;
@@ -9889,7 +9858,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   white-space: nowrap;
 }
 
-/* M125：预览「只看选中层」小按钮 */
+/* M125锛氶瑙堛€屽彧鐪嬮€変腑灞傘€嶅皬鎸夐挳 */
 .axv-dw-preview {
   position: relative;
 }
@@ -9909,7 +9878,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   cursor: pointer;
   z-index: 2;
 }
-/* ===== M140: 历史版本快照面板 ===== */
+/* ===== M140: 鍘嗗彶鐗堟湰蹇収闈㈡澘 ===== */
 .axv-snap-panel { width: min(520px, 92vw); max-height: 80vh; display: flex; flex-direction: column; }
 .axv-snap-file { margin-left: 8px; font-size: 12px; color: #8a94a6; font-weight: 400; }
 .axv-snap-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 10px; }
@@ -9932,10 +9901,10 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-snap-acts { display: flex; align-items: center; gap: 4px; }
 .axv-snap-restore { font-size: 12px; }
 .axv-snap-del { color: #dc2626; }
-/* ===== M140: 历史版本工具条按钮 ===== */
+/* ===== M140: 鍘嗗彶鐗堟湰宸ュ叿鏉℃寜閽?===== */
 .axv-tb-history { position: relative; }
 .axv-tb-badge { position: absolute; top: 2px; right: 2px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: #2f6bff; color: #fff; font-size: 9px; line-height: 15px; text-align: center; font-weight: 600; }
-/* ===== M141: 未保存修改提示 ===== */
+/* ===== M141: 鏈繚瀛樹慨鏀规彁绀?===== */
 .axv-unsaved { width: min(420px, 90vw); }
 .axv-unsaved-body { padding: 4px 4px 16px; font-size: 13px; line-height: 1.6; color: #4b5563; }
 .axv-unsaved-foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
@@ -9943,7 +9912,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-btn.axv-primary { background: #2f6bff; color: #fff; border-color: #2f6bff; }
 .axv-btn.axv-primary:disabled { opacity: .5; }
 
-/* M165：并排对比（同一份布局在多台设备上的只读渲染，覆盖层） */
+/* M165锛氬苟鎺掑姣旓紙鍚屼竴浠藉竷灞€鍦ㄥ鍙拌澶囦笂鐨勫彧璇绘覆鏌擄紝瑕嗙洊灞傦級 */
 .axv-cmp-overlay {
   position: fixed;
   inset: 0;
@@ -10030,7 +9999,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   font-size: 13px;
   padding: 24px;
 }
-/* 「显示与设备」菜单里的并排对比入口 */
+/* 銆屾樉绀轰笌璁惧銆嶈彍鍗曢噷鐨勫苟鎺掑姣斿叆鍙?*/
 .axv-vs-compare {
   margin-top: 12px;
   padding-top: 10px;
@@ -10054,7 +10023,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   filter: brightness(0.97);
 }
 
-/* M166：引用资源不存在时的预览内警告条 */
+/* M166锛氬紩鐢ㄨ祫婧愪笉瀛樺湪鏃剁殑棰勮鍐呰鍛婃潯 */
 .axv-dp-missing {
   position: absolute;
   inset: auto 0 0 0;
@@ -10082,7 +10051,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-dp-missing-hint {
   opacity: 0.8;
 }
-/* M166：RefField 的搜索框 + 候选列表容器 */
+/* M166锛歊efField 鐨勬悳绱㈡ + 鍊欓€夊垪琛ㄥ鍣?*/
 .axv-ref-search {
   margin-top: 8px;
 }
@@ -10091,9 +10060,9 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   margin-bottom: 6px;
 }
 
-/* M171：应用图标设置面板 */
+/* M171锛氬簲鐢ㄥ浘鏍囪缃潰鏉?*/
 .axv-ai-check {
-  /* M174b：按用户要求 position: revert（等同 static）+ padding: 6px */
+  /* M174b锛氭寜鐢ㄦ埛瑕佹眰 position: revert锛堢瓑鍚?static锛? padding: 6px */
   position: revert;
   inset: 0;
   z-index: 80;
@@ -10178,7 +10147,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   font-size: 11.5px;
   line-height: 1.5;
   opacity: 0.72;
-  /* 文件路径那行没有空格，不强制断行会把卡片撑宽、文字被裁 */
+  /* 鏂囦欢璺緞閭ｈ娌℃湁绌烘牸锛屼笉寮哄埗鏂浼氭妸鍗＄墖鎾戝銆佹枃瀛楄瑁?*/
   min-width: 0;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -10195,7 +10164,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   padding-top: 4px;
 }
 
-/* M173：工具栏「更多」弹出菜单（portal 到 .axv-main 层，不放在 .axv-tb-scroll 里，避免被 overflow 裁掉） */
+/* M173锛氬伐鍏锋爮銆屾洿澶氥€嶅脊鍑鸿彍鍗曪紙portal 鍒?.axv-main 灞傦紝涓嶆斁鍦?.axv-tb-scroll 閲岋紝閬垮厤琚?overflow 瑁佹帀锛?*/
 .axv-tb-more {
   position: relative;
   display: inline-flex;
@@ -10248,7 +10217,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   text-overflow: ellipsis;
 }
 
-/* M173：左栏 AI 助手的自定义描边矢量 */
+/* M173锛氬乏鏍?AI 鍔╂墜鐨勮嚜瀹氫箟鎻忚竟鐭㈤噺 */
 .axv-rail-svg {
   display: block;
   opacity: 0.86;
@@ -10258,7 +10227,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   stroke-width: 1.6;
 }
 
-/* M180：项目树搜索 + res 目录虚拟分组 */
+/* M180锛氶」鐩爲鎼滅储 + res 鐩綍铏氭嫙鍒嗙粍 */
 .axv-proj-tree .axv-ws-item-name .axv-ws-item-sub {
   font-weight: 400;
   opacity: 0.7;
@@ -10267,3 +10236,17 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   min-width: 0;
 }
 
+/* M181：项目卡片长按菜单 + 属性弹窗 */
+.axv-cpm { min-width: 170px; }
+.axv-prop-card { max-height: 92vh; overflow: auto; }
+.axv-prop-head { display: flex; align-items: center; gap: 10px; padding: 4px 0 10px; }
+.axv-prop-icon { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; }
+.axv-prop-icon-hint { font-size: 11px; color: var(--axv-on-surface-variant); line-height: 1.4; }
+.axv-prop-sec-title { font-size: 11.5px; font-weight: 600; letter-spacing: .04em; color: var(--axv-on-surface-variant); text-transform: uppercase; margin: 12px 0 6px; }
+.axv-prop-deps { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow: auto; border: 1px solid var(--axv-outline-variant); border-radius: 8px; padding: 6px; margin-bottom: 8px; }
+.axv-prop-dep { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 4px; border-radius: 6px; }
+.axv-prop-dep:active { background: color-mix(in srgb, var(--axv-primary) 12%, transparent); }
+.axv-prop-dep-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; }
+.axv-prop-dep-tag { flex: 0 0 auto; font-size: 10px; color: var(--axv-on-surface-variant); }
+.axv-prop-add { display: flex; gap: 6px; margin-bottom: 10px; }
+.axv-prop-add .axv-saveas-input { flex: 1; }

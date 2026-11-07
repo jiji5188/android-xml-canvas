@@ -6712,7 +6712,7 @@ button.axv-ws-caret:hover {
 .axv-ai-input-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-wrap: nowrap;
   min-width: 0;
 }

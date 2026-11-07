@@ -8,6 +8,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { t as tt } from "@/lib/i18n-src";
+import { groupResDirs, resSearchMatches } from "@/lib/xml/res-search";
 import type { BrowseEntry, LibKind, ProjectMeta, ProjectSource } from "@/lib/xml/project-browse";
 import { isIconDirRel, isImageName, readEntryImageUrl, resDirDescription, describeFile } from "@/lib/xml/project-browse";
 import { parseDrawable, flattenDrawable } from "@/lib/xml/drawable-node";
@@ -76,6 +77,12 @@ export interface ProjectPanelProps {
   onRequestAllFiles: () => void;
   /** M176：改项目名（目录名）/ app 名称 */
   onRenameProject?: (p: WsProject, dirName: string, appName: string) => Promise<{ ok: boolean; msg: string }>;
+
+  /** M180：重命名资源文件 → 同步改全项目对它的引用（布局/values/Java） */
+  onRenameResource?: (oldRel: string, newName: string) => Promise<{ ok: boolean; msg: string }>;
+
+  /** M180：把图标库里的图标填入选中节点的属性（src/background/foreground…） */
+  onFillIconAttr?: (attr: string, resourceName: string, vectorXml: string) => void;
 
   /** 当前项目 */
   projectName: string;
@@ -289,6 +296,10 @@ export function LazyTreeInner(props: {
   currentRel?: string | null;
   /** M144：持久化展开状态的 key（按项目区分，换项目不串） */
   storeKey?: string;
+  /** M180：重命名资源文件 → 同步改全项目对它的引用（传了才出「重命名」项） */
+  onRenameResource?: (oldRel: string, newName: string) => Promise<{ ok: boolean; msg: string }>;
+  /** M180：把图标库里的图标填入选中节点的属性（src/background/foreground…） */
+  onFillIconAttr?: (attr: string, resourceName: string, vectorXml: string) => void;
 }) {
   const {
     source,
@@ -332,6 +343,13 @@ export function LazyTreeInner(props: {
     | null
   >(null);
   const [busy, setBusy] = useState(false);
+  /** M180：搜索 + res 目录虚拟分组折叠 */
+  const [resQuery, setResQuery] = useState("");
+  /** M180：res/ 下按类型折叠的组（展开后看到真实限定符目录） */
+  const [resGroupOpen, setResGroupOpen] = useState<Set<string>>(() => new Set());
+  /** M180：搜索扫描到的整棵文件列表（首次搜索时拉一次，刷新后失效） */
+  const [scanAll, setScanAll] = useState<Array<{ rel: string; name: string; isDir: boolean }> | null>(null);
+  const [scanBusy, setScanBusy] = useState(false);
   /** 复制标记（M46） */
   const [clipboard, setClipboard] = useState<TreeNodeRef | null>(null);
   /** M46b：移动模式 —— target 为目标父目录（null = 还没选位置） */
@@ -436,6 +454,41 @@ export function LazyTreeInner(props: {
     if (kids[rel] === undefined) void load(rel);
   };
 
+  /* ---- M180：搜索（递归扫盘一次，然后本地过滤） ---- */
+  const MAX_SCAN = 900;
+  const scanTree = async () => {
+    if (scanBusy) return;
+    if (scanAll) return;
+    setScanBusy(true);
+    const out: Array<{ rel: string; name: string; isDir: boolean }> = [];
+    const walk = async (rel: string, depth: number): Promise<void> => {
+      if (depth > 9 || out.length >= MAX_SCAN) return;
+      const items = await source.listChildren(rel);
+      for (const it of items) {
+        if (out.length >= MAX_SCAN) return;
+        out.push({ rel: it.rel, name: it.name, isDir: it.kind === "dir" });
+        if (it.kind === "dir") await walk(it.rel, depth + 1);
+      }
+    };
+    await walk("", 0);
+    setScanAll(out);
+    setScanBusy(false);
+  };
+
+  const searchHits = useMemo(
+    () => (resQuery.trim() && scanAll ? resSearchMatches(scanAll, resQuery, 200) : []),
+    [resQuery, scanAll],
+  );
+
+  // 刷新时代（rev 变）才让搜索缓存失效；不能看 source 对象引用，否则每帧都清空
+  const scanRevRef = useRef(rev);
+  useEffect(() => {
+    if (scanRevRef.current !== rev) {
+      scanRevRef.current = rev;
+      setScanAll(null);
+    }
+  }, [rev]);
+
   /** M30c：原 axv-restree 的点击分流搬到这里
    *  - res/drawable|mipmap 里的 xml：形状 → 绘制编辑器；vector → 图片预览
    *  - 其余（layout / values / menu…）：照旧用编辑器打开（布局会在预览里画出来） */
@@ -467,6 +520,30 @@ export function LazyTreeInner(props: {
     onOpenEntry(e);
   };
 
+  /* ---- M180：把选中的 drawable 直接填给当前选中控件的 src ---- */
+  const doFill = async (symbol: string) => {
+    if (!props.onFillIconAttr) return;
+    // symbol 形如 drawable/ic_star；回调只要裸名（@drawable/<名> 由调用方拼）
+    const name = symbol.includes("/") ? symbol.slice(symbol.lastIndexOf("/") + 1) : symbol;
+    let xml = "";
+    try {
+      const rel = Object.entries(kids)
+        .flatMap(([, v]) => (Array.isArray(v) ? v : []))
+        .find((it) => it.kind === "file" && it.name.replace(/\.[^.]+$/, "") === name && /(^|\/)res\/(drawable|mipmap)/.test(it.rel));
+      if (rel) xml = (await source.readText(rel.rel)) || "";
+    } catch {
+      xml = "";
+    }
+    props.onFillIconAttr("src", name, xml);
+    setDlg({
+      kind: "msg",
+      title: tt("已填入"),
+      text: xml
+        ? tt("已把 @drawable/{name} 填给选中控件的 src", { name })
+        : tt("已把 @drawable/{name} 填给选中控件的 src（图片资源不带 xml 正文）", { name }),
+    });
+  };
+
   /* ---- M46：长按 → 操作菜单 ---- */
   const pressRef = useRef<{ timer: number | null; x: number; y: number; moved: boolean }>({
     timer: null,
@@ -485,8 +562,11 @@ export function LazyTreeInner(props: {
     }
   };
 
+  /** M180：「填入选中控件」不靠文件写入能力，web 模式也要能用 */
+  const canMenu = !!fileOps || !!props.onFillIconAttr;
+
   const beginPress = (e: React.PointerEvent, node: TreeNodeRef) => {
-    if (!fileOps || moving) return;
+    if (!canMenu || moving) return;
     if (e.button === 2) {
       e.preventDefault();
       suppressClick.current = true;
@@ -567,6 +647,7 @@ export function LazyTreeInner(props: {
       }
       return;
     }
+    if (a === "fill") void doFill(resSymbolOf(target.rel) || target.name.replace(/\.[^.]+$/, ""));
     if (a === "copy") {
       setClipboard(target);
       setDlg({ kind: "msg", title: tt("已复制"), text: tt("已复制「{name}」，到目标位置长按选「粘贴」。", { name: target.name }) });
@@ -782,6 +863,16 @@ export function LazyTreeInner(props: {
       });
       return;
     }
+    // M180：res/ 下的文件改名 → 同步改全项目对它的 @type/name 引用
+    if (props.onRenameResource && /(^|\/)res\//.test(target.rel)) {
+      const rr = await props.onRenameResource(target.rel, newName);
+      if (!rr.ok && rr.msg) {
+        setDlg({ kind: "msg", title: tt("已重命名，但引用同步失败"), text: rr.msg });
+        await refreshDir(parentOfRel(target.rel));
+        return;
+      }
+      if (rr.msg) setDlg({ kind: "msg", title: tt("已重命名"), text: rr.msg });
+    }
     await refreshDir(parentOfRel(target.rel));
   };
 
@@ -828,7 +919,77 @@ export function LazyTreeInner(props: {
       ];
     }
     const rows: ReactNode[] = [];
-    for (const n of items) {
+    // M180：res/ 下同类限定符目录折叠成一行（drawable-mdpi/night/xxhdpi → drawable (3)）
+    const groupK = (t: string) => `${rel}@@${t}`;
+    type Disp = { kind: "node"; e: BrowseEntry } | { kind: "group"; type: string; members: BrowseEntry[] };
+    let disp: Disp[] = items.map((e) => ({ kind: "node" as const, e }));
+    if (/(^|\/)res$/.test(rel)) {
+      const g = groupResDirs(items.filter((it) => it.kind === "dir").map((it) => it.name));
+      const multi = new Map<string, Set<string>>();
+      for (const [t, list] of g) if (list.length > 1) multi.set(t, new Set(list));
+      if (multi.size) {
+        const out: Disp[] = [];
+        const placed = new Set<string>();
+        for (const it of items) {
+          if (it.kind === "dir") {
+            let hit = "";
+            for (const [t, set] of multi) if (set.has(it.name)) hit = t;
+            if (hit) {
+              if (placed.has(hit)) continue;
+              placed.add(hit);
+              const members = items.filter((x) => x.kind === "dir" && multi.get(hit)!.has(x.name));
+              if (resGroupOpen.has(groupK(hit))) {
+                for (const m of members) out.push({ kind: "node", e: m });
+              } else {
+                out.push({ kind: "group", type: hit, members });
+              }
+              continue;
+            }
+          }
+          out.push({ kind: "node", e: it });
+        }
+        disp = out;
+      }
+    }
+    for (const d of disp) {
+      // M180：折叠组行（点开才看到具体限定符目录）
+      if (d.kind === "group") {
+        const key = groupK(d.type);
+        rows.push(
+          <li key={key} className="axv-ws-row" style={{ paddingLeft: depth * 14 }}>
+            <button
+              className="axv-ws-caret"
+              title={tt("展开")}
+              aria-label={tt("展开")}
+              onClick={(e) => {
+                e.stopPropagation();
+                setResGroupOpen((prev) => new Set(prev).add(key));
+              }}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>chevron_right</span>
+            </button>
+            <button
+              className="axv-ws-item"
+              type="button"
+              title={d.members.map((m) => m.name).join("、")}
+              onClick={(e) => {
+                e.stopPropagation();
+                setResGroupOpen((prev) => new Set(prev).add(key));
+              }}
+            >
+              <span className="msr axv-ws-item-icon" aria-hidden="true">folder</span>
+              <span className="axv-ws-item-main">
+                <span className="axv-ws-item-name">
+                  {d.type}/ <span className="axv-ws-item-sub">({d.members.length})</span>
+                </span>
+                <span className="axv-ws-item-sub">{d.members.map((m) => m.name).join("、")}</span>
+              </span>
+            </button>
+          </li>,
+        );
+        continue;
+      }
+      const n = d.e;
       const isDir = n.kind === "dir";
       const isOpen = isDir && open.has(n.rel);
       const editing = !isDir && currentFileName && n.name.toLowerCase() === currentFileName.toLowerCase();
@@ -863,7 +1024,7 @@ export function LazyTreeInner(props: {
           onPointerDown={(e) => beginPress(e, nodeRef)}
           onPointerMove={movePress}
           onContextMenu={(e) => {
-            if (!fileOps || moving) return;
+            if (!canMenu || moving) return;
             e.preventDefault();
             setMenu({ x: e.clientX, y: e.clientY, target: nodeRef });
           }}
@@ -940,7 +1101,69 @@ export function LazyTreeInner(props: {
           </button>
         </div>
       ) : null}
-      <ul className="axv-ws-list axv-proj-tree" ref={listRef}>{renderRows("", 0)}</ul>
+      {/* M180：项目内搜索（文件名 / 目录名，命中目录会列出下面全部文件） */}
+      <div className="axv-proj-filter">
+        <span className="msr" aria-hidden="true">search</span>
+        <input
+          className="axv-proj-filter-input"
+          value={resQuery}
+          placeholder={tt("搜索项目文件…")}
+          onChange={(e) => {
+            setResQuery(e.target.value);
+            if (e.target.value.trim()) void scanTree();
+          }}
+        />
+        {resQuery ? (
+          <button
+            type="button"
+            className="axv-proj-filter-clear"
+            title={tt("清除搜索")}
+            aria-label={tt("清除搜索")}
+            onClick={() => setResQuery("")}
+          >
+            <span className="msr" aria-hidden="true">close</span>
+          </button>
+        ) : null}
+      </div>
+      {resQuery.trim() ? (
+        scanBusy ? (
+          <div className="axv-ws-hint">{tt("正在扫描项目…")}</div>
+        ) : (
+          <ul className="axv-ws-list axv-proj-tree">
+            {searchHits.length === 0 ? (
+              <li>
+                <div className="axv-ws-row axv-ws-row-loading" style={{ paddingLeft: 26 }}>
+                  <span className="axv-ws-item-sub">{tt("没找到匹配「{q}」的文件", { q: resQuery })}</span>
+                </div>
+              </li>
+            ) : null}
+            {searchHits.map((h) => {
+              const entry: BrowseEntry = { rel: h.rel, name: h.name, kind: "file" };
+              return (
+                <li key={"s:" + h.rel} data-treerel={h.rel}>
+                  <div className="axv-ws-row" style={{ paddingLeft: 0 }}>
+                    <span className="axv-ws-caret" aria-hidden="true" />
+                    <button className="axv-ws-item" title={h.rel} type="button" onClick={() => void openEntry(entry)}>
+                      <span className="msr axv-ws-item-icon" aria-hidden="true">description</span>
+                      <span className="axv-ws-item-main">
+                        <span className="axv-ws-item-name">{h.name}</span>
+                        <span className="axv-ws-item-sub">{h.rel}</span>
+                      </span>
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+            {searchHits.length >= 200 ? (
+              <li>
+                <div className="axv-ws-hint">{tt("结果太多，只显示前 200 个，请输入更长的关键词")}</div>
+              </li>
+            ) : null}
+          </ul>
+        )
+      ) : (
+        <ul className="axv-ws-list axv-proj-tree" ref={listRef}>{renderRows("", 0)}</ul>
+      )}
       {busy ? <div className="axv-ws-hint">{tt("正在处理…")}</div> : null}
 
       {/* M46c：菜单与弹窗都挂到 .axv-main 下（用户要求），不再留在树内部 */}
@@ -953,6 +1176,7 @@ export function LazyTreeInner(props: {
           target={menu.target}
           canWrite={!!fileOps && fileOps.backend === "native"}
           hasClipboard={!!clipboard}
+          canFill={!!props.onFillIconAttr && !menu.target.isDir && /(^|\/)res\/(drawable|mipmap)/.test(menu.target.rel)}
           onAction={runAction}
           onClose={() => setMenu(null)}
         />
@@ -1023,7 +1247,9 @@ const LazyTree = memo(LazyTreeInner, (a, b) =>
   a.currentRel === b.currentRel &&
   a.storeKey === b.storeKey &&
   a.extras === b.extras &&
-  a.fileOps === b.fileOps,
+  a.fileOps === b.fileOps &&
+  a.onRenameResource === b.onRenameResource &&
+  a.onFillIconAttr === b.onFillIconAttr,
 );
 
 /* ---------------- 面板 ---------------- */
@@ -1330,6 +1556,8 @@ export function ProjectPanel(p: ProjectPanelProps) {
                 onPreviewImage={p.onPreviewImage}
                 fileOps={p.fileOps ?? null}
                 onFilesChanged={p.onFilesChanged}
+                onRenameResource={p.onRenameResource}
+                onFillIconAttr={p.onFillIconAttr}
               />
             ) : (
               <ul className="axv-ws-list axv-proj-tree">

@@ -22,7 +22,7 @@ export function Overlay({ children }: { children: ReactNode }) {
   return createPortal(children, host);
 }
 
-export type MenuAction = "new" | "rename" | "move" | "copy" | "paste" | "delete";
+export type MenuAction = "new" | "rename" | "move" | "copy" | "paste" | "delete" | "fill";
 
 /** M46d：路径太长时只留尾部 —— `app/src/main/java/com/returngoods/app` → `.../app/`
  *  规则：从尾部往前拼，整段超过 max 就停（保证至少留最后一级）。 */
@@ -56,12 +56,14 @@ export interface TreeFileMenuProps {
   canWrite: boolean;
   /** 有复制标记时才能粘贴 */
   hasClipboard: boolean;
+  /** M180：选中的是 drawable/mipmap 图标文件时，多一项「填入选中控件」 */
+  canFill?: boolean;
   onAction: (a: MenuAction) => void;
   onClose: () => void;
 }
 
 const MENU_W = 168;
-const MENU_H = 6 * 38 + 12;
+const MENU_H = 7 * 38 + 12;
 
 export function TreeFileMenu(p: TreeFileMenuProps) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -109,6 +111,8 @@ export function TreeFileMenu(p: TreeFileMenuProps) {
     },
     { key: "delete", label: tt("删除"), disabled: !p.canWrite, danger: true },
   ];
+  // M180：图标文件 → 直接填给选中控件的 src/背景
+  if (p.canFill) items.unshift({ key: "fill", label: tt("填入选中控件") });
 
   return (
     <div className="axv-tfm-mask" role="presentation">

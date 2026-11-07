@@ -9,6 +9,8 @@
 import AiPanel from "@/components/AiPanel";
 import { createResResolver } from "@/lib/xml/res-index";
 import { findUsages, type UsageHit } from "@/lib/xml/ai-usages";
+import { renameResRef } from "@/lib/xml/res-search";
+import type { AiFileEntry } from "@/lib/xml/ai-tools";
 import { ResValuesPanel } from "@/components/ResValuesPanel";
 import { formatResRefHit } from "@/lib/xml/res-refs";
 import { parseRefToken, refAction } from "@/lib/xml/ref-token";
@@ -4095,6 +4097,91 @@ const findResolved = findResolvedNode;
     [aiFileIo, flashNote, openResRef, openUsages],
   );
 
+  /**
+   * M180：重命名资源文件 → 同步改全项目对它的 @type/name 引用（布局/values/drawable 互引/Java）。
+   * 改名本身由调用方（项目树）完成，这里只负责文本替换 + 写回。
+   */
+  const onRenameResource = useCallback(
+    async (oldRel: string, newName: string) => {
+      if (!aiFileIo || !aiFileIo.canWrite) {
+        return { ok: false, msg: tt("当前环境不能写文件，只改了文件名，引用没同步") };
+      }
+      const m = /^(.*)\/res\/(\S+)\/.+/i.exec(oldRel);
+      if (!m) {
+        return { ok: false, msg: tt("这个名字不在 res/ 下，没敢自动改引用") };
+      }
+      const subDir = m[2].toLowerCase();
+      const kind: "ref" | "values" = subDir.startsWith("values") ? "values" : "ref";
+      const resType = kind === "values" ? (oldRel.split("/").pop() || "strings.xml").replace(/\.xml$/, "").replace(/-.*$/, "") : subDir.split("-")[0];
+      const oldName = oldRel.split("/").pop()!.replace(/\.[^.]+$/, "");
+      let files = 0;
+      let refs = 0;
+      let budget = 260;
+      // 扫项目里的 xml + java/kt（预算 260 个文件，超出停止）
+      const scanDir = async (dir: string, depth: number): Promise<void> => {
+        if (depth > 8 || budget <= 0) return;
+        let items: AiFileEntry[] = [];
+        try {
+          const r = await aiFileIo.list(dir);
+          items = r.ok && r.items ? r.items : [];
+        } catch {
+          return;
+        }
+        for (const it of items) {
+          if (budget <= 0) return;
+          const p = `${dir}/${it.name}`;
+          if (it.kind === "dir") {
+            await scanDir(p, depth + 1);
+            continue;
+          }
+          if (!/\.(xml|java|kt)$/i.test(it.name)) continue;
+          const rd = await aiFileIo.read(p);
+          if (!rd.ok || typeof rd.text !== "string" || !rd.text) continue;
+          const inValues = /\/res\/values/.test(p);
+          const r2 = renameResRef(rd.text, inValues ? "values" : "ref", resType, oldName, newName);
+          if (r2.n > 0) {
+            const w = await aiFileIo.write(p, r2.text);
+            if (w.ok) {
+              files++;
+              refs += r2.n;
+            }
+          }
+          budget--;
+        }
+      };
+      await scanDir("", 0);
+      // 当前编辑器里打开的布局如果也引用了 → 一并改（未保存内容）
+      if (kind === "ref" && xml.includes(`@${resType}/${oldName}`)) {
+        const esc = oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const fixed = xml.replace(new RegExp(`@${resType}/${esc}(?![A-Za-z0-9_])`, "g"), `@${resType}/${newName}`);
+        if (fixed !== xml) setXmlAndTrack(fixed);
+      }
+      return {
+        ok: true,
+        msg:
+          refs > 0
+            ? tt("已同步 {n} 处引用（{f} 个文件）", { n: refs, f: files })
+            : tt("项目里没找到对「{name}」的引用", { name: oldName }),
+      };
+    },
+    [aiFileIo, xml],
+  );
+
+  /** M180：项目树里选中的图标 → 直接写进当前选中控件的属性（attr 由调用方给，通常 src） */
+  const onFillIconAttr = useCallback(
+    (attr: string, resourceName: string, vectorXml: string) => {
+      if (!selectedPath) {
+        flashNote(tt("先在画布上选一个控件（比如 ImageView），再点「填入选中控件」"));
+        return;
+      }
+      const safe = sanitizeResName(resourceName, "ic");
+      if (vectorXml) setGeneratedDrawables((m) => ({ ...m, [safe]: vectorXml }));
+      commitAttrRef.current(attr, `@drawable/${safe}`);
+      flashNote(tt("已填入 {attr} = @drawable/{name}", { attr, name: safe }));
+    },
+    [selectedPath, flashNote],
+  );
+
   return (
     <div
       className="axv-editor"
@@ -4467,6 +4554,8 @@ const findResolved = findResolvedNode;
               fileOps={activeProject ? fileOpsCtxOf(activeProject) : null}
               onFilesChanged={() => setProjectRev((n) => n + 1)}
               checkDeleteImpact={checkDeleteImpact}
+              onRenameResource={onRenameResource}
+              onFillIconAttr={onFillIconAttr}
               onNewProject={(suggest) => {
                 setNewProjName(uniqueProjectName([...(suggest ? [suggest] : []), ...wsProjects.map((w) => w.name)]));
                 setNewProjPkg("");

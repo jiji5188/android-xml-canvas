@@ -10257,3 +10257,13 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   opacity: 1;
   stroke-width: 1.6;
 }
+
+/* M180：项目树搜索 + res 目录虚拟分组 */
+.axv-proj-tree .axv-ws-item-name .axv-ws-item-sub {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.axv-proj-tree .axv-ws-row [title] {
+  min-width: 0;
+}
+

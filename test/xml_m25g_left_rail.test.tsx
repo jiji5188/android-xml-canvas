@@ -42,10 +42,10 @@ function render(over: Partial<LeftRailProps> = {}) {
 }
 
 describe("LeftRail — 图标条", () => {
-  it("8 个入口：组件/图层/AI/已生成资源/资源值/项目管理/设置/关于", () => {
+  it("7 个入口：组件/图层/AI/资源/项目管理/设置/关于", () => {
     const { rail } = render();
     const labels = rail.map((e) => String(e.props["aria-label"]));
-    expect(labels).toEqual(["组件", "图层", "AI 助手", "已生成资源", "资源值", "项目管理", "设置", "关于"]);
+    expect(labels).toEqual(["组件", "图层", "AI 助手", "资源", "项目管理", "设置", "关于"]);
   });
 
   it("只有当前视图高亮（on + aria-pressed + data-fill）", () => {

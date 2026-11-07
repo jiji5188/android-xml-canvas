@@ -11,7 +11,6 @@ import { createResResolver } from "@/lib/xml/res-index";
 import { findUsages, type UsageHit } from "@/lib/xml/ai-usages";
 import { renameResRef } from "@/lib/xml/res-search";
 import type { AiFileEntry } from "@/lib/xml/ai-tools";
-import { ResValuesPanel } from "@/components/ResValuesPanel";
 import { formatResRefHit } from "@/lib/xml/res-refs";
 import { parseRefToken, refAction } from "@/lib/xml/ref-token";
 import { useEffect, useMemo, useRef, useState, useCallback, useDeferredValue, startTransition } from "react";
@@ -179,7 +178,7 @@ import { ConstraintPanel, type SibOption } from "./ConstraintPanel";
 import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } from "@/lib/xml/autoconstrain";
 import { ResImagePreview } from "./ResImagePreview";
 import { ShapeEditor } from "./ShapeEditor";
-import { GenAssetsPanel } from "./GenAssetsPanel";
+import { ResourcePanel } from "./ResourcePanel";
 import IconCanvasEditor from "./IconCanvasEditor";
 import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/paths";
@@ -4480,50 +4479,37 @@ const findResolved = findResolvedNode;
           )}
           {leftView === "assets" && (
             <div className="axv-rail-scroll axv-assets-inline-wrap">
-              <GenAssetsPanel
-                inline
+              <ResourcePanel
+                source={activeProject?.source ?? null}
+                aiFileIo={aiFileIo}
                 assets={generatedDrawables}
-                layoutXml={xml}
-                onRename={(oldName, newName) => onRenameAsset(oldName, newName)}
-                onDelete={onDeleteAsset}
-                onEditShape={(name, shapeXml) => setResShape({ name, xml: shapeXml })}
-                onEditIcon={(name, iconXml) => setResIcon({ name, xml: iconXml })}
                 onNewIcon={() => setResIcon({ name: "", xml: "" })}
                 onNewDrawable={() => setResShape({ name: "", xml: "", forceTree: true })}
-                onClose={() => setLeftView("parts")}
-                projectRoot={projRoot}
-                projectName={activeProject?.name || ""}
-                onNote={(text) => {
-                  setExportNote(text);
-                  window.setTimeout(() => setExportNote(" "), 3200);
-                }}
-              />
-            </div>
-          )}
-          {leftView === "values" && (
-            <div className="axv-rail-scroll">
-              <ResValuesPanel
-                io={aiFileIo}
-                docRel={openRel ?? null}
-                onJump={(rel, line) => {
+                onEditIcon={(name, iconXml) => setResIcon({ name, xml: iconXml })}
+                onEditShape={(name, shapeXml) => setResShape({ name, xml: shapeXml })}
+                onOpenFile={(rel, line) => {
                   const src = activeProjectRef.current?.source;
                   if (!src) {
-                    setWsMsg(tt("先打开一个项目目录，才能跳到资源文件"));
+                    setExportNote(tt("先打开一个项目目录，才能打开资源文件"));
+                    window.setTimeout(() => setExportNote(" "), 3000);
                     return;
                   }
                   if (openRel === rel) {
-                    jumpToCodeLine(line);
-                    setWsMsg(`${rel}:${line}`);
+                    if (typeof line === "number") jumpToCodeLine(line);
                     return;
                   }
-                  void loadEntry(src, { kind: "file", name: rel.split("/").pop() || rel, rel }).then(() => {
-                    jumpToCodeLine(line);
-                    setWsMsg(`${rel}:${line}`);
+                  const rootPath = src.rootPath;
+                  const target = rootPath
+                    ? rootPath.replace(/[\\/]+$/, "") + "\\" + rel.replace(/\//g, "\\")
+                    : undefined;
+                  void loadEntry(src, { kind: "file", name: rel.split("/").pop() || rel, rel, target }).then(() => {
+                    if (typeof line === "number") jumpToCodeLine(line);
                   });
                 }}
+                onPreview={(rel, url, name) => setResImage({ rel, name, url })}
                 onNote={(text) => {
-                  setWsMsg(text);
-                  window.setTimeout(() => setWsMsg(" "), 3000);
+                  setExportNote(text);
+                  window.setTimeout(() => setExportNote(" "), 3200);
                 }}
               />
             </div>

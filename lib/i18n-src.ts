@@ -2193,6 +2193,21 @@ export const SRC_EN: SrcDict = {
   "调试日志": "Debug log",
   "清空日志": "Clear log",
   "还没有日志：发一条消息，就能看到请求、工具调用、工具返回和模型的原始输出": "No logs yet — send a message to see requests, tool calls, tool results and raw model output",
+  "还没写进项目的资源": "Not saved into the project yet",
+  "mipmap 与 drawable": "mipmap & drawable",
+  "字符串与数组": "Strings & arrays",
+  "尺寸 数字 布尔": "Dimens, ints, bools",
+  "草稿": "Draft",
+  "草稿区空着。新建图标 / 新建 drawable 生成后会出现在这里，写进项目就自动转到对应 tab。": "Nothing drafted yet. Icons and drawables you create land here, and move to their tab once written into the project.",
+  "新建图标": "New icon",
+  "新建 drawable": "New drawable",
+  "项目里没有 mipmap/drawable 文件": "No mipmap/drawable files in this project",
+  "先打开一个项目": "Open a project first",
+  "项目里没有字符串资源": "No string resources in this project",
+  "项目里没有颜色资源": "No color resources in this project",
+  "没有其他类型资源": "No other resources",
+  "还没加载到原文件，改不了值": "Original file not loaded yet — cannot edit",
+  "已改 {name} → {v}": "Changed {name} → {v}",
 };
 
 /** 繁體 —— 只登记与英文不同的；没登记的先走英文兜底（见 t()） */

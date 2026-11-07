@@ -1,0 +1,176 @@
+/* M183 资源面板：5 tab（草稿/图标/文本/颜色/其他） */
+.axv-rp {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-size: 13px;
+}
+
+.axv-rp-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--axv-outline);
+  flex: 0 0 auto;
+}
+
+.axv-rp-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 2px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.axv-rp-tab:hover { background: var(--axv-hover); color: var(--axv-on-surface); }
+.axv-rp-tab.on { background: var(--axv-surface-2, rgba(140, 140, 160, 0.16)); color: var(--axv-on-surface); font-weight: 600; }
+.axv-rp-tab-n {
+  font-size: 10px;
+  color: var(--axv-on-surface-variant);
+  background: rgba(140, 140, 160, 0.14);
+  border-radius: 8px;
+  padding: 0 5px;
+  min-width: 14px;
+  text-align: center;
+}
+.axv-rp-tab.on .axv-rp-tab-n { color: var(--axv-on-surface); background: rgba(140, 140, 160, 0.24); }
+
+.axv-rp-search {
+  margin: 8px;
+  padding: 6px 9px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 7px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+.axv-rp-search:focus { outline: none; border-color: var(--axv-primary); }
+
+.axv-rp-draft,
+.axv-rp-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.axv-rp-draft-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  flex: 0 0 auto;
+}
+
+.axv-rp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--axv-outline);
+  cursor: default;
+}
+
+.axv-rp-name {
+  font-family: var(--axv-code-font, ui-monospace, monospace);
+  font-size: 12px;
+  color: var(--axv-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.axv-rp-swatch {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--axv-outline);
+}
+
+.axv-rp-varcount {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--axv-on-surface-variant);
+  background: rgba(140, 140, 160, 0.14);
+  border-radius: 8px;
+  padding: 0 5px;
+}
+
+.axv-rp-kind {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--axv-on-surface-variant);
+  margin-left: auto;
+}
+
+.axv-rp-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--axv-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+
+.axv-rp-edit {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--axv-primary);
+  border-radius: 5px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+}
+
+.axv-rp-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 1px solid var(--axv-outline);
+  background: transparent;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+  text-align: left;
+}
+.axv-rp-file:hover { background: var(--axv-hover); }
+.axv-rp-file-name {
+  font-family: var(--axv-code-font, ui-monospace, monospace);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.axv-rp-file-rel {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--axv-on-surface-variant);
+  max-width: 45%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.axv-rp-empty {
+  padding: 14px 10px;
+  color: var(--axv-on-surface-variant);
+  font-size: 12px;
+  line-height: 1.6;
+}

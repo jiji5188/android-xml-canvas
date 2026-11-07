@@ -52,7 +52,7 @@
   font-family: system-ui, "Segoe UI", Roboto, sans-serif;
   overflow: visible;
   /* M12锛氭粴鍔ㄥ鍣ㄤ笉鏄剧ず婊氬姩鏉°€傛闈?Chrome 鐨勭粡鍏告粴鍔ㄦ潯浼氬悆鎺?15px 鍐呭瀹藉害锛?     鑰?Android 鐨勬粴鍔ㄦ潯鏄诞鍔紙fade锛夌殑銆佷笉鍗犲竷灞€ 鈫?妯″瀷鎸?824px 绠楀嚭鏉ョ殑 match_parent 瀹藉害
-     浼氳秴鍑虹湡姝ｅ唴瀹瑰尯 15px锛岃倝鐪煎氨鏄€屽乏鍙抽棿璺濅笉涓€鑷淬€佸彸杈瑰亸绐勩€嶃€?/
+     浼氳秴鍑虹湡姝ｅ唴瀹瑰尯 15px锛岃倝鐪煎氨鏄€屽乏鍙抽棿璺濅笉涓€鑷淬€佸彸杈瑰亸绐勩€嶃€*/
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -490,9 +490,9 @@
 /* M20e锛氳繑鍥炴寜閽崲鎴愬儚绱犻 SVG锛圧unPreview.tsx 鍐呰仈锛夛紝灏哄璺熷鑸爮鍥炬爣鍗忚皟 */
 /* M11锛氬鑸爮鍥炬爣鏀惧ぇ 2 鍊嶏紱M20e锛氳繑鍥?1.6 鍊嶏紙36 鈫?57.6锛夛紝涓婚〉/澶氫换鍔?1.3 鍊嶏紙36 鈫?46.8锛?*/
 .axv-nav-btn svg { width: 36px; height: 36px; display: block; }
-.axv-nav-btn[title='杩斿洖'] svg { width: 57.6px; height: 57.6px; }
-.axv-nav-btn[title^='涓婚〉'] svg,
-.axv-nav-btn[title^='澶氫换鍔?] svg { width: 46.8px; height: 46.8px; }
+.axv-nav-btn[title='返回'] svg { width: 57.6px; height: 57.6px; }
+.axv-nav-btn[title^='主页'] svg,
+.axv-nav-btn[title^='多任务'] svg { width: 46.8px; height: 46.8px; }
 
 /* ===== 椤堕儴鎮诞宸ュ叿鏍忥紙M6b 涓夋爮甯冨眬锛?===== */
 .axv-toolbar-v2 {
@@ -3745,7 +3745,7 @@ body.axv-lt-dragging .axv-lt-row {
   white-space: nowrap;
 }
 .axv-run-crumb.is-on { color: #fff; background: rgba(124, 77, 255, 0.35); }
-.axv-run-crumb + .axv-run-crumb::before { content: "鈥?; margin-right: 4px; color: #6a6a80; }
+.axv-run-crumb + .axv-run-crumb::before { content: "›"; margin-right: 4px; color: #6a6a80; }
 .axv-run-actions { display: inline-flex; gap: 4px; }
 .axv-run-btn {
   display: inline-flex;
@@ -4145,7 +4145,7 @@ body.axv-lt-dragging .axv-lt-row {
   outline-offset: 1px;
 }
 .axv-node.axv-leaf-invalid::before {
-  content: "鉀?涓嶆槸 ViewGroup锛屼笉鑳芥湁瀛愭帶浠?;
+  content: "⚠ 不是 ViewGroup，不能有子控件";
   position: absolute;
   left: 0;
   top: 0;
@@ -4219,7 +4219,7 @@ body.axv-lt-dragging .axv-lt-row {
 
 /* M11y锛欳hip 甯?closeIcon 鏃跺彸渚х敾涓皬鍙夛紙Android 鏄浘鏍囷紝杩欓噷鐢ㄦ枃瀛楀弶鍗犱綅锛?*/
 .axv-node.axv-chip-close::after {
-  content: "鉁?;
+  content: "✓";
   font-size: 0.78em;
   line-height: 1;
   margin-left: 0.5em;
@@ -5398,7 +5398,7 @@ html[data-axv-theme="dark"] .axv-icon-ed-warn {
 }
 
 .axv-node.axv-calendar::before {
-  content: "CalendarView 鏃ュ巻锛堢郴缁?UI锛?;
+  content: "CalendarView 日历（系统 UI）";
 }
 
 /* 璁℃椂鍣細鐢绘垚鏅€氭枃鏈殑鏍峰瓙 */
@@ -8549,7 +8549,7 @@ button.axv-sb-item:hover {
   }
   .axv-cv-stage { padding: 12px; }
 }
-锘?/* M81 淇锛氳鐢诲竷鎾戞弧楂樺害銆佸簳閮ㄦ寜閽í鎺?*/
+/* M81 淇锛氳鐢诲竷鎾戞弧楂樺害銆佸簳閮ㄦ寜閽í鎺?*/
 .axv-icon-page-body.axv-cv-body {
   align-items: stretch;
   overflow: hidden;
@@ -10250,3 +10250,109 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-prop-dep-tag { flex: 0 0 auto; font-size: 10px; color: var(--axv-on-surface-variant); }
 .axv-prop-add { display: flex; gap: 6px; margin-bottom: 10px; }
 .axv-prop-add .axv-saveas-input { flex: 1; }
+
+/* M182: project segmented view (layout/resource/code/all) */
+/* M182：项目分段视图（布局 / 资源 / 代码 / 全部） */
+.axv-pb-scopes {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--axv-outline-variant);
+  position: sticky;
+  top: 0;
+  background: var(--axv-surface);
+  z-index: 2;
+}
+.axv-pb-scope {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 5px 0;
+  font-size: 12px;
+  border-radius: 7px;
+  color: var(--axv-on-surface-variant);
+  background: transparent;
+}
+.axv-pb-scope:hover {
+  background: color-mix(in srgb, var(--axv-primary) 10%, transparent);
+}
+.axv-pb-scope.on {
+  background: color-mix(in srgb, var(--axv-primary) 16%, transparent);
+  color: var(--axv-on-primary);
+  font-weight: 600;
+}
+.dark .axv-pb-scope.on {
+  color: var(--axv-primary);
+}
+
+/* 资源段二级 tab（图标 / 文本 / 颜色 / 其他） */
+.axv-pb-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 8px 4px;
+}
+.axv-pb-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  border-radius: 999px;
+  border: 1px solid var(--axv-outline-variant);
+  color: var(--axv-on-surface-variant);
+}
+.axv-pb-kind.on {
+  background: var(--axv-primary-container, color-mix(in srgb, var(--axv-primary) 14%, transparent));
+  border-color: transparent;
+  color: var(--axv-on-primary);
+  font-weight: 600;
+}
+.axv-pb-kind-n {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+/* 目录分组头 */
+.axv-pb-dir { padding: 2px 8px; }
+.axv-pb-dir-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 5px 4px;
+  font-size: 12px;
+  color: var(--axv-on-surface-variant);
+}
+.axv-pb-dir-btn:hover {
+  background: color-mix(in srgb, var(--axv-primary) 8%, transparent);
+  border-radius: 6px;
+}
+.axv-pb-dir-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+}
+.axv-pb-dir-n {
+  flex: 0 0 auto;
+  font-size: 10px;
+  opacity: 0.7;
+}
+/* 目录折叠/展开：行内旋转 chevron（复用 caret 类） */
+.axv-pb-dir-btn .axv-ws-caret.msr {
+  transition: transform 0.12s ease;
+}
+.axv-pb-dir-btn .axv-ws-caret.open {
+  transform: rotate(90deg);
+}
+
+.axv-pb-list { padding: 0 0 8px; }
+.axv-pb-hint {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--axv-on-surface-variant);
+  line-height: 1.5;
+}

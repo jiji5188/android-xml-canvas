@@ -36,6 +36,8 @@ import {
 } from "@/lib/xml/project-browse";
 import { saveProjectFile, type ProjectSaveRoot } from "@/lib/xml/project-save";
 import { ProjectPropsDialog } from "@/components/ProjectPropsDialog";
+import { ProjectScopeTree } from "@/components/ProjectScopeTree";
+import type { ProjectScope } from "@/lib/xml/project-scope";
 import {
   ConfirmDialog,
   MessageDialog,
@@ -1646,8 +1648,41 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
   );
 }
 
+/** M182：分段视图的定义 + 本地记忆（上次看的是哪段） */
+const SCOPES: Array<{ k: ProjectScope; label: string }> = [
+  { k: "layout", label: "布局" }, // i18n-ignore：作为 tt() 的 key 传入
+  { k: "res", label: "资源" }, // i18n-ignore
+  { k: "code", label: "代码" }, // i18n-ignore
+  { k: "all", label: "全部" }, // i18n-ignore
+];
+const LS_SCOPE = "axv.projscope.v1";
+
+function readScopePref(): ProjectScope {
+  try {
+    const v = window.localStorage.getItem(LS_SCOPE);
+    if (v === "layout" || v === "res" || v === "code" || v === "all") return v;
+  } catch {
+    /* 隐私模式 / 沙箱可能抦不住 localStorage */
+  }
+  return "all";
+}
+
+function writeScopePref(s: ProjectScope): void {
+  try {
+    window.localStorage.setItem(LS_SCOPE, s);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function ProjectPanel(p: ProjectPanelProps) {
   const { tr, tab, onTab, wsState, wsBusy, wsMsg, projects, metaOf, projectSource } = p;
+  /** M182：当前项目树的分段视图（布局 / 资源 / 代码 / 全部） */
+  const [scope, setScope] = useState<ProjectScope>(() => readScopePref());
+  const pickScope = (s: ProjectScope) => {
+    setScope(s);
+    writeScopePref(s);
+  };
 
   return (
     <div className="axv-rail-scroll axv-rail-fill">
@@ -1704,21 +1739,50 @@ export function ProjectPanel(p: ProjectPanelProps) {
             </div>
 
             {projectSource ? (
-              <LazyTree
-                source={projectSource}
-                rev={p.projectRev}
-                currentFileName={p.currentFileName}
-                currentRel={p.currentRel ?? null}
-                storeKey={p.projectName || undefined}
-                onOpenEntry={p.onOpenEntry}
-                extras={p.resExtras}
-                onOpenDrawable={p.onOpenDrawable}
-                onPreviewImage={p.onPreviewImage}
-                fileOps={p.fileOps ?? null}
-                onFilesChanged={p.onFilesChanged}
-                onRenameResource={p.onRenameResource}
-                onFillIconAttr={p.onFillIconAttr}
-              />
+              <>
+                {/* M182：分段视图（布局 / 资源 / 代码 / 全部） */}
+                <div className="axv-pb-scopes" role="tablist" aria-label={tt("项目结构")}>
+                  {SCOPES.map((s) => (
+                    <button
+                      key={s.k}
+                      role="tab"
+                      aria-selected={scope === s.k}
+                      className={"axv-pb-scope" + (scope === s.k ? " on" : "")}
+                      onClick={() => pickScope(s.k)}
+                    >
+                      {tt(s.label)}
+                    </button>
+                  ))}
+                </div>
+                {scope === "all" ? (
+                  <LazyTree
+                    source={projectSource}
+                    rev={p.projectRev}
+                    currentFileName={p.currentFileName}
+                    currentRel={p.currentRel ?? null}
+                    storeKey={p.projectName || undefined}
+                    onOpenEntry={p.onOpenEntry}
+                    extras={p.resExtras}
+                    onOpenDrawable={p.onOpenDrawable}
+                    onPreviewImage={p.onPreviewImage}
+                    fileOps={p.fileOps ?? null}
+                    onFilesChanged={p.onFilesChanged}
+                    onRenameResource={p.onRenameResource}
+                    onFillIconAttr={p.onFillIconAttr}
+                  />
+                ) : (
+                  <ProjectScopeTree
+                    source={projectSource}
+                    rev={p.projectRev}
+                    scope={scope}
+                    extras={p.resExtras}
+                    currentRel={p.currentRel ?? null}
+                    onOpenEntry={p.onOpenEntry}
+                    onOpenDrawable={p.onOpenDrawable}
+                    onPreviewImage={p.onPreviewImage}
+                  />
+                )}
+              </>
             ) : (
               <ul className="axv-ws-list axv-proj-tree">
                 <li>

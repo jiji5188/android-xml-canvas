@@ -51,6 +51,8 @@ export interface AxvNativeBridge {
   writeText?(target: string, base64: string): string;
   /** 另存整包：Java 弹文件夹选择器，写完回调 window.AxvNativeSaved(json) */
   saveBundle?(name: string, filesJson: string): void;
+  /** M191：设备上生成 keystore（PKCS#12）；返回 "ok:<字节数>" / "err:<原因>" */
+  makeKeystore?(path: string, alias: string, password: string, cn: string, org: string, years: number): string;
 }
 
 declare global {

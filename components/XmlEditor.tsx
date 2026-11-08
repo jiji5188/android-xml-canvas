@@ -2320,6 +2320,28 @@ const allDrawableNames = useMemo(() => {
     setSignIconDefault(iconDefault);
     setSignDialogOpen(true);
   }, [activeProject]);
+  /** M191：在设备上生成 keystore（Android 里跑的是真 JVM，只缺 keytool 命令；
+   *  KeystoreMaker.java 用标准 java.security 自己造 PKCS#12，桌面 keytool/apksigner 已验过） */
+  const makeKeystoreOnDevice = useCallback(
+    async (rel: string, o: { alias: string; password: string; cn: string; years: number }) => {
+      const b = nativeBridge();
+      if (!b?.makeKeystore) return { ok: false, msg: tt("当前 APK 版本还不支持在设备上生成，请升级到 1.16.27 以上") };
+      const root = projectSaveRoot(activeProject);
+      const base = root?.kind === "native" ? root.base.replace(/[/\\]+$/, "") : b.getDefaultWorkspace?.() || "";
+      if (!base) return { ok: false, msg: tt("没有可写的项目目录") };
+      const clean = rel.replace(/\\/g, "/").replace(/^\/+/, "");
+      const abs = `${base}/${clean}`;
+      try {
+        const r = b.makeKeystore(abs, o.alias, o.password, o.cn, "Android", o.years);
+        if (r.startsWith("ok:")) return { ok: true, msg: r };
+        return { ok: false, msg: r.replace(/^err:/, "") || tt("生成失败") };
+      } catch (e) {
+        return { ok: false, msg: e instanceof Error ? e.message : String(e) };
+      }
+    },
+    [activeProject],
+  );
+
   const writeGradleForSign = useCallback(
     async (next: string) => {
       const root = projectSaveRoot(activeProject);
@@ -5218,6 +5240,7 @@ const findResolved = findResolvedNode;
           appName={signAppName}
           iconDefault={signIconDefault}
           pkg={activeProject?.name ? packageOf(activeProject.name) : undefined}
+          onMakeKeystore={makeKeystoreOnDevice}
           onWriteGradle={writeGradleForSign}
           onClose={() => setSignDialogOpen(false)}
           onNote={(m, ms = 2400) => {

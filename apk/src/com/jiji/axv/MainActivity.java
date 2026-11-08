@@ -510,6 +510,25 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> startSaveBundle(name, filesJson));
         }
 
+        /** M191：在设备上生成 release 签名用的 keystore（PKCS#12）。
+         *  path 必须落在默认工作目录内（与 writeText 同一道护栏）。
+         *  返回 "ok:<字节数>" / "err:<原因>" */
+        @JavascriptInterface
+        public String makeKeystore(String path, String alias, String password, String cn, String org, int years) {
+            try {
+                if (path == null || path.trim().isEmpty()) return "err:路径为空";
+                File f = new File(path.trim());
+                String base = defaultDir().getCanonicalPath();
+                String canon = f.getCanonicalPath();
+                if (!canon.startsWith(base)) return "err:只能写在项目目录里";
+                long n = KeystoreMaker.make(canon, alias, password, cn, org, years);
+                return "ok:" + n;
+            } catch (Throwable t) {
+                String m = t.getMessage();
+                return "err:" + (m == null ? t.getClass().getSimpleName() : m);
+            }
+        }
+
         @JavascriptInterface
         public String getWorkspace() {
             return workspaceLabel();

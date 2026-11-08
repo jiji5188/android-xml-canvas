@@ -22,6 +22,8 @@ export interface SigningDialogProps {
   appName?: string | null;
   /** M189+：图标是否还是系统默认 */
   iconDefault?: boolean;
+  /** M191：在设备上生成 keystore 文件（native bridge）；不传则按钮置灰 */
+  onMakeKeystore?: (rel: string, o: { alias: string; password: string; cn: string; years: number }) => Promise<{ ok: boolean; msg: string }>;
   /** 写回（成功后弹层关闭 + 提示）；返回 true 成功 */
   onWriteGradle: (next: string) => Promise<boolean>;
   onClose: () => void;
@@ -40,7 +42,7 @@ const EMPTY: SigningParams = {
   v3: true,
 };
 
-export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onWriteGradle, onClose, onNote }: SigningDialogProps) {
+export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onWriteGradle, onClose, onNote }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
   const [alias, setAlias] = useState(prefill?.alias || EMPTY.alias);
   const [keyPassword, setKeyPassword] = useState(prefill?.keyPassword || "");
@@ -53,6 +55,9 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
   const [v3, setV3] = useState(prefill?.v3 ?? true);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /* M191：设备端生成 keystore */
+  const [ksBusy, setKsBusy] = useState(false);
+  const [ksDone, setKsDone] = useState(false);
 
   /* M189：发布信息（版本号 / SDK）+ 发布前检查 */
   /** 本地副本：发布前检查里的「修」按钮直接改它（最后写入时用这份） */
@@ -63,10 +68,11 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
   const [versionCode, setVersionCode] = useState<number>(pub?.versionCode ?? 1);
   const [versionName, setVersionName] = useState<string>(pub?.versionName ?? "1.0");
   const defaultAppName = !!appName && /^(my ?application|my ?app|app|untitled|应用|我的应用)?$/i.test(appName.trim());
+  const ksEffective = ksDone ? true : keystoreExists;
   const issues = baseText
     ? checkPublish({
         info: pub!,
-        keystoreExists,
+        keystoreExists: ksEffective,
         storeFile,
         anyScheme: v1 || v2 || v3,
         defaultAppName,
@@ -97,6 +103,21 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
       setPkgEdit(null);
     } else {
       setErr(r.msg || tt("包名不合法"));
+    }
+  };
+
+  /** M191：在设备上生成 keystore 文件（alias/口令/CN 都用当前表单里的） */
+  const doMakeKeystore = async () => {
+    if (!onMakeKeystore) return;
+    setKsBusy(true);
+    const rel = storeFile ?? ".axv/release.keystore";
+    const r = await onMakeKeystore(rel, { alias: alias ?? "release", password: keyPassword ?? "", cn: "", years: 25 });
+    setKsBusy(false);
+    if (r.ok) {
+      setKsDone(true);
+      onNote(tt("已在设备上生成 keystore：{path}", { path: rel }), 3200);
+    } else {
+      setErr(r.msg);
     }
   };
 
@@ -168,7 +189,22 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
         </div>
         <div className="axv-sign-row">
           <label>{tt("keystore 路径")}</label>
-          <input value={storeFile} onChange={(e) => setStoreFile(e.target.value)} />
+          <div style={{ display: "flex", gap: 6, flex: 1 }}>
+            <input value={storeFile} onChange={(e) => setStoreFile(e.target.value)} style={{ flex: 1 }} />
+            {!ksDone && onMakeKeystore && keyPassword.length >= 6 && (
+              <button
+                type="button"
+                onClick={() => void doMakeKeystore()}
+                disabled={ksBusy}
+                title={tt("在设备上生成 RSA 2048 自签名证书 + PKCS#12 文件")}
+              >
+                {ksBusy ? tt("生成中…") : tt("生成")}
+              </button>
+            )}
+          </div>
+          {ksDone && (
+            <div className="axv-sign-ok" style={{ marginTop: 4 }}>{tt("keystore 已在本机生成")}</div>
+          )}
         </div>
         <div className="axv-sign-row">
           <label>{tt("算法")}</label>

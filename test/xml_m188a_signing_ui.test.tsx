@@ -113,3 +113,72 @@ describe("M188a SigningDialog", () => {
     expect(html).toContain('type="password"');
   });
 });
+
+describe("M189+ SigningDialog 版本区与检查项修复按钮", () => {
+  const GRADLE = `android {
+    namespace 'com.example.demo'
+    defaultConfig {
+        applicationId 'com.example.demo'
+        minSdk 24
+        targetSdk 34
+        versionCode 7
+        versionName '1.3'
+    }
+}
+`;
+
+  const h = renderToStaticMarkup(
+    <SigningDialog
+      gradleText={GRADLE}
+      keystoreExists={false}
+      appName="My Application"
+      iconDefault
+      onWriteGradle={async () => true}
+      onClose={() => {}}
+      onNote={() => {}}
+    />
+  );
+
+  it("版本区回填 build.gradle 里的值", () => {
+    expect(h).toContain("版本信息");
+    expect(h).toContain('value="7"');
+    expect(h).toContain('value="1.3"');
+  });
+
+  it("只读 meta 显示包名与 SDK 级别", () => {
+    expect(h).toContain("com.example.demo");
+    expect(h).toContain("minSdk 24");
+    expect(h).toContain("targetSdk 34");
+  });
+
+  it("包名是 com.example.* 时给出「改包名」修复按钮", () => {
+    expect(h).toContain("改包名");
+    expect(h).toContain("axv-sign-fix");
+  });
+
+  it("keystore 不存在给黄色警告", () => {
+    expect(h).toContain("axv-sign-issue-warn");
+    expect(h).toContain("keystore 文件还不存在");
+  });
+
+  it("默认应用名与默认图标给灰色提示", () => {
+    expect(h).toContain("应用名还是默认值");
+    expect(h).toContain("应用图标还是系统默认的");
+  });
+
+  it("一切正常时不显示问题列表", () => {
+    const ok = renderToStaticMarkup(
+      <SigningDialog
+        gradleText={GRADLE.replace(/com\.example\.demo/g, "com.acme.app")}
+        keystoreExists
+        appName="仓储助手"
+        iconDefault={false}
+        onWriteGradle={async () => true}
+        onClose={() => {}}
+        onNote={() => {}}
+      />
+    );
+    expect(ok).toContain("发布前检查：没发现问题");
+    expect(ok).not.toContain("axv-sign-issue-error");
+  });
+});

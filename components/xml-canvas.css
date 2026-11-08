@@ -11042,3 +11042,31 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   background: color-mix(in srgb, var(--axv-accent, #4f8cff) 10%, transparent);
   margin: 4px 0 0;
 }
+
+
+/* M189+ 发布前检查的「修」按钮 */
+.axv-sign-fix {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  opacity: 0.85;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-sign-fix:hover { opacity: 1; }
+.axv-sign-pkgfix {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.axv-sign-pkgfix input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.axv-sign-pkgfix button { font-size: 12px; padding: 2px 10px; }

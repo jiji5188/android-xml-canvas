@@ -2277,12 +2277,13 @@ const allDrawableNames = useMemo(() => {
   const [signRootMissing, setSignRootMissing] = useState(false);
   /** M189：keystore 文件是否真存在（不给就是没检查） */
   const [signKeystoreExists, setSignKeystoreExists] = useState<boolean | undefined>(undefined);
+  const [signAppName, setSignAppName] = useState<string | null>(null);
+  const [signIconDefault, setSignIconDefault] = useState<boolean | undefined>(undefined);
   const LS_KEY_SIGN_DRAFT = "axv.signing.draft";
   const openSignDialog = useCallback(async () => {
     const root = projectSaveRoot(activeProject);
     // M188c：统一走 readProjectFile（native 用 readTextQueued，web 用目录句柄）
-    const txt = await readProjectFile(root, "app/build.gradle");
-    // 没有可写根时，读 localStorage 里的草稿
+    const txt = await readProjectFile(root, "app/build.gradle");    // 没有可写根时，读 localStorage 里的草稿
     const missing = !root;
     let use = txt;
     if (missing && !use) {
@@ -2297,9 +2298,24 @@ const allDrawableNames = useMemo(() => {
       const store = readSigningFromGradle(use)?.storeFile || ".axv/release.keystore";
       exists = await projectFileExists(root, store);
     }
+    // M189+：读 strings.xml 的 app_name 和 manifest 图标，判断是否还是默认值
+    let appName: string | null = null;
+    let iconDefault: boolean | undefined;
+    if (root) {
+      const strings = await readProjectFile(root, "app/src/main/res/values/strings.xml");
+      appName = strings ? readAppName(strings) : null;
+      const mf = await readProjectFile(root, "app/src/main/AndroidManifest.xml");
+      if (mf) {
+        const m = /android:icon\s*=\s*"([^"]*)"/.exec(mf);
+        const v = m ? m[1] : "";
+        iconDefault = !v || /@(mipmap|drawable)\/ic_launcher(_round)?$/.test(v);
+      }
+    }
     setGradleForSign(use);
     setSignRootMissing(missing);
     setSignKeystoreExists(exists);
+    setSignAppName(appName);
+    setSignIconDefault(iconDefault);
     setSignDialogOpen(true);
   }, [activeProject]);
   const writeGradleForSign = useCallback(
@@ -5156,6 +5172,8 @@ const findResolved = findResolvedNode;
           gradleText={gradleForSign}
           rootMissing={signRootMissing}
           keystoreExists={signKeystoreExists}
+          appName={signAppName}
+          iconDefault={signIconDefault}
           pkg={activeProject?.name ? packageOf(activeProject.name) : undefined}
           onWriteGradle={writeGradleForSign}
           onClose={() => setSignDialogOpen(false)}

@@ -169,8 +169,23 @@ describe("M189 checkPublish", () => {
     expect(issues.some((i) => i.fix === "enable-v2")).toBe(true);
   });
 
-  it("结果按 error → warn → info 排序", () => {
-    const g = 'android { namespace "com.example.x" }';
+  it("默认图标也是默认值 → 灰色 info 提示", () => {
+    const issues = checkPublish({
+      info: readPublishInfo(GRADLE),
+      keystoreExists: true,
+      anyScheme: true,
+      defaultIcon: true,
+    });
+    const hit = issues.find((i) => i.msg.includes("应用图标"));
+    expect(hit?.level).toBe("info");
+  });
+
+  it("defaultIcon 不传时不产生图标提示", () => {
+    const issues = checkPublish({ info: readPublishInfo(GRADLE), keystoreExists: true, anyScheme: true });
+    expect(issues.some((i) => i.msg.includes("应用图标"))).toBe(false);
+  });
+
+  it("结果按 error → warn → info 排序", () => {    const g = 'android { namespace "com.example.x" }';
     const issues = checkPublish({
       info: readPublishInfo(g),
       keystoreExists: false,

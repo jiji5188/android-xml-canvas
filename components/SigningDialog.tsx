@@ -7,6 +7,7 @@ import { useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { validateSigning, readSigningFromGradle, applySigningToGradle, defaultAppGradle, type SigningParams } from "@/lib/xml/signing";
 import { checkPublish, readPublishInfo, setPublishVersion } from "@/lib/xml/gradle-publish";
+import { setGradlePackage } from "@/lib/xml/project-info";
 
 export interface SigningDialogProps {
   /** 读项目里 app/build.gradle（没有就 null） */
@@ -17,6 +18,10 @@ export interface SigningDialogProps {
   pkg?: string;
   /** M189：keystore 文件是否真实存在（undefined = 没检查） */
   keystoreExists?: boolean;
+  /** M189+：strings.xml 里的 app_name（判断是否还是默认值） */
+  appName?: string | null;
+  /** M189+：图标是否还是系统默认 */
+  iconDefault?: boolean;
   /** 写回（成功后弹层关闭 + 提示）；返回 true 成功 */
   onWriteGradle: (next: string) => Promise<boolean>;
   onClose: () => void;
@@ -35,7 +40,7 @@ const EMPTY: SigningParams = {
   v3: true,
 };
 
-export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, onWriteGradle, onClose, onNote }: SigningDialogProps) {
+export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onWriteGradle, onClose, onNote }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
   const [alias, setAlias] = useState(prefill?.alias || EMPTY.alias);
   const [keyPassword, setKeyPassword] = useState(prefill?.keyPassword || "");
@@ -50,17 +55,50 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, on
   const [busy, setBusy] = useState(false);
 
   /* M189：发布信息（版本号 / SDK）+ 发布前检查 */
-  const pub = gradleText ? readPublishInfo(gradleText) : null;
+  /** 本地副本：发布前检查里的「修」按钮直接改它（最后写入时用这份） */
+  const [baseText, setBaseText] = useState<string | null>(gradleText);
+  /** 改包名的内联输入（null = 没展开） */
+  const [pkgEdit, setPkgEdit] = useState<string | null>(null);
+  const pub = baseText ? readPublishInfo(baseText) : null;
   const [versionCode, setVersionCode] = useState<number>(pub?.versionCode ?? 1);
   const [versionName, setVersionName] = useState<string>(pub?.versionName ?? "1.0");
-  const issues = gradleText
+  const defaultAppName = !!appName && /^(my ?application|my ?app|app|untitled|应用|我的应用)?$/i.test(appName.trim());
+  const issues = baseText
     ? checkPublish({
         info: pub!,
         keystoreExists,
         storeFile,
         anyScheme: v1 || v2 || v3,
+        defaultAppName,
+        defaultIcon: iconDefault,
       })
     : [];
+
+  /** 「修」：直接把改动应用到本地文本（写盘前可预览） */
+  const applyFix = (fix: "bump-version" | "set-package" | "enable-v2") => {
+    if (fix === "bump-version") {
+      setVersionCode((n) => Math.max(1, n) + 1);
+      return;
+    }
+    if (fix === "enable-v2") {
+      setV2(true);
+      setV3(true);
+      return;
+    }
+    const cur = pub?.applicationId || pub?.namespace || pkg || "com.example.app";
+    setPkgEdit(cur);
+  };
+
+  const commitPkg = () => {
+    if (!baseText || !pkgEdit) return;
+    const r = setGradlePackage(baseText, pkgEdit.trim());
+    if (r.ok) {
+      setBaseText(r.text);
+      setPkgEdit(null);
+    } else {
+      setErr(r.msg || tt("包名不合法"));
+    }
+  };
 
   /** 把「签名 + 版本」一次写进 build.gradle */
   const composeNext = (base: string, p: SigningParams): { ok: boolean; next: string; error: string | null } => {
@@ -99,7 +137,7 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, on
     }
 
     setBusy(true);
-    const r = composeNext(gradleText, p);
+    const r = composeNext(baseText || "", p);
     if (!r.ok) { setErr(r.error); setBusy(false); return; }
     const ok = await onWriteGradle(r.next);
     setBusy(false);
@@ -181,7 +219,7 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, on
         {err && <div className="axv-sign-err" role="alert">{err}</div>}
 
         {/* M189：版本信息 */}
-        {gradleText ? (
+        {baseText ? (
           <>
             <div className="axv-sign-sep">{tt("版本信息")}</div>
             <div className="axv-sign-row">
@@ -215,12 +253,37 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, on
                     <span className="msr" aria-hidden="true">
                       {it.level === "error" ? "error" : it.level === "warn" ? "warning" : "info"}
                     </span>
-                    {it.msg}
+                    <span style={{ flex: 1 }}>{it.msg}</span>
+                    {it.fix && (
+                      <button
+                        type="button"
+                        className="axv-sign-fix"
+                        onClick={() => applyFix(it.fix!)}
+                      >
+                        {it.fix === "bump-version" ? tt("自动 +1") : it.fix === "set-package" ? tt("改包名") : tt("开 v2")}
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
             ) : (
               <div className="axv-sign-ok">{tt("发布前检查：没发现问题")}</div>
+            )}
+            {pkgEdit !== null && (
+              <div className="axv-sign-pkgfix">
+                <input
+                  value={pkgEdit}
+                  onChange={(e) => setPkgEdit(e.target.value)}
+                  placeholder="com.yourcompany.app"
+                  aria-label={tt("包名")}
+                />
+                <button type="button" className="axv-sign-primary" onClick={commitPkg}>
+                  {tt("应用")}
+                </button>
+                <button type="button" onClick={() => setPkgEdit(null)}>
+                  {tt("取消")}
+                </button>
+              </div>
             )}
           </>
         ) : null}

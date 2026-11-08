@@ -106,6 +106,8 @@ export interface PublishCheckInput {
   anyScheme?: boolean;
   /** 应用名是否是默认值（Android Studio 默认 My Application / 空） */
   defaultAppName?: boolean;
+  /** 应用图标是否还是系统默认（@mipmap/ic_launcher 或 manifest 里没写 icon） */
+  defaultIcon?: boolean;
 }
 
 /** 发布前检查：返回按严重程度排过序的问题列表（空 = 可以发） */
@@ -150,6 +152,10 @@ export function checkPublish(input: PublishCheckInput): PublishIssue[] {
 
   if (input.defaultAppName) {
     out.push({ level: "info", msg: "应用名还是默认值，桌面图标下会显示它" });
+  }
+
+  if (input.defaultIcon) {
+    out.push({ level: "info", msg: "应用图标还是系统默认的，上架前建议换成自己的" });
   }
 
   const order: Record<PublishIssueLevel, number> = { error: 0, warn: 1, info: 2 };

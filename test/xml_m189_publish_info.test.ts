@@ -169,6 +169,33 @@ describe("M189 checkPublish", () => {
     expect(issues.some((i) => i.fix === "enable-v2")).toBe(true);
   });
 
+  it("大写包名（com.momo.ReturnSystem）不算非法，只给 info", () => {
+    const g = "android {\n    namespace 'com.momo.ReturnSystem'\n    defaultConfig {\n        applicationId 'com.momo.ReturnSystem'\n        versionCode 3\n        versionName '1.0'\n        minSdk 24\n    }\n}";
+    const issues = checkPublish({ info: readPublishInfo(g), keystoreExists: true, anyScheme: true });
+    expect(issues.some((i) => i.level === "error" && i.fix === "set-package")).toBe(false);
+    const hit = issues.find((i) => i.msg.includes("大写字母"));
+    expect(hit?.level).toBe("info");
+  });
+
+  it("旧写法 minSdkVersion / targetSdkVersion / compileSdkVersion 也能读到", () => {
+    const g = `android {
+    compileSdkVersion 34
+    defaultConfig {
+        applicationId "com.acme.app"
+        minSdkVersion 21
+        targetSdkVersion 33
+        versionCode 2
+        versionName "1.1"
+    }
+}`;
+    const i = readPublishInfo(g);
+    expect(i.minSdk).toBe(21);
+    expect(i.targetSdk).toBe(33);
+    expect(i.compileSdk).toBe(34);
+    const issues = checkPublish({ info: i, keystoreExists: true, anyScheme: true });
+    expect(issues.some((x) => x.msg.includes("minSdk"))).toBe(false);
+  });
+
   it("默认图标也是默认值 → 灰色 info 提示", () => {
     const issues = checkPublish({
       info: readPublishInfo(GRADLE),

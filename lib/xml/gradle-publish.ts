@@ -27,6 +27,14 @@ function readNum(text: string, key: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** 旧写法 minSdkVersion 21 / targetSdkVersion 34 / compileSdkVersion 34 也得认，
+ *  但 `minSdk` 直接匹配会把 "minSdkVersion" 的 Version 当值 → 必须先试长名。 */
+function readSdk(text: string, key: "minSdk" | "targetSdk" | "compileSdk"): number | null {
+  const long = readNum(text, `${key}Version`);
+  if (long != null) return long;
+  return readNum(text, key);
+}
+
 /** 读版本与 SDK 信息；任何一项没有就 null */
 export function readPublishInfo(gradle: string): PublishInfo {
   return {
@@ -34,9 +42,9 @@ export function readPublishInfo(gradle: string): PublishInfo {
     versionName: readRaw(gradle, "versionName"),
     applicationId: readRaw(gradle, "applicationId"),
     namespace: readRaw(gradle, "namespace"),
-    minSdk: readNum(gradle, "minSdk"),
-    targetSdk: readNum(gradle, "targetSdk"),
-    compileSdk: readNum(gradle, "compileSdk"),
+    minSdk: readSdk(gradle, "minSdk"),
+    targetSdk: readSdk(gradle, "targetSdk"),
+    compileSdk: readSdk(gradle, "compileSdk"),
   };
 }
 
@@ -126,8 +134,12 @@ export function checkPublish(input: PublishCheckInput): PublishIssue[] {
   }
 
   const pkg = info.applicationId || info.namespace;
-  if (!pkg || !/^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)+$/.test(pkg)) {
+  // Android 允许大写字母（Java 包名惯例是小写，但不强制）；只拦真不合法的：
+  // 少于两段、以数字/下划线开头、带连字符或空格
+  if (!pkg || !/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$/.test(pkg)) {
     out.push({ level: "error", msg: "包名不合法（要像 com.example.app）", fix: "set-package" });
+  } else if (/[A-Z]/.test(pkg)) {
+    out.push({ level: "info", msg: "包名里有大写字母：Android 能用，但 Google Play 惯例是全小写" });
   } else if (pkg.startsWith("com.example")) {
     out.push({ level: "warn", msg: "包名还是 com.example.* —— 上架前建议改成自己的域名", fix: "set-package" });
   }

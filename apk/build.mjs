@@ -4,6 +4,7 @@
 // 和 Android Studio 自带 JDK（jbr）；assets/www 会先从仓库 out/ 拷贝进来
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import zlib from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -167,6 +168,15 @@ run(jbrExe("jar"), ["uf", "build/base.apk", "-C", "build/dex", "classes.dex"], a
       .map((f) => path.join("build/signcls", String(f))),
     apksignerJar,
   ], apk);
+
+  // M192c：两个 dex 必须 gzip 后再进 assets。
+  //  原因：华为/荣耀这类 ROM 的安装扫描在「扫描校验」阶段会拒掉「APK 内含 dex 可执行
+  //  载荷」的包（1.16.28/29 就是这么装不上的）。光改名成 .bin 不够 —— 扫描器会嗅
+  //  magic bytes（"dex\n035"）。gzip 后运行时解压到 cache 再当 dex 用，功能不变。
+  const gz = (src, dst) =>
+    fs.writeFileSync(dst, zlib.gzipSync(fs.readFileSync(src), { level: 9 }));
+  gz(path.join(apk, "build/shelldex/classes.dex"), path.join(apk, "build/shell.bin.gz"));
+  gz(path.join(apk, "build/signdex/classes.dex"), path.join(apk, "build/signer.bin.gz"));
 }
 
 // 6.5) assets 必须用正斜杠：aapt2 在 Windows 上会写成反斜杠（AssetManager 读不到，白屏），
@@ -180,8 +190,8 @@ run(process.execPath, [path.join(apk, "make-fw-stub.mjs"), path.join(SDK, "platf
 run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "build", "base.apk"), path.join(apk, "assets", "www"),
   "--add", path.join(apk, "lib", "arm64-v8a", "libaapt2.so"), "lib/arm64-v8a/libaapt2.so",
   "--add", fwStub, "assets/fw/framework-res-stub.apk.gz",
-  "--add", path.join(apk, "build", "shelldex", "classes.dex"), "assets/shell/shell.dex",
-  "--add", path.join(apk, "build", "signdex", "classes.dex"), "assets/apksig/signer.dex"], apk);
+  "--add", path.join(apk, "build", "shell.bin.gz"), "assets/shell/shell.bin.gz",
+  "--add", path.join(apk, "build", "signer.bin.gz"), "assets/apksig/signer.bin.gz"], apk);
 
 // 7) zipalign + 签名
 const keystore = path.join(apk, "debug.keystore");

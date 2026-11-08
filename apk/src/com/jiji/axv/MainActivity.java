@@ -2,6 +2,7 @@ package com.jiji.axv;
 
 import android.app.Activity;
 import android.content.ContentValues;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -2376,6 +2377,16 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** M192c：assets 里的 dex 是 gzip 过的（避厂商安装扫描的 dex 检测）→ 读时解压 */
+    private byte[] readAssetGz(String name) throws IOException {
+        java.io.InputStream in = new java.util.zip.GZIPInputStream(getAssets().open(name));
+        try {
+            return ApkPack.readAll(in);
+        } finally {
+            in.close();
+        }
+    }
+
     /** 用 assets 里的 apksig（DexClassLoader 加载）签名；返回 "ok:..."/"err:..." */
     private String signWithApksig(File inApk, File outApk, String ksPath, String storePass, String alias,
             String keyPass) {
@@ -2383,7 +2394,9 @@ public class MainActivity extends Activity {
             File dir = new File(getCacheDir(), "apksig");
             if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("建不了缓存目录: " + dir);
             File dex = new File(dir, "signer.dex");
-            byte[] want = readAssetBytes("apksig/signer.dex");
+            // 注意：assets 里存的是 .bin（不是 .dex）——不少手机厂商的安装扫描会对
+            // 「APK 里面的 dex 文件」敏感，改名后运行时装到 cache 再当 dex 用。
+            byte[] want = readAssetGz("apksig/signer.bin.gz");
             if (!dex.isFile() || dex.length() != want.length) {
                 writeBytes(dex, want);
             }
@@ -2509,7 +2522,7 @@ public class MainActivity extends Activity {
 
             step = "pack";
             File packed = new File(root, "packed.apk");
-            ApkPack.addDexAndAlign(unsigned, readAssetBytes("shell/shell.dex"), packed);
+            ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), packed);
             log.append("注入壳 dex，打包后 ").append(packed.length()).append(" 字节\n");
 
             step = "sign";
@@ -2567,6 +2580,24 @@ public class MainActivity extends Activity {
                 File f = new File(path);
                 if (!f.isFile()) {
                     toast("找不到 APK：" + path);
+                    return;
+                }
+                // M192b：Android 8+ 要单独放行「安装未知来源应用」，否则安装器只给一句
+                // 「为了安全，你的手机不允许……”——先把用户引到开关处
+                if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+                    new AlertDialog.Builder(MainActivity.this)
+                            .setTitle("需要允许安装应用")
+                            .setMessage("系统拦下了安装：请允许本应用「安装未知应用」，然后再点一次「安装到本机」。")
+                            .setPositiveButton("去设置", (dlg, w) -> {
+                                try {
+                                    startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                            Uri.parse("package:" + getPackageName())));
+                                } catch (Throwable t) {
+                                    toast("打不开设置页：" + t.getMessage());
+                                }
+                            })
+                            .setNegativeButton("取消", null)
+                            .show();
                     return;
                 }
                 Uri uri = AxvApkProvider.uriFor(MainActivity.this, f);

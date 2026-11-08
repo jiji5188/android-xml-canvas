@@ -10591,7 +10591,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 8px;
+  padding: 0 12px;
   /* M193：把手条高 26px（M193c 从 20 回调） */
   height: 26px;
   min-height: 26px;

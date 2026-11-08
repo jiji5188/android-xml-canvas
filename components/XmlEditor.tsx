@@ -221,6 +221,7 @@ function writeLastRel(projectKey: string, rel: string): void {
 import { RunPreview } from "./RunPreview";
 import { Toolbar } from "./Toolbar";
 import { LeftRail, type LeftView } from "./LeftRail";
+import { ProblemsDrawer } from "./ProblemsDrawer";
 import { Inspector } from "./Inspector";
 import { StatusBar } from "./StatusBar";
 import { LayerTree } from "./LayerTree";
@@ -4383,6 +4384,12 @@ const findResolved = findResolvedNode;
         </div>
       ) : null}
 
+      {/* M185：通用底部抽屉（ROADMAP L0.5-22）：Problems 先接现有 lints，构建日志后续填 */}
+      <ProblemsDrawer
+        problems={(lints ?? []).map((l) => ({ line: l.line ?? 1, msg: l.message }))}
+        onGotoLine={(ln) => gotoLine(ln)}
+        tr={tr}
+      />
       {/* M101：代码面板也要看得到 toast（exportNote 的汉堡包在 CanvasStage，代码 tab 看不到） */}
       <XmlCodeView
         open={mobileTab === "xml" || mobileTab === "values"}

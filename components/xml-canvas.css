@@ -1269,7 +1269,7 @@
 }
 .axv-pp-foot {
   flex: 0 0 auto;
-  padding: 8px 14px 36px 14px;
+  padding: 8px 14px 16px;
   font-size: 11px;
   color: var(--axv-on-surface-variant);
   border-top: 1px solid var(--axv-outline);
@@ -10589,9 +10589,9 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   align-items: center;
   gap: 4px;
   padding: 0 8px;
-  /* M193：把手条压到 20px（原 28px），状态信息合并进来，不再单独占一行 */
-  height: 20px;
-  min-height: 20px;
+  /* M193：把手条高 26px（M193c 从 20 回调） */
+  height: 26px;
+  min-height: 26px;
   background: var(--axv-toolbar-bg, #f6f5f4);
   border-top: 1px solid var(--axv-outline-variant, #0000001a);
   box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.08);
@@ -10643,7 +10643,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   color: var(--axv-on-surface, #333);
   font-size: 11px;
   padding: 0 6px;
-  height: 16px;
+  height: 18px;
   border-radius: 6px;
   cursor: pointer;
   flex: 0 0 auto;

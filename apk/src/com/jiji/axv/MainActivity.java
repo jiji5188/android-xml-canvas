@@ -2400,6 +2400,19 @@ public class MainActivity extends Activity {
             if (!dex.isFile() || dex.length() != want.length) {
                 writeBytes(dex, want);
             }
+            // ⚠ Android 14（API 34）起禁止动态加载「可写」的 dex：
+            //   Writable dex file '...' is not allowed
+            // 解：写完立刻改成只读（0444）。之前写过但仍是可写的旧文件也要补一刀。
+            if (dex.canWrite()) {
+                if (!dex.setReadOnly()) {
+                    try {
+                        Runtime.getRuntime().exec(new String[] { "chmod", "444", dex.getAbsolutePath() }).waitFor();
+                    } catch (Throwable ignored) {
+                        // 下面 DexClassLoader 会报确切错误，交给上层展示
+                    }
+                }
+            }
+            if (dex.canWrite()) throw new IOException("dex 文件无法设为只读（Android 14+ 要求）: " + dex.getAbsolutePath());
             File oat = new File(dir, "oat");
             if (!oat.isDirectory()) oat.mkdirs();
             dalvik.system.DexClassLoader cl = new dalvik.system.DexClassLoader(

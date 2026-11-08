@@ -153,6 +153,72 @@ function findClosingBrace(text: string, open: number): number {
   return text.length - 1;
 }
 
+/** M188c：项目里根本没有 app/build.gradle 时，生成一份带签名的基础模板。
+ *  之所以要它：用户打开的是轻量工程（只建了 res/layout）或旧工程，
+ *  以前会直接报「先建项目」把路堵死；现在允许当场生成。
+ *  pkg 不传默认 com.example.app（不猜项目名，以免猜错包名）。 */
+export function defaultAppGradle(p: SigningParams, pkg?: string): {
+  ok: boolean;
+  next: string;
+  error: string | null;
+} {
+  const check = validateSigning(p);
+  if (!check.ok) return { ok: false, next: "", error: check.error };
+  const store = p.storeFile || ".axv/release.keystore";
+  const alias = p.alias.trim();
+  const pwd = p.keyPassword;
+  const v1 = p.v1 ?? true;
+  const v2 = p.v2 ?? true;
+  const v3 = p.v3 ?? true;
+  const id = (pkg || "com.example.app").trim();
+  return {
+    ok: true,
+    error: null,
+    next: [
+      "// 由 XML 画板生成的基础 app/build.gradle（含 release 签名配置）",
+      "plugins {",
+      "    id 'com.android.application'",
+      "}",
+      "",
+      "android {",
+      `    namespace '${id}'`,
+      "    compileSdk 34",
+      "",
+      "    defaultConfig {",
+      `        applicationId '${id}'`,
+      "        minSdk 24",
+      "        targetSdk 34",
+      "        versionCode 1",
+      "        versionName '1.0'",
+      "    }",
+      "",
+      "    signingConfigs {",
+      "        release {",
+      `            storeFile file('${store}')`,
+      `            storePassword '${pwd}'`,
+      `            keyAlias '${alias}'`,
+      `            keyPassword '${pwd}'`,
+      `            enableV1Signing ${v1}`,
+      `            enableV2Signing ${v2}`,
+      `            enableV3Signing ${v3}`,
+      "        }",
+      "    }",
+      "",
+      "    buildTypes {",
+      "        release {",
+      "            minifyEnabled false",
+      "            signingConfig signingConfigs.release",
+      "        }",
+      "    }",
+      "}",
+      "",
+      "dependencies {",
+      "}",
+      "",
+    ].join("\n"),
+  };
+}
+
 /** 读取 build.gradle 里已有的 signingConfigs（解析成参数，UI 回填用）；没有就 null */
 export function readSigningFromGradle(
   gradleText: string,

@@ -60,7 +60,7 @@ import { yieldToUi } from "@/lib/xml/native-async";
 import { perfMark, perfTimer, heapMB, perfLogPath } from "@/lib/xml/perf-log";
 import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
 // M31i：新建项目时把完整 Android 工程骨架落盘
-import { createAndroidProject, safeProjectName, validatePackageName } from "@/lib/xml/new-project";
+import { createAndroidProject, packageOf, safeProjectName, validatePackageName } from "@/lib/xml/new-project";
 import {
   dirNameOf,
   readAppName,
@@ -78,7 +78,7 @@ import { pickXmlFile } from "@/lib/xml/save-as";
 import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { hasRealRender, renderReal } from "@/lib/xml/native-render";
 import { collectProjectRes } from "@/lib/xml/res-collect";
-import { projectSaveRoot, saveProjectFile, saveResFiles, resAbs } from "@/lib/xml/project-save";
+import { projectSaveRoot, readProjectFile, saveProjectFile, saveResFiles, resAbs } from "@/lib/xml/project-save";
 import { parseAppIconConfig } from "@/lib/xml/app-icon";
 import { nativeBridge } from "@/lib/xml/native-save";
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
@@ -2277,28 +2277,18 @@ const allDrawableNames = useMemo(() => {
   const LS_KEY_SIGN_DRAFT = "axv.signing.draft";
   const openSignDialog = useCallback(async () => {
     const root = projectSaveRoot(activeProject);
-    let txt: string | null = null;
-    if (root && root.kind === "native") {
-      try {
-        const bridge = (window as unknown as { __axvBridge?: { readText?: (p: string) => Promise<string> } }).__axvBridge;
-        if (bridge?.readText) txt = await bridge.readText(`${root.base}/app/build.gradle`);
-      } catch { /* 没有该文件 */ }
-    } else if (root && root.kind === "handle") {
-      try {
-        // 网页版目录句柄：项目源自带 readText（ai-fs 包装的 ProjectSource）
-        const src = (activeProject as { source?: { readText?: (rel: string) => Promise<string> } } | null)?.source;
-        if (src?.readText) txt = await src.readText("app/build.gradle");
-      } catch { txt = null; }
-    }
+    // M188c：统一走 readProjectFile（native 用 readTextQueued，web 用目录句柄）
+    const txt = await readProjectFile(root, "app/build.gradle");
     // 没有可写根时，读 localStorage 里的草稿
     const missing = !root;
-    if (missing && !txt) {
+    let use = txt;
+    if (missing && !use) {
       try {
         const draft = window.localStorage.getItem(LS_KEY_SIGN_DRAFT);
-        if (draft) txt = draft;
+        if (draft) use = draft;
       } catch { /* ignore */ }
     }
-    setGradleForSign(txt);
+    setGradleForSign(use);
     setSignRootMissing(missing);
     setSignDialogOpen(true);
   }, [activeProject]);
@@ -5155,6 +5145,7 @@ const findResolved = findResolvedNode;
         <SigningDialog
           gradleText={gradleForSign}
           rootMissing={signRootMissing}
+          pkg={activeProject?.name ? packageOf(activeProject.name) : undefined}
           onWriteGradle={writeGradleForSign}
           onClose={() => setSignDialogOpen(false)}
           onNote={(m, ms = 2400) => {

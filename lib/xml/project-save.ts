@@ -7,7 +7,8 @@
 // 这里只做「把 SaveFileSpec[] 写进某项目 res 根」这件事，纯路径计算可单测；
 // native 走 bridge.writeText（内部 mkdirs），web 走目录句柄逐级 create。
 
-import { writeTextNative } from "./native-save";
+import { nativeBridge, writeTextNative } from "./native-save";
+import { readTextQueued } from "./native-async";
 import type { SaveFileSpec } from "./save-as";
 
 /** res 在 Android 工程里的固定前缀 */
@@ -56,6 +57,58 @@ export function projectSaveRoot(p: {
   if (base && base.startsWith("/")) return { kind: "native", base: base.replace(/\/+$/, "") };
   if (p.handle) return { kind: "handle", handle: p.handle };
   return null;
+}
+
+/** M188c：按工程内相对路径读一个文件（manifest / build.gradle / values …）
+ *  —— 没这个文件（或读不到）返回 null，调用方自己决定怎么提示。
+ *  之前 M188a 直接去摸 window.__axvBridge（拼错了，真实是 window.AxvNative），
+ *  导致 APK 里永远读到 null，弹层就报「项目里没有 app/build.gradle」。 */
+export async function readProjectFile(
+  root: ProjectSaveRoot | null,
+  rel: string,
+): Promise<string | null> {
+  if (!root) return null;
+  const clean = rel.replace(/\\/g, "/").replace(/^\/+/, "");
+  try {
+    if (root.kind === "native") {
+      const base = root.base.replace(/[/\\]+$/, "");
+      const abs = `${base}/${clean}`;
+      // 优先异步读（不堵 UI）；老 APK 没有 readTextAsync 时退回同步桥
+      const txt = await readTextQueued(abs);
+      if (typeof txt === "string" && txt.length > 0) return txt;
+      try {
+        const b = nativeBridge();
+        const sync = b?.readText?.(abs);
+        if (typeof sync === "string" && sync.length > 0) return sync;
+      } catch {
+        /* ignore */
+      }
+      return null;
+    }
+    return await readUnderHandle(root.handle, clean);
+  } catch {
+    return null;
+  }
+}
+
+async function readUnderHandle(root: unknown, rel: string): Promise<string | null> {
+  const segs = rel.split("/").filter(Boolean);
+  const file = segs.pop();
+  if (!file) return null;
+  let dir = root as {
+    getDirectoryHandle?(n: string, o?: { create?: boolean }): Promise<unknown>;
+    getFileHandle?(n: string, o?: { create?: boolean }): Promise<unknown>;
+  };
+  for (const s of segs) {
+    if (typeof dir.getDirectoryHandle !== "function") return null;
+    dir = (await dir.getDirectoryHandle(s, { create: false })) as typeof dir;
+  }
+  if (typeof dir.getFileHandle !== "function") return null;
+  const fh = (await dir.getFileHandle(file, { create: false })) as { getFile?(): Promise<File> };
+  if (!fh || typeof fh.getFile !== "function") return null;
+  const f = await fh.getFile();
+  const txt = await f.text();
+  return txt.length > 0 ? txt : null;
 }
 
 /** 拼出 native 绝对路径：<base>/app/src/main/res/<rel> */

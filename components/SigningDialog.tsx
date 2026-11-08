@@ -5,13 +5,15 @@
 
 import { useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
-import { validateSigning, readSigningFromGradle, applySigningToGradle, type SigningParams } from "@/lib/xml/signing";
+import { validateSigning, readSigningFromGradle, applySigningToGradle, defaultAppGradle, type SigningParams } from "@/lib/xml/signing";
 
 export interface SigningDialogProps {
   /** 读项目里 app/build.gradle（没有就 null） */
   gradleText: string | null;
   /** M188b：当前项目没有可写根（网页版没选目录 / 示例项目）→ 写入先进 localStorage 草稿 */
   rootMissing?: boolean;
+  /** M188c：项目包名（没有 build.gradle 时生成基础模板用；不传就 com.example.app） */
+  pkg?: string;
   /** 写回（成功后弹层关闭 + 提示）；返回 true 成功 */
   onWriteGradle: (next: string) => Promise<boolean>;
   onClose: () => void;
@@ -30,7 +32,7 @@ const EMPTY: SigningParams = {
   v3: true,
 };
 
-export function SigningDialog({ gradleText, rootMissing, onWriteGradle, onClose, onNote }: SigningDialogProps) {
+export function SigningDialog({ gradleText, rootMissing, pkg, onWriteGradle, onClose, onNote }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
   const [alias, setAlias] = useState(prefill?.alias || EMPTY.alias);
   const [keyPassword, setKeyPassword] = useState(prefill?.keyPassword || "");
@@ -49,7 +51,27 @@ export function SigningDialog({ gradleText, rootMissing, onWriteGradle, onClose,
     const p: SigningParams = { alias, keyPassword, storeFile, algorithm, keySize, validityDays, v1, v2, v3 };
     const check = validateSigning(p);
     if (!check.ok) { setErr(check.error); return; }
-    if (!gradleText) { setErr(tt("项目里没有 app/build.gradle，先建项目")); return; }
+
+    // M188c：项目里没有 app/build.gradle 时不再堵死，直接生成一份带签名的基础模板
+    if (!gradleText) {
+      if (rootMissing) {
+        setErr(tt("没有可写的项目目录：先打开项目或选一个保存目录"));
+        return;
+      }
+      setBusy(true);
+      const made = defaultAppGradle(p, pkg);
+      if (!made.ok) { setErr(made.error); setBusy(false); return; }
+      const okNew = await onWriteGradle(made.next);
+      setBusy(false);
+      if (okNew) {
+        onNote(tt("已生成 app/build.gradle 并写入签名配置"), 3200);
+        onClose();
+      } else {
+        setErr(tt("写入 build.gradle 失败"));
+      }
+      return;
+    }
+
     setBusy(true);
     const r = applySigningToGradle(gradleText, p);
     if (!r.ok) { setErr(r.error); setBusy(false); return; }

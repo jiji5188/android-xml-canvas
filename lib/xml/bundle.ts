@@ -3,6 +3,7 @@
 
 import type { ResourceExtras, ResTreeDir, ResTreeFile } from "./resdir";
 import type { ZipEntry } from "./zip";
+import { dedupeValuesFragment } from "./values-merge";
 
 export interface BundleInput {
   /** 已规范化（带声明）的布局 XML 全文 */
@@ -120,16 +121,20 @@ function rank(p: string): number {
   return 2;
 }
 
-/** 把零散的 <string>/<dimen>/<color> 标签包一层 <resources> */
+/** 把零散的 <string>/<dimen>/<color> 标签包一层 <resources>
+ *  M183c：包之前先按 kind/name 去重 —— 旧版直接把整个片段塞进去，
+ *  valuesXml 里一旦有重复（多次合并累积出来的）就会写出几千条重复定义。 */
 function wrapValues(fragment: string): string {
-  const body = fragment
-    .replace(/<\?xml[^>]*\?>/gi, "")
-    .replace(/<\/?resources[^>]*>/gi, "")
-    // M12c：<macro> 是 AAPT2 新特性，AIDE 内嵌的老 aapt 遇到会直接
-    // “Found tag macro where item is expected”→ 导出时丢掉（宏只影响 gradle 层，预览/编译不需要）
-    .replace(/<macro\b[^>]*\/>/gi, "")
-    .replace(/<macro\b[^>]*>[\s\S]*?<\/macro>/gi, "")
-    .trim();
+  const body = dedupeValuesFragment(
+    fragment
+      .replace(/<\?xml[^>]*\?>/gi, "")
+      .replace(/<\/?resources[^>]*>/gi, "")
+      // M12c：<macro> 是 AAPT2 新特性，AIDE 内嵌的老 aapt 遇到会直接
+      // “Found tag macro where item is expected”→ 导出时丢掉（宏只影响 gradle 层，预览/编译不需要）
+      .replace(/<macro\b[^>]*\/>/gi, "")
+      .replace(/<macro\b[^>]*>[\s\S]*?<\/macro>/gi, "")
+      .trim(),
+  );
   return `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${body}\n</resources>\n`;
 }
 

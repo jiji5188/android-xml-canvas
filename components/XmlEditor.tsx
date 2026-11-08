@@ -4499,8 +4499,9 @@ const findResolved = findResolvedNode;
                     return;
                   }
                   const rootPath = src.rootPath;
+                  // M183c：native 路径分隔符用 /（Linux/Android），旧版拼成 \\ 会写错盘
                   const target = rootPath
-                    ? rootPath.replace(/[\\/]+$/, "") + "\\" + rel.replace(/\//g, "\\")
+                    ? rootPath.replace(/[\\/]+$/, "") + "/" + rel
                     : undefined;
                   void loadEntry(src, { kind: "file", name: rel.split("/").pop() || rel, rel, target }).then(() => {
                     if (typeof line === "number") jumpToCodeLine(line);

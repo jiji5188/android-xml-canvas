@@ -71,6 +71,15 @@ export function valuesQualifier(dirName: string): string {
   return m ? m[2] || "" : "";
 }
 
+/**
+ * M183c：取一个组的「主变体」——默认限定符（values/）优先，
+ * 没有默认目录时才退回第一个变体。面板的行显示/就地改值/双击跳转都应走它，
+ * 避免用户实际改的是 values-night 而以为是 values（或反过来）。
+ */
+export function primaryVariant(g: ValueGroup): ValueGroup["variants"][number] | undefined {
+  return g.variants.find((v) => v.qualifier === "") ?? g.variants[0];
+}
+
 /** 文本 tab 只放 string 系（string/arrays 都算），颜色 tab 放 color，其他 tab 放其余 */
 export function splitGroupsByTab(groups: ValueGroup[]): {
   text: ValueGroup[];
@@ -92,15 +101,6 @@ export function splitGroupsByTab(groups: ValueGroup[]): {
  * 给资源选一个「默认编辑目标」：没有限定符的值优先（values/ 是主文件），
  * 其次按 qualifier 的「长度短 = 更通用」排。返回要打开的文件 rel + 行号。
  */
-export function primaryVariant(g: ValueGroup): { rel: string; line: number } {
-  let best = g.variants[0];
-  for (const v of g.variants) {
-    if (v.qualifier === "" && best.qualifier !== "") best = v;
-    else if (v.qualifier.length < best.qualifier.length) best = v;
-  }
-  return { rel: best.rel, line: best.items[0].line };
-}
-
 /** 项目图标/drawable 文件的 tab 归属：图片与 vector 归「图标」，xml 形状类归「其他」 */
 export function iconFileTab(rel: string, name: string): "icon" | "other" {
   const p = (rel + "/" + name).toLowerCase();

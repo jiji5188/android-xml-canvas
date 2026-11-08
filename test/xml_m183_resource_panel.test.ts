@@ -81,7 +81,7 @@ describe("primaryVariant", () => {
       { rel: "res/values-night/b.xml", xml: NIGHT },
     ]);
     const primary = groups.find((g) => g.name === "app_name")!;
-    const pv = primaryVariant(primary);
+    const pv = primaryVariant(primary)!;
     expect(pv.rel).toBe("res/values/a.xml");
   });
 });

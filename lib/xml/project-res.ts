@@ -12,6 +12,7 @@ import type { AiFileIo } from "./ai-tools";
 import { scanResDirs } from "./res-index";
 import { buildResourceExtras, type ResourceExtras, type ResUploadItem } from "./resdir";
 import { refsIn } from "./res-collect";
+import { mergeValuesFragments, valuesKeys } from "./values-merge";
 
 const IMG_EXT = /\.(png|webp|jpe?g|gif|bmp)$/i;
 const MAX_READS = 420;
@@ -96,10 +97,14 @@ function addImage(extras: ResourceExtras, rel: string, url: string) {
   }
 }
 
-/** 合并两份资源表（b 覆盖 a） */
+/** 合并两份资源表（b 覆盖 a）
+ *  M183c：valuesXml 不能再直接拼接 —— 这个函数被「载入项目资源」反复调用，
+ *  拼一次就多一份，最后把整份 values 文本叠成几千条重复定义（还写回了项目 res）。
+ *  改成按 kind/name 去重合并（幂等），同名以 b 为准。 */
 export function mergeProjectExtras(a: ResourceExtras | null, b: ResourceExtras | null): ResourceExtras | null {
   if (!a) return b;
   if (!b) return a;
+  const valuesXml = mergeValuesFragments(a.valuesXml ?? "", b.valuesXml ?? "");
   return {
     ...a,
     ...b,
@@ -107,12 +112,13 @@ export function mergeProjectExtras(a: ResourceExtras | null, b: ResourceExtras |
     drawableXml: { ...a.drawableXml, ...b.drawableXml },
     styles: { ...a.styles, ...b.styles },
     vectorNames: [...new Set([...a.vectorNames, ...b.vectorNames])],
-    valuesXml: [a.valuesXml, b.valuesXml].filter(Boolean).join("\n"),
+    valuesXml,
     sourceFiles: [...new Set([...a.sourceFiles, ...b.sourceFiles])],
     counts: {
       images: Object.keys({ ...a.drawables, ...b.drawables }).length,
       vectors: new Set([...a.vectorNames, ...b.vectorNames]).size,
-      values: a.counts.values + b.counts.values,
+      // 数真去重后的键数，不再把两边的计数盲加（旧版会越加越大）
+      values: valuesKeys(valuesXml).size,
       styles: Object.keys({ ...a.styles, ...b.styles }).length,
       shapes: Math.max(a.counts.shapes, b.counts.shapes),
     },

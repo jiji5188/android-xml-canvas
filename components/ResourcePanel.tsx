@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "@/lib/i18n-src";
 import {
   groupValuesByResource,
+  primaryVariant,
   resolveColorCss,
   splitGroupsByTab,
   valuePreview,
@@ -149,7 +150,9 @@ function ValueRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
-  const first = g.variants[0];
+  /** M183c：编辑/跳转都走「默认限定符」那份（values/ 优先），而不是扫描顺序第一个 */
+  const primary = primaryVariant(g);
+  const first = primary;
   const raw = first?.items[0]?.item.value ?? "";
   const pv = valuePreview(raw);
   const swatch = resolveColorCss(raw, colorMap) ?? pv.color ?? null;
@@ -161,13 +164,17 @@ function ValueRow({
     setEditing(false);
     const cur = first?.items[0]?.item.value ?? "";
     if (draft === cur) return;
+    if (!first || !first.items[0]) return; // i18n-ignore
     onPatch(first.rel, first.items[0].item, draft);
   };
   return (
     <div
       className="axv-rp-row"
-      onDoubleClick={() => onOpenFile(first.rel, first.items[0].line)}
-      title={g.variants.length > 1 ? g.variants.map((v) => v.rel).join("\n") : first.rel}
+      onDoubleClick={() => {
+        if (!first?.items[0]) return;
+        onOpenFile(first.rel, first.items[0].line);
+      }}
+      title={g.variants.length > 1 ? g.variants.map((v) => v.rel).join("\n") : first?.rel}
     >
       <span className="axv-rp-name" title={g.name}>
         {g.name}
@@ -232,91 +239,64 @@ export function ResourcePanel(props: ResourcePanelProps) {
     const icons: BrowseEntry[] = [];
     const others: BrowseEntry[] = [];
     const valuesFiles: string[] = [];
+    // M183c：同一 rel 只收一次（旧版 BFS 会把 values 文件推两遍）
+    const seenValues = new Set<string>();
+    const seenIcons = new Set<string>();
+    const seenOthers = new Set<string>();
+    const addValues = (rel: string) => {
+      if (seenValues.has(rel) || valuesFiles.length >= FILE_CAP) return;
+      const base = rel.split("/").pop() || "";
+      // 本工具导出的合并文件（res.zip / 资源包里的 values/res_values.xml）不进面板
+      if (base.toLowerCase() === "res_values.xml") return;
+      seenValues.add(rel);
+      valuesFiles.push(rel);
+    };
+    const addIcon = (e: BrowseEntry) => {
+      if (!e.rel || seenIcons.has(e.rel)) return;
+      seenIcons.add(e.rel);
+      icons.push(e);
+    };
+    const addOther = (e: BrowseEntry) => {
+      if (!e.rel || seenOthers.has(e.rel)) return;
+      seenOthers.add(e.rel);
+      others.push(e);
+    };
     (async () => {
       try {
-        const walk = async (rel: string, depth: number): Promise<void> => {
-          if (dead || depth > RES_DIR_DEPTH_CAP) return;
-          const kids = await source.listChildren(rel);
-          for (const k of kids) {
-            if (dead) return;
-            if (k.kind !== "dir") {
-              // 文件：只看 res 下的
-              if (!k.rel || !k.rel.includes("res/")) continue;
-              const rd = resDirOf(k.rel);
-              const name = k.name.toLowerCase();
-              if (rd === "values" || rd.startsWith("values-")) {
-                if (/\.xml$/.test(name) && valuesFiles.length < FILE_CAP) valuesFiles.push(k.rel);
-              } else if (rd.startsWith("mipmap") || rd.startsWith("drawable")) {
-                icons.push(k);
-              } else if (rd === "raw" || rd === "menu" || rd === "font" || rd === "xml") {
-                others.push(k);
-              }
-              continue;
-            }
-            // 目录：只跟 res 下的子目录（values-night 等）
-            const rd = resDirOf(k.rel || "");
-            if (rd === "values" || rd.startsWith("values-")) {
-              const inner = await source.listChildren(k.rel || "");
-              for (const f of inner) {
-                if (dead || f.kind !== "file" || !f.rel) continue;
-                if (/\.xml$/.test((f.name || "").toLowerCase()) && valuesFiles.length < FILE_CAP)
-                  valuesFiles.push(f.rel);
-              }
-            } else if (rd.startsWith("mipmap") || rd.startsWith("drawable")) {
-              const inner = await source.listChildren(k.rel || "");
-              for (const f of inner) {
-                if (dead || f.kind !== "file") continue;
-                if (rd.startsWith("mipmap") || rd.startsWith("drawable")) {
-                  if (rd.startsWith("mipmap")) icons.push(f);
-                  else icons.push(f); // drawable 里的 xml 也当图标文件列（点开后按内容分流） // i18n-ignore
-                }
-              }
-            } else if (rd === "raw" || rd === "menu" || rd === "font" || rd === "xml") {
-              const inner = await source.listChildren(k.rel || "");
-              for (const f of inner) if (dead || f.kind !== "file") continue;
-              else others.push(f);
-            }
-          }
-        };
-        // 从项目根找 res 目录
-        const roots = await source.listChildren("");
-        // 直接扫：找所有 res（app/src/main/res 常见）
+        // 从项目根 BFS 找所有 res 目录（app/src/main/res 常见，test/ 下也可能有）
         const queue: Array<{ rel: string; depth: number }> = [{ rel: "", depth: 0 }];
         while (queue.length > 0 && !dead) {
           const cur = queue.shift()!;
           const kids = await source.listChildren(cur.rel);
           for (const k of kids) {
             if (dead) break;
-            if (k.kind === "dir") {
-              const nm = (k.name || "").toLowerCase();
-              if (nm === "res") {
-                // 进入 res，一层层处理
-                const resKids = await source.listChildren(k.rel || "");
-                for (const rk of resKids) {
-                  if (rk.kind === "dir") {
-                    const rd = rk.name || "";
-                    if (rd === "values" || rd.startsWith("values-")) {
-                      const inners = await source.listChildren(rk.rel || "");
-                      for (const f of inners) {
-                        if (f.kind === "file" && f.rel && /\.xml$/i.test(f.name || "") && valuesFiles.length < FILE_CAP)
-                          valuesFiles.push(f.rel);
-                      }
-                    } else if (rd.startsWith("mipmap") || rd.startsWith("drawable")) {
-                      const inners = await source.listChildren(rk.rel || "");
-                      for (const f of inners) if (f.kind === "file" && f.rel) icons.push(f);
-                    } else if (rd === "raw" || rd === "menu" || rd === "font" || rd === "xml") {
-                      const inners = await source.listChildren(rk.rel || "");
-                      for (const f of inners) if (f.kind === "file" && f.rel) others.push(f);
+            if (k.kind !== "dir") continue;
+            const nm = (k.name || "").toLowerCase();
+            if (nm === "res") {
+              // 进入 res，逐个子目录收集
+              const resKids = await source.listChildren(k.rel || "");
+              for (const rk of resKids) {
+                if (dead) break;
+                if (rk.kind === "dir") {
+                  const rd = rk.name || "";
+                  const inners = await source.listChildren(rk.rel || "");
+                  if (rd === "values" || rd.startsWith("values-")) {
+                    for (const f of inners) {
+                      if (f.kind === "file" && f.rel && /\.xml$/i.test(f.name || "")) addValues(f.rel);
                     }
-                  } else if (rk.kind === "file" && rk.rel) {
-                    // res 下直接文件（少见）
-                    if (/\.xml$/i.test((rk.name || "").toLowerCase())) valuesFiles.push(rk.rel);
+                  } else if (rd.startsWith("mipmap") || rd.startsWith("drawable")) {
+                    for (const f of inners) if (f.kind === "file" && f.rel) addIcon(f);
+                  } else if (rd === "raw" || rd === "menu" || rd === "font" || rd === "xml") {
+                    for (const f of inners) if (f.kind === "file" && f.rel) addOther(f);
                   }
+                } else if (rk.kind === "file" && rk.rel) {
+                  // res 下直接文件（少见）
+                  if (/\.xml$/i.test((rk.name || "").toLowerCase())) addValues(rk.rel);
                 }
               }
-              // 继续往下走（app/src/main 这种嵌套）
-              if (cur.depth < RES_DIR_DEPTH_CAP) queue.push({ rel: k.rel || "", depth: cur.depth + 1 });
             }
+            // 继续往下走（app/src/main 这种嵌套；res 本身不用再进去）
+            if (nm !== "res" && cur.depth < RES_DIR_DEPTH_CAP) queue.push({ rel: k.rel || "", depth: cur.depth + 1 });
           }
         }
       } catch {

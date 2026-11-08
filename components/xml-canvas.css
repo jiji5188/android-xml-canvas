@@ -10681,8 +10681,8 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 }
 @media (max-width: 840px) {
   .axv-drawer {
-    margin-left: 0;
-    margin-right: 0;
+    margin-left: 4px;
+    margin-right: 4px;
   }
   .axv-drawer-body {
     height: 42vh;

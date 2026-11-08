@@ -2371,15 +2371,48 @@ const allDrawableNames = useMemo(() => {
         if (pg.applicationId || pg.namespace) pkg = pg.applicationId || pg.namespace || pkg;
       }
       const input = currentSaveInput();
-      const layout = (input.name || "activity_main.xml").replace(/\.xml$/i, "");
       setApkBusy(true);
       setExportNote(tt("正在收集资源…"));
       try {
-        const collected = await collectProjectRes(aiFileIo, openRel, buildRealRenderFiles(input));
+        // M192f：当前编辑的可能是 MainActivity.java（Java 代码），不能把编辑器正文当布局写盘
+        // —— 否则 layout/activity_main.xml 里装的是 Java，aapt2 报 syntax error。
+        // 策略：非布局文档时先用一个探针布局跑一次收集，从收集结果里挑真正的布局文件。
+        const openRelNorm = (openRel || input.name || "").replace(/\\/g, "/");
+        const relLayout = openRelNorm.match(/(?:^|\/)layout(?:-[^/]+)?\/(.+)\.xml$/i);
+        const PROBE = "__axv_pick.xml";
+        const PROBE_XML =
+          '<?xml version="1.0" encoding="utf-8"?>\n<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" />';
+        const isLayoutDoc = docKind === "layout" && !!relLayout;
+        let layout = isLayoutDoc && relLayout ? relLayout[1] : "";
+        const baseInput = isLayoutDoc ? input : { ...input, name: PROBE, xml: PROBE_XML };
+        const collected = await collectProjectRes(aiFileIo, openRel, buildRealRenderFiles(baseInput));
+        let files = collected.files;
+        if (!layout) {
+          // 优先取 Java 里 R.layout.xxx 引用的那个，否则 activity_main，再否则第一个
+          const want = (xml.match(/R\.layout\.([A-Za-z_][A-Za-z0-9_]*)/) || [])[1] || "";
+          const names = [
+            ...new Set(
+              files
+                .map((f) => (f.path.match(/^layout(?:-[^/]+)?\/(.+)\.xml$/i) || [])[1])
+                .filter((x): x is string => !!x && x !== "__axv_pick"),
+            ),
+          ];
+          layout = want && names.includes(want) ? want : names.includes("activity_main") ? "activity_main" : names[0] || "";
+          if (!layout) {
+            setApkResult({
+              ok: false,
+              step: "compile",
+              log: tt("项目里没找到布局文件（layout/*.xml）。请先在左侧资源新建或打开一个布局，再打包。"),
+            });
+            setExportNote(tt("打包失败：{msg}", { msg: "compile" }));
+            return;
+          }
+          files = files.filter((f) => !/^layout(-[^/]+)?\/__axv_pick\.xml$/i.test(f.path));
+        }
         setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
         // M192e：与真机渲染用同一套洗法（补占位、去重、include 命名空间…）
         // 不洗直接打包的话，aapt2 会在 layout 上报 syntax error
-        const prep = prepareFiles(layout, collected.files);
+        const prep = prepareFiles(layout, files);
         if (prep.blocked) {
           setApkResult({ ok: false, step: "compile", log: prep.blocked });
           setExportNote(tt("打包失败：{msg}", { msg: "compile" }));
@@ -2406,7 +2439,7 @@ const allDrawableNames = useMemo(() => {
         setApkBusy(false);
       }
     },
-    [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel],
+    [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel, docKind, xml],
   );
 
   const writeGradleForSign = useCallback(

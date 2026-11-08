@@ -8,6 +8,7 @@ import { t as tt } from "@/lib/i18n-src";
 import { validateSigning, readSigningFromGradle, applySigningToGradle, defaultAppGradle, type SigningParams } from "@/lib/xml/signing";
 import { checkPublish, readPublishInfo, setPublishVersion } from "@/lib/xml/gradle-publish";
 import { setGradlePackage } from "@/lib/xml/project-info";
+import type { StoredSigning } from "@/lib/xml/sign-store";
 
 export interface SigningDialogProps {
   /** M192：一键打包成可安装 APK（设备端 aapt2 + 壳 dex + apksig 签名） */
@@ -32,6 +33,10 @@ export interface SigningDialogProps {
   onMakeKeystore?: (rel: string, o: { alias: string; password: string; cn: string; years: number }) => Promise<{ ok: boolean; msg: string }>;
   /** 写回（成功后弹层关闭 + 提示）；返回 true 成功 */
   onWriteGradle: (next: string) => Promise<boolean>;
+  /** M195：本项目上次保存的签名配置（build.gradle 读不到时用它回填） */
+  stored?: StoredSigning | null;
+  /** M195：把当前表单记到本机（按项目），返回是否保存成功 */
+  onRemember?: (s: Omit<StoredSigning, "savedAt">) => boolean;
   onClose: () => void;
   onNote: (msg: string, ms?: number) => void;
 }
@@ -48,17 +53,37 @@ const EMPTY: SigningParams = {
   v3: true,
 };
 
-export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onWriteGradle, onClose, onNote }: SigningDialogProps) {
+export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onWriteGradle, onClose, onNote, stored, onRemember }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
-  const [alias, setAlias] = useState(prefill?.alias || EMPTY.alias);
-  const [keyPassword, setKeyPassword] = useState(prefill?.keyPassword || "");
-  const [storeFile, setStoreFile] = useState(prefill?.storeFile || EMPTY.storeFile);
-  const [algorithm, setAlgorithm] = useState<"RSA" | "EC">(prefill?.algorithm || "RSA");
-  const [keySize, setKeySize] = useState(prefill?.keySize ?? 2048);
-  const [validityDays, setValidityDays] = useState(prefill?.validityDays ?? 10000);
-  const [v1, setV1] = useState(prefill?.v1 ?? true);
-  const [v2, setV2] = useState(prefill?.v2 ?? true);
-  const [v3, setV3] = useState(prefill?.v3 ?? true);
+  // M195：build.gradle 里没写的项（典型：口令）用本机记住的配置补
+  const seed = prefill ?? (stored as SigningParams | null);
+  const [alias, setAlias] = useState(seed?.alias || EMPTY.alias);
+  const [keyPassword, setKeyPassword] = useState(
+    prefill?.keyPassword || stored?.keyPass || stored?.storePass || "",
+  );
+  const [storeFile, setStoreFile] = useState(seed?.storeFile || EMPTY.storeFile);
+  const [algorithm, setAlgorithm] = useState<"RSA" | "EC">(seed?.algorithm || "RSA");
+  const [keySize, setKeySize] = useState(seed?.keySize ?? 2048);
+  const [validityDays, setValidityDays] = useState(seed?.validityDays ?? 10000);
+  const [v1, setV1] = useState(seed?.v1 ?? true);
+  const [v2, setV2] = useState(seed?.v2 ?? true);
+  const [v3, setV3] = useState(seed?.v3 ?? true);
+  /** M195：记住状态（打包/写入后把表单存到本机） */
+  const remember = () => {
+    if (!onRemember) return;
+    onRemember({
+      storeFile: storeFile || ".axv/release.keystore",
+      storePass: keyPassword || "",
+      alias: alias || "release",
+      keyPass: keyPassword || "",
+      algorithm,
+      keySize,
+      validityDays,
+      v1,
+      v2,
+      v3,
+    });
+  };
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /* M191：设备端生成 keystore */
@@ -121,6 +146,23 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
     setKsBusy(false);
     if (r.ok) {
       setKsDone(true);
+      remember();
+      // M195：keystore 生成后表单信息就全了 → 顺手把签名配置写进 build.gradle（存进项目配置）
+      if (baseText) {
+        const p: SigningParams = { alias, keyPassword, storeFile: rel, algorithm, keySize, validityDays, v1, v2, v3 };
+        const c = composeNext(baseText, p);
+        if (c.ok) {
+          const wrote = await onWriteGradle(c.next);
+          if (wrote) setBaseText(c.next);
+          onNote(
+            wrote
+              ? tt("已生成 keystore，并把签名配置写入 build.gradle")
+              : tt("已在设备上生成 keystore：{path}", { path: rel }),
+            3200,
+          );
+          return;
+        }
+      }
       onNote(tt("已在设备上生成 keystore：{path}", { path: rel }), 3200);
     } else {
       setErr(r.msg);
@@ -169,7 +211,8 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
     const ok = await onWriteGradle(r.next);
     setBusy(false);
     if (ok) {
-      onNote(tt("签名配置已写入 build.gradle"), 2500);
+      remember();
+      onNote(tt("签名配置已写入 build.gradle（并已记住到本机）"), 2500);
       onClose();
     } else {
       setErr(tt("写入 build.gradle 失败"));
@@ -329,6 +372,11 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
             )}
           </>
         ) : null}
+        {stored && !prefill ? (
+          <div className="axv-sign-hint">
+            {tt("已从本机记忆回填签名配置（按项目保存，点打包/写入会更新）")}
+          </div>
+        ) : null}
         {rootMissing && !gradleText ? (
           <div className="axv-sign-hint">
             {tt("当前项目还没有可写目录：配置会先存到本地草稿，打开项目或选中保存目录后再点一次「写入」即可落盘到 build.gradle")}
@@ -348,14 +396,15 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
                 type="button"
                 className="axv-sign-primary"
                 disabled={!!apkBusy}
-                onClick={() =>
+                onClick={() => {
+                  remember();
                   void onBuildApk({
                     storeFile: storeFile || "",
                     storePass: keyPassword || "",
                     alias: alias || "",
                     keyPass: keyPassword || "",
-                  })
-                }
+                  });
+                }}
                 title={tt("资源编译 → 注入壳 dex → 对齐 → apksig 签名，产出一个可直接安装的 APK")}
               >
                 {apkBusy ? tt("打包中…") : tt("打包并安装 APK")}

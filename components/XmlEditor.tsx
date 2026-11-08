@@ -77,6 +77,7 @@ import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { hasRealRender, renderReal, prepareFiles } from "@/lib/xml/native-render";
+import { readStoredSigning, writeStoredSigning } from "@/lib/xml/sign-store";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildApk, hasBuildApk, installApk, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
@@ -2286,6 +2287,8 @@ const allDrawableNames = useMemo(() => {
   const [signAppName, setSignAppName] = useState<string | null>(null);
   const [signIconDefault, setSignIconDefault] = useState<boolean | undefined>(undefined);
   const LS_KEY_SIGN_DRAFT = "axv.signing.draft";
+  /** M195：本项目记住的签名配置（按项目名存，build.gradle 读不到时回填） */
+  const signStored = useMemo(() => readStoredSigning(activeProject?.name), [activeProject?.name, signDialogOpen]);
   const openSignDialog = useCallback(async () => {
     const root = projectSaveRoot(activeProject);
     // M188c：统一走 readProjectFile（native 用 readTextQueued，web 用目录句柄）
@@ -5372,6 +5375,8 @@ const findResolved = findResolvedNode;
             setExportNote(r.ok ? tt("已调起系统安装器") : tt("安装失败：{msg}", { msg: r.msg || "" }));
           }}
           onWriteGradle={writeGradleForSign}
+          stored={signStored}
+          onRemember={(s) => writeStoredSigning(activeProject?.name, s)}
           onClose={() => setSignDialogOpen(false)}
           onNote={(m, ms = 2400) => {
             setExportNote(m);

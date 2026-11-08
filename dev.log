@@ -10775,3 +10775,2342 @@ Import trace:
 ✓ Compiled in 331ms
 ✓ Compiled in 133ms
 ✓ Compiled in 296ms
+✓ Compiled in 349ms
+✓ Compiled in 109ms
+✓ Compiled in 121ms
+✓ Compiled in 136ms
+✓ Compiled in 105ms
+✓ Compiled in 1683ms
+✓ Compiled in 137ms
+ GET /xml/ 200 in 165ms (next.js: 28ms, application-code: 137ms)
+✓ Compiled in 362ms
+✓ Compiled in 468ms
+✓ Compiled in 9.2s
+✓ Compiled in 157ms
+✓ Compiled in 213ms
+✓ Compiled in 121ms
+✓ Compiled in 109ms
+✓ Compiled in 276ms
+[browser] ./components/CodeEditor.tsx:16:1
+Error: Export Gutter doesn't exist in target module
+  14 | import { t as tt } from "@/lib/i18n-src";
+  15 | import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@...
+> 16 | import {
+     | ^^^^^^^
+> 17 |   Decoration,
+     | ^^^^^^^^^^^^^
+> 18 |   EditorView,
+     | ^^^^^^^^^^^^^
+> 19 |   Gutter,
+     | ^^^^^^^^^
+> 20 |   ViewPlugin,
+     | ^^^^^^^^^^^^^
+> 21 |   drawSelection,
+     | ^^^^^^^^^^^^^^^^
+> 22 |   dropCursor,
+     | ^^^^^^^^^^^^^
+> 23 |   highlightActiveLine,
+     | ^^^^^^^^^^^^^^^^^^^^^^
+> 24 |   highlightActiveLineGutter,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |   highlightSpecialChars,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |   keymap,
+     | ^^^^^^^^^
+> 27 |   lineNumbers,
+     | ^^^^^^^^^^^^^^
+> 28 |   rectangularSelection,
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |   crosshairCursor,
+     | ^^^^^^^^^^^^^^^^^^
+> 30 |   type DecorationSet,
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 31 |   type ViewUpdate,
+     | ^^^^^^^^^^^^^^^^^^
+> 32 | } from "@codemirror/view";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  33 | import {
+  34 |   defaultKeymap,
+  35 |   indentWithTab,
+
+The export Gutter was not found in module [project]/node_modules/@codemirror/view/dist/index.js [app-client] (ecmascript).
+Did you mean to import gutter?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./components/CodeEditor.tsx [Client Component Browser]
+    ./components/XmlCodeView.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/CodeEditor.tsx:16:1
+Error: Export Gutter doesn't exist in target module
+  14 | import { t as tt } from "@/lib/i18n-src";
+  15 | import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@...
+> 16 | import {
+     | ^^^^^^^
+> 17 |   Decoration,
+     | ^^^^^^^^^^^^^
+> 18 |   EditorView,
+     | ^^^^^^^^^^^^^
+> 19 |   Gutter,
+     | ^^^^^^^^^
+> 20 |   ViewPlugin,
+     | ^^^^^^^^^^^^^
+> 21 |   drawSelection,
+     | ^^^^^^^^^^^^^^^^
+> 22 |   dropCursor,
+     | ^^^^^^^^^^^^^
+> 23 |   highlightActiveLine,
+     | ^^^^^^^^^^^^^^^^^^^^^^
+> 24 |   highlightActiveLineGutter,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |   highlightSpecialChars,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |   keymap,
+     | ^^^^^^^^^
+> 27 |   lineNumbers,
+     | ^^^^^^^^^^^^^^
+> 28 |   rectangularSelection,
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |   crosshairCursor,
+     | ^^^^^^^^^^^^^^^^^^
+> 30 |   type DecorationSet,
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 31 |   type ViewUpdate,
+     | ^^^^^^^^^^^^^^^^^^
+> 32 | } from "@codemirror/view";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  33 | import {
+  34 |   defaultKeymap,
+  35 |   indentWithTab,
+
+The export Gutter was not found in module [project]/node_modules/@codemirror/view/dist/index.js [app-client] (ecmascript).
+Did you mean to import gutter?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./components/CodeEditor.tsx [Client Component Browser]
+    ./components/XmlCodeView.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 242ms
+[browser] ./components/CodeEditor.tsx:16:1
+Error: Export Gutter doesn't exist in target module
+  14 | import { t as tt } from "@/lib/i18n-src";
+  15 | import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@...
+> 16 | import {
+     | ^^^^^^^
+> 17 |   Decoration,
+     | ^^^^^^^^^^^^^
+> 18 |   EditorView,
+     | ^^^^^^^^^^^^^
+> 19 |   Gutter,
+     | ^^^^^^^^^
+> 20 |   ViewPlugin,
+     | ^^^^^^^^^^^^^
+> 21 |   drawSelection,
+     | ^^^^^^^^^^^^^^^^
+> 22 |   dropCursor,
+     | ^^^^^^^^^^^^^
+> 23 |   highlightActiveLine,
+     | ^^^^^^^^^^^^^^^^^^^^^^
+> 24 |   highlightActiveLineGutter,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |   highlightSpecialChars,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |   keymap,
+     | ^^^^^^^^^
+> 27 |   lineNumbers,
+     | ^^^^^^^^^^^^^^
+> 28 |   rectangularSelection,
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |   crosshairCursor,
+     | ^^^^^^^^^^^^^^^^^^
+> 30 |   type DecorationSet,
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 31 |   type ViewUpdate,
+     | ^^^^^^^^^^^^^^^^^^
+> 32 | } from "@codemirror/view";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  33 | import {
+  34 |   defaultKeymap,
+  35 |   indentWithTab,
+
+The export Gutter was not found in module [project]/node_modules/@codemirror/view/dist/index.js [app-client] (ecmascript).
+Did you mean to import gutter?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./components/CodeEditor.tsx [Client Component Browser]
+    ./components/XmlCodeView.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/CodeEditor.tsx:16:1
+Error: Export Gutter doesn't exist in target module
+  14 | import { t as tt } from "@/lib/i18n-src";
+  15 | import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@...
+> 16 | import {
+     | ^^^^^^^
+> 17 |   Decoration,
+     | ^^^^^^^^^^^^^
+> 18 |   EditorView,
+     | ^^^^^^^^^^^^^
+> 19 |   Gutter,
+     | ^^^^^^^^^
+> 20 |   ViewPlugin,
+     | ^^^^^^^^^^^^^
+> 21 |   drawSelection,
+     | ^^^^^^^^^^^^^^^^
+> 22 |   dropCursor,
+     | ^^^^^^^^^^^^^
+> 23 |   highlightActiveLine,
+     | ^^^^^^^^^^^^^^^^^^^^^^
+> 24 |   highlightActiveLineGutter,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |   highlightSpecialChars,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |   keymap,
+     | ^^^^^^^^^
+> 27 |   lineNumbers,
+     | ^^^^^^^^^^^^^^
+> 28 |   rectangularSelection,
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |   crosshairCursor,
+     | ^^^^^^^^^^^^^^^^^^
+> 30 |   type DecorationSet,
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 31 |   type ViewUpdate,
+     | ^^^^^^^^^^^^^^^^^^
+> 32 | } from "@codemirror/view";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  33 | import {
+  34 |   defaultKeymap,
+  35 |   indentWithTab,
+
+The export Gutter was not found in module [project]/node_modules/@codemirror/view/dist/index.js [app-client] (ecmascript).
+Did you mean to import gutter?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./components/CodeEditor.tsx [Client Component Browser]
+    ./components/XmlCodeView.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/CodeEditor.tsx:16:1
+Error: Export Gutter doesn't exist in target module
+  14 | import { t as tt } from "@/lib/i18n-src";
+  15 | import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@...
+> 16 | import {
+     | ^^^^^^^
+> 17 |   Decoration,
+     | ^^^^^^^^^^^^^
+> 18 |   EditorView,
+     | ^^^^^^^^^^^^^
+> 19 |   Gutter,
+     | ^^^^^^^^^
+> 20 |   ViewPlugin,
+     | ^^^^^^^^^^^^^
+> 21 |   drawSelection,
+     | ^^^^^^^^^^^^^^^^
+> 22 |   dropCursor,
+     | ^^^^^^^^^^^^^
+> 23 |   highlightActiveLine,
+     | ^^^^^^^^^^^^^^^^^^^^^^
+> 24 |   highlightActiveLineGutter,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |   highlightSpecialChars,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |   keymap,
+     | ^^^^^^^^^
+> 27 |   lineNumbers,
+     | ^^^^^^^^^^^^^^
+> 28 |   rectangularSelection,
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |   crosshairCursor,
+     | ^^^^^^^^^^^^^^^^^^
+> 30 |   type DecorationSet,
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 31 |   type ViewUpdate,
+     | ^^^^^^^^^^^^^^^^^^
+> 32 | } from "@codemirror/view";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  33 | import {
+  34 |   defaultKeymap,
+  35 |   indentWithTab,
+
+The export Gutter was not found in module [project]/node_modules/@codemirror/view/dist/index.js [app-client] (ecmascript).
+Did you mean to import gutter?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./components/CodeEditor.tsx [Client Component Browser]
+    ./components/XmlCodeView.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/CodeEditor.tsx:16:1
+Error: Export Gutter doesn't exist in target module
+  14 | import { t as tt } from "@/lib/i18n-src";
+  15 | import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@...
+> 16 | import {
+     | ^^^^^^^
+> 17 |   Decoration,
+     | ^^^^^^^^^^^^^
+> 18 |   EditorView,
+     | ^^^^^^^^^^^^^
+> 19 |   Gutter,
+     | ^^^^^^^^^
+> 20 |   ViewPlugin,
+     | ^^^^^^^^^^^^^
+> 21 |   drawSelection,
+     | ^^^^^^^^^^^^^^^^
+> 22 |   dropCursor,
+     | ^^^^^^^^^^^^^
+> 23 |   highlightActiveLine,
+     | ^^^^^^^^^^^^^^^^^^^^^^
+> 24 |   highlightActiveLineGutter,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |   highlightSpecialChars,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |   keymap,
+     | ^^^^^^^^^
+> 27 |   lineNumbers,
+     | ^^^^^^^^^^^^^^
+> 28 |   rectangularSelection,
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |   crosshairCursor,
+     | ^^^^^^^^^^^^^^^^^^
+> 30 |   type DecorationSet,
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 31 |   type ViewUpdate,
+     | ^^^^^^^^^^^^^^^^^^
+> 32 | } from "@codemirror/view";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  33 | import {
+  34 |   defaultKeymap,
+  35 |   indentWithTab,
+
+The export Gutter was not found in module [project]/node_modules/@codemirror/view/dist/index.js [app-client] (ecmascript).
+Did you mean to import gutter?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./components/CodeEditor.tsx [Client Component Browser]
+    ./components/XmlCodeView.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/CodeEditor.tsx:16:1
+Error: Export Gutter doesn't exist in target module
+  14 | import { t as tt } from "@/lib/i18n-src";
+  15 | import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@...
+> 16 | import {
+     | ^^^^^^^
+> 17 |   Decoration,
+     | ^^^^^^^^^^^^^
+> 18 |   EditorView,
+     | ^^^^^^^^^^^^^
+> 19 |   Gutter,
+     | ^^^^^^^^^
+> 20 |   ViewPlugin,
+     | ^^^^^^^^^^^^^
+> 21 |   drawSelection,
+     | ^^^^^^^^^^^^^^^^
+> 22 |   dropCursor,
+     | ^^^^^^^^^^^^^
+> 23 |   highlightActiveLine,
+     | ^^^^^^^^^^^^^^^^^^^^^^
+> 24 |   highlightActiveLineGutter,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |   highlightSpecialChars,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |   keymap,
+     | ^^^^^^^^^
+> 27 |   lineNumbers,
+     | ^^^^^^^^^^^^^^
+> 28 |   rectangularSelection,
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |   crosshairCursor,
+     | ^^^^^^^^^^^^^^^^^^
+> 30 |   type DecorationSet,
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 31 |   type ViewUpdate,
+     | ^^^^^^^^^^^^^^^^^^
+> 32 | } from "@codemirror/view";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  33 | import {
+  34 |   defaultKeymap,
+  35 |   indentWithTab,
+
+The export Gutter was not found in module [project]/node_modules/@codemirror/view/dist/index.js [app-client] (ecmascript).
+Did you mean to import gutter?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./components/CodeEditor.tsx [Client Component Browser]
+    ./components/XmlCodeView.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/CodeEditor.tsx:16:1
+Error: Export Gutter doesn't exist in target module
+  14 | import { t as tt } from "@/lib/i18n-src";
+  15 | import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@...
+> 16 | import {
+     | ^^^^^^^
+> 17 |   Decoration,
+     | ^^^^^^^^^^^^^
+> 18 |   EditorView,
+     | ^^^^^^^^^^^^^
+> 19 |   Gutter,
+     | ^^^^^^^^^
+> 20 |   ViewPlugin,
+     | ^^^^^^^^^^^^^
+> 21 |   drawSelection,
+     | ^^^^^^^^^^^^^^^^
+> 22 |   dropCursor,
+     | ^^^^^^^^^^^^^
+> 23 |   highlightActiveLine,
+     | ^^^^^^^^^^^^^^^^^^^^^^
+> 24 |   highlightActiveLineGutter,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |   highlightSpecialChars,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |   keymap,
+     | ^^^^^^^^^
+> 27 |   lineNumbers,
+     | ^^^^^^^^^^^^^^
+> 28 |   rectangularSelection,
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |   crosshairCursor,
+     | ^^^^^^^^^^^^^^^^^^
+> 30 |   type DecorationSet,
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 31 |   type ViewUpdate,
+     | ^^^^^^^^^^^^^^^^^^
+> 32 | } from "@codemirror/view";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  33 | import {
+  34 |   defaultKeymap,
+  35 |   indentWithTab,
+
+The export Gutter was not found in module [project]/node_modules/@codemirror/view/dist/index.js [app-client] (ecmascript).
+Did you mean to import gutter?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./components/CodeEditor.tsx [Client Component Browser]
+    ./components/XmlCodeView.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/CodeEditor.tsx:16:1
+Error: Export Gutter doesn't exist in target module
+  14 | import { t as tt } from "@/lib/i18n-src";
+  15 | import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@...
+> 16 | import {
+     | ^^^^^^^
+> 17 |   Decoration,
+     | ^^^^^^^^^^^^^
+> 18 |   EditorView,
+     | ^^^^^^^^^^^^^
+> 19 |   Gutter,
+     | ^^^^^^^^^
+> 20 |   ViewPlugin,
+     | ^^^^^^^^^^^^^
+> 21 |   drawSelection,
+     | ^^^^^^^^^^^^^^^^
+> 22 |   dropCursor,
+     | ^^^^^^^^^^^^^
+> 23 |   highlightActiveLine,
+     | ^^^^^^^^^^^^^^^^^^^^^^
+> 24 |   highlightActiveLineGutter,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |   highlightSpecialChars,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |   keymap,
+     | ^^^^^^^^^
+> 27 |   lineNumbers,
+     | ^^^^^^^^^^^^^^
+> 28 |   rectangularSelection,
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |   crosshairCursor,
+     | ^^^^^^^^^^^^^^^^^^
+> 30 |   type DecorationSet,
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 31 |   type ViewUpdate,
+     | ^^^^^^^^^^^^^^^^^^
+> 32 | } from "@codemirror/view";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  33 | import {
+  34 |   defaultKeymap,
+  35 |   indentWithTab,
+
+The export Gutter was not found in module [project]/node_modules/@codemirror/view/dist/index.js [app-client] (ecmascript).
+Did you mean to import gutter?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./components/CodeEditor.tsx [Client Component Browser]
+    ./components/XmlCodeView.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/CodeEditor.tsx:16:1
+Error: Export Gutter doesn't exist in target module
+  14 | import { t as tt } from "@/lib/i18n-src";
+  15 | import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@...
+> 16 | import {
+     | ^^^^^^^
+> 17 |   Decoration,
+     | ^^^^^^^^^^^^^
+> 18 |   EditorView,
+     | ^^^^^^^^^^^^^
+> 19 |   Gutter,
+     | ^^^^^^^^^
+> 20 |   ViewPlugin,
+     | ^^^^^^^^^^^^^
+> 21 |   drawSelection,
+     | ^^^^^^^^^^^^^^^^
+> 22 |   dropCursor,
+     | ^^^^^^^^^^^^^
+> 23 |   highlightActiveLine,
+     | ^^^^^^^^^^^^^^^^^^^^^^
+> 24 |   highlightActiveLineGutter,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |   highlightSpecialChars,
+     | ^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |   keymap,
+     | ^^^^^^^^^
+> 27 |   lineNumbers,
+     | ^^^^^^^^^^^^^^
+> 28 |   rectangularSelection,
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+> 29 |   crosshairCursor,
+     | ^^^^^^^^^^^^^^^^^^
+> 30 |   type DecorationSet,
+     | ^^^^^^^^^^^^^^^^^^^^^
+> 31 |   type ViewUpdate,
+     | ^^^^^^^^^^^^^^^^^^
+> 32 | } from "@codemirror/view";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  33 | import {
+  34 |   defaultKeymap,
+  35 |   indentWithTab,
+
+The export Gutter was not found in module [project]/node_modules/@codemirror/view/dist/index.js [app-client] (ecmascript).
+Did you mean to import gutter?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  Client Component Browser:
+    ./components/CodeEditor.tsx [Client Component Browser]
+    ./components/XmlCodeView.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 157ms
+ GET /xml/ 200 in 193ms (next.js: 111ms, application-code: 82ms)
+ GET /xml/ 200 in 269ms (next.js: 0.6ms, application-code: 268ms)
+ GET /xml/ 200 in 72ms (next.js: 3ms, application-code: 69ms)
+ GET /xml/ 200 in 94ms (next.js: 0.5ms, application-code: 94ms)
+[browser] Uncaught TypeError: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$codemirror$2f$view$2f$dist$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__.gutter.define is not a function
+    at module evaluation (components/CodeEditor.tsx:137:26)
+    at module evaluation (components/XmlCodeView.tsx:12:1)
+    at module evaluation (components/XmlEditor.tsx:172:1)
+    at module evaluation (components/widget-catalog.ts:1023:33)
+    at <unknown> (.next\dev\static\chunks\components_XmlEditor_tsx_1kug7hoaa0dz4._.js:28:16)
+    at XmlPage (app/xml/page.tsx:8:10)
+  135 |
+  136 | /* M185b：错误行号旁的红色小圆点（gutter widget） */
+> 137 | const errGutter = Gutter.define({
+      |                          ^
+  138 |   class: "cm-errGutter",
+  139 |   initialSize: 1,
+  140 |   lineWidget: (view: import("@codemirror/view").EditorView, line: import("@codemirror/view").EditorView & { number: number }) => {
+[browser] Uncaught TypeError: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$codemirror$2f$view$2f$dist$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__.gutter.define is not a function
+    at module evaluation (components/CodeEditor.tsx:137:26)
+    at module evaluation (components/XmlCodeView.tsx:12:1)
+    at module evaluation (components/XmlEditor.tsx:172:1)
+    at module evaluation (components/widget-catalog.ts:1023:33)
+    at <unknown> (.next\dev\static\chunks\components_XmlEditor_tsx_1kug7hoaa0dz4._.js:28:16)
+    at XmlPage (app/xml/page.tsx:8:10)
+  135 |
+  136 | /* M185b：错误行号旁的红色小圆点（gutter widget） */
+> 137 | const errGutter = Gutter.define({
+      |                          ^
+  138 |   class: "cm-errGutter",
+  139 |   initialSize: 1,
+  140 |   lineWidget: (view: import("@codemirror/view").EditorView, line: import("@codemirror/view").EditorView & { number: number }) => {
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 153ms
+ GET /xml/ 200 in 83ms (next.js: 0.5ms, application-code: 82ms)
+ GET /xml/ 200 in 62ms (next.js: 1.6ms, application-code: 60ms)
+[browser] Uncaught TypeError: errGutter is not a function
+    at CodeEditor.useEffect (components/CodeEditor.tsx:543:9)
+    at XmlCodeView (components/XmlCodeView.tsx:83:9)
+    at XmlEditor (components/XmlEditor.tsx:4394:7)
+    at XmlPage (app/xml/page.tsx:8:10)
+  541 |       extensions: [
+  542 |         lineNumbers(),
+> 543 |         errGutter(),
+      |         ^
+  544 |         highlightActiveLineGutter(),
+  545 |         highlightSpecialChars(),
+  546 |         // M139:不装 CM6 自带的 history -- 撤销栈统一由 XmlEditor 的 diffHistory 管
+[browser] Uncaught TypeError: errGutter is not a function
+    at CodeEditor.useEffect (components/CodeEditor.tsx:543:9)
+    at XmlCodeView (components/XmlCodeView.tsx:83:9)
+    at XmlEditor (components/XmlEditor.tsx:4394:7)
+    at XmlPage (app/xml/page.tsx:8:10)
+  541 |       extensions: [
+  542 |         lineNumbers(),
+> 543 |         errGutter(),
+      |         ^
+  544 |         highlightActiveLineGutter(),
+  545 |         highlightSpecialChars(),
+  546 |         // M139:不装 CM6 自带的 history -- 撤销栈统一由 XmlEditor 的 diffHistory 管
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /xml/ 200 in 22ms (next.js: 0.5ms, application-code: 21ms)
+✓ Compiled in 154ms
+ GET /xml/ 200 in 62ms (next.js: 1.2ms, application-code: 61ms)
+ GET /xml/ 200 in 22ms (next.js: 0.5ms, application-code: 21ms)
+✓ Compiled in 137ms
+✓ Compiled in 117ms
+✓ Compiled in 122ms
+✓ Compiled in 891ms
+✓ Compiled in 135ms
+✓ Compiled in 432ms
+ GET /xml/ 200 in 128ms (next.js: 2ms, application-code: 126ms)
+ GET /xml/ 200 in 24ms (next.js: 0.4ms, application-code: 24ms)
+[browser] Uncaught ChunkLoadError: Failed to load chunk /_next/static/chunks/lib_xml_02iq-0-_258x8._.js from module [project]/components/XmlEditor.tsx [app-client] (ecmascript, next/dynamic entry, async loader)
+    at XmlPage (app/xml/page.tsx:8:10)
+   6 |
+   7 | export default function XmlPage() {
+>  8 |   return <XmlEditor />;
+     |          ^
+   9 | }
+  10 |
+ GET /xml/ 200 in 22ms (next.js: 0.8ms, application-code: 21ms)
+✓ Compiled in 444ms
+[browser] ./components/Inspector.tsx:169:14
+Error: Unterminated regexp literal
+  167 |             />
+  168 |           </div>
+> 169 |             </div>
+      |              ^^^^^
+  170 |             )}
+  171 |           </div>
+  172 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:169:14
+Error: Unterminated regexp literal
+  167 |             />
+  168 |           </div>
+> 169 |             </div>
+      |              ^^^^^
+  170 |             )}
+  171 |           </div>
+  172 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:169:14
+Error: Unterminated regexp literal
+  167 |             />
+  168 |           </div>
+> 169 |             </div>
+      |              ^^^^^
+  170 |             )}
+  171 |           </div>
+  172 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:169:14
+Error: Unterminated regexp literal
+  167 |             />
+  168 |           </div>
+> 169 |             </div>
+      |              ^^^^^
+  170 |             )}
+  171 |           </div>
+  172 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:169:14
+Error: Unterminated regexp literal
+  167 |             />
+  168 |           </div>
+> 169 |             </div>
+      |              ^^^^^
+  170 |             )}
+  171 |           </div>
+  172 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:169:14
+Error: Unterminated regexp literal
+  167 |             />
+  168 |           </div>
+> 169 |             </div>
+      |              ^^^^^
+  170 |             )}
+  171 |           </div>
+  172 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+⨯ ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  [90m169 |[0m             />
+  [90m170 |[0m           </div>
+[31m[1m>[0m [90m171 |[0m             </div>
+  [90m    |[0m              [31m[1m^^^^^[0m
+  [90m172 |[0m             )}
+  [90m173 |[0m           </div>
+  [90m174 |[0m         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+ GET /xml/ 500 in 171ms (next.js: 145ms, application-code: 26ms)
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] Uncaught Error: ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+⨯ ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  [90m169 |[0m             />
+  [90m170 |[0m           </div>
+[31m[1m>[0m [90m171 |[0m             </div>
+  [90m    |[0m              [31m[1m^^^^^[0m
+  [90m172 |[0m             )}
+  [90m173 |[0m           </div>
+  [90m174 |[0m         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+ GET /xml/ 500 in 11ms (next.js: 6ms, application-code: 5ms)
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] Uncaught Error: ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+Debugger listening on ws://127.0.0.1:9229/22098718-3b1d-4702-a9e6-0d8b99aa40a5
+For help, see: https://nodejs.org/learn/getting-started/debugging
+⨯ ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  [90m169 |[0m             />
+  [90m170 |[0m           </div>
+[31m[1m>[0m [90m171 |[0m             </div>
+  [90m    |[0m              [31m[1m^^^^^[0m
+  [90m172 |[0m             )}
+  [90m173 |[0m           </div>
+  [90m174 |[0m         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+ GET /xml/ 500 in 9ms (next.js: 3ms, application-code: 6ms)
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] Uncaught Error: ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+⨯ ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  [90m169 |[0m             />
+  [90m170 |[0m           </div>
+[31m[1m>[0m [90m171 |[0m             </div>
+  [90m    |[0m              [31m[1m^^^^^[0m
+  [90m172 |[0m             )}
+  [90m173 |[0m           </div>
+  [90m174 |[0m         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+ GET /xml/ 500 in 7ms (next.js: 2ms, application-code: 4ms)
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] Uncaught Error: ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+⨯ ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  [90m169 |[0m             />
+  [90m170 |[0m           </div>
+[31m[1m>[0m [90m171 |[0m             </div>
+  [90m    |[0m              [31m[1m^^^^^[0m
+  [90m172 |[0m             )}
+  [90m173 |[0m           </div>
+  [90m174 |[0m         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+ GET /xml/ 500 in 9ms (next.js: 5ms, application-code: 4ms)
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] Uncaught Error: ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+⨯ ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  [90m169 |[0m             />
+  [90m170 |[0m           </div>
+[31m[1m>[0m [90m171 |[0m             </div>
+  [90m    |[0m              [31m[1m^^^^^[0m
+  [90m172 |[0m             )}
+  [90m173 |[0m           </div>
+  [90m174 |[0m         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+ GET /xml/ 500 in 7ms (next.js: 3ms, application-code: 4ms)
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] Uncaught Error: ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+⨯ ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  [90m169 |[0m             />
+  [90m170 |[0m           </div>
+[31m[1m>[0m [90m171 |[0m             </div>
+  [90m    |[0m              [31m[1m^^^^^[0m
+  [90m172 |[0m             )}
+  [90m173 |[0m           </div>
+  [90m174 |[0m         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+ GET /xml/ 500 in 11ms (next.js: 4ms, application-code: 7ms)
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] Uncaught Error: ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+⨯ ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  [90m169 |[0m             />
+  [90m170 |[0m           </div>
+[31m[1m>[0m [90m171 |[0m             </div>
+  [90m    |[0m              [31m[1m^^^^^[0m
+  [90m172 |[0m             )}
+  [90m173 |[0m           </div>
+  [90m174 |[0m         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+ GET /xml/ 500 in 15ms (next.js: 4ms, application-code: 12ms)
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] Uncaught Error: ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component]
+
+
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 283ms
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 120ms
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 112ms
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 101ms
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+[browser] ./components/Inspector.tsx:171:14
+Error: Unterminated regexp literal
+  169 |             />
+  170 |           </div>
+> 171 |             </div>
+      |              ^^^^^
+  172 |             )}
+  173 |           </div>
+  174 |         ) : (
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Client Component Browser:
+    ./components/Inspector.tsx [Client Component Browser]
+    ./components/XmlEditor.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Client Component Browser]
+    ./app/xml/page.tsx [Server Component] 
+✓ Compiled in 459ms
+ GET /xml/ 200 in 39ms (next.js: 18ms, application-code: 20ms)
+ GET /xml/ 200 in 15ms (next.js: 0.7ms, application-code: 14ms)
+✓ Compiled in 100ms
+✓ Compiled in 115ms
+✓ Compiled in 112ms
+✓ Compiled in 110ms
+✓ Compiled in 185ms
+✓ Compiled in 219ms
+✓ Compiled in 127ms
+✓ Compiled in 105ms
+✓ Compiled in 192ms
+✓ Compiled in 102ms
+✓ Compiled in 144ms
+✓ Compiled in 105ms
+✓ Compiled in 101ms
+✓ Compiled in 147ms
+ GET / 200 in 67ms (next.js: 0.9ms, application-code: 66ms)
+ GET /xml/ 200 in 30ms (next.js: 1.8ms, application-code: 28ms)
+✓ Compiled in 156ms
+✓ Compiled in 133ms
+✓ Compiled in 127ms

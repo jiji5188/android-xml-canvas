@@ -80,7 +80,14 @@ export function ProblemsDrawer({ problems, onGotoLine, tr }: ProblemsDrawerProps
               <ul className="axv-drawer-list" role="list">
                 {problems.map((p, i) => (
                   <li key={i}>
-                    <button className="axv-drawer-item" onClick={() => onGotoLine(p.line)}>
+                    <button
+                      className="axv-drawer-item"
+                      onClick={() => {
+                        onGotoLine(p.line);
+                        // M187：跳行后收起抽屉，别让 22vh 的抽屉挡住要看的行
+                        setOpen(false);
+                      }}
+                    >
                       <span className="axv-drawer-line">L{p.line}</span>
                       <span className="axv-drawer-msg">{p.msg}</span>
                     </button>

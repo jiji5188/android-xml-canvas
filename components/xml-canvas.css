@@ -10716,3 +10716,165 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-code-errbar.axv-errbar-jump:hover {
   background: color-mix(in srgb, var(--axv-danger) 20%, var(--axv-surface));
 }
+
+/* M186：右侧面板「检查器」tab（层级树 / 实测尺寸 / 溢出警告） */
+.axv-inp-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.axv-inp {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 2px;
+}
+.axv-inp-sec {
+  border: 1px solid var(--axv-line, var(--axv-outline-variant, #0000001a));
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--axv-surface, #fff);
+}
+.axv-inp-h {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--axv-muted, var(--axv-on-surface-variant, #777));
+}
+.axv-inp-h-warn {
+  color: var(--axv-warning, #b26a00);
+}
+.axv-inp-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.axv-inp-m {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--axv-soft, var(--axv-surface-head, #f0f0f0));
+  color: var(--axv-title, var(--axv-on-surface, #333));
+  font-variant-numeric: tabular-nums;
+}
+.axv-inp-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--axv-muted, var(--axv-on-surface-variant, #888));
+}
+.axv-inp-warns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.axv-inp-warn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-line, var(--axv-outline-variant, #0000001a));
+  background: color-mix(in srgb, var(--axv-warning, #b26a00) 8%, var(--axv-surface, #fff));
+  color: var(--axv-title, var(--axv-on-surface, #333));
+  cursor: pointer;
+}
+.axv-inp-warn:hover {
+  background: color-mix(in srgb, var(--axv-warning, #b26a00) 16%, var(--axv-surface, #fff));
+}
+.axv-inp-wbadge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--axv-warning, #b26a00);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  display: inline-block;
+}
+.axv-inp-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 40vh;
+  overflow: auto;
+  border: 1px solid var(--axv-line, var(--axv-outline-variant, #0000001a));
+  border-radius: 8px;
+  padding: 4px;
+  background: var(--axv-surface, #fff);
+}
+.axv-inp-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 6px;
+  min-height: 24px;
+}
+.axv-inp-row.is-sel {
+  background: var(--axv-primary-soft, var(--axv-primary-container, #d8e3ff));
+}
+.axv-inp-tw {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--axv-muted, var(--axv-on-surface-variant, #888));
+  padding: 0;
+  flex: 0 0 auto;
+}
+.axv-inp-tw:hover {
+  color: var(--axv-title, var(--axv-on-surface, #333));
+}
+.axv-inp-node {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  font-size: 12px;
+  padding: 3px 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--axv-title, var(--axv-on-surface, #333));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 6px;
+}
+.axv-inp-node:hover {
+  background: var(--axv-soft, var(--axv-surface-head, #f0f0f0));
+}
+.axv-inp-row.is-sel .axv-inp-node {
+  font-weight: 600;
+}
+.axv-inp-id {
+  color: var(--axv-muted, var(--axv-on-surface-variant, #888));
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  margin-left: 4px;
+}
+.axv-inp-size {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--axv-muted, var(--axv-on-surface-variant, #888));
+  font-variant-numeric: tabular-nums;
+  padding-right: 6px;
+}
+.axv-inp-empty {
+  padding: 16px 8px;
+  text-align: center;
+  color: var(--axv-muted, var(--axv-on-surface-variant, #888));
+  font-size: 12px;
+}

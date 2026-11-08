@@ -2,6 +2,7 @@
 //
 // 只负责「属性面板长什么样」：include 只读提示 → ConstraintPanel（在 ConstraintLayout 里才出）
 // → AttrPanel（属性列表 / 图标 / 形状编辑入口）。所有状态都在 XmlEditor，这里纯展示 + 回调。
+// M186：加了「属性 / 检查器」双 tab（检查器 = 层级树 + 实测尺寸 + 溢出警告，数据由 XmlEditor 算好传入）。
 
 import type { ResolvedNode } from "@/lib/xml/types";
 import { t as tt } from "@/lib/i18n-src";
@@ -10,6 +11,8 @@ import type { OutlineItem } from "@/lib/xml/java-outline";
 import { AttrPanel } from "./AttrPanel";
 import { CodeOutline } from "./CodeOutline";
 import { ConstraintPanel, type SibOption } from "./ConstraintPanel";
+import { InspectorTab } from "./InspectorTab";
+import type { MeasuredNode, InspectorWarning, InspectableNode } from "@/lib/xml/inspector";
 
 export interface InspectorProps {
   open: boolean;
@@ -46,6 +49,19 @@ export interface InspectorProps {
   onSaveShape?: (attr: string, resourceName: string, xml: string) => void;
   generatedXml: Record<string, string>;
 
+  /* —— M186：检查器 tab（不传 = 只显示属性页签） —— */
+  inspector?: {
+    tree: InspectableNode | null;
+    measured: MeasuredNode[];
+    selectedPath: string | null;
+    warnings: InspectorWarning[];
+    gotoLine?: (line: number) => void;
+  };
+  onInspectSelect?: (path: string) => void;
+  /** 当前页签（缺省 attrs） */
+  tab?: "attrs" | "inspector";
+  onTab?: (tab: "attrs" | "inspector") => void;
+
   /* —— M61：Java/Kotlin 文件 → 右侧改成函数列表（不传/undefined 就是原来的属性面板） —— */
   outline?: OutlineItem[];
   outlineName?: string;
@@ -56,11 +72,14 @@ export interface InspectorProps {
 export function Inspector(props: InspectorProps) {
   const { open, onClose, node, chain } = props;
   const isOutline = props.outline !== undefined;
+  /** M186：属性 | 检查器 页签。状态放在 XmlEditor（本组件保持无状态，方便直接调用做契约测试） */
+  const tab: "attrs" | "inspector" = props.tab ?? "attrs";
+  const setTab = (v: "attrs" | "inspector") => props.onTab?.(v);
 
   return (
     <aside className={"axv-slide-right" + (open ? " axv-open" : "")}>
       <div className="axv-slide-head">
-        <span>{isOutline ? tt("函数") : tt("属性")}</span>
+        <span>{isOutline ? tt("函数") : props.inspector ? tt("属性 / 检查器") : tt("属性")}</span>
         <button className="axv-icon-btn" title={tt("关闭面板")} aria-label={tt("关闭面板")} onClick={onClose}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 24 }}>
             right_panel_close
@@ -77,41 +96,81 @@ export function Inspector(props: InspectorProps) {
           />
         ) : node ? (
           <div className="axv-panel-stack">
-            {node.sourceFile ? (
-              <div
-                className="axv-include-readonly"
-                title={tt("include 展开进来的节点：主 XML 里没有它的实体，改不了（要改去那个文件）")}
-              >
-                ⚠ {tt("来自")} <b>{node.sourceFile}</b>（{tt("include 展开，只读")}）
+            {props.inspector ? (
+              <div className="axv-attr-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === "attrs"}
+                  className={"axv-attr-tab" + (tab === "attrs" ? " is-on" : "")}
+                  onClick={() => setTab("attrs")}
+                >
+                  {tt("属性")}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === "inspector"}
+                  className={"axv-attr-tab" + (tab === "inspector" ? " is-on" : "")}
+                  onClick={() => setTab("inspector")}
+                >
+                  {tt("检查器")}
+                  {props.inspector.warnings.length > 0 ? (
+                    <span className="axv-inp-wbadge">{props.inspector.warnings.length}</span>
+                  ) : null}
+                </button>
               </div>
             ) : null}
-            {props.isChildOfCL && (
-              <ConstraintPanel
-                node={node}
-                siblings={props.clSiblings}
-                onCommitMany={props.onCommitMany}
-                onAuto={props.onAutoConstrain}
-                onClear={props.onClearConstraints}
-                autoNotes={props.autoNotes}
-              />
+            {tab === "inspector" && props.inspector ? (
+              <div className="axv-inp-wrap">
+                <InspectorTab
+                  tree={props.inspector.tree}
+                  measured={props.inspector.measured}
+                  selectedPath={props.inspector.selectedPath}
+                  warnings={props.inspector.warnings}
+                  onSelectPath={(p2) => props.onInspectSelect?.(p2)}
+                  onGotoLine={props.inspector.gotoLine}
+                />
+              </div>
+            ) : (
+              <div className="axv-panel-inner">
+                {node.sourceFile ? (
+                  <div
+                    className="axv-include-readonly"
+                    title={tt("include 展开进来的节点：主 XML 里没有它的实体，改不了（要改去那个文件）")}
+                  >
+                    ⚠ {tt("来自")} <b>{node.sourceFile}</b>（{tt("include 展开，只读")}）
+                  </div>
+                ) : null}
+                {props.isChildOfCL && (
+                  <ConstraintPanel
+                    node={node}
+                    siblings={props.clSiblings}
+                    onCommitMany={props.onCommitMany}
+                    onAuto={props.onAutoConstrain}
+                    onClear={props.onClearConstraints}
+                    autoNotes={props.autoNotes}
+                  />
+                )}
+                <AttrPanel
+                  node={node}
+                  chain={chain}
+                  onSelectPath={props.onSelectPath}
+                  onCommit={props.onCommitAttr}
+                  onRemove={props.onRemoveAttr}
+                  onAddAttr={props.onAddAttr}
+                  onOpenRef={props.onOpenRef}
+                  onFindUsages={props.onFindUsages}
+                  resExtras={props.resExtras}
+                  onDeleteNode={() => props.onDeleteNode(node.path)}
+                  onPickIcon={props.onPickIcon}
+                  onEditIconResource={props.onEditIconResource}
+                  iconNames={props.iconNames}
+                  onSaveShape={props.onSaveShape}
+                  generatedXml={props.generatedXml}
+                />
+              </div>
             )}
-            <AttrPanel
-              node={node}
-              chain={chain}
-              onSelectPath={props.onSelectPath}
-              onCommit={props.onCommitAttr}
-              onRemove={props.onRemoveAttr}
-              onAddAttr={props.onAddAttr}
-              onOpenRef={props.onOpenRef}
-              onFindUsages={props.onFindUsages}
-              resExtras={props.resExtras}
-              onDeleteNode={() => props.onDeleteNode(node.path)}
-              onPickIcon={props.onPickIcon}
-              onEditIconResource={props.onEditIconResource}
-              iconNames={props.iconNames}
-              onSaveShape={props.onSaveShape}
-              generatedXml={props.generatedXml}
-            />
           </div>
         ) : (
           <div className="axv-attr-hint">{tt("在画布或图层树上点任意控件查看并编辑属性")}</div>

@@ -176,6 +176,8 @@ import { defaultFor } from "./attr-catalog";
 import { WidgetPalette } from "./WidgetPalette";
 import { ConstraintPanel, type SibOption } from "./ConstraintPanel";
 import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } from "@/lib/xml/autoconstrain";
+import { collectMeasurements, inspectorWarningsOf } from "@/lib/xml/inspector";
+import type { MeasuredNode } from "@/lib/xml/inspector";
 import { ResImagePreview } from "./ResImagePreview";
 import { ShapeEditor } from "./ShapeEditor";
 import { ResourcePanel } from "./ResourcePanel";
@@ -2261,7 +2263,35 @@ const allDrawableNames = useMemo(() => {
     setAutoNotes([]);
   };
 
-  // ===== 组件插入（点击 / 拖放）=====
+  /** M186：右侧面板当前页签（属性 / 检查器） */
+  const [rightTab, setRightTab] = useState<"attrs" | "inspector">("attrs");
+  /** M186：右侧「检查器」tab 数据（DOM 实测 → dp，纯函数在 lib/xml/inspector.ts） */
+  const [inspMeasured, setInspMeasured] = useState<MeasuredNode[]>([]);
+  useEffect(() => {
+    const st = stageRef.current;
+    if (!st || !treeRoot || !previewActive) {
+      setInspMeasured([]);
+      return;
+    }
+    const take = () => {
+      const els = st.querySelectorAll<HTMLElement>("[data-path]");
+      setInspMeasured(collectMeasurements(st, els, 2, () => ""));
+    };
+    take();
+    const obs = new ResizeObserver(take);
+    obs.observe(st);
+    const t = window.setTimeout(take, 300);
+    return () => {
+      obs.disconnect();
+      window.clearTimeout(t);
+    };
+  }, [treeRoot, previewActive]);
+  const inspWarnings = useMemo(
+    () => (treeRoot ? inspectorWarningsOf(treeRoot, inspMeasured) : []),
+    [treeRoot, inspMeasured],
+  );
+
+    // ===== 组件插入（点击 / 拖放）=====
   // 有选中节点：插到它的同级（兄弟）；否则插到根节点末尾
   const setXmlAndTrack = useCallback(
     (next: string, /** M2u：同一手势 key 在 900ms 内合并成一步撤销 */ mergeKey?: string) => {
@@ -3217,9 +3247,11 @@ const findResolved = findResolvedNode;
         setXmlAndTrack(txt);
 
         if (!parseOk) {
-          // 解析失败 → 切到代码面板，让用户就地改；画布会显示失败说明，不会崩
-          setLeftView("code");
-          setLeftOpen(true);
+          // 解析失败 → 切到代码视图，让用户就地改；画布会显示失败说明，不会崩
+          // M187：代码视图在主区 tab（原来是 setLeftView("code") + 打开左面板，而左面板根本没有 code 页）
+          setMobileTab("xml");
+          setLeftOpen(false);
+          setRightOpen(false);
           setFocusLine(1);
           setFocusTick((t) => t + 1);
           setExportNote(tt("「{name}」有不完整或错误的结构（{err}），已切到代码面板，改好画布会自动恢复", { name: f.name, err: firstErr }));
@@ -3950,14 +3982,19 @@ const findResolved = findResolvedNode;
     setFocusTick((t) => t + 1);
   }, [selectedPath, selectedLine, mobileTab]);
 
-  /** M2s：跳转到代码 tab 并让代码编辑器滚动/选中到指定行 */
+  /** M2s：跳转到代码视图并让代码编辑器滚动/选中到指定行
+   *  M187 修复：代码视图早就搬到主区 tab（mobileTab === "xml"）了，这里还在 setLeftView("code")
+   *  → 点抽屉里的问题只弹出左侧滑面板、代码根本没动。改成切主区 tab + 关面板 + 下一帧跳行。 */
   const [focusLine, setFocusLine] = useState(0);
   const [focusTick, setFocusTick] = useState(0);
   const gotoLine = useCallback((line: number) => {
-    setLeftView("code");
-    setLeftOpen(true);
-    setFocusLine(line);
-    setFocusTick((t) => t + 1);
+    setMobileTab("xml");
+    setLeftOpen(false);
+    setRightOpen(false);
+    requestAnimationFrame(() => {
+      setFocusLine(line);
+      setFocusTick((t) => t + 1);
+    });
   }, []);
 
   /** M61：函数列表 → 跳行（手机上先切到「代码」页，等一帧编辑器挂载后再跳） */
@@ -4631,6 +4668,16 @@ const findResolved = findResolvedNode;
         iconNames={Object.keys(generatedDrawables)}
         onSaveShape={onSaveShape}
         generatedXml={generatedDrawables}
+        inspector={{
+          tree: treeRoot,
+          measured: inspMeasured,
+          selectedPath: selectedPath,
+          warnings: inspWarnings,
+          gotoLine: () => {}, // M186：层级树选中走画布；后续版本再补代码行跳转
+        }}
+        onInspectSelect={(p) => setSelectedPath(p)}
+        tab={rightTab}
+        onTab={setRightTab}
         outline={javaOutline}
         outlineName={codeFileName}
         outlineLine={codeCursor}

@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { validateSigning, readSigningFromGradle, applySigningToGradle, defaultAppGradle, type SigningParams } from "@/lib/xml/signing";
+import { checkPublish, readPublishInfo, setPublishVersion } from "@/lib/xml/gradle-publish";
 
 export interface SigningDialogProps {
   /** 读项目里 app/build.gradle（没有就 null） */
@@ -14,6 +15,8 @@ export interface SigningDialogProps {
   rootMissing?: boolean;
   /** M188c：项目包名（没有 build.gradle 时生成基础模板用；不传就 com.example.app） */
   pkg?: string;
+  /** M189：keystore 文件是否真实存在（undefined = 没检查） */
+  keystoreExists?: boolean;
   /** 写回（成功后弹层关闭 + 提示）；返回 true 成功 */
   onWriteGradle: (next: string) => Promise<boolean>;
   onClose: () => void;
@@ -32,7 +35,7 @@ const EMPTY: SigningParams = {
   v3: true,
 };
 
-export function SigningDialog({ gradleText, rootMissing, pkg, onWriteGradle, onClose, onNote }: SigningDialogProps) {
+export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, onWriteGradle, onClose, onNote }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
   const [alias, setAlias] = useState(prefill?.alias || EMPTY.alias);
   const [keyPassword, setKeyPassword] = useState(prefill?.keyPassword || "");
@@ -45,6 +48,28 @@ export function SigningDialog({ gradleText, rootMissing, pkg, onWriteGradle, onC
   const [v3, setV3] = useState(prefill?.v3 ?? true);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /* M189：发布信息（版本号 / SDK）+ 发布前检查 */
+  const pub = gradleText ? readPublishInfo(gradleText) : null;
+  const [versionCode, setVersionCode] = useState<number>(pub?.versionCode ?? 1);
+  const [versionName, setVersionName] = useState<string>(pub?.versionName ?? "1.0");
+  const issues = gradleText
+    ? checkPublish({
+        info: pub!,
+        keystoreExists,
+        storeFile,
+        anyScheme: v1 || v2 || v3,
+      })
+    : [];
+
+  /** 把「签名 + 版本」一次写进 build.gradle */
+  const composeNext = (base: string, p: SigningParams): { ok: boolean; next: string; error: string | null } => {
+    const signed = applySigningToGradle(base, p);
+    if (!signed.ok) return { ok: false, next: base, error: signed.error };
+    const ver = setPublishVersion(signed.next, { versionCode, versionName });
+    // 版本字段没找到不算错（有些工程用 buildConfigField 之类），只不写版本
+    return { ok: true, next: ver.ok ? ver.text : signed.next, error: null };
+  };
 
   const submit = async () => {
     setErr(null);
@@ -61,7 +86,8 @@ export function SigningDialog({ gradleText, rootMissing, pkg, onWriteGradle, onC
       setBusy(true);
       const made = defaultAppGradle(p, pkg);
       if (!made.ok) { setErr(made.error); setBusy(false); return; }
-      const okNew = await onWriteGradle(made.next);
+      const ver = setPublishVersion(made.next, { versionCode, versionName });
+      const okNew = await onWriteGradle(ver.ok ? ver.text : made.next);
       setBusy(false);
       if (okNew) {
         onNote(tt("已生成 app/build.gradle 并写入签名配置"), 3200);
@@ -73,7 +99,7 @@ export function SigningDialog({ gradleText, rootMissing, pkg, onWriteGradle, onC
     }
 
     setBusy(true);
-    const r = applySigningToGradle(gradleText, p);
+    const r = composeNext(gradleText, p);
     if (!r.ok) { setErr(r.error); setBusy(false); return; }
     const ok = await onWriteGradle(r.next);
     setBusy(false);
@@ -153,6 +179,51 @@ export function SigningDialog({ gradleText, rootMissing, pkg, onWriteGradle, onC
           </div>
         </div>
         {err && <div className="axv-sign-err" role="alert">{err}</div>}
+
+        {/* M189：版本信息 */}
+        {gradleText ? (
+          <>
+            <div className="axv-sign-sep">{tt("版本信息")}</div>
+            <div className="axv-sign-row">
+              <label>{tt("versionCode")}</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="number"
+                  min={1}
+                  value={versionCode}
+                  onChange={(e) => setVersionCode(Number(e.target.value) || 1)}
+                  style={{ flex: 1 }}
+                />
+                <button type="button" onClick={() => setVersionCode((n) => n + 1)}>
+                  +1
+                </button>
+              </div>
+            </div>
+            <div className="axv-sign-row">
+              <label>{tt("versionName")}</label>
+              <input value={versionName} onChange={(e) => setVersionName(e.target.value)} />
+            </div>
+            <div className="axv-sign-meta">
+              {tt("包名")}：{pub?.applicationId || pub?.namespace || tt("（未设置）")}
+              {pub?.minSdk != null ? ` · minSdk ${pub.minSdk}` : ""}
+              {pub?.targetSdk != null ? ` · targetSdk ${pub.targetSdk}` : ""}
+            </div>
+            {issues.length > 0 ? (
+              <ul className="axv-sign-issues">
+                {issues.map((it, i) => (
+                  <li key={i} className={"axv-sign-issue axv-sign-issue-" + it.level}>
+                    <span className="msr" aria-hidden="true">
+                      {it.level === "error" ? "error" : it.level === "warn" ? "warning" : "info"}
+                    </span>
+                    {it.msg}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="axv-sign-ok">{tt("发布前检查：没发现问题")}</div>
+            )}
+          </>
+        ) : null}
         {rootMissing && !gradleText ? (
           <div className="axv-sign-hint">
             {tt("当前项目还没有可写目录：配置会先存到本地草稿，打开项目或选中保存目录后再点一次「写入」即可落盘到 build.gradle")}

@@ -78,7 +78,7 @@ import { pickXmlFile } from "@/lib/xml/save-as";
 import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { hasRealRender, renderReal } from "@/lib/xml/native-render";
 import { collectProjectRes } from "@/lib/xml/res-collect";
-import { projectSaveRoot, readProjectFile, saveProjectFile, saveResFiles, resAbs } from "@/lib/xml/project-save";
+import { projectSaveRoot, projectFileExists, readProjectFile, saveProjectFile, saveResFiles, resAbs } from "@/lib/xml/project-save";
 import { parseAppIconConfig } from "@/lib/xml/app-icon";
 import { nativeBridge } from "@/lib/xml/native-save";
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
@@ -223,6 +223,7 @@ function writeLastRel(projectKey: string, rel: string): void {
 import { RunPreview } from "./RunPreview";
 import { Toolbar } from "./Toolbar";
 import { SigningDialog } from "./SigningDialog";
+import { readSigningFromGradle } from "@/lib/xml/signing";
 import { LeftRail, type LeftView } from "./LeftRail";
 import { ProblemsDrawer } from "./ProblemsDrawer";
 import { Inspector } from "./Inspector";
@@ -2274,6 +2275,8 @@ const allDrawableNames = useMemo(() => {
   const [signDialogOpen, setSignDialogOpen] = useState(false);
   const [gradleForSign, setGradleForSign] = useState<string | null>(null);
   const [signRootMissing, setSignRootMissing] = useState(false);
+  /** M189：keystore 文件是否真存在（不给就是没检查） */
+  const [signKeystoreExists, setSignKeystoreExists] = useState<boolean | undefined>(undefined);
   const LS_KEY_SIGN_DRAFT = "axv.signing.draft";
   const openSignDialog = useCallback(async () => {
     const root = projectSaveRoot(activeProject);
@@ -2288,8 +2291,15 @@ const allDrawableNames = useMemo(() => {
         if (draft) use = draft;
       } catch { /* ignore */ }
     }
+    // M189：查一下 keystore 文件在不在（发布前检查用）
+    let exists: boolean | undefined;
+    if (root && use) {
+      const store = readSigningFromGradle(use)?.storeFile || ".axv/release.keystore";
+      exists = await projectFileExists(root, store);
+    }
     setGradleForSign(use);
     setSignRootMissing(missing);
+    setSignKeystoreExists(exists);
     setSignDialogOpen(true);
   }, [activeProject]);
   const writeGradleForSign = useCallback(
@@ -5145,6 +5155,7 @@ const findResolved = findResolvedNode;
         <SigningDialog
           gradleText={gradleForSign}
           rootMissing={signRootMissing}
+          keystoreExists={signKeystoreExists}
           pkg={activeProject?.name ? packageOf(activeProject.name) : undefined}
           onWriteGradle={writeGradleForSign}
           onClose={() => setSignDialogOpen(false)}

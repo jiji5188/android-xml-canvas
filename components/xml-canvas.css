@@ -10990,3 +10990,55 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   background: var(--axv-accent, #4f8cff);
   display: inline-block;
 }
+
+
+/* M189 版本信息 + 发布前检查 */
+.axv-sign-sep {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--axv-text-2, #999);
+  border-top: 1px solid var(--axv-outline, #333);
+  padding-top: 10px;
+}
+.axv-sign-meta {
+  font-size: 11px;
+  color: var(--axv-text-2, #999);
+  margin: 4px 0 8px;
+  word-break: break-all;
+}
+.axv-sign-issues {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.axv-sign-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+.axv-sign-issue .msr { font-size: 14px; margin-top: 1px; }
+.axv-sign-issue-error {
+  color: color-mix(in srgb, var(--axv-danger, #ff5b5b) 85%, white);
+  background: color-mix(in srgb, var(--axv-danger, #ff5b5b) 12%, transparent);
+}
+.axv-sign-issue-warn {
+  color: color-mix(in srgb, var(--axv-warn, #ffb020) 85%, white);
+  background: color-mix(in srgb, var(--axv-warn, #ffb020) 12%, transparent);
+}
+.axv-sign-issue-info {
+  color: var(--axv-text-2, #999);
+  background: color-mix(in srgb, var(--axv-surface-2, #222) 55%, transparent);
+}
+.axv-sign-ok {
+  font-size: 12px;
+  color: var(--axv-accent, #4f8cff);
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--axv-accent, #4f8cff) 10%, transparent);
+  margin: 4px 0 0;
+}

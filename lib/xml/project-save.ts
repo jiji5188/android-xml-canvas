@@ -8,7 +8,7 @@
 // native 走 bridge.writeText（内部 mkdirs），web 走目录句柄逐级 create。
 
 import { nativeBridge, writeTextNative } from "./native-save";
-import { readTextQueued } from "./native-async";
+import { readBase64Queued, readTextQueued } from "./native-async";
 import type { SaveFileSpec } from "./save-as";
 
 /** res 在 Android 工程里的固定前缀 */
@@ -88,6 +88,33 @@ export async function readProjectFile(
     return await readUnderHandle(root.handle, clean);
   } catch {
     return null;
+  }
+}
+
+/** M189：判断工程里某个文件存不存在（keystore 这种二进制也适用）。
+ *  native 走 readBase64Async（能读字节就知道文件在），老壳退回同步 readText；
+ *  handle 跟逐个 getFileHandle 看能不能拿到。 */
+export async function projectFileExists(
+  root: ProjectSaveRoot | null,
+  rel: string,
+): Promise<boolean | undefined> {
+  if (!root) return undefined;
+  const clean = rel.replace(/\\/g, "/").replace(/^\/+/, "");
+  try {
+    if (root.kind === "native") {
+      const base = root.base.replace(/[/\\]+$/, "");
+      const abs = `${base}/${clean}`;
+      const b64 = await readBase64Queued(abs);
+      if (typeof b64 === "string" && b64.length > 0) return true;
+      const b = nativeBridge();
+      const txt = b?.readText?.(abs);
+      if (typeof txt === "string") return true;
+      return false;
+    }
+    const txt = await readUnderHandle(root.handle, clean);
+    return txt != null;
+  } catch {
+    return false;
   }
 }
 

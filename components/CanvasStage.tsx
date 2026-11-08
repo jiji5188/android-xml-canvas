@@ -182,7 +182,8 @@ export function CanvasStage(props: CanvasStageProps) {
             boxSizing: "border-box",
             background: phoneBg,
             color: phoneFg,
-            transform: fitRatio < 1 ? `scale(${fitRatio})` : undefined,
+            // M187：放大档 fitRatio > 1 也要生效（原来 < 1 才 scale，放大等于没反应）
+            transform: fitRatio !== 1 ? `scale(${fitRatio})` : undefined,
             transformOrigin: "top left",
             borderRadius: radius ? Math.round(radius * DPX) : undefined,
           }}

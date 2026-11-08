@@ -113,6 +113,7 @@ export function inspectorWarningsOf(
 
 /** 从 DOM 元素采集实测数据（px → dp 由调用方传入 scale 系数） */
 export function collectMeasurements(
+  /** 相对 stage 内容区左上角的坐标参考（stage 自身左上角会随滚动偏移，实测按 stage 内容区算） */
   stage: HTMLElement,
   els: Iterable<HTMLElement>,
   scale: number,

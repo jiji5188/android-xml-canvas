@@ -1738,7 +1738,11 @@ const allDrawableNames = useMemo(() => {
   /** M20i：回退到今天之前的实现（用户要求）。
    *  布局模型固定用 SCALE（不随用户缩放），缩放只作用于外壳/状态栏/导航栏。
    *  DPX = 1dp 对应 px（含用户缩放），仅用于状态栏/导航栏高度与圆角。 */
-  const DPX = SCALE * scale;
+  /** M187：DPX 固定 = SCALE。
+   *  用户缩放不再进布局 px —— 否则「外壳随缩放变大、控件 px 不变」，
+   *  里面所有 dp 控件相对外框越缩越小（用户看到的「排版没跟上」）。
+   *  现在缩放只由手机外壳的 transform: scale(fitRatio) 表达，整机等比放大缩小。 */
+  const DPX = SCALE;
 
   /** M37b：当前文档是布局还是「只读代码」（manifest / values / menu …） */  const docKind = useMemo(
     () => detectDocKind(xml, openRel, saveOrigin?.name ?? null),
@@ -2275,17 +2279,29 @@ const allDrawableNames = useMemo(() => {
     }
     const take = () => {
       const els = st.querySelectorAll<HTMLElement>("[data-path]");
-      setInspMeasured(collectMeasurements(st, els, 2, () => ""));
+      // M187：dp = 视觉 px ÷ (SCALE × vs)，两层就够
+      //   ① SCALE：1dp = 2px（用户缩放 scale 已经算进布局 px 里了，别再除一次）
+      //   ② vs = 视觉宽 ÷ 布局宽 = 手机外壳 transform: scale(fitRatio) 的压缩比，实测比自己推 fitRatio 稳
+      // 原点用 .axv-phone-body：量的是「相对画布内容区左上角」，不是含留白的整个 stage
+      const body = st.querySelector<HTMLElement>(".axv-phone-body");
+      const ref = body && body.offsetWidth > 0 ? body : st;
+      const vs = ref.offsetWidth > 0 ? ref.getBoundingClientRect().width / ref.offsetWidth : 1;
+      const pxPerDp = SCALE * (vs > 0 ? vs : 1);
+      setInspMeasured(collectMeasurements(ref, els, pxPerDp, () => ""));
     };
     take();
     const obs = new ResizeObserver(take);
     obs.observe(st);
+    // M187：缩放改变的是手机外壳大小（stage 容器本身不变），单独盯外壳才跟得上
+    const ph = phoneRef.current;
+    if (ph) obs.observe(ph);
     const t = window.setTimeout(take, 300);
     return () => {
       obs.disconnect();
       window.clearTimeout(t);
     };
-  }, [treeRoot, previewActive]);
+    // scale 进依赖：缩放一变就重新量（ResizeObserver 是兜底）
+  }, [treeRoot, previewActive, scale]);
   const inspWarnings = useMemo(
     () => (treeRoot ? inspectorWarningsOf(treeRoot, inspMeasured) : []),
     [treeRoot, inspMeasured],
@@ -3140,8 +3156,9 @@ const allDrawableNames = useMemo(() => {
     return findResolvedNode(model.root, selectedPath);
   }, [selectedPath, model]);
 
-  const widthPx = Math.round(device.w * SCALE * scale);
-  const heightPx = Math.round(device.h * SCALE * scale);
+  // M187：外壳布局 px 固定（不乘 scale），缩放靠 transform
+  const widthPx = Math.round(device.w * SCALE);
+  const heightPx = Math.round(device.h * SCALE);
   /** 屏 dp → px（含用户缩放） */
   /** 手机外壳边框宽（px）；内容区保持 412x892dp 不被边框吃掉
    *  M12：必须和 xml-canvas.css 里 `.axv-phone` 的 `border: 8px` 一致。
@@ -3176,7 +3193,8 @@ const allDrawableNames = useMemo(() => {
     // M20i：用户要求复原为之前的实现（基准装入比 × 用户缩放）
     const baseW = device.w * SCALE + PHONE_BORDER * 2;
     const fitBase = Math.min(1, avail / Math.max(1, baseW));
-    return Math.min(1, fitBase * scale);
+    // M187：不再钳 1 —— 钳了以后放大档等于没放大（外壳变大 + transform 缩回，内容却没变）
+    return fitBase * scale;
   })();
 
   function shortTag(t: string): string {

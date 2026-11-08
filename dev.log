@@ -13114,3 +13114,35 @@ Import trace:
 ✓ Compiled in 156ms
 ✓ Compiled in 133ms
 ✓ Compiled in 127ms
+✓ Compiled in 1515ms
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [[object Object], true]
+Incoming: [[object Object], true, 1] 
+    at XmlEditor (components/XmlEditor.tsx:2270:12)
+    at Set.forEach (<anonymous>)
+  2268 |   /** M186：右侧「检查器」tab 数据（DOM 实测 → dp，纯函数在 lib/xml/inspector.ts） */
+  2269 |   const [inspMeasured, setInspMeasured] = useState<MeasuredNode[]>([]);
+> 2270 |   useEffect(() => {
+       |            ^
+  2271 |     const st = stageRef.current;
+  2272 |     if (!st || !treeRoot || !previewActive) {
+  2273 |       setInspMeasured([]); (components/XmlEditor.tsx:2270:12)
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [, false]
+Incoming: [, false, 1] 
+    at XmlEditor (components/XmlEditor.tsx:2270:12)
+    at Set.forEach (<anonymous>)
+  2268 |   /** M186：右侧「检查器」tab 数据（DOM 实测 → dp，纯函数在 lib/xml/inspector.ts） */
+  2269 |   const [inspMeasured, setInspMeasured] = useState<MeasuredNode[]>([]);
+> 2270 |   useEffect(() => {
+       |            ^
+  2271 |     const st = stageRef.current;
+  2272 |     if (!st || !treeRoot || !previewActive) {
+  2273 |       setInspMeasured([]); (components/XmlEditor.tsx:2270:12)
+✓ Compiled in 309ms
+✓ Compiled in 225ms
+✓ Compiled in 124ms
+✓ Compiled in 268ms
+✓ Compiled in 115ms

@@ -39,10 +39,12 @@ export interface ProblemsDrawerProps {
   onGotoLine: (line: number) => void;
   /** M188b：构建日志列表（新在前）；没有就不显示小点 */
   buildLogs?: BuildLogEntry[];
+  /** M193：状态信息（文件名/未保存/问题数/设备/缩放）—— 合并进把手条，不再单独占一行 */
+  statusSlot?: React.ReactNode;
   tr: (key: string, fallback: string, vars?: Record<string, string | number>) => string;
 }
 
-export function ProblemsDrawer({ problems, onGotoLine, buildLogs, tr }: ProblemsDrawerProps) {
+export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, tr }: ProblemsDrawerProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<DrawerPanel>("problems");
 
@@ -64,6 +66,11 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, tr }: Problems
         <span className="msr axv-drawer-chevron" aria-hidden="true">
           {open ? "expand_less" : "expand_more"}
         </span>
+        {statusSlot ? (
+          <div className="axv-drawer-status" onClick={(e) => e.stopPropagation()}>
+            {statusSlot}
+          </div>
+        ) : null}
         {buildLogs && buildLogs.length > 0 ? (
           <span className="axv-drawer-logdot" title={tr("drawer.log.has", "有构建日志")} />
         ) : null}

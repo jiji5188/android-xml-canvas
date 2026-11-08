@@ -10588,32 +10588,68 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  min-height: 28px;
+  padding: 0 8px;
+  /* M193：把手条压到 20px（原 28px），状态信息合并进来，不再单独占一行 */
+  height: 20px;
+  min-height: 20px;
   background: var(--axv-toolbar-bg, #f6f5f4);
   border-top: 1px solid var(--axv-outline-variant, #0000001a);
   box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.08);
   transition: background 0.15s;
+  overflow: hidden;
 }
 .axv-drawer-chevron {
-  font-size: 15px;
+  font-size: 14px;
   color: var(--axv-on-surface, #333);
-  margin-right: 4px;
+  margin-right: 2px;
+  flex: 0 0 auto;
+}
+/* M193：把原 .axv-appstatus（固定底部 28px 条）压成把手条里的一截 */
+.axv-drawer-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.axv-drawer-status .axv-appstatus {
+  position: static;
+  height: auto;
+  width: 100%;
+  padding: 0;
+  gap: 6px;
+  background: none;
+  backdrop-filter: none;
+  border: 0;
+  font-size: 11px;
+  overflow: hidden;
+}
+.axv-drawer-status .axv-sb-item {
+  height: 16px;
+  padding: 0 5px;
+  font-size: 11px;
+}
+.axv-drawer-status .axv-sb-file {
+  max-width: 40%;
+}
+.axv-drawer-status .axv-sb-src {
+  display: none;
 }
 .axv-drawer-tab {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   border: none;
   background: transparent;
   color: var(--axv-on-surface, #333);
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 8px;
+  font-size: 11px;
+  padding: 0 6px;
+  height: 16px;
+  border-radius: 6px;
   cursor: pointer;
+  flex: 0 0 auto;
 }
 .axv-drawer-tab .msr {
-  font-size: 14px;
+  font-size: 12px;
 }
 .axv-drawer-tab.on {
   background: var(--axv-primary-container, #d8e3ff);

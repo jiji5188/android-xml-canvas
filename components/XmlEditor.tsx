@@ -4673,6 +4673,34 @@ const findResolved = findResolvedNode;
         problems={(lints ?? []).map((l) => ({ line: l.line ?? 1, msg: l.message }))}
         onGotoLine={(ln) => gotoLine(ln)}
         buildLogs={buildLogs}
+        statusSlot={
+          /* M193：状态条合并进抽屉把手条（不再自己占一行 28px） */
+          <StatusBar
+            isMobile={isMobile}
+            fileName={saveOrigin?.name || activeFile(project)?.name || currentFile?.name || "activity_main.xml"}
+            source={
+              saveOrigin?.kind === "native"
+                ? saveOrigin.target
+                : saveOrigin?.kind === "handle"
+                  ? saveOrigin.name
+                  : workspaceLabel() || null
+            }
+            deviceLabel={device.label}
+            deviceSize={`${device.w}×${device.h}`}
+            scale={scale}
+            dirty={dirty}
+            issueCount={lintErrCount}
+            onIssues={() => setShowIssues((v) => !v)}
+            onResetZoom={() => applyZoom(1)}
+            savedHint={
+              savedAt
+                ? tt("已保存 {time}", {
+                    time: new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                  })
+                : null
+            }
+          />
+        }
         tr={tr}
       />
       {/* M101：代码面板也要看得到 toast（exportNote 的汉堡包在 CanvasStage，代码 tab 看不到） */}
@@ -5473,29 +5501,7 @@ const findResolved = findResolvedNode;
         />
       ) : null}
 
-      {/* M27：底部状态条（文件 / 未保存 / 问题数 / 设备 / 缩放） */}
-      <StatusBar
-        isMobile={isMobile}
-        // M31k：桌面端侧栏展开时把状态条让出 320px，别被面板压住（移动端不动）
-        leftInset={isMobile ? undefined : leftOpen ? 320 : 0}
-        rightInset={isMobile ? undefined : rightOpen ? 320 : 0}
-        fileName={saveOrigin?.name || activeFile(project)?.name || currentFile?.name || "activity_main.xml"}
-        source={
-          saveOrigin?.kind === "native" ? saveOrigin.target : saveOrigin?.kind === "handle" ? saveOrigin.name : workspaceLabel() || null
-        }
-        deviceLabel={device.label}
-        deviceSize={`${device.w}×${device.h}`}
-        scale={scale}
-        dirty={dirty}
-        issueCount={lintErrCount}
-        onIssues={() => setShowIssues((v) => !v)}
-        onResetZoom={() => applyZoom(1)}
-        savedHint={
-          savedAt
-            ? tt("已保存 {time}", { time: new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })
-            : null
-        }
-      />
+      {/* M193：底部状态条不再单独渲染，已合并进 ProblemsDrawer 的把手条（20px） */}
     </div>
   );
 }

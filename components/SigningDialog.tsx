@@ -10,6 +10,12 @@ import { checkPublish, readPublishInfo, setPublishVersion } from "@/lib/xml/grad
 import { setGradlePackage } from "@/lib/xml/project-info";
 
 export interface SigningDialogProps {
+  /** M192：一键打包成可安装 APK（设备端 aapt2 + 壳 dex + apksig 签名） */
+  onBuildApk?: (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => Promise<void>;
+  apkBusy?: boolean;
+  apkResult?: { ok: boolean; path?: string; name?: string; bytes?: number; ms?: number; step?: string; log?: string } | null;
+  /** M192：调系统安装器装刚打出来的包 */
+  onInstallApk?: (path: string) => void;
   /** 读项目里 app/build.gradle（没有就 null） */
   gradleText: string | null;
   /** M188b：当前项目没有可写根（网页版没选目录 / 示例项目）→ 写入先进 localStorage 草稿 */
@@ -42,7 +48,7 @@ const EMPTY: SigningParams = {
   v3: true,
 };
 
-export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onWriteGradle, onClose, onNote }: SigningDialogProps) {
+export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onWriteGradle, onClose, onNote }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
   const [alias, setAlias] = useState(prefill?.alias || EMPTY.alias);
   const [keyPassword, setKeyPassword] = useState(prefill?.keyPassword || "");
@@ -334,6 +340,62 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
             </div>
           )
         )}
+        {/* M192：一键打包 → 安装调试 */}
+        {onBuildApk ? (
+          <div className="axv-sign-row" style={{ display: "block", borderTop: "1px solid rgba(0,0,0,.08)", paddingTop: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                type="button"
+                className="axv-sign-primary"
+                disabled={!!apkBusy}
+                onClick={() =>
+                  void onBuildApk({
+                    storeFile: storeFile || "",
+                    storePass: keyPassword || "",
+                    alias: alias || "",
+                    keyPass: keyPassword || "",
+                  })
+                }
+                title={tt("资源编译 → 注入壳 dex → 对齐 → apksig 签名，产出一个可直接安装的 APK")}
+              >
+                {apkBusy ? tt("打包中…") : tt("打包并安装 APK")}
+              </button>
+              {apkResult?.ok && apkResult.path && onInstallApk ? (
+                <button type="button" onClick={() => onInstallApk(apkResult.path!)}>
+                  {tt("安装到本机")}
+                </button>
+              ) : null}
+            </div>
+            {apkResult ? (
+              apkResult.ok ? (
+                <div className="axv-sign-ok" style={{ marginTop: 6 }}>
+                  {tt("已生成 {name}（{kb} KB，{ms} ms）", {
+                    name: apkResult.name || "",
+                    kb: String(Math.round((apkResult.bytes || 0) / 1024)),
+                    ms: String(apkResult.ms || 0),
+                  })}
+                  <div style={{ opacity: 0.7, wordBreak: "break-all", fontSize: 11 }}>{apkResult.path}</div>
+                </div>
+              ) : (
+                <div className="axv-sign-issue axv-sign-issue-error" style={{ marginTop: 6, display: "block" }}>
+                  <div>{tt("打包失败（{step}）", { step: apkResult.step || "?" })}</div>
+                  <pre
+                    style={{
+                      margin: "6px 0 0",
+                      fontSize: 11,
+                      maxHeight: 160,
+                      overflow: "auto",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {apkResult.log || ""}
+                  </pre>
+                </div>
+              )
+            ) : null}
+          </div>
+        ) : null}
         <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "flex-end" }}>
           <button type="button" onClick={onClose} disabled={busy}>{tt("取消")}</button>
           <button type="button" className="axv-sign-primary" onClick={() => void submit()} disabled={busy}>

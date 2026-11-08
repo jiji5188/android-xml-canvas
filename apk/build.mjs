@@ -112,6 +112,63 @@ run(jbrExe("javac"), [
 //    改用 Java 的 jar 命令（jbr 里有 jar.exe）：jar uf base.apk classes.dex
 run(jbrExe("jar"), ["uf", "build/base.apk", "-C", "build/dex", "classes.dex"], apk);
 
+// 6.2) M192：预编译两个「设备端要用」的 dex，后面当 assets 塞进去
+//  - shell.dex ：一键打包生成的 APK 里那个只显示布局的 Activity（设备上没有 javac/d8，
+//                项目的 Java 编译不了，这个壳让用户在真机上看到成品）
+//  - signer.dex：apksig（官方签名实现）+ SigningBridge 一起 dex，设备端靠 DexClassLoader
+//                加载后签 v2/v3 —— 比自己拼 ASN.1 签名块可靠得多
+{
+  const androidJar = path.join(SDK, "platforms", PLATFORM, "android.jar");
+  const apksignerJar = btExe("lib/apksigner.jar");
+
+  const shellSrc = [];
+  (function walk(dir) {
+    if (!fs.existsSync(dir)) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith(".java")) shellSrc.push(p);
+    }
+  })(path.join(apk, "shell-src"));
+  fs.mkdirSync(path.join(apk, "build/shellcls"), { recursive: true });
+  run(jbrExe("javac"), [
+    "--release", "11", "-encoding", "UTF-8", "-classpath", androidJar,
+    "-d", "build/shellcls", ...shellSrc,
+  ], apk);
+  fs.mkdirSync(path.join(apk, "build/shelldex"), { recursive: true });
+  run(jbrExe("java"), [
+    "-cp", btExe("lib/d8.jar"), "com.android.tools.r8.D8",
+    "--lib", androidJar, "--min-api", "24", "--output", "build/shelldex",
+    ...fs.readdirSync(path.join(apk, "build/shellcls"), { recursive: true })
+      .filter((f) => String(f).endsWith(".class"))
+      .map((f) => path.join("build/shellcls", String(f))),
+  ], apk);
+
+  const signerSrc = [];
+  (function walk(dir) {
+    if (!fs.existsSync(dir)) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith(".java")) signerSrc.push(p);
+    }
+  })(path.join(apk, "signer-src"));
+  fs.mkdirSync(path.join(apk, "build/signcls"), { recursive: true });
+  run(jbrExe("javac"), [
+    "--release", "11", "-encoding", "UTF-8", "-classpath", apksignerJar,
+    "-d", "build/signcls", ...signerSrc,
+  ], apk);
+  fs.mkdirSync(path.join(apk, "build/signdex"), { recursive: true });
+  run(jbrExe("java"), [
+    "-cp", btExe("lib/d8.jar"), "com.android.tools.r8.D8",
+    "--lib", androidJar, "--min-api", "24", "--output", "build/signdex",
+    ...fs.readdirSync(path.join(apk, "build/signcls"), { recursive: true })
+      .filter((f) => String(f).endsWith(".class"))
+      .map((f) => path.join("build/signcls", String(f))),
+    apksignerJar,
+  ], apk);
+}
+
 // 6.5) assets 必须用正斜杠：aapt2 在 Windows 上会写成反斜杠（AssetManager 读不到，白屏），
 //      .NET ZipArchive 追加又会写 data descriptor（启动闪退）——用 append-assets.mjs 纯手写 STORE
 // M155：顺手把 framework 资源桩（只含 attr 的最小 android 包）也打进去，
@@ -122,7 +179,9 @@ const fwRaw = path.join(apk, "build", "framework-res-stub.apk");
 run(process.execPath, [path.join(apk, "make-fw-stub.mjs"), path.join(SDK, "platforms", PLATFORM), fwStub, fwRaw, btExe("aapt2.exe")], apk);
 run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "build", "base.apk"), path.join(apk, "assets", "www"),
   "--add", path.join(apk, "lib", "arm64-v8a", "libaapt2.so"), "lib/arm64-v8a/libaapt2.so",
-  "--add", fwStub, "assets/fw/framework-res-stub.apk.gz"], apk);
+  "--add", fwStub, "assets/fw/framework-res-stub.apk.gz",
+  "--add", path.join(apk, "build", "shelldex", "classes.dex"), "assets/shell/shell.dex",
+  "--add", path.join(apk, "build", "signdex", "classes.dex"), "assets/apksig/signer.dex"], apk);
 
 // 7) zipalign + 签名
 const keystore = path.join(apk, "debug.keystore");

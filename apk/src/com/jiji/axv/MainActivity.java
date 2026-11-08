@@ -510,6 +510,29 @@ public class MainActivity extends Activity {
             runOnUiThread(() -> startSaveBundle(name, filesJson));
         }
 
+        /** M192：一键打包成可安装 APK（资源 + 壳 dex + apksig 签名）。返回 JSON 字符串 */
+        @JavascriptInterface
+        public String buildInstallApk(String payloadJson) {
+            return MainActivity.this.buildInstallApk(payloadJson);
+        }
+
+        /** M192：异步版（打包要几秒，不能堵 JS 线程）→ window.__axvBuildApk(id, resultJson) */
+        @JavascriptInterface
+        public void buildInstallApkAsync(final String id, final String payloadJson) {
+            new Thread(() -> {
+                final String res = MainActivity.this.buildInstallApk(payloadJson);
+                final String js = "window.__axvBuildApk && window.__axvBuildApk(" + JSONObject.quote(id) + ","
+                        + JSONObject.quote(res) + ");";
+                if (web != null) web.post(() -> web.evaluateJavascript(js, null));
+            }).start();
+        }
+
+        /** M192：调系统安装器装刚打出来的包 */
+        @JavascriptInterface
+        public void installApk(String path) {
+            MainActivity.this.installApkFromProject(path);
+        }
+
         /** M191：在设备上生成 release 签名用的 keystore（PKCS#12）。
          *  path 必须落在默认工作目录内（与 writeText 同一道护栏）。
          *  返回 "ok:<字节数>" / "err:<原因>" */
@@ -2339,6 +2362,223 @@ public class MainActivity extends Activity {
                 + ",\"logFile\":" + quote(logPath)
                 + ",\"pkg\":" + quote(pkg) + ",\"layout\":" + quote(layout)
                 + ",\"log\":" + quote(log.toString()) + "}";
+    }
+
+    /* ---------- M192：一键打包成可安装 APK ---------- */
+
+    /** 读 assets 里的预编译 dex */
+    private byte[] readAssetBytes(String name) throws IOException {
+        java.io.InputStream in = getAssets().open(name);
+        try {
+            return ApkPack.readAll(in);
+        } finally {
+            in.close();
+        }
+    }
+
+    /** 用 assets 里的 apksig（DexClassLoader 加载）签名；返回 "ok:..."/"err:..." */
+    private String signWithApksig(File inApk, File outApk, String ksPath, String storePass, String alias,
+            String keyPass) {
+        try {
+            File dir = new File(getCacheDir(), "apksig");
+            if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("建不了缓存目录: " + dir);
+            File dex = new File(dir, "signer.dex");
+            byte[] want = readAssetBytes("apksig/signer.dex");
+            if (!dex.isFile() || dex.length() != want.length) {
+                writeBytes(dex, want);
+            }
+            File oat = new File(dir, "oat");
+            if (!oat.isDirectory()) oat.mkdirs();
+            dalvik.system.DexClassLoader cl = new dalvik.system.DexClassLoader(
+                    dex.getAbsolutePath(), oat.getAbsolutePath(), null, getClassLoader());
+            Class<?> c = Class.forName("com.jiji.axv.sign.SigningBridge", true, cl);
+            java.lang.reflect.Method m = c.getMethod("sign", String.class, String.class, String.class,
+                    String.class, String.class, String.class, int.class);
+            Object r = m.invoke(null, inApk.getAbsolutePath(), outApk.getAbsolutePath(), ksPath,
+                    storePass, alias, keyPass, Integer.valueOf(24));
+            return String.valueOf(r);
+        } catch (Throwable t) {
+            Throwable cause = t.getCause() == null ? t : t.getCause();
+            String msg = cause.getMessage();
+            return "err:" + (msg == null ? cause.getClass().getSimpleName() : msg);
+        }
+    }
+
+    /** 把 xml 文本里的 & < > " 转义，避免属性值把清单写坏 */
+    private static String xmlAttr(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
+    /**
+     * M192：一键打包"可安装 APK"。
+     * payload: {pkg, layout, appName, files:[{path,text|base64}], keystore, storePass, alias, keyPass, outName}
+     * 返回 JSON: {ok, path, bytes, ms, log} 或 {ok:false, step, log}
+     */
+    private String buildInstallApk(String payloadJson) {
+        long t0 = System.currentTimeMillis();
+        StringBuilder log = new StringBuilder();
+        String step = "init";
+        try {
+            JSONObject p = new JSONObject(payloadJson);
+            String pkg = p.optString("pkg", "com.axv.app");
+            String layout = p.optString("layout", "activity_main");
+            String label = p.optString("appName", "AXV App");
+            String outName = p.optString("outName", "");
+            String ksPath = p.optString("keystore", "");
+            String storePass = p.optString("storePass", "");
+            String alias = p.optString("alias", "");
+            String keyPass = p.optString("keyPass", "");
+            JSONArray files = p.optJSONArray("files");
+
+            if (!pkg.matches("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)*")) {
+                return "{\"ok\":false,\"step\":\"pkg\",\"log\":\"包名不合法: " + pkg.replace("\"", "") + "\"}";
+            }
+            if (ksPath.isEmpty() || !new File(ksPath).isFile()) {
+                return "{\"ok\":false,\"step\":\"keystore\",\"log\":\"找不到 keystore 文件，先在弹层里生成一个\"}";
+            }
+            if (files == null || files.length() == 0) {
+                return "{\"ok\":false,\"step\":\"files\",\"log\":\"没有资源文件\"}";
+            }
+
+            step = "write";
+            File root = new File(getCacheDir(), "buildapk");
+            deleteTree(root);
+            File resDir = new File(root, "res");
+            if (!resDir.mkdirs()) throw new IOException("mkdirs 失败: " + resDir);
+
+            int written = 0;
+            for (int i = 0; i < files.length(); i++) {
+                JSONObject f = files.getJSONObject(i);
+                String path = f.optString("path", "");
+                String text = f.optString("text", "");
+                String b64 = f.optString("base64", "");
+                if (path.isEmpty()) continue;
+                if (path.startsWith("/") || path.contains("..")) continue;
+                if (!b64.isEmpty()) {
+                    byte[] data;
+                    try {
+                        data = Base64.decode(b64, Base64.NO_WRAP);
+                    } catch (IllegalArgumentException bad) {
+                        continue;
+                    }
+                    if (data.length == 0) continue;
+                    writeBytes(new File(resDir, path), data);
+                    written++;
+                    continue;
+                }
+                if (text.isEmpty()) continue;
+                writeUtf8(new File(resDir, path), text);
+                written++;
+            }
+            log.append("资源 ").append(written).append(" 个文件\n");
+
+            File man = new File(root, "AndroidManifest.xml");
+            writeUtf8(man, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                    + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"" + pkg + "\">\n"
+                    + "  <uses-sdk android:minSdkVersion=\"24\" android:targetSdkVersion=\"34\" />\n"
+                    + "  <application android:label=\"" + xmlAttr(label) + "\">\n"
+                    + "    <activity android:name=\"com.jiji.axv.shell.ShellActivity\" android:exported=\"true\">\n"
+                    + "      <meta-data android:name=\"axv.layout\" android:value=\"" + xmlAttr(layout) + "\" />\n"
+                    + "      <intent-filter>\n"
+                    + "        <action android:name=\"android.intent.action.MAIN\" />\n"
+                    + "        <category android:name=\"android.intent.category.LAUNCHER\" />\n"
+                    + "      </intent-filter>\n"
+                    + "    </activity>\n"
+                    + "  </application>\n"
+                    + "</manifest>\n");
+
+            step = "aapt2";
+            File bin = new File(getApplicationInfo().nativeLibraryDir, "libaapt2.so");
+            if (!bin.isFile()) throw new IOException("找不到 aapt2：" + bin);
+            File fw = frameworkResForLink(root, log);
+            File compiled = new File(root, "compiled.zip");
+            int c1 = runAapt2(bin, root, new String[] { "compile", "--dir", resDir.getAbsolutePath(),
+                    "-o", compiled.getAbsolutePath() }, log);
+            if (c1 != 0) return jsonFail("compile", log);
+            File unsigned = new File(root, "unsigned.apk");
+            int c2 = runAapt2(bin, root, new String[] { "link", "-o", unsigned.getAbsolutePath(),
+                    "-I", fw.getAbsolutePath(),
+                    "--manifest", man.getAbsolutePath(),
+                    "--min-sdk-version", "24",
+                    "--target-sdk-version", "34",
+                    "--auto-add-overlay",
+                    compiled.getAbsolutePath() }, log);
+            if (c2 != 0) return jsonFail("link", log);
+            if (!unsigned.isFile()) return jsonFail("link", log);
+
+            step = "pack";
+            File packed = new File(root, "packed.apk");
+            ApkPack.addDexAndAlign(unsigned, readAssetBytes("shell/shell.dex"), packed);
+            log.append("注入壳 dex，打包后 ").append(packed.length()).append(" 字节\n");
+
+            step = "sign";
+            File signedTmp = new File(root, "signed.apk");
+            String sr = signWithApksig(packed, signedTmp, ksPath, storePass, alias, keyPass);
+            if (!sr.startsWith("ok:")) {
+                final String why = sr.startsWith("err:") ? sr.substring(4) : sr;
+                return "{\"ok\":false,\"step\":\"sign\",\"log\":" + quote(why) + "}";
+            }
+            log.append("签名完成 v1/v2/v3（apksig） -> ").append(signedTmp.length()).append(" 字节\n");
+
+            step = "output";
+            File outDir = new File(defaultDir(), "build");
+            if (!outDir.isDirectory() && !outDir.mkdirs()) throw new IOException("建不了输出目录: " + outDir);
+            String name = outName.isEmpty() ? (pkg + ".apk") : outName;
+            if (!name.endsWith(".apk")) name = name + ".apk";
+            File out = new File(outDir, name);
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
+            try {
+                java.io.FileInputStream fis = new java.io.FileInputStream(signedTmp);
+                try {
+                    byte[] buf = new byte[64 * 1024];
+                    int r;
+                    while ((r = fis.read(buf)) > 0) fos.write(buf, 0, r);
+                } finally {
+                    fis.close();
+                }
+            } finally {
+                fos.close();
+            }
+
+            return "{\"ok\":true,\"path\":" + quote(out.getAbsolutePath())
+                    + ",\"name\":" + quote(out.getName())
+                    + ",\"bytes\":" + out.length()
+                    + ",\"ms\":" + (System.currentTimeMillis() - t0)
+                    + ",\"pkg\":" + quote(pkg)
+                    + ",\"layout\":" + quote(layout)
+                    + ",\"log\":" + quote(log.toString()) + "}";
+        } catch (Throwable t) {
+            Log.e(TAG, "buildInstallApk fail", t);
+            String m = t.getMessage();
+            return "{\"ok\":false,\"step\":" + quote(step) + ",\"log\":"
+                    + quote((m == null ? t.getClass().getSimpleName() : m) + "\n" + log) + "}";
+        }
+    }
+
+    private static String jsonFail(String step, StringBuilder log) {
+        return "{\"ok\":false,\"step\":" + quote(step) + ",\"log\":" + quote(log.toString()) + "}";
+    }
+
+    /** M192：调系统安装器装刚打出来的包 */
+    private void installApkFromProject(String path) {
+        runOnUiThread(() -> {
+            try {
+                File f = new File(path);
+                if (!f.isFile()) {
+                    toast("找不到 APK：" + path);
+                    return;
+                }
+                Uri uri = AxvApkProvider.uriFor(MainActivity.this, f);
+                Intent it = new Intent(Intent.ACTION_VIEW);
+                it.setDataAndType(uri, "application/vnd.android.package-archive");
+                it.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(it);
+            } catch (Throwable t) {
+                Log.e(TAG, "install apk fail", t);
+                toast("调不起安装器：" + t.getMessage());
+            }
+        });
     }
 
     /** M155：给 aapt2 link 找 framework 资源。

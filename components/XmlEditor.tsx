@@ -77,6 +77,8 @@ import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { hasRealRender, renderReal } from "@/lib/xml/native-render";
+import { buildApk, hasBuildApk, installApk, type BuildApkResult } from "@/lib/xml/native-apk";
+import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { projectSaveRoot, projectFileExists, readProjectFile, saveProjectFile, saveResFiles, resAbs } from "@/lib/xml/project-save";
 import { parseAppIconConfig } from "@/lib/xml/app-icon";
@@ -2340,6 +2342,63 @@ const allDrawableNames = useMemo(() => {
       }
     },
     [activeProject],
+  );
+
+  /* M192：一键打包成可安装 APK（设备端 aapt2 + 壳 dex + apksig） */
+  const [apkBusy, setApkBusy] = useState(false);
+  const [apkResult, setApkResult] = useState<BuildApkResult | null>(null);
+  const doBuildApk = useCallback(
+    async (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => {
+      if (apkBusy) return;
+      setApkResult(null);
+      if (!hasBuildApk()) {
+        setApkResult({ ok: false, step: "env", log: tt("当前环境不支持打包（网页版没有 aapt2/apksig），请在手机上操作") });
+        return;
+      }
+      const b = nativeBridge();
+      const root = projectSaveRoot(activeProject);
+      const base = root?.kind === "native" ? root.base.replace(/[/\\]+$/, "") : b?.getDefaultWorkspace?.() || "";
+      if (!base) {
+        setApkResult({ ok: false, step: "keystore", log: tt("没有可写的项目目录") });
+        return;
+      }
+      const clean = (o.storeFile || "").replace(/\\/g, "/").replace(/^\/+/, "");
+      const keystore = clean ? `${base}/${clean}` : "";
+      // 包名：优先读 build.gradle 的 applicationId，读不到退回项目名推导
+      let pkg = activeProject?.name ? packageOf(activeProject.name) : "com.axv.app";
+      if (gradleForSign) {
+        const pg = parseGradlePackage(gradleForSign);
+        if (pg.applicationId || pg.namespace) pkg = pg.applicationId || pg.namespace || pkg;
+      }
+      const input = currentSaveInput();
+      const layout = (input.name || "activity_main.xml").replace(/\.xml$/i, "");
+      setApkBusy(true);
+      setExportNote(tt("正在收集资源…"));
+      try {
+        const collected = await collectProjectRes(aiFileIo, openRel, buildRealRenderFiles(input));
+        setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
+        const r = await buildApk({
+          pkg,
+          layout,
+          appName: signAppName || layout,
+          files: collected.files,
+          keystore,
+          storePass: o.storePass,
+          alias: o.alias,
+          keyPass: o.keyPass,
+          outName: `${pkg}-${layout}.apk`,
+        });
+        setApkResult(r);
+        setExportNote(r.ok ? tt("打包完成：{name}", { name: r.name || "" }) : tt("打包失败：{msg}", { msg: r.step || "" }));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setApkResult({ ok: false, step: "js", log: msg });
+        setExportNote(tt("打包失败：{msg}", { msg }));
+      } finally {
+        setApkBusy(false);
+      }
+    },
+    [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel],
   );
 
   const writeGradleForSign = useCallback(
@@ -5241,6 +5300,13 @@ const findResolved = findResolvedNode;
           iconDefault={signIconDefault}
           pkg={activeProject?.name ? packageOf(activeProject.name) : undefined}
           onMakeKeystore={makeKeystoreOnDevice}
+          onBuildApk={doBuildApk}
+          apkBusy={apkBusy}
+          apkResult={apkResult}
+          onInstallApk={(p) => {
+            const r = installApk(p);
+            setExportNote(r.ok ? tt("已调起系统安装器") : tt("安装失败：{msg}", { msg: r.msg || "" }));
+          }}
           onWriteGradle={writeGradleForSign}
           onClose={() => setSignDialogOpen(false)}
           onNote={(m, ms = 2400) => {

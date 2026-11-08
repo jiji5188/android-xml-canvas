@@ -142,6 +142,9 @@ export interface NamespaceIssue {
 /** 找出「应该用 app: 却写成了 android:」的属性（aapt 会报错的那些） */
 export function namespaceIssues(src: string): NamespaceIssue[] {
   const out: NamespaceIssue[] = [];
+  // M194：AndroidManifest.xml 里的 android:icon / android:label / android:title 都是真平台属性，
+  // 不能按 View 的 app: 规则改（否则会把 android:icon 误报成 app:icon，越改越坏）
+  const isManifest = /<manifest[\s>]/.test(src) || /<application[\s>]/.test(src);
   const lines = src.split(/\r?\n/);
   lines.forEach((text, i) => {
     for (const m of text.matchAll(/\bandroid:([A-Za-z0-9_]+)\s*=/g)) {
@@ -150,6 +153,7 @@ export function namespaceIssues(src: string): NamespaceIssue[] {
         out.push({ line: i + 1, from: "android:style", to: "style" });
         continue;
       }
+      if (isManifest) continue;
       if (ANDROIDX_ATTRS.has(name) && !ANDROID_ONLY_ATTRS.has(name)) {
         out.push({ line: i + 1, from: `android:${name}`, to: `app:${name}` });
       }
@@ -165,10 +169,13 @@ export function namespaceIssues(src: string): NamespaceIssue[] {
  * ③ 用了 app: 却没声明 xmlns:app → 在根标签补一条
  */
 export function fixNamespacePrefixes(src: string): string {
-  let out = src.replace(/\bandroid:([A-Za-z0-9_]+)(\s*=)/g, (whole, name: string, eq: string) => {
-    if (ANDROIDX_ATTRS.has(name) && !ANDROID_ONLY_ATTRS.has(name)) return `app:${name}${eq}`;
-    return whole;
-  });
+  const isManifest = /<manifest[\s>]/.test(src) || /<application[\s>]/.test(src);
+  let out = isManifest
+    ? src
+    : src.replace(/\bandroid:([A-Za-z0-9_]+)(\s*=)/g, (whole, name: string, eq: string) => {
+        if (ANDROIDX_ATTRS.has(name) && !ANDROID_ONLY_ATTRS.has(name)) return `app:${name}${eq}`;
+        return whole;
+      });
   out = out.replace(/\bandroid:style(\s*=)/g, "style$1");
   if (/\bapp:[A-Za-z0-9_]+\s*=/.test(out) && !/xmlns:app\s*=/.test(out)) {
     out = out.replace(/<([A-Za-z_][A-Za-z0-9_.]*)(\s|>)/, (_m, tag: string, tail: string) =>

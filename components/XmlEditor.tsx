@@ -77,6 +77,7 @@ import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { hasRealRender, renderReal, prepareFiles } from "@/lib/xml/native-render";
+import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildApk, hasBuildApk, installApk, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
@@ -1800,9 +1801,10 @@ const allDrawableNames = useMemo(() => {
   const aiFileIo = useMemo(() => ioForProject(activeProject), [activeProject]);
 
   // M159：打开文件就把它引用的项目资源读进来（values + @drawable 递归 → 再后台扫全套）
-  // 这样不用每次手动传 res；项目资源优先级高于上次缓存的上传结果
+  // M194：Java/Kotlin 文件（codeOnly）也要扫 —— javaResEnv 靠它查 R.layout.X / R.string.X 是否真存在
+  // 否则「R.layout.activity_main 不存在」对磁盘上真实存在的布局是误报（以前只扫非 code 文档）
   useEffect(() => {
-    if (!aiFileIo || !openRel || codeOnly) return;
+    if (!aiFileIo || !openRel) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -1819,7 +1821,7 @@ const allDrawableNames = useMemo(() => {
     return () => {
       cancelled = true;
     };
-  }, [aiFileIo, openRel, codeOnly, currentXml]);
+  }, [aiFileIo, openRel, currentXml]);
 
   const hasViewTabRef = useRef(hasViewTab);
   hasViewTabRef.current = hasViewTab;
@@ -2376,29 +2378,16 @@ const allDrawableNames = useMemo(() => {
       try {
         // M192f：当前编辑的可能是 MainActivity.java（Java 代码），不能把编辑器正文当布局写盘
         // —— 否则 layout/activity_main.xml 里装的是 Java，aapt2 报 syntax error。
-        // 策略：非布局文档时先用一个探针布局跑一次收集，从收集结果里挑真正的布局文件。
+        // M192g：collectProjectRes 只按引用收集，不会把 layout/ 整目录带上，所以得自己列 layout 目录挑。
         const openRelNorm = (openRel || input.name || "").replace(/\\/g, "/");
         const relLayout = openRelNorm.match(/(?:^|\/)layout(?:-[^/]+)?\/(.+)\.xml$/i);
-        const PROBE = "__axv_pick.xml";
-        const PROBE_XML =
-          '<?xml version="1.0" encoding="utf-8"?>\n<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" />';
         const isLayoutDoc = docKind === "layout" && !!relLayout;
         let layout = isLayoutDoc && relLayout ? relLayout[1] : "";
-        const baseInput = isLayoutDoc ? input : { ...input, name: PROBE, xml: PROBE_XML };
-        const collected = await collectProjectRes(aiFileIo, openRel, buildRealRenderFiles(baseInput));
-        let files = collected.files;
+        let baseInput = input;
         if (!layout) {
-          // 优先取 Java 里 R.layout.xxx 引用的那个，否则 activity_main，再否则第一个
           const want = (xml.match(/R\.layout\.([A-Za-z_][A-Za-z0-9_]*)/) || [])[1] || "";
-          const names = [
-            ...new Set(
-              files
-                .map((f) => (f.path.match(/^layout(?:-[^/]+)?\/(.+)\.xml$/i) || [])[1])
-                .filter((x): x is string => !!x && x !== "__axv_pick"),
-            ),
-          ];
-          layout = want && names.includes(want) ? want : names.includes("activity_main") ? "activity_main" : names[0] || "";
-          if (!layout) {
+          const picked = await pickProjectLayout(aiFileIo, openRel, want);
+          if (!picked) {
             setApkResult({
               ok: false,
               step: "compile",
@@ -2407,8 +2396,12 @@ const allDrawableNames = useMemo(() => {
             setExportNote(tt("打包失败：{msg}", { msg: "compile" }));
             return;
           }
-          files = files.filter((f) => !/^layout(-[^/]+)?\/__axv_pick\.xml$/i.test(f.path));
+          layout = picked.name;
+          // 把真实布局内容当成当前文档送去收集（否则 layout/ 里根本没有这个文件）
+          baseInput = { ...input, name: picked.rel, xml: picked.text };
         }
+        const collected = await collectProjectRes(aiFileIo, openRel, buildRealRenderFiles(baseInput));
+        const files = collected.files;
         setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
         // M192e：与真机渲染用同一套洗法（补占位、去重、include 命名空间…）
         // 不洗直接打包的话，aapt2 会在 layout 上报 syntax error

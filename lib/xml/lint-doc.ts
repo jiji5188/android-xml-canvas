@@ -106,11 +106,8 @@ function lintManifest(xml: string, starts: number[]): LintIssue[] {
       });
     }
     if (!/\bpackage\s*=/.test(open)) {
-      out.push({
-        line: at(doc.manifest.from),
-        level: "warn",
-        message: "<manifest> 没有 package：AGP 8 用 namespace 兜底，但老项目/第三方 SDK 会找它",
-      });
+      // M194：不再报「没有 package」—— AGP 8+ 用 build.gradle 的 namespace 就够，
+      // 我们自己的打包/真机渲染也不读它；对用户只是噪音（列为「问题」更误导）
     }
   }
 

@@ -2240,6 +2240,32 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** M192e：compile 失败时把 layout 文件开头几行抓进日志，看得到到底是哪里写坏了 */
+    private static void dumpLayoutHeads(File resDir, StringBuilder log) {
+        try {
+            File[] dirs = resDir.listFiles();
+            if (dirs == null) return;
+            int shown = 0;
+            for (File d : dirs) {
+                if (!d.isDirectory() || !d.getName().startsWith("layout")) continue;
+                File[] xs = d.listFiles();
+                if (xs == null) continue;
+                for (File x : xs) {
+                    if (shown >= 4) return;
+                    String text = new String(java.nio.file.Files.readAllBytes(x.toPath()), "UTF-8");
+                    String head = text.length() > 400 ? text.substring(0, 400) : text;
+                    log.append("--- ").append(d.getName()).append('/').append(x.getName())
+                            .append(" (").append(text.length()).append(" 字符) ---\n")
+                            .append(head.replace("\r", "\\r")).append("\n");
+                    if (text.startsWith("\uFEFF")) log.append("⚠ 文件带 BOM\n");
+                    shown++;
+                }
+            }
+        } catch (Throwable t) {
+            log.append("读 layout 失败: ").append(t.getMessage()).append('\n');
+        }
+    }
+
     /** 跑一次 aapt2，输出全部收进 log；返回 exit code */
     private static int runAapt2(File bin, File cwd, String[] args, StringBuilder log) throws Exception {
         String[] cmd = new String[args.length + 1];
@@ -2521,7 +2547,10 @@ public class MainActivity extends Activity {
             File compiled = new File(root, "compiled.zip");
             int c1 = runAapt2(bin, root, new String[] { "compile", "--dir", resDir.getAbsolutePath(),
                     "-o", compiled.getAbsolutePath() }, log);
-            if (c1 != 0) return jsonFail("compile", log);
+            if (c1 != 0) {
+                dumpLayoutHeads(resDir, log);
+                return jsonFail("compile", log);
+            }
             File unsigned = new File(root, "unsigned.apk");
             int c2 = runAapt2(bin, root, new String[] { "link", "-o", unsigned.getAbsolutePath(),
                     "-I", fw.getAbsolutePath(),

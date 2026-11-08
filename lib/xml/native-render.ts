@@ -300,39 +300,35 @@ export function withPlaceholders(files: RenderFile[], missing: string[]): Render
  * 把 res 文件丢给原生编译 + 渲染。
  * @param layoutName 布局名（不带 .xml），必须是 files 里 layout/<name>.xml 的那个
  */
-export function renderReal(
+/**
+ * M192e：把「收集到的 res 文件清单」洗成「能直接喂 aapt2 的清单」。
+ *
+ * 真机渲染与「打包 APK」走的是同一套 prepare：base64 洗坏图片、缺失资源补占位、
+ * 重名资源去重、adaptive-icon 归位、include 命名空间纠正。以前这些只写在 renderReal
+ * 里，打包时直接拿 collectProjectRes 的原始结果 → aapt2 在 layout 上报 syntax error。
+ */
+export function prepareFiles(
   layoutName: string,
   files: RenderFile[],
-  timeoutMs = 25000,
-): Promise<RealRenderResult> {
-  const b = bridge();
-  if (!b || typeof b.renderReal !== "function") {
-    return Promise.resolve({ ok: false, log: "当前环境不支持真机渲染（网页版 / 旧 APK）" });
-  }
+): { files: RenderFile[]; blocked?: string } {
   const name = layoutName.replace(/\.xml$/i, "");
   const list = renderableFiles(files);
   if (!list.some((f) => f.path === `layout/${name}.xml`)) {
-    return Promise.resolve({ ok: false, log: `文件清单里没有 layout/${name}.xml` });
+    return { files: [], blocked: `文件清单里没有 layout/${name}.xml` };
   }
-  // M156：先查布局里引用的 @string/@color… 在不在文件清单里。
-  // 不查的话设备端 aapt2 只会丢一句 "resource string/xxx not found"，看不出是「没定义」还是「没上传」。
   const missing = unresolvedRefs(list, name);
-  // M159：现在收集阶段会给缺失资源生成占位（能编译），所以这里不再“发现缺失就不让渲染”，
-  // 否则永远卡在资源检查、根本看不到真实效果。只有确实无法造假的二进制资源才拦。
   const hard = missing.filter((m) => /^(font|interpolator)\//.test(m));
   if (hard.length > 0) {
-    return Promise.resolve({
-      ok: false,
-      stage: "资源检查",
-      log:
+    return {
+      files: [],
+      blocked:
         `布局引用了 ${hard.length} 个无法自动占位的资源：${hard.slice(0, 8).join("、")}` +
         (hard.length > 8 ? " …" : "") +
         "。字体/插值器需要真实的二进制文件，请把对应 res 目录上传。",
-    });
+    };
   }
-  install();
   // M161：先洗一遍 base64，洗坏的 png 直接丢掉，改由 withPlaceholders 出透明占位，
-  // 否则设备端写出 0 字节 png，aapt2 compile 直接失败（20:14 那份日志）
+  // 否则设备端写出 0 字节 png，aapt2 compile 直接失败
   const cleaned: RenderFile[] = [];
   const broken: string[] = [];
   for (const f of list) {
@@ -346,7 +342,6 @@ export function renderReal(
       if (m) broken.push(`${m[1]}/${m[3]}`);
       continue;
     }
-    // M162：扩展名和真实内容对不上就按内容改名（jpg 存成 .png 是常见事）
     const em = f.path.match(/^(.*)\.(png|webp|jpg|jpeg)$/i);
     if (em) {
       const kind = sniffImageKind(v);
@@ -366,30 +361,37 @@ export function renderReal(
     cleaned.push({ ...f, base64: v });
   }
   const missingAll = broken.length ? [...new Set([...missing, ...broken])] : missing;
-  // M166：项目自己的 values 文件和 res_values.xml（工具合并落地）里同名资源会撞 aapt2 的
-  // “duplicate value”（如 color/primary 在 colors.xml 和 res_values.xml 各定义一次）。
-  // 发设备前按「项目优先」把 res_values.xml 里的重复项去掉，全被覆盖就整份丢掉。
   let filled = withPlaceholders(cleaned, missingAll);
   const projectDefs = new Set<string>();
   for (const f of filled) {
     if (f.path === "values/res_values.xml" || !/^values(\/|$)/.test(f.path) || !/\.xml$/i.test(f.path) || !f.text) continue;
-    // 收集除 res_values.xml 外所有 values 文件里定义的资源名，作为去重基准
-    // 这里直接用 res-collect 的导出，不重写正则
     for (const k of definedValueKeys(f.text)) projectDefs.add(k);
   }
   filled = dedupeValuesFiles(filled, projectDefs);
-  // M170：同名同目录（drawable/x.xml 与 drawable/x.png）会让 link 报 duplicate value
   filled = dedupeSameNameRes(filled);
-  // M170：adaptive-icon 摆错目录 → link 报 require sdk >= 26
   filled = relocateAdaptiveIcons(filled);
-  // M169b：所有发下去的布局文本再过一道 include 命名空间纠正。
-  // 目标布局已经过 exportLayoutXml（serialize 里会去前缀），但从项目磁盘直接补进来的
-  // 被 include 的子布局（collectProjectRes 按原文读）可能还是 android:layout="@layout/x"，
-  // 真机 LayoutInflater.parseInclude 用 getAttributeResourceValue(null, "layout", 0) 取
-  // ——带前缀就取到 0，直接抛 You must specify a layout in the include tag。
   filled = filled.map((f) =>
     f.text && /^layout(-[^/]+)?\//.test(f.path) ? { ...f, text: fixIncludeLayoutNs(f.text) } : f,
   );
+  return { files: filled };
+}
+
+export function renderReal(
+  layoutName: string,
+  files: RenderFile[],
+  timeoutMs = 25000,
+): Promise<RealRenderResult> {
+  const b = bridge();
+  if (!b || typeof b.renderReal !== "function") {
+    return Promise.resolve({ ok: false, log: "当前环境不支持真机渲染（网页版 / 旧 APK）" });
+  }
+  const name = layoutName.replace(/\.xml$/i, "");
+  const prep = prepareFiles(name, files);
+  if (prep.blocked) {
+    return Promise.resolve({ ok: false, stage: "资源检查", log: prep.blocked });
+  }
+  const filled = prep.files;
+  install();
   seq += 1;
   const id = `r${Date.now().toString(36)}${seq}`;
   return new Promise<RealRenderResult>((resolve) => {

@@ -76,7 +76,7 @@ import {
 import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/xml/new-project-io";
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
-import { hasRealRender, renderReal } from "@/lib/xml/native-render";
+import { hasRealRender, renderReal, prepareFiles } from "@/lib/xml/native-render";
 import { buildApk, hasBuildApk, installApk, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
@@ -2377,11 +2377,19 @@ const allDrawableNames = useMemo(() => {
       try {
         const collected = await collectProjectRes(aiFileIo, openRel, buildRealRenderFiles(input));
         setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
+        // M192e：与真机渲染用同一套洗法（补占位、去重、include 命名空间…）
+        // 不洗直接打包的话，aapt2 会在 layout 上报 syntax error
+        const prep = prepareFiles(layout, collected.files);
+        if (prep.blocked) {
+          setApkResult({ ok: false, step: "compile", log: prep.blocked });
+          setExportNote(tt("打包失败：{msg}", { msg: "compile" }));
+          return;
+        }
         const r = await buildApk({
           pkg,
           layout,
           appName: signAppName || layout,
-          files: collected.files,
+          files: prep.files,
           keystore,
           storePass: o.storePass,
           alias: o.alias,

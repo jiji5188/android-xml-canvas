@@ -10373,10 +10373,18 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   padding: 6px 8px;
   border-bottom: 1px solid var(--axv-outline);
   flex: 0 0 auto;
+  /* M183b：窄栏横向滚动，不挤成小方块 */
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  scrollbar-width: thin;
 }
+.axv-rp-tabs::-webkit-scrollbar { height: 4px; }
+.axv-rp-tabs::-webkit-scrollbar-thumb { background: var(--axv-outline); border-radius: 2px; }
 
 .axv-rp-tab {
-  flex: 1;
+  flex: 0 0 auto;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -10533,4 +10541,31 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   color: var(--axv-on-surface-variant);
   font-size: 12px;
   line-height: 1.6;
+}
+
+/* M183b：资源面板真实缩略图 / 色块 */
+.axv-rp-thumb {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: rgba(140, 140, 160, 0.1);
+}
+
+.axv-rp-thumb-ph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--axv-on-surface-variant);
+}
+
+.axv-rp-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  flex: 0 0 auto;
 }

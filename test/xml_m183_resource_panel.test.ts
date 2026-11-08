@@ -99,8 +99,9 @@ describe("iconFileTab", () => {
 
 describe("valuePreview", () => {
   it("颜色带回色块，长文本截断", () => {
-    expect(valuePreview("#0B5FA5")).toEqual({ text: "#0B5FA5", color: "#0B5FA5" });
-    expect(valuePreview("#0B5FA5FF").color).toBe("#0B5FA5FF");
+    expect(valuePreview("#0B5FA5")).toEqual({ text: "#0B5FA5", color: "#0b5fa5" });
+    // M183b：8 位是 Android 的 AARRGGBB（FF A 不透明 → rgb）
+    expect(valuePreview("#FF0B5FA5").color).toBe("rgb(11, 95, 165)");
     const long = valuePreview("a".repeat(50));
     expect(long.text.endsWith("…")).toBe(true);
   });

@@ -113,10 +113,91 @@ export function iconFileTab(rel: string, name: string): "icon" | "other" {
   return "other";
 }
 
+/**
+ * Android 颜色字面量 → CSS 颜色。支持 #RGB / #ARGB / #RRGGBB / #AARRGGBB。
+ * 注意 Android 的 8 位是 AARRGGBB（透明度在前），CSS 是 RRGGBBAA（在后），必须换算。
+ * 认不出返回 null。
+ */
+export function androidColorToCss(v: string): string | null {
+  const s = v.trim();
+  const m = /^#([0-9a-fA-F]{3,8})$/.exec(s);
+  if (!m) return null;
+  let hex = m[1];
+  const toRgba = (r: string, g: string, b: string, a?: string) => {
+    const ri = parseInt(r, 16);
+    const gi = parseInt(g, 16);
+    const bi = parseInt(b, 16);
+    const ai = a ? parseInt(a, 16) / 255 : 1;
+    return ai >= 1
+      ? `rgb(${ri}, ${gi}, ${bi})`
+      : `rgba(${ri}, ${gi}, ${bi}, ${Math.round(ai * 1000) / 1000})`;
+  };
+  if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
+  if (hex.length === 4) {
+    // #ARGB
+    return toRgba(hex[1] + hex[1], hex[2] + hex[2], hex[3] + hex[3], hex[0] + hex[0]);
+  }
+  if (hex.length === 6) return "#" + hex.toLowerCase();
+  if (hex.length === 8) {
+    // #AARRGGBB
+    return toRgba(hex.slice(2, 4), hex.slice(4, 6), hex.slice(6, 8), hex.slice(0, 2));
+  }
+  return null;
+}
+
+/**
+ * 值 → 真实 CSS 颜色：`@color/xxx` 顺着 map（颜色名 → 原值）解析，最多追 4 层；
+ * 字面量直接换算。解析不了返回 null。
+ */
+export function resolveColorCss(
+  value: string,
+  map?: Map<string, string> | null,
+  depth = 0,
+): string | null {
+  const v = (value || "").trim();
+  // 系统色先查（@android:color/white），再走项目引用
+  const sys = /^@android:color\/(\w+)$/.exec(v);
+  if (sys) return CSS_NAMED(sys[1]);
+  const ref = /^@(?:[\w.]+:)?color\/([\w.]+)$/.exec(v);
+  if (ref) {
+    if (!map || depth > 4) return null;
+    const next = map.get(ref[1]);
+    return next === undefined ? null : resolveColorCss(next, map, depth + 1);
+  }
+  if (/^[a-zA-Z]+$/.test(v)) return CSS_NAMED(v);
+  return androidColorToCss(v);
+}
+
+const SYS_COLORS: Record<string, string> = {
+  black: "#000000",
+  white: "#ffffff",
+  transparent: "rgba(0, 0, 0, 0)",
+  red: "#ff0000",
+  green: "#00ff00",
+  blue: "#0000ff",
+  yellow: "#ffff00",
+  cyan: "#00ffff",
+  magenta: "#ff00ff",
+  gray: "#808080",
+  grey: "#808080",
+  darkgray: "#a9a9a9",
+  lightgray: "#d3d3d3",
+  holo_blue_dark: "#0099cc",
+  holo_blue_light: "#33b5e5",
+  holo_green_dark: "#669900",
+  holo_green_light: "#99cc00",
+  holo_red_dark: "#cc0000",
+  holo_red_light: "#ff4444",
+};
+
+function CSS_NAMED(name: string): string | null {
+  return SYS_COLORS[name.toLowerCase()] ?? (typeof CSS !== "undefined" && CSS.supports?.("color", name) ? name : null);
+}
+
 /** 一行值显示：颜色带色块，字符串截断 */
 export function valuePreview(v: string): { text: string; color?: string } {
-  const m = /^#([0-9a-f]{6,8})$/i.exec(v.trim());
-  if (m) return { text: v, color: v };
+  const css = androidColorToCss(v);
+  if (css) return { text: v, color: css };
   if (v.length > 24) return { text: v.slice(0, 24) + "…" };
   return { text: v };
 }

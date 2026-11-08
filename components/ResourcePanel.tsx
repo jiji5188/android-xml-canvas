@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t } from "@/lib/i18n-src";
 import {
   groupValuesByResource,
+  resolveColorCss,
   splitGroupsByTab,
   valuePreview,
   type ResTab,
@@ -28,6 +29,7 @@ import {
   type ProjectSource,
 } from "@/lib/xml/project-browse";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
+import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 
 export interface ResourcePanelProps {
   /** 项目文件源（扫描用；没有就只显示草稿 tab） */
@@ -51,6 +53,41 @@ const FILE_CAP = 40;
 const ITEM_CAP = 900;
 const RES_DIR_DEPTH_CAP = 6;
 
+/** 密度目录优先级：自适应图标 xml > 高密度位图 */
+const DENSITY_RANK: Record<string, number> = {
+  ldpi: 1,
+  mdpi: 2,
+  hdpi: 3,
+  xhdpi: 4,
+  xxhdpi: 5,
+  xxxhdpi: 6,
+  nodpi: 7,
+  anydpi: 8,
+};
+
+/** 同名资源跨密度去重：留最高优先的那份，并记一份数量 */
+function dedupeIcons(list: BrowseEntry[]): Array<{ entry: BrowseEntry; copies: number }> {
+  const best = new Map<string, { entry: BrowseEntry; score: number; copies: number }>();
+  for (const e of list) {
+    const base = (e.name || "").replace(/\.(png|webp|jpe?g|gif|bmp|xml)$/i, "");
+    const dir = (e.rel || "").split("/").slice(-2, -1)[0] || "";
+    const m = /[-_](\w+)$/.exec(dir);
+    const dens = m ? DENSITY_RANK[m[1].toLowerCase()] ?? 0 : 0;
+    const isAdaptive = /\.xml$/i.test(e.name || "") ? 1 : 0;
+    const score = isAdaptive * 100 + dens;
+    const cur = best.get(base);
+    if (!cur) best.set(base, { entry: e, score, copies: 1 });
+    else {
+      cur.copies += 1;
+      if (score > cur.score) {
+        cur.score = score;
+        cur.entry = e;
+      }
+    }
+  }
+  return [...best.values()].map((x) => ({ entry: x.entry, copies: x.copies }));
+}
+
 const RES_TABS: Array<{ key: ResTab; label: string; hint: string }> = [
   { key: "draft", label: t("草稿"), hint: t("还没写进项目的资源") },
   { key: "icon", label: t("图标"), hint: t("mipmap 与 drawable") },
@@ -66,20 +103,56 @@ function resDirOf(rel: string): string {
   return i >= 0 ? segs[i + 1] || "" : "";
 }
 
+/** 真实缩略图：图片读原图，vector xml 现场转 svg data url，其余给占位图标 */
+function IconThumb({ entry, source }: { entry: BrowseEntry; source: ProjectSource | null }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const name = entry.name || "";
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      let u: string | null = null;
+      try {
+        if (IMAGE_EXT_RE.test(name)) {
+          u = await readEntryImageUrl(entry);
+        } else if (/\.xml$/i.test(name) && source && entry.rel) {
+          const xml = await source.readText(entry.rel);
+          if (xml) u = vectorToDataUrl(xml);
+        }
+      } catch {
+        u = null;
+      }
+      if (!dead) setUrl(u);
+    })();
+    return () => {
+      dead = true;
+    };
+  }, [entry, name, source]);
+  if (url) return <img className="axv-rp-thumb" src={url} alt="" />;
+  return (
+    <span className="msr axv-rp-thumb axv-rp-thumb-ph" aria-hidden="true">
+      {IMAGE_EXT_RE.test(name) ? "image" : "code"}
+    </span>
+  );
+}
+
 /** 值条目：可就地改（双击值）、双击整行打开源文件 */
 function ValueRow({
   g,
   onPatch,
   onOpenFile,
+  colorMap,
 }: {
   g: ValueGroup;
   onPatch(rel: string, item: ValueItem, v: string): void;
   onOpenFile(rel: string, line?: number): void;
+  colorMap?: Map<string, string> | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const first = g.variants[0];
-  const pv = valuePreview(first?.items[0]?.item.value ?? "");
+  const raw = first?.items[0]?.item.value ?? "";
+  const pv = valuePreview(raw);
+  const swatch = resolveColorCss(raw, colorMap) ?? pv.color ?? null;
   const startEdit = () => {
     setDraft(first?.items[0]?.item.value ?? "");
     setEditing(true);
@@ -99,7 +172,7 @@ function ValueRow({
       <span className="axv-rp-name" title={g.name}>
         {g.name}
       </span>
-      {pv.color ? <span className="axv-rp-swatch" style={{ background: pv.color }} aria-label={pv.color} /> : null}
+      {swatch ? <span className="axv-rp-swatch" style={{ background: swatch }} aria-label={swatch} /> : null}
       {g.variants.length > 1 ? (
         <span className="axv-rp-varcount" title={t("同名的限定符副本")}>
           {g.variants.length}
@@ -275,6 +348,16 @@ export function ResourcePanel(props: ResourcePanelProps) {
   const colorGroups = color;
   const otherGroups = other;
 
+  /** 颜色名 → 原值（@color/xxx 引用解析用） */
+  const colorMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const g of colorGroups) {
+      const v = g.variants[0]?.items[0]?.item.value;
+      if (v !== undefined) m.set(g.name, v);
+    }
+    return m;
+  }, [colorGroups]);
+
   /** 就地改值：改当前值（写回原文件，只替换值区间，不动注释/顺序） */
   const patchValue = useCallback(
     async (rel: string, item: ValueItem, next: string) => {
@@ -338,7 +421,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
   const filter = <T,>(arr: T[], hasName: (x: T) => string): T[] =>
     !q ? arr : arr.filter((x) => hasName(x).toLowerCase().includes(q.toLowerCase()));
 
-  const iconList = filter(iconFiles, (f) => f.name || "");
+  const iconList = dedupeIcons(filter(iconFiles, (f) => f.name || ""));
   const textList = filter(textGroups, (g) => g.name);
   const colorList = filter(colorGroups, (g) => g.name);
   const otherList: Array<{ kind: "file"; entry: BrowseEntry } | { kind: "group"; group: ValueGroup }> = [
@@ -348,7 +431,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
 
   const tabCounts: Record<ResTab, number> = {
     draft: Object.keys(assets).length,
-    icon: iconFiles.length,
+    icon: iconList.length,
     text: textGroups.length,
     color: colorGroups.length,
     other: otherFiles.length + otherGroups.length,
@@ -390,23 +473,34 @@ export function ResourcePanel(props: ResourcePanelProps) {
           </div>
           {draftEntries.length === 0 ? (
             <div className="axv-rp-empty">
-              t("草稿区空着。新建图标 / 新建 drawable 生成后会出现在这里，写进项目就自动转到对应 tab。")
+              {t("草稿区空着。新建图标 / 新建 drawable 生成后会出现在这里，写进项目就自动转到对应 tab。")}
             </div>
           ) : (
-            draftEntries.map(([name, xml]) => (
-              <div
-                key={name}
-                className="axv-rp-row"
-                onDoubleClick={() => {
-                  if (/<vector[\s>]/.test(xml)) onEditIcon(name, xml);
-                  else onEditShape(name, xml);
-                }}
-                title={t("双击打开编辑器")}
-              >
-                <span className="axv-rp-name">{name}</span>
-                <span className="axv-rp-kind">{/<vector[\s>]/.test(xml) ? "vector" : "shape"}</span>
-              </div>
-            ))
+            draftEntries.map(([name, xml]) => {
+              const isVector = /<vector[\s>]/.test(xml);
+              const u = isVector ? vectorToDataUrl(xml) : null;
+              return (
+                <div
+                  key={name}
+                  className="axv-rp-row"
+                  onDoubleClick={() => {
+                    if (isVector) onEditIcon(name, xml);
+                    else onEditShape(name, xml);
+                  }}
+                  title={t("双击打开编辑器")}
+                >
+                  {u ? (
+                    <img className="axv-rp-thumb" src={u} alt="" />
+                  ) : (
+                    <span className="msr axv-rp-thumb axv-rp-thumb-ph" aria-hidden="true">
+                      {isVector ? "star" : "square"}
+                    </span>
+                  )}
+                  <span className="axv-rp-name">{name}</span>
+                  <span className="axv-rp-kind">{isVector ? "vector" : "shape"}</span>
+                </div>
+              );
+            })
           )}
         </div>
       )}
@@ -416,18 +510,17 @@ export function ResourcePanel(props: ResourcePanelProps) {
           {iconList.length === 0 ? (
             <div className="axv-rp-empty">{scanned ? t("项目里没有 mipmap/drawable 文件") : t("先打开一个项目")}</div>
           ) : (
-            iconList.slice(0, ITEM_CAP).map((it) => (
+            iconList.slice(0, ITEM_CAP).map(({ entry: it, copies }) => (
               <button
                 key={it.rel}
                 type="button"
                 className="axv-rp-file"
                 onClick={() => void clickIconFile(it)}
-                title={(it.name || "") + " · " + t("双击编辑")}
+                title={(it.name || "") + (copies > 1 ? ` (${copies} 份密度副本)` : "") + " · " + t("双击编辑")}
               >
-                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>
-                  {/\.(png|webp|jpe?g|gif|bmp)$/i.test(it.name || "") ? "image" : "code"}
-                </span>
+                <IconThumb entry={it} source={source ?? null} />
                 <span className="axv-rp-file-name">{it.name}</span>
+                {copies > 1 ? <span className="axv-rp-varcount">{copies}</span> : null}
                 <span className="axv-rp-file-rel">{it.rel}</span>
               </button>
             ))
@@ -441,7 +534,13 @@ export function ResourcePanel(props: ResourcePanelProps) {
             <div className="axv-rp-empty">{scanned ? t("项目里没有字符串资源") : t("先打开一个项目")}</div>
           ) : (
             textList.slice(0, ITEM_CAP).map((g) => (
-              <ValueRow key={"t" + g.name} g={g} onPatch={(rel, item, v) => void patchValue(rel, item, v)} onOpenFile={onOpenFile} />
+              <ValueRow
+                key={"t" + g.name}
+                g={g}
+                colorMap={colorMap}
+                onPatch={(rel, item, v) => void patchValue(rel, item, v)}
+                onOpenFile={onOpenFile}
+              />
             ))
           )}
         </div>
@@ -453,7 +552,13 @@ export function ResourcePanel(props: ResourcePanelProps) {
             <div className="axv-rp-empty">{scanned ? t("项目里没有颜色资源") : t("先打开一个项目")}</div>
           ) : (
             colorList.slice(0, ITEM_CAP).map((g) => (
-              <ValueRow key={"c" + g.name} g={g} onPatch={(rel, item, v) => void patchValue(rel, item, v)} onOpenFile={onOpenFile} />
+              <ValueRow
+                key={"c" + g.name}
+                g={g}
+                colorMap={colorMap}
+                onPatch={(rel, item, v) => void patchValue(rel, item, v)}
+                onOpenFile={onOpenFile}
+              />
             ))
           )}
         </div>
@@ -475,7 +580,13 @@ export function ResourcePanel(props: ResourcePanelProps) {
                 </button>
               );
             return (
-              <ValueRow key={"g" + i} g={o.group} onPatch={(rel, item, v) => void patchValue(rel, item, v)} onOpenFile={onOpenFile} />
+              <ValueRow
+                key={"g" + i}
+                g={o.group}
+                colorMap={colorMap}
+                onPatch={(rel, item, v) => void patchValue(rel, item, v)}
+                onOpenFile={onOpenFile}
+              />
             );
           })}
         </div>

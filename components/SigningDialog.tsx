@@ -10,6 +10,8 @@ import { validateSigning, readSigningFromGradle, applySigningToGradle, type Sign
 export interface SigningDialogProps {
   /** 读项目里 app/build.gradle（没有就 null） */
   gradleText: string | null;
+  /** M188b：当前项目没有可写根（网页版没选目录 / 示例项目）→ 写入先进 localStorage 草稿 */
+  rootMissing?: boolean;
   /** 写回（成功后弹层关闭 + 提示）；返回 true 成功 */
   onWriteGradle: (next: string) => Promise<boolean>;
   onClose: () => void;
@@ -28,7 +30,7 @@ const EMPTY: SigningParams = {
   v3: true,
 };
 
-export function SigningDialog({ gradleText, onWriteGradle, onClose, onNote }: SigningDialogProps) {
+export function SigningDialog({ gradleText, rootMissing, onWriteGradle, onClose, onNote }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
   const [alias, setAlias] = useState(prefill?.alias || EMPTY.alias);
   const [keyPassword, setKeyPassword] = useState(prefill?.keyPassword || "");
@@ -129,10 +131,16 @@ export function SigningDialog({ gradleText, onWriteGradle, onClose, onNote }: Si
           </div>
         </div>
         {err && <div className="axv-sign-err" role="alert">{err}</div>}
-        {!prefill && !keyPassword && (
+        {rootMissing && !gradleText ? (
           <div className="axv-sign-hint">
-            {tt("注意：keystore 文件本身要手动生成（keytool）或后续版本自动补；这里先把配置写进 build.gradle")}
+            {tt("当前项目还没有可写目录：配置会先存到本地草稿，打开项目或选中保存目录后再点一次「写入」即可落盘到 build.gradle")}
           </div>
+        ) : (
+          !prefill && !keyPassword && (
+            <div className="axv-sign-hint">
+              {tt("注意：keystore 文件本身要手动生成（keytool）或后续版本自动补；这里先把配置写进 build.gradle")}
+            </div>
+          )
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 14, justifyContent: "flex-end" }}>
           <button type="button" onClick={onClose} disabled={busy}>{tt("取消")}</button>

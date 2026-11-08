@@ -81,13 +81,35 @@ describe("M185 底部抽屉", () => {
     expect(onGotoLine).toHaveBeenCalledWith(12);
   });
 
-  it("切到构建日志 tab：显示日志占位，不显示问题列表", async () => {
+  it("切到构建日志 tab：没有日志时显示空提示，不显示问题列表", async () => {
     const h = await mount(
       <ProblemsDrawer problems={[{ line: 1, msg: "a" }]} onGotoLine={() => {}} tr={tr} />,
     );
     await click(h, ".axv-drawer-bar");
     await click(h, ".axv-drawer-tab", 1);
-    expect(h.querySelector(".axv-drawer-log")).not.toBeNull();
+    expect(h.querySelector(".axv-drawer-empty")).not.toBeNull();
     expect(h.querySelector(".axv-drawer-list")).toBeNull();
+  });
+
+  it("M188b：给了 buildLogs 就渲染日志卡片（新在前、失败有标记）", async () => {
+    const h = await mount(
+      <ProblemsDrawer
+        problems={[]}
+        onGotoLine={() => {}}
+        tr={tr}
+        buildLogs={[
+          { id: "b", ok: false, stage: "真机渲染（link）", log: "boom", ms: 120 },
+          { id: "a", ok: true, stage: "真机渲染", log: "fine", ms: 88 },
+        ]}
+      />,
+    );
+    await click(h, ".axv-drawer-bar");
+    await click(h, ".axv-drawer-tab", 1);
+    const cards = [...h.querySelectorAll(".axv-drawer-logcard")];
+    expect(cards.length).toBe(2);
+    expect(cards[0].className).toContain("axv-drawer-logcard-err");
+    expect(cards[0].textContent).toContain("真机渲染（link）");
+    expect(cards[0].textContent).toContain("120ms");
+    expect(cards[1].textContent).toContain("88ms");
   });
 });

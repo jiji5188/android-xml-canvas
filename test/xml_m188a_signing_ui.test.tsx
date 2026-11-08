@@ -101,6 +101,14 @@ describe("M188a SigningDialog", () => {
     expect(html).toContain("keystore 文件本身要手动生成");
   });
 
+  it("rootMissing 时显示草稿提示", () => {
+    const h2 = renderToStaticMarkup(
+      <SigningDialog gradleText={null} rootMissing onWriteGradle={async () => true} onClose={() => {}} onNote={() => {}} />
+    );
+    expect(h2).toContain("本地草稿");
+    expect(h2).not.toContain("keystore 文件本身要手动生成");
+  });
+
   it("密码框是 password 类型", () => {
     expect(html).toContain('type="password"');
   });

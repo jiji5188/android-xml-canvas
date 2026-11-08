@@ -20,18 +20,31 @@ const TABS: DrawerTabDef[] = [
   { key: "build-log", label: "构建日志", icon: "terminal" }, // i18n-ignore
 ];
 
+/** M188b：一条构建日志（真机渲染等） */
+export interface BuildLogEntry {
+  id: string;
+  ok: boolean;
+  stage?: string;
+  ms?: number;
+  log?: string;
+  logFile?: string;
+  files?: number;
+  bytes?: number;
+}
+
 export interface ProblemsDrawerProps {
   /** 问题列表（空 = 收起时把手不显示红点） */
   problems: { line: number; msg: string }[];
   /** 点击某条问题 → 跳代码行 */
   onGotoLine: (line: number) => void;
+  /** M188b：构建日志列表（新在前）；没有就不显示小点 */
+  buildLogs?: BuildLogEntry[];
   tr: (key: string, fallback: string, vars?: Record<string, string | number>) => string;
 }
 
-export function ProblemsDrawer({ problems, onGotoLine, tr }: ProblemsDrawerProps) {
+export function ProblemsDrawer({ problems, onGotoLine, buildLogs, tr }: ProblemsDrawerProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<DrawerPanel>("problems");
-  const [logText, setLogText] = useState("");
 
   const n = problems.length;
   return (
@@ -51,6 +64,9 @@ export function ProblemsDrawer({ problems, onGotoLine, tr }: ProblemsDrawerProps
         <span className="msr axv-drawer-chevron" aria-hidden="true">
           {open ? "expand_less" : "expand_more"}
         </span>
+        {buildLogs && buildLogs.length > 0 ? (
+          <span className="axv-drawer-logdot" title={tr("drawer.log.has", "有构建日志")} />
+        ) : null}
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -68,6 +84,9 @@ export function ProblemsDrawer({ problems, onGotoLine, tr }: ProblemsDrawerProps
             </span>
             {tr("drawer.tab." + t.key, t.label)}
             {t.key === "problems" && n > 0 ? <span className="axv-drawer-badge">{n}</span> : null}
+            {t.key === "build-log" && buildLogs && buildLogs.length > 0 ? (
+              <span className="axv-drawer-badge axv-drawer-badge-log" aria-hidden="true" />
+            ) : null}
           </button>
         ))}
       </div>
@@ -96,13 +115,27 @@ export function ProblemsDrawer({ problems, onGotoLine, tr }: ProblemsDrawerProps
               </ul>
             )
           ) : (
-            /* 构建日志：先给个容器 + 占位（M185 构建功能接入时填 logText） */
-            <textarea
-              className="axv-drawer-log"
-              readOnly
-              value={logText || tr("drawer.log.empty", "暂无构建日志。")}
-              onChange={(e) => setLogText(e.target.value)}
-            />
+            /* M188b：构建日志（真机渲染 pipeline 的结构化输出） */
+            buildLogs && buildLogs.length > 0 ? (
+              <div className="axv-drawer-logwrap">
+                {buildLogs.slice(0, 20).map((l) => (
+                  <details
+                    key={l.id}
+                    className={"axv-drawer-logcard" + (l.ok ? "" : " axv-drawer-logcard-err")}
+                  >
+                    <summary>
+                      <span className="axv-drawer-logdot" aria-hidden="true" />
+                      {l.stage || tr("drawer.log.render", "真机渲染")}
+                      {typeof l.ms === "number" ? " · " + l.ms + "ms" : ""}
+                      {l.ok ? "" : " · " + tr("drawer.log.fail", "失败")}
+                    </summary>
+                    <pre className="axv-drawer-log">{l.log || l.logFile || ""}</pre>
+                  </details>
+                ))}
+              </div>
+            ) : (
+              <div className="axv-drawer-empty">{tr("drawer.log.empty", "暂无构建日志。")}</div>
+            )
           )}
         </div>
       ) : null}

@@ -2268,9 +2268,13 @@ const allDrawableNames = useMemo(() => {
     setAutoNotes([]);
   };
 
-  /** M188a：签名与发布配置弹层（读写项目里的 app/build.gradle） */
+  /** M188a：签名与发布配置弹层（读写项目里的 app/build.gradle）
+   *  M188b：放宽为只要有 activeProject 就能打开；没可写根时配置先暂存 localStorage，
+   *  用户保存项目后可再点一次「写入 build.gradle」真正落盘 */
   const [signDialogOpen, setSignDialogOpen] = useState(false);
   const [gradleForSign, setGradleForSign] = useState<string | null>(null);
+  const [signRootMissing, setSignRootMissing] = useState(false);
+  const LS_KEY_SIGN_DRAFT = "axv.signing.draft";
   const openSignDialog = useCallback(async () => {
     const root = projectSaveRoot(activeProject);
     let txt: string | null = null;
@@ -2279,15 +2283,38 @@ const allDrawableNames = useMemo(() => {
         const bridge = (window as unknown as { __axvBridge?: { readText?: (p: string) => Promise<string> } }).__axvBridge;
         if (bridge?.readText) txt = await bridge.readText(`${root.base}/app/build.gradle`);
       } catch { /* 没有该文件 */ }
+    } else if (root && root.kind === "handle") {
+      try {
+        // 网页版目录句柄：项目源自带 readText（ai-fs 包装的 ProjectSource）
+        const src = (activeProject as { source?: { readText?: (rel: string) => Promise<string> } } | null)?.source;
+        if (src?.readText) txt = await src.readText("app/build.gradle");
+      } catch { txt = null; }
+    }
+    // 没有可写根时，读 localStorage 里的草稿
+    const missing = !root;
+    if (missing && !txt) {
+      try {
+        const draft = window.localStorage.getItem(LS_KEY_SIGN_DRAFT);
+        if (draft) txt = draft;
+      } catch { /* ignore */ }
     }
     setGradleForSign(txt);
+    setSignRootMissing(missing);
     setSignDialogOpen(true);
   }, [activeProject]);
   const writeGradleForSign = useCallback(
     async (next: string) => {
       const root = projectSaveRoot(activeProject);
-      if (!root) return false;
-      return saveProjectFile(root, "app/build.gradle", next);
+      if (!root) {
+        // 没可写根：配置存草稿，提示用户保存项目后再写
+        try { window.localStorage.setItem(LS_KEY_SIGN_DRAFT, next); } catch { /* ignore */ }
+        return true;
+      }
+      const ok = await saveProjectFile(root, "app/build.gradle", next);
+      if (ok) {
+        try { window.localStorage.removeItem(LS_KEY_SIGN_DRAFT); } catch { /* ignore */ }
+      }
+      return ok;
     },
     [activeProject],
   );
@@ -3413,6 +3440,20 @@ const findResolved = findResolvedNode;
   /** M154：真机渲染——把当前 xml + 依赖资源交给设备端 aapt2 现场编译，
    *  再用系统 LayoutInflater 渲染（不是 CSS 模拟，能对照出 canvas 的偏差）。
    *  M158：编译前先从项目 res 里按引用递归补齐（资源列表里有的文件，之前没进文件清单）。 */
+  /** M188b：构建日志（真机渲染 pipeline，新在前），给底部抽屉「构建日志」tab */
+  const [buildLogs, setBuildLogs] = useState<
+    {
+      id: string;
+      ok: boolean;
+      stage?: string;
+      ms?: number;
+      log?: string;
+      logFile?: string;
+      files?: number;
+      bytes?: number;
+    }[]
+  >([]);
+
   const doRealRender = () => {
     if (realRenderBusy) return;
     const input = currentSaveInput();
@@ -3434,6 +3475,23 @@ const findResolved = findResolvedNode;
       })
       .then((r) => {
         setRealRenderBusy(false);
+        setBuildLogs((prev) =>
+          [
+            {
+              id: String(Date.now()),
+              ok: !!r.ok,
+              stage: r.ok
+                ? tt("真机渲染")
+                : tt("真机渲染（{stage}）", { stage: r.stage || tt("未知") }),
+              ms: r.ms,
+              log: r.log,
+              logFile: r.logFile,
+              files: r.files,
+              bytes: r.bytes,
+            },
+            ...prev,
+          ].slice(0, 20),
+        );
         if (r.ok) {
           setExportNote(
             tt("真机渲染：{n} 个文件 → 资源包 {kb} KB（编译 {ms} ms），已打开真控件预览\n日志：{log}", {
@@ -4464,10 +4522,11 @@ const findResolved = findResolvedNode;
         </div>
       ) : null}
 
-      {/* M185：通用底部抽屉（ROADMAP L0.5-22）：Problems 先接现有 lints，构建日志后续填 */}
+      {/* M185：通用底部抽屉（ROADMAP L0.5-22）：Problems 先接现有 lints，M188b 构建日志 */}
       <ProblemsDrawer
         problems={(lints ?? []).map((l) => ({ line: l.line ?? 1, msg: l.message }))}
         onGotoLine={(ln) => gotoLine(ln)}
+        buildLogs={buildLogs}
         tr={tr}
       />
       {/* M101：代码面板也要看得到 toast（exportNote 的汉堡包在 CanvasStage，代码 tab 看不到） */}
@@ -4804,7 +4863,7 @@ const findResolved = findResolvedNode;
         onHistory={() => setHistPanelOpen(true)}
         snapCount={snapCount}
         onSign={openSignDialog}
-        canSign={!!projRoot}
+        canSign
       />
       </div>
 
@@ -5095,6 +5154,7 @@ const findResolved = findResolvedNode;
       {signDialogOpen && (
         <SigningDialog
           gradleText={gradleForSign}
+          rootMissing={signRootMissing}
           onWriteGradle={writeGradleForSign}
           onClose={() => setSignDialogOpen(false)}
           onNote={(m, ms = 2400) => {

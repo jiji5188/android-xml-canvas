@@ -10943,3 +10943,50 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   color: #fff;
   cursor: pointer;
 }
+
+
+/* M188b 构建日志抽屉条目 */
+.axv-drawer-logwrap {
+  max-height: 100%;
+  overflow: auto;
+  padding: 4px 10px 8px;
+}
+.axv-drawer-logcard {
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  margin: 4px 0;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--axv-surface) 80%, transparent);
+}
+.axv-drawer-logcard-err {
+  border-color: color-mix(in srgb, var(--axv-danger, #ff5b5b) 55%, transparent);
+}
+.axv-drawer-logcard summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--axv-text-2);
+  user-select: none;
+}
+.axv-drawer-logcard summary::marker {
+  color: var(--axv-text-3, #888);
+}
+.axv-drawer-logcard pre.axv-drawer-log {
+  margin: 6px 0 2px;
+  padding: 8px;
+  font: 11px/1.5 ui-monospace, Consolas, monospace;
+  color: var(--axv-text);
+  background: color-mix(in srgb, var(--axv-bg, #111) 45%, transparent);
+  border-radius: 8px;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.axv-drawer-badge-log {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  background: var(--axv-accent, #4f8cff);
+  display: inline-block;
+}

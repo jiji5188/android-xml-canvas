@@ -2363,7 +2363,7 @@ body.axv-lt-dragging .axv-lt-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 4px 8px;
   background: color-mix(in srgb, var(--axv-danger) 14%, var(--axv-surface));
   border-top: 1px solid var(--axv-danger);
   color: var(--axv-danger);
@@ -7606,7 +7606,7 @@ button.axv-sb-item:hover {
   display: flex;
   gap: 4px;
   align-items: center;
-  padding: 4px 6px;
+  padding: 2px 6px;
   overflow-x: auto;
   overflow-y: hidden;
   border-top: 1px solid color-mix(in srgb, var(--axv-on-surface) 10%, transparent);
@@ -10577,7 +10577,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 55; /* 低于 multibar(60)，高于画布 */
+  z-index: 10; /* M193b：原来 55 太高，会盖住画布上的手势层/浮层；抽屉自身仍靠 pointer-events 控制交互 */
   display: flex;
   flex-direction: column;
   justify-content: flex-end;

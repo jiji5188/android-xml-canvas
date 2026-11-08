@@ -51,9 +51,10 @@ function render(over: Partial<StatusBarProps> = {}) {
 }
 
 describe("StatusBar", () => {
-  it("显示文件名、来源、设备、尺寸、缩放、无问题", () => {
+  it("显示文件名、来源、设备、尺寸、缩放（问题数改由抽屉 tab 徒标显示）", () => {
     const { full, all } = render();
-    for (const s of ["activity_main.xml", base.source, "Pixel 5", "393×851", "100%", "无问题"]) {      expect(full).toContain(s);
+    for (const s of ["activity_main.xml", base.source, "Pixel 5", "393×851", "100%"]) {
+      expect(full).toContain(s);
     }
     const dot = all.find((e) => String(e.props.className).includes("axv-sb-dot"))!;
     expect(String(dot.props.className)).not.toContain("on");
@@ -67,13 +68,11 @@ describe("StatusBar", () => {
     expect(String(dot.props.className)).toContain("on");
   });
 
-  it("有问题 → 显示数量，点击回调", () => {
-    const onIssues = vi.fn();
-    const { full, buttons } = render({ issueCount: 3, onIssues });
-    expect(full).toContain("3 个问题");
-    const btn = buttons.find((b) => String(b.props.className).includes("axv-sb-issue"))!;
-    btn.props.onClick();
-    expect(onIssues).toHaveBeenCalledTimes(1);
+  it("M193b：不再渲染问题块（避免与抽屉 tab 徒标重复）", () => {
+    const { full, buttons } = render({ issueCount: 3, onIssues: vi.fn() });
+    expect(full).not.toContain("个问题");
+    expect(full).not.toContain("无问题");
+    expect(buttons.some((b) => String(b.props.className).includes("axv-sb-issue"))).toBe(false);
   });
 
   it("缩放四舍五入显示，点击回 100%", () => {

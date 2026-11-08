@@ -51,22 +51,7 @@ export function StatusBar(props: StatusBarProps) {
 
       <span className="axv-sb-gap" />
 
-      {props.issueCount > 0 ? (
-        <button
-          type="button"
-          className="axv-sb-item axv-sb-issue"
-          onClick={props.onIssues}
-          title={tt("显示/隐藏问题标记")}
-        >
-          <span className="msr" aria-hidden="true">error</span>
-          {tt("{n} 个问题", { n: props.issueCount })}
-        </button>
-      ) : (
-        <span className="axv-sb-item axv-sb-ok" title={tt("没有结构性问题")}>
-          <span className="msr" aria-hidden="true">check_circle</span>
-          {tt("无问题")}
-        </span>
-      )}
+      {/* M193b：问题数已由抽屉把手条的 tab 徽标显示，这里不再重复一块 */}
 
       {!props.isMobile ? (
         <span className="axv-sb-item" title={`${props.deviceLabel} ${props.deviceSize}`}>

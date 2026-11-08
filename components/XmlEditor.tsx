@@ -4673,6 +4673,8 @@ const findResolved = findResolvedNode;
         problems={(lints ?? []).map((l) => ({ line: l.line ?? 1, msg: l.message }))}
         onGotoLine={(ln) => gotoLine(ln)}
         buildLogs={buildLogs}
+        insetLeft={isMobile ? undefined : leftOpen ? 320 : 0}
+        insetRight={isMobile ? undefined : rightOpen ? 320 : 0}
         statusSlot={
           /* M193：状态条合并进抽屉把手条（不再自己占一行 28px） */
           <StatusBar

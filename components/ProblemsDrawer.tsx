@@ -41,17 +41,25 @@ export interface ProblemsDrawerProps {
   buildLogs?: BuildLogEntry[];
   /** M193：状态信息（文件名/未保存/问题数/设备/缩放）—— 合并进把手条，不再单独占一行 */
   statusSlot?: React.ReactNode;
+  /** M193d：桌面侧栏展开时让出宽度（手机不传） */
+  insetLeft?: number;
+  insetRight?: number;
   tr: (key: string, fallback: string, vars?: Record<string, string | number>) => string;
 }
 
-export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, tr }: ProblemsDrawerProps) {
+export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, insetLeft, insetRight, tr }: ProblemsDrawerProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<DrawerPanel>("problems");
 
   const n = problems.length;
+  const insetStyle =
+    insetLeft === undefined && insetRight === undefined
+      ? undefined
+      : { marginLeft: insetLeft ?? 0, marginRight: insetRight ?? 0, transition: "margin 0.22s" };
   return (
     <div
       className={"axv-drawer" + (open ? " axv-drawer-open" : "")}
+      style={insetStyle}
       role="region"
       aria-label={tr("drawer.title", "问题 / 日志抽屉")}
     >

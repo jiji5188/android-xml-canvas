@@ -7619,8 +7619,8 @@ button.axv-sb-item:hover {
 }
 .axv-sym-btn {
   flex: 0 0 auto;
-  height: 24px;
-  min-width: 24px;
+  height: 20px;
+  min-width: 20px;
   padding: 0 8px;
   border: 1px solid color-mix(in srgb, var(--axv-on-surface) 14%, transparent);
   border-radius: 6px;
@@ -10577,6 +10577,9 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   left: 0;
   right: 0;
   bottom: 0;
+  /* M193d：桌面避让左右侧栏（320px）；手机全宽（见下方 media） */
+  margin-left: 320px;
+  margin-right: 320px;
   z-index: 10; /* M193b：原来 55 太高，会盖住画布上的手势层/浮层；抽屉自身仍靠 pointer-events 控制交互 */
   display: flex;
   flex-direction: column;
@@ -10677,6 +10680,10 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   overflow: auto;
 }
 @media (max-width: 840px) {
+  .axv-drawer {
+    margin-left: 0;
+    margin-right: 0;
+  }
   .axv-drawer-body {
     height: 42vh;
     max-height: 50vh;

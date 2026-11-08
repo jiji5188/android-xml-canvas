@@ -39,6 +39,16 @@ export const KNOWN_METHODS: string[] = [
   // Log / 通用
   "println", "isFinishing", "isDestroyed", "getWindow", "setSoftInputMode", "addFlags", "putExtra",
   "getStringExtra", "getIntExtra", "getBooleanExtra", "putString", "getString", "apply", "edit",
+  // M185b：数据库/游标（ContentValues / Cursor / SQLiteDatabase）
+  // 这些是官方真实方法，缺了会大量误报（实测 put→post、getInt→getId）
+  "put", "putNull", "getAsString", "getAsInteger", "getAsLong", "getAsBoolean", "getAsDouble",
+  "getAsFloat", "getAsByteArray", "containsKey", "keySet", "size", "clear", "remove",
+  "moveToFirst", "moveToNext", "moveToPrevious", "moveToPosition", "moveToLast", "isFirst", "isLast",
+  "isBeforeFirst", "isAfterLast", "getCount", "getPosition", "getColumnCount",
+  "getColumnIndex", "getColumnIndexOrThrow", "getColumnName", "getColumnNames", "close",
+  "getInt", "getLong", "getShort", "getFloat", "getDouble", "getBlob", "isNull", "requery",
+  "insert", "insertOrThrow", "update", "delete", "query", "rawQuery", "execSQL",
+  "beginTransaction", "setTransactionSuccessful", "endTransaction", "getWritableDatabase", "getReadableDatabase",
 ];
 
 const KNOWN = new Set(KNOWN_METHODS);
@@ -93,6 +103,9 @@ export function findMethodTypos(code: string, opts: FindMethodTyposOpts = {}): M
   const lines = code.split("\n");
   const check = (name: string, lineNo: number) => {
     if (KNOWN.has(name) || declared.has(name) || seen.has(name)) return;
+    // M185b：短名（≤ 3 字符，如 put / get / add / run）不查 ——
+    // 编辑距离只有 2 时几乎必误报（put→post），而这些短方法名本来就不是拼写坑
+    if (name.length <= 3) return;
     // 大小写归一化后再找（findviewbyid 这类）
     let sug = suggestMethod(name, 2);
     if (!sug) {

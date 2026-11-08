@@ -10700,3 +10700,19 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   background: var(--axv-surface, #fff);
   color: var(--axv-on-surface, #333);
 }
+
+
+/* M185b：错误行号旁的红点 */
+.cm-errGutter .cm-errGutterDot {
+  color: var(--axv-error, #dc2626);
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+/* M185b：错误条可点（点一下跳到出错行） */
+.axv-code-errbar.axv-errbar-jump {
+  cursor: pointer;
+}
+.axv-code-errbar.axv-errbar-jump:hover {
+  background: color-mix(in srgb, var(--axv-danger) 20%, var(--axv-surface));
+}

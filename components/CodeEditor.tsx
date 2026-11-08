@@ -1,12 +1,12 @@
-// components/CodeEditor.tsx — M38：CodeMirror 6 版代码编辑器（替换 textarea 蹭高亮层的老实现）
+// components/CodeEditor.tsx - M38:CodeMirror 6 版代码编辑器(替换 textarea 蹭高亮层的老实现)
 //
-// 为什么要换：老实现每次按键都全量 highlightXml + innerHTML 替换 + React 全量重渲，
-// 5000 行 XML 单次按键 20–40ms，手机上直接掉字。CM6 是视口虚拟化（只渲染可见行）+
-// 增量解析，几万行也稳，还顺带送括号匹配、自动缩进、折叠、多光标、原生撤销栈。
+// 为什么要换:老实现每次按键都全量 highlightXml + innerHTML 替换 + React 全量重渲,
+// 5000 行 XML 单次按键 20-40ms,手机上直接掉字。CM6 是视口虚拟化(只渲染可见行)+
+// 增量解析,几万行也稳,还顺带送括号匹配、自动缩进、折叠、多光标、原生撤销栈。
 //
-// 对外接口与 XmlCodeEditor 保持一致（value / onChange / errors / focusLine / focusTick /
-// onCursorLine / onFormat），外加 lang（xml | java）。外观仍然全部吃 CSS 变量
-// （--axv-code-* / --axv-x-*），设置面板里调颜色不用改这里。
+// 对外接口与 XmlCodeEditor 保持一致(value / onChange / errors / focusLine / focusTick /
+// onCursorLine / onFormat),外加 lang(xml | java)。外观仍然全部吃 CSS 变量
+// (--axv-code-* / --axv-x-*),设置面板里调颜色不用改这里。
 
 "use client";
 
@@ -63,19 +63,19 @@ export interface CodeEditorProps {
   focusTick?: number;
   onCursorLine?: (line: number) => void;
   onFormat?: () => void;
-  /** M179：一键修复（把 errors 里带 fix 的替换掉） */
+  /** M179:一键修复(把 errors 里带 fix 的替换掉) */
   onFixAll?: () => void;
-  /** M38：语法（默认 xml） */
+  /** M38:语法(默认 xml) */
   lang?: EditorLang;
-  /** M40：缩进宽度（空格数，默认 4） */
+  /** M40:缩进宽度(空格数,默认 4) */
   indent?: number;
-  /** M45：资源名候选（@drawable/xxx 补全用），不传就只用文档里的 token */
+  /** M45:资源名候选(@drawable/xxx 补全用),不传就只用文档里的 token */
   resNames?: string[];
-  /** M101：Ctrl/Cmd + 点击资源引用时回调（raw 如 `@string/app_name` / `R.id.btn`） */
+  /** M101:Ctrl/Cmd + 点击资源引用时回调(raw 如 `@string/app_name` / `R.id.btn`) */
   onRefClick?: (raw: string) => void;
 }
 
-/** M76：在一份文本里找全部匹配（大小写不敏感，上限 500 条，空 query 返回空） */
+/** M76:在一份文本里找全部匹配(大小写不敏感,上限 500 条,空 query 返回空) */
 export function findAllIn(doc: string, query: string): { from: number; to: number }[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -91,19 +91,19 @@ export function findAllIn(doc: string, query: string): { from: number; to: numbe
   return out;
 }
 
-/** M45：弹窗当前状态 */
+/** M45:弹窗当前状态 */
 interface SugState {
   items: string[];
   sel: number;
   kind: SuggestKind;
-  /** M99：与 items 对应的分类（逐条不同） */
+  /** M99:与 items 对应的分类(逐条不同) */
   kinds?: SuggestKind[];
   prefix: string;
   placement: Placement;
   width: number;
 }
 
-/* ===== 错误行装饰：行底色 + 左侧红条 + 悬停看原因 ===== */
+/* ===== 错误行装饰:行底色 + 左侧红条 + 悬停看原因 ===== */
 const setErrLines = StateEffect.define<Map<number, string>>();
 
 function buildErrDeco(doc: { lines: number; line(n: number): { from: number } }, m: Map<number, string>) {
@@ -112,7 +112,7 @@ function buildErrDeco(doc: { lines: number; line(n: number): { from: number } },
     if (ln < 1 || ln > doc.lines) continue;
     ranges.push(
       Decoration.line({
-        class: "axv-cm-errline",
+        class: "cm-errline",
         attributes: { title: m.get(ln) || tt("结构问题") },
       }).range(doc.line(ln).from),
     );
@@ -132,7 +132,7 @@ const errLineField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-/* ===== 主题：全吃 CSS 变量，设置面板改色即时生效 ===== */
+/* ===== 主题:全吃 CSS 变量,设置面板改色即时生效 ===== */
 const cmTheme = EditorView.theme({
   "&": {
     height: "100%",
@@ -165,8 +165,8 @@ const cmTheme = EditorView.theme({
     textAlign: "right",
   },
   ".cm-activeLine": {
-    // M50：背景改由 cmCurLineBg（独立负层）画。
-    // 这里必须留透明：内容层背景会盖住选区层（z-index:-2），
+    // M50:背景改由 cmCurLineBg(独立负层)画。
+    // 这里必须留透明:内容层背景会盖住选区层(z-index:-2),
     // 用户看到的就是「选了文字但看不见选中颜色」。
     backgroundColor: "transparent",
   },
@@ -174,10 +174,10 @@ const cmTheme = EditorView.theme({
     backgroundColor: "var(--axv-code-cur-bg, rgba(11, 95, 165, 0.08))",
     color: "var(--axv-on-surface)",
   },
-  // M41：选区颜色。注意 CodeMirror 自带主题里有更高优先级的规则：
+  // M41:选区颜色。注意 CodeMirror 自带主题里有更高优先级的规则:
   //   .cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground { background: #D7D4F0 }
-  // 所以光写 &.cm-focused .cm-selectionBackground 会被它压住（用户看到的淡紫就是它）。
-  // 这里用相同/更高优先级的选择器覆盖，并用 background 简写（对方也是简写）。
+  // 所以光写 &.cm-focused .cm-selectionBackground 会被它压住(用户看到的淡紫就是它)。
+  // 这里用相同/更高优先级的选择器覆盖,并用 background 简写(对方也是简写)。
   ".cm-selectionLayer .cm-selectionBackground": {
     background: "var(--axv-code-sel-bg, rgba(4, 64, 159, 0.18))",
   },
@@ -227,12 +227,12 @@ const cmHl = HighlightStyle.define([
 
 const fontTheme = EditorView.theme({ "&": { fontSize: "var(--axv-code-font-size, 13px)" } });
 
-/* ===== M50：当前行背景独立成层 =====
- * 用户要的三层叠放（自下而上）：当前行背景 > 选区背景 > 正文文字。
- * CM6 的选区层是 z-index:-2，而 .cm-activeLine 的 background 属于**内容层**，
+/* ===== M50:当前行背景独立成层 =====
+ * 用户要的三层叠放(自下而上):当前行背景 > 选区背景 > 正文文字。
+ * CM6 的选区层是 z-index:-2,而 .cm-activeLine 的 background 属于**内容层**,
  * 内容层永远压在负值层之上 → 行背景必定盖住选区。
- * 解法：行背景不再用行元素的 background，改成 scroller 里的一个绝对定位 div
- * （z-index:-4），文字留在内容层 → 三层自然成立，不需要牺牲文字可读性。
+ * 解法:行背景不再用行元素的 background,改成 scroller 里的一个绝对定位 div
+ * (z-index:-4),文字留在内容层 → 三层自然成立,不需要牺牲文字可读性。
  */
 const cmCurLineBg = ViewPlugin.fromClass(
   class {
@@ -250,18 +250,18 @@ const cmCurLineBg = ViewPlugin.fromClass(
     update(u: ViewUpdate) {
       if (u.selectionSet || u.docChanged || u.viewportChanged || u.geometryChanged) this.sync();
     }
-    /** 用 requestMeasure：行块坐标是异步测量的，直接读会拿到旧值（滚动/换行时跳位） */
+    /** 用 requestMeasure:行块坐标是异步测量的,直接读会拿到旧值(滚动/换行时跳位) */
     sync() {
       this.view.requestMeasure({
         key: this.key,
         read: (v) => {
           const b = v.lineBlockAt(v.state.selection.main.head);
-          // 行块坐标是相对内容盒的，但 .cm-content 自己有 padding-top（本项目 12px），
-          // 我们的层挂在 scroller 上 → 必须补上这段，否则整块背景会往上偏一行。
+          // 行块坐标是相对内容盒的,但 .cm-content 自己有 padding-top(本项目 12px),
+          // 我们的层挂在 scroller 上 → 必须补上这段,否则整块背景会往上偏一行。
           const padTop = parseFloat(getComputedStyle(v.contentDOM).paddingTop) || 0;
-          // M90：宽度按「最长行」填（contentDOM 实际宽度 = 最长行），
-          // 而不是按可视区宽度（scroller clientWidth）——长行滚动时高亮不能中途断掉。
-          // 同时至少铺满可视区（max），否则短文件时右边会缺一截。
+          // M90:宽度按「最长行」填(contentDOM 实际宽度 = 最长行),
+          // 而不是按可视区宽度(scroller clientWidth)--长行滚动时高亮不能中途断掉。
+          // 同时至少铺满可视区(max),否则短文件时右边会缺一截。
           const contentEl = v.contentDOM;
           const contentW = contentEl.offsetLeft + contentEl.offsetWidth;
           const viewW = v.scrollDOM.clientWidth;
@@ -303,19 +303,19 @@ export function CodeEditor({
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const langComp = useRef(new Compartment());
-  /** M96：候选列表按语言分流（xml 走标签/属性，java 走关键字/类/方法） */
+  /** M96:候选列表按语言分流(xml 走标签/属性,java 走关键字/类/方法) */
   const langRef = useRef(lang);
   langRef.current = lang;
-  /** M40：缩进宽度（indentUnit + tabSize）单独一个 compartment，改设置即时生效 */
+  /** M40:缩进宽度(indentUnit + tabSize)单独一个 compartment,改设置即时生效 */
   const indentComp = useRef(new Compartment());
-  /** 回调放进 ref：view 只建一次，避免每次 render 重建 */
+  /** 回调放进 ref:view 只建一次,避免每次 render 重建 */
   const onChangeRef = useRef(onChange);
   const onCursorLineRef = useRef(onCursorLine);
   const onRefClickRef = useRef(onRefClick);
   onChangeRef.current = onChange;
   onCursorLineRef.current = onCursorLine;
   onRefClickRef.current = onRefClick;
-  /** M57：最后一次由编辑器自身发出的文本——父层防抖回灌同一个值时据此跳过，避免“冲掉刚输入的字” */
+  /** M57:最后一次由编辑器自身发出的文本--父层防抖回灌同一个值时据此跳过,避免"冲掉刚输入的字" */
   const lastEmittedRef = useRef<string | null>(null);
 
   const [findOpen, setFindOpen] = useState(false);
@@ -323,22 +323,22 @@ export function CodeEditor({
   const [hitIdx, setHitIdx] = useState(0);
   const findRef = useRef<HTMLInputElement | null>(null);
 
-  /* ===== M45：输入关键词检索弹窗 ===== */
+  /* ===== M45:输入关键词检索弹窗 ===== */
   const [sug, setSug] = useState<SugState | null>(null);
   const sugRef = useRef<SugState | null>(null);
   const setSugBoth = useCallback((v: SugState | null) => {
     sugRef.current = v;
     setSug(v);
   }, []);
-  /** 刚接受过一次（此时不要再弹，否则回车确认后立刻又弹出来） */
+  /** 刚接受过一次(此时不要再弹,否则回车确认后立刻又弹出来) */
   const lastAcceptRef = useRef(0);
   const sugTimer = useRef<number | null>(null);
   /**
-   * M98：候选弹窗的「按下→抬起」追踪。
-   * 以前 pointerdown 直接确认，结果：
-   *   ① 手机上想滑列表，一按就把第一个词填进去了；
-   *   ② pointerdown 里 preventDefault 把 touch 滚动也一起拦了，列表根本滑不动。
-   * 现在：按下只记位置，抬起时「同一项 + 没怎么动 + 没滚动过」才算点击。
+   * M98:候选弹窗的「按下→抬起」追踪。
+   * 以前 pointerdown 直接确认,结果:
+   *   1 手机上想滑列表,一按就把第一个词填进去了;
+   *   2 pointerdown 里 preventDefault 把 touch 滚动也一起拦了,列表根本滑不动。
+   * 现在:按下只记位置,抬起时「同一项 + 没怎么动 + 没滚动过」才算点击。
    */
   const pressRef = useRef<{ i: number; x: number; y: number; top: number } | null>(null);
   const resNamesRef = useRef<string[] | undefined>(resNames);
@@ -358,7 +358,7 @@ export function CodeEditor({
     if (!v) return;
     const sel = v.state.selection.main;
     const pos = sel.from + insert.length - back;
-    // M76：一次 dispatch 完成（两次会变成两步撤销）
+    // M76:一次 dispatch 完成(两次会变成两步撤销)
     v.dispatch({
       changes: { from: sel.from, to: sel.to, insert },
       selection: { anchor: pos },
@@ -367,18 +367,18 @@ export function CodeEditor({
     v.focus();
   }, []);
 
-  /** M76：输入法是否在组合中（此时按键/候选一律让路） */
+  /** M76:输入法是否在组合中(此时按键/候选一律让路) */
   const composing = useCallback(() => !!viewRef.current?.composing, []);
 
-  /* ===== M45：算候选 + 算光标坐标 → 定位弹窗 ===== */
+  /* ===== M45:算候选 + 算光标坐标 → 定位弹窗 ===== */
   const refreshSuggest = useCallback(() => {
     const v = viewRef.current;
     const body = bodyRef.current;
     if (!v || !body) return;
-    // 刚接受过：不再弹（否则回车确认后马上又弹一个）
+    // 刚接受过:不再弹(否则回车确认后马上又弹一个)
     if (Date.now() - lastAcceptRef.current < 160) return;
 
-    // M76：组合中不弹（拼音还没落字，弹出来挡住输入法候选条）
+    // M76:组合中不弹(拼音还没落字,弹出来挡住输入法候选条)
     if (v.composing) {
       setSugBoth(null);
       return;
@@ -399,7 +399,7 @@ export function CodeEditor({
       setSugBoth(null);
       return;
     }
-    // 光标后面还有词字符 → 不弹（免得替掉后面的字）
+    // 光标后面还有词字符 → 不弹(免得替掉后面的字)
     const rest = line.text.slice(col - 1);
     if (/^[A-Za-z0-9_.:@#+\/-]/.test(rest)) {
       setSugBoth(null);
@@ -434,7 +434,7 @@ export function CodeEditor({
     });
   }, [setSugBoth]);
 
-  /** 防抖：连续打字时不要每个键都算一遍 */
+  /** 防抖:连续打字时不要每个键都算一遍 */
   const scheduleSuggest = useCallback(() => {
     if (sugTimer.current !== null) window.clearTimeout(sugTimer.current);
     sugTimer.current = window.setTimeout(() => {
@@ -443,7 +443,7 @@ export function CodeEditor({
     }, 90);
   }, [refreshSuggest]);
 
-  /* ===== M45：接受候选（用 item 替掉光标左边的 prefix） ===== */
+  /* ===== M45:接受候选(用 item 替掉光标左边的 prefix) ===== */
   const acceptSuggest = useCallback(
     (idx: number) => {
       const v = viewRef.current;
@@ -477,14 +477,14 @@ export function CodeEditor({
     [setSugBoth],
   );
 
-  /** M98：按下：只记录，不确认
-   *  * 保留焦点：不对指针事件 preventDefault —— 一 preventDefault，触屏滑动就被吃掉了
-   *  * 用 pressRef 告诉 blur 处理器「现在是在弹窗上按，先别关」
+  /** M98:按下:只记录,不确认
+   *  * 保留焦点:不对指针事件 preventDefault -- 一 preventDefault,触屏滑动就被吃掉了
+   *  * 用 pressRef 告诉 blur 处理器「现在是在弹窗上按,先别关」
    */
   const onSugDown = useCallback(
     (i: number, e: React.PointerEvent<HTMLDivElement>) => {
-      // 鼠标：拦掉默认行为，保住编辑器焦点（鼠标不需要滑列表，滚轮不受影响）
-      // 触屏 / 手写笔：不能拦，一拦手势滑动就被吃掉
+      // 鼠标:拦掉默认行为,保住编辑器焦点(鼠标不需要滑列表,滚轮不受影响)
+      // 触屏 / 手写笔:不能拦,一拦手势滑动就被吃掉
       if (e.pointerType === "mouse") e.preventDefault();
       const list = (e.currentTarget.parentElement as HTMLElement | null) ?? e.currentTarget;
       pressRef.current = { i, x: e.clientX, y: e.clientY, top: list.scrollTop };
@@ -493,7 +493,7 @@ export function CodeEditor({
     [setSugBoth],
   );
 
-  /** M98：抬起：同一项 + 位移 < 10px + 没滚动过 → 才算点击 */
+  /** M98:抬起:同一项 + 位移 < 10px + 没滚动过 → 才算点击 */
   const onSugUp = useCallback(
     (i: number, e: React.PointerEvent<HTMLDivElement>) => {
       const press = pressRef.current;
@@ -502,18 +502,18 @@ export function CodeEditor({
       const moved = Math.abs(e.clientX - press.x) + Math.abs(e.clientY - press.y);
       const list = (e.currentTarget.parentElement as HTMLElement | null) ?? e.currentTarget;
       const scrolled = Math.abs(list.scrollTop - press.top) > 2;
-      if (moved > 10 || scrolled) return; // 是在滑列表，不是选词
+      if (moved > 10 || scrolled) return; // 是在滑列表,不是选词
       acceptSuggest(i);
     },
     [acceptSuggest],
   );
 
-  /** M98：取消 / 滑动 / 滚出屏幕 → 丢弃这次按下 */
+  /** M98:取消 / 滑动 / 滚出屏幕 → 丢弃这次按下 */
   const cancelPress = useCallback(() => {
     pressRef.current = null;
   }, []);
 
-  /* ===== 建视图（只一次） ===== */
+  /* ===== 建视图(只一次) ===== */
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -524,9 +524,9 @@ export function CodeEditor({
         lineNumbers(),
         highlightActiveLineGutter(),
         highlightSpecialChars(),
-        // M139：不装 CM6 自带的 history —— 撤销栈统一由 XmlEditor 的 diffHistory 管
-        // （原因：外部回灌 value 时 CM6 会把「整篇替换」也当作一步撤销，
-        //   和工具栏/画布的撤销互相覆盖，表现为按一次 Ctrl+Z 倒退两步）
+        // M139:不装 CM6 自带的 history -- 撤销栈统一由 XmlEditor 的 diffHistory 管
+        // (原因:外部回灌 value 时 CM6 会把「整篇替换」也当作一步撤销,
+        //   和工具栏/画布的撤销互相覆盖,表现为按一次 Ctrl+Z 倒退两步)
         drawSelection(),
         dropCursor(),
         rectangularSelection(),
@@ -535,9 +535,9 @@ export function CodeEditor({
         cmCurLineBg,
         indentOnInput(),
         bracketMatching(),
-        // M76：引号/括号自动配对（之前没有，XML 里写属性得自己敲两遍引号）
+        // M76:引号/括号自动配对(之前没有,XML 里写属性得自己敲两遍引号)
         closeBrackets(),
-        // M76：打 <TextView 回车时自动补 </TextView>（只对 XML 生效，java 文件里是空操作）
+        // M76:打 <TextView 回车时自动补 </TextView>(只对 XML 生效,java 文件里是空操作)
         autoCloseTags,
         indentComp.current.of([
           indentUnit.of(" ".repeat(indent)),
@@ -547,7 +547,7 @@ export function CodeEditor({
         cmTheme,
         fontTheme,
         errLineField,
-        // M45：候选列表开着时抢下方向键/回车/取消，未开时完全透明
+        // M45:候选列表开着时抢下方向键/回车/取消,未开时完全透明
         Prec.highest(
           keymap.of([
             {
@@ -561,7 +561,7 @@ export function CodeEditor({
             {
               key: "Enter",
               run: () => {
-                // M76：中文/日文输入法组合中，回车是「确认候选词」，不能拿来接受建议
+                // M76:中文/日文输入法组合中,回车是「确认候选词」,不能拿来接受建议
                 if (composing()) return false;
                 const s = sugRef.current;
                 if (!s) return false;
@@ -599,12 +599,12 @@ export function CodeEditor({
               return true;
             },
           },
-          // M40：回车 = 换行 + 按语法自动缩进（放在 defaultKeymap 前，保证优先）
+          // M40:回车 = 换行 + 按语法自动缩进(放在 defaultKeymap 前,保证优先)
           { key: "Enter", run: insertNewlineAndIndent },
           // 配对的右括号/右引号要能被 Backspace 一次吃掉
           ...closeBracketsKeymap,
           ...defaultKeymap,
-          // M139：historyKeymap 一并去掉，Ctrl+Z / Ctrl+Shift+Z 冒泡到 window 交给 app 撤销栈
+          // M139:historyKeymap 一并去掉,Ctrl+Z / Ctrl+Shift+Z 冒泡到 window 交给 app 撤销栈
           indentWithTab,
         ]),
         EditorView.contentAttributes.of({
@@ -616,7 +616,7 @@ export function CodeEditor({
         EditorView.updateListener.of((u) => {
           if (u.docChanged) {
             const s = u.state.doc.toString();
-            // M57：记下「本次变更是我自己发出的」，父层回灌同一个 value 时不要回写
+            // M57:记下「本次变更是我自己发出的」,父层回灌同一个 value 时不要回写
             lastEmittedRef.current = s;
             onChangeRef.current(s);
           }
@@ -624,15 +624,15 @@ export function CodeEditor({
             const head = u.state.selection.main.head;
             onCursorLineRef.current?.(u.state.doc.lineAt(head).number);
           }
-          // M45：光标/内容变了重算候选（防抖）
+          // M45:光标/内容变了重算候选(防抖)
           if (u.docChanged || u.selectionSet) scheduleSuggest();
         }),
-        // M45：失焦就关（M98：在弹窗上按住时不关，等 pointerup 再决定）
+        // M45:失焦就关(M98:在弹窗上按住时不关,等 pointerup 再决定)
         EditorView.domEventHandlers({
-          // M101：Ctrl/Cmd + 点击资源引用 → 跳定义 / 查引用（画布以外最快的一条导航路线）
+          // M101:Ctrl/Cmd + 点击资源引用 → 跳定义 / 查引用(画布以外最快的一条导航路线)
           mousedown: (e, view) => {
-            // M114：刚点过候选词（弹窗已消失）→ 吞掉这次 mousedown，
-            // 否则触屏的兼容鼠标事件会落到下面的代码区，把光标跳到点击位置（表现为「选了 a 却跳到 12 行」）
+            // M114:刚点过候选词(弹窗已消失)→ 吞掉这次 mousedown,
+            // 否则触屏的兼容鼠标事件会落到下面的代码区,把光标跳到点击位置(表现为「选了 a 却跳到 12 行」)
             if (Date.now() - lastAcceptRef.current < 350) {
               e.preventDefault();
               return true;
@@ -657,7 +657,7 @@ export function CodeEditor({
 
     const view = new EditorView({ state, parent: host });
     viewRef.current = view;
-    // M45：滚动就关（光标坐标靠的是当前视口，滚走了就对不上了）
+    // M45:滚动就关(光标坐标靠的是当前视口,滚走了就对不上了)
     const onScroll = () => setSugBoth(null);
     view.scrollDOM.addEventListener("scroll", onScroll, { passive: true });
     return () => {
@@ -668,12 +668,12 @@ export function CodeEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ===== 外部 value 变化（撤销/重做/格式化/切文件）→ 写进编辑器 ===== */
+  /* ===== 外部 value 变化(撤销/重做/格式化/切文件)→ 写进编辑器 ===== */
   useEffect(() => {
     const v = viewRef.current;
     if (!v) return;
-    // M57：父层现在防抖回灌（打字时 value 可能暂时比文档旧）——
-    // 只要是「我自己刚发出去的」就一律跳过，否则会把用户刚输入的字符冲掉
+    // M57:父层现在防抖回灌(打字时 value 可能暂时比文档旧)--
+    // 只要是「我自己刚发出去的」就一律跳过,否则会把用户刚输入的字符冲掉
     if (value === lastEmittedRef.current) return;
     const cur = v.state.doc.toString();
     if (cur === value) return;
@@ -687,7 +687,7 @@ export function CodeEditor({
     v.dispatch({ effects: langComp.current.reconfigure(langExt(lang)) });
   }, [lang]);
 
-  /* ===== M40：缩进宽度变化（设置面板里改） ===== */
+  /* ===== M40:缩进宽度变化(设置面板里改) ===== */
   useEffect(() => {
     const v = viewRef.current;
     if (!v) return;
@@ -706,7 +706,7 @@ export function CodeEditor({
     v.dispatch({ effects: setErrLines.of(errLines) });
   }, [errLines]);
 
-  /* ===== 跳转行（画布点选 / 报错定位） ===== */
+  /* ===== 跳转行(画布点选 / 报错定位) ===== */
   useEffect(() => {
     const v = viewRef.current;
     if (!v || !focusLine) return;
@@ -717,15 +717,15 @@ export function CodeEditor({
       effects: EditorView.scrollIntoView(line.from, { y: "center" }),
     });
     v.focus();
-    // focusTick 变化才重新跳（同一行二次点击也要生效）
+    // focusTick 变化才重新跳(同一行二次点击也要生效)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTick]);
 
-  /* ===== 查找（自带一套，不引 @codemirror/search 面板） ===== */
+  /* ===== 查找(自带一套,不引 @codemirror/search 面板) ===== */
   const hits = useMemo(() => {
     const v = viewRef.current;
-    // M76：优先用编辑器里的实时文本 —— 父层 value 有 250ms 防抖，
-    // 拿旧文本算出来的偏移去 dispatch，会跳到错的位置（甚至越界）
+    // M76:优先用编辑器里的实时文本 -- 父层 value 有 250ms 防抖,
+    // 拿旧文本算出来的偏移去 dispatch,会跳到错的位置(甚至越界)
     return findAllIn(v ? v.state.doc.toString() : value, query);
   }, [query, value]);
 
@@ -745,8 +745,8 @@ export function CodeEditor({
         selection: { anchor: h.from, head: h.to },
         effects: EditorView.scrollIntoView(h.from, { y: "center" }),
       });
-      // M76：从查找框/按钮点进来时不要把焦点抢回编辑器 ——
-      // 抢了之后焦点离开输入框，再按 Enter 就变成正文里换行，而且手机上会弹键盘
+      // M76:从查找框/按钮点进来时不要把焦点抢回编辑器 --
+      // 抢了之后焦点离开输入框,再按 Enter 就变成正文里换行,而且手机上会弹键盘
       if (focusEditor) v.focus();
     },
     [query],
@@ -757,12 +757,24 @@ export function CodeEditor({
     return list[0] || null;
   }, [errors]);
 
-  /** M179：可自动修复的问题数量（带 fix 的） */
+  /** M185b:点错误条跳到对应行(编辑器内部定位) */
+  const jumpToLine = useCallback((n: number) => {
+    const v = viewRef.current;
+    if (!v || !n || n < 1) return;
+    const line = v.state.doc.line(Math.min(n, v.state.doc.lines));
+    v.dispatch({
+      selection: { anchor: line.from, head: line.to },
+      effects: EditorView.scrollIntoView(line.from, { y: "center" }),
+    });
+    v.focus();
+  }, []);
+
+  /** M179:可自动修复的问题数量(带 fix 的) */
   const fixCount = useMemo(() => (errors || []).filter((e) => e.fix).length, [errors]);
   const fixTitle = useMemo(() => {
     const list = (errors || []).filter((e) => e.fix).slice(0, 4);
     const head = list.map((e) => e.fix!.label).join("  |  ");
-    return fixCount > 4 ? `${head}  …+${fixCount - 4}` : head;
+    return fixCount > 4 ? `${head}  ...+${fixCount - 4}` : head;
   }, [errors, fixCount]);
 
   return (
@@ -781,18 +793,18 @@ export function CodeEditor({
               maxHeight: sug.placement.maxHeight,
             }}
             data-placement={sug.placement.placement}
-            // M114：栏住兼容鼠标事件，避免点击透传到下面的代码区
+            // M114:栏住兼容鼠标事件,避免点击透传到下面的代码区
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
             }}
-            // M98：列表自己滚动（手指滑列表不能选中）；滚过就不再算点击
+            // M98:列表自己滚动(手指滑列表不能选中);滚过就不再算点击
             onScroll={cancelPress}
             onPointerCancel={cancelPress}
             onPointerLeave={cancelPress}
           >
             {sug.items.map((it, i) => {
-              // M99：每条自带分类，角标单字（声/类/方/变/常/引/属）
+              // M99:每条自带分类,角标单字(声/类/方/变/常/引/属)
               const k = sug.kinds?.[i] ?? sug.kind;
               return (
               <div
@@ -805,7 +817,7 @@ export function CodeEditor({
                 onPointerUp={(e) => onSugUp(i, e)}
                 onPointerCancel={cancelPress}
                 onMouseEnter={() => {
-                  // 触屏按下时也会派 mouseenter，别让它抢掉滚动
+                  // 触屏按下时也会派 mouseenter,别让它抢掉滚动
                   if (pressRef.current) return;
                   if (sugRef.current && sugRef.current.sel !== i) {
                     setSugBoth({ ...sugRef.current, sel: i });
@@ -854,7 +866,7 @@ export function CodeEditor({
             <button
               type="button"
               className="axv-find-btn"
-              title={tt("上一个（Shift+Enter）")}
+              title={tt("上一个(Shift+Enter)")}
               aria-label={tt("上一个")}
               disabled={hits.length === 0}
               onClick={() => gotoHit(hitIdx - 1)}
@@ -864,7 +876,7 @@ export function CodeEditor({
             <button
               type="button"
               className="axv-find-btn"
-              title={tt("下一个（Enter）")}
+              title={tt("下一个(Enter)")}
               aria-label={tt("下一个")}
               disabled={hits.length === 0}
               onClick={() => gotoHit(hitIdx + 1)}
@@ -874,7 +886,7 @@ export function CodeEditor({
             <button
               type="button"
               className="axv-find-btn"
-              title={tt("关闭（Esc）")}
+              title={tt("关闭(Esc)")}
               aria-label={tt("关闭查找")}
               onClick={() => {
                 setFindOpen(false);
@@ -888,13 +900,27 @@ export function CodeEditor({
       </div>
 
       {(firstErr || fixCount > 0) && (
-        <div className="axv-code-errbar" style={firstErr ? undefined : { background: "color-mix(in srgb, var(--axv-warn, #d97706) 14%, var(--axv-surface))", borderTopColor: "var(--axv-warn, #d97706)", color: "var(--axv-on-surface)" }}>
+        <div
+          className={"axv-code-errbar" + (firstErr ? " axv-errbar-jump" : "")}
+          onClick={() => firstErr && jumpToLine(firstErr.line)}
+          title={firstErr ? tt("点击跳到出错行") : undefined}
+          role={firstErr ? "button" : undefined}
+          style={
+            firstErr
+              ? undefined
+              : {
+                  background: "color-mix(in srgb, var(--axv-warn, #d97706) 14%, var(--axv-surface))",
+                  borderTopColor: "var(--axv-warn, #d97706)",
+                  color: "var(--axv-on-surface)",
+                }
+          }
+        > 
           <span className="axv-err-dot" aria-hidden="true" style={firstErr ? undefined : { background: "var(--axv-warn, #d97706)" }} />
           <span className="axv-err-text">
             {firstErr
               ? tt("第 {n} 行 · {msg}", { n: firstErr.line, msg: firstErr.message })
               : tt("有 {n} 处可自动修复", { n: fixCount })}
-            {errors && errors.length > 1 && firstErr ? tt("　（共 {n} 处）", { n: errors.length }) : ""}
+            {errors && errors.length > 1 && firstErr ? tt(" (共 {n} 处)", { n: errors.length }) : ""}
           </span>
           {onFixAll && fixCount > 0 ? (
             <button
@@ -917,7 +943,7 @@ export function CodeEditor({
           <button
             type="button"
             className="axv-sym-btn axv-sym-action"
-            title={tt("重排缩进（保留注释）")}
+            title={tt("重排缩进(保留注释)")}
             onMouseDown={(e) => e.preventDefault()}
             onTouchStart={(e) => e.preventDefault()}
             onClick={onFormat}

@@ -10706,11 +10706,12 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   gap: 10px;
   width: 100%;
   border: none;
+  border-bottom: 1px solid var(--axv-outline-variant, #0000001a);
   background: transparent;
-  color: var(--axv-on-surface, #333);
+  color: #ff2c2c;
   font-size: 12px;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: 0px;
   cursor: pointer;
   text-align: left;
 }
@@ -10728,7 +10729,8 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .axv-drawer-log {
   width: 100%;

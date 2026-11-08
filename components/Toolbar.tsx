@@ -56,6 +56,10 @@ export type ToolbarProps = {
   onFormat: () => void;
   /** M140：历史版本快照面板（可选，不传就不画按钮） */
   onHistory?: () => void;
+  /** M188a：打开「签名与发布」配置弹层 */
+  onSign?: () => void;
+  /** M188a：有可写项目根时才显示签名项（网页版目录句柄也算） */
+  canSign?: boolean;
   snapCount?: number;
 };
 
@@ -91,6 +95,8 @@ export function Toolbar(props: ToolbarProps) {
     realRenderBusy,
     onRealRender,
     onFormat,
+    onSign,
+    canSign,
     onHistory,
     snapCount,
   } = props;
@@ -117,6 +123,15 @@ export function Toolbar(props: ToolbarProps) {
   }
   if (hasRes) {
     moreItems.push({ key: "clearres", icon: "hide_image", label: tt("清除 res"), onClick: onClearRes });
+  }
+  if (canSign) {
+    moreItems.push({
+      key: "sign",
+      icon: "key",
+      label: tt("签名与发布"),
+      hint: tt("别名 / 口令 / keystore 路径 / scheme 开关"),
+      onClick: () => onSign?.(),
+    });
   }
   if (nativeAvailable) {
     moreItems.push({

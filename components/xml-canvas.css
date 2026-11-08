@@ -10878,3 +10878,68 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   color: var(--axv-muted, var(--axv-on-surface-variant, #888));
   font-size: 12px;
 }
+
+
+/* M188a 签名与发布弹层 */
+.axv-sign-card {
+  width: min(420px, 94vw);
+  background: var(--axv-surface);
+  border: 1px solid var(--axv-outline);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.28);
+  padding: 18px;
+}
+.axv-sign-row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.axv-sign-row > label {
+  font-size: 12px;
+  color: var(--axv-text-2);
+}
+.axv-sign-row input,
+.axv-sign-row select {
+  width: 100%;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: var(--axv-field-bg, transparent);
+  color: var(--axv-text);
+}
+.axv-sign-row button {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--axv-text-2);
+  cursor: pointer;
+}
+.axv-sign-row button.axv-sign-on {
+  background: var(--axv-primary, #4f8cff);
+  border-color: transparent;
+  color: #fff;
+}
+.axv-sign-err {
+  font-size: 12px;
+  color: var(--axv-danger, #ff5b5b);
+  margin-top: 8px;
+}
+.axv-sign-hint {
+  font-size: 11px;
+  color: var(--axv-text-3, var(--axv-text-2));
+  margin-top: 8px;
+}
+.axv-sign-primary {
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-primary, #4f8cff);
+  background: var(--axv-primary, #4f8cff);
+  color: #fff;
+  cursor: pointer;
+}

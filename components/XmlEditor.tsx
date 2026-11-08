@@ -222,6 +222,7 @@ function writeLastRel(projectKey: string, rel: string): void {
 
 import { RunPreview } from "./RunPreview";
 import { Toolbar } from "./Toolbar";
+import { SigningDialog } from "./SigningDialog";
 import { LeftRail, type LeftView } from "./LeftRail";
 import { ProblemsDrawer } from "./ProblemsDrawer";
 import { Inspector } from "./Inspector";
@@ -2266,6 +2267,30 @@ const allDrawableNames = useMemo(() => {
     commitMany(del.map((k) => [k, null] as [string, null]));
     setAutoNotes([]);
   };
+
+  /** M188a：签名与发布配置弹层（读写项目里的 app/build.gradle） */
+  const [signDialogOpen, setSignDialogOpen] = useState(false);
+  const [gradleForSign, setGradleForSign] = useState<string | null>(null);
+  const openSignDialog = useCallback(async () => {
+    const root = projectSaveRoot(activeProject);
+    let txt: string | null = null;
+    if (root && root.kind === "native") {
+      try {
+        const bridge = (window as unknown as { __axvBridge?: { readText?: (p: string) => Promise<string> } }).__axvBridge;
+        if (bridge?.readText) txt = await bridge.readText(`${root.base}/app/build.gradle`);
+      } catch { /* 没有该文件 */ }
+    }
+    setGradleForSign(txt);
+    setSignDialogOpen(true);
+  }, [activeProject]);
+  const writeGradleForSign = useCallback(
+    async (next: string) => {
+      const root = projectSaveRoot(activeProject);
+      if (!root) return false;
+      return saveProjectFile(root, "app/build.gradle", next);
+    },
+    [activeProject],
+  );
 
   /** M186：右侧面板当前页签（属性 / 检查器） */
   const [rightTab, setRightTab] = useState<"attrs" | "inspector">("attrs");
@@ -4778,6 +4803,8 @@ const findResolved = findResolvedNode;
         onFormat={doFormat}
         onHistory={() => setHistPanelOpen(true)}
         snapCount={snapCount}
+        onSign={openSignDialog}
+        canSign={!!projRoot}
       />
       </div>
 
@@ -5065,6 +5092,17 @@ const findResolved = findResolvedNode;
       ) : null}
 
       {/* M90：配色方案编辑子页（改界面 token + 代码编辑器 4 个颜色） */}
+      {signDialogOpen && (
+        <SigningDialog
+          gradleText={gradleForSign}
+          onWriteGradle={writeGradleForSign}
+          onClose={() => setSignDialogOpen(false)}
+          onNote={(m, ms = 2400) => {
+            setExportNote(m);
+            window.setTimeout(() => setExportNote(""), ms);
+          }}
+        />
+      )}
       {editingTheme ? (
         <ThemeEditor
           presetId={editingTheme}

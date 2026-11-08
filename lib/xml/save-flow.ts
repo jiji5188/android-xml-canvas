@@ -71,7 +71,7 @@ export function buildSaveFiles(input: SaveInput): SaveFileSpec[] {
     extras: input.extras,
     extraRes: input.extraRes,
   });
-  return entries.map((e) => ({ path: e.path, text: e.text }));
+  return entries.map((e) => ({ path: e.path, text: e.text ?? "" }));
 }
 
 /** M156：真机渲染 → 要带上设备端 aapt2 能过的全部资源（布局 + res/ 下的 xml） */
@@ -84,7 +84,7 @@ export function buildRealRenderFiles(input: SaveInput): SaveFileSpec[] {
     extras: input.extras,
     extraRes: input.extraRes,
   });
-  return entries.map((e) => ({ path: e.path, text: e.text }));
+  return entries.map((e) => ({ path: e.path, text: e.text ?? "" }));
 }
 
 /** 有来源 → 写回原路径；没来源 → 另存 */

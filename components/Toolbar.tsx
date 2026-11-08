@@ -60,6 +60,9 @@ export type ToolbarProps = {
   onSign?: () => void;
   /** M188a：有可写项目根时才显示签名项（网页版目录句柄也算） */
   canSign?: boolean;
+  /** M190：导出可编译项目 zip（需项目根 / AI 文件通道） */
+  canExportProject?: boolean;
+  onExportProject?: () => void;
   snapCount?: number;
 };
 
@@ -97,6 +100,8 @@ export function Toolbar(props: ToolbarProps) {
     onFormat,
     onSign,
     canSign,
+    canExportProject,
+    onExportProject,
     onHistory,
     snapCount,
   } = props;
@@ -131,6 +136,15 @@ export function Toolbar(props: ToolbarProps) {
       label: tt("签名与发布"),
       hint: tt("别名 / 口令 / keystore 路径 / scheme 开关"),
       onClick: () => onSign?.(),
+    });
+  }
+  if (canExportProject) {
+    moreItems.push({
+      key: "exportproj",
+      icon: "archive",
+      label: tt("导出可编译项目"),
+      hint: tt("整个项目打成 zip，拷到电脑出 release 包"),
+      onClick: () => onExportProject?.(),
     });
   }
   if (nativeAvailable) {

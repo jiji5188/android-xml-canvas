@@ -129,6 +129,8 @@ import {
   type ProjectSource,
 } from "@/lib/xml/project-browse";
 import { ioForProject } from "@/lib/xml/ai-fs";
+import { exportProjectZip } from "@/lib/xml/project-export";
+import { readPublishInfo } from "@/lib/xml/gradle-publish";
 import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
 
 /** M31：当前打开的项目（name = app 名称；iconUrl = ic_launcher 图标） */
@@ -3424,6 +3426,45 @@ const findResolved = findResolvedNode;
   /** 清掉已上传的资源，回到内置默认 */
   /** M3g：导出 res 包（zip）：布局 + 图标矢量 + 上传的 shape/values 一起带走，
    *  避免别处打开工程时「找不到图标文件」。*/
+  /** M190：导出整个可编译项目（zip）——手机上没有 Gradle/JDK，出 release 包得拿到电脑上，
+   *  所以这里把整个项目（含二进制资源）打包，附一份打包说明。 */
+  const doExportProject = async () => {
+    const io = aiFileIo;
+    if (!io) {
+      flashNote(tt("先打开一个项目目录，再导出"), 3200);
+      return;
+    }
+    const name = activeProject?.name || "project";
+    const gradleTxt = await readProjectFile(projectSaveRoot(activeProject), "app/build.gradle");
+    const info = gradleTxt ? readPublishInfo(gradleTxt) : null;
+    const sign = gradleTxt ? readSigningFromGradle(gradleTxt) : null;
+    setExportNote(tt("正在打包项目…"));
+    try {
+      const r = await exportProjectZip({
+        io,
+        projectName: name,
+        pkg: info?.applicationId || info?.namespace || null,
+        versionName: info?.versionName || null,
+        storeFile: sign?.storeFile || null,
+        alias: sign?.alias || null,
+      });
+      if (!r.ok) {
+        setExportNote(tt("导出失败：{reason}", { reason: r.error || "未知错误" }));
+        return;
+      }
+      setExportNote(
+        tt("已导出 {name}（{n} 个文件，{mb} MB）", {
+          name: r.filename || "",
+          n: r.files,
+          mb: (r.bytes / 1024 / 1024).toFixed(2),
+        }) + (r.skipped.length ? tt("；跳过 {n} 项（见包内「跳过文件清单.txt」）", { n: r.skipped.length }) : ""),
+      );
+      window.setTimeout(() => setExportNote(""), 6000);
+    } catch (e) {
+      setExportNote(tt("导出失败：{reason}", { reason: e instanceof Error ? e.message : String(e) }));
+    }
+  };
+
   const doDownloadResZip = () => {
     // M37b：非布局文件没有「res 包」概念，直接阻止
     if (codeOnly) {
@@ -4860,6 +4901,8 @@ const findResolved = findResolvedNode;
         onCopyXml={copyExportedXml}
         showResZip={Boolean(resExtras) || Object.keys(generatedDrawables).length > 0}
         onExportRes={doDownloadResZip}
+        canExportProject={!!aiFileIo}
+        onExportProject={() => void doExportProject()}
         onExportImage={() => setImgExportOpen(true)}
         hasRes={Boolean(resExtras)}
         onClearRes={clearRes}

@@ -8,7 +8,9 @@ export interface ZipEntry {
   /** zip 内路径，如 drawable/ic_search.xml */
   path: string;
   /** 文本内容（UTF-8） */
-  text: string;
+  text?: string;
+  /** M190：二进制内容（png / jar / keystore 等）；给了 bytes 就忽略 text */
+  bytes?: Uint8Array;
 }
 
 const CRC_TABLE: number[] = (() => {
@@ -44,7 +46,7 @@ export function makeZip(entries: ZipEntry[], now = new Date()): Uint8Array {
 
   for (const e of entries) {
     const name = enc.encode(e.path);
-    const data = enc.encode(e.text);
+    const data = e.bytes ?? enc.encode(e.text ?? "");
     const crc = crc32(data);
 
     // 本地文件头 30 + name

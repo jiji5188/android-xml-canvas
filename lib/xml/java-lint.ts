@@ -28,7 +28,19 @@ export interface JavaLintIssue {
   len?: number;
   sev: JavaLintSeverity;
   /** 机器可读的小标记,方便测试与后续分组 */
-  code: "brace" | "quote" | "rid" | "import" | "override" | "rtype" | "ridtype" | "method" | "sym";
+  code:
+    | "brace"
+    | "quote"
+    | "rid"
+    | "import"
+    | "override"
+    | "rtype"
+    | "ridtype"
+    | "method"
+    | "sym"
+    | "return"
+    | "dup"
+    | "voidret";
   msg: string;
   /** M179:能自动修复时给出 from → to */
   fix?: { from: string; to: string };
@@ -541,6 +553,125 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
         });
       }
     }
+  }
+
+  // 8) M204：控制流类硬错（return 路径缺失 / void 带 return 值 / 同名重复定义）
+  {
+    const sy = extractJavaSymbols(text, !!opts.isKotlin);
+    const lines = text.split("\n");
+    // 逐行找方法签名（带返回类型、方法名、是否 void、行号）
+    const sigRe = /^\s*(?:(?:public|private|protected|static|final|abstract|synchronized|native)\s+)*(?:[\w.<>\[\],\s]+?\s)?([a-z_]\w*)\s*\(([^)]*)\)\s*(?:throws\s+[\w.,\s]+)?[;{]/gm;
+    // 找所有方法的 [sigLine, name, isVoid, bodyOpenPos]
+    const methods: { sig: number; name: string; isVoid: boolean; retType: string }[] = [];
+    let sm: RegExpExecArray | null;
+    while ((sm = sigRe.exec(masked.code))) {
+      const fullSig = sm[0];
+      const isVoid = /\bvoid\b/.test(fullSig) || /\svoid\s*\(/.test(fullSig);
+      const retTypeM = fullSig.match(/(?:[\w.<>\[\],\s]+?\s)?(void|\w+(?:<[^>()]*>)?(?:\[\s*\])*)\s+\w+\s*\(/);
+      methods.push({
+        sig: masked.code.slice(0, sm.index).split("\n").length, // 1 基行号
+        name: sm[1],
+        isVoid,
+        retType: retTypeM ? retTypeM[1] : "",
+      });
+    }
+
+    // 8a) void 方法却带了 return <值>（return 后面跟了表达式）
+    for (const md of methods) {
+      if (!md.isVoid) continue; // 只查 void 方法
+      const off = smOffset(masked.code, md.sig);
+      const bodyStart = masked.code.indexOf("{", off);
+      if (bodyStart < 0) continue;
+      const bodyChunk = masked.code.slice(bodyStart, bodyStart + 600);
+      // 找 `return <非空>;`（return 后跟了值，而非 `return;`）
+      const retValM = /return\s+([^;\n\[\s][^;\n]*|[^;\n\s][^;\n]*);/.exec(bodyChunk);
+      if (retValM) {
+        const lineInChunk = bodyChunk.slice(0, retValM.index).split("\n").length;
+        const rl = md.sig + lineInChunk - 1;
+        const allLines = masked.code.split("\n");
+        const thatLine = allLines[rl - 1] || "";
+        const retIdx = thatLine.indexOf("return");
+        issues.push({
+          line: rl,
+          col: retIdx + 1,
+          len: thatLine.length - retIdx || 1,
+          sev: "error",
+          code: "voidret",
+          msg: `void 方法 ${md.name}() 不能 return 值（写了 return ${retValM[1].trim()};）`,
+        });
+      }
+    }
+
+    // 8b) 非 void 方法没有 return 路径（方法体里找 `return` / `throw`）
+    for (const md of methods) {
+      if (md.isVoid) continue; // 只查非 void
+      if (!md.retType) continue; // 构造器/解析不到返回类型的，跳过（避免误报）
+      const off = smOffset(masked.code, md.sig);
+      if (off < 0) continue;
+      let depth = 0,
+        i = 0,
+        end = -1;
+      const bStart = masked.code.indexOf("{", off);
+      if (bStart < 0) continue;
+      for (i = bStart; i < masked.code.length; i++) {
+        const ch = masked.code[i];
+        if (ch === "{") depth++;
+        else if (ch === "}") {
+          depth--;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
+        }
+      }
+      if (end < 0) continue;
+      const body = masked.code.slice(bStart, end + 1);
+      if (!/\breturn\b/.test(body) && !/\bthrow\b/.test(body)) {
+        issues.push({
+          line: md.sig,
+          col: (masked.code.slice(off).split("\n")[0] || "").indexOf(md.name) + 1,
+          len: md.name.length,
+          sev: "error",
+          code: "return",
+          msg: `${md.name}() 返回类型是 ${md.retType}，但方法体里没有 return / throw（所有路径都要返回值）`,
+        });
+      }
+    }
+
+    // 8c) 同名重复定义（两个方法/字段同名同参）—— 保守：只查字段重复
+    {
+      const fieldNames = new Map<string, number>(); // name → 第一次出现的行号
+      const fieldRe2 = /^\s*(?:(?:public|private|protected|static|final|transient|volatile)\s+)*([A-Za-z_]\w*(?:\s*<[^>()]*>)?(?:\s*\[\s*\])*)\s+([A-Za-z_]\w*)\s*(?:=[^;]*)?;/gm;
+      let fm: RegExpExecArray | null;
+      while ((fm = fieldRe2.exec(masked.code))) {
+        const name = fm[2];
+        const ln = masked.code.slice(0, fm.index).split("\n").length;
+        if (fieldNames.has(name)) {
+          issues.push({
+            line: ln,
+            col: 1,
+            len: name.length,
+            sev: "error",
+            code: "dup",
+            msg: `字段 ${name} 重复定义（前面第 ${fieldNames.get(name)} 行已声明过）`,
+          });
+        } else fieldNames.set(name, ln);
+      }
+    }
+  }
+
+  /** 取 1 基行号对应的文本偏移（简化：从头数换行） */
+  function smOffset(code: string, line1: number): number {
+    if (line1 <= 1) return 0;
+    let off = 0;
+    let ln = 1;
+    while (ln < line1 && off < code.length) {
+      const nl = code.indexOf("\n", off + 1);
+      if (nl < 0) break;
+      off = nl;
+      ln++;
+    }
+    return off + 1;
   }
 
   return issues.sort((a, b) => a.line - b.line);

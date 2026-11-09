@@ -15,6 +15,8 @@ import { TAG_TO_CLASS, isAssignableTo } from "./java-res-env";
 import { findMethodTypos } from "./java-methods";
 import { nearestName } from "./nearest-name";
 import { extractJavaSymbols, findUnknownSymbols } from "./java-symbols";
+import { findAssignMismatches } from "./java-assign";
+import { findCaseMismatches } from "./java-case";
 
 // M179:输出侧复用了这个方法(XML 资源引用检查也用),从 shared 模块 re-export 兼容旧引用
 export { nearestName };
@@ -40,7 +42,10 @@ export interface JavaLintIssue {
     | "sym"
     | "return"
     | "dup"
-    | "voidret";
+    | "voidret"
+    | "assign"
+    | "unusedimport"
+    | "case";
   msg: string;
   /** M179:能自动修复时给出 from → to */
   fix?: { from: string; to: string };
@@ -672,6 +677,72 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
       ln++;
     }
     return off + 1;
+  }
+
+  // 9) M205：赋值类型不匹配（int x = "abc" / int z = 1.5 / String s = 123 这类硬冲突）
+  // 注意用原始 text（不 masked）—— 要看字符串字面量才能判 int x = "abc" 这种冲突
+  {
+    for (const a of findAssignMismatches(text)) {
+      issues.push({
+        line: a.line,
+        col: a.col,
+        len: a.len,
+        sev: "error",
+        code: "assign",
+        msg: `类型不匹配：左边声明为 ${a.declared}，右边是 ${a.actual}`,
+      });
+    }
+  }
+
+  // 10) M205：import 了但没用到的类（warn 级，不算编译错，只是冗余）
+  {
+    const usedTypes = new Set<string>();
+    // 正文里出现的首字母大写单词 = 用到的类型（粗略但够用）
+    const noImport = text
+      .split("\n")
+      .filter((l) => !/^\s*import\b/.test(l))
+      .join("\n");
+    for (const m of noImport.matchAll(/\b([A-Z]\w*)\b/g)) usedTypes.add(m[1]);
+    // 逐条 import 行（带行号 + 简单名）
+    const importLines: { line: number; simple: string; fq: string }[] = [];
+    const tLines = text.split("\n");
+    for (let i = 0; i < tLines.length; i++) {
+      const m = /^\s*import\s+(?:static\s+)?([\w.*]+)\s*;?/.exec(tLines[i]);
+      if (m) importLines.push({ line: i + 1, simple: m[1].slice(m[1].lastIndexOf(".") + 1), fq: m[1] });
+    }
+    for (const im of importLines) {
+      if (im.simple === "" || im.simple === "*") continue; // 通配 import 不查
+      if (!usedTypes.has(im.simple)) {
+        issues.push({
+          line: im.line,
+          col: 1,
+          len: im.fq.length,
+          sev: "warn",
+          code: "unusedimport",
+          msg: `import 了 ${im.fq} 但代码里没用过（可以删掉）`,
+        });
+      }
+    }
+  }
+
+  // 11) M206：大小写写错（Java/Kotlin 区分大小写）——string→String、toast→Toast、settext→setText
+  {
+    const declaredNames = new Set<string>();
+    for (const m of text.matchAll(/\b(?:class|interface|enum|record)\s+([A-Z]\w*)/g)) declaredNames.add(m[1]);
+    for (const m of text.matchAll(/\b[A-Za-z_][\w<>\[\]]*\s+([a-z_]\w*)\s*\(/g)) declaredNames.add(m[1]);
+    for (const c of findCaseMismatches(text, declaredNames)) {
+      issues.push({
+        line: c.line,
+        col: c.col,
+        len: c.len,
+        sev: "error",
+        code: "case",
+        msg:
+          c.kind === "type"
+            ? `大小写写错了：${c.written} → ${c.correct}（Java/Kotlin 区分大小写，类型名首字母要大写）`
+            : `大小写写错了：${c.written} → ${c.correct}（Java/Kotlin 区分大小写法名，驼峰要正确）`,
+      });
+    }
   }
 
   return issues.sort((a, b) => a.line - b.line);

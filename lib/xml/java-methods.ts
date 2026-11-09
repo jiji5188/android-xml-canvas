@@ -49,6 +49,11 @@ export const KNOWN_METHODS: string[] = [
   "getInt", "getLong", "getShort", "getFloat", "getDouble", "getBlob", "isNull", "requery",
   "insert", "insertOrThrow", "update", "delete", "query", "rawQuery", "execSQL",
   "beginTransaction", "setTransactionSuccessful", "endTransaction", "getWritableDatabase", "getReadableDatabase",
+  // SharedPreferences 全家族（M205b：之前漏 putInt/putLong 等，报「没有 putInt() 这个方法」误报）
+  "putInt", "putLong", "putBoolean", "putString", "putFloat", "putStringSet",
+  "getBoolean", "getFloat", "getString", "getStringSet", "getAll", "contains", "edit", "apply", "commit",
+  "remove", "clear", "getDefaultSharedPreferences", "getSharedPreferences", "registerOnSharedPreferenceChangeListener",
+  "unregisterOnSharedPreferenceChangeListener", "onSharedPreferenceChanged", "get",
 ];
 
 const KNOWN = new Set(KNOWN_METHODS);

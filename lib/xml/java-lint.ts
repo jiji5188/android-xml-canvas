@@ -548,11 +548,15 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
         if (reported.has(u.name)) continue; // 同名只报一次（最高频来源）
         reported.add(u.name);
         const sug = nearestName(u.name, Array.from(sy.declared).filter((d) => d[0] === d[0].toLowerCase()));
+        // M207 置信度分级：
+        //  - 能猜到近似声明（拼写错）→ error（高置信度，几乎必错）
+        //  - 猜不到 → warn（我们的符号提取有盲区：反射注入字段、注解处理器生成代码等）
+        //   宁可降级也不拿"可能是我漏识别"冒充编译错
         issues.push({
           line: u.line,
           col: u.col,
           len: u.len,
-          sev: "error",
+          sev: sug ? "error" : "warn",
           code: "sym",
           msg: `用了 ${u.name} 但本类没声明（不是字段/参数/局部变量/方法，也不是已 import 的类）${sug ? `（是不是想写 ${sug}）` : "（打错字？还是忘声明？）"}`,
         });

@@ -86,6 +86,15 @@ export function extractJavaSymbols(src: string, isKotlin = false): JavaSymbols {
       methods.add(m[1]);
       collectDeclaredFromParams(m[2] || "", declared, true);
     }
+    // M207：Kotlin lambda 隐式参数 `it`（forEach { it } 最常见），否则必误报
+    if (/\bit\b/.test(src)) declared.add("it");
+    // `{ x -> ... }` / `{ a, b -> ... }` 显式 lambda 参数
+    for (const m of src.matchAll(/\{\s*([a-z_]\w*(?:\s*,\s*[a-z_]\w*)*)\s*->/g)) {
+      for (const p of (m[1] || "").split(",")) {
+        const t = p.trim();
+        if (t) declared.add(t);
+      }
+    }
     return { declared, methods };
   }
 

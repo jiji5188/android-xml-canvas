@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { diagRanges as calcDiagRanges, type DiagInfo } from "@/lib/xml/diag-deco";
+import { codeHint } from "@/lib/xml/diag-hints";
 import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
@@ -438,6 +439,7 @@ export function CodeEditor({
       if (e.col !== undefined) d.col = e.col;
       if (e.len !== undefined) d.len = e.len;
       if (e.fix) d.fix = e.fix;
+      if (e.code) d.code = e.code;
       // 同一行多条：error 优先，其次取第一条
       const prev = m.get(e.line);
       if (!prev || (prev.sev === "warn" && e.level === "error")) {
@@ -879,8 +881,13 @@ export function CodeEditor({
 
   /* M202：问题卡片 + 上/下一条导航 */
   const [diagIdx, setDiagIdx] = useState(-1); // 当前选中的问题（-1 = 没选，不弹卡片）
-  const curDiag =
-    errors && diagIdx >= 0 && diagIdx < errors.length ? errors[diagIdx] : null;
+  /* M207：只看错误 —— 把 warn 级（风格建议）从错误条/卡片里隐藏，降低误报感知 */
+  const [onlyErr, setOnlyErr] = useState(false);
+  const shownErrors = useMemo(
+    () => (onlyErr ? (errors || []).filter((e) => e.level === "error") : errors || []),
+    [errors, onlyErr],
+  );
+  const curDiag = diagIdx >= 0 && diagIdx < shownErrors.length ? shownErrors[diagIdx] : null;
 
   /** M202：跳到某条问题（设 diagIdx + 滚到那一行） */
   const gotoDiag = useCallback(
@@ -1035,14 +1042,14 @@ export function CodeEditor({
         ) : null}
       </div>
 
-      {(firstErr || fixCount > 0 || (errors && errors.length > 0)) && (
+      {(firstErr || fixCount > 0 || (shownErrors && shownErrors.length > 0)) && (
         <div className="axv-diagbar-wrap">
           <div
             className={"axv-code-errbar" + (firstErr ? " axv-errbar-jump" : "")}
             onClick={() => {
               // M202：点错误条 → 打开问题卡片（优先第一条 error，否则第一条）
-              if (!errors || !errors.length) return;
-              const i = firstErr ? errors.findIndex((e) => e === firstErr) : 0;
+              if (!shownErrors.length) return;
+              const i = firstErr ? shownErrors.findIndex((e) => e === firstErr) : 0;
               gotoDiag(i < 0 ? 0 : i);
             }}
             title={tt("点击查看问题详情")}
@@ -1065,11 +1072,11 @@ export function CodeEditor({
                   ? tt("第 {n} 行 · {msg}", { n: firstErr.line, msg: firstErr.message })
                   : fixCount > 0
                     ? tt("有 {n} 处可自动修复", { n: fixCount })
-                    : tt("共 {n} 处问题", { n: errors?.length ?? 0 })}
-              {errors && errors.length > 1 ? tt(" (共 {n} 处)", { n: errors.length }) : ""}
+                    : tt("共 {n} 处问题", { n: shownErrors.length })}
+              {shownErrors.length > 1 ? tt(" (共 {n} 处)", { n: shownErrors.length }) : ""}
             </span>
             {/* M202：上/下一条导航 */}
-            {errors && errors.length > 1 ? (
+            {shownErrors.length > 1 ? (
               <span className="axv-diag-nav" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
@@ -1082,7 +1089,7 @@ export function CodeEditor({
                   <span className="msr" aria-hidden="true">keyboard_arrow_up</span>
                 </button>
                 <span className="axv-diag-count">
-                  {diagIdx < 0 ? "—" : Math.min(diagIdx + 1, errors.length)}/{errors.length}
+                  {diagIdx < 0 ? "—" : Math.min(diagIdx + 1, shownErrors.length)}/{shownErrors.length}
                 </span>
                 <button
                   type="button"
@@ -1109,10 +1116,33 @@ export function CodeEditor({
                 {tt("修复 {n} 处", { n: fixCount })}
               </button>
             ) : null}
+            {/* M207：只看错误（从错误条/卡片里隐藏 warn 级风格建议） */}
+            {errors && errors.some((e) => e.level === "warn") ? (
+              <button
+                type="button"
+                className={"axv-errbar-only" + (onlyErr ? " axv-errbar-only-on" : "")}
+                title={tt("隐藏「注意」级提示，只看「错误」")}
+                onMouseDown={(e) => e.preventDefault()}
+                onTouchStart={(e) => e.preventDefault()}
+                onClick={() => setOnlyErr((v) => !v)}
+              >
+                <span className="msr" aria-hidden="true">{onlyErr ? "visibility" : "visibility_off"}</span>
+                {tt("只看错误")}
+              </button>
+            ) : null}
           </div>
 
           {/* M202：问题卡片（点错误区域或行号槽弹出） */}
-          {curDiag ? (
+          {curDiag ? (() => {
+            const hint = codeHint(curDiag.code, curDiag.message);
+            // 合并修复：卡片自带 fix 优先，否则用 hint.fix 拼一个
+            const mergedFix =
+              curDiag.fix ??
+              (hint?.fix
+                ? { from: hint.fix.from, to: hint.fix.to, label: `${hint.fix.from} → ${hint.fix.to}` }
+                : undefined);
+            const diagForFix = mergedFix ? { ...curDiag, fix: mergedFix } : curDiag;
+            return (
             <div className="axv-diagcard" role="dialog" aria-label={tt("问题详情")}>
               <div className="axv-diagcard-head">
                 <span className={"axv-diagcard-sev axv-diagcard-sev-" + (curDiag.level === "error" ? "err" : "warn")}>
@@ -1120,12 +1150,24 @@ export function CodeEditor({
                 </span>
                 <span className="axv-diagcard-title">{curDiag.message}</span>
               </div>
-              {curDiag.fix && onFixOne ? (
+              {hint ? (
+                <div className="axv-diagcard-why">
+                  <div className="axv-diagcard-whyrow">
+                    <span className="axv-diagcard-label">{tt("为什么报")}</span>
+                    <span className="axv-diagcard-body">{hint.why}</span>
+                  </div>
+                  <div className="axv-diagcard-whyrow">
+                    <span className="axv-diagcard-label">{tt("怎么改")}</span>
+                    <span className="axv-diagcard-body">{hint.how}</span>
+                  </div>
+                </div>
+              ) : null}
+              {mergedFix && onFixOne ? (
                 <div className="axv-diagcard-actions">
                   <button
                     type="button"
                     className="axv-diagcard-fix"
-                    onClick={() => onFixOne(curDiag)}
+                    onClick={() => onFixOne(diagForFix)}
                   >
                     <span className="msr" aria-hidden="true">build</span>
                     {tt("应用此修复")}
@@ -1141,7 +1183,8 @@ export function CodeEditor({
                 <span className="msr" aria-hidden="true">close</span>
               </button>
             </div>
-          ) : null}
+            );
+          })() : null}
         </div>
       )}
 

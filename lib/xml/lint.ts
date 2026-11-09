@@ -15,6 +15,9 @@ export interface LintIssue {
   len?: number;
   /** M179：可自动修复（from → to 的替换）；有值时编辑器工具条上出现「一键修复」 */
   fix?: { from: string; to: string; label: string };
+  /** M207：机器可读的小标记（java-lint 的 code，如 method/case/sym/assign/dup/...），
+   *  供问题卡片显示「为什么报 / 怎么改」两栏；没有时不显示 */
+  code?: string;
 }
 
 /**

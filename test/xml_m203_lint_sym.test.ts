@@ -17,8 +17,8 @@ describe("lintJava sym 规则 (M203)", () => {
     const names = sym.map((i) => i.msg.match(/用了 (\w+)/)?.[1]).filter(Boolean);
     expect(names).toContain("dsdxvbb");
     expect(names).toContain("lhh4");
-    // 是 error 级
-    expect(sym.every((i) => i.sev === "error")).toBe(true);
+    // M207：置信度分级——猜不到近似声明时降级为 warn（不拿"可能是我漏识别"冒充编译错）
+    expect(sym.every((i) => i.sev === "error" || i.sev === "warn")).toBe(true);
   });
 
   it("正常构造器不报 sym", () => {

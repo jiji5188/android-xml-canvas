@@ -8,6 +8,8 @@ export interface DiagInfo {
   line: number;
   sev: "error" | "warn";
   msg: string;
+  /** M207：机器可读 code（如 method/case/sym/assign/dup...），卡片据此显示「为什么/怎么改」 */
+  code?: string;
   /** 1 起列号（有值时画精确波浪，没有就退回整行标色） */
   col?: number;
   /** 下划线长度（默认 1） */

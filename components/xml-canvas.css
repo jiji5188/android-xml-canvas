@@ -11244,4 +11244,58 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 }
 .axv-diagcard-close:hover { background: rgba(0, 0, 0, 0.06); }
 .axv-diagcard-close .msr { font-size: 15px; }
+/* M207：卡片「为什么/怎么改」两栏 */
+.axv-diagcard-why {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-top: 1px solid color-mix(in srgb, var(--axv-outline-variant, #000) 14%, transparent);
+}
+.axv-diagcard-whyrow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.axv-diagcard-label {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--axv-on-surface-variant, #6e7781);
+  padding-top: 2px;
+  min-width: 44px;
+}
+.axv-diagcard-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--axv-on-surface, #1f2933);
+  overflow-wrap: anywhere;
+}
+/* M207：错误条「只看错误」切换 */
+.axv-errbar-only {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  margin-left: 6px;
+  border: 1px solid color-mix(in srgb, var(--axv-outline, #94a3b8) 40%, transparent);
+  border-radius: 9px;
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--axv-on-surface-variant, #6e7781);
+}
+.axv-errbar-only-on {
+  background: color-mix(in srgb, var(--axv-primary, #0b5fa5) 12%, transparent);
+  border-color: var(--axv-primary, #0b5fa5);
+  color: var(--axv-primary, #0b5fa5);
+  font-weight: 600;
+}
 

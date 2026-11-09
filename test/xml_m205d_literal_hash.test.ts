@@ -75,3 +75,42 @@ class A { void f(String s) { JSONObject o = new JSONObject(s); } }`;
     expect(iss.filter((i) => i.code === "unusedimport")).toHaveLength(0);
   });
 });
+
+// M207：sym 置信度分级（拼错→error，孤例→warn）+ Kotlin `it` 不报
+describe("M207 sym 置信度分级", () => {
+  it("有近似声明（拼错）→ error", () => {
+    const src = `class A {
+    String title; void f() { titel = "x"; }
+}`;
+    const sym = lintJava(src).filter((i) => i.code === "sym");
+    const hit = sym.find((i) => i.msg.includes("titel"));
+    expect(hit).toBeTruthy();
+    expect(hit!.sev).toBe("error");
+  });
+
+  it("孤例未知标识符（猜不到）→ warn", () => {
+    const src = `class A {
+    void f() {
+        qqqzzz = 1;
+    }
+}`;
+    const sym = lintJava(src).filter((i) => i.code === "sym");
+    const hit = sym.find((i) => i.msg.includes("qqqzzz"));
+    expect(hit).toBeTruthy();
+    expect(hit!.sev).toBe("warn");
+  });
+});
+
+describe("M207 Kotlin lambda 参数 it 不报", () => {
+  it("forEach { it } 的 it 不算未声明", () => {
+    const src = `class A {
+    private var items: List<String> = listOf("a")
+    fun show() { items.forEach { it.println() } }
+}`;
+    const symbols = extractJavaSymbols(src, true);
+    expect(symbols.declared.has("it")).toBe(true);
+    // 全量 lint（Kotlin）下 it 也不该被报 sym
+    const iss = lintJava(src, { isKotlin: true });
+    expect(iss.filter((i) => i.code === "sym")).toHaveLength(0);
+  });
+});

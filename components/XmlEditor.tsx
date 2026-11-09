@@ -2088,10 +2088,12 @@ const allDrawableNames = useMemo(() => {
           ...(j.len !== undefined ? { len: j.len } : {}),
           // M179：能自动修复的带上 from/to，编辑器给「一键修复」
           ...(j.fix ? { fix: { from: j.fix.from, to: j.fix.to, label: `${j.fix.from} → ${j.fix.to}` } } : {}),
+          // M207：带上机器可读 code，问题卡片能显示「为什么报 / 怎么改」
+          code: j.code,
         }));
         // M178：控件方法名拼写错误（setTxt → setText），只报编辑距离 1 的
         for (const a of checkApiTypos(lintSrc)) {
-          out.push({ line: a.line, level: "warn", message: formatApiIssue(a) });
+          out.push({ line: a.line, level: "warn", message: formatApiIssue(a), code: "method" });
         }
       } else if (codeOnly) {
         // M138：非布局文件走 lint-doc（结构 + 清单/values/drawable 等类型规则）

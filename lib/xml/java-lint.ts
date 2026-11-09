@@ -14,6 +14,7 @@ export type JavaLintSeverity = "error" | "warn";
 import { TAG_TO_CLASS, isAssignableTo } from "./java-res-env";
 import { findMethodTypos } from "./java-methods";
 import { nearestName } from "./nearest-name";
+import { extractJavaSymbols, findUnknownSymbols } from "./java-symbols";
 
 // M179:输出侧复用了这个方法(XML 资源引用检查也用),从 shared 模块 re-export 兼容旧引用
 export { nearestName };
@@ -27,7 +28,7 @@ export interface JavaLintIssue {
   len?: number;
   sev: JavaLintSeverity;
   /** 机器可读的小标记,方便测试与后续分组 */
-  code: "brace" | "quote" | "rid" | "import" | "override" | "rtype" | "ridtype" | "method";
+  code: "brace" | "quote" | "rid" | "import" | "override" | "rtype" | "ridtype" | "method" | "sym";
   msg: string;
   /** M179:能自动修复时给出 from → to */
   fix?: { from: string; to: string };
@@ -504,6 +505,41 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
         msg: `没有 ${t.name}() 这个方法,是不是想写 ${t.suggestion}()?`,
         fix: { from: t.name, to: t.suggestion },
       });
+    }
+  }
+
+  // 7) M203：未声明的标识符（本类没字段/参数/局部变量、不是方法名、不是关键字、不是已知类）
+  {
+    const sy = extractJavaSymbols(text, !!opts.isKotlin);
+    // 保守：只有看到「类体/构造器结构」才启用，避免方法体片段（看不到类字段）误报
+    const hasClassStructure =
+      /\bclass\s+[A-Z]/.test(text) || /^\s*(?:public|private|protected)?\s*[A-Z]\w*\s*\(/m.test(text);
+    if (hasClassStructure && sy.declared.size + sy.methods.size > 0) {
+      // 已知类型名：import 的简单名 + 常见类简单名 + 本类自己声明的类型（字段/参数类型里的首字母大写词）
+      const knownTypes = new Set<string>();
+      for (const m of masked.code.matchAll(/^\s*import\s+(?:static\s+)?([\w.*]+)\s*;?/gm)) {
+        const fq = m[1];
+        knownTypes.add(fq.slice(fq.lastIndexOf(".") + 1));
+      }
+      for (const simple of Object.keys(COMMON_IMPORTS)) knownTypes.add(simple);
+      // 泛型/基本类型名（int/String/List/... 出现在声明里的）
+      for (const m of masked.code.matchAll(/\b([A-Z]\w*)\s+(?:[a-z_]\w*)\s*[=;:)]/g)) knownTypes.add(m[1]);
+      const starts2 = starts; // 复用上面算的
+      const unknowns = findUnknownSymbols(masked.code, sy, knownTypes, starts2);
+      const reported = new Set<string>();
+      for (const u of unknowns) {
+        if (reported.has(u.name)) continue; // 同名只报一次（最高频来源）
+        reported.add(u.name);
+        const sug = nearestName(u.name, Array.from(sy.declared).filter((d) => d[0] === d[0].toLowerCase()));
+        issues.push({
+          line: u.line,
+          col: u.col,
+          len: u.len,
+          sev: "error",
+          code: "sym",
+          msg: `用了 ${u.name} 但本类没声明（不是字段/参数/局部变量/方法，也不是已 import 的类）${sug ? `（是不是想写 ${sug}）` : "（打错字？还是忘声明？）"}`,
+        });
+      }
     }
   }
 

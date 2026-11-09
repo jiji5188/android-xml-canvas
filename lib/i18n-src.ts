@@ -2446,6 +2446,15 @@ export const SRC_EN: SrcDict = {
   "分享 APK": "Share APK",
   "已调起分享": "Share sheet opened",
   "分享失败：{msg}": "Share failed: {msg}",
+  // M201 写入安全网
+  "文件已被外部修改": "File changed outside the editor",
+  "磁盘上的内容和上次保存的不一样（可能是 Android Studio、git 或别的工具改过）。直接保存会把那些改动整段覆盖掉。":
+    "The file on disk differs from what was last saved (edited by Android Studio, git, or another tool). Saving now would overwrite those changes.",
+  "从第 {n} 行开始不一致 · 磁盘 {a} 行 / 编辑器 {b} 行":
+    "Differs from line {n} · disk {a} lines / editor {b} lines",
+  "载入磁盘版本": "Load disk version",
+  "覆盖保存": "Overwrite anyway",
+  "已载入磁盘上的版本（编辑器里的未保存改动已丢弃）": "Loaded the disk version (unsaved edits were discarded)",
   // M199 Java 逻辑仿真
   "Java 逻辑 {n} 条": "Java logic · {n} effect(s)",
   "Java 仿真：执行 onCreate 的 {n} 条语句": "Java sim: ran {n} statement(s) from onCreate",

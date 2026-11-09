@@ -7015,6 +7015,19 @@ button.axv-ws-caret:hover {
 .axv-saveas-title { font-size: 15px; font-weight: 700; color: var(--axv-title); }
 .axv-saveas-hint { margin-top: 8px; font-size: 12px; line-height: 1.6; color: var(--axv-desc); }
 .axv-saveas-hint code { background: var(--axv-surface-sunken); border-radius: 4px; padding: 0 4px; }
+/* M201：外部改动冲突弹窗里的文件路径 */
+.axv-conflict-path {
+  display: block;
+  margin-top: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--axv-on-surface-variant);
+  background: var(--axv-surface-sunken);
+  border-radius: 6px;
+  padding: 6px 8px;
+  word-break: break-all;
+}
 .axv-saveas-field { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
 .axv-saveas-field > span { font-size: 12px; color: var(--axv-on-surface-variant); }
 .axv-saveas-subhint { font-size: 11px; color: var(--axv-on-surface-variant); opacity: .8; }

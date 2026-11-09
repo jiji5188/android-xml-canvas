@@ -49,6 +49,7 @@ import { checkXmlResRefs, applyFixToLine } from "@/lib/xml/xml-res-check";
 import { checkApiTypos, formatApiIssue } from "@/lib/xml/java-api-check";
 import { lintCodeDoc } from "@/lib/xml/lint-doc";
 import { loadSnaps, pushSnap, SNAP_LABEL_SAVE } from "@/lib/xml/snapshots";
+import { loadBaseline, planWrite, saveBaseline, snapshotBeforeWrite, firstDiffLine } from "@/lib/xml/safe-write";
 import { useUnsavedLeave } from "@/components/UnsavedLeaveDialog";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { sanitizeResName } from "@/lib/xml/resname";
@@ -83,7 +84,7 @@ import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildApk, hasBuildApk, installApk, shareApkFile, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
-import { projectSaveRoot, projectFileExists, readProjectFile, saveProjectFile, saveResFiles, resAbs } from "@/lib/xml/project-save";
+import { projectSaveRoot, projectFileExists, readProjectFile, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
 import { parseAppIconConfig } from "@/lib/xml/app-icon";
 import { nativeBridge } from "@/lib/xml/native-save";
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
@@ -763,6 +764,21 @@ export function XmlEditor() {
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState("activity_main.xml");
   const [wsBusy, setWsBusy] = useState(false);
+
+  /** M201：磁盘上的文件被外部改过 → 拦下这一次写入，让用户选
+   *  （直接用旧内容盖掉别人在电脑上的改动是开发工具最不能犯的错） */
+  const [conflict, setConflict] = useState<
+    | {
+        rel: string;
+        disk: string;
+        mine: string;
+        /** 用户点「覆盖保存」后重跑的那次写入 */
+        retry: () => void;
+        /** 载入磁盘版本（放弃编辑器里的改动） */
+        loadDisk?: () => void;
+      }
+    | null
+  >(null);
 
   /** M140：历史版本快照面板 */
   const [histPanelOpen, setHistPanelOpen] = useState(false);
@@ -2548,6 +2564,8 @@ const allDrawableNames = useMemo(() => {
           return;
         }
         setXmlAndTrack(text);
+        // M201：把「打开时的磁盘内容」记成基线 —— 之后别人在电脑上改了、我们再保存时能拦下来
+        saveBaseline(entry.rel || entry.target || entry.name, text);
         // M25b：结构树里标「正在编辑」用
         setWsActiveName(entry.name);
         // M37b：记住工程内相对路径（非布局文件保存/判定都靠它）
@@ -4017,10 +4035,29 @@ const findResolved = findResolvedNode;
   }, [projRoot]);
 
   /** 把当前内容整包写进当前项目的 res 目录（layout + 依赖 drawable/values） */
-  const saveIntoProject = async (name?: string): Promise<boolean> => {
+  const saveIntoProject = async (name?: string, forceExternal = false): Promise<boolean> => {
     if (!projRoot) return false;
     const input = currentSaveInput(name);
     const files = buildSaveFiles(input);
+    /* M201：写之前先读磁盘主文件，看是不是别人在电脑上改过了。
+     * 只在「我们记得上次写了什么」且「磁盘对不上」时拦，首次写不拦。 */
+    const primary = files[0];
+    const diskRel = primary ? `${RES_PREFIX}/${primary.path}` : "";
+    if (primary && diskRel) {
+      const disk = await readProjectFile(projRoot, diskRel);
+      const plan = planWrite(loadBaseline(diskRel), disk, forceExternal);
+      if (plan.conflict) {
+        setConflict({
+          rel: diskRel,
+          disk: disk ?? "",
+          mine: primary.text ?? "",
+          retry: () => void saveIntoProject(name, true),
+          loadDisk: () => loadDiskIntoEditor(disk ?? ""),
+        });
+        return false;
+      }
+      snapshotBeforeWrite(diskRel, disk, primary.text ?? "");
+    }
     const r = await saveResFiles(projRoot, files);
     if (!r.ok) {
       flashNote(
@@ -4035,10 +4072,19 @@ const findResolved = findResolvedNode;
       4200,
     );
     markSaved(xml);
+    // M201：写成功了才更新基线（失败时不更新，下次还能发现外部改动）
+    for (const f of files) saveBaseline(`${RES_PREFIX}/${f.path}`, f.text ?? "");
     return true;
   };
 
-  /** 写回原路径（含依赖资源） */
+  /** M201：用户在「文件已被外部修改」弹窗里选「载入磁盘版本」 */
+  const loadDiskIntoEditor = (text: string) => {
+    liveXmlRef.current = null;
+    docRef.current = text;
+    setXml(text);
+    markSaved(text);
+    flashNote(tt("已载入磁盘上的版本（编辑器里的未保存改动已丢弃）"), 4600);
+  };
   const saveBack = async (): Promise<boolean> => {
     // M36：有打开的项目 → 优先进项目 res（不依赖 saveOrigin）
     if (projRoot && (await saveIntoProject())) return true;
@@ -4082,11 +4128,32 @@ const findResolved = findResolvedNode;
   };
 
   /** M37b：非布局文件（manifest / values / menu …）—— 整文件原位写回，不生成任何布局/依赖资源 */
-  const saveRawFile = async (): Promise<boolean> => {
+  const saveRawFile = async (forceExternal = false): Promise<boolean> => {
     const name = saveOrigin?.name || (openRel ? openRel.split("/").pop() || "" : "") || tt("文件");
     // 1) 原生绝对路径 / content URI
     if (saveOrigin?.kind === "native") {
-      if (writeTextNative(saveOrigin.target, xml)) {
+      /* M201：绝对路径也查一次外部改动（读不到就当首次，不拦） */
+      const target = saveOrigin.target;
+      let disk: string | null = null;
+      try {
+        disk = nativeBridge()?.readText?.(target) ?? null;
+      } catch {
+        disk = null;
+      }
+      const plan = planWrite(loadBaseline(target), disk, forceExternal);
+      if (plan.conflict) {
+        setConflict({
+          rel: target,
+          disk: disk ?? "",
+          mine: xml,
+          retry: () => void saveRawFile(true),
+          loadDisk: () => loadDiskIntoEditor(disk ?? ""),
+        });
+        return false;
+      }
+      snapshotBeforeWrite(target, disk, xml);
+      if (writeTextNative(target, xml)) {
+        saveBaseline(target, xml);
         flashNote(tt("已保存 {name}（原路径）", { name }), 3200);
         markSaved(xml);
         return true;
@@ -4096,8 +4163,22 @@ const findResolved = findResolvedNode;
     }
     // 2) 项目可写根 + 工程内相对路径（native 拼绝对路径 / web 走目录句柄）
     if (projRoot && openRel) {
+      const disk = await readProjectFile(projRoot, openRel);
+      const plan = planWrite(loadBaseline(openRel), disk, forceExternal);
+      if (plan.conflict) {
+        setConflict({
+          rel: openRel,
+          disk: disk ?? "",
+          mine: xml,
+          retry: () => void saveRawFile(true),
+          loadDisk: () => loadDiskIntoEditor(disk ?? ""),
+        });
+        return false;
+      }
+      snapshotBeforeWrite(openRel, disk, xml);
       const ok = await saveProjectFile(projRoot, openRel, xml);
       if (ok) {
+        saveBaseline(openRel, xml);
         flashNote(tt("已保存 {name} → {rel}", { name, rel: openRel }), 3600);
         markSaved(xml);
         return true;
@@ -5238,6 +5319,57 @@ const findResolved = findResolvedNode;
               </button>
               <button className="axv-set-btn axv-saveas-ok" onClick={() => void confirmSaveAs()}>
                 {tr("save.confirm", "选择文件夹并保存")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* M201：文件被外部改过 → 写入前拦一道 */}
+      {conflict ? (
+        <div
+          className="axv-saveas-mask"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setConflict(null);
+          }}
+        >
+          <div className="axv-saveas-card" role="dialog" aria-modal="true" aria-label={tt("文件已被外部修改")}>
+            <div className="axv-saveas-title">{tt("文件已被外部修改")}</div>
+            <div className="axv-saveas-hint">
+              {tt("磁盘上的内容和上次保存的不一样（可能是 Android Studio、git 或别的工具改过）。直接保存会把那些改动整段覆盖掉。")}
+            </div>
+            <code className="axv-conflict-path">{conflict.rel}</code>
+            <div className="axv-saveas-subhint">
+              {tt("从第 {n} 行开始不一致 · 磁盘 {a} 行 / 编辑器 {b} 行", {
+                n: firstDiffLine(conflict.disk, conflict.mine),
+                a: conflict.disk ? conflict.disk.split("\n").length : 0,
+                b: conflict.mine ? conflict.mine.split("\n").length : 0,
+              })}
+            </div>
+            <div className="axv-saveas-btns">
+              <button className="axv-set-btn" onClick={() => setConflict(null)}>
+                {tt("取消")}
+              </button>
+              <button
+                className="axv-set-btn"
+                onClick={() => {
+                  const c = conflict;
+                  setConflict(null);
+                  c.loadDisk?.();
+                }}
+              >
+                {tt("载入磁盘版本")}
+              </button>
+              <button
+                className="axv-set-btn axv-saveas-ok"
+                onClick={() => {
+                  const c = conflict;
+                  setConflict(null);
+                  c.retry();
+                }}
+              >
+                {tt("覆盖保存")}
               </button>
             </div>
           </div>

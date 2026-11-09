@@ -22,6 +22,8 @@ export interface Snap {
 export const SNAP_LABEL_SAVE = "保存";
 export const SNAP_LABEL_MANUAL = "手动";
 export const SNAP_LABEL_BEFORE_RESTORE = "恢复前";
+/** M201：写盘前把磁盘上的旧内容存一份，方便回滚别人/自己的改动 */
+export const SNAP_LABEL_BEFORE_WRITE = "写入前";
 
 export const SNAP_CAP = 12;
 export const SNAP_CHARS = 1_200_000;

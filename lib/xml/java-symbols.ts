@@ -26,7 +26,9 @@ const JAVA_KEYWORDS = new Set(
     "abstract assert boolean break byte case catch char class const continue default do double else " +
     "enum extends final finally float for goto if implements import instanceof int interface long " +
     "native new package private protected public return short static strictfp super switch " +
-    "synchronized this throw throws transient try void volatile while"
+    "synchronized this throw throws transient try void volatile while " +
+    // M205d：字面量不是标识符（之前报「用了 null/true/false 但没声明」）
+    "null true false"
   ).split(/\s+/),
 );
 

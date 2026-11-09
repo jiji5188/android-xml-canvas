@@ -38,18 +38,15 @@ describe("lintJava M205 集成", () => {
     expect(iss.some((i) => i.code === "assign")).toBe(true);
   });
 
-  it("import 了没用到的类报 unusedimport（warn）", () => {
+  it("M205d：不再报 unusedimport（风格建议误报代价太大，已移除）", () => {
     const src = `import android.widget.TextView;
 import java.util.List;
 class A { void f() { List<String> l = new java.util.ArrayList<>(); } }`;
     const iss = lintJava(src);
-    // TextView 没用到 → 报；List 用到了 → 不报
-    const unused = iss.filter((i) => i.code === "unusedimport");
-    expect(unused.some((i) => i.msg.includes("TextView"))).toBe(true);
-    expect(unused.some((i) => i.msg.includes("List"))).toBe(false);
+    expect(iss.filter((i) => i.code === "unusedimport")).toHaveLength(0);
   });
 
-  it("全用到了的 import 不报 unusedimport", () => {
+  it("真正用到的 import 当然也不报", () => {
     const src = `import java.util.List;
 class A { void f() { List<String> l = null; } }`;
     const iss = lintJava(src);

@@ -618,36 +618,10 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
     }
   }
 
-  // 10) M205：import 了但没用到的类（warn 级，不算编译错，只是冗余）
-  {
-    const usedTypes = new Set<string>();
-    // 正文里出现的首字母大写单词 = 用到的类型（粗略但够用）
-    const noImport = text
-      .split("\n")
-      .filter((l) => !/^\s*import\b/.test(l))
-      .join("\n");
-    for (const m of noImport.matchAll(/\b([A-Z]\w*)\b/g)) usedTypes.add(m[1]);
-    // 逐条 import 行（带行号 + 简单名）
-    const importLines: { line: number; simple: string; fq: string }[] = [];
-    const tLines = text.split("\n");
-    for (let i = 0; i < tLines.length; i++) {
-      const m = /^\s*import\s+(?:static\s+)?([\w.*]+)\s*;?/.exec(tLines[i]);
-      if (m) importLines.push({ line: i + 1, simple: m[1].slice(m[1].lastIndexOf(".") + 1), fq: m[1] });
-    }
-    for (const im of importLines) {
-      if (im.simple === "" || im.simple === "*") continue; // 通配 import 不查
-      if (!usedTypes.has(im.simple)) {
-        issues.push({
-          line: im.line,
-          col: 1,
-          len: im.fq.length,
-          sev: "warn",
-          code: "unusedimport",
-          msg: `import 了 ${im.fq} 但代码里没用过（可以删掉）`,
-        });
-      }
-    }
-  }
+  // 10) M205d：import 未使用检查已移除。
+  //    原因：多次误报（用户明确在用的 JSONObject/JSONException 被报"未使用"），
+  //    根因是单文件静态分析无法可靠判定"是否通过继承/反射/生成代码间接使用"，
+  //    而这是风格建议（非编译错），误报代价 >> 收益。
 
   // 11) M206：大小写写错（Java/Kotlin 区分大小写）——string→String、toast→Toast、settext→setText
   {

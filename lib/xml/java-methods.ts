@@ -65,6 +65,13 @@ export const KNOWN_METHODS: string[] = [
   "charAt", "indexOf", "lastIndexOf", "startsWith", "endsWith", "equalsIgnoreCase",
   "split", "toUpperCase", "toLowerCase", "hashCode", "getClass", "wait", "notify",
   "sleep", "currentTimeMillis", "nanoTime", "exitTime", "getInstance", "newInstance",
+  // M205d：Java 标准库高频方法（之前缺 hash/Objects.hash 等，被当拼写错建议 has）
+  "hash", "equals", "clone", "compare", "compareTo", "toString", "values",
+  "entrySet", "keySet", "containsKey", "containsValue", "size", "addAll", "putAll",
+  "putIfAbsent", "computeIfAbsent", "getOrDefault", "forEach", "iterator", "of", "asList",
+  "copyOf", "requireNonNull", "isNull", "nonNull", "deepEquals", "equalsIgnoreCase",
+  "notifyAll", "interrupt", "join", "setName", "getName", "run", "call", "apply",
+  "accept", "test", "andThen", "compose",
 ];
 
 const KNOWN = new Set(KNOWN_METHODS);

@@ -83,6 +83,8 @@ function lowerHint(name: string, cand: string): number {
 export interface MethodTypo {
   /** 行号（1 基） */
   line: number;
+  /** M202：行内列号（1 基），编辑器精确下划线用 */
+  col: number;
   name: string;
   suggestion: string;
 }
@@ -101,7 +103,7 @@ export function findMethodTypos(code: string, opts: FindMethodTyposOpts = {}): M
   const out: MethodTypo[] = [];
   const seen = new Set<string>();
   const lines = code.split("\n");
-  const check = (name: string, lineNo: number) => {
+  const check = (name: string, lineNo: number, colNo: number) => {
     if (KNOWN.has(name) || declared.has(name) || seen.has(name)) return;
     // M185b：短名（≤ 3 字符，如 put / get / add / run）不查 ——
     // 编辑距离只有 2 时几乎必误报（put→post），而这些短方法名本来就不是拼写坑
@@ -118,16 +120,22 @@ export function findMethodTypos(code: string, opts: FindMethodTyposOpts = {}): M
     }
     if (!sug) return;
     seen.add(name);
-    out.push({ line: lineNo, name, suggestion: sug });
+    out.push({ line: lineNo, col: colNo, name, suggestion: sug });
   };
   // 无接收者的调用（findviewbyid(...)）只在这几个动词开头时才查，否则跟局部函数/关键字打架
   const BARE_VERB = /^(?:get|set|find|make|start|finish|show|add|remove|notify|post|run|is|has|on)/;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    for (const m of line.matchAll(/\.\s*([a-z_][A-Za-z0-9_]*)\s*\(/g)) check(m[1], i + 1);
+    for (const m of line.matchAll(/\.\s*([a-z_][A-Za-z0-9_]*)\s*\(/g)) {
+      // m[1] 是方法名：整段匹配以 `.`（或 `.`+空格）开头，名字起点 = m.index + 前缀长度
+      const prefix = m[0].slice(0, m[0].indexOf(m[1]));
+      check(m[1], i + 1, m.index + prefix.length + 1);
+    }
     for (const m of line.matchAll(/(?:^|[^.\w$])([a-z_][A-Za-z0-9_]*)\s*\(/g)) {
       if (!BARE_VERB.test(m[1])) continue;
-      check(m[1], i + 1);
+      // m.index===0 时名字就是行首；否则前面吃掉了 1 个字符
+      const nameAt = m.index === 0 ? m.index : m.index + 1;
+      check(m[1], i + 1, nameAt + 1);
     }
   }
   return out;

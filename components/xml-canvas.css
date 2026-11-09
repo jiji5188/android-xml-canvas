@@ -11128,3 +11128,120 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   padding: 4px 8px;
 }
 .axv-sign-pkgfix button { font-size: 12px; padding: 2px 10px; }
+
+/* ===== M202：AIDE 式错误引导（上/下一条 + 问题卡片） ===== */
+.axv-diagbar-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.axv-diag-nav {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+}
+.axv-diag-navbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 11px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.axv-diag-navbtn:hover { opacity: 1; background: rgba(0, 0, 0, 0.06); }
+.axv-diag-navbtn .msr { font-size: 16px; }
+.axv-diag-count {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+  min-width: 30px;
+  text-align: center;
+}
+
+/* 问题卡片：贴在错误条上方 */
+.axv-diagcard {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 6px);
+  z-index: 40;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--axv-surface, #fff);
+  color: var(--axv-on-surface, #1f2328);
+  border: 1px solid var(--axv-outline-variant, rgba(0, 0, 0, 0.12));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  font-size: 12px;
+  line-height: 1.55;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px 8px;
+}
+.axv-diagcard-head {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 22px;
+}
+.axv-diagcard-sev {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #fff;
+}
+.axv-diagcard-sev-err { background: #dc2626; }
+.axv-diagcard-sev-warn { background: #d97706; }
+.axv-diagcard-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.axv-diagcard-actions { flex: 0 0 auto; }
+.axv-diagcard-fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--axv-primary, #0b5fa5);
+  background: color-mix(in srgb, var(--axv-primary, #0b5fa5) 10%, transparent);
+  color: var(--axv-primary, #0b5fa5);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.axv-diagcard-fix .msr { font-size: 14px; }
+.axv-diagcard-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--axv-on-surface-variant, #6e7781);
+  cursor: pointer;
+}
+.axv-diagcard-close:hover { background: rgba(0, 0, 0, 0.06); }
+.axv-diagcard-close .msr { font-size: 15px; }
+

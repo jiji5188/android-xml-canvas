@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
+import { diagRanges as calcDiagRanges, type DiagInfo } from "@/lib/xml/diag-deco";
 import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
@@ -29,6 +30,7 @@ import {
   type DecorationSet,
   type ViewUpdate,
 } from "@codemirror/view";
+
 import {
   defaultKeymap,
   indentWithTab,
@@ -65,6 +67,8 @@ export interface CodeEditorProps {
   onFormat?: () => void;
   /** M179:一键修复(把 errors 里带 fix 的替换掉) */
   onFixAll?: () => void;
+  /** M202：修某一条（点问题卡片里的「应用此修复」） */
+  onFixOne?: (iss: LintIssue) => void;
   /** M38:语法(默认 xml) */
   lang?: EditorLang;
   /** M40:缩进宽度(空格数,默认 4) */
@@ -126,6 +130,55 @@ const errLineField = StateField.define<DecorationSet>({
     let next = deco.map(tr.changes);
     for (const e of tr.effects) {
       if (e.is(setErrLines)) next = buildErrDeco(tr.state.doc, e.value);
+    }
+    return next;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+/* ===== M202：AIDE 式精确错误引导 =====
+ *  1. 波浪下划线（range mark）圈住出问题的这一段，不再整行飘红
+ *  2. 行号槽红/黄点 + 悬停看原因
+ *  3. 点一下跳到那一行，底部错误条加「上一条 / 下一条」导航
+ *  4. 点错误区域弹问题卡片，带「应用此修复」按钮 */
+
+const setDiags = StateEffect.define<Map<number, DiagInfo>>();
+
+/** M202：把 diags 算成 CodeMirror 装饰（整行标色 / 精确波浪下划线） */
+function buildDiagDeco(
+  doc: { lines: number; line(n: number): { from: number; to: number } },
+  m: Map<number, DiagInfo>,
+) {
+  const ranges: ReturnType<Decoration["range"]>[] = [];
+  for (const r of calcDiagRanges(doc, m)) {
+    if (r.from === r.to) continue; // 空范围不画
+    if (r.full) {
+      // 整行 → 行底色（老行为）
+      ranges.push(
+        Decoration.line({
+          class: r.sev === "error" ? "cm-errline" : "cm-warnline",
+          attributes: { title: r.msg },
+        }).range(r.from),
+      );
+    } else {
+      // 精确范围 → 波浪下划线
+      ranges.push(
+        Decoration.mark({
+          class: r.sev === "error" ? "cm-diag-err" : "cm-diag-warn",
+          attributes: { title: r.msg },
+        }).range(r.from, r.to),
+      );
+    }
+  }
+  return Decoration.set(ranges, true);
+}
+
+const diagField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    let next = deco.map(tr.changes);
+    for (const e of tr.effects) {
+      if (e.is(setDiags)) next = buildDiagDeco(tr.state.doc, e.value);
     }
     return next;
   },
@@ -197,6 +250,23 @@ const cmTheme = EditorView.theme({
   ".cm-errline": {
     backgroundColor: "rgba(220, 38, 38, 0.07)",
     boxShadow: "inset 3px 0 0 rgba(220, 38, 38, 0.55)",
+  },
+  // M202：精确范围的波浪下划线（AIDE 风格）
+  ".cm-diag-err": {
+    textDecoration: "underline wavy rgba(220, 38, 38, 0.9)",
+    textDecorationSkipInk: "none",
+    textUnderlineOffset: "3px",
+    cursor: "pointer",
+  },
+  ".cm-diag-warn": {
+    textDecoration: "underline wavy rgba(217, 119, 6, 0.9)",
+    textDecorationSkipInk: "none",
+    textUnderlineOffset: "3px",
+    cursor: "pointer",
+  },
+  ".cm-warnline": {
+    backgroundColor: "rgba(217, 119, 6, 0.07)",
+    boxShadow: "inset 3px 0 0 rgba(217, 119, 6, 0.55)",
   },
   ".cm-matchingBracket, &.cm-focused .cm-matchingBracket": {
     backgroundColor: "var(--axv-code-sel-bg, rgba(4, 64, 159, 0.18))",
@@ -294,6 +364,7 @@ export function CodeEditor({
   onCursorLine,
   onFormat,
   onFixAll,
+  onFixOne,
   lang = "xml",
   indent = 4,
   resNames,
@@ -313,6 +384,8 @@ export function CodeEditor({
   const onCursorLineRef = useRef(onCursorLine);
   const onRefClickRef = useRef(onRefClick);
   onChangeRef.current = onChange;
+  /** M202：ref 包装，供 view 创建 effect 使用 */
+  const diagClickRef = useRef<((e: MouseEvent) => void) | null>(null);
   onCursorLineRef.current = onCursorLine;
   onRefClickRef.current = onRefClick;
   /** M57:最后一次由编辑器自身发出的文本--父层防抖回灌同一个值时据此跳过,避免"冲掉刚输入的字" */
@@ -349,6 +422,27 @@ export function CodeEditor({
     for (const e of errors || []) {
       if (e.level !== "error") continue;
       if (!m.has(e.line)) m.set(e.line, e.message);
+    }
+    return m;
+  }, [errors]);
+
+  /* M202：把 errors 转成 Map<line, DiagInfo>（保留 col/len/sev/fix，供精确下划线 + 行号槽 + 问题卡片） */
+  const diagMap = useMemo(() => {
+    const m = new Map<number, DiagInfo>();
+    for (const e of errors || []) {
+      const d: DiagInfo = {
+        line: e.line,
+        sev: e.level,
+        msg: e.message,
+      };
+      if (e.col !== undefined) d.col = e.col;
+      if (e.len !== undefined) d.len = e.len;
+      if (e.fix) d.fix = e.fix;
+      // 同一行多条：error 优先，其次取第一条
+      const prev = m.get(e.line);
+      if (!prev || (prev.sev === "warn" && e.level === "error")) {
+        m.set(e.line, d);
+      }
     }
     return m;
   }, [errors]);
@@ -547,6 +641,8 @@ export function CodeEditor({
         cmTheme,
         fontTheme,
         errLineField,
+        // M202：精确错误装饰（波浪下划线，整行无列号时退回行标色）
+        diagField,
         // M45:候选列表开着时抢下方向键/回车/取消,未开时完全透明
         Prec.highest(
           keymap.of([
@@ -660,8 +756,12 @@ export function CodeEditor({
     // M45:滚动就关(光标坐标靠的是当前视口,滚走了就对不上了)
     const onScroll = () => setSugBoth(null);
     view.scrollDOM.addEventListener("scroll", onScroll, { passive: true });
+    // M202：点错误区域（cm-diag-err / cm-diag-warn）→ 弹问题卡片（用 ref 避免 hoisting 问题）
+    const onClick = (e: MouseEvent) => diagClickRef.current?.(e);
+    view.contentDOM.addEventListener("click", onClick);
     return () => {
       view.scrollDOM.removeEventListener("scroll", onScroll);
+      view.contentDOM.removeEventListener("click", onClick);
       view.destroy();
       viewRef.current = null;
     };
@@ -699,12 +799,12 @@ export function CodeEditor({
     });
   }, [indent]);
 
-  /* ===== 错误行装饰 ===== */
+  /* ===== M202：精确错误装饰（波浪下划线 + 行号槽红/黄点 + 问题卡片） ===== */
   useEffect(() => {
     const v = viewRef.current;
     if (!v) return;
-    v.dispatch({ effects: setErrLines.of(errLines) });
-  }, [errLines]);
+    v.dispatch({ effects: [setErrLines.of(errLines), setDiags.of(diagMap)] });
+  }, [errLines, diagMap]);
 
   /* ===== 跳转行(画布点选 / 报错定位) ===== */
   useEffect(() => {
@@ -776,6 +876,42 @@ export function CodeEditor({
     const head = list.map((e) => e.fix!.label).join("  |  ");
     return fixCount > 4 ? `${head}  ...+${fixCount - 4}` : head;
   }, [errors, fixCount]);
+
+  /* M202：问题卡片 + 上/下一条导航 */
+  const [diagIdx, setDiagIdx] = useState(-1); // 当前选中的问题（-1 = 没选，不弹卡片）
+  const curDiag =
+    errors && diagIdx >= 0 && diagIdx < errors.length ? errors[diagIdx] : null;
+
+  /** M202：跳到某条问题（设 diagIdx + 滚到那一行） */
+  const gotoDiag = useCallback(
+    (idx: number) => {
+      if (!errors || !errors.length) return;
+      const len = errors.length;
+      // 负数（含从 -1 往前）→ 最后一条；否则取模循环
+      const n = idx < 0 ? len - 1 : ((idx % len) + len) % len;
+      setDiagIdx(n);
+      const e = errors[n];
+      if (e && e.line) jumpToLine(e.line);
+    },
+    [errors, jumpToLine],
+  );
+
+  /** M202：点错误区域 → 弹问题卡片 */
+  const handleDiagClick = useCallback(
+    (e: MouseEvent) => {
+      // 只有点在 cm-diag-err / cm-diag-warn 上才算
+      const target = e.target as HTMLElement;
+      const cls = target.className || "";
+      if (!cls.includes("cm-diag-err") && !cls.includes("cm-diag-warn")) return;
+      // 找对应的 line：从标题或 data 属性读
+      const title = target.getAttribute("title") || "";
+      const idx = (errors || []).findIndex((x) => x.message === title);
+      if (idx >= 0) setDiagIdx(idx);
+    },
+    [errors],
+  );
+  /** M202：ref 包装（已在上方声明） */
+  diagClickRef.current = (e: MouseEvent) => handleDiagClick(e);
 
   return (
     <div className={"axv-code" + (className ? " " + className : "")}>
@@ -899,41 +1035,112 @@ export function CodeEditor({
         ) : null}
       </div>
 
-      {(firstErr || fixCount > 0) && (
-        <div
-          className={"axv-code-errbar" + (firstErr ? " axv-errbar-jump" : "")}
-          onClick={() => firstErr && jumpToLine(firstErr.line)}
-          title={firstErr ? tt("点击跳到出错行") : undefined}
-          role={firstErr ? "button" : undefined}
-          style={
-            firstErr
-              ? undefined
-              : {
-                  background: "color-mix(in srgb, var(--axv-warn, #d97706) 14%, var(--axv-surface))",
-                  borderTopColor: "var(--axv-warn, #d97706)",
-                  color: "var(--axv-on-surface)",
-                }
-          }
-        > 
-          <span className="axv-err-dot" aria-hidden="true" style={firstErr ? undefined : { background: "var(--axv-warn, #d97706)" }} />
-          <span className="axv-err-text">
-            {firstErr
-              ? tt("第 {n} 行 · {msg}", { n: firstErr.line, msg: firstErr.message })
-              : tt("有 {n} 处可自动修复", { n: fixCount })}
-            {errors && errors.length > 1 && firstErr ? tt(" (共 {n} 处)", { n: errors.length }) : ""}
-          </span>
-          {onFixAll && fixCount > 0 ? (
-            <button
-              type="button"
-              className="axv-err-fix"
-              onMouseDown={(e) => e.preventDefault()}
-              onTouchStart={(e) => e.preventDefault()}
-              onClick={onFixAll}
-              title={fixTitle}
-            >
-              <span className="msr" aria-hidden="true">build</span>
-              {tt("修复 {n} 处", { n: fixCount })}
-            </button>
+      {(firstErr || fixCount > 0 || (errors && errors.length > 0)) && (
+        <div className="axv-diagbar-wrap">
+          <div
+            className={"axv-code-errbar" + (firstErr ? " axv-errbar-jump" : "")}
+            onClick={() => {
+              // M202：点错误条 → 打开问题卡片（优先第一条 error，否则第一条）
+              if (!errors || !errors.length) return;
+              const i = firstErr ? errors.findIndex((e) => e === firstErr) : 0;
+              gotoDiag(i < 0 ? 0 : i);
+            }}
+            title={tt("点击查看问题详情")}
+            role="button"
+            style={
+              firstErr
+                ? undefined
+                : {
+                    background: "color-mix(in srgb, var(--axv-warn, #d97706) 14%, var(--axv-surface))",
+                    borderTopColor: "var(--axv-warn, #d97706)",
+                    color: "var(--axv-on-surface)",
+                  }
+            }
+          >
+            <span className="axv-err-dot" aria-hidden="true" style={firstErr ? undefined : { background: "var(--axv-warn, #d97706)" }} />
+            <span className="axv-err-text">
+              {curDiag
+                ? tt("第 {n} 行 · {msg}", { n: curDiag.line, msg: curDiag.message })
+                : firstErr
+                  ? tt("第 {n} 行 · {msg}", { n: firstErr.line, msg: firstErr.message })
+                  : fixCount > 0
+                    ? tt("有 {n} 处可自动修复", { n: fixCount })
+                    : tt("共 {n} 处问题", { n: errors?.length ?? 0 })}
+              {errors && errors.length > 1 ? tt(" (共 {n} 处)", { n: errors.length }) : ""}
+            </span>
+            {/* M202：上/下一条导航 */}
+            {errors && errors.length > 1 ? (
+              <span className="axv-diag-nav" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="axv-diag-navbtn"
+                  title={tt("上一处")}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onTouchStart={(e) => e.preventDefault()}
+                  onClick={() => gotoDiag(diagIdx - 1)}
+                >
+                  <span className="msr" aria-hidden="true">keyboard_arrow_up</span>
+                </button>
+                <span className="axv-diag-count">
+                  {diagIdx < 0 ? "—" : Math.min(diagIdx + 1, errors.length)}/{errors.length}
+                </span>
+                <button
+                  type="button"
+                  className="axv-diag-navbtn"
+                  title={tt("下一处")}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onTouchStart={(e) => e.preventDefault()}
+                  onClick={() => gotoDiag(diagIdx + 1)}
+                >
+                  <span className="msr" aria-hidden="true">keyboard_arrow_down</span>
+                </button>
+              </span>
+            ) : null}
+            {onFixAll && fixCount > 0 ? (
+              <button
+                type="button"
+                className="axv-err-fix"
+                onMouseDown={(e) => e.preventDefault()}
+                onTouchStart={(e) => e.preventDefault()}
+                onClick={onFixAll}
+                title={fixTitle}
+              >
+                <span className="msr" aria-hidden="true">build</span>
+                {tt("修复 {n} 处", { n: fixCount })}
+              </button>
+            ) : null}
+          </div>
+
+          {/* M202：问题卡片（点错误区域或行号槽弹出） */}
+          {curDiag ? (
+            <div className="axv-diagcard" role="dialog" aria-label={tt("问题详情")}>
+              <div className="axv-diagcard-head">
+                <span className={"axv-diagcard-sev axv-diagcard-sev-" + (curDiag.level === "error" ? "err" : "warn")}>
+                  {curDiag.level === "error" ? tt("错误") : tt("注意")}
+                </span>
+                <span className="axv-diagcard-title">{curDiag.message}</span>
+              </div>
+              {curDiag.fix && onFixOne ? (
+                <div className="axv-diagcard-actions">
+                  <button
+                    type="button"
+                    className="axv-diagcard-fix"
+                    onClick={() => onFixOne(curDiag)}
+                  >
+                    <span className="msr" aria-hidden="true">build</span>
+                    {tt("应用此修复")}
+                  </button>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="axv-diagcard-close"
+                onClick={() => setDiagIdx(-1)}
+                title={tt("关闭")}
+              >
+                <span className="msr" aria-hidden="true">close</span>
+              </button>
+            </div>
           ) : null}
         </div>
       )}

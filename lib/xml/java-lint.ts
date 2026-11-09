@@ -1,13 +1,13 @@
-// lib/xml/java-lint.ts — M70（C2）：Java/Kotlin 轻量静态检查
+// lib/xml/java-lint.ts - M70(C2):Java/Kotlin 轻量静态检查
 //
-// 不指望在这里做真正的编译：目标是「明显会编译不过的东西别直接甩给用户」。
-// 检查项（全部本地、无依赖、够快）：
-//   1. 括号/花括号/方括号不平衡（带开括号所在行）
-//   2. 字符串/字符字面量没闭合（会连带整段后续代码判错，所以优先报这个）
-//   3. R.id.xxx 在项目 layout 里不存在（拼错 id 的最高频来源）
-//   4. 用了常见类但没 import（Intent / Toast / Bundle / TextView …）
+// 不指望在这里做真正的编译:目标是「明显会编译不过的东西别直接甩给用户」。
+// 检查项(全部本地、无依赖、够快):
+//   1. 括号/花括号/方括号不平衡(带开括号所在行)
+//   2. 字符串/字符字面量没闭合(会连带整段后续代码判错,所以优先报这个)
+//   3. R.id.xxx 在项目 layout 里不存在(拼错 id 的最高频来源)
+//   4. 用了常见类但没 import(Intent / Toast / Bundle / TextView ...)
 //   5. @Override 后面跟的不是方法声明
-// 结果分 error / warn 两档；formatJavaLint 固定带「未编译验证」声明，避免模型谎称编译通过。
+// 结果分 error / warn 两档;formatJavaLint 固定带「未编译验证」声明,避免模型谎称编译通过。
 
 export type JavaLintSeverity = "error" | "warn";
 
@@ -15,25 +15,29 @@ import { TAG_TO_CLASS, isAssignableTo } from "./java-res-env";
 import { findMethodTypos } from "./java-methods";
 import { nearestName } from "./nearest-name";
 
-// M179：输出侧复用了这个方法（XML 资源引用检查也用），从 shared 模块 re-export 兼容旧引用
+// M179:输出侧复用了这个方法(XML 资源引用检查也用),从 shared 模块 re-export 兼容旧引用
 export { nearestName };
 
 export interface JavaLintIssue {
   /** 1 起行号 */
   line: number;
+  /** M202:1 起列号(编辑器精确下划线用) */
+  col?: number;
+  /** M202:下划线长度(默认 1) */
+  len?: number;
   sev: JavaLintSeverity;
-  /** 机器可读的小标记，方便测试与后续分组 */
+  /** 机器可读的小标记,方便测试与后续分组 */
   code: "brace" | "quote" | "rid" | "import" | "override" | "rtype" | "ridtype" | "method";
   msg: string;
-  /** M179：能自动修复时给出 from → to */
+  /** M179:能自动修复时给出 from → to */
   fix?: { from: string; to: string };
 }
 
 export interface JavaLintOpts {
   isKotlin?: boolean;
-  /** 项目里真实存在的 id 名（不含 @+id/ 前缀）。传了才查 R.id */
+  /** 项目里真实存在的 id 名(不含 @+id/ 前缀)。传了才查 R.id */
   ids?: Iterable<string>;
-  /** M177：项目里各类资源名。传了对应类型才查 R.string / R.layout / R.drawable … */
+  /** M177:项目里各类资源名。传了对应类型才查 R.string / R.layout / R.drawable ... */
   res?: {
     layout?: Iterable<string>;
     string?: Iterable<string>;
@@ -43,9 +47,9 @@ export interface JavaLintOpts {
     mipmap?: Iterable<string>;
     style?: Iterable<string>;
   };
-  /** M177：id → 控件标签（TextView…），用于 findViewById 赋值类型校验 */
+  /** M177:id → 控件标签(TextView...),用于 findViewById 赋值类型校验 */
   idTag?: Record<string, string>;
-  /** 允许「用了但不 import」的名字（同包类、内部类） */
+  /** 允许「用了但不 import」的名字(同包类、内部类) */
   allowNames?: Iterable<string>;
 }
 
@@ -80,22 +84,22 @@ const COMMON_IMPORTS: Record<string, string> = {
 };
 
 interface Masked {
-  /** 与原文等长：注释与字符串内容替换成空格（保留换行），用于结构检查 */
+  /** 与原文等长:注释与字符串内容替换成空格(保留换行),用于结构检查 */
   code: string;
   /** 逐字符是否落在字符串/字符字面量里 */
   inStr: boolean[];
-  /** M98：文件结束时仍未闭合的字面量起始偏移（null = 都闭合了） */
+  /** M98:文件结束时仍未闭合的字面量起始偏移(null = 都闭合了) */
   openAt: number | null;
 }
 
-/** 把注释和字面量内容抹成空格，保持偏移量与行号不变
+/** 把注释和字面量内容抹成空格,保持偏移量与行号不变
  *
- * M98：以前只认 `"` / `'` / `//` / `/* *\/`，三种真实写法会被当成代码，
- * 于是里面的括号被拿去配对 → 误报「括号不配对」：
- *   1. Java 文本块 `"""…"""`（内容里的 " 会提前结束掩码）
- *   2. Kotlin 原始字符串 `"""…"""`（`"""{"a":1}"""` 这种 JSON 模板最典型）
- *   3. Kotlin 字符串模板 `"${map["k"]}"`（内层引号会把外层提前关掉）
- * 现在用状态栈处理：raw（三引号）、tpl（`${…}` 模板嵌套）。
+ * M98:以前只认 `"` / `'` / `//` / `/* *\/`,三种真实写法会被当成代码,
+ * 于是里面的括号被拿去配对 → 误报「括号不配对」:
+ *   1. Java 文本块 `"""..."""`(内容里的 " 会提前结束掩码)
+ *   2. Kotlin 原始字符串 `"""..."""`(`"""{"a":1}"""` 这种 JSON 模板最典型)
+ *   3. Kotlin 字符串模板 `"${map["k"]}"`(内层引号会把外层提前关掉)
+ * 现在用状态栈处理:raw(三引号)、tpl(`${...}` 模板嵌套)。
  */
 function mask(src: string, isKotlin = false): Masked {
   const out: string[] = [];
@@ -105,7 +109,7 @@ function mask(src: string, isKotlin = false): Masked {
   const stack: { st: St; quote?: string; depth?: number; at?: number }[] = [];
   const top = () => stack[stack.length - 1];
   stack.push({ st: "code" });
-  /** 按原文长度占位：换行保留换行，其余变空格 */
+  /** 按原文长度占位:换行保留换行,其余变空格 */
   const blank = (text: string, isStr: boolean) => {
     for (const ch of text) {
       out.push(ch === "\n" ? "\n" : " ");
@@ -132,7 +136,7 @@ function mask(src: string, isKotlin = false): Masked {
         i += 2;
         continue;
       }
-      // 三引号：Java 文本块 / Kotlin 原始字符串
+      // 三引号:Java 文本块 / Kotlin 原始字符串
       if (c === '"' && n === '"' && n2 === '"') {
         stack.push({ st: "raw", at: i });
         blank('"""', true);
@@ -182,7 +186,7 @@ function mask(src: string, isKotlin = false): Masked {
     }
 
     if (st === "raw") {
-      // 闭合三引号。Java 文本块里 `\` 仍会转义，Kotlin 原始字符串完全不转义
+      // 闭合三引号。Java 文本块里 `\` 仍会转义,Kotlin 原始字符串完全不转义
       if (c === "\\" && !isKotlin) {
         blank(src.slice(i, i + 2), true);
         i += 2;
@@ -199,7 +203,7 @@ function mask(src: string, isKotlin = false): Masked {
       continue;
     }
 
-    // tpl：Kotlin 字符串模板 `${…}`，里面还能再套字符串和花括号
+    // tpl:Kotlin 字符串模板 `${...}`,里面还能再套字符串和花括号
     if (st === "tpl") {
       if (c === '"' && n === '"' && n2 === '"') {
         stack.push({ st: "raw", at: i });
@@ -217,7 +221,7 @@ function mask(src: string, isKotlin = false): Masked {
       else if (c === "}") {
         const d = (cur.depth ?? 0) - 1;
         if (d <= 0) {
-          // 模板结束，回到外层字符串
+          // 模板结束,回到外层字符串
           stack.pop();
           blank("}", true);
           i++;
@@ -233,7 +237,7 @@ function mask(src: string, isKotlin = false): Masked {
     // str / char
     const quote = cur.quote ?? '"';
     if (c === "\\") {
-      // 转义：`\"` / `\'` / `\\` 都把后一个字符一起吞掉
+      // 转义:`\"` / `\'` / `\\` 都把后一个字符一起吞掉
       blank(src.slice(i, i + 2), true);
       i += 2;
       continue;
@@ -251,7 +255,7 @@ function mask(src: string, isKotlin = false): Masked {
       continue;
     }
     if (c === "\n" && st === "str") {
-      // Java 不允许裸换行的字符串字面量（Kotlin 原始字符串走 raw，不来这里）
+      // Java 不允许裸换行的字符串字面量(Kotlin 原始字符串走 raw,不来这里)
       blank("\n", true);
       i++;
       continue;
@@ -289,24 +293,28 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
 
   const masked = mask(text, !!opts.isKotlin);
   const starts = lineStarts(text);
+  /** M202:偏移 → 1 起列号(供编辑器画精确下划线) */
+  const colOf = (offset: number): number => offset - starts[lineOf(starts, offset) - 1] + 1;
 
-  // 1) 字面量没闭合（先查，否则后面括号检查全是噪音）
-  //    M98：改成看 mask 的结束状态 —— 以前靠 inStr 扫一遍，遇到文件末尾正好是 "abc" 会误报
+  // 1) 字面量没闭合(先查,否则后面括号检查全是噪音)
+  //    M98:改成看 mask 的结束状态 -- 以前靠 inStr 扫一遍,遇到文件末尾正好是 "abc" 会误报
   const lastQuoteLine = masked.openAt === null ? 0 : lineOf(starts, masked.openAt);
   if (lastQuoteLine) {
     issues.push({
       line: lastQuoteLine,
+      col: masked.openAt !== null ? colOf(masked.openAt) : undefined,
+      len: 1,
       sev: "error",
       code: "quote",
-      msg: "字符串或字符字面量没有闭合（少了收尾的引号）",
+      msg: "字符串或字符字面量没有闭合(少了收尾的引号)",
     });
   }
 
-  // 2) 括号平衡。字面量没闭合时跳过，避免误导
+  // 2) 括号平衡。字面量没闭合时跳过,避免误导
   if (!lastQuoteLine) {
     const stack: { ch: string; at: number }[] = [];
     const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
-    /** M98：已经报过「不配对」就不再补一条「没闭合」—— 同一个错报两次最像误报 */
+    /** M98:已经报过「不配对」就不再补一条「没闭合」-- 同一个错报两次最像误报 */
     let mismatched = false;
     for (let i = 0; i < masked.code.length; i++) {
       const c = masked.code[i];
@@ -316,9 +324,11 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
         if (!top) {
           issues.push({
             line: lineOf(starts, i),
+            col: colOf(i),
+            len: 1,
             sev: "error",
             code: "brace",
-            msg: `多余的 "${c}"：前面没有对应的开括号`,
+            msg: `多余的 "${c}":前面没有对应的开括号`,
           });
           mismatched = true;
           break;
@@ -326,9 +336,11 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
         if (top.ch !== pairs[c]) {
           issues.push({
             line: lineOf(starts, top.at),
+            col: colOf(top.at),
+            len: 1,
             sev: "error",
             code: "brace",
-            msg: `括号不配对："${top.ch}"（第 ${lineOf(starts, top.at)} 行）却遇到 "${c}"`,
+            msg: `括号不配对:"${top.ch}"(第 ${lineOf(starts, top.at)} 行)却遇到 "${c}"`,
           });
           mismatched = true;
           break;
@@ -339,9 +351,11 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
       const top = stack[stack.length - 1];
       issues.push({
         line: lineOf(starts, top.at),
+        col: colOf(top.at),
+        len: 1,
         sev: "error",
         code: "brace",
-        msg: `"${top.ch}" 没有闭合（缺 ${top.ch === "{" ? "}" : top.ch === "(" ? ")" : "]"}）`,
+        msg: `"${top.ch}" 没有闭合(缺 ${top.ch === "{" ? "}" : top.ch === "(" ? ")" : "]"})`,
       });
     }
   }
@@ -357,6 +371,8 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
       const sug = nearestName(name, ids);
       issues.push({
         line: lineOf(starts, m.index || 0),
+        col: colOf(m.index || 0),
+        len: m[0].length,
         sev: "warn",
         code: "rid",
         msg: `R.id.${name} 在项目布局里不存在（拼错？或者还没在 xml 里声明 @+id/${name}）${sug ? `（是不是想写 ${sug}）` : ""}`,
@@ -365,7 +381,7 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
     }
   }
 
-  // 3b) M177：R.string / R.layout / R.drawable / R.color / R.dimen / R.mipmap / R.style 是否真存在
+  // 3b) M177:R.string / R.layout / R.drawable / R.color / R.dimen / R.mipmap / R.style 是否真存在
   const RES_KINDS = ["layout", "string", "drawable", "color", "dimen", "mipmap", "style"] as const;
   const RES_LABEL: Record<string, string> = {
     layout: "布局",
@@ -389,6 +405,8 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
       const sug = nearestName(name, set);
       issues.push({
         line: lineOf(starts, m.index || 0),
+        col: colOf(m.index || 0),
+        len: m[0].length,
         sev: "warn",
         code: "rtype",
         msg: `R.${kind}.${name} 不存在（项目里没有这个${RES_LABEL[kind]}资源，检查拼写或资源名）${sug ? `（是不是想写 ${sug}）` : ""}`,
@@ -397,7 +415,7 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
     }
   }
 
-  // 3c) M177：findViewById 的赋值类型与布局里的控件对不上
+  // 3c) M177:findViewById 的赋值类型与布局里的控件对不上
   const idTag = opts.idTag && Object.keys(opts.idTag).length ? opts.idTag : null;
   if (idTag) {
     for (const m of masked.code.matchAll(/\b([A-Z]\w*)\s+([a-z_]\w*)\s*=\s*(?:\([^()]*?\)\s*)?[\w.]*?findViewById\s*\(\s*R\s*\.\s*id\s*\.\s*([A-Za-z_]\w*)\s*\)/g)) {
@@ -408,11 +426,16 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
       const want = TAG_TO_CLASS[actual];
       if (!want) continue;
       if (isAssignableTo(want, declType)) continue;
+      // M202：下划线圈在 findViewById 里的 R.id.xxx 上（而不是整行）
+      const rPart = /R\s*\.\s*id\s*\.\s*[A-Za-z_]\w*/.exec(m[0]);
+      const rOff = rPart ? m[0].indexOf(rPart[0]) : 0;
       issues.push({
         line: lineOf(starts, m.index || 0),
+        col: rPart ? colOf((m.index || 0) + rOff) : undefined,
+        len: rPart ? rPart[0].length : undefined,
         sev: "warn",
         code: "ridtype",
-        msg: `findViewById(R.id.${idName}) 拿到的是 ${actual}（${want}），赋给 ${declType} 会 ClassCastException`,
+        msg: `findViewById(R.id.${idName}) 拿到的是 ${actual}(${want}),赋给 ${declType} 会 ClassCastException`,
       });
     }
   }
@@ -433,14 +456,17 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
     if (fq.startsWith(pkg + ".") && pkg) continue;
     const re = new RegExp(`\\b${simple}\\b`);
     if (!re.test(masked.code)) continue;
-    // 只当类型用（后面跟变量名/泛型/括号）才算，避免撞上同名变量
+    // 只当类型用(后面跟变量名/泛型/括号)才算,避免撞上同名变量
     const used = new RegExp(`\\b${simple}\\s*(?:<|\\[|\\.|\\(|\\s+[a-z_]\\w*\\s*[=;,)]|\\s+[a-z_]\\w*\\s*:)`);
-    if (!used.test(masked.code)) continue;
+    const usedM = used.exec(masked.code);
+    if (!usedM) continue;
     issues.push({
-      line: 1,
+      line: lineOf(starts, usedM.index),
+      col: colOf(usedM.index),
+      len: simple.length,
       sev: "warn",
       code: "import",
-      msg: `用到 ${simple} 但没 import（应加 import ${fq};）`,
+      msg: `用到 ${simple} 但没 import(应加 import ${fq};)`,
     });
   }
 
@@ -453,24 +479,29 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
       while (j < lines.length && (!lines[j].trim() || lines[j].trim().startsWith("@"))) j++;
       const next = lines[j] || "";
       if (!/\(/.test(next) && !/\b(class|interface|enum)\b/.test(next)) {
+        const at = lines[i].indexOf("@Override");
         issues.push({
           line: i + 1,
+          col: at >= 0 ? at + 1 : 1,
+          len: at >= 0 ? "@Override".length : 1,
           sev: "warn",
           code: "override",
-          msg: "@Override 后面没有紧跟方法声明（多写了一个 @Override？）",
+          msg: "@Override 后面没有紧跟方法声明(多写了一个 @Override?)",
         });
       }
     }
   }
 
-  // 6) M178：方法名拼错（setTxt → setText）
+  // 6) M178:方法名拼错(setTxt → setText)
   if (!opts.isKotlin) {
     for (const t of findMethodTypos(masked.code)) {
       issues.push({
         line: t.line,
+        col: t.col,
+        len: t.name.length,
         sev: "warn",
         code: "method",
-        msg: `没有 ${t.name}() 这个方法，是不是想写 ${t.suggestion}()？`,
+        msg: `没有 ${t.name}() 这个方法,是不是想写 ${t.suggestion}()?`,
         fix: { from: t.name, to: t.suggestion },
       });
     }
@@ -479,9 +510,9 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
   return issues.sort((a, b) => a.line - b.line);
 }
 
-/** 人话输出。永远带「未编译验证」声明 —— 不要让模型以为这是编译结果。 */
+/** 人话输出。永远带「未编译验证」声明 -- 不要让模型以为这是编译结果。 */
 export function formatJavaLint(issues: JavaLintIssue[], label = "这段代码"): string {
-  const head = "（静态检查，未编译验证 —— 不保证能编译通过，最终请以 gradle 构建为准）";
+  const head = "(静态检查,未编译验证 -- 不保证能编译通过,最终请以 gradle 构建为准)";
   if (!issues.length) {
     return `${label}没查出明显问题 ${head}`;
   }
@@ -489,8 +520,8 @@ export function formatJavaLint(issues: JavaLintIssue[], label = "这段代码"):
   const warns = issues.filter((i) => i.sev === "warn");
   const parts: string[] = [`${label}查出 ${errs.length} 个错误、${warns.length} 个可疑点 ${head}`];
   for (const i of issues) {
-    parts.push(`- ${i.sev === "error" ? "错误" : "注意"} L${i.line}：${i.msg}`);
+    parts.push(`- ${i.sev === "error" ? "错误" : "注意"} L${i.line}:${i.msg}`);
   }
-  if (errs.length) parts.push("先修错误，再处理注意项；改完记得把整处逻辑再过一遍。");
+  if (errs.length) parts.push("先修错误,再处理注意项;改完记得把整处逻辑再过一遍。");
   return parts.join("\n");
 }

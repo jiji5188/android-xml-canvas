@@ -32,6 +32,8 @@ export interface XmlCodeViewProps {
   onFormat: () => void;
   /** M179：一键修复可自动修的问题（资源引用拼错/方法名拼错） */
   onFixAll?: () => void;
+  /** M202：修某一条（问题卡片里点「应用此修复」） */
+  onFixOne?: (iss: LintIssue) => void;
 
   /** M38：当前文件语法（xml / java） */
   lang?: EditorLang;
@@ -88,6 +90,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           onChange={props.onChange}
           errors={props.errors}
           onFixAll={props.onFixAll}
+          onFixOne={props.onFixOne}
           focusLine={props.focusLine}
           focusTick={props.focusTick}
           onCursorLine={props.onCursorLine}

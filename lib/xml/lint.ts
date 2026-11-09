@@ -9,6 +9,10 @@ export interface LintIssue {
   line: number;
   level: "error" | "warn";
   message: string;
+  /** M202：1 起列号（行内定位）。有值时编辑器给精确的波浪下划线，没有就退回整行标色 */
+  col?: number;
+  /** M202：下划线长度（默认 1）。配合 col 圈出「出问题的这一段」 */
+  len?: number;
   /** M179：可自动修复（from → to 的替换）；有值时编辑器工具条上出现「一键修复」 */
   fix?: { from: string; to: string; label: string };
 }

@@ -542,6 +542,8 @@ export function XmlEditor() {
    * 这也是 VS Code（Monaco）/ CM6 官方 React 包的做法：文档真相在编辑器里，React 只拿快照。 */
   const docRef = useRef(xml);
   const liveXmlRef = useRef<string | null>(null);
+  /** M202：doFixOne 在 setXmlAndTrack 声明之前就需要引用它，用 ref 包一层 */
+  const setXmlAndTrackRef = useRef<((next: string, mergeKey?: string) => void) | null>(null);
   const xmlSyncTimer = useRef<number | null>(null);
   /** 当前真实文本（优先编辑中的最新值） */
   const currentXml = useCallback(() => liveXmlRef.current ?? docRef.current, []);
@@ -2081,6 +2083,9 @@ const allDrawableNames = useMemo(() => {
           line: j.line,
           level: j.sev,
           message: j.msg,
+          // M202：带列号/长度，编辑器能画精确范围的波浪下划线（像 AIDE 那样圈住出问题的这一段）
+          ...(j.col !== undefined ? { col: j.col } : {}),
+          ...(j.len !== undefined ? { len: j.len } : {}),
           // M179：能自动修复的带上 from/to，编辑器给「一键修复」
           ...(j.fix ? { fix: { from: j.fix.from, to: j.fix.to, label: `${j.fix.from} → ${j.fix.to}` } } : {}),
         }));
@@ -2167,6 +2172,27 @@ const allDrawableNames = useMemo(() => {
     setExportNote(tt("已修复 {n} 处（可撤销）", { n: fixed }));
     window.setTimeout(() => setExportNote(""), 2400);
   };
+
+  /** M202：点某条问题卡片的「应用此修复」—— 只修这一条（其余等用户再点） */
+  const doFixOne = useCallback(
+    (iss: LintIssue) => {
+      const fx = iss.fix;
+      if (!fx) return;
+      flushXml();
+      const cur = currentXml();
+      const lines = cur.split("\n");
+      const idx = Math.max(0, Math.min((iss.line ?? 1) - 1, lines.length - 1));
+      const L = lines[idx];
+      if (L === undefined) return;
+      const r = applyFixToLine(L, fx.from, fx.to);
+      if (!r.count) return;
+      lines[idx] = r.text;
+      setXmlAndTrackRef.current?.(lines.join("\n"));
+      setExportNote(tt("已修复 {n} 处（可撤销）", { n: r.count }));
+      window.setTimeout(() => setExportNote(""), 2400);
+    },
+    [flushXml, currentXml],
+  );
 
   /* ===== ConstraintLayout 约束编辑（一期：表单 + 自动推断） ===== */
   const [autoNotes, setAutoNotes] = useState<string[]>([]);
@@ -2553,6 +2579,7 @@ const allDrawableNames = useMemo(() => {
     },
     [flushTextTimer, commitHistory],
   );
+  setXmlAndTrackRef.current = setXmlAndTrack;
 
   /** M25d：把一个条目载入画布（记住来源，保存时写回原文件） */
   const loadEntry = useCallback(
@@ -4864,6 +4891,7 @@ const findResolved = findResolvedNode;
         onCursorLine={onCodeCursorLine}
         onFormat={doFormat}
         onFixAll={doFixAll}
+        onFixOne={doFixOne}
         onRefClick={onGotoRef}
         lang={editorLang}
         indent={editorTheme.indent}

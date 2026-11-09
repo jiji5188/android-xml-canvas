@@ -63,8 +63,29 @@ export function resSearchMatches(
 }
 
 /**
+ * values 文件名 → R 类型（strings→string、colors→color、dimens→dimen…）。
+ * 不归一化的话 `colors.xml` 会算出 resType="colors"，XML 的 `@colors/x` 和
+ * `<color name="x">` 两边都对不上（M196 修）。
+ */
+export function singularResType(name: string): string {
+  const n = (name || "").trim().toLowerCase();
+  const map: Record<string, string> = {
+    strings: "string",
+    colors: "color",
+    dimens: "dimen",
+    bools: "bool",
+    integers: "integer",
+    styles: "style",
+    ids: "id",
+    arrays: "array",
+    attrs: "attr",
+  };
+  return map[n] || n;
+}
+
+/**
  * 重命名同步：把文本里对资源 oldName 的引用/定义名改成 newName。
- *   kind="ref"    ：`@type/oldName`（含 drawable↔mipmap 互通）→ `@type/newName`
+ *   kind="ref"    ：`@type/oldName`（含 drawable↔mipmap 互通）+ Java/Kotlin 的 `R.type.oldName`
  *   kind="values" ：`<tag ... name="oldName">`（tag ∈ 该类型允许集合），不动 android:name
  * 返回 { text, n }，n = 替换次数（0 = 没动）。
  */
@@ -77,8 +98,21 @@ export function renameResRef(
 ): { text: string; n: number } {
   if (!text || !oldName || oldName === newName) return { text, n: 0 };
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const type = singularResType(resType);
   let n = 0;
   let out = text;
+
+  /** Java/Kotlin：R.type.oldName（也覆盖 R.drawable↔R.mipmap 混用） */
+  const replaceR = (types: string[]) => {
+    for (const t of types) {
+      const re = new RegExp(`\\bR\\.${esc(t)}\\.${esc(oldName)}(?![A-Za-z0-9_])`, "g");
+      out = out.replace(re, () => {
+        n++;
+        return `R.${t}.${newName}`;
+      });
+    }
+  };
+
   if (kind === "ref") {
     const re = new RegExp(`@${esc(resType)}/${esc(oldName)}(?![A-Za-z0-9_])`, "g");
     out = out.replace(re, () => {
@@ -86,31 +120,37 @@ export function renameResRef(
       return `@${resType}/${newName}`;
     });
     // drawable / mipmap 经常混用（@drawable/ic_x 也可能写成 @mipmap/ic_x）
-    if (resType === "drawable" || resType === "mipmap") {
-      const other = resType === "drawable" ? "mipmap" : "drawable";
+    const types: string[] = [type];
+    if (type === "drawable" || type === "mipmap") {
+      const other = type === "drawable" ? "mipmap" : "drawable";
+      types.push(other);
       const re2 = new RegExp(`@${esc(other)}/${esc(oldName)}(?![A-Za-z0-9_])`, "g");
       out = out.replace(re2, () => {
         n++;
         return `@${other}/${newName}`;
       });
     }
+    replaceR(types);
     return { text: out, n };
   }
+
   const tags: string[] =
-    resType === "string"
+    type === "string"
       ? ["string", "string-array"]
-      : resType === "color"
+      : type === "color"
         ? ["color", "color-state-list"]
-      : resType === "style"
-        ? ["style", "styleable", "declare-styleable"]
-        : [resType];
+        : type === "style"
+          ? ["style", "styleable", "declare-styleable"]
+          : [type];
   for (const tag of tags) {
     // attrs = 标签名与 name 之间的所有属性（带前导空格），原样保留
-    const re = new RegExp(`<${esc(tag)}\\b(\\s[^>]*?)?\\bname\\s*=\\s*"${esc(oldName)}"` , "g");
+    const re = new RegExp(`<${esc(tag)}\\b(\\s[^>]*?)?\\bname\\s*=\\s*"${esc(oldName)}"`, "g");
     out = out.replace(re, (_m, attrs: string | undefined) => {
       n++;
       return `<${tag}${attrs ?? ""}name="${newName}"`;
     });
   }
+  // values 改名字也要同步 Java 的 R.string.xxx / R.color.xxx
+  replaceR([type]);
   return { text: out, n };
 }

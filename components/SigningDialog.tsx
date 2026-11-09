@@ -382,7 +382,7 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
             {tt("当前项目还没有可写目录：配置会先存到本地草稿，打开项目或选中保存目录后再点一次「写入」即可落盘到 build.gradle")}
           </div>
         ) : (
-          !prefill && !keyPassword && (
+          !prefill && !keyPassword && !stored?.keyPass && !stored?.storePass && (
             <div className="axv-sign-hint">
               {tt("注意：keystore 文件本身要手动生成（keytool）或后续版本自动补；这里先把配置写进 build.gradle")}
             </div>

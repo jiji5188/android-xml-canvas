@@ -9,7 +9,7 @@
 import AiPanel from "@/components/AiPanel";
 import { createResResolver } from "@/lib/xml/res-index";
 import { findUsages, type UsageHit } from "@/lib/xml/ai-usages";
-import { renameResRef } from "@/lib/xml/res-search";
+import { renameResRef, singularResType } from "@/lib/xml/res-search";
 import type { AiFileEntry } from "@/lib/xml/ai-tools";
 import { formatResRefHit } from "@/lib/xml/res-refs";
 import { parseRefToken, refAction } from "@/lib/xml/ref-token";
@@ -4425,7 +4425,12 @@ const findResolved = findResolvedNode;
       }
       const subDir = m[2].toLowerCase();
       const kind: "ref" | "values" = subDir.startsWith("values") ? "values" : "ref";
-      const resType = kind === "values" ? (oldRel.split("/").pop() || "strings.xml").replace(/\.xml$/, "").replace(/-.*$/, "") : subDir.split("-")[0];
+      const resType =
+        kind === "values"
+          ? singularResType(
+              (oldRel.split("/").pop() || "strings.xml").replace(/\.xml$/, "").replace(/-.*$/, ""),
+            )
+          : subDir.split("-")[0];
       const oldName = oldRel.split("/").pop()!.replace(/\.[^.]+$/, "");
       let files = 0;
       let refs = 0;

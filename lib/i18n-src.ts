@@ -2418,10 +2418,34 @@ export const SRC_EN: SrcDict = {
   "已设为应用图标：{n}/{total} 个文件写入 res/（背景 {color}）": "Set as app icon: {n}/{total} files written to res/ (background {color})",
   "生成成功但写入失败：{reason}": "Generated successfully but writing failed: {reason}",
   "已生成 {n} 个图标文件（背景 {color}），导 res.zip 或真机渲染时一起带走": "Generated {n} icon files (background {color}); they go along in res.zip or on-device renders",
+  "没有可检查的布局（当前不是有效的 XML）": "No inspectable layout (current XML is not valid)",
+  "实测尺寸": "Measured size",
+  "相对画布左上角的位置": "Position relative to the canvas top-left",
+  "画布 1dp = 2px，数字为换算后的 dp 值（与设备真实像素无关）": "Canvas is 1dp = 2px; numbers are dp after conversion (not real device pixels)",
+  "警告": "Warnings",
+  "点击选中该控件": "Click to select this view",
+  "树为空": "Tree is empty",
+  "收起": "Collapse",
+  "点击选中": "Click to select",
+  "上一个(Shift+Enter)": "Previous (Shift+Enter)",
+  "下一个(Enter)": "Next (Enter)",
+  "关闭(Esc)": "Close (Esc)",
+  "点击跳到出错行": "Click to jump to the error line",
+  " (共 {n} 处)": " ({n} total)",
+  "重排缩进(保留注释)": "Reflow indentation (keep comments)",
+  "已生成 keystore，并把签名配置写入 build.gradle": "Keystore created; signing config written to build.gradle",
+  "签名配置已写入 build.gradle（并已记住到本机）": "Signing config written to build.gradle (and remembered on this device)",
+  "已从本机记忆回填签名配置（按项目保存，点打包/写入会更新）": "Signing config restored from this device (saved per project; updates when you build or write)",
+  "写入 build.gradle": "Write to build.gradle",
+  "属性 / 检查器": "Attributes / Inspector",
+  "检查器": "Inspector",
+  "项目里没找到布局文件（layout/*.xml）。请先在左侧资源新建或打开一个布局，再打包。": "No layout file found in this project (layout/*.xml). Create or open a layout in the left panel, then build again.",
+  "真机渲染（{stage}）": "Real render ({stage})",
 
 };
 
 /** 繁體 —— 只登记与英文不同的；没登记的先走英文兜底（见 t()） */
+/** M196：「警告」在 Hant 下保持（与简体同形，无需差异条目） */
 export const SRC_HANT: SrcDict = {
   "跟随系统": "跟隨系統",
   "简体中文": "簡體中文",

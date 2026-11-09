@@ -3,7 +3,6 @@
 import { describe, expect, it } from "vitest";
 import { createRoot, type Root } from "react-dom/client";
 import { RunPreview } from "@/components/RunPreview";
-
 const flush = async () => {
   for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 5));
 };

@@ -21,13 +21,28 @@ export interface JavaSimFile {
   text: string;
 }
 
+/** 仿真里能存的变量值（数字 / 布尔 就够做计数器与开关） */
+export type SimValue = string | number | boolean;
+
+export type SimCmpOp = "==" | "!=" | ">" | ">=" | "<" | "<=";
+
+/** M200：if 条件 —— 数值比较 / 布尔变量 / 控件可见性 */
+export type SimCond =
+  | { kind: "cmp"; name: string; op: SimCmpOp; value: number }
+  | { kind: "truthy"; name: string; negate: boolean }
+  | { kind: "vis"; viewId: string; value: "visible" | "invisible" | "gone"; negate: boolean };
+
 export type SimEffect =
   | { kind: "setText"; viewId: string; text: string; resRef?: string }
+  | { kind: "setTextVar"; viewId: string; name: string; prefix?: string; suffix?: string }
   | { kind: "setVisibility"; viewId: string; value: "visible" | "invisible" | "gone" }
   | { kind: "setEnabled"; viewId: string; value: boolean }
   | { kind: "toast"; text: string; resRef?: string }
   | { kind: "log"; level: "d" | "i" | "w" | "e"; tag: string; msg: string; resRef?: string }
-  | { kind: "startActivity"; className: string; layout?: string };
+  | { kind: "startActivity"; className: string; layout?: string }
+  | { kind: "assign"; name: string; value: SimValue }
+  | { kind: "incr"; name: string; delta: number }
+  | { kind: "if"; cond: SimCond; then: SimEffect[]; else?: SimEffect[] };
 
 export interface SimHandler {
   /** 触发它的控件 id（例如 `btn_next`），没有 id 的 onClick 会跳过 */
@@ -44,8 +59,19 @@ export interface SimModel {
   startup: SimEffect[];
   /** 没认出来的语句（原句，给 UI 提示「暂不支持」） */
   skipped: string[];
+  /** M200：成员变量初值（`private int count = 0;`） */
+  fields: Record<string, SimValue>;
   /** 来源文件 */
   rel: string;
+}
+
+/** M200：运行时状态，跨点击保留（每个 Activity 一份） */
+export interface SimState {
+  vars: Record<string, SimValue>;
+}
+
+export function createSimState(model?: SimModel | null): SimState {
+  return { vars: { ...(model?.fields ?? {}) } };
 }
 
 /** 从类名猜布局：SettingsActivity → settings / activity_settings */
@@ -107,149 +133,261 @@ function textOf(arg: string): { text: string; resRef?: string } {
   return { text: a };
 }
 
-/** 切语句：Java 按顶层 `;`，Kotlin（没分号）按行 + 花括号深度 */
-function splitStatements(src: string): string[] {
-  const out: string[] = [];
-  if (src.includes(";")) {
-    let depth = 0;
-    let cur = "";
-    for (const ch of src) {
-      if (ch === "{") depth++;
-      else if (ch === "}") {
-        depth--;
-        if (depth === 0 && cur.trim()) out.push(cur.trim());
-        cur = "";
-        continue;
-      }
-      if (depth === 0 && ch === ";") {
-        if (cur.trim()) out.push(cur.trim());
-        cur = "";
-        continue;
-      }
-      cur += ch;
+/** 读一条简单语句（到 `;` 或 Kotlin 换行为止，括号/花括号归零才算） */
+function readStatement(src: string, start: number, kt: boolean): [string, number] {
+  let i = start;
+  let paren = 0;
+  let brace = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === "(") paren++;
+    else if (c === ")") paren = Math.max(0, paren - 1);
+    else if (c === "{") brace++;
+    else if (c === "}") {
+      if (brace > 0) brace--;
+      else return [src.slice(start, i), i + 1]; // 块结束，语句到此为止
     }
-    if (cur.trim()) out.push(cur.trim());
-    return out;
+    if (paren === 0 && brace === 0 && c === ";") return [src.slice(start, i), i + 1];
+    if (kt && paren === 0 && brace === 0 && c === "\n") return [src.slice(start, i), i + 1];
+    i++;
   }
-  // Kotlin 风格：一行一句，跳过块结构行
-  let depth = 0;
-  for (const raw of src.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line) continue;
-    const before = depth;
-    for (const ch of line) {
-      if (ch === "{") depth++;
-      else if (ch === "}") depth--;
-    }
-    if (before !== 0 || depth !== 0) continue;
-    if (/^(fun|class|object|if|else|when|for|while|try|catch)\b/.test(line)) continue;
-    out.push(line);
-  }
-  return out;
+  return [src.slice(start, i), i];
 }
 
-function parseEffects(body: string, kt: boolean): { effects: SimEffect[]; skipped: string[] } {
+/** `if (count > 0)` / `if (tv.getVisibility() == View.GONE)` / `if (flag)` */
+function parseCond(raw: string): SimCond | null {
+  const t = raw.trim();
+  let m = /^(\w+)\s*\.\s*getVisibility\s*\(\s*\)\s*(==|!=)\s*View\.(VISIBLE|INVISIBLE|GONE)$/.exec(t);
+  if (m) {
+    return {
+      kind: "vis",
+      viewId: m[1],
+      value: m[3].toLowerCase() as "visible" | "invisible" | "gone",
+      negate: m[2] === "!=",
+    };
+  }
+  m = /^(\w+)\s*\.\s*isVisible\s*$/.exec(t);
+  if (m) return { kind: "vis", viewId: m[1], value: "visible", negate: false };
+  m = /^!\s*(\w+)\s*\.\s*isVisible\s*$/.exec(t);
+  if (m) return { kind: "vis", viewId: m[1], value: "visible", negate: true };
+  m = /^(\w+)\s*(==|!=|>=|<=|>|<)\s*(-?\d+)$/.exec(t);
+  if (m) return { kind: "cmp", name: m[1], op: m[2] as SimCmpOp, value: Number(m[3]) };
+  m = /^(\w+)\s*==\s*(true|false)$/.exec(t);
+  if (m) return { kind: "truthy", name: m[1], negate: m[2] === "false" };
+  m = /^!\s*(\w+)$/.exec(t);
+  if (m) return { kind: "truthy", name: m[1], negate: true };
+  m = /^(\w+)$/.exec(t);
+  if (m) return { kind: "truthy", name: m[1], negate: false };
+  return null;
+}
+
+/** 单条语句 → 效果；"skip" = 认识但不支持，null = 无副作用 / 纯绑定 */
+function parseOneStatement(s: string): SimEffect | "skip" | null {
+  // 先把「整段监听器 / 方法声明」排掉：里面的 Toast / setText 属于 handler 体，不能再当 onCreate 的副作用
+  if (/setOnClickListener/.test(s) || /^fun\s/.test(s) || /^(public|private|internal)\s+/.test(s)) return null;
+
+  // 绑定语句本身不产生副作用（Kotlin 泛型 findViewById<Button>(...) 也认）
+  if (/^(?:\w+\s+)?(\w+)\s*=\s*findViewById\s*(?:<[^>]*>)?\s*\(\s*R\.id\.\w+/.test(s)) return null;
+
+  // M200：变量自增 / 自减 / 复合赋值
+  let m = /^(\w+)\s*\+\+$/.exec(s);
+  if (m) return { kind: "incr", name: m[1], delta: 1 };
+  m = /^(\w+)\s*--$/.exec(s);
+  if (m) return { kind: "incr", name: m[1], delta: -1 };
+  m = /^(\w+)\s*([+-])=\s*(\d+)$/.exec(s);
+  if (m) return { kind: "incr", name: m[1], delta: (m[2] === "-" ? -1 : 1) * Number(m[3]) };
+
+  // M200：变量赋值（数字 / 布尔），含 Kotlin `var count = 0`
+  m = /^(?:var|val|int|boolean|long|float|double|String)\s+(\w+)\s*=\s*(-?\d+|true|false)$/.exec(s);
+  if (!m) m = /^(\w+)\s*=\s*(-?\d+|true|false)$/.exec(s);
+  if (m) {
+    const raw = m[2];
+    const value: SimValue = raw === "true" ? true : raw === "false" ? false : Number(raw);
+    return { kind: "assign", name: m[1], value };
+  }
+
+  // setText（字面量 / 资源引用）
+  m = /^(\w+)\s*\.setText\s*\(\s*("[^"]*"|R\.string\.\w+)\s*\)/.exec(s);
+  if (m) {
+    const { text, resRef } = textOf(m[2]);
+    return { kind: "setText", viewId: m[1], text, resRef };
+  }
+  // setText 带第二个参数（如 setText(text, BufferType.SPANNABLE)）
+  m = /^(\w+)\s*\.setText\s*\(\s*("[^"]*"|R\.string\.\w+)\s*,\s*BufferType\.\w+\s*\)/.exec(s);
+  if (m) {
+    const { text, resRef } = textOf(m[2]);
+    return { kind: "setText", viewId: m[1], text, resRef };
+  }
+  // Kotlin 属性赋值：先认模板串 / 拼接，再当纯字面量
+  m = /^(\w+)\s*\.text\s*=\s*"([^"$]*)\$\{?(\w+)\}?([^"]*)"\s*$/.exec(s);
+  if (m) return { kind: "setTextVar", viewId: m[1], name: m[3], prefix: m[2], suffix: m[4] };
+  m = /^(\w+)\s*\.text\s*=\s*"([^"]*)"\s*\+\s*(\w+)\s*\+\s*"([^"]*)"\s*$/.exec(s);
+  if (m) return { kind: "setTextVar", viewId: m[1], name: m[3], prefix: m[2], suffix: m[4] };
+  m = /^(\w+)\s*\.text\s*=\s*""\s*\+\s*(\w+)\s*$/.exec(s);
+  if (m) return { kind: "setTextVar", viewId: m[1], name: m[2] };
+  m = /^(\w+)\s*\.text\s*=\s*("[^"]*"|R\.string\.\w+)\s*$/.exec(s);
+  if (m) {
+    const { text, resRef } = textOf(m[2]);
+    return { kind: "setText", viewId: m[1], text, resRef };
+  }
+
+  // M200：显示变量 —— setText(String.valueOf(n)) / setText("" + n) / setText("前缀" + n)
+  m = /^(\w+)\s*\.setText\s*\(\s*String\.valueOf\s*\(\s*(\w+)\s*\)\s*\)/.exec(s);
+  if (m) return { kind: "setTextVar", viewId: m[1], name: m[2] };
+  m = /^(\w+)\s*\.setText\s*\(\s*""\s*\+\s*(\w+)\s*\)/.exec(s);
+  if (m) return { kind: "setTextVar", viewId: m[1], name: m[2] };
+  m = /^(\w+)\s*\.setText\s*\(\s*"([^"]*)"\s*\+\s*(\w+)\s*\+\s*"([^"]*)"\s*\)/.exec(s);
+  if (m) return { kind: "setTextVar", viewId: m[1], name: m[3], prefix: m[2], suffix: m[4] };
+  m = /^(\w+)\s*\.setText\s*\(\s*"([^"]*)"\s*\+\s*(\w+)\s*\)/.exec(s);
+  if (m) return { kind: "setTextVar", viewId: m[1], name: m[3], prefix: m[2] };
+  // Kotlin 模板：text = "已点击 ${count} 次"
+  m = /^(\w+)\s*\.text\s*=\s*"([^"$]*)\$\{?(\w+)\}?([^"]*)"\s*$/.exec(s);
+  if (m) return { kind: "setTextVar", viewId: m[1], name: m[3], prefix: m[2], suffix: m[4] };
+  m = /^(\w+)\s*\.text\s*=\s*"([^"]*)"\s*\+\s*(\w+)\s*\+\s*"([^"]*)"\s*$/.exec(s);
+  if (m) return { kind: "setTextVar", viewId: m[1], name: m[3], prefix: m[2], suffix: m[4] };
+
+  // setVisibility
+  m = /^(\w+)\s*\.setVisibility\s*\(\s*View\.(VISIBLE|INVISIBLE|GONE)\s*\)/.exec(s);
+  if (m) {
+    const v = m[2].toLowerCase() as "visible" | "invisible" | "gone";
+    return { kind: "setVisibility", viewId: m[1], value: v };
+  }
+  // Kotlin 属性风格
+  m = /^(\w+)\s*\.visibility\s*=\s*View\.(VISIBLE|INVISIBLE|GONE)\s*$/.exec(s);
+  if (m) {
+    const v = m[2].toLowerCase() as "visible" | "invisible" | "gone";
+    return { kind: "setVisibility", viewId: m[1], value: v };
+  }
+
+  // setEnabled
+  m = /^(\w+)\s*\.setEnabled\s*\(\s*(true|false)\s*\)/.exec(s);
+  if (m) return { kind: "setEnabled", viewId: m[1], value: m[2] === "true" };
+  m = /^(\w+)\s*\.isEnabled\s*=\s*(true|false)\s*$/.exec(s);
+  if (m) return { kind: "setEnabled", viewId: m[1], value: m[2] === "true" };
+
+  // Toast（锚 ^：避免把监听器体里的 Toast 当成外层副作用）
+  m = /^Toast\.makeText\s*\(\s*[^,]+,\s*("[^"]*"|R\.string\.\w+)\s*,\s*Toast\.LENGTH_\w+\s*\)\s*\.show\s*\(\s*\)/.exec(s);
+  if (m) {
+    const { text, resRef } = textOf(m[1]);
+    return { kind: "toast", text, resRef };
+  }
+
+  // Log
+  m = /^Log\.(d|i|w|e)\s*\(\s*"([^"]*)"\s*,\s*("[^"]*"|R\.string\.\w+)\s*\)/.exec(s);
+  if (m) {
+    const { text, resRef } = textOf(m[3]);
+    return { kind: "log", level: m[1] as "d" | "i" | "w" | "e", tag: m[2], msg: text, resRef };
+  }
+
+  // startActivity
+  if (/^startActivity\s*\(/.test(s)) {
+    const target = intentTarget(s);
+    if (target) {
+      const layout = classNameToLayout(target);
+      return { kind: "startActivity", className: target, layout: layout ?? undefined };
+    }
+  }
+
+  // 其余带 `.` 的副作用语句（requestFocus / setSelection…）进 skipped，让 UI 提示「暂不支持」
+  if (/[.]\w+\s*\(/.test(s) && !/^\s*(if|while|for|when)\s*[(]/.test(s)) return "skip";
+  return null;
+}
+
+/** 解析一段分支体（`{ ... }` 或单条语句），返回效果与结束位置 */
+function parseBranch(
+  src: string,
+  at: number,
+  kt: boolean,
+): { effects: SimEffect[]; next: number } | null {
+  let i = at;
+  while (i < src.length && /\s/.test(src[i])) i++;
+  if (src[i] === "{") {
+    const close = findBalanced(src, i);
+    if (close < 0) return null;
+    const { effects } = parseBlock(src.slice(i + 1, close), kt);
+    return { effects, next: close + 1 };
+  }
+  // else if (...) 链：当成 else 里只包一个 if
+  if (/^if\s*\(/.test(src.slice(i))) {
+    const r = parseIfBlock(src, i, kt);
+    if (!r) return null;
+    return { effects: [r.effect], next: r.next };
+  }
+  const [stmt, next] = readStatement(src, i, kt);
+  const s = stmt.trim();
+  if (!s) return { effects: [], next };
+  const e = parseOneStatement(s);
+  if (!e || e === "skip") return { effects: [], next };
+  return { effects: [e], next };
+}
+
+/** `if (cond) { ... } else { ... }`（M200） */
+function parseIfBlock(
+  src: string,
+  at: number,
+  kt: boolean,
+): { effect: SimEffect; next: number } | null {
+  const m = /^if\s*\(/.exec(src.slice(at));
+  if (!m) return null;
+  const condOpen = at + m[0].length - 1;
+  const condClose = findBalanced(src, condOpen, "(", ")");
+  if (condClose < 0) return null;
+  const cond = parseCond(src.slice(condOpen + 1, condClose));
+  if (!cond) return null;
+
+  const thenR = parseBranch(src, condClose + 1, kt);
+  if (!thenR) return null;
+  let next = thenR.next;
+
+  let k = next;
+  while (k < src.length && /\s/.test(src[k])) k++;
+  let elseEffects: SimEffect[] | undefined;
+  if (/^else\b/.test(src.slice(k))) {
+    const elseR = parseBranch(src, k + 4, kt);
+    if (elseR) {
+      elseEffects = elseR.effects;
+      next = elseR.next;
+    }
+  }
+
+  const effect: SimEffect = elseEffects
+    ? { kind: "if", cond, then: thenR.effects, else: elseEffects }
+    : { kind: "if", cond, then: thenR.effects };
+  return { effect, next };
+}
+
+/** 把一段代码体解析成效果列表（处理 if/else 嵌套） */
+function parseBlock(src: string, kt: boolean): { effects: SimEffect[]; skipped: string[] } {
   const effects: SimEffect[] = [];
   const skipped: string[] = [];
-  const src = stripComments(body);
-  const stmts = splitStatements(src);
+  let i = 0;
+  while (i < src.length) {
+    while (i < src.length && /\s/.test(src[i])) i++;
+    if (i >= src.length) break;
 
-  for (const s of stmts) {
-    if (!s) continue;
-
-    // findViewById 绑定
-    let m = /^(\w+)\s*=\s*findViewById\s*\(\s*R\.id\.(\w+)/.exec(s);
-    if (m) continue; // 绑定语句本身不产生副作用（但会被 handlers 用到）
-
-    // setText
-    m = /^(\w+)\s*\.setText\s*\(\s*("[^"]*"|R\.string\.\w+)\s*\)/.exec(s);
-    if (m) {
-      const { text, resRef } = textOf(m[2]);
-      effects.push({ kind: "setText", viewId: m[1], text, resRef });
-      continue;
-    }
-    // Kotlin 属性赋值：X.text = "..." / R.string.xxx
-    m = /^(\w+)\s*\.text\s*=\s*("[^"]*"|R\.string\.\w+)\s*$/.exec(s);
-    if (m) {
-      const { text, resRef } = textOf(m[2]);
-      effects.push({ kind: "setText", viewId: m[1], text, resRef });
-      continue;
-    }
-    // setText 带第二个参数（如 setText(text, BufferType.SPANNABLE)）
-    m = /^(\w+)\s*\.setText\s*\(\s*("[^"]*"|R\.string\.\w+)\s*,\s*BufferType\.\w+\s*\)/.exec(s);
-    if (m) {
-      const { text, resRef } = textOf(m[2]);
-      effects.push({ kind: "setText", viewId: m[1], text, resRef });
-      continue;
-    }
-
-    // setVisibility
-    m = /^(\w+)\s*\.setVisibility\s*\(\s*View\.(VISIBLE|INVISIBLE|GONE)\s*\)/.exec(s);
-    if (m) {
-      const v = m[2].toLowerCase() as "visible" | "invisible" | "gone";
-      effects.push({ kind: "setVisibility", viewId: m[1], value: v });
-      continue;
-    }
-    // setVisible / isVisible 直接赋值（Kotlin 属性风格）
-    m = /^(\w+)\s*\.visibility\s*=\s*View\.(VISIBLE|INVISIBLE|GONE)\s*$/.exec(s);
-    if (m) {
-      const v = m[2].toLowerCase() as "visible" | "invisible" | "gone";
-      effects.push({ kind: "setVisibility", viewId: m[1], value: v });
-      continue;
-    }
-
-    // setEnabled
-    m = /^(\w+)\s*\.setEnabled\s*\(\s*(true|false)\s*\)/.exec(s);
-    if (m) {
-      effects.push({ kind: "setEnabled", viewId: m[1], value: m[2] === "true" });
-      continue;
-    }
-    m = /^(\w+)\s*\.isEnabled\s*=\s*(true|false)\s*$/.exec(s);
-    if (m) {
-      effects.push({ kind: "setEnabled", viewId: m[1], value: m[2] === "true" });
-      continue;
-    }
-
-    // Toast
-    m = /Toast\.makeText\s*\(\s*[^,]+,\s*("[^"]*"|R\.string\.\w+)\s*,\s*Toast\.LENGTH_\w+\s*\)\s*\.show\s*\(\s*\)/.exec(s);
-    if (m) {
-      const { text, resRef } = textOf(m[1]);
-      effects.push({ kind: "toast", text, resRef });
-      continue;
-    }
-
-    // Log
-    m = /^Log\.(d|i|w|e)\s*\(\s*"([^"]*)"\s*,\s*("[^"]*"|R\.string\.\w+)\s*\)/.exec(s);
-    if (m) {
-      const { text, resRef } = textOf(m[3]);
-      effects.push({ kind: "log", level: m[1] as "d" | "i" | "w" | "e", tag: m[2], msg: text, resRef });
-      continue;
-    }
-
-    // startActivity（Java `new Intent(...)` / Kotlin `Intent(this, X::class.java)` 都认）
-    if (/^startActivity\s*\(/.test(s)) {
-      const target = intentTarget(s);
-      if (target) {
-        const layout = classNameToLayout(target);
-        effects.push({ kind: "startActivity", className: target, layout: layout ?? undefined });
+    if (/^if\s*\(/.test(src.slice(i))) {
+      const r = parseIfBlock(src, i, kt);
+      if (r) {
+        effects.push(r.effect);
+        i = r.next;
         continue;
       }
     }
 
-    // 有 setOnClickListener 但里面是空体/注释，当 noop 不报 skipped
-    if (/setOnClickListener/.test(s) || /^fun\s/.test(s) || /^(public|private|internal)\s+/.test(s)) {
-      // 方法声明 / 嵌套函数，先跳过（下面单独处理）
-      continue;
-    }
-
-    // 其余带 `.` 的副作用语句（例如 requestFocus、setSelection）才进 skipped；
-    // 纯赋值 / import / 控制流不算
-    if (/[.]\w+\s*\(/.test(s) && !/^\s*if\s*\(/.test(s) && !/^\s*while\s*\(/.test(s) && !/^\s*for\s*\(/.test(s)) {
-      skipped.push(s);
-    }
+    const [stmt, next] = readStatement(src, i, kt);
+    i = next;
+    const s = stmt.trim();
+    if (!s) continue;
+    const e = parseOneStatement(s);
+    if (e === "skip") skipped.push(s);
+    else if (e) effects.push(e);
   }
-
   return { effects, skipped };
+}
+
+/** 兼容旧调用名 */
+function parseEffects(body: string, kt: boolean): { effects: SimEffect[]; skipped: string[] } {
+  return parseBlock(stripComments(body), kt);
 }
 
 function extractHandlerBody(src: string, fromIdx: number): string | null {
@@ -275,13 +413,46 @@ function extractHandlerBody(src: string, fromIdx: number): string | null {
 /** 把效果里的「变量名」换成「真实 view id」：Java 里 `tvTitle.setText` 的 tvTitle 是字段，
  *  DOM 里的控件 id 是 `@+id/tv_title`。idByField 是 字段名 → 真实 id。 */
 function mapEffectViewIds(effects: SimEffect[], idByField: Map<string, string>): SimEffect[] {
+  const mapId = (v: string) => idByField.get(v) ?? v;
   return effects.map((e) => {
-    if (e.kind === "setText" || e.kind === "setVisibility" || e.kind === "setEnabled") {
-      const real = idByField.get(e.viewId) ?? e.viewId;
-      return { ...e, viewId: real };
+    switch (e.kind) {
+      case "setText":
+      case "setTextVar":
+      case "setVisibility":
+      case "setEnabled":
+        return { ...e, viewId: mapId(e.viewId) };
+      case "if":
+        return {
+          ...e,
+          cond: e.cond.kind === "vis" ? { ...e.cond, viewId: mapId(e.cond.viewId) } : e.cond,
+          then: mapEffectViewIds(e.then, idByField),
+          else: e.else ? mapEffectViewIds(e.else, idByField) : undefined,
+        };
+      default:
+        return e;
     }
-    return e;
   });
+}
+
+/** 成员变量初值：Java `private int count = 0;` / Kotlin `private var count = 0` */
+function parseFieldInitializers(src: string): Record<string, SimValue> {
+  const out: Record<string, SimValue> = {};
+  const put = (name: string, raw: string) => {
+    if (raw === "true") out[name] = true;
+    else if (raw === "false") out[name] = false;
+    else out[name] = Number(raw);
+  };
+  for (const m of src.matchAll(
+    /(?:private|public|protected|internal)\s+(?:static\s+)?(?:final\s+)?(?:int|boolean|long|float|double)\s+(\w+)\s*=\s*(-?\d+|true|false)\s*;/g,
+  )) {
+    put(m[1], m[2]);
+  }
+  for (const m of src.matchAll(
+    /(?:^|\n)\s*(?:private\s+|internal\s+)?(?:var|val)\s+(\w+)\s*(?::\s*\w+)?\s*=\s*(-?\d+|true|false)\s*(?:\n|$)/g,
+  )) {
+    put(m[1], m[2]);
+  }
+  return out;
 }
 
 export function parseJavaSim(file: JavaSimFile): SimModel | null {
@@ -296,6 +467,7 @@ export function parseJavaSim(file: JavaSimFile): SimModel | null {
   const handlers: SimHandler[] = [];
   const startup: SimEffect[] = [];
   const skipped: string[] = [];
+  const fields = parseFieldInitializers(src);
 
   // 1. setContentView → layoutName
   const sv = /setContentView\s*\(\s*R\.layout\.(\w+)/.exec(src);
@@ -303,7 +475,7 @@ export function parseJavaSim(file: JavaSimFile): SimModel | null {
 
   // 2. findViewById 绑定：字段名 = R.id.xxx
   const idByField = new Map<string, string>();
-  for (const m of src.matchAll(/(\w+)\s*=\s*findViewById\s*\(\s*R\.id\.(\w+)/g)) {
+  for (const m of src.matchAll(/(?:\w+\s+)?(\w+)\s*=\s*findViewById\s*(?:<[^>]*>)?\s*\(\s*R\.id\.(\w+)/g)) {
     idByField.set(m[1], m[2]);
   }
 
@@ -333,7 +505,7 @@ export function parseJavaSim(file: JavaSimFile): SimModel | null {
     }
   }
 
-  return { className, layoutName, handlers, startup, skipped, rel: file.rel };
+  return { className, layoutName, handlers, startup, skipped, fields, rel: file.rel };
 }
 
 function onOpenIdx(i: number, s: string): number {
@@ -377,14 +549,55 @@ export interface SimReceiver {
   toast(text: string): void;
   log(level: "d" | "i" | "w" | "e", tag: string, msg: string): void;
   navigate(layoutOrClass: string, source: string): void;
+  /** M200：读当前控件可见性（给 if (x.getVisibility() == View.GONE) 用） */
+  getVisibility?(viewId: string): "visible" | "invisible" | "gone" | null;
 }
 
-export function applyEffects(model: SimModel, effects: SimEffect[], rx: SimReceiver): void {
+function evalCond(cond: SimCond, rx: SimReceiver, state: SimState): boolean {
+  if (cond.kind === "cmp") {
+    const v = Number(state.vars[cond.name] ?? 0);
+    switch (cond.op) {
+      case "==":
+        return v === cond.value;
+      case "!=":
+        return v !== cond.value;
+      case ">":
+        return v > cond.value;
+      case ">=":
+        return v >= cond.value;
+      case "<":
+        return v < cond.value;
+      case "<=":
+        return v <= cond.value;
+    }
+  }
+  if (cond.kind === "truthy") {
+    const v = !!state.vars[cond.name];
+    return cond.negate ? !v : v;
+  }
+  const vis = rx.getVisibility?.(cond.viewId) ?? null;
+  if (!vis) return false;
+  const hit = vis === cond.value;
+  return cond.negate ? !hit : hit;
+}
+
+export function applyEffects(
+  model: SimModel,
+  effects: SimEffect[],
+  rx: SimReceiver,
+  state: SimState = createSimState(model),
+): void {
   for (const e of effects) {
     switch (e.kind) {
       case "setText":
-        rx.setText(e.viewId, e.resRef ? e.text : e.text);
+        rx.setText(e.viewId, e.text);
         break;
+      case "setTextVar": {
+        const raw = state.vars[e.name];
+        const txt = (e.prefix ?? "") + String(raw ?? 0) + (e.suffix ?? "");
+        rx.setText(e.viewId, txt);
+        break;
+      }
       case "setVisibility":
         rx.setVisibility(e.viewId, e.value);
         break;
@@ -392,7 +605,7 @@ export function applyEffects(model: SimModel, effects: SimEffect[], rx: SimRecei
         rx.setEnabled(e.viewId, e.value);
         break;
       case "toast":
-        rx.toast(e.resRef ? e.text : e.text);
+        rx.toast(e.text);
         break;
       case "log":
         rx.log(e.level, e.tag, e.resRef ? `${e.msg} (${e.resRef})` : e.msg);
@@ -400,6 +613,17 @@ export function applyEffects(model: SimModel, effects: SimEffect[], rx: SimRecei
       case "startActivity": {
         const target = e.layout || e.className;
         rx.navigate(target, e.className);
+        break;
+      }
+      case "assign":
+        state.vars[e.name] = e.value;
+        break;
+      case "incr":
+        state.vars[e.name] = Number(state.vars[e.name] ?? 0) + e.delta;
+        break;
+      case "if": {
+        const hit = evalCond(e.cond, rx, state);
+        applyEffects(model, hit ? e.then : (e.else ?? []), rx, state);
         break;
       }
     }

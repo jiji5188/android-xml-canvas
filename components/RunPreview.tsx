@@ -19,7 +19,16 @@ import type { ResourceTable } from "@/lib/xml/types";
 import { XmlCanvas } from "./XmlCanvas";
 import { decorateRunScreen } from "./run-decorate";
 import { eventText, idToPath, runRoleOf, targetLabel } from "@/lib/xml/run-sim";
-import { applyEffects, pickJavaSim, type SimEffect, type SimReceiver } from "@/lib/xml/java-sim";
+import {
+  applyEffects,
+  createSimState,
+  parseJavaSim,
+  pickJavaSim,
+  type SimEffect,
+  type SimModel,
+  type SimReceiver,
+  type SimState,
+} from "@/lib/xml/java-sim";
 
 const SCALE = 2; // 1dp = 2px（与编辑器一致）
 
@@ -195,12 +204,39 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
     return pickJavaSim(javaFiles, entryName, layouts);
   }, [javaFiles, entryName, layouts]);
 
-  const simBooted = useRef(false);
+  // M200：按布局名索引所有 Activity，换屏后能读对应那一个
+  const simByLayout = useMemo(() => {
+    const map = new Map<string, SimModel>();
+    if (!javaFiles?.length) return map;
+    for (const f of javaFiles) {
+      const m = parseJavaSim(f);
+      if (!m) continue;
+      const key = m.layoutName;
+      if (key && !map.has(key)) map.set(key, m);
+    }
+    return map;
+  }, [javaFiles]);
+
+  const curSim = simByLayout.get(cur.name) ?? (cur.name === entryName ? sim : null);
+  /** M200：每屏一份运行时变量状态（进屏时重建，跟 Activity 重建一致） */
+  const simStates = useRef(new Map<string, SimState>());
+  const curSimRef = useRef<SimModel | null>(null);
+  const curNameRef = useRef<string>("");
+  curSimRef.current = curSim;
+  curNameRef.current = cur.name;
+  const simBootedKey = useRef<string | null>(null);
 
   /** 把 Java 仿真的效果应用到运行中的 DOM；识别不到控件只记日志，不改页面 */
   const applySim = useCallback(
     (effects: SimEffect[]) => {
-      if (!sim) return;
+      const model = curSimRef.current;
+      if (!model) return;
+      const screenName = curNameRef.current;
+      let state = simStates.current.get(screenName);
+      if (!state) {
+        state = createSimState(model);
+        simStates.current.set(screenName, state);
+      }
       const screenEl = bodyRef.current?.querySelector<HTMLElement>(".axv-run-screen") ?? null;
       const byPath = (viewId: string): HTMLElement | null => {
         const path = idToPath(parsed.root, viewId);
@@ -247,6 +283,14 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
         log(level, tag, msg) {
           log(level.toUpperCase() as "D" | "I" | "W" | "E", `${tag}: ${msg}`);
         },
+        // M200：让 if (x.getVisibility() == View.GONE) 能读到真实 DOM 状态
+        getVisibility(viewId) {
+          const el = byPath(viewId);
+          if (!el) return null;
+          if (el.style.display === "none") return "gone";
+          if (el.style.visibility === "hidden") return "invisible";
+          return "visible";
+        },
         navigate(target, source) {
           const hit = findLayout(target);
           if (!hit) {
@@ -258,9 +302,9 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
           setStack((s) => [...s, hit]);
         },
       };
-      applyEffects(sim, effects, rx);
+      applyEffects(model, effects, rx, state);
     },
-    [sim, parsed.root, log, showToast, findLayout],
+    [parsed.root, log, showToast, findLayout],
   );
 
   const back = useCallback(() => {
@@ -291,7 +335,8 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
       // M199：代码里写的 setOnClickListener 优先（跟安卓真实行为一致）
       const rawId = String(node.attrs["id"] ?? "");
       const viewId = rawId.replace(/^@\+?id\//, "").trim();
-      const simHandler = sim && viewId ? sim.handlers.find((h) => h.viewId === viewId) : undefined;
+      const model = curSimRef.current;
+      const simHandler = model && viewId ? model.handlers.find((h) => h.viewId === viewId) : undefined;
       if (simHandler) {
         log("I", eventText("click", label, tt("Java 逻辑 {n} 条", { n: simHandler.effects.length })));
         applySim(simHandler.effects);
@@ -322,7 +367,7 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
       setDir("fwd");
       setStack((s) => [...s, target]);
     },
-    [parsed.root, findLayout, log, back, showToast, sim, applySim],
+    [parsed.root, findLayout, log, back, showToast, applySim],
   );
 
   // M18：换屏后给 DOM 加交互（输入/勾选/拖动/下拉/列表行/涟漪）
@@ -341,14 +386,17 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
       setInteractive(r.interactive);
       if (r.interactive > 0) log("D", tt("本屏可交互控件 {n} 个", { n: r.interactive }));
       // M199：onCreate 里的直接语句只跑一次（进首页时）
-      if (sim && !simBooted.current && cur.name === entryName) {
-        simBooted.current = true;
-        if (sim.startup.length) {
-          log("I", tt("Java 仿真：执行 onCreate 的 {n} 条语句", { n: sim.startup.length }));
-          applySim(sim.startup);
+      // M199/M200：onCreate 里的直接语句每进一屏跑一次（变量状态跟 Activity 一起重建）
+      const model = curSimRef.current;
+      if (model && simBootedKey.current !== cur.name) {
+        simBootedKey.current = cur.name;
+        simStates.current.set(cur.name, createSimState(model));
+        if (model.startup.length) {
+          log("I", tt("Java 仿真：执行 onCreate 的 {n} 条语句", { n: model.startup.length }));
+          applySim(model.startup);
         }
-        if (sim.skipped.length) {
-          log("W", tt("Java 仿真：{n} 条语句暂不支持（已跳过）", { n: sim.skipped.length }));
+        if (model.skipped.length) {
+          log("W", tt("Java 仿真：{n} 条语句暂不支持（已跳过）", { n: model.skipped.length }));
         }
       }
     }, 0);

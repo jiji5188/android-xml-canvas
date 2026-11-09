@@ -53,7 +53,7 @@ export function codeHint(code: string | undefined, msg: string): DiagHint | null
       const m = /用了 (\w+) 但本类没声明/.exec(msg);
       if (!m) return null;
       return {
-        why: `${m[1]} 不在本类已知的字段/参数/局部变量/方法/import 里。可能：① 真的忘声明 ② 拼错 ③ 缺 import ④ 我的符号提取有盲区（反射/注入字段、注解生成代码、Kotlin 隐式 it）。`,
+        why: `${m[1]} 不在本类已知的字段/参数/局部变量/方法/import 里。注意：这是全文件范围的检查（不做精确作用域），所以我宁可多认一个声明、也不拿"可能是我漏识别"冒充编译错。盲区：反射/注入字段、注解生成代码、Kotlin 隐式 it。`,
         how: `先确认 ${m[1]} 到底是什么：变量/方法 → 补声明或 import；拼错 → 看有没有「是不是想写 X」；都排除 → 那就是我的误判，直接忽略。带「是不是想写」的这类列为「错误」（高置信），没有的列为「注意」（仅供参考）。`,
       };
     }

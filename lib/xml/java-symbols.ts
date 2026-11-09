@@ -140,6 +140,21 @@ export function extractJavaSymbols(src: string, isKotlin = false): JavaSymbols {
     collectDeclaredFromParams(m[2] || "", declared);
   }
 
+  // 3b) M208 全局参数兜底：签名跨行 / 方法名在下一行 / 匿名类等方法，methodSigRe 会漏
+  //      对所有 `(...) ` 括号组，逐段判断是否为「类型+参数名」形式，是就收参数名。
+  //      宁可多收（只造成误报变漏报），不可漏收（造成误报）
+  const PARAM_ITEM = new RegExp(
+    `^(?:(?:public|private|protected|static|final|transient|volatile|@\\w+\\s*)*${TYPE}\\s+([a-z_]\\w*))$`,
+  );
+  for (const g of src.matchAll(/\(([^()]*)\)/g)) {
+    for (const part of splitTopLevel(g[1], ",")) {
+      const p = part.replace(/^\s*final\s+/, "").trim();
+      if (!p) continue;
+      const pm = PARAM_ITEM.exec(p);
+      if (pm) declared.add(pm[1]);
+    }
+  }
+
   // 4) 局部变量（方法体内 `int a = 0;` / `for (int i=0; ...)`）
   // M208：同样允许嵌套泛型与 final / 注解
   const localRe = new RegExp(

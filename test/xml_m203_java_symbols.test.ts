@@ -89,3 +89,51 @@ describe("findUnknownSymbols", () => {
     expect(unknowns).toHaveLength(0);
   });
 });
+
+describe("M203b 常见误报源（必须不报）", () => {
+  const CLS = `public class MainActivity extends Activity {
+    void f(java.util.List<String> list) {
+      try {
+        for (String s : list) {
+          count++;
+        }
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+      btn.setOnClickListener(v -> v.getId());
+      int sd = Build.VERSION.SDK_INT;
+      getWindow().setStatusBarColor(0);
+    }
+    int count;
+  }`;
+
+  it("catch / 增强 for / lambda / 大写类名 / 链式调用 都不报", () => {
+    const sy = extractJavaSymbols(CLS);
+    const unknowns = findUnknownSymbols(CLS, sy, new Set(["Build"]), starts(CLS));
+    const names = unknowns.map((u) => u.name);
+    expect(names).not.toContain("e");
+    expect(names).not.toContain("s");
+    expect(names).not.toContain("v");
+    expect(names).not.toContain("Build");
+    expect(names).not.toContain("VERSION");
+    expect(names).not.toContain("SDK_INT");
+    expect(names).not.toContain("getWindow");
+    expect(names).not.toContain("count");
+    // 全部不报（btn 作为 .setOnClickListener 的接收者被宽松跳过——取舍：宁可漏报不误报）
+    expect(names).toEqual([]);
+  });
+
+  it("裸用未声明变量（非接收者）仍然报", () => {
+    const src = `public class A {
+    void f() {
+      dsdxvbb==lhh4;
+      zzz = 1;
+    }
+  }`;
+    const sy = extractJavaSymbols(src);
+    const names = findUnknownSymbols(src, sy, new Set(), starts(src)).map((u) => u.name);
+    expect(names).toContain("dsdxvbb");
+    expect(names).toContain("lhh4");
+    expect(names).toContain("zzz");
+  });
+});

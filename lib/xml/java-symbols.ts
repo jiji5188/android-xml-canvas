@@ -117,8 +117,33 @@ export function extractJavaSymbols(src: string, isKotlin = false): JavaSymbols {
   const localRe = /(?<!\w)(?:int|long|double|float|char|boolean|byte|short|String|[A-Z]\w*(?:<[^>()]*>)?|[A-Z]\w*\[\])\s+([a-z_]\w*)\s*(=|[;,(])/g;
   for (const m of src.matchAll(localRe)) declared.add(m[1]);
 
+  // 4b) M203b: catch (Exception e) → e
+  for (const m of src.matchAll(/\bcatch\s*\(([^)]*)\)/g)) collectDeclaredFromParams(m[1] || "", declared);
+
+  // 4c) M203b: 增强 for `for (String s : list)` → s
+  for (const m of src.matchAll(/\bfor\s*\(\s*(?:final\s+)?[A-Za-z_][\w.<>\[\]]*\s+([a-z_]\w*)\s*:/g)) {
+    declared.add(m[1]);
+  }
+
+  // 4d) M203b: lambda 参数 `v -> ...` / `(a, b) -> ...`
+  for (const m of src.matchAll(/\(\s*([a-z_]\w*(?:\s*,\s*[a-z_]\w*)*)\s*\)\s*->/g)) {
+    for (const p of (m[1] || "").split(",")) {
+      const t = p.trim();
+      if (t) declared.add(t);
+    }
+  }
+  for (const m of src.matchAll(/(?:^|[^\w.])([a-z_]\w*)\s*->/g)) declared.add(m[1]);
+
+  // 4e) M203b: 泛型类型变量 `<T>` / `<T, R>`
+  for (const m of src.matchAll(/<\s*([A-Z]\w*(?:\s*,\s*[A-Z]\w*)*)\s*>/g)) {
+    for (const p of (m[1] || "").split(",")) {
+      const t = p.trim();
+      if (t) declared.add(t);
+    }
+  }
+
   // `this.xxx` / `super.xxx` 字段（补全 this 引用的字段名）
-  for (const m of src.matchAll(/this\.([a-z_]\w*)/g)) declared.add(m[1]);
+  for (const m of src.matchAll(/(?:this|super)\.([a-z_]\w*)/g)) declared.add(m[1]);
 
   // 5) 把关键字排除掉（字段正则可能误抓 `int` 当变量名等）
   for (const k of JAVA_KEYWORDS) declared.delete(k);
@@ -171,19 +196,28 @@ export function findUnknownSymbols(
       const name = tm[2];
       const prefix = tm[1];
       const col = (tm.index || 0) + (prefix ? prefix.length : 0) + 1;
+      const before = ln.slice(0, tm.index + (prefix ? prefix.length : 0));
+      const afterIdx = tm.index + (prefix ? prefix.length : 0) + name.length;
       // 跳过 new 后面的类型
       if (prefix?.trimEnd().endsWith("new")) continue;
-      // 跳过 ==/=/赋值 右边的类型? 简化：不跳
+      // M203b：成员访问（前面是 .）不算变量——`Build.VERSION.SDK_INT` 的 VERSION/SDK_INT
+      if (before.trimEnd().endsWith(".")) continue;
+      // M203b：大写开头按 Java 习惯是类型/常量，不当变量报（dsdxvbb/lhh4 是小写，仍会抓）
+      if (/^[A-Z]/.test(name)) continue;
       if (symbols.declared.has(name)) continue;
       if (symbols.methods.has(name)) continue;
       if (knownTypes.has(name)) continue;
       if (JAVA_KEYWORDS.has(name)) continue;
       // 跳过方法调用接收者：`name(` 或 `name.` 后面跟 ( / .
-      const rest = ln.slice(tm.index + prefix?.length + name.length);
+      const rest = ln.slice(afterIdx);
       if (/^\s*\(/.test(rest) || /^\s*\./.test(rest)) {
         // 方法调用/属性访问的接收者——宽松跳过（避免误报）
         continue;
       }
+      // M203b：`name:` 是标签/case，`name[])` 等跳过
+      if (/^\s*:/.test(rest)) continue;
+      // M203b：注解 @name
+      if (before.trimEnd().endsWith("@")) continue;
       // 跳过赋值左边 `x =`（x 没声明才报，但赋值左边的裸标识符基本就是 bug，保留报）
       out.push({ name, line: i + 1, col, len: name.length });
     }

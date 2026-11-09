@@ -42,6 +42,7 @@ import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild, childLimitOf } from "@/lib/xml/insert";
 import { moveNodeRaw, scanElements, elementAt } from "@/lib/xml/reorder";
 import { formatXml } from "@/lib/xml/format";
+import { formatJava } from "@/lib/xml/java-format";
 import { lintXml, type LintIssue } from "@/lib/xml/lint";
 import { lintJava } from "@/lib/xml/java-lint";
 import { collectResEnv } from "@/lib/xml/java-res-env";
@@ -2141,7 +2142,12 @@ const allDrawableNames = useMemo(() => {
   const doFormat = () => {
     flushXml();
     const cur = currentXml();
-    const next = formatXml(cur, 2);
+    let next: string;
+    if (isJavaLikePath(openRel || "")) {
+      next = formatJava(cur, { indent: editorTheme.indent || 4 });
+    } else {
+      next = formatXml(cur, 2);
+    }
     if (next !== cur) setXmlAndTrack(next);
   };
 
@@ -4528,7 +4534,21 @@ const findResolved = findResolvedNode;
   const onGotoRef = useCallback(
     (raw: string) => {
       const t = parseRefToken(raw);
-      if (!t) return;
+      if (!t) {
+        // M209：不是资源引用 → 当「本文件内符号」处理：Ctrl+点击跳到声明行
+        if (isJavaLikePath(openRel || "")) {
+          const name = raw.replace(/^\.+|\.+$/g, "").split(".").pop() || "";
+          const isKt = /\.kts?$/i.test(openRel || "");
+          const outline = parseOutline(xml, isKt);
+          const hit = outline.find((s) => s.name === name);
+          if (hit) {
+            jumpToCodeLine(hit.line);
+            return;
+          }
+        }
+        flashNote(tt("这里没有可跳转的定义"));
+        return;
+      }
       const a = refAction(t);
       if (a.kind === "none") {
         flashNote(
@@ -4547,7 +4567,51 @@ const findResolved = findResolvedNode;
       }
       void openResRef(a.refValue);
     },
-    [aiFileIo, flashNote, openResRef, openUsages],
+    [aiFileIo, flashNote, openResRef, openUsages, openRel, xml, jumpToCodeLine],
+  );
+
+  /**
+   * M209：代码编辑器悬停提示——光标落在资源引用 / 已知方法·变量上时，给一行说明。
+   * 数据源：resExtras（项目 res）+ generatedDrawables（本工具生成）+ 当前文件的 Java/Kotlin 大纲。
+   */
+  const hoverTip = useCallback(
+    (raw: string): string | null => {
+      // R.id.X / R.drawable.X / @drawable/X / @string/X
+      const rType = raw.match(/^R\.(\w+)\.(\w+)$/);
+      const atType = raw.match(/^@(\w+)\s*\/\s*(\w+)$/);
+      if (rType || atType) {
+        const kind = rType ? rType[1] : atType ? atType[1] : null;
+        const name = (rType ? rType[2] : atType ? atType[2] : null) || "";
+        if (kind === "id") {
+          const found = xml.search(new RegExp(`<[^>]*android:id="@\\+?id/"?${name}"?`, "g"));
+          if (found >= 0) {
+            const ln = xml.slice(0, found).split("\n").length;
+            return `R.id.${name} · layout L${ln}`;
+          }
+        }
+        // drawable / string 等资源
+        if (resExtras || generatedDrawables[name]) {
+          const where = kind === "drawable" || kind === "mipmap" ? "res/drawable" : `res/values/${kind}s`;
+          return tt("资源 {name}（{where}）", { name, where });
+        }
+        return `R.${kind}.${name}`;
+      }
+      // 裸标识符：查当前文件的 Java/Kotlin 大纲（类 / 方法）
+      if (isJavaLikePath(openRel || "")) {
+        const isKt = /\.kts?$/i.test(openRel || "");
+        const outline = parseOutline(xml, isKt);
+        const hit = outline.find((s) => s.name === raw);
+        if (hit) {
+          return tt("{kind} {name} · L{line}", {
+            kind: hit.kind === "class" ? tt("类") : tt("方法"),
+            name: hit.name,
+            line: hit.line,
+          });
+        }
+      }
+      return null;
+    },
+    [xml, resExtras, generatedDrawables, openRel],
   );
 
   /**
@@ -4895,6 +4959,7 @@ const findResolved = findResolvedNode;
         onFixAll={doFixAll}
         onFixOne={doFixOne}
         onRefClick={onGotoRef}
+        hoverTip={hoverTip}
         lang={editorLang}
         indent={editorTheme.indent}
         resNames={useMemo(() => {

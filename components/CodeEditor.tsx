@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { diagRanges as calcDiagRanges, type DiagInfo } from "@/lib/xml/diag-deco";
 import { codeHint } from "@/lib/xml/diag-hints";
-import { Compartment, EditorState, Prec, SelectionRange, StateEffect, StateField } from "@codemirror/state";
+import { Compartment, EditorState, Prec, RangeSet, SelectionRange, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -24,7 +24,12 @@ import {
   highlightActiveLine,
   highlightActiveLineGutter,
   highlightSpecialChars,
+  highlightWhitespace,
+  highlightTrailingWhitespace,
+  hoverTooltip,
   keymap,
+  gutter,
+  GutterMarker,
   lineNumbers,
   rectangularSelection,
   crosshairCursor,
@@ -40,10 +45,13 @@ import {
 import {
   HighlightStyle,
   bracketMatching,
+  foldGutter,
+  foldKeymap,
   indentOnInput,
   indentUnit,
   syntaxHighlighting,
 } from "@codemirror/language";
+import { highlightSelectionMatches } from "@codemirror/search";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { tags } from "@lezer/highlight";
 import { autoCloseTags, xml } from "@codemirror/lang-xml";
@@ -78,6 +86,8 @@ export interface CodeEditorProps {
   resNames?: string[];
   /** M101:Ctrl/Cmd + 点击资源引用时回调(raw 如 `@string/app_name` / `R.id.btn`) */
   onRefClick?: (raw: string) => void;
+  /** M209:悬停提示——父层把光标下的 token（如 R.id.btn / @drawable/ic / 变量名）解析成提示文本，非 null 就弹 tooltip */
+  hoverTip?: (raw: string) => string | null;
 }
 
 /** M76:在一份文本里找全部匹配(大小写不敏感,上限 500 条,空 query 返回空) */
@@ -185,6 +195,49 @@ const diagField = StateField.define<DecorationSet>({
   },
   provide: (f) => EditorView.decorations.from(f),
 });
+
+/* ===== M209：可修复行的行号槽灯泡（视觉提示）=====
+ *  在行号 gutter 左边多一列，凡是带 fix 的行都画一个小灯泡。
+ *  点它仍走底部问题卡片的「应用此修复」，这里只做醒目提示。 */
+class FixMarker extends GutterMarker {
+  elementClass = "cm-fix-slot";
+  constructor(public readonly fixable: boolean) {
+    super();
+  }
+  toDOM() {
+    const wrap = document.createElement("span");
+    wrap.className = "cm-fix-slot";
+    if (this.fixable) {
+      const b = document.createElement("span");
+      b.className = "cm-fix-bulb";
+      b.textContent = "💡";
+      b.title = tt("此行有可自动修复的问题");
+      wrap.appendChild(b);
+    }
+    return wrap;
+  }
+  eq(other: FixMarker) {
+    return other.fixable === this.fixable;
+  }
+}
+
+/** M209：给行号 gutter 左边加一列「可修复」槽；哪行可修就画灯泡 */
+const fixGutter = gutter({
+  class: "cm-fix-gutter",
+  markers: (view) => {
+    const lines = view.state.doc.lines;
+    const marks: GutterMarker[] = [];
+    for (let i = 1; i <= lines; i++) {
+      const iss = fixIssuesByLineRef.current.get(i);
+      marks.push(new FixMarker(!!iss && !!iss.fix));
+    }
+    const set = RangeSet.of(marks.map((m, i) => m.range(view.state.doc.line(i).from)));
+    return set;
+  },
+});
+
+/** M209：行号 → 该行的可修问题（供 fixGutter 的 markers 读） */
+const fixIssuesByLineRef = { current: new Map<number, LintIssue>() };
 
 /* ===== 主题:全吃 CSS 变量,设置面板改色即时生效 ===== */
 const cmTheme = EditorView.theme({
@@ -370,6 +423,7 @@ export function CodeEditor({
   indent = 4,
   resNames,
   onRefClick,
+  hoverTip,
 }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -380,21 +434,29 @@ export function CodeEditor({
   langRef.current = lang;
   /** M40:缩进宽度(indentUnit + tabSize)单独一个 compartment,改设置即时生效 */
   const indentComp = useRef(new Compartment());
+  // M209：显示空白字符开关
+  const wsComp = useRef(new Compartment());
+  const [showWs, setShowWs] = useState(false);
   /** 回调放进 ref:view 只建一次,避免每次 render 重建 */
   const onChangeRef = useRef(onChange);
   const onCursorLineRef = useRef(onCursorLine);
   const onRefClickRef = useRef(onRefClick);
+  const hoverTipRef = useRef(hoverTip);
   onChangeRef.current = onChange;
   /** M202：ref 包装，供 view 创建 effect 使用 */
   const diagClickRef = useRef<((e: MouseEvent) => void) | null>(null);
   onCursorLineRef.current = onCursorLine;
   onRefClickRef.current = onRefClick;
+  hoverTipRef.current = hoverTip;
   /** M57:最后一次由编辑器自身发出的文本--父层防抖回灌同一个值时据此跳过,避免"冲掉刚输入的字" */
   const lastEmittedRef = useRef<string | null>(null);
 
   const [findOpen, setFindOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [hitIdx, setHitIdx] = useState(0);
+  // M209：替换（展开第二行输入 + 替换/全部替换）
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceText, setReplaceText] = useState("");
   const findRef = useRef<HTMLInputElement | null>(null);
 
   /* ===== M45:输入关键词检索弹窗 ===== */
@@ -447,6 +509,15 @@ export function CodeEditor({
       }
     }
     return m;
+  }, [errors]);
+
+  /* M209：把「哪行可修」喂给行号槽灯泡（fixGutter 的 markers 读它） */
+  useEffect(() => {
+    const m = new Map<number, LintIssue>();
+    for (const e of errors || []) {
+      if (e.fix && !m.has(e.line)) m.set(e.line, e);
+    }
+    fixIssuesByLineRef.current = m;
   }, [errors]);
 
   const insertSnippet = useCallback((insert: string, back = 0) => {
@@ -618,8 +689,73 @@ export function CodeEditor({
       doc: value,
       extensions: [
         lineNumbers(),
+        // M209：行号左边多一列「可修复」灯泡槽
+        fixGutter,
         highlightActiveLineGutter(),
         highlightSpecialChars(),
+        // M209：代码折叠（XML 嵌套 / Java 方法体）
+        foldGutter(),
+        // M209：选中一个词，全文件同名出现处高亮
+        highlightSelectionMatches({ minSelectionLength: 2, highlightWordAroundCursor: false }),
+        // M209：显示空白字符开关
+        wsComp.current.of(
+          showWs
+            ? [highlightWhitespace(), highlightTrailingWhitespace()]
+            : [],
+        ),
+        // M209：悬停提示——光标落在已知 token（资源/方法/变量）上，父层给提示就弹
+        hoverTooltip((view) => {
+          const fn = hoverTipRef.current;
+          if (!fn) return null;
+          const { state } = view;
+          const head = state.selection.main.head;
+          const line = state.doc.lineAt(head);
+          const text = line.text;
+          const col = head - line.from;
+          // 资源引用：@drawable/xxx | R.type.xxx
+          const atRef = text.match(/@\w+\s*\/\s*\w+/g);
+          let raw: string | null = null;
+          if (atRef) {
+            for (const m of atRef) {
+              const i = text.indexOf(m);
+              if (i <= col && col < i + m.length) {
+                raw = m;
+                break;
+              }
+            }
+          }
+          // R.type.name
+          if (!raw) {
+            const rRef = text.match(/R\.\w+\.\w+/g);
+            if (rRef) {
+              for (const m of rRef) {
+                const i = text.indexOf(m);
+                if (i <= col && col < i + m.length) {
+                  raw = m;
+                  break;
+                }
+              }
+            }
+          }
+          // 裸标识符（方法名 / 变量名）
+          if (!raw) {
+            const idm = /[A-Za-z_]\w*/.exec(text.slice(col).trimStart())?.[0];
+            if (idm && idm.length >= 3) raw = idm;
+          }
+          if (!raw) return null;
+          const tip = fn(raw);
+          if (!tip) return null;
+          return {
+            pos: head,
+            above: true,
+            create() {
+              const dom = document.createElement("div");
+              dom.className = "axv-hover-tip";
+              dom.textContent = tip;
+              return { dom };
+            },
+          };
+        }, {hoverTime: 400}),
         // M139:不装 CM6 自带的 history -- 撤销栈统一由 XmlEditor 的 diffHistory 管
         // (原因:外部回灌 value 时 CM6 会把「整篇替换」也当作一步撤销,
         //   和工具栏/画布的撤销互相覆盖,表现为按一次 Ctrl+Z 倒退两步)
@@ -689,6 +825,8 @@ export function CodeEditor({
           ]),
         ),
         keymap.of([
+          // M209：折叠快捷键（Mod-Alt-[ / ]）
+          ...foldKeymap,
           {
             key: "Mod-f",
             run: () => {
@@ -789,6 +927,19 @@ export function CodeEditor({
     v.dispatch({ effects: langComp.current.reconfigure(langExt(lang)) });
   }, [lang]);
 
+  /* ===== M209：显示空白开关 ===== */
+  useEffect(() => {
+    const v = viewRef.current;
+    if (!v) return;
+    v.dispatch({
+      effects: wsComp.current.reconfigure(
+        showWs
+          ? [highlightWhitespace(), highlightTrailingWhitespace()]
+          : [],
+      ),
+    });
+  }, [showWs]);
+
   /* ===== M40:缩进宽度变化(设置面板里改) ===== */
   useEffect(() => {
     const v = viewRef.current;
@@ -858,6 +1009,36 @@ export function CodeEditor({
     const list = (errors || []).filter((e) => e.level === "error");
     return list[0] || null;
   }, [errors]);
+
+  // M209：替换当前命中（从后往前改偏移才不会错）
+  const replaceCurrent = useCallback(() => {
+    const v = viewRef.current;
+    if (!v || !query.trim()) return;
+    const list = findAllIn(v.state.doc.toString(), query);
+    if (!list.length) return;
+    const n = ((hitIdx % list.length) + list.length) % list.length;
+    const h = list[n];
+    v.dispatch({
+      changes: { from: h.from, to: h.to, insert: replaceText },
+      selection: { anchor: h.from + replaceText.length },
+      scrollIntoView: true,
+    });
+    // 替换后重新定位到同一位置的下一个命中
+    setHitIdx(n);
+  }, [query, replaceText, hitIdx]);
+
+  // M209：全部替换
+  const replaceAll = useCallback(() => {
+    const v = viewRef.current;
+    if (!v || !query.trim()) return;
+    const list = findAllIn(v.state.doc.toString(), query);
+    if (!list.length) return;
+    // 一次 dispatch（单个事务、可一次撤销）
+    v.dispatch({
+      changes: list.map((h) => ({ from: h.from, to: h.to, insert: replaceText })),
+    });
+    setHitIdx(0);
+  }, [query, replaceText]);
 
   /** M185b:点错误条跳到对应行(编辑器内部定位) */
   const jumpToLine = useCallback((n: number) => {
@@ -1028,15 +1209,80 @@ export function CodeEditor({
             </button>
             <button
               type="button"
+              className={"axv-find-btn" + (replaceOpen ? " is-on" : "")}
+              title={tt("替换")}
+              aria-label={tt("替换")}
+              aria-pressed={replaceOpen}
+              onClick={() => {
+                setReplaceOpen((o) => !o);
+                setFindOpen(true);
+              }}
+            >
+              <span className="msr" aria-hidden="true">find_replace</span>
+            </button>
+            <button
+              type="button"
+              className={"axv-find-btn" + (showWs ? " is-on" : "")}
+              title={tt("显示/隐藏空白字符")}
+              aria-label={tt("显示/隐藏空白字符")}
+              aria-pressed={showWs}
+              onClick={() => setShowWs((w) => !w)}
+            >
+              <span className="msr" aria-hidden="true">format_indent_increase</span>
+            </button>
+            <button
+              type="button"
               className="axv-find-btn"
               title={tt("关闭(Esc)")}
               aria-label={tt("关闭查找")}
               onClick={() => {
                 setFindOpen(false);
+                setReplaceOpen(false);
                 viewRef.current?.focus();
               }}
             >
               <span className="msr" aria-hidden="true">close</span>
+            </button>
+          </div>
+        ) : null}
+        {findOpen && replaceOpen ? (
+          <div className="axv-find axv-find-rep" role="group" aria-label={tt("替换")}>
+            <input
+              className="axv-find-input"
+              value={replaceText}
+              placeholder={tt("替换为")}
+              aria-label={tt("替换为")}
+              onChange={(e) => setReplaceText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  replaceCurrent();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setReplaceOpen(false);
+                  viewRef.current?.focus();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="axv-find-btn axv-find-repbtn"
+              title={tt("替换当前")}
+              aria-label={tt("替换当前")}
+              disabled={hits.length === 0}
+              onClick={replaceCurrent}
+            >
+              {tt("替换")}
+            </button>
+            <button
+              type="button"
+              className="axv-find-btn axv-find-repbtn"
+              title={tt("全部替换")}
+              aria-label={tt("全部替换")}
+              disabled={hits.length === 0}
+              onClick={replaceAll}
+            >
+              {tt("全部")}
             </button>
           </div>
         ) : null}

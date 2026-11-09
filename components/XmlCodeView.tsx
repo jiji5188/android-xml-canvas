@@ -27,6 +27,8 @@ export interface XmlCodeViewProps {
   onCursorLine?: (line: number) => void;
   /** M101：Ctrl/Cmd + 点击资源引用回调（raw 如 `@string/app_name`） */
   onRefClick?: (raw: string) => void;
+  /** M209：悬停提示——把光标下 token 解析成提示文本 */
+  hoverTip?: (raw: string) => string | null;
 
   /** 格式化（重排缩进，保留注释） */
   onFormat: () => void;
@@ -96,6 +98,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           onCursorLine={props.onCursorLine}
           onFormat={props.onFormat}
           onRefClick={props.onRefClick}
+          hoverTip={props.hoverTip}
           lang={props.lang}
           indent={props.indent}
           resNames={props.resNames}

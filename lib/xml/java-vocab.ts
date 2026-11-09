@@ -247,6 +247,15 @@ export const JAVA_SYMBOLS: JavaSymbol[] = [
   { label: "Log.d(", insert: 'Log.d("TAG", "");', title: "打日志" },
   { label: "new ", insert: "new ", title: "创建对象" },
   { label: "TODO", insert: "// TODO: ", title: "待办注释" },
+  // M209：常用 Java 脚手架（选了就插入一整个块，光标留在中间）
+  { label: "if/else", insert: "if () {\n\n} else {\n\n}", back: 1, title: "if / else 分支" },
+  { label: "for", insert: "for (int i = 0; i < n; i++) {\n\n}", back: 1, title: "循环" },
+  { label: "for-in", insert: "for (Item it : items) {\n\n}", back: 1, title: "增强 for" },
+  { label: "try/catch", insert: "try {\n\n} catch (Exception e) {\n\n}", back: 1, title: "try / catch" },
+  { label: "while", insert: "while () {\n\n}", back: 1, title: "while 循环" },
+  { label: "switch", insert: "switch () {\n    case 0:\n      break;\n    default:\n      break;\n}", back: 1, title: "switch 分支" },
+  { label: "Activity", insert: "public class MainActivity extends Activity {\n\n    @Override\n    protected void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        setContentView(R.layout.activity_main);\n    }\n}", back: 1, title: "Activity 模板" },
+  { label: "Fragment", insert: "public class MyFragment extends Fragment {\n\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n    }\n}", back: 1, title: "Fragment 模板" },
 ];
 
 const WORD = /[A-Za-z0-9_$]/;

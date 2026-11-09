@@ -1573,6 +1573,7 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
                 item={propsFor.item}
                 source={propsFor.source}
                 saveRoot={propsFor.saveRoot}
+                fileOpsCtx={fileOpsCtxOf(propsFor.item)}
                 iconUrl={propsFor.iconUrl}
                 onRenameProject={p.onRenameProject}
                 onSaved={() => {

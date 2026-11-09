@@ -15,12 +15,16 @@ import type { WsProject } from "@/lib/xml/workspace";
 import { readAppName, setAppName } from "@/lib/xml/project-rename";
 import { addGradleDep, listGradleDeps, parseGradlePackage, removeGradleDep, setGradlePackage } from "@/lib/xml/project-info";
 import { saveProjectFile, type ProjectSaveRoot } from "@/lib/xml/project-save";
+import type { FileOpsCtx } from "@/lib/xml/file-ops";
+import { syncPkgInSource } from "@/lib/xml/pkg-sync";
 import { Overlay } from "@/components/TreeFileMenu";
 
 export interface ProjectPropsDialogProps {
   item: WsProject;
   source: ProjectSource;
   saveRoot: ProjectSaveRoot | null;
+  /** M209：文件操作上下文（native 目录改名用）；web 传 null 则只改文件内容不移动目录 */
+  fileOpsCtx?: FileOpsCtx | null;
   iconUrl?: string | null;
   onClose: () => void;
   /** 改目录名（复用现有改名流程，成功后会重命名目录并同步 grader/settings/主题） */
@@ -182,7 +186,7 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
           setStrings({ ...strings, text: next });
         }
       }
-      // 3) 包名
+      // 3) 包名：gradle 的 namespace/applicationId + 源码 package 声明 + 源码目录
       if (gradle && pkg && pkg !== origin.pkg) {
         const r = setGradlePackage(gradle.text, pkg);
         if (!r.ok) {
@@ -190,6 +194,22 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
           return;
         }
         setGradle({ ...gradle, text: r.text });
+        // M209：同步 .java/.kt 的 package 声明 + 按包名建的源码目录
+        if (p.saveRoot) {
+          const sync = await syncPkgInSource(p.source, origin.pkg, pkg, p.saveRoot, p.fileOpsCtx ?? null);
+          if (sync.files.length > 0 || sync.moved) {
+            setMsg(
+              tt("包名已同步：改了 {n} 个源码文件，目录{mv}", {
+                n: sync.files.length,
+                mv: sync.moved
+                  ? "已移动"
+                  : sync.moveWarn === "pkg-move-unsupported"
+                    ? "需手动改目录名"
+                    : "未能自动移动目录（" + (sync.moveWarn || "") + "）",
+              }),
+            );
+          }
+        }
       }
       // 4) 依赖（gradle 正文已在内存里改过）
       if (gradle) {

@@ -17,6 +17,8 @@ export interface SigningDialogProps {
   apkResult?: { ok: boolean; path?: string; name?: string; bytes?: number; ms?: number; step?: string; log?: string } | null;
   /** M192：调系统安装器装刚打出来的包 */
   onInstallApk?: (path: string) => void;
+  /** M197：把打好的 APK 分享出去 */
+  onShareApk?: (path: string) => void;
   /** 读项目里 app/build.gradle（没有就 null） */
   gradleText: string | null;
   /** M188b：当前项目没有可写根（网页版没选目录 / 示例项目）→ 写入先进 localStorage 草稿 */
@@ -37,6 +39,8 @@ export interface SigningDialogProps {
   stored?: StoredSigning | null;
   /** M195：把当前表单记到本机（按项目），返回是否保存成功 */
   onRemember?: (s: Omit<StoredSigning, "savedAt">) => boolean;
+  /** M197：清除本机记住的签名配置 */
+  onForget?: () => void;
   onClose: () => void;
   onNote: (msg: string, ms?: number) => void;
 }
@@ -53,7 +57,7 @@ const EMPTY: SigningParams = {
   v3: true,
 };
 
-export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onWriteGradle, onClose, onNote, stored, onRemember }: SigningDialogProps) {
+export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onShareApk, onWriteGradle, onClose, onNote, stored, onRemember, onForget }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
   // M195：build.gradle 里没写的项（典型：口令）用本机记住的配置补
   const seed = prefill ?? (stored as SigningParams | null);
@@ -375,6 +379,15 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
         {stored && !prefill ? (
           <div className="axv-sign-hint">
             {tt("已从本机记忆回填签名配置（按项目保存，点打包/写入会更新）")}
+            {onForget ? (
+              <button
+                type="button"
+                onClick={onForget}
+                style={{ marginLeft: 8, background: "none", border: 0, color: "#2c6ef2", cursor: "pointer", padding: 0 }}
+              >
+                {tt("忘记本机记忆")}
+              </button>
+            ) : null}
           </div>
         ) : null}
         {rootMissing && !gradleText ? (
@@ -412,6 +425,11 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
               {apkResult?.ok && apkResult.path && onInstallApk ? (
                 <button type="button" onClick={() => onInstallApk(apkResult.path!)}>
                   {tt("安装到本机")}
+                </button>
+              ) : null}
+              {apkResult?.ok && apkResult.path && onShareApk ? (
+                <button type="button" onClick={() => onShareApk(apkResult.path!)}>
+                  {tt("分享 APK")}
                 </button>
               ) : null}
             </div>

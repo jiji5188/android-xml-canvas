@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // M192：一键打包桥（设备端 aapt2 + 壳 dex + apksig）—— 纯 JS 侧协议测试
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { buildApk, hasBuildApk, installApk } from "@/lib/xml/native-apk";
+import { buildApk, hasBuildApk, installApk, shareApkFile } from "@/lib/xml/native-apk";
 
 type Win = { AxvNative?: Record<string, unknown>; __axvBuildApk?: (id: string, json: string) => void };
 
@@ -98,5 +98,21 @@ describe("M192 native-apk 桥", () => {
     win().AxvNative = { installApk: fn };
     expect(installApk("/sdcard/build/a.apk").ok).toBe(true);
     expect(fn).toHaveBeenCalledWith("/sdcard/build/a.apk");
+  });
+
+  it("M197 shareApkFile：没桥报不支持，有桥调一次，抛错不漏", () => {
+    expect(shareApkFile("/x.apk").ok).toBe(false);
+    const fn = vi.fn();
+    win().AxvNative = { shareApk: fn };
+    expect(shareApkFile("/sdcard/build/a.apk")).toEqual({ ok: true });
+    expect(fn).toHaveBeenCalledWith("/sdcard/build/a.apk");
+    win().AxvNative = {
+      shareApk: () => {
+        throw new Error("no chooser");
+      },
+    };
+    const bad = shareApkFile("/x.apk");
+    expect(bad.ok).toBe(false);
+    expect(bad.msg).toContain("no chooser");
   });
 });

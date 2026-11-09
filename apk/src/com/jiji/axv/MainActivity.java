@@ -534,6 +534,12 @@ public class MainActivity extends Activity {
             MainActivity.this.installApkFromProject(path);
         }
 
+        /** M197：把刚打出来的 APK 分享出去（微信/QQ/邮件/蓝牙…） */
+        @JavascriptInterface
+        public void shareApk(String path) {
+            MainActivity.this.shareApkFromProject(path);
+        }
+
         /** M191：在设备上生成 release 签名用的 keystore（PKCS#12）。
          *  path 必须落在默认工作目录内（与 writeText 同一道护栏）。
          *  返回 "ok:<字节数>" / "err:<原因>" */
@@ -2616,6 +2622,28 @@ public class MainActivity extends Activity {
     }
 
     /** M192：调系统安装器装刚打出来的包 */
+    /** M197：分享刚打出来的 APK（走 AxvApkProvider 的 content:// 授权，别用 file://） */
+    private void shareApkFromProject(String path) {
+        runOnUiThread(() -> {
+            try {
+                File f = new File(path);
+                if (!f.isFile()) {
+                    toast("找不到 APK：" + path);
+                    return;
+                }
+                Uri uri = AxvApkProvider.uriFor(MainActivity.this, f);
+                Intent it = new Intent(Intent.ACTION_SEND);
+                it.setType("application/vnd.android.package-archive");
+                it.putExtra(Intent.EXTRA_STREAM, uri);
+                it.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(it, "分享 APK"));
+            } catch (Throwable t) {
+                Log.e(TAG, "share apk fail", t);
+                toast("分享失败：" + t.getMessage());
+            }
+        });
+    }
+
     private void installApkFromProject(String path) {
         runOnUiThread(() -> {
             try {

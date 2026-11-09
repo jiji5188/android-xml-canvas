@@ -2441,6 +2441,11 @@ export const SRC_EN: SrcDict = {
   "检查器": "Inspector",
   "项目里没找到布局文件（layout/*.xml）。请先在左侧资源新建或打开一个布局，再打包。": "No layout file found in this project (layout/*.xml). Create or open a layout in the left panel, then build again.",
   "真机渲染（{stage}）": "Real render ({stage})",
+  "忘记本机记忆": "Forget saved config",
+  "已清除本机记住的签名配置": "Cleared the signing config saved on this device",
+  "分享 APK": "Share APK",
+  "已调起分享": "Share sheet opened",
+  "分享失败：{msg}": "Share failed: {msg}",
 
 };
 

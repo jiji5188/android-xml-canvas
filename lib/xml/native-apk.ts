@@ -45,6 +45,7 @@ export interface BuildApkResult {
 interface ApkBridge {
   buildInstallApkAsync?(id: string, payload: string): void;
   installApk?(path: string): void;
+  shareApk?(path: string): void;
 }
 
 type Resolver = (r: BuildApkResult) => void;
@@ -118,6 +119,18 @@ export function installApk(path: string): { ok: boolean; msg?: string } {
   if (!b || typeof b.installApk !== "function") return { ok: false, msg: "当前环境不支持安装" };
   try {
     b.installApk(path);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, msg: String(e) };
+  }
+}
+
+/** M197：把打好的 APK 分享出去（微信/QQ/邮件…；返回是否调起成功） */
+export function shareApkFile(path: string): { ok: boolean; msg?: string } {
+  const b = bridge();
+  if (!b || typeof b.shareApk !== "function") return { ok: false, msg: "当前环境不支持分享" };
+  try {
+    b.shareApk(path);
     return { ok: true };
   } catch (e) {
     return { ok: false, msg: String(e) };

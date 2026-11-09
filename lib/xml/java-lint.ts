@@ -387,6 +387,13 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
     for (const m of masked.code.matchAll(/\bR\s*\.\s*id\s*\.\s*([A-Za-z_]\w*)/g)) {
       const name = m[1];
       if (ids.has(name) || seen.has(name)) continue;
+      // M208c：R 前面带限定符（android.R.id / 某类名.R.id）就不是项目 R，跳过（系统/别的类，别误报）
+      const at = m.index || 0;
+      const before = masked.code.slice(Math.max(0, at - 40), at);
+      if (/\w\s*\.\s*$/.test(before)) {
+        seen.add(name);
+        continue;
+      }
       seen.add(name);
       const sug = nearestName(name, ids);
       issues.push({
@@ -421,6 +428,13 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
     for (const m of masked.code.matchAll(new RegExp(`\\bR\\s*\\.\\s*${kind}\\s*\\.\\s*([A-Za-z_]\\w*)`, "g"))) {
       const name = m[1];
       if (set.has(name) || seen.has(name)) continue;
+      // M208c：R 前面带限定符（android.R.drawable / 某类名.R.drawable）就不是项目资源，别误报
+      const at = m.index || 0;
+      const before = masked.code.slice(Math.max(0, at - 40), at);
+      if (/\w\s*\.\s*$/.test(before)) {
+        seen.add(name);
+        continue;
+      }
       seen.add(name);
       const sug = nearestName(name, set);
       issues.push({
@@ -480,6 +494,9 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
     const used = new RegExp(`\\b${simple}\\s*(?:<|\\[|\\.|\\(|\\s+[a-z_]\\w*\\s*[=;,)]|\\s+[a-z_]\\w*\\s*:)`);
     const usedM = used.exec(masked.code);
     if (!usedM) continue;
+    // M208c：已经是全限定引用（如 `android.graphics.Color.parseColor`）就不需要 import，别误报
+    const q = masked.code.slice(0, usedM.index);
+    if (/[\w.]\./.test(q.slice(-2))) continue;
     issues.push({
       line: lineOf(starts, usedM.index),
       col: colOf(usedM.index),

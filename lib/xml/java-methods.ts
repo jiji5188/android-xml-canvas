@@ -54,6 +54,17 @@ export const KNOWN_METHODS: string[] = [
   "getBoolean", "getFloat", "getString", "getStringSet", "getAll", "contains", "edit", "apply", "commit",
   "remove", "clear", "getDefaultSharedPreferences", "getSharedPreferences", "registerOnSharedPreferenceChangeListener",
   "unregisterOnSharedPreferenceChangeListener", "onSharedPreferenceChanged", "get",
+  // M205c：org.json JSONObject / JSONArray 全家族（之前缺 optLong → 被当成 getLong 的拼写错）
+  "optString", "optInt", "optLong", "optDouble", "optBoolean", "optJSONObject", "optJSONArray",
+  "optStringSet", "optJSONArrayOrNull", "getJSONObject", "getJSONArray", "getJSONObjectOrNull",
+  "has", "keys", "names", "length", "toMap", "accumulate", "write", "toString",
+  "toJSONObject", "toJSONArray", "join", "quote",
+  // M205c：其它高频但之前漏的（真实 api，缺了就会误报成拼写错）
+  "parseLong", "parseInt", "parseBoolean", "parseDouble", "valueOf", "format", "intern",
+  "substring", "trim", "isEmpty", "matches", "replaceAll", "replaceFirst", "concat",
+  "charAt", "indexOf", "lastIndexOf", "startsWith", "endsWith", "equalsIgnoreCase",
+  "split", "toUpperCase", "toLowerCase", "hashCode", "getClass", "wait", "notify",
+  "sleep", "currentTimeMillis", "nanoTime", "exitTime", "getInstance", "newInstance",
 ];
 
 const KNOWN = new Set(KNOWN_METHODS);
@@ -66,15 +77,20 @@ export { editDistance };
 /** 找最接近的已知方法（距离 ≤ maxDist 才算） */
 export function suggestMethod(name: string, maxDist = 2): string | null {
   if (KNOWN.has(name)) return null;
+  const low = name.toLowerCase();
   let best: string | null = null;
   let bestD = maxDist + 1;
   for (const cand of KNOWN_METHODS) {
     const d = editDistance(name, cand, maxDist);
-    if (d < bestD) {
-      bestD = d;
-      best = cand;
-      if (d === 1) break;
-    }
+    if (d >= bestD) continue;
+    // M205c 防误报：动词不同的不算拼写错（optLong → getLong 这种，编辑距离 2 但语义完全不同）
+    // 要求：与原名前 2 个字符相同（忽略大小写），或只差 1 个字符
+    const cl = cand.toLowerCase();
+    const sharedPrefix = cl.length >= 2 && low.length >= 2 && cl.slice(0, 2) === low.slice(0, 2);
+    if (d > 1 && !sharedPrefix) continue;
+    bestD = d;
+    best = cand;
+    if (d === 1) break;
   }
   return bestD <= maxDist ? best : null;
 }

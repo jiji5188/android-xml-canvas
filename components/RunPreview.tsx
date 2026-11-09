@@ -18,7 +18,8 @@ import { DEFAULT_RENDER_THEME, type RenderTheme } from "@/lib/xml/theme";
 import type { ResourceTable } from "@/lib/xml/types";
 import { XmlCanvas } from "./XmlCanvas";
 import { decorateRunScreen } from "./run-decorate";
-import { eventText, runRoleOf, targetLabel } from "@/lib/xml/run-sim";
+import { eventText, idToPath, runRoleOf, targetLabel } from "@/lib/xml/run-sim";
+import { applyEffects, pickJavaSim, type SimEffect, type SimReceiver } from "@/lib/xml/java-sim";
 
 const SCALE = 2; // 1dp = 2px（与编辑器一致）
 
@@ -43,6 +44,8 @@ interface Props {
   resources: ResourceTable;
   device: RunDevice;
   onClose: () => void;
+  /** M199：项目里的 Java/Kotlin 源码（可选）。给了就跑「轻量逻辑仿真」 */
+  javaFiles?: { rel: string; text: string }[];
 }
 
 type LogLevel = "I" | "W" | "E" | "D";
@@ -76,7 +79,7 @@ function normName(raw: string): string {
     .toLowerCase();
 }
 
-export function RunPreview({ entryXml, entryName, layouts, resources, device, onClose }: Props) {
+export function RunPreview({ entryXml, entryName, layouts, resources, device, onClose, javaFiles }: Props) {
   const [rotated, setRotated] = useState(false);
   const [stack, setStack] = useState<Screen[]>([{ name: entryName, xml: entryXml }]);
   const [dir, setDir] = useState<"fwd" | "back">("fwd");
@@ -186,6 +189,80 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
     [layouts],
   );
 
+  // M199：挑一个跟当前布局最相关的 Activity，做「轻量逻辑仿真」（不编译、不执行真 Java）
+  const sim = useMemo(() => {
+    if (!javaFiles?.length) return null;
+    return pickJavaSim(javaFiles, entryName, layouts);
+  }, [javaFiles, entryName, layouts]);
+
+  const simBooted = useRef(false);
+
+  /** 把 Java 仿真的效果应用到运行中的 DOM；识别不到控件只记日志，不改页面 */
+  const applySim = useCallback(
+    (effects: SimEffect[]) => {
+      if (!sim) return;
+      const screenEl = bodyRef.current?.querySelector<HTMLElement>(".axv-run-screen") ?? null;
+      const byPath = (viewId: string): HTMLElement | null => {
+        const path = idToPath(parsed.root, viewId);
+        if (!path || !screenEl) return null;
+        return screenEl.querySelector<HTMLElement>(`[data-path="${path}"]`);
+      };
+      const rx: SimReceiver = {
+        setText(viewId, text) {
+          const el = byPath(viewId);
+          if (!el) {
+            log("W", tt("Java 逻辑：找不到控件 #{id}", { id: viewId }));
+            return;
+          }
+          // 只换「纯文本的 span」，避免拆掉复合 drawable / 图标
+          const spans = Array.from(el.querySelectorAll("span")).filter((s) => s.children.length === 0);
+          if (spans.length) spans[spans.length - 1].textContent = text;
+          else el.textContent = text;
+          log("D", `Java: ${viewId}.setText("${text}")`);
+        },
+        setVisibility(viewId, v) {
+          const el = byPath(viewId);
+          if (!el) {
+            log("W", tt("Java 逻辑：找不到控件 #{id}", { id: viewId }));
+            return;
+          }
+          el.style.display = v === "gone" ? "none" : "";
+          el.style.visibility = v === "invisible" ? "hidden" : "";
+          log("D", `Java: ${viewId}.setVisibility(${v.toUpperCase()})`);
+        },
+        setEnabled(viewId, v) {
+          const el = byPath(viewId);
+          if (!el) {
+            log("W", tt("Java 逻辑：找不到控件 #{id}", { id: viewId }));
+            return;
+          }
+          el.style.opacity = v ? "" : "0.5";
+          el.style.pointerEvents = v ? "" : "none";
+          log("D", `Java: ${viewId}.setEnabled(${v})`);
+        },
+        toast(text) {
+          showToast(text);
+          log("I", `Toast: ${text}`);
+        },
+        log(level, tag, msg) {
+          log(level.toUpperCase() as "D" | "I" | "W" | "E", `${tag}: ${msg}`);
+        },
+        navigate(target, source) {
+          const hit = findLayout(target);
+          if (!hit) {
+            log("W", tt("startActivity({cls})：找不到布局「{target}」", { cls: source, target }));
+            return;
+          }
+          log("I", tt("startActivity({cls}) → {name}.xml", { cls: source, name: hit.name }));
+          setDir("fwd");
+          setStack((s) => [...s, hit]);
+        },
+      };
+      applyEffects(sim, effects, rx);
+    },
+    [sim, parsed.root, log, showToast, findLayout],
+  );
+
   const back = useCallback(() => {
     setStack((s) => {
       if (s.length <= 1) {
@@ -211,6 +288,16 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
       const label = targetLabel(node.tag, node.attrs["id"]);
       const action = String(node.attrs["onClick"] ?? "").trim();
 
+      // M199：代码里写的 setOnClickListener 优先（跟安卓真实行为一致）
+      const rawId = String(node.attrs["id"] ?? "");
+      const viewId = rawId.replace(/^@\+?id\//, "").trim();
+      const simHandler = sim && viewId ? sim.handlers.find((h) => h.viewId === viewId) : undefined;
+      if (simHandler) {
+        log("I", eventText("click", label, tt("Java 逻辑 {n} 条", { n: simHandler.effects.length })));
+        applySim(simHandler.effects);
+        return;
+      }
+
       if (!action) {
         log("D", eventText("click", label, tt("无 onClick")));
         return;
@@ -235,7 +322,7 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
       setDir("fwd");
       setStack((s) => [...s, target]);
     },
-    [parsed.root, findLayout, log, back, showToast],
+    [parsed.root, findLayout, log, back, showToast, sim, applySim],
   );
 
   // M18：换屏后给 DOM 加交互（输入/勾选/拖动/下拉/列表行/涟漪）
@@ -253,6 +340,17 @@ export function RunPreview({ entryXml, entryName, layouts, resources, device, on
       cleanup = r.cleanup;
       setInteractive(r.interactive);
       if (r.interactive > 0) log("D", tt("本屏可交互控件 {n} 个", { n: r.interactive }));
+      // M199：onCreate 里的直接语句只跑一次（进首页时）
+      if (sim && !simBooted.current && cur.name === entryName) {
+        simBooted.current = true;
+        if (sim.startup.length) {
+          log("I", tt("Java 仿真：执行 onCreate 的 {n} 条语句", { n: sim.startup.length }));
+          applySim(sim.startup);
+        }
+        if (sim.skipped.length) {
+          log("W", tt("Java 仿真：{n} 条语句暂不支持（已跳过）", { n: sim.skipped.length }));
+        }
+      }
     }, 0);
     return () => {
       window.clearTimeout(t);

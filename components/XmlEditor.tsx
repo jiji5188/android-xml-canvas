@@ -36,6 +36,7 @@ import {
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
 import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras } from "@/lib/xml/project-res";
+import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild, childLimitOf } from "@/lib/xml/insert";
@@ -831,6 +832,14 @@ export function XmlEditor() {
   const [exportAction, setExportAction] = useState<"download" | "copy">("download");
   const [dropHint, setDropHint] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
+  /** M199：运行调试时加载的 Java/Kotlin 源码（轻量逻辑仿真用） */
+  const [runJavaFiles, setRunJavaFiles] = useState<{ rel: string; text: string }[]>([]);
+  /** M199：当前布局名（Java 仿真按它挑 Activity）；开的是代码文件时退回 activity_main */
+  const entryLayoutName = useMemo(() => {
+    const seg = (openRel || "").replace(/\\/g, "/").split("/").pop() || "";
+    if (!/\.xml$/i.test(seg)) return "activity_main";
+    return seg.replace(/\.xml$/i, "") || "activity_main";
+  }, [openRel]);
 
   /** M5b：已生成资源管理面板 */
   // M11：设置 / 关于面板
@@ -1823,6 +1832,23 @@ const allDrawableNames = useMemo(() => {
       cancelled = true;
     };
   }, [aiFileIo, openRel, currentXml]);
+
+  // M199：进运行调试前把项目里的 Java/Kotlin 读进来（只读，失败就当没代码）
+  useEffect(() => {
+    if (!runOpen) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const files = await loadProjectJavaFiles(aiFileIo);
+        if (!cancelled) setRunJavaFiles(files);
+      } catch {
+        if (!cancelled) setRunJavaFiles([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [runOpen, aiFileIo]);
 
   const hasViewTabRef = useRef(hasViewTab);
   hasViewTabRef.current = hasViewTab;
@@ -5104,10 +5130,11 @@ const findResolved = findResolvedNode;
       {runOpen ? (
         <RunPreview
           entryXml={xml}
-          entryName={"activity_main"}
+          entryName={entryLayoutName}
           layouts={resExtras?.layouts ?? {}}
           resources={resources}
           device={{ label: device.label, w: device.w, h: device.h, radius: device.radius }}
+          javaFiles={runJavaFiles}
           onClose={() => setRunOpen(false)}
         />
       ) : null}

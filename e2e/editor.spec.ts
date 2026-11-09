@@ -92,7 +92,12 @@ test.describe("代码 ↔ 画布联动", () => {
     await expect(page.locator(".axv-phone")).toContainText("E2E按钮");
 
     // 撤销应把代码退回上一版（不再有 E2E 标记）
+    // ⚠ 撤销必须回到代码页再按：点了预览 tab 后焦点不在 CodeMirror，Ctrl+Z 会落到页面
+    await tab(page, "代码", "Code").click();
+    await cm.click();
     await page.keyboard.press("Control+z");
+    await page.waitForTimeout(300);
+    await tab(page, "预览", "Preview").click();
     await expect(page.locator(".axv-phone")).not.toContainText("E2E按钮", { timeout: 15_000 });
 
     expect(errs, errs.join("\n")).toEqual([]);

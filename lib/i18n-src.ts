@@ -2446,6 +2446,13 @@ export const SRC_EN: SrcDict = {
   "分享 APK": "Share APK",
   "已调起分享": "Share sheet opened",
   "分享失败：{msg}": "Share failed: {msg}",
+  // M199 Java 逻辑仿真
+  "Java 逻辑 {n} 条": "Java logic · {n} effect(s)",
+  "Java 仿真：执行 onCreate 的 {n} 条语句": "Java sim: ran {n} statement(s) from onCreate",
+  "Java 仿真：{n} 条语句暂不支持（已跳过）": "Java sim: {n} statement(s) not supported yet (skipped)",
+  "Java 逻辑：找不到控件 #{id}": "Java logic: view #{id} not found",
+  "startActivity({cls})：找不到布局「{target}」": "startActivity({cls}): layout 「{target}」 not found",
+  "startActivity({cls}) → {name}.xml": "startActivity({cls}) → {name}.xml",
 
 };
 

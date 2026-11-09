@@ -6,6 +6,7 @@
 // 真正的 DOM 操作留在 RunPreview.tsx 里，避免测试环境没有 DOM。
 
 import { hapticNative } from "./native-save";
+import type { XmlNode } from "./types";
 
 /** 运行时角色 */
 export type RunRole =
@@ -180,6 +181,25 @@ export function targetLabel(tag: string, id?: unknown): string {
 export function previewInput(value: string, limit = 40): string {
   const v = value.replace(/\r/g, "").replace(/\n+/g, "⏎");
   return v.length > limit ? v.slice(0, limit) + "…" : v;
+}
+
+/** 按 android:id（去掉 @+id/ 前缀）在布局树里找路径，找不到返回 null。M199 Java 仿真用。 */
+export function idToPath(root: XmlNode | null, id: string): string | null {
+  if (!root) return null;
+  const clean = id.replace(/^@\+?id\//, "").trim();
+  if (!clean) return null;
+  let found: string | null = null;
+  const walk = (n: XmlNode) => {
+    if (found) return;
+    const raw = n.attrs?.["id"] ?? n.attrs?.["android:id"] ?? n.attrs?.["android_id"];
+    if (typeof raw === "string" && raw.replace(/^@\+?id\//, "").trim() === clean) {
+      found = n.path;
+      return;
+    }
+    for (const c of n.children ?? []) walk(c);
+  };
+  walk(root);
+  return found;
 }
 
 /** 该角色在状态变化时该不该震、震多久（ms）。

@@ -72,9 +72,19 @@ export const KNOWN_METHODS: string[] = [
   "copyOf", "requireNonNull", "isNull", "nonNull", "deepEquals", "equalsIgnoreCase",
   "notifyAll", "interrupt", "join", "setName", "getName", "run", "call", "apply",
   "accept", "test", "andThen", "compose",
+  // M208：Throwable 家族 + 常用标准库（以前全缺，把 getMessage 当拼错报 setMessage）
+  "getMessage", "getLocalizedMessage", "getCause", "getStackTrace", "printStackTrace",
+  "addSuppressed", "getSuppressed", "initCause", "fillInStackTrace", "toString", "hashCode", "equals",
+  "isEmpty", "isBlank", "strip", "trim", "length", "charAt", "substring", "toLowerCase", "toUpperCase",
+  "split", "replace", "replaceAll", "replaceFirst", "matches", "contains", "startsWith", "endsWith",
+  "indexOf", "lastIndexOf", "compareTo", "concat", "format", "valueOf", "isDigit", "isLetter",
+  "isEmpty", "nonEmpty",
 ];
 
 const KNOWN = new Set(KNOWN_METHODS);
+
+/** M208：开头字母是常见动词首字母时，d==1 但动词不同的不能当拼写错 */
+const VERB_INITIALS = new Set(["g", "s", "i", "h", "p", "c", "t"]);
 
 // M179：editDistance 挪到 nearest-name.ts 共用；这里 re-export 保持既有 import 路径可用
 import { editDistance } from "./nearest-name";
@@ -95,6 +105,11 @@ export function suggestMethod(name: string, maxDist = 2): string | null {
     const cl = cand.toLowerCase();
     const sharedPrefix = cl.length >= 2 && low.length >= 2 && cl.slice(0, 2) === low.slice(0, 2);
     if (d > 1 && !sharedPrefix) continue;
+    // M208：d==1 但只差在开头动词（get↔set / is↔has ...）→ 不是拼错，是两个不同方法
+    //       真实误报：getMessage() 被建议成 setMessage()
+    if (d === 1 && !sharedPrefix && VERB_INITIALS.has(low[0]) && VERB_INITIALS.has(cl[0]) && low[0] !== cl[0]) {
+      continue;
+    }
     bestD = d;
     best = cand;
     if (d === 1) break;

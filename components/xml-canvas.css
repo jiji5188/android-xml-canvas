@@ -2383,7 +2383,9 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-err-text {
   flex: 1 1 auto;
   min-width: 0;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .axv-err-fix {
   flex: 0 0 auto;

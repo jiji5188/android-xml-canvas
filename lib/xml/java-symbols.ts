@@ -101,20 +101,36 @@ export function extractJavaSymbols(src: string, isKotlin = false): JavaSymbols {
   // ===== Java 路径 =====
 
   // 1) 字段声明（类体里、方法外的 `修饰 类型 名;`）。用正则抓行首修饰 + 分号结尾的整行。
-  const fieldRe =
-    /^\s*(?:(?:public|private|protected|static|final|transient|volatile)\s+)*([A-Z]\w*(?:\s*<[^>()]*>)?(?:\s*\[\s*\])*|[a-z_]\w*(?:\s*<[^>()]*>)?(?:\s*\[\s*\])*)\s+([A-Za-z_]\w*)\s*(?:=|;)/gm;
+  // M208：类型允许嵌套泛型（Map<String, List<String>>）与注解，否则 cache / jsonString 这类名字会漏收 → 误报未声明
+  //   只认「首字母大写类型」或基本类型，避免把 return / new / else 当类型名
+  const PRIM =
+    "int|long|double|float|char|boolean|byte|short|void|var";
+  const TYPE = `(?:[A-Z]\\w*(?:\\s*<[^;=(){}]*>)?(?:\\s*\\[\\s*\\])*|(?:${PRIM}))`;
+  const fieldRe = new RegExp(
+    `^\\s*(?:@\\w+(?:\\([^)]*\\))?\\s*)*(?:(?:public|private|protected|static|final|transient|volatile)\\s+)*${TYPE}\\s+([A-Za-z_]\\w*)\\s*(?:=|;)`,
+    "gm",
+  );
   for (const m of src.matchAll(fieldRe)) {
-    // 排除明显是方法签名的（方法签名不会以 ; 结尾且会有 ( )）
     const line = m[0];
     if (/^\s*(?:public|private|protected|static|final|transient|volatile)\s*$/.test(line)) continue;
-    declared.add(m[2]);
+    declared.add(m[1]);
   }
 
   // 2) 构造器 / 方法参数
-  // 构造器：`Name(Type a, Type b) {`（类名 = 构造器名，首字母大写）
-  const ctorRe = /^\s*(?:public|private|protected)?\s*([A-Z]\w*)\s*\(([^)]*)\)/m;
-  const ctorM = ctorRe.exec(src);
-  if (ctorM) collectDeclaredFromParams(ctorM[2], declared);
+  // M208：一个类可能有好几个构造器，以前只用 exec 取第一个 → 第二个构造器的参数全被当成"未声明"
+  //（真实报错：public DataManager(..., int pagesize) 里的 pagesize 被报未声明）
+  const classNames = new Set<string>();
+  for (const m of src.matchAll(/\b(?:class|enum|interface)\s+([A-Z]\w*)/g)) classNames.add(m[1]);
+  for (const cn of classNames) {
+    for (const m of src.matchAll(new RegExp(`\\b${cn}\\s*\\(([^)]*)\\)`, "g"))) {
+      collectDeclaredFromParams(m[1] || "", declared);
+    }
+  }
+  if (classNames.size === 0) {
+    // 只有代码片段（没有 class 声明）时，退回首个首字母大写的 `Name(...)`
+    const ctorM = /^\s*(?:public|private|protected)?\s*([A-Z]\w*)\s*\(([^)]*)\)/m.exec(src);
+    if (ctorM) collectDeclaredFromParams(ctorM[2], declared);
+  }
 
   // 方法参数：`returnType name(params) {` 或 `abstract ... name(params);`
   const methodSigRe =
@@ -125,7 +141,11 @@ export function extractJavaSymbols(src: string, isKotlin = false): JavaSymbols {
   }
 
   // 4) 局部变量（方法体内 `int a = 0;` / `for (int i=0; ...)`）
-  const localRe = /(?<!\w)(?:int|long|double|float|char|boolean|byte|short|String|[A-Z]\w*(?:<[^>()]*>)?|[A-Z]\w*\[\])\s+([a-z_]\w*)\s*(=|[;,(])/g;
+  // M208：同样允许嵌套泛型与 final / 注解
+  const localRe = new RegExp(
+    `(?<!\\w)(?:final\\s+)?${TYPE}\\s+([a-z_]\\w*)\\s*(?:=|[;,(])`,
+    "g",
+  );
   for (const m of src.matchAll(localRe)) declared.add(m[1]);
 
   // 4b) M203b: catch (Exception e) → e

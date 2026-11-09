@@ -311,6 +311,8 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
 
   const masked = mask(text, !!opts.isKotlin);
   const starts = lineStarts(text);
+  // M208：符号表提到函数级，供后续多条规则（sym/case...）共用
+  const sy = extractJavaSymbols(text, !!opts.isKotlin);
   /** M202:偏移 → 1 起列号(供编辑器画精确下划线) */
   const colOf = (offset: number): number => offset - starts[lineOf(starts, offset) - 1] + 1;
 
@@ -527,7 +529,6 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
 
   // 7) M203：未声明的标识符（本类没字段/参数/局部变量、不是方法名、不是关键字、不是已知类）
   {
-    const sy = extractJavaSymbols(text, !!opts.isKotlin);
     // 保守：只有看到「类体/构造器结构」才启用，避免方法体片段（看不到类字段）误报
     const hasClassStructure =
       /\bclass\s+[A-Z]/.test(text) || /^\s*(?:public|private|protected)?\s*[A-Z]\w*\s*\(/m.test(text);
@@ -632,6 +633,10 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
     const declaredNames = new Set<string>();
     for (const m of text.matchAll(/\b(?:class|interface|enum|record)\s+([A-Z]\w*)/g)) declaredNames.add(m[1]);
     for (const m of text.matchAll(/\b[A-Za-z_][\w<>\[\]]*\s+([a-z_]\w*)\s*\(/g)) declaredNames.add(m[1]);
+    // M208：把全量符号表（字段/参数/局部变量/方法名）也排进去——
+    // 否则一个叫 error / string / value 的普通变量会被当成"大小写写错"
+    for (const d of sy.declared) declaredNames.add(d);
+    for (const d of sy.methods) declaredNames.add(d);
     for (const c of findCaseMismatches(text, declaredNames)) {
       issues.push({
         line: c.line,

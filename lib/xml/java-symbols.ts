@@ -105,7 +105,9 @@ export function extractJavaSymbols(src: string, isKotlin = false): JavaSymbols {
   //   只认「首字母大写类型」或基本类型，避免把 return / new / else 当类型名
   const PRIM =
     "int|long|double|float|char|boolean|byte|short|void|var";
-  const TYPE = `(?:[A-Z]\\w*(?:\\s*<[^;=(){}]*>)?(?:\\s*\\[\\s*\\])*|(?:${PRIM}))`;
+  // M210b：`[]` 必须对基本类型也生效 —— `int[] attrsArray = {...}` 以前整行不匹配
+  //   → attrsArray 漏收 → 误报「用了 attrsArray 但本类没声明」（真实案例：AutoFitRecyclerView）
+  const TYPE = `(?:[A-Z]\\w*(?:\\s*<[^;=(){}]*>)?|(?:${PRIM}))(?:\\s*\\[\\s*\\])*`;
   const fieldRe = new RegExp(
     `^\\s*(?:@\\w+(?:\\([^)]*\\))?\\s*)*(?:(?:public|private|protected|static|final|transient|volatile)\\s+)*${TYPE}\\s+([A-Za-z_]\\w*)\\s*(?:=|;)`,
     "gm",

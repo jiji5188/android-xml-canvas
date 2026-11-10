@@ -37,6 +37,7 @@ import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
 import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras, invalidateProjectRes } from "@/lib/xml/project-res";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";import { loadProjectJavaFiles } from "@/lib/xml/java-files";
+import { findLauncherActivity } from "@/lib/xml/find-launcher";
 import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild, childLimitOf } from "@/lib/xml/insert";
@@ -2500,6 +2501,13 @@ const allDrawableNames = useMemo(() => {
         if (dexGot.length) {
           setExportNote(tt("发现 {n} 个已编译 dex，一起打进包", { n: dexGot.length }));
         }
+        // M213：设备端真编译——把项目 Java/Kotlin 源码交给设备上的 ECJ+D8，产出 dex 注进包
+        setExportNote(tt("正在收集 Java 源码…"));
+        const javaSrc = await loadProjectJavaFiles(aiFileIo);
+        const javaSources = javaSrc.map((j) => ({ path: j.rel, code: j.text }));
+        // 启动 Activity：项目清单里的 launcher Activity（有就用它，没有设备端退回 ShellActivity）
+        const manifest = javaSrc.length ? await findLauncherActivity(aiFileIo) : "";
+        if (javaSources.length) setExportNote(tt("{n} 个 Java/Kotlin 源码将在设备上编译", { n: javaSources.length }));
         setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
         // M192e：与真机渲染用同一套洗法（补占位、去重、include 命名空间…）
         // 不洗直接打包的话，aapt2 会在 layout 上报 syntax error
@@ -2521,6 +2529,9 @@ const allDrawableNames = useMemo(() => {
           outName: `${pkg}-${layout}.apk`,
           // M211：把项目里已有的 classes*.dex 一起打进包（自定义控件才能 inflate）
           extraDex: dexFiles,
+          // M213：设备端真编译——项目源码 + 启动 Activity
+          javaSources,
+          launchActivity: manifest || "",
         });
         setApkResult(r);
         setExportNote(r.ok ? tt("打包完成：{name}", { name: r.name || "" }) : tt("打包失败：{msg}", { msg: r.step || "" }));

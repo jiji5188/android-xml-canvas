@@ -184,6 +184,7 @@ run(jbrExe("jar"), ["uf", "build/base.apk", "-C", "build/dex", "classes.dex"], a
 // M155：顺手把 framework 资源桩（只含 attr 的最小 android 包）也打进去，
 //      设备端 aapt2 link 的 -I 用它 —— 手机上 framework-res.apk 常常读不到，
 //      android.jar 里的 resources.arsc 又会被手机版 aapt2 判为非法。
+run(process.execPath, [path.join(apk, "make-compiler.mjs")], apk);
 const fwStub = path.join(apk, "build", "framework-res-stub.apk.gz");
 const fwRaw = path.join(apk, "build", "framework-res-stub.apk");
 run(process.execPath, [path.join(apk, "make-fw-stub.mjs"), path.join(SDK, "platforms", PLATFORM), fwStub, fwRaw, btExe("aapt2.exe")], apk);
@@ -191,7 +192,11 @@ run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "buil
   "--add", path.join(apk, "lib", "arm64-v8a", "libaapt2.so"), "lib/arm64-v8a/libaapt2.so",
   "--add", fwStub, "assets/fw/framework-res-stub.apk.gz",
   "--add", path.join(apk, "build", "shell.bin.gz"), "assets/shell/shell.bin.gz",
-  "--add", path.join(apk, "build", "signer.bin.gz"), "assets/apksig/signer.bin.gz"], apk);
+  "--add", path.join(apk, "build", "signer.bin.gz"), "assets/apksig/signer.bin.gz",
+  ...fs.readdirSync(path.join(apk, "build", "compiler"))
+    .filter((n) => /^tool\d+\.bin\.gz$/.test(n) || n === "android.jar.gz")
+    .map((n) => ["--add", path.join(apk, "build", "compiler", n), "assets/compiler/" + n])
+  .flat()], apk);
 
 // 7) zipalign + 签名
 const keystore = path.join(apk, "debug.keystore");

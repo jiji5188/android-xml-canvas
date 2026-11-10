@@ -11,11 +11,17 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 /**
- * M192：「一键打包」生成的 APK 里唯一的 Activity。
+ * M192/M213：「一键打包」生成的 APK 里的入口 Activity。
  *
- * 它不是用户的业务代码 —— 设备上没有 javac/d8，编译不了项目的 Java。
- * 它只做一件事：把打包进去的布局 inflate 出来显示，让用户能在真机上看到成品长什么样。
- * 布局名从 manifest 的 meta-data（axv.layout）里读，所以同一个 dex 能用于任何项目。
+ * 职责有两层：
+ * 1) M213 起设备端能用 ECJ+D8 真编译项目的 Java —— 若清单里带了 axv.launcher
+ *    （项目自己的 launcher Activity），且这个类在包里真存在，就先 startActivity 转给它，
+ *    让用户的项目代码真正跑起来（setContentView/findViewById/监听器都是他的原逻辑）。
+ * 2) 兜底：项目没有 launcher、或编译失败没进包（类不存在），就本地 inflate 布局
+ *    （布局名从 meta-data axv.layout 读），至少能看到界面。
+ *
+ * 之所以把判断放运行时而不是打包时：清单要在 aapt2 link 之前写好，那时还不知道编译会不会成功；
+ * 写成「固定壳 + 运行时接管」就不会出现「清单指向不存在的类 → 装上秒崩」。
  */
 public class ShellActivity extends Activity {
 
@@ -31,6 +37,29 @@ public class ShellActivity extends Activity {
             }
         } catch (Throwable ignored) {
             // 读不到就用默认名，下面会给出提示页
+        }
+
+        // M213：项目自己的 launcher Activity 在包里就转给它（真跑用户代码）
+        String launcher = "";
+        try {
+            ActivityInfo ai = getPackageManager().getActivityInfo(getComponentName(),
+                    PackageManager.GET_META_DATA);
+            if (ai != null && ai.metaData != null) {
+                launcher = ai.metaData.getString("axv.launcher", "");
+            }
+        } catch (Throwable ignored) {
+        }
+        if (launcher != null && launcher.length() > 0 && !launcher.equals(getClass().getName())) {
+            try {
+                Class.forName(launcher);
+                android.content.Intent it = new android.content.Intent();
+                it.setClassName(this, launcher);
+                startActivity(it);
+                finish();
+                return;
+            } catch (Throwable notCompiled) {
+                // 类不在包里（没编译成功 / 没源码）→ 继续走本地 inflate
+            }
         }
 
         int id = 0;

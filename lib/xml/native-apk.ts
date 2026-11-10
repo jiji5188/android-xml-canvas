@@ -28,6 +28,10 @@ export interface BuildApkInput {
   outName?: string;
   /** M211：项目里已经编译好的 dex（classes2.dex 起）。用来让布局里的自定义控件能 inflate。 */
   extraDex?: { name: string; base64: string }[];
+  /** M213：项目 Java/Kotlin 源码（设备端用 ECJ+D8 真编译，产出 dex 注进包）。path 相对项目根。 */
+  javaSources?: { path: string; code: string }[];
+  /** M213：启动 Activity 全限定名（项目清单里的 launcher；没有就退回壳 Activity） */
+  launchActivity?: string;
 }
 
 export interface BuildApkResult {

@@ -2523,6 +2523,146 @@ public class MainActivity extends Activity {
     }
 
     /** 把 xml 文本里的 & < > " 转义，避免属性值把清单写坏 */
+    /** M213：设备端真编译 —— 把项目 Java 源码编成 dex，塞进 extraDex（classes2.dex…）
+    * @param javaSources  {path, code} 列表（path 相对项目根，形如 app/src/main/java/…/X.java）
+    * @param genDir       aapt2 生成的 R.java 所在目录（可能没有 R.java，允许为空）
+    * @param pkg          包名（R.java 的包 = pkg；与 --custom-package 一致）
+    * @param extraDex     已收集的项目 dex（会追加编译产物）
+    */
+   private void compileProjectJava(JSONArray javaSources, String launchActivity, File root, File genDir,
+            String pkg, StringBuilder log, java.util.List<byte[]> extraDex) {
+        if (javaSources == null || javaSources.length() == 0) return;
+        try {
+            File compDir = ensureCompiler();
+            File clsDir = new File(root, "cls");
+            File srcDir = new File(root, "srcx");
+            // 写源码
+            java.util.List<File> files = new java.util.ArrayList<>();
+            for (int i = 0; i < javaSources.length(); i++) {
+                JSONObject j = javaSources.getJSONObject(i);
+                String rel = j.optString("path", "");
+                String code = j.optString("code", "");
+                if (rel.isEmpty() || rel.contains("..")) continue;
+                File dst = new File(srcDir, rel);
+                dst.getParentFile().mkdirs();
+                writeUtf8(dst, code);
+                files.add(dst);
+            }
+            // R.java（aapt2 --java 生成在 genDir/pkg/…）
+            java.util.List<String> rFiles = new java.util.ArrayList<>();
+            if (genDir != null && genDir.isDirectory()) {
+                walkJava(genDir, rFiles);
+            }
+            log.append("编译 ").append(files.size()).append(" 个 java + ").append(rFiles.size()).append(" 个 R.java\n");
+            File androidJar = new File(compDir, "android.jar");
+            if (!androidJar.isFile()) throw new IOException("缺 android.jar（编译器资源没装齐）");
+            // ECJ
+            java.lang.ClassLoader cl = compilerLoader(compDir);
+            Class<?> ecj = cl.loadClass("com.jiji.axv.compiler.EcjBridge");
+            java.util.List<String> ecjLog = new java.util.ArrayList<>();
+            String[] ecjArgs = new String[] {
+                "-source", "11", "-target", "11", "-nowarn", "-encoding", "UTF-8",
+                "-classpath", androidJar.getAbsolutePath(),
+                "-d", clsDir.getAbsolutePath() };
+            java.lang.reflect.Method ecjCompile = ecj.getMethod("compile", String[].class, java.util.List.class);
+            boolean ecjOk = Boolean.valueOf((Boolean) ecjCompile.invoke(null, ecjArgs, ecjLog));
+            if (!ecjOk || ecjLog.size() > 0) {
+                log.append("ECJ: ").append(String.join("\n", ecjLog).substring(0, Math.min(2000, String.join("\n", ecjLog).length()))).append("\n");
+            }
+            if (!ecjOk) throw new IOException("Java 编译失败（见日志），改用壳 Activity（若布局能 inflate）");
+            // D8：.class → dex
+            File dexDir = new File(root, "jex");
+            dexDir.mkdirs();
+            java.util.List<String> classFiles = new java.util.ArrayList<>();
+            walkClass(clsDir, classFiles);
+            Class<?> d8 = cl.loadClass("com.jiji.axv.compiler.D8Bridge");
+            java.util.List<String> d8Log = new java.util.ArrayList<>();
+            java.util.List<String> d8Args = new java.util.ArrayList<>();
+            d8Args.add("--release"); d8Args.add("--min-api"); d8Args.add("24");
+            d8Args.add("--lib"); d8Args.add(androidJar.getAbsolutePath());
+            d8Args.add("--output"); d8Args.add(dexDir.getAbsolutePath());
+            for (String cf : classFiles) d8Args.add(cf);
+            java.lang.reflect.Method d8Method = d8.getMethod("dex", String[].class, java.util.List.class);
+            boolean d8Ok = Boolean.valueOf((Boolean) d8Method.invoke(null, d8Args.toArray(new String[0]), d8Log));
+            if (!d8Ok) {
+                log.append("D8: ").append(String.join("\n", d8Log)).append("\n");
+                throw new IOException("dex 转换失败（见日志）");
+            }
+            // 读 dex → extraDex（护栏同 M211：≤12MB/个、总 ≤40MB、dex 魔数）
+            File[] dexFiles = dexDir.listFiles();
+            java.util.Arrays.sort(dexFiles, (a, b) -> a.getName().compareTo(b.getName()));
+            long total = 0; int n = 0;
+            if (dexFiles != null) {
+                for (File df : dexFiles) {
+                    if (!df.getName().matches("classes\\d*\\.dex")) continue;
+                    byte[] data = readFile(df);
+                    if (data == null || data.length < 8 || data.length > 12 * 1024 * 1024) continue;
+                    if (data[0] != 'd' || data[1] != 'e' || data[2] != 'x') continue;
+                    if (total + data.length > 40L * 1024 * 1024) break;
+                    extraDex.add(data); total += data.length; n++;
+                }
+            }
+            log.append("设备端编译成功，注入 ").append(n).append(" 个 dex（").append(total / 1024).append(" KB）\n");
+        } catch (Throwable t) {
+            log.append("编译跳过/失败：").append(t.getMessage()).append("\n");
+        }
+    }
+
+    /** 递归找 .java（R.java 等），绝对路径 */
+    private static void walkJava(File dir, java.util.List<String> out) {
+        File[] fs = dir.listFiles(); if (fs == null) return;
+        for (File f : fs) if (f.isDirectory()) walkJava(f, out); else if (f.getName().endsWith(".java")) out.add(f.getAbsolutePath());
+    }
+    /** 递归找 .class，绝对路径 */
+    private static void walkClass(File dir, java.util.List<String> out) {
+        File[] fs = dir.listFiles(); if (fs == null) return;
+        for (File f : fs) if (f.isDirectory()) walkClass(f, out); else if (f.getName().endsWith(".class")) out.add(f.getAbsolutePath());
+    }
+    private static byte[] readFile(File f) {
+        try (java.io.FileInputStream in = new java.io.FileInputStream(f)) { return in.readAllBytes(); }
+        catch (Throwable t) { return null; }
+    }
+
+    /** 把编译器 dex 解压到 cache/compiler，建好只读，返回该目录。缓存 4 个 tool + android.jar。 */
+    private File ensureCompiler() throws IOException {
+        File dir = new File(getCacheDir(), "compiler");
+        if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("建不了 compiler 目录");
+        // android.jar.gz
+        File jar = new File(dir, "android.jar");
+        byte[] jarGz = readAssetGz("compiler/android.jar.gz");
+        if (!jar.isFile() || jar.length() != unGzip(jarGz).length) {
+            writeBytes(jar, unGzip(jarGz));
+            if (jar.canWrite()) { jar.setReadOnly(); try { Runtime.getRuntime().exec(new String[]{"chmod","444",jar.getAbsolutePath()}).waitFor(); } catch (Throwable ignored) {} }
+        }
+        // tool*.bin.gz（1..N，逐个）
+        int i = 1;
+        while (true) {
+            File bin = new File(dir, "tool" + i + ".bin");
+            byte[] b;
+            try { b = readAssetGz("compiler/tool" + i + ".bin.gz"); } catch (Throwable notFound) { break; }
+            if (bin.isFile() && bin.length() == b.length) { i++; continue; }
+            writeBytes(bin, b);
+            if (bin.canWrite()) { bin.setReadOnly(); try { Runtime.getRuntime().exec(new String[]{"chmod","444",bin.getAbsolutePath()}).waitFor(); } catch (Throwable ignored) {} }
+            i++;
+        }
+        return dir;
+    }
+
+    /** 建编译器 classloader（多 dex 拼起来），父 = 本 classloader（能拿到 app 的类） */
+    private java.lang.ClassLoader compilerLoader(File compDir) throws IOException {
+        // 读 tool*.bin（解压后的 dex）拼成 byte[][]，内存里加载（不落盘、无需 oat）
+        java.util.List<byte[]> els = new java.util.ArrayList<>();
+        int i = 1; while (true) { File b = new File(compDir, "tool" + i + ".bin"); if (!b.isFile()) break; byte[] data = readFile(b); if (data == null) break; els.add(data); i++; }
+        if (els.isEmpty()) throw new IOException("没找到编译器 dex（tool*.bin）");
+        byte[][] arr = new byte[els.size()][];
+        for (int k = 0; k < els.size(); k++) arr[k] = els.get(k);
+        java.nio.ByteBuffer[] bb = new java.nio.ByteBuffer[arr.length];
+        for (int k = 0; k < arr.length; k++) bb[k] = java.nio.ByteBuffer.wrap(arr[k]);
+        return new dalvik.system.InMemoryDexClassLoader(bb, null, getClassLoader());
+    }
+
+
+    /** M192：一键打包"可安装 APK"。 */
     private static String xmlAttr(String s) {
         if (s == null) return "";
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
@@ -2543,6 +2683,9 @@ public class MainActivity extends Activity {
             String layout = p.optString("layout", "activity_main");
             String label = p.optString("appName", "AXV App");
             String outName = p.optString("outName", "");
+            // M213：设备端真编译 —— 项目 Java 源码 + 要用的启动 Activity
+            JSONArray javaSources = p.optJSONArray("javaSources");
+            String launchActivity = p.optString("launchActivity", "");
             String ksPath = p.optString("keystore", "");
             String storePass = p.optString("storePass", "");
             String alias = p.optString("alias", "");
@@ -2592,12 +2735,16 @@ public class MainActivity extends Activity {
             log.append("资源 ").append(written).append(" 个文件\n");
 
             File man = new File(root, "AndroidManifest.xml");
+            // M213：清单固定指向壳 Activity（它保证存在，能兜底 inflate 布局）。
+            // 项目自己的 Activity 能否真跑，交给壳在运行时判断（axv.launcher meta-data）：
+            // 类存在就 startActivity 转过去，不存在/没编译成功就本地 inflate 布局。
             writeUtf8(man, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                     + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"" + pkg + "\">\n"
                     + "  <uses-sdk android:minSdkVersion=\"24\" android:targetSdkVersion=\"34\" />\n"
                     + "  <application android:label=\"" + xmlAttr(label) + "\">\n"
                     + "    <activity android:name=\"com.jiji.axv.shell.ShellActivity\" android:exported=\"true\">\n"
                     + "      <meta-data android:name=\"axv.layout\" android:value=\"" + xmlAttr(layout) + "\" />\n"
+                    + "      <meta-data android:name=\"axv.launcher\" android:value=\"" + xmlAttr(launchActivity) + "\" />\n"
                     + "      <intent-filter>\n"
                     + "        <action android:name=\"android.intent.action.MAIN\" />\n"
                     + "        <category android:name=\"android.intent.category.LAUNCHER\" />\n"
@@ -2611,6 +2758,10 @@ public class MainActivity extends Activity {
             if (!bin.isFile()) throw new IOException("找不到 aapt2：" + bin);
             File fw = frameworkResForLink(root, log);
             File compiled = new File(root, "compiled.zip");
+            // M213：生成 R.java（--java），设备端编译项目 Java 时要用
+            File genDir = new File(root, "gen");
+            File customPkg = new File(root, ".pkg");
+            writeUtf8(customPkg, pkg + "\n");
             int c1 = runAapt2(bin, root, new String[] { "compile", "--dir", resDir.getAbsolutePath(),
                     "-o", compiled.getAbsolutePath() }, log);
             if (c1 != 0) {
@@ -2624,6 +2775,8 @@ public class MainActivity extends Activity {
                     "--min-sdk-version", "24",
                     "--target-sdk-version", "34",
                     "--auto-add-overlay",
+                    "--java", genDir.getAbsolutePath(),
+                    "--custom-package", pkg,
                     compiled.getAbsolutePath() }, log);
             if (c2 != 0) return jsonFail("link", log);
             if (!unsigned.isFile()) return jsonFail("link", log);
@@ -2654,6 +2807,8 @@ public class MainActivity extends Activity {
                     extraDex.add(data);
                 }
             }
+            // M213：编译项目 Java（extraDex 已含 payload dex，这里追加编译产物）
+            compileProjectJava(javaSources, launchActivity, root, genDir, pkg, log, extraDex);
             ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), extraDex, packed);
             log.append("注入壳 dex + ").append(extraDex.size()).append(" 个项目 dex，打包后 ")
                     .append(packed.length()).append(" 字节\n");

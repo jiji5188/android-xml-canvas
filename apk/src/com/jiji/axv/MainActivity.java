@@ -391,7 +391,7 @@ public class MainActivity extends Activity {
         if (req == REQ_APK) {
             final Uri picked = (res == RESULT_OK && data != null) ? data.getData() : null;
             if (picked == null) {
-                                try { web.evaluateJavascript("window.__axvPickedApk && window.__axvPickedApk('' , 'err:canceled')", null); } catch (Throwable ignored) {}
+                evalJsOnUi("window.__axvPickedApk && window.__axvPickedApk('' , 'err:canceled')");
                 return;
             }
             new Thread(() -> {
@@ -412,10 +412,10 @@ public class MainActivity extends Activity {
                     String name = dest.getName();
                     String js = "window.__axvPickedApk && window.__axvPickedApk(" + JSONObject.quote(dest.getAbsolutePath())
                             + "," + JSONObject.quote("ok:" + name) + ");";
-                    web.evaluateJavascript(js, null);
+                    evalJsOnUi(js);
                 } catch (Throwable t) {
                     String js = "window.__axvPickedApk && window.__axvPickedApk(''," + JSONObject.quote("err:" + t.getMessage()) + ");";
-                    web.evaluateJavascript(js, null);
+                    evalJsOnUi(js);
                 }
             }).start();
             return;
@@ -580,7 +580,7 @@ public class MainActivity extends Activity {
         /** M212：导入 APK 选择器（选中后把 apk 拷进 cache，再回话 window.__axvPickedApk(path, result)） */
         @JavascriptInterface
         public void pickApk() {
-            MainActivity.this.pickApkFile();
+            MainActivity.this.runOnUiThread(() -> MainActivity.this.pickApkFile());
         }
 
         /** M212：列出 APK 里的条目（JSON 数组 [{name,size}]） */
@@ -596,7 +596,7 @@ public class MainActivity extends Activity {
                 final String res = MainActivity.this.repackApk(payloadJson);
                 final String js = "window.__axvRepackApk && window.__axvRepackApk(" + JSONObject.quote(id) + ","
                         + JSONObject.quote(res) + ");";
-                MainActivity.this.web.evaluateJavascript(js, null);
+                MainActivity.this.evalJsOnUi(js);
             }).start();
         }
 
@@ -3336,6 +3336,19 @@ public class MainActivity extends Activity {
             if (assetExists(c)) return c;
         }
         return null;
+    }
+
+    /** M212d：后台线程绝不能直接碰 WebView —— Android 会抛
+     *  "A WebView method was called on thread 'Thread-N'" 把整个 App 干掉
+     *  （用户实测：选完 APK 拷完文件回调时崩）。所有后台回调统一走这里。 */
+    private void evalJsOnUi(final String js) {
+        runOnUiThread(() -> {
+            try {
+                if (web != null) web.evaluateJavascript(js, null);
+            } catch (Throwable t) {
+                Log.e(TAG, "evaluateJavascript fail", t);
+            }
+        });
     }
 
     private static boolean isText(String mime) {

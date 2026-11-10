@@ -2570,8 +2570,33 @@ public class MainActivity extends Activity {
 
             step = "pack";
             File packed = new File(root, "packed.apk");
-            ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), packed);
-            log.append("注入壳 dex，打包后 ").append(packed.length()).append(" 字节\n");
+            // M211：项目里已编译的 dex（classes2.dex 起），没有就是空列表
+            java.util.List<byte[]> extraDex = new java.util.ArrayList<byte[]>();
+            JSONArray dx = p.optJSONArray("extraDex");
+            if (dx != null) {
+                long dexTotal = 0;
+                for (int i = 0; i < dx.length() && extraDex.size() < 8; i++) {
+                    JSONObject d = dx.optJSONObject(i);
+                    if (d == null) continue;
+                    String b64 = d.optString("base64", "");
+                    if (b64.isEmpty()) continue;
+                    byte[] data;
+                    try {
+                        data = Base64.decode(b64, Base64.NO_WRAP);
+                    } catch (IllegalArgumentException bad) {
+                        continue;
+                    }
+                    // 护栏：dex 至少要有 dex\n035 魔数，单文件 ≤12MB，总 ≤40MB
+                    if (data.length < 8 || data.length > 12 * 1024 * 1024) continue;
+                    if (data[0] != 'd' || data[1] != 'e' || data[2] != 'x') continue;
+                    if (dexTotal + data.length > 40L * 1024 * 1024) break;
+                    dexTotal += data.length;
+                    extraDex.add(data);
+                }
+            }
+            ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), extraDex, packed);
+            log.append("注入壳 dex + ").append(extraDex.size()).append(" 个项目 dex，打包后 ")
+                    .append(packed.length()).append(" 字节\n");
 
             step = "sign";
             File signedTmp = new File(root, "signed.apk");

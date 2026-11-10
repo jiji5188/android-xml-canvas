@@ -26,6 +26,8 @@ export interface BuildApkInput {
   keyPass?: string;
   /** 输出文件名，默认 <pkg>.apk */
   outName?: string;
+  /** M211：项目里已经编译好的 dex（classes2.dex 起）。用来让布局里的自定义控件能 inflate。 */
+  extraDex?: { name: string; base64: string }[];
 }
 
 export interface BuildApkResult {

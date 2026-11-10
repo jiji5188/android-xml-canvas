@@ -1412,6 +1412,8 @@ export const SRC_EN: SrcDict = {
   "正在收集资源…": "Collecting resources…",
   "正在编译资源并签名（设备端，约十几秒）…": "Compiling resources and signing on device (about 10+ seconds)…",
   "打包完成：{name}": "APK built: {name}",
+  "发现 {n} 个已编译 dex，一起打进包": "Found {n} prebuilt dex file(s), including them in the APK",
+  "已打进 {n} 个 dex（{names}）": "Bundled {n} dex file(s) ({names})",
   "打包失败：{msg}": "Build failed: {msg}",
   "已调起系统安装器": "System installer opened",
   "安装失败：{msg}": "Install failed: {msg}",

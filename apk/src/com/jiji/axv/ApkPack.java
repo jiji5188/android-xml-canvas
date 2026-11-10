@@ -42,6 +42,14 @@ public final class ApkPack {
     }
 
     public static void addDexAndAlign(File inApk, byte[] dex, File outApk) throws IOException {
+        addDexAndAlign(inApk, dex, null, outApk);
+    }
+
+    /**
+     * M211：shell dex 占 classes.dex，用户在 Studio 里编好的 dex 依次作 classes2.dex / classes3.dex …
+     * （原生 multidex，API 21+ 自动加载）——这样布局里的自定义控件才能 inflate。
+     */
+    public static void addDexAndAlign(File inApk, byte[] dex, List<byte[]> extraDex, File outApk) throws IOException {
         List<String> names = new ArrayList<String>();
         List<byte[]> datas = new ArrayList<byte[]>();
         List<Boolean> stores = new ArrayList<Boolean>();
@@ -49,6 +57,17 @@ public final class ApkPack {
         names.add("classes.dex");
         datas.add(dex);
         stores.add(Boolean.FALSE);
+
+        if (extraDex != null) {
+            int idx = 2;
+            for (byte[] d : extraDex) {
+                if (d == null || d.length < 8) continue;
+                names.add("classes" + idx + ".dex");
+                datas.add(d);
+                stores.add(Boolean.FALSE);
+                idx++;
+            }
+        }
 
         ZipInputStream zis = new ZipInputStream(new FileInputStream(inApk));
         try {
@@ -58,6 +77,7 @@ public final class ApkPack {
                 if (e.isDirectory()) continue;
                 String name = e.getName();
                 if ("classes.dex".equals(name)) continue;
+                if (name.matches("classes[0-9]+\\.dex")) continue;
                 ByteArrayOutputStream bo = new ByteArrayOutputStream();
                 int r;
                 while ((r = zis.read(buf)) > 0) bo.write(buf, 0, r);

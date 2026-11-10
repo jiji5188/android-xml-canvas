@@ -36,7 +36,7 @@ import {
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
 import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras, invalidateProjectRes } from "@/lib/xml/project-res";
-import { loadProjectJavaFiles } from "@/lib/xml/java-files";
+import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
 import { insertChild, insertSiblingAfter, insertAt, moveSibling, isContainerTag, applyConstraintDefaults, canAcceptChild, childLimitOf } from "@/lib/xml/insert";
@@ -2491,6 +2491,12 @@ const allDrawableNames = useMemo(() => {
         }
         const collected = await collectProjectRes(aiFileIo, openRel, buildRealRenderFiles(baseInput));
         const files = collected.files;
+        // M211：收集项目里已编译的 dex（没找到就是空数组，不影响正常打包）
+        const dexGot = await collectProjectDex(aiFileIo);
+        const dexFiles = numberDexFiles(dexGot).map((d) => ({ name: d.name, base64: d.base64 }));
+        if (dexGot.length) {
+          setExportNote(tt("发现 {n} 个已编译 dex，一起打进包", { n: dexGot.length }));
+        }
         setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
         // M192e：与真机渲染用同一套洗法（补占位、去重、include 命名空间…）
         // 不洗直接打包的话，aapt2 会在 layout 上报 syntax error
@@ -2510,6 +2516,8 @@ const allDrawableNames = useMemo(() => {
           alias: o.alias,
           keyPass: o.keyPass,
           outName: `${pkg}-${layout}.apk`,
+          // M211：把项目里已有的 classes*.dex 一起打进包（自定义控件才能 inflate）
+          extraDex: dexFiles,
         });
         setApkResult(r);
         setExportNote(r.ok ? tt("打包完成：{name}", { name: r.name || "" }) : tt("打包失败：{msg}", { msg: r.step || "" }));

@@ -2631,9 +2631,9 @@ public class MainActivity extends Activity {
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("建不了 compiler 目录");
         // android.jar.gz
         File jar = new File(dir, "android.jar");
-        byte[] jarGz = readAssetGz("compiler/android.jar.gz");
-        if (!jar.isFile() || jar.length() != unGzip(jarGz).length) {
-            writeBytes(jar, unGzip(jarGz));
+        byte[] jarBytes = readAssetGz("compiler/android.jar.gz"); // 已解压的 jar
+        if (!jar.isFile() || jar.length() != jarBytes.length) {
+            writeBytes(jar, jarBytes);
             if (jar.canWrite()) { jar.setReadOnly(); try { Runtime.getRuntime().exec(new String[]{"chmod","444",jar.getAbsolutePath()}).waitFor(); } catch (Throwable ignored) {} }
         }
         // tool*.bin.gz（1..N，逐个）
@@ -3084,7 +3084,8 @@ public class MainActivity extends Activity {
                     if (parent != null && !parent.isDirectory()) parent.mkdirs();
                     FileOutputStream out = new FileOutputStream(target);
                     try {
-                        java.io.ByteArrayInputStream bin = new java.io.ByteArrayInputStream(unGzip(gz));
+                        byte[] unzipped = unGzip(gz); // 注意：这里 gz 是 .gz 原文，unGzip 是对的
+                        java.io.ByteArrayInputStream bin = new java.io.ByteArrayInputStream(unzipped);
                         byte[] buf = new byte[131072];
                         int n;
                         while ((n = bin.read(buf)) > 0) out.write(buf, 0, n);

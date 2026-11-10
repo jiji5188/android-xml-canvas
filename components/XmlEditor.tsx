@@ -83,6 +83,7 @@ import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, n
 import { hasRealRender, renderReal, prepareFiles } from "@/lib/xml/native-render";
 import { readStoredSigning, writeStoredSigning, clearStoredSigning } from "@/lib/xml/sign-store";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
+import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { buildApk, hasBuildApk, installApk, shareApkFile, compileModeOf, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
@@ -2494,7 +2495,9 @@ const allDrawableNames = useMemo(() => {
           baseInput = { ...input, name: picked.rel, xml: picked.text };
         }
         const collected = await collectProjectRes(aiFileIo, openRel, buildRealRenderFiles(baseInput));
-        const files = collected.files;
+        // M217：当前文档有未保存改动时，用编辑器里的内容覆盖同名资源（strings.xml 这类）
+        const relNow = (openRel || input.name || "").replace(/\\/g, "/");
+        const files = /\\.xml$/i.test(relNow) ? withCurrentXml(collected.files, relNow, xml) : collected.files;
         // M211：收集项目里已编译的 dex（没找到就是空数组，不影响正常打包）
         const dexGot = await collectProjectDex(aiFileIo);
         const dexFiles = numberDexFiles(dexGot).map((d) => ({ name: d.name, base64: d.base64 }));
@@ -2504,10 +2507,19 @@ const allDrawableNames = useMemo(() => {
         // M213：设备端真编译——把项目 Java/Kotlin 源码交给设备上的 ECJ+D8，产出 dex 注进包
         setExportNote(tt("正在收集 Java 源码…"));
         const javaSrc = await loadProjectJavaFiles(aiFileIo);
-        const javaSources = javaSrc.map((j) => ({ path: j.rel, code: j.text }));
+        // M217：当前正在编辑的 Java/Kotlin 可能还没保存 —— 用编辑器正文覆盖磁盘旧版，
+        // 否则「明明改了代码，打出来的包却没变化」，且没有任何提示。
+        const javaSrcMapped = javaSrc.map((j) => ({ path: j.rel, code: j.text }));
+        // M217：当前正在编辑的 Java/Kotlin 可能还没保存 —— 用编辑器正文覆盖磁盘旧版，
+        // 否则「明明改了代码，打出来的包却没变化」，且没有任何提示。
+        const javaSources = withCurrentSource(javaSrcMapped, relNow, xml);
         // 启动 Activity：项目清单里的 launcher Activity（有就用它，没有设备端退回 ShellActivity）
-        const manifest = javaSrc.length ? await findLauncherActivity(aiFileIo) : "";
+        const manifest = javaSources.length ? await findLauncherActivity(aiFileIo) : "";
         if (javaSources.length) setExportNote(tt("{n} 个 Java/Kotlin 源码将在设备上编译", { n: javaSources.length }));
+        // M217：明确告知用户「编辑器里没保存的改动也会一起打进包」，消除「改了没生效」的疑惑
+        if (javaSources !== javaSrcMapped && javaSources.length) {
+          setExportNote(tt("{f} 还没保存，这次打包用的是编辑器里的最新内容", { f: (relNow.split("/").pop() || relNow) }));
+        }
         setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
         // M192e：与真机渲染用同一套洗法（补占位、去重、include 命名空间…）
         // 不洗直接打包的话，aapt2 会在 layout 上报 syntax error

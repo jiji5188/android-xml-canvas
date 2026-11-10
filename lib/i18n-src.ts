@@ -1458,6 +1458,7 @@ export const SRC_EN: SrcDict = {
   "项目没有 .java 文件，这是布局壳（不运行任何逻辑）": "No .java files found; this is a layout shell (no logic runs)",
   // M216 其它漏译
   "正在收集 Java 源码…": "Collecting Java source files…",
+  "{f} 还没保存，这次打包用的是编辑器里的最新内容": "{f} is not saved; this build uses the latest content in the editor",
   "{n} 个 Java/Kotlin 源码将在设备上编译": "{n} Java/Kotlin sources will be compiled on-device",
   "这里没有可跳转的定义": "No definition to jump to here",
   "显示/隐藏空白字符": "Show/hide whitespace",

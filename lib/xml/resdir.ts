@@ -218,11 +218,16 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
       continue;
     }
 
-    // ---- res/layout/*.xml：存全文，画布可点选预览 ----
-    if (file.endsWith(".xml") && /(^|\/)layout\//.test(rel)) {
+    // ---- res/layout*/*.xml：存全文，画布可点选预览 ----
+    // M210：从 `layout/` 扩到 `layout-land/` `layout-sw600dp/` 等变体（以前只认顶层 layout/，
+    //  导致 javaResEnv 收不到这些布局里的 @+id → R.id 误报），但同名只保留默认 layout/ 那份。
+    const layoutDirName = dir.split("/").pop() || "";
+    if (file.endsWith(".xml") && /^layout(-|$)/.test(layoutDirName)) {
       const text = await item.file.text();
       extras.layouts = extras.layouts || {};
-      extras.layouts[file] = text;
+      const isDefaultLayout = /^layout(-[A-Za-z0-9]+)?$/.test(layoutDirName) && layoutDirName === "layout";
+      // 默认 layout/ 优先；其他变体不覆盖已有的同名
+      if (isDefaultLayout || !extras.layouts[file]) extras.layouts[file] = text;
       extras.sourceFiles.push(rel);
       upsertTree(tree, rel, item.file, text);
       continue;

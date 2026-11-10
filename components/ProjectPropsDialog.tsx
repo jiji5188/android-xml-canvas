@@ -197,16 +197,20 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
         // M209：同步 .java/.kt 的 package 声明 + 按包名建的源码目录
         if (p.saveRoot) {
           const sync = await syncPkgInSource(p.source, origin.pkg, pkg, p.saveRoot, p.fileOpsCtx ?? null);
-          if (sync.files.length > 0 || sync.moved) {
+          if (sync.files.length > 0 || sync.moved || sync.manifests.length > 0) {
+            const mv = sync.moved
+              ? tt("目录已移动")
+              : sync.moveWarn === "pkg-move-unsupported"
+                ? tt("需手动改目录名")
+                : tt("未能自动移动目录（{r}）", { r: sync.moveWarn || "" });
             setMsg(
-              tt("包名已同步：改了 {n} 个源码文件，目录{mv}", {
-                n: sync.files.length,
-                mv: sync.moved
-                  ? "已移动"
-                  : sync.moveWarn === "pkg-move-unsupported"
-                    ? "需手动改目录名"
-                    : "未能自动移动目录（" + (sync.moveWarn || "") + "）",
-              }),
+              sync.manifests.length > 0
+                ? tt("包名已同步：{n} 个源码文件 + {m} 个 AndroidManifest，{mv}", {
+                    n: sync.files.length,
+                    m: sync.manifests.length,
+                    mv,
+                  })
+                : tt("包名已同步：{n} 个源码文件，{mv}", { n: sync.files.length, mv }),
             );
           }
         }
@@ -221,7 +225,9 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
       }
       setOrigin({ dir: dir.trim() || origin.dir, appName, pkg });
       p.onSaved();
-      setMsg(tt("已保存"));
+      // 保留第 3 步的包名同步详情（「已保存」会把具体结果冲掉）：
+      // 有同步结果就展示它，没有就展示「已保存」
+      setMsg(msg.startsWith("包名已同步") ? msg : tt("已保存"));
       window.setTimeout(() => p.onClose(), 550);
     } finally {
       setBusy(false);

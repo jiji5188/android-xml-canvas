@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { diagRanges as calcDiagRanges, type DiagInfo } from "@/lib/xml/diag-deco";
 import { codeHint } from "@/lib/xml/diag-hints";
-import { Compartment, EditorState, Prec, RangeSet, SelectionRange, StateEffect, StateField } from "@codemirror/state";
+import { Compartment, EditorState, Prec, Range, RangeSet, SelectionRange, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -225,14 +225,15 @@ class FixMarker extends GutterMarker {
 const fixGutter = gutter({
   class: "cm-fix-gutter",
   markers: (view) => {
-    const lines = view.state.doc.lines;
-    const marks: GutterMarker[] = [];
-    for (let i = 1; i <= lines; i++) {
-      const iss = fixIssuesByLineRef.current.get(i);
-      marks.push(new FixMarker(!!iss && !!iss.fix));
+    const doc = view.state.doc;
+    const ranges: Range<GutterMarker>[] = [];
+    for (const [lineNo, iss] of fixIssuesByLineRef.current) {
+      if (!iss.fix) continue;
+      if (lineNo < 1 || lineNo > doc.lines) continue; // 行号越界（文档刚变）跳过
+      ranges.push(new FixMarker(true).range(doc.line(lineNo).from));
     }
-    const set = RangeSet.of(marks.map((m, i) => m.range(view.state.doc.line(i).from)));
-    return set;
+    if (!ranges.length) return RangeSet.empty;
+    return RangeSet.of(ranges, true);
   },
 });
 

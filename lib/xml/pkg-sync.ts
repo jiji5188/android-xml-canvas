@@ -22,6 +22,8 @@ export interface PkgSyncResult {
   ok: boolean;
   /** 被改写的源文件（相对项目根） */
   files: string[];
+  /** 被改写的 AndroidManifest（相对项目根） */
+  manifests: string[];
   /** 目录是否移动成功 */
   moved: boolean;
   /** 没能移动目录（web / 没 fileOpsCtx / 旧目录不存在） */
@@ -94,6 +96,54 @@ export function rewritePkgDecl(text: string, oldPkg: string, newPkg: string): st
 }
 
 /**
+ * 把 AndroidManifest.xml 里引用旧包名的地方换成新包名。
+ *
+ * 处理（都是属性值里的完整包名）：
+ *   package="com.old"
+ *   android:name="com.old.MainActivity"
+ *   android:taskAffinity="com.old" / android:process="com.old:remote"
+ *   android:authorities="com.old.fileprovider"
+ *   android:value="com.old.xxx"（meta-data）
+ *   <permission android:name="com.old.permission.X">
+ *
+ * 不碰：android:name=".MainActivity"（相对写法）、${applicationId}.fileprovider（占位符）
+ */
+export function rewriteManifestPkg(text: string, oldPkg: string, newPkg: string): string | null {
+  if (!text || !oldPkg || !newPkg || oldPkg === newPkg) return null;
+  const esc = oldPkg.replace(/\./g, "\\.");
+  // 前面不能紧跟标识符字符/点（避免 foo.com.old 被误改）
+  // 后面必须是 . " 空白 : / 或行尾（避免 com.old 命中 com.older / com.oldx）
+  const re = new RegExp(`(^|[^A-Za-z0-9_.$])${esc}(?=[."\\s:/]|$)`, "g");
+  const out = text.replace(re, (_m, pre: string) => `${pre}${newPkg}`);
+  return out !== text ? out : null;
+}
+
+/** 可能含包名引用的 manifest 路径（根 / app / app/src/<variant>） */
+async function findManifests(source: ProjectSource): Promise<string[]> {
+  const found = new Set<string>();
+  for (const p of ["AndroidManifest.xml", "app/AndroidManifest.xml"]) {
+    const t = await source.readText(p).catch(() => null);
+    if (t && /<manifest[\s>]/.test(t)) found.add(p);
+  }
+  let srcDirs = ["main"];
+  try {
+    const kids = await source.listChildren("app/src").catch(() => []);
+    if (Array.isArray(kids)) {
+      const dirs = kids.filter((e) => e.kind === "dir").map((e) => e.name);
+      if (dirs.length) srcDirs = dirs;
+    }
+  } catch {
+    /* default main */
+  }
+  for (const d of srcDirs) {
+    const p = `app/src/${d}/AndroidManifest.xml`;
+    const t = await source.readText(p).catch(() => null);
+    if (t && /<manifest[\s>]/.test(t)) found.add(p);
+  }
+  return [...found];
+}
+
+/**
  * 改包名同步。oldPkg/newPkg 都是完整包名（com.a.b）。
  * 返回改写的文件清单 + 目录是否移动成功。
  */
@@ -104,8 +154,21 @@ export async function syncPkgInSource(
   saveRoot: ProjectSaveRoot,
   fileOpsCtx: FileOpsCtx | null,
 ): Promise<PkgSyncResult> {
-  const result: PkgSyncResult = { ok: true, files: [], moved: false, foundSrc: false };
+  const result: PkgSyncResult = { ok: true, files: [], manifests: [], moved: false, foundSrc: false };
   if (!oldPkg || !newPkg || oldPkg === newPkg) return result;
+
+  // 0) AndroidManifest.xml：package 属性 + 所有引用完整包名的属性值
+  const manifests = await findManifests(source);
+  for (const rel of manifests) {
+    const text = await source.readText(rel).catch(() => null);
+    if (!text) continue;
+    const next = rewriteManifestPkg(text, oldPkg, newPkg);
+    if (next && next !== text) {
+      const ok = await saveProjectFile(saveRoot, rel, next);
+      if (!ok) result.ok = false;
+      result.manifests.push(rel);
+    }
+  }
 
   // 1) 找出所有源码文件并改写 package 声明
   const oldDir = oldPkg.replace(/\./g, "/");

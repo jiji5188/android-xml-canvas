@@ -116,6 +116,25 @@ export function extractJavaSymbols(src: string, isKotlin = false): JavaSymbols {
     declared.add(m[1]);
   }
 
+  // 1b) M210 多变量单语句：`private TextView tv_key, tv_value, right_ImageView;`
+  //   以前只收第一个名字 → tv_value / right_ImageView 全报「本类没声明」。
+  //   策略：先找回「类型 + 首个变量」的位置，再从那里往后吃逗号分隔的后续名字，遇到 ; 停。
+  const declHeadRe = new RegExp(
+    `(?:^|;|\\{|\\})\\s*(?:@\\w+(?:\\([^)]*\\))?\\s*)*(?:(?:public|private|protected|static|final|transient|volatile)\\s+)*${TYPE}\\s+([A-Za-z_]\\w*)`,
+    "gm",
+  );
+  for (const m of src.matchAll(declHeadRe)) {
+    declared.add(m[1]);
+    const after = m.index! + m[0].length;
+    let rest = src.slice(after, after + 400);
+    // 只在「本语句」范围里找：到 ; 或 { 为止，且不含 = （初始化器里的逗号不算声明）
+    const stop = rest.search(/[;{}]/);
+    if (stop >= 0) rest = rest.slice(0, stop);
+    if (stop >= 0) rest = rest.slice(0, stop);
+    // 不看 `=`：初始化器里的 "a, b)" 因后面紧跟 `)` 不会被匹配（lookahead 只认 , = 或结尾）
+    for (const mm of rest.matchAll(/,\s*([A-Za-z_]\w*)\s*(?=[,=]|$)/g)) declared.add(mm[1]);
+  }
+
   // 2) 构造器 / 方法参数
   // M208：一个类可能有好几个构造器，以前只用 exec 取第一个 → 第二个构造器的参数全被当成"未声明"
   //（真实报错：public DataManager(..., int pagesize) 里的 pagesize 被报未声明）
@@ -162,6 +181,15 @@ export function extractJavaSymbols(src: string, isKotlin = false): JavaSymbols {
     "g",
   );
   for (const m of src.matchAll(localRe)) declared.add(m[1]);
+
+  // 4a) M210 局部多变量：`int a = 0, b = 1;` —— 同样把逗号后面的名字收进来
+  for (const m of src.matchAll(declHeadRe)) {
+    const after = m.index! + m[0].length;
+    let rest = src.slice(after, after + 400);
+    const stop = rest.search(/[;{}]/);
+    if (stop >= 0) rest = rest.slice(0, stop);
+    for (const mm of rest.matchAll(/,\s*([A-Za-z_]\w*)\s*(?=[,=]|$)/g)) declared.add(mm[1]);
+  }
 
   // 4b) M203b: catch (Exception e) → e
   for (const m of src.matchAll(/\bcatch\s*\(([^)]*)\)/g)) collectDeclaredFromParams(m[1] || "", declared);

@@ -1172,6 +1172,9 @@ export const SRC_EN: SrcDict = {
   "包名已同步：改了 {n} 个源码文件，目录{mv}":
     "Package synced: updated {n} source file(s), folder {mv}",
   "目录已移动": "folder moved",
+  "未能自动移动目录（{r}）": "could not move the folder automatically ({r})",
+  "包名已同步：{n} 个源码文件 + {m} 个 AndroidManifest，{mv}":
+    "Package synced: updated {n} source file(s) + {m} AndroidManifest file(s), {mv}",
   "需手动改目录名": "rename the source folder manually",
   "此行有可自动修复的问题": "This line has an auto-fixable issue",
   "资源 {name}（{where}）": "Resource {name} ({where})",

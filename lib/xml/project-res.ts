@@ -110,6 +110,8 @@ export function mergeProjectExtras(a: ResourceExtras | null, b: ResourceExtras |
     ...b,
     drawables: { ...a.drawables, ...b.drawables },
     drawableXml: { ...a.drawableXml, ...b.drawableXml },
+    // M210：layouts 也合并（a 是快速通道里当前文档引用的，b 是全量扫描；缺一边都会少 id）
+    layouts: { ...(a.layouts || {}), ...(b.layouts || {}) },
     styles: { ...a.styles, ...b.styles },
     vectorNames: [...new Set([...a.vectorNames, ...b.vectorNames])],
     valuesXml,
@@ -246,8 +248,27 @@ export async function loadProjectResIndex(
     }
   }
 
-  const drawableDirs = dirs.filter((d) => /^(drawable|mipmap)/.test(d));
-  const images: string[] = [];
+  // M210：layout 目录也要扫 —— javaResEnv 靠 extras.layouts 收集 @+id 与布局名，
+  //  以前只扫 values/drawable，导致「R.layout.xxx 不存在」和「R.id.xxx 不存在」满屏误报。
+  //  单个布局文本通常 2~10KB，限制数量避免打爆内存。
+  const layoutDirs = dirs.filter((d) => /^layout(-|$)/.test(d));
+  let layoutsRead = 0;
+  const MAX_LAYOUTS = 120;
+  for (const d of layoutDirs) {
+    for (const rel of await listDir(io, resRel, d)) {
+      if (!/\.xml$/i.test(rel)) continue;
+      if (seen.has(rel) || layoutsRead >= MAX_LAYOUTS || reads >= MAX_READS) continue;
+      reads++;
+      layoutsRead++;
+      const text = await readText(io, resRel, rel);
+      if (text != null) {
+        seen.add(rel);
+        items.push(textItem(rel, text));
+      }
+    }
+  }
+
+  const drawableDirs = dirs.filter((d) => /^(drawable|mipmap)/.test(d));  const images: string[] = [];
   for (const d of drawableDirs) {
     for (const rel of await listDir(io, resRel, d)) {
       if (!/\.xml$/i.test(rel)) {

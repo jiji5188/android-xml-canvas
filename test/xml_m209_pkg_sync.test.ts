@@ -1,7 +1,43 @@
 import { describe, expect, it } from "vitest";
-import { rewritePkgDecl, syncPkgInSource } from "@/lib/xml/pkg-sync";
+import { rewritePkgDecl, rewriteManifestPkg, syncPkgInSource } from "@/lib/xml/pkg-sync";
 import type { ProjectSource, BrowseEntry } from "@/lib/xml/project-browse";
 import type { FileOpsCtx } from "@/lib/xml/file-ops";
+
+describe("M210 pkg-sync rewriteManifestPkg", () => {
+  it("改写 package 属性", () => {
+    const src = '<?xml version="1.0"?>\n<manifest package="com.old.app">\n  <application/>\n</manifest>';
+    const out = rewriteManifestPkg(src, "com.old.app", "com.new.app");
+    expect(out).toContain("package=\"com.new.app\"");
+  });
+
+  it("改写组件的 android:name 全类名", () => {
+    const src = '<activity android:name="com.old.app.MainActivity"/>';
+    const out = rewriteManifestPkg(src, "com.old.app", "com.new.app");
+    expect(out).toContain('android:name="com.new.app.MainActivity"');
+  });
+
+  it("改写 authorities / taskAffinity / process", () => {
+    const src =
+      '<provider android:authorities="com.old.app.fileprovider"/>' +
+      '<activity android:taskAffinity="com.old.app" android:process="com.old.app:remote"/>' +
+      '<meta-data android:name="x" android:value="com.old.app.things"/>';
+    const out = rewriteManifestPkg(src, "com.old.app", "com.new.app");
+    expect(out).toContain("com.new.app.fileprovider");
+    expect(out).toContain('taskAffinity="com.new.app"');
+    expect(out).toContain("com.new.app:remote");
+    expect(out).toContain("com.new.app.things");
+  });
+
+  it("不动相对写法的 android:name", () => {
+    const src = '<activity android:name=\".MainActivity\"/>';
+    expect(rewriteManifestPkg(src, "com.old", "com.new")).toBeNull();
+  });
+
+  it("不误伤相似前缀 com.oldx", () => {
+    const src = '<meta-data android:value="com.oldx.Thing"/>';
+    expect(rewriteManifestPkg(src, "com.old", "com.new")).toBeNull();
+  });
+});
 
 describe("M209 pkg-sync rewritePkgDecl", () => {
   it("改顶层 package 声明", () => {

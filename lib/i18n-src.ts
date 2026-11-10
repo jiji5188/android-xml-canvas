@@ -1439,6 +1439,7 @@ export const SRC_EN: SrcDict = {
   "处理中…": "Working…",
   "先至少替换一个文件": "Replace at least one file first",
   "重打包失败": "Repack failed",
+  "这个 APK 里没有 classes*.dex：重签后能装，但它自身没代码，点开会闪退（重签不会凭空加代码）": "This APK has no classes*.dex: it will still install after re-signing, but it has no code of its own and will crash on launch (re-signing cannot add code)",
   "先点「选择 APK 文件」": "Choose an APK file first",
   "先至少点一次「替换」，选好要换的文件": "Tap “Replace” on at least one entry and pick a file first",
   "已选 {n} 个替换": "{n} replacement(s) selected",

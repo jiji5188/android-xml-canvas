@@ -131,6 +131,8 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
   }, []);
 
   const pickedCount = Object.keys(picked).length;
+  /** 原包里有没有 classes*.dex：没有的话重签也能装，但它本来就没代码，点开会闪退——先说清楚 */
+  const hasDex = useMemo(() => (entries ? entries.some((e) => /^classes\d*\.dex$/i.test(e.name)) : true), [entries]);
 
   /** 缺什么就说什么（主按钮点不动时给出明确原因） */
   const blocker = !supported
@@ -217,6 +219,12 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
             </span>
           ) : null}
         </div>
+
+        {entries && !hasDex ? (
+          <div className="axv-sign-issue axv-sign-issue-warn axv-repack-warn">
+            {tt("这个 APK 里没有 classes*.dex：重签后能装，但它自身没代码，点开会闪退（重签不会凭空加代码）")}
+          </div>
+        ) : null}
 
         {entries ? (
           <>

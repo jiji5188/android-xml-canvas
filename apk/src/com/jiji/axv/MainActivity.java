@@ -2891,65 +2891,107 @@ public class MainActivity extends Activity {
                 "/system_ext/framework/framework-res.apk",
                 "/apex/com.android.framework_res_overlay/framework/framework-res.apk",
         };
-        // 先用自带的资源桩：系统里那个 framework-res.apk 能 stat/access 不代表 aapt2 子进程真能读
-        // （实测 SDK36 上 canRead() 返回 true，aapt2 却报 failed to load include path），
-        // 所以不复探系统路径，直接用确定能读的桩。
-        File cached = externalStubDir().isDirectory()
-                ? new File(externalStubDir(), "framework-res-stub-v2.apk")
-                : new File(getCacheDir(), "framework-res-stub-v2.apk");
-        File legacy = new File(getCacheDir(), "framework-res-stub.apk");
-        if (legacy.isFile()) legacy.delete();
-        // M155e：桩改放 AndroidUIIDE/tmp/（用户能自己看到/验证），写不了再退 cache
-        // M155f：桩从 17MB 的 arsc 换成 ~164KB 的最小 attr 包，尺寸区间也相应调整
-        if (cached.isFile() && cached.length() > 100000L && cached.length() < 2000000L) {
+        // 自带资源桩（含全部 android 公开资源占位）：系统里的 framework-res.apk 常常读不到
+        // （实测 canRead()=true 但 aapt2 子进程报 failed to load include path），所以优先用桩。
+        byte[] gz = null;
+        try {
+            gz = readAssetBytes(getAssets().open("fw/framework-res-stub.apk.gz"));
+        } catch (Throwable t) {
+            if (log != null) log.append("framework 资源桩读取失败: ").append(t).append('\n');
+        }
+        // M212b：文件名带内容指纹（gz 字节数）。换了桩就换名，永远不会复用旧缓存——
+        // 之前用固定名 v2，用户升级后仍读到旧的 attr-only 桩，link 一直报
+        // resource android:drawable/xxx not found。
+        String stamp = gz == null ? "v3" : ("s" + gz.length);
+        String fileName = "framework-res-stub-" + stamp + ".apk";
+
+        File dir = externalStubDir().isDirectory() ? externalStubDir() : getCacheDir();
+        File cached = new File(dir, fileName);
+        purgeOldStubs(dir, fileName);
+        if (cached.isFile() && cached.length() > 50000L && cached.length() < 1500000L) {
             if (log != null) log.append("framework: 已解包的资源桩 ").append(cached.getAbsolutePath())
                     .append(" ").append(cached.length()).append(" 字节\n");
             return cached;
         }
         if (cached.isFile()) cached.delete();
-        try {
-            InputStream in = new java.util.zip.GZIPInputStream(getAssets().open("fw/framework-res-stub.apk.gz"));
-            try (FileOutputStream out = new FileOutputStream(cached)) {
-                byte[] buf = new byte[131072];
-                int n;
-                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-            } finally {
-                in.close();
-            }
-            if (log != null) log.append("framework: assets 资源桩 → ").append(cached.getAbsolutePath())
-                    .append(" ").append(cached.length()).append(" 字节\n");
-            return cached;
-        } catch (Throwable t) {
-            if (log != null) log.append("framework 资源桩解包失败: ").append(t).append('\n');
-            // 外部存储写不了 → 退 App cache 再试一次
-            File alt = new File(getCacheDir(), "framework-res-stub-v3.apk");
-            if (!alt.equals(cached)) {
+
+        if (gz != null) {
+            File[] targets = new File[] { cached, new File(getCacheDir(), fileName) };
+            for (File target : targets) {
+                if (target.equals(cached) && externalStubDir().isDirectory() != true) continue;
                 try {
-                    InputStream in = new java.util.zip.GZIPInputStream(getAssets().open("fw/framework-res-stub.apk.gz"));
-                    try (FileOutputStream out = new FileOutputStream(alt)) {
+                    File parent = target.getParentFile();
+                    if (parent != null && !parent.isDirectory()) parent.mkdirs();
+                    FileOutputStream out = new FileOutputStream(target);
+                    try {
+                        java.io.ByteArrayInputStream bin = new java.io.ByteArrayInputStream(unGzip(gz));
                         byte[] buf = new byte[131072];
                         int n;
-                        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                        while ((n = bin.read(buf)) > 0) out.write(buf, 0, n);
                     } finally {
-                        in.close();
+                        out.close();
                     }
-                    if (log != null) log.append("framework: assets 资源桩 → ").append(alt.getAbsolutePath())
-                            .append(" ").append(alt.length()).append(" 字节\n");
-                    return alt;
-                } catch (Throwable t2) {
-                    if (log != null) log.append("framework 资源桩解包失败(cache): ").append(t2).append('\n');
+                    if (target.isFile() && target.length() > 50000L) {
+                        if (log != null) log.append("framework: assets 资源桩 → ").append(target.getAbsolutePath())
+                                .append(" ").append(target.length()).append(" 字节\n");
+                        return target;
+                    }
+                } catch (Throwable t) {
+                    if (log != null) log.append("framework 资源桩解包失败(").append(target.getAbsolutePath())
+                            .append("): ").append(t).append('\n');
                 }
             }
         }
+
         // 实在不行再试系统路径（真能 open 的才算）
         for (String c : candidates) {
-            File f = new File(c);
-            if (f.isFile() && canReallyOpen(f)) {
+            File f2 = new File(c);
+            if (f2.isFile() && canReallyOpen(f2)) {
                 if (log != null) log.append("framework: 系统 ").append(c).append('\n');
-                return f;
+                return f2;
             }
         }
         return new File("/system/framework/framework-res.apk");
+    }
+
+    /** 删掉目录里其它版本的资源桩（旧 v1/v2 只有 attr，留着会被下次误用） */
+    private void purgeOldStubs(File dir, String keepName) {
+        try {
+            File[] list = dir.listFiles();
+            if (list == null) return;
+            for (File f : list) {
+                String n = f.getName();
+                if (!n.startsWith("framework-res-stub")) continue;
+                if (n.equals(keepName)) continue;
+                if (n.equals("framework-res-stub.apk") || n.matches("framework-res-stub-[vs].*\\.apk")) {
+                    f.delete();
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 读整个流（Android 的 InputStream 没有可靠的 readAllBytes） */
+    private static byte[] readAssetBytes(InputStream in) throws IOException {
+        try {
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            return bo.toByteArray();
+        } finally {
+            in.close();
+        }
+    }
+
+    /** gzip 解压到字节数组 */
+    private static byte[] unGzip(byte[] gz) throws IOException {
+        java.util.zip.GZIPInputStream in = new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(gz));
+        try {
+            return readAssetBytes(in);
+        } finally {
+            in.close();
+        }
     }
 
     /** access() 过了不代表真能读（SELinux 可能拦 open），这里实际打开读 4 字节验证 */

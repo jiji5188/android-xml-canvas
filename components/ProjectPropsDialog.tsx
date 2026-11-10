@@ -202,7 +202,9 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
               ? tt("目录已移动")
               : sync.moveWarn === "pkg-move-unsupported"
                 ? tt("需手动改目录名")
-                : tt("未能自动移动目录（{r}）", { r: sync.moveWarn || "" });
+                : sync.moveWarn === "pkg-nested-rename"
+                  ? tt("包名是嵌套关系（如 com.a → com.a.b），内容已改，目录层次请手动调整")
+                  : tt("未能自动移动目录（{r}）", { r: sync.moveWarn || "" });
             setMsg(
               sync.manifests.length > 0
                 ? tt("包名已同步：{n} 个源码文件 + {m} 个 AndroidManifest，{mv}", {

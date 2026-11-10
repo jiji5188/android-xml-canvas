@@ -34,6 +34,30 @@ export interface PkgSyncResult {
 
 const SRC_ROOTS = ["app/src/main/java", "app/src/main/kotlin"];
 
+/** 动态发现源码根：枚举 app/src/<variant>/{java,kotlin}（含 main / debug / release / test / androidTest / flavor）
+ *  找不到 app/src 时退回静态 SRC_ROOTS。纯 IO，不抛错。 */
+async function discoverSrcRoots(source: ProjectSource): Promise<string[]> {
+  const out: string[] = [];
+  let variants: string[] = [];
+  try {
+    const kids = await source.listChildren("app/src").catch(() => []);
+    if (Array.isArray(kids)) variants = kids.filter((e) => e.kind === "dir").map((e) => e.name);
+  } catch {
+    /* 退静态 */
+  }
+  if (variants.length === 0) return [...SRC_ROOTS];
+  for (const v of variants) {
+    for (const lang of ["java", "kotlin"]) {
+      const rel = `app/src/${v}/${lang}`;
+      const probe = await source.listChildren(rel).catch(() => null);
+      if (Array.isArray(probe)) out.push(rel);
+    }
+  }
+  // 保底：至少含 main 的两路（即使 probe 失败也不丢主路径）
+  if (out.length === 0) return [...SRC_ROOTS];
+  return out;
+}
+
 /** 旧包名 com.a.b → 各源码根下对应的目录 com/a/b */
 function pkgDir(srcRoot: string, pkg: string): string {
   const path = pkg.replace(/\./g, "/").replace(/^\/+|\/+$/g, "");
@@ -118,6 +142,56 @@ export function rewriteManifestPkg(text: string, oldPkg: string, newPkg: string)
   return out !== text ? out : null;
 }
 
+/**
+ * M219b：全文件包名 token 替换（比只改第一行 package 声明更宽）。
+ * 把 `com.old.pkg` 这种点分 token 在整段文本里全换成 `com.new.pkg`：
+ *   import com.old.pkg.Foo; → import com.new.pkg.Foo;
+ *   com.old.pkg.R.id.x / new com.old.pkg.MainActivity() / package com.old.pkg;
+ * 边界守卫（关键）：
+ *   - 前一个字符不能是 [A-Za-z0-9_.]（避免 xcom.old.pkg 或 subcom.old.pkg 误中；也避免 already-renamed 重复）
+ *   - 后一个字符不能是 [A-Za-z0-9_]（避免 com.old.pkgExtra 误中；后面是 . 时照常换，留给 .Foo）
+ * 返回 { text, changed }。
+ */
+export function rewritePkgTokens(text: string, oldPkg: string, newPkg: string): { text: string; changed: boolean } {
+  if (!text || !oldPkg || !newPkg || oldPkg === newPkg) return { text, changed: false };
+  const esc = oldPkg.replace(/\./g, "\\.");
+  const re = new RegExp("(?<![A-Za-z0-9_.])" + esc + "(?![A-Za-z0-9_])", "g");
+  const out = text.replace(re, newPkg);
+  return { text: out, changed: out !== text };
+}
+
+/** 递归列出某个目录下所有文本源文件（.java/.kt + 所有 .xml，供包名全量同步用）。相对项目根。 */
+export async function listAllTextFiles(source: ProjectSource, startRel: string): Promise<string[]> {
+  const out: string[] = [];
+  let depth = 0;
+  const walk = async (rel: string): Promise<void> => {
+    depth++;
+    if (depth > 20) return;
+    let children;
+    try {
+      children = await source.listChildren(rel);
+    } catch {
+      depth--;
+      return;
+    }
+    if (!Array.isArray(children)) {
+      depth--;
+      return;
+    }
+    for (const e of children) {
+      const full = rel ? `${rel}/${e.name}` : e.name;
+      if (e.kind === "dir") {
+        await walk(full);
+      } else if (isJavaSrcName(e.name) || /\.xml$/i.test(e.name)) {
+        out.push(full);
+      }
+    }
+    depth--;
+  };
+  await walk(startRel);
+  return out;
+}
+
 /** 可能含包名引用的 manifest 路径（根 / app / app/src/<variant>） */
 async function findManifests(source: ProjectSource): Promise<string[]> {
   const found = new Set<string>();
@@ -170,19 +244,45 @@ export async function syncPkgInSource(
     }
   }
 
-  // 1) 找出所有源码文件并改写 package 声明
+  // 1) M219b：全项目 token 扫描（.java/.kt/.xml 全量）——
+  //  旧版只改旧包目录里的第一行 package 声明，会漏掉：其它包 import com.old.pkg.Foo、
+  //  全限定 new com.old.pkg.MainActivity()、manifest 里的属性值等。这里一次性全换。
+  //  扫描范围＝动态发现的源码根（java/kotlin，含各 variant），避免走 res 大目录。
+  const srcRoots = await discoverSrcRoots(source);
+  const sweepSeen = new Set<string>(); // 避免同一文件被两个源码根重复计
+  for (const srcRoot of srcRoots) {
+    const allFiles = await listAllTextFiles(source, srcRoot);
+    for (const rel of allFiles) {
+      if (sweepSeen.has(rel)) continue;
+      sweepSeen.add(rel);
+      const text = await source.readText(rel).catch(() => null);
+      if (!text) continue;
+      const r = rewritePkgTokens(text, oldPkg, newPkg);
+      if (r.changed) {
+        const ok = await saveProjectFile(saveRoot, rel, r.text);
+        if (!ok) result.ok = false;
+        result.files.push(rel);
+        result.foundSrc = true;
+      }
+    }
+  }
+
+  // 2) 找出所有源码文件并改写 package 声明
   const oldDir = oldPkg.replace(/\./g, "/");
   const newDir = newPkg.replace(/\./g, "/");
+  // 嵌套改名（com.old → com.old.app）不能直接 move 自己进自己，会报错/递归。
+  const nested = newDir.startsWith(oldDir + "/") || oldDir === newDir;
   const seenSrcRoot = new Set<string>();
 
-  for (const srcRoot of SRC_ROOTS) {
+  for (const srcRoot of srcRoots) {
     const rootDir = pkgDir(srcRoot, oldPkg);
     let baseRel = "";
     try {
-      // 旧包根目录是否真实存在：探一下该目录能否列子项（不存在会报错/空）
+      // 旧包根目录是否真实存在：探一下该目录能否列子项（不存在就跳过移动）
       const probe = await source.listChildren(rootDir).catch(() => null);
       if (!Array.isArray(probe)) continue;
       baseRel = rootDir;
+      void baseRel;
     } catch {
       continue;
     }
@@ -190,27 +290,18 @@ export async function syncPkgInSource(
     seenSrcRoot.add(srcRoot);
     result.foundSrc = true;
 
-    const files = await listJavaFiles(source, baseRel);
-    for (const rel of files) {
-      const text = await source.readText(rel).catch(() => null);
-      if (!text) continue;
-      const next = rewritePkgDecl(text, oldPkg, newPkg);
-      if (next && next !== text) {
-        const ok = await saveProjectFile(saveRoot, rel, next);
-        if (!ok) result.ok = false;
-        result.files.push(rel);
-      }
+    // M219b：文件内容的 package 声明 / 跨包引用 已由上面的全项目 token 扫描统一改过，
+    // 这里只负责把旧包目录整体移到新包目录（内容已改完，移完即 package 与目录对齐）。
+    if (nested) {
+      // 嵌套改名（com.old → com.old.app 或同名）不能直接挪，需用户手动处理目录层次。
+      result.moveWarn = "pkg-nested-rename";
+      continue;
     }
-
-    // 2) 移动目录：旧包目录整体 → 新包目录
-    //  moveEntry(ctx, rel, targetParentRel, asName)：rel = 旧全路径（相对项目根）；
-    //  targetParentRel = 新全路径的父目录；asName = 新全路径最后一段。
-    //  底层 native bridge.renameEntry(from,to) 会自动建中间父目录。
+    const oldFull = `${srcRoot}/${oldDir}`;
+    const newFull = `${srcRoot}/${newDir}`;
+    const targetParentRel = newFull.slice(0, newFull.lastIndexOf("/") + 1).replace(/\/+$/, "");
+    const asName = newDir.split("/").pop() || "";
     if (fileOpsCtx) {
-      const oldFull = `${srcRoot}/${oldDir}`;
-      const newFull = `${srcRoot}/${newDir}`;
-      const targetParentRel = newFull.slice(0, newFull.lastIndexOf("/") + 1).replace(/\/+$/, "");
-      const asName = newDir.split("/").pop() || "";
       const mv = await moveEntry(fileOpsCtx, oldFull, targetParentRel, asName);
       if (mv.ok) {
         result.moved = true;

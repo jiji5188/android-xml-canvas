@@ -6,6 +6,7 @@
 // 不想重新编译整个项目。这里选 APK → 列出条目 → 挑要换的 → 选本地新文件 → 重签。
 //
 // 明确的限制（界面上会写出来）：layout/values 是编译过的二进制，改不了；只换「原样存着的文件」。
+// M212c：样式改用专属 .axv-repack-* 类（之前误用了不存在的 axv-saveas，弹窗完全没有底色/内边距）。
 
 import { useCallback, useMemo, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
@@ -151,31 +152,34 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
   }, [entries, filter]);
 
   const pickedCount = Object.keys(picked).length;
+  const canRepack = !!apkPath && !busy && pickedCount > 0 && supported;
 
   return (
-    <div className="axv-saveas-mask" role="dialog" aria-modal="true">
-      <div
-        className="axv-saveas"
-        style={{ width: "min(720px, 94vw)", maxHeight: "86vh", display: "flex", flexDirection: "column" }}
-      >
-        <div className="axv-saveas-title">{tt("导入 APK 换图重签")}</div>
+    <div className="axv-saveas-mask" role="dialog" aria-modal="true" aria-label={tt("导入 APK 换图重签")}>
+      <div className="axv-repack-card">
+        <div className="axv-repack-head">
+          <div className="axv-repack-title">{tt("导入 APK 换图重签")}</div>
+          <button type="button" className="axv-repack-x" onClick={onClose} disabled={!!busy} aria-label={tt("关闭")}>
+            ✕
+          </button>
+        </div>
+
+        <div className="axv-repack-sub">
+          {tt("能换：图片（png/webp/jpg）、assets、res/raw、lib、任意原始文件。改不了：layout/values 这类编译过的 XML 和 resources.arsc——那需要整套反编译。")}
+        </div>
 
         {!supported ? (
-          <div className="axv-sign-hint" style={{ marginBottom: 8 }}>
+          <div className="axv-sign-issue axv-sign-issue-warn axv-repack-warn">
             {tt("此环境不支持（需要手机 App 端）：网页版无法读写 APK")}
           </div>
         ) : null}
 
-        <div className="axv-sign-hint" style={{ marginBottom: 8 }}>
-          {tt("能换：图片（png/webp/jpg）、assets、res/raw、lib、任意原始文件。改不了：layout/values 这类编译过的 XML 和 resources.arsc——那需要整套反编译。")}
-        </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <button type="button" onClick={() => void pickApkFile()} disabled={!!busy || !supported}>
+        <div className="axv-repack-bar">
+          <button type="button" className="axv-repack-ghost" onClick={() => void pickApkFile()} disabled={!!busy || !supported}>
             {entries ? tt("换一个 APK") : tt("选择 APK 文件")}
           </button>
           {apkName ? (
-            <span style={{ fontSize: 12, opacity: 0.75, wordBreak: "break-all" }}>
+            <span className="axv-repack-file">
               {apkName}
               {entries ? ` · ${entries.length} ${tt("个条目")}` : ""}
             </span>
@@ -185,64 +189,31 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
         {entries ? (
           <>
             <input
-              className="axv-sign-input"
-              style={{ marginTop: 10 }}
+              className="axv-repack-search"
               placeholder={tt("筛选条目，例如 drawable / assets / icon")}
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
-            <div
-              style={{
-                marginTop: 8,
-                flex: 1,
-                minHeight: 160,
-                overflow: "auto",
-                border: "1px solid rgba(0,0,0,.1)",
-                borderRadius: 8,
-              }}
-            >
+            <div className="axv-repack-list">
               {shown.map((e) => {
                 const can = isReplaceableEntry(e.name);
                 const p = picked[e.name];
                 return (
-                  <div
-                    key={e.name}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "4px 8px",
-                      borderBottom: "1px solid rgba(0,0,0,.05)",
-                      fontSize: 12,
-                    }}
-                  >
-                    <span
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        opacity: can ? 1 : 0.45,
-                      }}
-                      title={e.name}
-                    >
+                  <div key={e.name} className={`axv-repack-row${can ? "" : " is-fixed"}`}>
+                    <span className="axv-repack-name" title={e.name}>
                       {e.name}
                     </span>
-                    <span style={{ opacity: 0.55, fontVariantNumeric: "tabular-nums" }}>{kb(e.size)}</span>
+                    <span className="axv-repack-size">{kb(e.size)}</span>
                     {p ? (
-                      <span
-                        style={{ color: "#0a7", maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                        title={p.name}
-                      >
+                      <span className="axv-repack-picked" title={p.name}>
                         ✓ {p.name}
                       </span>
                     ) : null}
                     <button
                       type="button"
+                      className="axv-repack-btn"
                       disabled={!can || !!busy}
                       onClick={() => void pickReplace(e.name)}
-                      style={{ fontSize: 11, padding: "2px 8px" }}
                       title={can ? tt("选一个本地文件替换它") : tt("这个条目是编译产物，不能直接换")}
                     >
                       {p ? tt("重选") : tt("替换")}
@@ -250,39 +221,35 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
                   </div>
                 );
               })}
-              {shown.length === 0 ? (
-                <div style={{ padding: 12, fontSize: 12, opacity: 0.6 }}>{tt("没有匹配的条目")}</div>
-              ) : null}
+              {shown.length === 0 ? <div className="axv-repack-empty">{tt("没有匹配的条目")}</div> : null}
             </div>
             {entries.length > shown.length ? (
-              <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+              <div className="axv-repack-more">
                 {tt("只显示前 {n} 条，用筛选框缩小范围", { n: String(shown.length) })}
               </div>
             ) : null}
           </>
         ) : null}
 
-        {busy ? <div className="axv-sign-hint" style={{ marginTop: 8 }}>{busy}</div> : null}
+        {busy ? <div className="axv-sign-hint">{busy}</div> : null}
         {err ? (
-          <div className="axv-sign-issue axv-sign-issue-error" style={{ marginTop: 8, display: "block" }}>
-            {err}
-          </div>
+          <div className="axv-sign-issue axv-sign-issue-error axv-repack-err">{err}</div>
         ) : null}
         {okPath ? (
-          <div className="axv-sign-ok" style={{ marginTop: 8 }}>
+          <div className="axv-sign-ok axv-repack-ok">
             {tt("已生成：")}
-            <span style={{ wordBreak: "break-all", fontSize: 11 }}>{okPath}</span>
+            <span className="axv-repack-okpath">{okPath}</span>
           </div>
         ) : null}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} disabled={!!busy}>
+        <div className="axv-repack-foot">
+          <button type="button" className="axv-repack-ghost" onClick={onClose} disabled={!!busy}>
             {tt("关闭")}
           </button>
           <button
             type="button"
-            className="axv-sign-primary"
-            disabled={!apkPath || !!busy || pickedCount === 0 || !supported}
+            className="axv-sign-primary axv-repack-go"
+            disabled={!canRepack}
             onClick={() => void doRepack()}
             title={pickedCount === 0 ? tt("先至少替换一个文件") : tt("重新打包并签名")}
           >

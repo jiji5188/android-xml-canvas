@@ -11357,3 +11357,78 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   line-height: 1.4;
 }
 
+
+/* M212c 导入 APK 换图重签弹窗（之前误用不存在的 axv-saveas，弹窗没底没边距） */
+.axv-repack-card {
+  width: min(720px, 94vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--axv-surface, #fff);
+  border: 1px solid var(--axv-outline, #d8dce3);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  padding: 18px 18px 14px;
+}
+.axv-repack-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.axv-repack-title { font-size: 15px; font-weight: 700; color: var(--axv-title, var(--axv-on-surface, #1d1b20)); }
+.axv-repack-x {
+  flex: 0 0 auto; width: 26px; height: 26px; line-height: 1; border-radius: 8px;
+  border: 1px solid transparent; background: transparent; cursor: pointer;
+  color: var(--axv-text-2, #5f6368); font-size: 13px;
+}
+.axv-repack-x:hover { background: var(--axv-surface-sunken, #f2f3f5); }
+.axv-repack-sub { margin-top: 6px; font-size: 11.5px; line-height: 1.65; color: var(--axv-desc, var(--axv-text-2, #5f6368)); }
+.axv-repack-warn { display: block; margin: 8px 0 0; }
+.axv-repack-bar { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.axv-repack-file { font-size: 12px; color: var(--axv-text-2, #5f6368); word-break: break-all; min-width: 0; }
+.axv-repack-ghost {
+  font-size: 12px; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--axv-outline, #d8dce3);
+  background: var(--axv-surface, #fff); color: var(--axv-on-surface, #1d1b20); cursor: pointer;
+}
+.axv-repack-ghost:disabled { opacity: 0.5; cursor: default; }
+.axv-repack-search {
+  margin-top: 10px; width: 100%; box-sizing: border-box;
+  font-size: 12px; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid var(--axv-outline, #d8dce3);
+  background: var(--axv-surface-sunken, #f7f8fa); color: var(--axv-on-surface, #1d1b20);
+}
+.axv-repack-search:focus { outline: 2px solid var(--axv-primary, #4f8cff); outline-offset: -1px; }
+.axv-repack-list {
+  margin-top: 8px; flex: 1 1 auto; min-height: 150px; max-height: 46vh; overflow: auto;
+  border: 1px solid var(--axv-outline, #d8dce3); border-radius: 10px;
+  background: var(--axv-surface-sunken, #fafbfc);
+}
+.axv-repack-row { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 12px; border-bottom: 1px solid rgba(0,0,0,.05); }
+.axv-repack-row:last-child { border-bottom: 0; }
+.axv-repack-row:hover { background: color-mix(in srgb, var(--axv-primary, #4f8cff) 7%, transparent); }
+.axv-repack-row.is-fixed { opacity: 0.5; }
+.axv-repack-name {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px;
+  color: var(--axv-on-surface, #1d1b20);
+}
+.axv-repack-size { flex: 0 0 auto; color: var(--axv-text-3, var(--axv-text-2, #8a8f98)); font-variant-numeric: tabular-nums; font-size: 11px; }
+.axv-repack-picked { flex: 0 0 auto; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0a8f5f; font-size: 11px; }
+.axv-repack-btn {
+  flex: 0 0 auto; font-size: 11px; padding: 3px 10px; border-radius: 6px;
+  border: 1px solid var(--axv-outline, #d8dce3); background: var(--axv-surface, #fff);
+  color: var(--axv-on-surface, #1d1b20); cursor: pointer;
+}
+.axv-repack-btn:hover:not(:disabled) { border-color: var(--axv-primary, #4f8cff); color: var(--axv-primary, #4f8cff); }
+.axv-repack-btn:disabled { opacity: 0.4; cursor: default; }
+.axv-repack-empty { padding: 14px; font-size: 12px; color: var(--axv-text-3, #8a8f98); }
+.axv-repack-more { margin-top: 4px; font-size: 11px; color: var(--axv-text-3, #8a8f98); }
+.axv-repack-err { display: block; margin-top: 8px; }
+.axv-repack-ok { margin-top: 8px; }
+.axv-repack-okpath { font-size: 11px; word-break: break-all; }
+.axv-repack-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.axv-repack-go { min-width: 132px; }
+@media (max-width: 640px) {
+  .axv-repack-card { width: 96vw; padding: 14px 12px 10px; max-height: 88vh; }
+  .axv-repack-row { padding: 6px 8px; }
+  .axv-repack-size { display: none; }
+  .axv-repack-list { max-height: 42vh; }
+  .axv-repack-picked { max-width: 84px; }
+}

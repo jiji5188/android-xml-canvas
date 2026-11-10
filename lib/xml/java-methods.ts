@@ -79,6 +79,48 @@ export const KNOWN_METHODS: string[] = [
   "split", "replace", "replaceAll", "replaceFirst", "matches", "contains", "startsWith", "endsWith",
   "indexOf", "lastIndexOf", "compareTo", "concat", "format", "valueOf", "isDigit", "isLetter",
   "isEmpty", "nonEmpty",
+  // M214：Intent 全家族（此前缺 getFlags，被建议成 getClass —— 编辑距离 2 配对的典型误报）
+  "getFlags", "setFlags", "addFlags", "clearFlags", "removeFlags",
+  "getAction", "setAction", "getData", "setData", "setDataAndType", "getDataString",
+  "getType", "setType", "getCategories", "addCategory", "removeCategory", "hasCategory",
+  "getExtras", "putExtras", "replaceExtras", "removeExtra",
+  "putCharExtra", "putLongExtra", "putDoubleExtra", "putFloatExtra", "putShortExtra",
+  "putByteArrayExtra", "putCharSequenceExtra", "putStringArrayListExtra", "putIntegerArrayListExtra",
+  "getLongExtra", "getShortExtra", "getDoubleExtra", "getFloatExtra", "getCharExtra", "getByteExtra",
+  "getSerializableExtra", "getParcelableExtra", "getParcelableArrayListExtra",
+  "getStringArrayListExtra", "getIntegerArrayListExtra", "getCharSequenceArrayListExtra",
+  "getBundleExtra", "getComponent", "setComponent", "setClassName", "setClass", "getSelector",
+  "setSelector", "cloneFilter", "getIdentifier", "toUri", "parseUri", "normalizeMimeType",
+  "createChooser", "makeMainActivity", "setActivityAction", "getDataUri", "hasFileDescriptorExtra",
+  // M214：Bundle 全家族（extras 载体，之前大量缺失）
+  "getBundle", "putBundle", "getParcelable", "putParcelable", "getSerializable", "putSerializable",
+  "getCharSequence", "putCharSequence", "getStringArray", "putStringArray", "getIntArray",
+  "putIntArray", "getLongArray", "putLongArray", "getDoubleArray", "putDoubleArray",
+  "getFloatArray", "putFloatArray", "getBooleanArray", "putBooleanArray", "getShortArray",
+  "putShortArray", "getIntegerArrayList", "getStringArrayList", "getCharSequenceArrayList",
+  "getParcelableArrayList", "isEmpty", "putAll", "keySet", "size", "containsKey", "remove", "clear",
+  // M214：Uri / Intent.Builder 家族
+  "fromFile", "withAppendedPath", "withAuthority", "withScheme", "withPath", "withFragment",
+  "withQuery", "getLastPathSegment", "getPathSegments", "getQueryParameter", "getQueryParameters",
+  "buildUpon", "build", "encode", "decode", "getScheme", "getHost", "getPort", "getPath",
+  "getFragment", "getEncodedPath", "getAuthority", "getEncodedAuthority", "getRawPath",
+  "getEncodedSchemeSpecificPart", "getSchemeSpecificPart", "getRawQuery", "getRawFragment",
+  "getQuery", "getCategories", "getUri", "normalizeUri",
+  // M214：Activity / Context 常见调用（getSystemService / 文件 / 服务 / 广播）
+  "getCallingActivity", "setIntent", "getLocalClassName", "getPackageManager", "getSystemService",
+  "getAssets", "getFilesDir", "getCacheDir", "getExternalFilesDir", "getExternalCacheDir",
+  "openFileOutput", "openFileInput", "deleteFile", "fileList", "getDir", "getMainLooper",
+  "getApplication", "isTaskRoot", "moveTaskToBack", "recreate", "setTheme", "getTheme",
+  "requestPermissions", "checkSelfPermission", "shouldShowRequestPermissionRationale",
+  "openOptionsMenu", "closeOptionsMenu", "invalidateOptionsMenu", "getWindow",
+  "requestWindowFeature", "setVolumeControlStream", "getPackageInfo", "getInstalledPackages",
+  "getInstalledApplications", "bindService", "unbindService", "startService", "stopService",
+  "startForegroundService", "getContentResolver", "openInputStream", "openOutputStream",
+  "queryIntentActivities", "resolveActivity", "registerReceiver", "unregisterReceiver",
+  "sendBroadcast", "sendOrderedBroadcast", "getApplicationInfo", "getInstalledServices",
+  "getRunningServices", "isIgnoringBatteryOptimizations", "requestIgnoreBatteryOptimizations",
+  "isDeviceIdleMode", "isPowerSaveMode", "registerComponentListener",
+  "unregisterComponentListener", "getServicesForComponent", "startInstrumentation",
 ];
 
 const KNOWN = new Set(KNOWN_METHODS);
@@ -105,6 +147,11 @@ export function suggestMethod(name: string, maxDist = 2): string | null {
     const cl = cand.toLowerCase();
     const sharedPrefix = cl.length >= 2 && low.length >= 2 && cl.slice(0, 2) === low.slice(0, 2);
     if (d > 1 && !sharedPrefix) continue;
+    // M214：d==2 时再加一道门槛——前 4 个字符（忽略大小写）要一致，否则两个毫不
+    // 相关的 API 会被配成"拼写错"（getFlags → getClass 就是这么误报的；前 4 字符
+    // "getf" vs "getc" 不同）。重复字符类真拼错（setTexttt → setText）前 4 字符相同，不受影响；
+    // 单字符错 d==1 也不受影响，大小写型 findviewbyid 走下面的 lowerHint 通道
+    if (d === 2 && cl.slice(0, 4) !== low.slice(0, 4)) continue;
     // M208：d==1 但只差在开头动词（get↔set / is↔has ...）→ 不是拼错，是两个不同方法
     //       真实误报：getMessage() 被建议成 setMessage()
     if (d === 1 && !sharedPrefix && VERB_INITIALS.has(low[0]) && VERB_INITIALS.has(cl[0]) && low[0] !== cl[0]) {

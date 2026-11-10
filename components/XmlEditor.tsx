@@ -232,6 +232,7 @@ function writeLastRel(projectKey: string, rel: string): void {
 import { RunPreview } from "./RunPreview";
 import { Toolbar } from "./Toolbar";
 import { SigningDialog } from "./SigningDialog";
+import { ApkRepackDialog } from "./ApkRepackDialog";
 import { readSigningFromGradle } from "@/lib/xml/signing";
 import { LeftRail, type LeftView } from "./LeftRail";
 import { ProblemsDrawer } from "./ProblemsDrawer";
@@ -2362,6 +2363,8 @@ const allDrawableNames = useMemo(() => {
    *  M188b：放宽为只要有 activeProject 就能打开；没可写根时配置先暂存 localStorage，
    *  用户保存项目后可再点一次「写入 build.gradle」真正落盘 */
   const [signDialogOpen, setSignDialogOpen] = useState(false);
+  /** M212：导入 APK 换资源重签面板 */
+  const [repackOpen, setRepackOpen] = useState(false);
   const [gradleForSign, setGradleForSign] = useState<string | null>(null);
   const [signRootMissing, setSignRootMissing] = useState(false);
   /** M189：keystore 文件是否真存在（不给就是没检查） */
@@ -5660,6 +5663,10 @@ const findResolved = findResolvedNode;
             const r = shareApkFile(p);
             setExportNote(r.ok ? tt("已调起分享") : tt("分享失败：{msg}", { msg: r.msg || "" }));
           }}
+          onOpenRepack={() => {
+            setSignDialogOpen(false);
+            setRepackOpen(true);
+          }}
           onForget={() => {
             clearStoredSigning(activeProject?.name);
             setSignStoredRev((v) => v + 1);
@@ -5670,6 +5677,25 @@ const findResolved = findResolvedNode;
             setExportNote(m);
             window.setTimeout(() => setExportNote(""), ms);
           }}
+        />
+      )}
+      {repackOpen && (
+        <ApkRepackDialog
+          signing={
+            signStored
+              ? {
+                  storeFile: signStored.storeFile,
+                  storePass: signStored.storePass || signStored.keyPass || "",
+                  alias: signStored.alias,
+                  keyPass: signStored.keyPass || signStored.storePass || "",
+                }
+              : null
+          }
+          onClose={() => setRepackOpen(false)}
+          onDone={(p) => {
+            setExportNote(tt("重签名完成：{name}", { name: p.split(/[\\/]/).pop() || "" }));
+          }}
+          onNote={(m) => setExportNote(m)}
         />
       )}
       {editingTheme ? (

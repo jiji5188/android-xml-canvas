@@ -19,6 +19,8 @@ export interface SigningDialogProps {
   onInstallApk?: (path: string) => void;
   /** M197：把打好的 APK 分享出去 */
   onShareApk?: (path: string) => void;
+  /** M212：打开「导入 APK 换资源重签名」面板 */
+  onOpenRepack?: () => void;
   /** 读项目里 app/build.gradle（没有就 null） */
   gradleText: string | null;
   /** M188b：当前项目没有可写根（网页版没选目录 / 示例项目）→ 写入先进 localStorage 草稿 */
@@ -57,7 +59,7 @@ const EMPTY: SigningParams = {
   v3: true,
 };
 
-export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onShareApk, onWriteGradle, onClose, onNote, stored, onRemember, onForget }: SigningDialogProps) {
+export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onShareApk, onOpenRepack, onWriteGradle, onClose, onNote, stored, onRemember, onForget }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
   // M195：build.gradle 里没写的项（典型：口令）用本机记住的配置补
   const seed = prefill ?? (stored as SigningParams | null);
@@ -430,6 +432,15 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
               {apkResult?.ok && apkResult.path && onShareApk ? (
                 <button type="button" onClick={() => onShareApk(apkResult.path!)}>
                   {tt("分享 APK")}
+                </button>
+              ) : null}
+              {onOpenRepack ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenRepack()}
+                  title={tt("拿一个现成 APK，换里面的图片/assets 等原始资源，然后重新签名")}
+                >
+                  {tt("导入 APK 换图重签")}
                 </button>
               ) : null}
             </div>

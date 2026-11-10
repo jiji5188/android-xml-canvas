@@ -89,6 +89,63 @@ public final class ApkPack {
             zis.close();
         }
 
+        writeZip(names, datas, stores, outApk);
+    }
+
+    /**
+     * M212：把一个已经签过名的 APK 解开，换掉其中某些条目（图片 / assets / 原始文件），再重新写 zip。
+     * 不碰二进制 AXML / resources.arsc（那些需要反编译才能改，这里只做「换图/换资源文件」）。
+     * 会自动丢掉旧的签名文件（META-INF/*.SF/.RSA/.DSA/.MF），否则会和重签名冲突。
+     */
+    public static int repack(File inApk, java.util.Map<String, byte[]> replacements, File outApk) throws IOException {
+        List<String> names = new ArrayList<String>();
+        List<byte[]> datas = new ArrayList<byte[]>();
+        List<Boolean> stores = new ArrayList<Boolean>();
+
+        ZipInputStream zis = new ZipInputStream(new FileInputStream(inApk));
+        try {
+            ZipEntry e;
+            byte[] buf = new byte[64 * 1024];
+            while ((e = zis.getNextEntry()) != null) {
+                if (e.isDirectory()) continue;
+                String name = e.getName().replace('\\', '/');
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                int r;
+                while ((r = zis.read(buf)) > 0) bo.write(buf, 0, r);
+                byte[] data = bo.toByteArray();
+                if (isSignatureFile(name)) continue;
+                if (replacements.containsKey(name)) data = replacements.get(name);
+                names.add(name);
+                datas.add(data);
+                // 保留原包的压缩方式：原本 STORED（.so / resources.arsc）继续 STORED，
+                // 否则改了压缩方式会让 extractNativeLibs=false 的应用装不上/崩。
+                stores.add(Boolean.valueOf(e.getMethod() == ZipEntry.STORED || mustStore(name)));
+            }
+        } finally {
+            zis.close();
+        }
+        // 新增的条目（原包里没有的）也支持：名字不在列表里就追加
+        for (java.util.Map.Entry<String, byte[]> en : replacements.entrySet()) {
+            String name = en.getKey();
+            if (names.contains(name)) continue;
+            names.add(name);
+            datas.add(en.getValue());
+            stores.add(Boolean.valueOf(mustStore(name)));
+        }
+        writeZip(names, datas, stores, outApk);
+        return names.size();
+    }
+
+    /** 旧签名文件（重签名前必须去掉） */
+    private static boolean isSignatureFile(String name) {
+        String u = name.toUpperCase(java.util.Locale.US);
+        if (!u.startsWith("META-INF/")) return false;
+        return u.endsWith(".SF") || u.endsWith(".RSA") || u.endsWith(".DSA") || u.endsWith(".MF")
+                || u.endsWith(".EC");
+    }
+
+    private static void writeZip(List<String> names, List<byte[]> datas, List<Boolean> stores, File outApk)
+            throws IOException {
         CRC32 crc32 = new CRC32();
         OutputStream os = new FileOutputStream(outApk);
         CountingOutputStream out = new CountingOutputStream(os);
@@ -119,15 +176,17 @@ public final class ApkPack {
                 int extraLen = 0;
                 byte[] extra = null;
                 if (stored) {
-                    // 数据起点 = lho + 30 + nameLen + extraLen → 补到 4 的倍数
-                    int pad = (int) ((4 - ((lho + 30 + nameB.length) % 4)) % 4);
+                    // 数据起点 = lho + 30 + nameLen + extraLen → 补到对齐边界（arsc 4 字节；.so 16KB 页对齐）
+                    int align = name.toLowerCase(java.util.Locale.US).endsWith(".so") ? 16384 : 4;
+                    int pad = (int) ((align - ((lho + 30 + nameB.length) % align)) % align);
+                    if (pad != 0 && pad < 4) pad += align; // extra 要放得下 id(2)+len(2)，且不能破坏对齐
                     if (pad > 0) {
-                        if (pad < 4) pad += 4; // extra 字段要放得下 id(2)+len(2)
                         extra = new byte[pad];
                         extra[0] = (byte) 0xD9; // 与 zipalign 同款 extra id 0xd935
                         extra[1] = (byte) 0x35;
-                        extra[2] = (byte) (pad - 4);
-                        extra[3] = 0;
+                        int inner = pad - 4;
+                        extra[2] = (byte) (inner & 0xff);
+                        extra[3] = (byte) ((inner >> 8) & 0xff);
                         extraLen = pad;
                     }
                 }

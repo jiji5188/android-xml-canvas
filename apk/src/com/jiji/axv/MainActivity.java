@@ -17,6 +17,9 @@ import android.provider.MediaStore;
 import android.provider.Settings;
 import android.content.pm.PackageManager;
 import android.Manifest;
+import java.io.FileInputStream;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipEntry;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -67,6 +70,8 @@ public class MainActivity extends Activity {
     private static final int REQ_FILE = 1001;
     private static final int REQ_TREE = 1002;
     private static final int REQ_SAVE_TREE = 1003;
+    /** M212：导入 APK 选择器 */
+    private static final int REQ_APK = 1004;
     /** 默认工作目录名（外存根下）：AndroidUIIDE/Project */
     private static final String DEFAULT_DIR = "AndroidUIIDE/Project";
     private static final String PREF = "axv";
@@ -383,6 +388,38 @@ public class MainActivity extends Activity {
             }
             return;
         }
+        if (req == REQ_APK) {
+            final Uri picked = (res == RESULT_OK && data != null) ? data.getData() : null;
+            if (picked == null) {
+                                try { web.evaluateJavascript("window.__axvPickedApk && window.__axvPickedApk('' , 'err:canceled')", null); } catch (Throwable ignored) {}
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    File dir = new File(getCacheDir(), "import");
+                    dir.mkdirs();
+                    File dest = new File(dir, "apked.apk");
+                    InputStream is = getContentResolver().openInputStream(picked);
+                    OutputStream os = new FileOutputStream(dest);
+                    try {
+                        byte[] buf = new byte[64 * 1024];
+                        int n;
+                        while ((n = is.read(buf)) > 0) os.write(buf, 0, n);
+                    } finally {
+                        is.close();
+                        os.close();
+                    }
+                    String name = dest.getName();
+                    String js = "window.__axvPickedApk && window.__axvPickedApk(" + JSONObject.quote(dest.getAbsolutePath())
+                            + "," + JSONObject.quote("ok:" + name) + ");";
+                    web.evaluateJavascript(js, null);
+                } catch (Throwable t) {
+                    String js = "window.__axvPickedApk && window.__axvPickedApk(''," + JSONObject.quote("err:" + t.getMessage()) + ");";
+                    web.evaluateJavascript(js, null);
+                }
+            }).start();
+            return;
+        }
         if (req == REQ_FILE) {
             Uri[] out = null;
             if (res == RESULT_OK && data != null && data.getData() != null) {
@@ -538,6 +575,29 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void shareApk(String path) {
             MainActivity.this.shareApkFromProject(path);
+        }
+
+        /** M212：导入 APK 选择器（选中后把 apk 拷进 cache，再回话 window.__axvPickedApk(path, result)） */
+        @JavascriptInterface
+        public void pickApk() {
+            MainActivity.this.pickApkFile();
+        }
+
+        /** M212：列出 APK 里的条目（JSON 数组 [{name,size}]） */
+        @JavascriptInterface
+        public String listApkEntries(String apkPath) {
+            return MainActivity.this.listApkEntries(apkPath);
+        }
+
+        /** M212：异步重打包（换资源 + 重签名）→ window.__axvRepackApk(id, resultJson) */
+        @JavascriptInterface
+        public void repackApkAsync(String id, String payloadJson) {
+            new Thread(() -> {
+                final String res = MainActivity.this.repackApk(payloadJson);
+                final String js = "window.__axvRepackApk && window.__axvRepackApk(" + JSONObject.quote(id) + ","
+                        + JSONObject.quote(res) + ");";
+                MainActivity.this.web.evaluateJavascript(js, null);
+            }).start();
         }
 
         /** M191：在设备上生成 release 签名用的 keystore（PKCS#12）。
@@ -2669,6 +2729,120 @@ public class MainActivity extends Activity {
         });
     }
 
+    /* ================= M212：导入 APK 换资源 + 重签名 ================= */
+
+    /** 打开系统 APK 选择器（ACTION_OPEN_DOCUMENT，mime = apk） */
+    private void pickApkFile() {
+        runOnUiThread(() -> {
+            try {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("application/vnd.android.package-archive");
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivityForResult(i, REQ_APK);
+            } catch (Throwable t) {
+                toast("打开 APK 选择器失败：" + t.getMessage());
+            }
+        });
+    }
+
+    /** 列出 APK 条目（不含目录）：[{name,size}]。路径必须是可存在的文件，返回 err: 前缀则失败。 */
+    private String listApkEntries(String apkPath) {
+        try {
+            File f = new File(apkPath == null ? "" : apkPath);
+            if (!f.isFile()) return "err:找不到 APK 文件";
+            JSONArray arr = new JSONArray();
+            ZipInputStream zis = new ZipInputStream(new FileInputStream(f));
+            try {
+                ZipEntry e;
+                while ((e = zis.getNextEntry()) != null) {
+                    if (e.isDirectory()) continue;
+                    JSONObject o = new JSONObject();
+                    o.put("name", e.getName().replace('\\', '/'));
+                    o.put("size", (long) e.getSize());
+                    arr.put(o);
+                }
+            } finally {
+                zis.close();
+            }
+            return "ok:" + arr.toString();
+        } catch (Throwable t) {
+            return "err:" + t.getMessage();
+        }
+    }
+
+    /**
+     * 重打包：解源 APK → 按 replacements 换/加条目 → 重签名 → 写到默认目录 build/。
+     * payload: { apk, replacements: [{name, base64}], keystore, storePass, alias, keyPass, outName }
+     * 返回 ok:<path> / err:<step>:<msg>
+     */
+    private String repackApk(String payloadJson) {
+        StringBuilder log = new StringBuilder();
+        String step = "init";
+        try {
+            JSONObject p = new JSONObject(payloadJson);
+            String apk = p.optString("apk", "");
+            String ksPath = p.optString("keystore", "");
+            String storePass = p.optString("storePass", "");
+            String alias = p.optString("alias", "");
+            String keyPass = p.optString("keyPass", "");
+            String outName = p.optString("outName", "");
+            File src = new File(apk);
+            if (!src.isFile()) return "err:src:找不到源 APK";
+            if (ksPath.isEmpty() || !new File(ksPath).isFile()) return "err:keystore:找不到 keystore";
+
+            Map<String, byte[]> reps = new HashMap<String, byte[]>();
+            JSONArray rl = p.optJSONArray("replacements");
+            if (rl != null) {
+                for (int i = 0; i < rl.length(); i++) {
+                    JSONObject r = rl.optJSONObject(i);
+                    if (r == null) continue;
+                    String nm = r.optString("name", "");
+                    String b64 = r.optString("base64", "");
+                    if (nm.isEmpty() || b64.isEmpty()) continue;
+                    if (nm.contains("..")) continue;
+                    try {
+                        reps.put(nm, Base64.decode(b64, Base64.NO_WRAP));
+                    } catch (IllegalArgumentException bad) {
+                        // 跳过坏 base64，继续
+                    }
+                }
+            }
+
+            step = "pack";
+            File work = new File(getCacheDir(), "repack");
+            deleteTree(work);
+            work.mkdirs();
+            File packed = new File(work, "packed.apk");
+            int n = ApkPack.repack(src, reps, packed);
+            log.append("重打包 ").append(n).append(" 个条目（换了 ").append(reps.size()).append(" 个）\n");
+
+            step = "sign";
+            File signed = new File(work, "signed.apk");
+            String sr = signWithApksig(packed, signed, ksPath, storePass, alias, keyPass);
+            if (!sr.startsWith("ok:")) return "err:sign:" + (sr.startsWith("err:") ? sr.substring(4) : sr);
+
+            step = "output";
+            File outDir = new File(defaultDir(), "build");
+            if (!outDir.isDirectory() && !outDir.mkdirs()) throw new IOException("建不了输出目录");
+            String name = outName.isEmpty() ? "repacked.apk" : outName;
+            if (!name.endsWith(".apk")) name = name + ".apk";
+            File out = new File(outDir, name);
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(out);
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(signed)) {
+                byte[] buf = new byte[64 * 1024];
+                int r;
+                while ((r = fis.read(buf)) > 0) fos.write(buf, 0, r);
+            } finally {
+                fos.close();
+            }
+            log.append("输出 ").append(out.length()).append(" 字节\n");
+            return "ok:" + out.getAbsolutePath();
+        } catch (Throwable t) {
+            return "err:" + step + ":" + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+        }
+    }
+
     private void installApkFromProject(String path) {
         runOnUiThread(() -> {
             try {
@@ -2748,7 +2922,7 @@ public class MainActivity extends Activity {
         } catch (Throwable t) {
             if (log != null) log.append("framework 资源桩解包失败: ").append(t).append('\n');
             // 外部存储写不了 → 退 App cache 再试一次
-            File alt = new File(getCacheDir(), "framework-res-stub-v2.apk");
+            File alt = new File(getCacheDir(), "framework-res-stub-v3.apk");
             if (!alt.equals(cached)) {
                 try {
                     InputStream in = new java.util.zip.GZIPInputStream(getAssets().open("fw/framework-res-stub.apk.gz"));

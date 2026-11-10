@@ -251,15 +251,55 @@ export function findUnknownSymbols(
   symbols: JavaSymbols,
   knownTypes: Set<string>,
   starts: number[],
+  isKotlin = false,
 ): UnknownSymbol[] {
   const out: UnknownSymbol[] = [];
   const lines = maskedCode.split("\n");
+
+  const prevMeaningful = (idx: number): string => {
+    for (let j = idx - 1; j >= 0; j--) {
+      const t = lines[j].trim();
+      if (t) return t;
+    }
+    return "";
+  };
+  const nextMeaningful = (idx: number): string => {
+    for (let j = idx + 1; j < lines.length; j++) {
+      const t = lines[j].trim();
+      if (t) return t;
+    }
+    return "";
+  };
 
   for (let i = 0; i < lines.length; i++) {
     const ln = lines[i];
     // 只考虑"表达式语句"——末尾是 ; 且整行不是控制流/注解/声明
     const trimmed = ln.trim();
-    if (!/;/.test(trimmed)) continue;
+    if (!/;/.test(trimmed)) {
+      // M215：整行只有一个裸标识符（如 `spy`）——Java 里没有任何合法语句长这样，
+      // 以前因为「必须以 ; 结尾」直接跳过，导致明显的垃圾代码零报警。
+      // 只有「上一行没写完 / 下一行是续行」时才放过（链式调用、数组初始化被拆行）。
+      const bare = /^([a-z_$][\w$]*)$/.exec(trimmed);
+      if (bare && !isKotlin) {
+        const name = bare[1];
+        const prev = prevMeaningful(i);
+        const next = nextMeaningful(i);
+        const continues =
+          /[.(\[,=+\-*/&|?:<>]$/.test(prev) ||
+          /^(\.|\(|,|\+|\-|\*|\/|&&|\|\||\?|:|->)/.test(next) ||
+          /\b(return|new|throw|case|else|instanceof|extends|implements)$/.test(prev);
+        if (
+          !continues &&
+          !symbols.declared.has(name) &&
+          !symbols.methods.has(name) &&
+          !knownTypes.has(name) &&
+          !JAVA_KEYWORDS.has(name)
+        ) {
+          out.push({ name, line: i + 1, col: ln.indexOf(name) + 1, len: name.length });
+        }
+      }
+      continue;
+    }
     // 跳过 import / package / 注解 / 控制流 / 方法签名 / 字段声明
     if (/^\s*(import|package|@|public\s|private\s|protected\s|static\s|final\s|class\s|interface\s|enum\s|void\s|\w+\s+\w+\s*\()/m.test(
       trimmed,

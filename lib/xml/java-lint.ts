@@ -560,7 +560,7 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
       // 泛型/基本类型名（int/String/List/... 出现在声明里的）
       for (const m of masked.code.matchAll(/\b([A-Z]\w*)\s+(?:[a-z_]\w*)\s*[=;:)]/g)) knownTypes.add(m[1]);
       const starts2 = starts; // 复用上面算的
-      const unknowns = findUnknownSymbols(masked.code, sy, knownTypes, starts2);
+      const unknowns = findUnknownSymbols(masked.code, sy, knownTypes, starts2, !!opts.isKotlin);
       const reported = new Set<string>();
       for (const u of unknowns) {
         if (reported.has(u.name)) continue; // 同名只报一次（最高频来源）

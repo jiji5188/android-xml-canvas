@@ -35,7 +35,7 @@ import {
 } from "@/lib/xml/history";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
-import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras } from "@/lib/xml/project-res";
+import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras, invalidateProjectRes } from "@/lib/xml/project-res";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
@@ -623,6 +623,10 @@ export function XmlEditor() {
   const [sampleValues, setSampleValues] = useState(sampleBoot.current.values);
   /** 上传 res/ 目录解析出的附加资源（drawable/vector/styles/values 原文） */
   const [resExtras, setResExtras] = useState<ResourceExtras | null>(null);
+  /** M210c：资源索引缓存世代。存了 res 文件（新建布局/values/drawable）后 +1，
+   *   让下一次「全量资源索引」先 invalidate 再扫，否则 20s 缓存里还是旧的（新建的 id 查不到 → 误报）。 */
+  const [resCacheRev, setResCacheRev] = useState(0);
+  const bumpResCache = useCallback(() => setResCacheRev((v) => v + 1), []);
   /** M3g/M3h：本工具生成的 drawable 资源：资源名 → xml 原文（图标 vector + 自定义 shape/ripple 共用） */
   const [generatedDrawables, setGeneratedDrawables] = useState<Record<string, string>>(sampleBoot.current.drawables);
   /** M171：应用图标生成的额外资源（mipmap-anydpi-v26/ic_launcher.xml 等，路径相对 res/） */
@@ -1837,6 +1841,8 @@ const allDrawableNames = useMemo(() => {
     let cancelled = false;
     void (async () => {
       try {
+        // M210c：项目 res 刚被写过（resCacheRev 变）→ 先失效全量索引缓存，否则 20s 内还是旧 id/布局
+        if (resCacheRev > 0) invalidateProjectRes(aiFileIo);
         const quick = await loadProjectResForDoc(aiFileIo, openRel, currentXml());
         if (cancelled) return;
         if (quick) setResExtras((prev) => mergeProjectExtras(prev, quick) ?? quick);
@@ -1850,7 +1856,7 @@ const allDrawableNames = useMemo(() => {
     return () => {
       cancelled = true;
     };
-  }, [aiFileIo, openRel, currentXml]);
+  }, [aiFileIo, openRel, currentXml, resCacheRev]);
 
   // M199：进运行调试前把项目里的 Java/Kotlin 读进来（只读，失败就当没代码）
   useEffect(() => {
@@ -3675,6 +3681,7 @@ const findResolved = findResolvedNode;
     // M36：有打开的项目 → 直接写进它的 res 目录，不再丢一个 res.zip 在工作目录根
     if (projRoot) {
       void saveResFiles(projRoot, buildSaveFiles(currentSaveInput())).then((r) => {
+        if (r.ok && r.written > 0) bumpResCache();
         setExportNote(
           r.ok
             ? tt("已写入《{name}》的 app/src/main/res/：{n}/{total} 个文件", { name: activeProject?.name || tt("项目"), n: r.written, total: r.total }) +
@@ -4214,6 +4221,7 @@ const findResolved = findResolvedNode;
       const ok = await saveProjectFile(projRoot, openRel, xml);
       if (ok) {
         saveBaseline(openRel, xml);
+        bumpResCache();
         flashNote(tt("已保存 {name} → {rel}", { name, rel: openRel }), 3600);
         markSaved(xml);
         return true;

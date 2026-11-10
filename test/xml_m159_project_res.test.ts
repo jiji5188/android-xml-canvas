@@ -5,6 +5,7 @@ import {
   loadProjectResIndex,
   loadProjectResIndexCached,
   mergeProjectExtras,
+  invalidateProjectRes,
 } from "@/lib/xml/project-res";
 
 function fakeIo(rootLabel: string, files: Record<string, string>, images: Record<string, string> = {}): AiFileIo {
@@ -104,5 +105,59 @@ describe("M159 打开文件即载入项目资源", () => {
     expect(m.drawableXml.bg).toBe("<selector/>");
     expect(m.vectorNames.sort()).toEqual(["v1", "v2"]);
     expect(m.sourceFiles.sort()).toEqual(["drawable/bg.xml", "drawable/bg2.xml"]);
+  });
+
+  it("全量索引：layout 目录的 @+id 也进 extras.layouts（M210）", async () => {
+    const io = fakeIo(`p-${Math.random()}`, {
+      "res/layout/activity_main.xml": '<LinearLayout><TextView android:id="@+id/tv_key"/></LinearLayout>',
+      "res/layout/layout_item_refund.xml":
+        '<LinearLayout><TextView android:id="@+id/tv_value"/><EditText android:id="@+id/tv_value_EditText"/></LinearLayout>',
+      "res/layout-land/land_only.xml": '<FrameLayout android:id="@+id/right_ImageView"/>',
+      "res/values/strings.xml": "<resources><string name=\"a\">x</string></resources>",
+    });
+    const ex = await loadProjectResIndex(io, "res/layout/activity_main.xml");
+    expect(ex).not.toBeNull();
+    // 三个布局名都在
+    const layouts = Object.keys(ex!.layouts ?? {});
+    expect(layouts).toContain("activity_main.xml");
+    expect(layouts).toContain("layout_item_refund.xml");
+    expect(layouts).toContain("land_only.xml");
+  });
+
+  it("全量索引：20s 内缓存命中同一对象（需显式 invalidateProjectRes 才刷新）", async () => {
+    const io: AiFileIo = {
+      rootLabel: () => "cache-stable",
+      async list(rel: string) {
+        // 模拟 res 下只有一个 layout 目录 + 一个文件
+        const items: { name: string; kind: "dir" | "file"; rel: string }[] = [];
+        if (!rel || rel === "") {
+          items.push({ name: "layout", kind: "dir", rel: "layout" });
+          items.push({ name: "values", kind: "dir", rel: "values" });
+        } else if (rel === "layout") {
+          items.push({ name: "a.xml", kind: "file", rel: "layout/a.xml" });
+        } else if (rel === "values") {
+          items.push({ name: "strings.xml", kind: "file", rel: "values/strings.xml" });
+        }
+        return { ok: true, items };
+      },
+      async read(rel: string) {
+        if (rel === "layout/a.xml") return { ok: true, text: "<TextView android:id='@+id/one'/>" };
+        if (rel === "values/strings.xml")
+          return { ok: true, text: "<resources><string name=\"s\">x</string></resources>" };
+        return { ok: false, error: "no" };
+      },
+      async write() {
+        return { ok: false, error: "readonly" };
+      },
+    };
+    // 清一下可能残留的缓存（同一 rootLabel 在别的测试里用过）
+    invalidateProjectRes(io);
+    const a = await loadProjectResIndexCached(io, "layout/a.xml");
+    const b = await loadProjectResIndexCached(io, "layout/a.xml");
+    expect(b).toBe(a); // 命中缓存，同一对象
+    // 内容变了但缓存还在 → 仍返回旧对象（这正是隐患：没有自动失效）
+    const c = await loadProjectResIndexCached(io, "layout/a.xml");
+    expect(c).toBe(a);
+    invalidateProjectRes(io); // 清掉，避免污染后续
   });
 });

@@ -83,7 +83,7 @@ import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, n
 import { hasRealRender, renderReal, prepareFiles } from "@/lib/xml/native-render";
 import { readStoredSigning, writeStoredSigning, clearStoredSigning } from "@/lib/xml/sign-store";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
-import { buildApk, hasBuildApk, installApk, shareApkFile, type BuildApkResult } from "@/lib/xml/native-apk";
+import { buildApk, hasBuildApk, installApk, shareApkFile, compileModeOf, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { projectSaveRoot, projectFileExists, readProjectFile, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
@@ -2534,7 +2534,20 @@ const allDrawableNames = useMemo(() => {
           launchActivity: manifest || "",
         });
         setApkResult(r);
-        setExportNote(r.ok ? tt("打包完成：{name}", { name: r.name || "" }) : tt("打包失败：{msg}", { msg: r.step || "" }));
+        // M216：把编译模式写进状态条，别把“布局壳”当“真跑逻辑的 APK”
+        if (r.ok) {
+          const base = tt("打包完成：{name}", { name: r.name || "" });
+          const cm = compileModeOf(r);
+          if (cm.mode === "java") {
+            setExportNote(tt("{base}（已编译 {n} 个 Java 类）", { base, n: String(cm.classes) }));
+          } else if (cm.mode === "shell") {
+            setExportNote(tt("{base}（项目无 .java，生成的是布局壳，不运行任何逻辑）", { base }));
+          } else {
+            setExportNote(base);
+          }
+        } else {
+          setExportNote(tt("打包失败（{step}）", { step: r.step || "?" }));
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setApkResult({ ok: false, step: "js", log: msg });

@@ -14,7 +14,7 @@ export interface SigningDialogProps {
   /** M192：一键打包成可安装 APK（设备端 aapt2 + 壳 dex + apksig 签名） */
   onBuildApk?: (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => Promise<void>;
   apkBusy?: boolean;
-  apkResult?: { ok: boolean; path?: string; name?: string; bytes?: number; ms?: number; step?: string; log?: string } | null;
+  apkResult?: { ok: boolean; path?: string; name?: string; bytes?: number; ms?: number; step?: string; log?: string; compileMode?: string; classes?: number } | null;
   /** M192：调系统安装器装刚打出来的包 */
   onInstallApk?: (path: string) => void;
   /** M197：把打好的 APK 分享出去 */
@@ -452,6 +452,16 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
                     kb: String(Math.round((apkResult.bytes || 0) / 1024)),
                     ms: String(apkResult.ms || 0),
                   })}
+                  {apkResult.compileMode?.startsWith("java:") ? (
+                    <div style={{ opacity: 0.8, fontSize: 11, marginTop: 2 }}>
+                      {tt("已编译 {n} 个 Java 类并注入 dex", { n: String(apkResult.classes ?? 0) })}
+                    </div>
+                  ) : null}
+                  {apkResult.compileMode === "none" ? (
+                    <div style={{ opacity: 0.8, fontSize: 11, marginTop: 2 }}>
+                      {tt("项目没有 .java 文件，这是布局壳（不运行任何逻辑）")}
+                    </div>
+                  ) : null}
                   <div style={{ opacity: 0.7, wordBreak: "break-all", fontSize: 11 }}>{apkResult.path}</div>
                 </div>
               ) : (

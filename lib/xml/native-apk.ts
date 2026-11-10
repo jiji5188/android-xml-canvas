@@ -46,6 +46,10 @@ export interface BuildApkResult {
   /** 失败阶段：pkg / keystore / files / write / aapt2 / compile / link / pack / sign / output */
   step?: string;
   log?: string;
+  /** M216："none" = 无 Java 源码的布局壳；"java:<n>" = 真编译并注入了 <n> 个 dex */
+  compileMode?: string;
+  /** M216：编译并注入的 dex 数量（只有 compileMode 以 java: 开头时才有意义） */
+  classes?: number;
 }
 
 interface ApkBridge {
@@ -117,6 +121,25 @@ export function buildApk(input: BuildApkInput): Promise<BuildApkResult> {
       }
     }, 90000);
   });
+}
+
+/**
+ * M216：解析打包结果里的编译模式。
+ * - "java"：设备端真编译了项目 Java，classes = 注入的 dex 个数
+ * - "shell"：项目里没有 .java，产出的是只能显示布局的壳（必须明确告诉用户）
+ * - "unknown"：老版本 APK 没带 compileMode 字段（不能断言是壳）
+ */
+export function compileModeOf(r: BuildApkResult | null | undefined): {
+  mode: "java" | "shell" | "unknown";
+  classes: number;
+} {
+  const cm = r?.compileMode || "";
+  if (cm.startsWith("java:")) {
+    const n = r?.classes ?? Number(cm.slice(5));
+    return { mode: "java", classes: Number.isFinite(n) ? n : 0 };
+  }
+  if (cm === "none" || cm === "shell") return { mode: "shell", classes: 0 };
+  return { mode: "unknown", classes: 0 };
 }
 
 /** 调系统安装器（需要原生支持；返回是否调起成功） */

@@ -2523,17 +2523,21 @@ public class MainActivity extends Activity {
     }
 
     /** 把 xml 文本里的 & < > " 转义，避免属性值把清单写坏 */
-    /** M213：设备端真编译 —— 把项目 Java 源码编成 dex，塞进 extraDex（classes2.dex…）
+    /** M216：设备端真编译 —— 把项目 Java 源码编成 dex，塞进 extraDex（classes2.dex…）
     * @param javaSources  {path, code} 列表（path 相对项目根，形如 app/src/main/java/…/X.java）
     * @param genDir       aapt2 生成的 R.java 所在目录（可能没有 R.java，允许为空）
     * @param pkg          包名（R.java 的包 = pkg；与 --custom-package 一致）
     * @param extraDex     已收集的项目 dex（会追加编译产物）
+    * @return "none"（项目无 Java 源码，打包布局壳）或 "java:<n>"（编译并注入了 n 个 dex）
+    *          失败时直接抛 IOException，由上层中止打包（M216：不再静默退化成壳）
     */
-   private void compileProjectJava(JSONArray javaSources, String launchActivity, File root, File genDir,
-            String pkg, StringBuilder log, java.util.List<byte[]> extraDex) {
-        if (javaSources == null || javaSources.length() == 0) return;
-        try {
-            File compDir = ensureCompiler();
+   private String compileProjectJava(JSONArray javaSources, String launchActivity, File root, File genDir,
+            String pkg, StringBuilder log, java.util.List<byte[]> extraDex) throws Exception {
+        if (javaSources == null || javaSources.length() == 0) {
+            log.append("项目无 Java 源码：本次打包为布局壳（不运行任何逻辑）\n");
+            return "none";
+        }
+        File compDir = ensureCompiler();
             File clsDir = new File(root, "cls");
             File srcDir = new File(root, "srcx");
             // 写源码
@@ -2569,7 +2573,7 @@ public class MainActivity extends Activity {
             if (!ecjOk || ecjLog.size() > 0) {
                 log.append("ECJ: ").append(String.join("\n", ecjLog).substring(0, Math.min(2000, String.join("\n", ecjLog).length()))).append("\n");
             }
-            if (!ecjOk) throw new IOException("Java 编译失败（见日志），改用壳 Activity（若布局能 inflate）");
+            if (!ecjOk) throw new IOException("Java 编译失败（看上面 ECJ 的报错行）—— 已中止打包，不会偷偷生成只显示布局的壳包");
             // D8：.class → dex
             File dexDir = new File(root, "jex");
             dexDir.mkdirs();
@@ -2603,9 +2607,7 @@ public class MainActivity extends Activity {
                 }
             }
             log.append("设备端编译成功，注入 ").append(n).append(" 个 dex（").append(total / 1024).append(" KB）\n");
-        } catch (Throwable t) {
-            log.append("编译跳过/失败：").append(t.getMessage()).append("\n");
-        }
+            return "java:" + n;
     }
 
     /** 递归找 .java（R.java 等），绝对路径 */
@@ -2808,7 +2810,9 @@ public class MainActivity extends Activity {
                 }
             }
             // M213：编译项目 Java（extraDex 已含 payload dex，这里追加编译产物）
-            compileProjectJava(javaSources, launchActivity, root, genDir, pkg, log, extraDex);
+            // M216：编译失败会抛异常，中止打包（不再静默退化成壳）；无 Java 时明确标注为布局壳
+            step = "compile";
+            String compileMode = compileProjectJava(javaSources, launchActivity, root, genDir, pkg, log, extraDex);
             ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), extraDex, packed);
             log.append("注入壳 dex + ").append(extraDex.size()).append(" 个项目 dex，打包后 ")
                     .append(packed.length()).append(" 字节\n");
@@ -2848,6 +2852,7 @@ public class MainActivity extends Activity {
                     + ",\"ms\":" + (System.currentTimeMillis() - t0)
                     + ",\"pkg\":" + quote(pkg)
                     + ",\"layout\":" + quote(layout)
+                    + ",\"compileMode\":" + quote(compileMode)
                     + ",\"log\":" + quote(log.toString()) + "}";
         } catch (Throwable t) {
             Log.e(TAG, "buildInstallApk fail", t);

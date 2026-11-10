@@ -7,8 +7,10 @@
 //
 // 明确的限制（界面上会写出来）：layout/values 是编译过的二进制，改不了；只换「原样存着的文件」。
 // M212c：样式改用专属 .axv-repack-* 类（之前误用了不存在的 axv-saveas，弹窗完全没有底色/内边距）。
+// M212e：① 文件选择改用「常驻在 DOM 里的 input」（临时 createElement 在 WebView 里可能不弹选择器）
+//        ② 主按钮不再静默禁用——点不动时明确说缺什么，能点就立刻显示「处理中…」
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import {
   hasApkRepack,
@@ -69,53 +71,81 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
   const [okPath, setOkPath] = useState("");
+  /** 当前正在替换哪个条目（配合常驻 input） */
+  const targetRef = useRef<string>("");
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const pickApkFile = useCallback(async () => {
     setErr("");
+    setOkPath("");
     setBusy(tt("选择 APK…"));
-    const r = await pickApk();
-    setBusy("");
-    if (r.err) {
-      if (r.err !== "已取消" && r.err !== "canceled") setErr(r.err);
-      return;
-    }
-    if (!r.path) {
-      setErr(tt("没拿到文件路径"));
-      return;
-    }
-    const l = listApkEntries(r.path);
-    if (l.error) {
-      setErr(l.error);
-      return;
-    }
-    setApkPath(r.path);
-    setApkName(r.name || r.path.split(/[\\/]/).pop() || "app.apk");
-    setEntries(l.entries);
-    setPicked({});
-  }, []);
-
-  const pickReplace = useCallback(async (entryName: string) => {
-    // 桌面/网页版也能用：走 <input type=file>
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "*/*";
-    const file = await new Promise<File | null>((resolve) => {
-      input.onchange = () => resolve(input.files && input.files[0] ? input.files[0] : null);
-      // 新版浏览器支持 cancel 事件；用户在对话框直接关掉时不再挂着
-      input.oncancel = () => resolve(null);
-      input.click();
-    });
-    if (!file) return;
     try {
-      const b64 = await readFileBase64(file);
-      setPicked((p) => ({ ...p, [entryName]: { name: file.name, dataUrl: b64, bytes: file.size } }));
+      const r = await pickApk();
+      if (r.err) {
+        if (r.err !== "已取消" && r.err !== "canceled") setErr(r.err);
+        return;
+      }
+      if (!r.path) {
+        setErr(tt("没拿到文件路径"));
+        return;
+      }
+      const l = listApkEntries(r.path);
+      if (l.error) {
+        setErr(l.error);
+        return;
+      }
+      setApkPath(r.path);
+      setApkName(r.name || r.path.split(/[\\/]/).pop() || "app.apk");
+      setEntries(l.entries);
+      setPicked({});
     } catch (e) {
       setErr(String(e));
+    } finally {
+      setBusy("");
     }
   }, []);
 
+  const pickReplace = useCallback((entryName: string) => {
+    targetRef.current = entryName;
+    const el = fileRef.current;
+    if (!el) {
+      setErr(tt("当前环境打不开文件选择器"));
+      return;
+    }
+    el.value = "";
+    el.click();
+  }, []);
+
+  const onFileChosen = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    const name = targetRef.current;
+    targetRef.current = "";
+    if (!file || !name) return;
+    try {
+      const b64 = await readFileBase64(file);
+      setPicked((p) => ({ ...p, [name]: { name: file.name, dataUrl: b64, bytes: file.size } }));
+      setErr("");
+    } catch (ex) {
+      setErr(String(ex));
+    }
+  }, []);
+
+  const pickedCount = Object.keys(picked).length;
+
+  /** 缺什么就说什么（主按钮点不动时给出明确原因） */
+  const blocker = !supported
+    ? tt("此环境不支持（需要手机 App 端）")
+    : !apkPath
+      ? tt("先点「选择 APK 文件」")
+      : pickedCount === 0
+        ? tt("先至少点一次「替换」，选好要换的文件")
+        : "";
+
   const doRepack = useCallback(async () => {
-    if (!apkPath) return;
+    if (blocker) {
+      setErr(blocker);
+      return;
+    }
     if (!signing || !signing.storeFile || !signing.storePass || !signing.alias) {
       onNote?.(tt("先在签名面板填好 keystore / 口令 / alias，再来重签"));
       setErr(tt("签名配置不完整：需要 keystore 路径、口令、alias"));
@@ -124,25 +154,30 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
     setErr("");
     setOkPath("");
     setBusy(tt("重新打包并签名…"));
-    const replacements = Object.entries(picked).map(([name, p]) => ({ name, base64: p.dataUrl }));
-    const baseName = (apkName || "app.apk").replace(/\.apk$/i, "");
-    const r = await repackApk({
-      apk: apkPath,
-      replacements,
-      keystore: signing.storeFile,
-      storePass: signing.storePass,
-      alias: signing.alias,
-      keyPass: signing.keyPass,
-      outName: `${baseName}-resigned.apk`,
-    });
-    setBusy("");
-    if (r.ok && r.path) {
-      setOkPath(r.path);
-      onDone?.(r.path);
-    } else {
-      setErr(`${r.step ? `[${r.step}] ` : ""}${r.log || tt("重打包失败")}`);
+    try {
+      const replacements = Object.entries(picked).map(([name, p]) => ({ name, base64: p.dataUrl }));
+      const baseName = (apkName || "app.apk").replace(/\.apk$/i, "");
+      const r = await repackApk({
+        apk: apkPath,
+        replacements,
+        keystore: signing.storeFile,
+        storePass: signing.storePass,
+        alias: signing.alias,
+        keyPass: signing.keyPass,
+        outName: `${baseName}-resigned.apk`,
+      });
+      if (r.ok && r.path) {
+        setOkPath(r.path);
+        onDone?.(r.path);
+      } else {
+        setErr(`${r.step ? `[${r.step}] ` : ""}${r.log || tt("重打包失败")}`);
+      }
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy("");
     }
-  }, [apkPath, apkName, picked, signing, onDone, onNote]);
+  }, [blocker, signing, picked, apkPath, apkName, onDone, onNote]);
 
   const shown = useMemo(() => {
     if (!entries) return [];
@@ -150,9 +185,6 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
     const list = f ? entries.filter((e) => e.name.toLowerCase().includes(f)) : entries;
     return list.slice(0, 400);
   }, [entries, filter]);
-
-  const pickedCount = Object.keys(picked).length;
-  const canRepack = !!apkPath && !busy && pickedCount > 0 && supported;
 
   return (
     <div className="axv-saveas-mask" role="dialog" aria-modal="true" aria-label={tt("导入 APK 换图重签")}>
@@ -213,7 +245,7 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
                       type="button"
                       className="axv-repack-btn"
                       disabled={!can || !!busy}
-                      onClick={() => void pickReplace(e.name)}
+                      onClick={() => pickReplace(e.name)}
                       title={can ? tt("选一个本地文件替换它") : tt("这个条目是编译产物，不能直接换")}
                     >
                       {p ? tt("重选") : tt("替换")}
@@ -231,10 +263,8 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
           </>
         ) : null}
 
-        {busy ? <div className="axv-sign-hint">{busy}</div> : null}
-        {err ? (
-          <div className="axv-sign-issue axv-sign-issue-error axv-repack-err">{err}</div>
-        ) : null}
+        {busy ? <div className="axv-sign-hint axv-repack-busy">{busy}</div> : null}
+        {err ? <div className="axv-sign-issue axv-sign-issue-error axv-repack-err">{err}</div> : null}
         {okPath ? (
           <div className="axv-sign-ok axv-repack-ok">
             {tt("已生成：")}
@@ -243,20 +273,33 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
         ) : null}
 
         <div className="axv-repack-foot">
+          <span className={`axv-repack-state${blocker ? " is-blocked" : ""}`}>
+            {blocker ? blocker : tt("已选 {n} 个替换", { n: String(pickedCount) })}
+          </span>
           <button type="button" className="axv-repack-ghost" onClick={onClose} disabled={!!busy}>
             {tt("关闭")}
           </button>
           <button
             type="button"
             className="axv-sign-primary axv-repack-go"
-            disabled={!canRepack}
+            // 不设 disabled：点不动时也要给原因，别让用户以为「按钮坏了」
+            aria-disabled={!!blocker || !!busy}
             onClick={() => void doRepack()}
-            title={pickedCount === 0 ? tt("先至少替换一个文件") : tt("重新打包并签名")}
+            title={blocker || tt("重新打包并签名")}
           >
             {busy ? tt("处理中…") : tt("重新打包并签名")}
             {pickedCount > 0 ? ` (${pickedCount})` : ""}
           </button>
         </div>
+
+        {/* 常驻文件选择器：Android WebView 对「临时 createElement().click()」经常不弹窗 */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="*/*"
+          className="axv-repack-fileinput"
+          onChange={(e) => void onFileChosen(e)}
+        />
       </div>
     </div>
   );

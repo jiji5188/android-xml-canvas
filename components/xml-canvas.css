@@ -11432,3 +11432,17 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   .axv-repack-list { max-height: 42vh; }
   .axv-repack-picked { max-width: 84px; }
 }
+/* M212e 底部状态行 + 常驻文件输入 + 处理中提示 */
+.axv-repack-state {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--axv-text-3, #8a8f98);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-repack-state.is-blocked { color: var(--axv-warn, #b26a00); }
+.axv-repack-fileinput { display: none; }
+.axv-repack-busy { margin-top: 8px; }
+.axv-repack-go[aria-disabled='true'] { opacity: 0.5; }

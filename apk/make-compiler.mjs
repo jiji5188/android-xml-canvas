@@ -114,6 +114,33 @@ dexFiles.forEach((f, i) => {
 const jarGz = path.join(out, "android.jar.gz");
 fs.writeFileSync(jarGz, zlib.gzipSync(fs.readFileSync(ANDROID_JAR), { level: 9 }));
 
+// 5.5) M219：ECJ 的诊断消息包（.properties）。D8 dex 时把这些 .properties 丢光了，
+// ECJ 一初始化就 ResourceBundle.getBundle(...batch.messages)，找不到会抛 MissingResourceException
+// （"Can't find bundle ... locale zh_CN"）。把这 4 个包从 ecj.jar 里抠出来打成 zip 再 gzip，
+// 设备端解到 cache/compiler/res 并挂到编译器 classloader 父链（MainActivity.ResClassLoader）。
+const MSGS = [
+  "org/eclipse/jdt/internal/compiler/batch/messages.properties",
+  "org/eclipse/jdt/internal/compiler/problem/messages.properties",
+  "org/eclipse/jdt/internal/compiler/messages.properties",
+  "org/eclipse/jdt/internal/antadapter/messages.properties",
+];
+const msgsDir = path.join(out, "msgs");
+fs.rmSync(msgsDir, { recursive: true, force: true });
+fs.mkdirSync(msgsDir, { recursive: true });
+for (const rel of MSGS) {
+  // jar xf 不支持 -C，用 cwd 定位提取目录；entry 用正斜杠
+  execFileSync(path.join(JBR, "jar.exe"), ["xf", ecjJar, rel], { cwd: msgsDir, stdio: "ignore" });
+  if (!fs.existsSync(path.join(msgsDir, rel.replace(/\//g, path.sep)))) {
+    console.error("ECJ 里找不到 " + rel);
+    process.exit(1);
+  }
+}
+const msgsZip = path.join(out, "msgs.zip");
+execFileSync(path.join(JBR, "jar.exe"), ["cf", msgsZip, "-C", msgsDir, "org"], { stdio: "ignore" });
+const msgsGz = path.join(out, "msgs.bin.gz");
+fs.writeFileSync(msgsGz, zlib.gzipSync(fs.readFileSync(msgsZip), { level: 9 }));
+console.log(`  msgs.bin.gz ${fs.statSync(msgsGz).size} 字节（${MSGS.length} 个 ECJ 消息包）`);
+
 const jarGzSize = fs.statSync(jarGz).size;
 console.log(`compiler 资源就绪：${dexFiles.length} 个 tool dex（共 ${(toolBytes / 1048576).toFixed(2)} MB）+ android.jar.gz ${(jarGzSize / 1048576).toFixed(2)} MB`);
 if (jarGzSize > 40 * 1048576) {

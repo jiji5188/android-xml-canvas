@@ -194,7 +194,7 @@ run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "buil
   "--add", path.join(apk, "build", "shell.bin.gz"), "assets/shell/shell.bin.gz",
   "--add", path.join(apk, "build", "signer.bin.gz"), "assets/apksig/signer.bin.gz",
   ...fs.readdirSync(path.join(apk, "build", "compiler"))
-    .filter((n) => /^tool\d+\.bin\.gz$/.test(n) || n === "android.jar.gz")
+    .filter((n) => /^tool\d+\.bin\.gz$/.test(n) || n === "android.jar.gz" || n === "msgs.bin.gz")
     .map((n) => ["--add", path.join(apk, "build", "compiler", n), "assets/compiler/" + n])
   .flat()], apk);
 

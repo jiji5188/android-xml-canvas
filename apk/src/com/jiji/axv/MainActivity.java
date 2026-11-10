@@ -2647,10 +2647,31 @@ public class MainActivity extends Activity {
             if (bin.canWrite()) { bin.setReadOnly(); try { Runtime.getRuntime().exec(new String[]{"chmod","444",bin.getAbsolutePath()}).waitFor(); } catch (Throwable ignored) {} }
             i++;
         }
+        // M219：ECJ 的诊断消息包（.properties，dex 里被丢光了）。读 compiler/msgs.bin.gz
+        // （一个含 4 个 messages.properties 的 zip，外层再 gzip）解到 dir/res/…。
+        // 读不到不致命：旧包没这个资源时退化成「没有中文诊断文案」，不影响编译。
+        try {
+            File resDir = new File(dir, "res");
+            byte[] msgs = readAssetGz("compiler/msgs.bin.gz");
+            if (resDir.isDirectory()) { File[] old = resDir.listFiles(); if (old != null) for (File x : old) rmRec(x); }
+            resDir.mkdirs();
+            unzipToDir(msgs, resDir);
+        } catch (Throwable ignored) {
+            // 资源缺失/解包失败：不阻断编译，只是 ECJ 报错过来的时候文案可能缺
+        }
         return dir;
     }
 
-    /** 建编译器 classloader（多 dex 拼起来），父 = 本 classloader（能拿到 app 的类） */
+    /** 递归删目录/文件 */
+    private static void rmRec(File f) {
+        try {
+            File[] kids = f.isDirectory() ? f.listFiles() : null;
+            if (kids != null) for (File k : kids) rmRec(k);
+            f.delete();
+        } catch (Throwable ignored) {}
+    }
+
+    /** 建编译器 classloader（多 dex 拼起来），父链上挂个能读 res 目录的 ResClassLoader（M219） */
     private java.lang.ClassLoader compilerLoader(File compDir) throws IOException {
         // 读 tool*.bin（解压后的 dex）拼成 byte[][]，内存里加载（不落盘、无需 oat）
         java.util.List<byte[]> els = new java.util.ArrayList<>();
@@ -2660,7 +2681,70 @@ public class MainActivity extends Activity {
         for (int k = 0; k < els.size(); k++) arr[k] = els.get(k);
         java.nio.ByteBuffer[] bb = new java.nio.ByteBuffer[arr.length];
         for (int k = 0; k < arr.length; k++) bb[k] = java.nio.ByteBuffer.wrap(arr[k]);
-        return new dalvik.system.InMemoryDexClassLoader(bb, null, getClassLoader());
+        // M219：把 res 目录（ECJ 的 .properties）挂在父链上，ECJ 的 ResourceBundle.getBundle 才能找到消息包
+        File resDir = new File(compDir, "res");
+        java.lang.ClassLoader resLoader = new ResClassLoader(resDir, getClassLoader());
+        java.lang.ClassLoader cl = new dalvik.system.InMemoryDexClassLoader(bb, null, resLoader);
+        // 顺带把 TCCL 指到它，避免 ECJ 内部用当前线程 classloader 找资源时绕过父链
+        Thread.currentThread().setContextClassLoader(cl);
+        return cl;
+    }
+
+    /**
+     * M219：把 ECJ 的 .properties（诊断消息包）从缓存目录当资源提供给编译器 classloader。
+     * 为什么需要它：tool*.bin 是 dex，只含 .class；D8 打包时会把 ECJ 的
+     * batch/problem/compiler/antadapter 下的 messages.properties 全部丢光。ECJ 一初始化就
+     * 调 ResourceBundle.getBundle，找不到 bundle 会抛 MissingResourceException（"Can't find bundle
+     * for base name ...batch.messages, locale zh_CN"）。让 dex 加载器的父链上有个能从文件读资源的
+     * ClassLoader，getBundle 走 getResourceAsStream 就能找到。只读、只服务 res 目录，不加载 .class。
+     */
+    private static final class ResClassLoader extends java.lang.ClassLoader {
+        private final File root;
+        ResClassLoader(File root, java.lang.ClassLoader parent) { super(parent); this.root = root; }
+        @Override public java.net.URL findResource(String name) {
+            java.io.File f = new java.io.File(root, name.replace('/', java.io.File.separatorChar));
+            return f.isFile() ? safeUrl(f) : null;
+        }
+        @Override public java.io.InputStream getResourceAsStream(String name) {
+            try {
+                java.io.File f = new java.io.File(root, name.replace('/', java.io.File.separatorChar));
+                return f.isFile() ? new java.io.FileInputStream(f) : null;
+            } catch (Throwable t) { return null; }
+        }
+        @Override public java.net.URL getResource(String name) {
+            java.net.URL u = findResource(name);
+            if (u != null) return u;
+            return super.getResource(name);
+        }
+        private static java.net.URL safeUrl(java.io.File f) {
+            try { return f.toURI().toURL(); } catch (Throwable t) { return null; }
+        }
+    }
+
+    /** 把 zip（可能是 gzip 过的 zip）解到目录，条目路径做 ../ 防护 */
+    private static void unzipToDir(byte[] data, File destDir) throws IOException {
+        byte[] zip = data;
+        // 兼容两种入参：裸 zip 或 gzip(zip)。先看魔数。
+        if (data.length >= 2 && data[0] == (byte) 0x1f && data[1] == (byte) 0x8b) zip = unGzip(data);
+        java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(zip));
+        try {
+            java.util.zip.ZipEntry e;
+            while ((e = zis.getNextEntry()) != null) {
+                if (e.isDirectory()) continue;
+                java.io.File out = new java.io.File(destDir, e.getName());
+                String canon = out.getCanonicalPath();
+                if (!canon.startsWith(destDir.getCanonicalPath() + java.io.File.separator) && !canon.equals(destDir.getCanonicalPath())) {
+                    zis.closeEntry(); continue; // 跳过越界条目
+                }
+                out.getParentFile().mkdirs();
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(out)) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = zis.read(buf)) > 0) fos.write(buf, 0, n);
+                }
+                zis.closeEntry();
+            }
+        } finally { zis.close(); }
     }
 
 

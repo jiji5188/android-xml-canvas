@@ -2532,10 +2532,22 @@ public class MainActivity extends Activity {
     *          失败时直接抛 IOException，由上层中止打包（M216：不再静默退化成壳）
     */
    private String compileProjectJava(JSONArray javaSources, String launchActivity, File root, File genDir,
-            String pkg, StringBuilder log, java.util.List<byte[]> extraDex) throws Exception {
+            String pkg, StringBuilder log, java.util.List<byte[]> extraDex, JSONArray resFiles) throws Exception {
         if (javaSources == null || javaSources.length() == 0) {
             log.append("项目无 Java 源码：本次打包为布局壳（不运行任何逻辑）\n");
             return "none";
+        }
+        // M221：编译缓存。指纹 = 全部 Java 源码(路径+内容, 排序) + 资源文件路径(排序)。
+        // 二者都不变时 R.java 字段值不变，直接复用上次编译出的 dex，跳过 ECJ+D8。
+        String fingerprint = compileFingerprint(javaSources, resFiles);
+        File cacheDir = new File(getCacheDir(), "dxcache");
+        if (!cacheDir.isDirectory() && !cacheDir.mkdirs()) { /* ignore */ }
+        File cacheFile = new File(cacheDir, fingerprint + ".d");
+        java.util.List<byte[]> cachedDex = readDexCache(cacheFile);
+        if (cachedDex != null && !cachedDex.isEmpty()) {
+            extraDex.addAll(cachedDex);
+            log.append("命中编译缓存（").append(cachedDex.size()).append(" 个 dex），跳过 ECJ+D8 编译\n");
+            return "java:" + cachedDex.size();
         }
         File compDir = ensureCompiler();
             File clsDir = new File(root, "cls");
@@ -2607,7 +2619,79 @@ public class MainActivity extends Activity {
                 }
             }
             log.append("设备端编译成功，注入 ").append(n).append(" 个 dex（").append(total / 1024).append(" KB）\n");
+            // M221：写回编译缓存，下次源码/资源没变就跳过 ECJ+D8
+            if (n > 0) writeDexCache(cacheFile, dexFiles);
             return "java:" + n;
+    }
+
+    /** M221：编译缓存指纹。sha1(排序后的 java 源码 path+content + 排序后的资源文件 path)。
+     * 资源只取路径：R.java 的字段由资源名/类型决定，内容字节不影响 id。 */
+    private static String compileFingerprint(JSONArray javaSources, JSONArray resFiles) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
+            java.util.List<String> js = new java.util.ArrayList<>();
+            if (javaSources != null) {
+                for (int i = 0; i < javaSources.length(); i++) {
+                    JSONObject j = javaSources.getJSONObject(i);
+                    js.add(j.optString("path", "") + "\u0001" + j.optString("code", ""));
+                }
+            }
+            java.util.Collections.sort(js);
+            for (String s : js) md.update(s.getBytes("UTF-8"));
+            java.util.List<String> rs = new java.util.ArrayList<>();
+            if (resFiles != null) {
+                for (int i = 0; i < resFiles.length(); i++) {
+                    JSONObject f = resFiles.getJSONObject(i);
+                    rs.add(f.optString("path", ""));
+                }
+            }
+            java.util.Collections.sort(rs);
+            for (String s : rs) md.update(s.getBytes("UTF-8"));
+            byte[] digest = md.digest();
+            StringBuilder hex = new StringBuilder();
+            for (byte b : digest) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (Throwable t) {
+            // 算不了指纹就别缓存（保守），退化成全量编译
+            return "nocache";
+        }
+    }
+
+    /** M221：读编译缓存。文件格式：[int 数量] 后逐个 [int 长度 + 字节]。任何异常 → null（不用缓存）。 */
+    private static java.util.List<byte[]> readDexCache(File cacheFile) {
+        if (cacheFile == null || !cacheFile.isFile()) return null;
+        try (java.io.DataInputStream in = new java.io.DataInputStream(new FileInputStream(cacheFile))) {
+            int count = in.readInt();
+            if (count <= 0 || count > 16) return null;
+            java.util.List<byte[]> out = new java.util.ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                int len = in.readInt();
+                if (len < 8 || len > 12 * 1024 * 1024) return null;
+                byte[] data = new byte[len];
+                in.readFully(data);
+                if (data[0] != 'd' || data[1] != 'e' || data[2] != 'x') return null;
+                out.add(data);
+            }
+            return out;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** M221：写编译缓存（仅存 .class 转换出的 dex 文件）。 */
+    private static void writeDexCache(File cacheFile, File[] dexFiles) {
+        try (java.io.DataOutputStream out = new java.io.DataOutputStream(new FileOutputStream(cacheFile))) {
+            out.writeInt(dexFiles.length);
+            for (File df : dexFiles) {
+                if (df == null || !df.isFile()) continue;
+                byte[] data = readFile(df);
+                if (data == null || data.length < 8) continue;
+                out.writeInt(data.length);
+                out.write(data);
+            }
+        } catch (Throwable t) {
+            // 写不了缓存不影响本次打包
+        }
     }
 
     /** 递归找 .java（R.java 等），绝对路径 */
@@ -2896,7 +2980,7 @@ public class MainActivity extends Activity {
             // M213：编译项目 Java（extraDex 已含 payload dex，这里追加编译产物）
             // M216：编译失败会抛异常，中止打包（不再静默退化成壳）；无 Java 时明确标注为布局壳
             step = "compile";
-            String compileMode = compileProjectJava(javaSources, launchActivity, root, genDir, pkg, log, extraDex);
+            String compileMode = compileProjectJava(javaSources, launchActivity, root, genDir, pkg, log, extraDex, files);
             ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), extraDex, packed);
             log.append("注入壳 dex + ").append(extraDex.size()).append(" 个项目 dex，打包后 ")
                     .append(packed.length()).append(" 字节\n");

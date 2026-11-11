@@ -2657,16 +2657,20 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** M221：读编译缓存。文件格式：[int 数量] 后逐个 [int 长度 + 字节]。任何异常 → null（不用缓存）。 */
+    /** M221：读编译缓存。文件格式：[int 数量] 后逐个 [int 长度 + 字节]。任何异常 → null（不用缓存）。
+     *  每个 dex 按写入时的护栏逐条验（魔数 + 单文件 ≤12MB），防止缓存文件被写坏/截断后注入非法 dex。 */
     private static java.util.List<byte[]> readDexCache(File cacheFile) {
         if (cacheFile == null || !cacheFile.isFile()) return null;
         try (java.io.DataInputStream in = new java.io.DataInputStream(new FileInputStream(cacheFile))) {
             int count = in.readInt();
             if (count <= 0 || count > 16) return null;
             java.util.List<byte[]> out = new java.util.ArrayList<>();
+            long total = 0;
             for (int i = 0; i < count; i++) {
                 int len = in.readInt();
                 if (len < 8 || len > 12 * 1024 * 1024) return null;
+                total += len;
+                if (total > 40L * 1024 * 1024) return null;
                 byte[] data = new byte[len];
                 in.readFully(data);
                 if (data[0] != 'd' || data[1] != 'e' || data[2] != 'x') return null;
@@ -2678,19 +2682,52 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** M221：写编译缓存（仅存 .class 转换出的 dex 文件）。 */
+    /** M221：写编译缓存。只写通过护栏（魔数 + 单文件 ≤12MB + 总 ≤40MB）的 dex，与写入 extraDex 的口径一致。
+     *  先读到内存再写，避免读一半失败时落出半截文件（下次 readDexCache 校验不过就全废，比没有还糟）。 */
     private static void writeDexCache(File cacheFile, File[] dexFiles) {
-        try (java.io.DataOutputStream out = new java.io.DataOutputStream(new FileOutputStream(cacheFile))) {
-            out.writeInt(dexFiles.length);
+        if (cacheFile == null) return;
+        java.util.List<byte[]> picked = new java.util.ArrayList<>();
+        long total = 0;
+        if (dexFiles != null) {
             for (File df : dexFiles) {
                 if (df == null || !df.isFile()) continue;
                 byte[] data = readFile(df);
-                if (data == null || data.length < 8) continue;
+                if (data == null || data.length < 8 || data.length > 12 * 1024 * 1024) continue;
+                if (data[0] != 'd' || data[1] != 'e' || data[2] != 'x') continue;
+                if (total + data.length > 40L * 1024 * 1024) break;
+                picked.add(data);
+                total += data.length;
+            }
+        }
+        if (picked.isEmpty()) return;
+        // 先写临时文件再改名（同目录，原子性最好），避免中途失败留下半截 .d
+        File tmp = new File(cacheFile.getParentFile(), cacheFile.getName() + ".tmp");
+        boolean wrote = false;
+        try (java.io.DataOutputStream out = new java.io.DataOutputStream(new FileOutputStream(tmp))) {
+            out.writeInt(picked.size());
+            for (byte[] data : picked) {
                 out.writeInt(data.length);
                 out.write(data);
             }
+            out.flush();
+            wrote = true;
         } catch (Throwable t) {
             // 写不了缓存不影响本次打包
+            tmp.delete();
+            return;
+        }
+        if (wrote) {
+            if (!tmp.renameTo(cacheFile)) {
+                // rename 失败（罕见，跨文件系统/权限）：直接覆盖写，失败也不影响本次
+                tmp.delete();
+                try (java.io.DataOutputStream out = new java.io.DataOutputStream(new FileOutputStream(cacheFile))) {
+                    out.writeInt(picked.size());
+                    for (byte[] data : picked) {
+                        out.writeInt(data.length);
+                        out.write(data);
+                    }
+                } catch (Throwable t2) { /* 兜底，失败也不影响本次 */ }
+            }
         }
     }
 

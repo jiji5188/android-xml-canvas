@@ -453,7 +453,7 @@ export async function collectProjectRes(
     let im: RegExpExecArray | null;
     while ((im = itemAttrRe.exec(f.text)) !== null) {
       const n = im[1];
-      if (!n || defs.has(`attr/${n}`)) continue;
+      if (!n || n.includes(":") || defs.has(`attr/${n}`)) continue;
       customAttrs.add(n);
     }
   }

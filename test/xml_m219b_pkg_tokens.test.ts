@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { rewritePkgTokens, syncPkgInSource } from "@/lib/xml/pkg-sync";
+import { setGradlePackage, parseGradlePackage } from "@/lib/xml/project-info";
 import type { ProjectSource, BrowseEntry } from "@/lib/xml/project-browse";
 import type { ProjectSaveRoot } from "@/lib/xml/project-save";
 
@@ -109,5 +110,25 @@ describe("M219b syncPkgInSource 跨引用 + 嵌套改名", () => {
     const r = await syncPkgInSource(src, "com.old", "com.new", SAVE_ROOT, null);
     expect(r.moved).toBe(false);
     expect(r.moveWarn).toBe("pkg-move-unsupported");
+  });
+});
+
+describe("M220 改包名后打包拿到新包名（build.gradle 读写闭环）", () => {
+  it("setGradlePackage 写入新包名后，parseGradlePackage 读回来就是新包名", () => {
+    const gradle = [
+      "plugins { id 'com.android.application' }",
+      "android {",
+      "    namespace 'com.old'",
+      "    defaultConfig {",
+      "        applicationId 'com.old'",
+      "    }",
+      "}",
+      "",
+    ].join("\n");
+    const r = setGradlePackage(gradle, "com.new");
+    expect(r.ok).toBe(true);
+    const back = parseGradlePackage(r.text);
+    expect(back.applicationId).toBe("com.new");
+    expect(back.namespace).toBe("com.new");
   });
 });

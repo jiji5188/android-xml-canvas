@@ -2466,9 +2466,17 @@ const allDrawableNames = useMemo(() => {
       const clean = (o.storeFile || "").replace(/\\/g, "/").replace(/^\/+/, "");
       const keystore = clean ? `${base}/${clean}` : "";
       // 包名：优先读 build.gradle 的 applicationId，读不到退回项目名推导
+      // M220：gradleForSign 是「打开签名弹层时」读到的缓存，若用户之后在项目属性改了包名
+      // （写回磁盘），缓存就过期了 → 打包用的是旧包名。所以打包时再读一次磁盘为准，
+      // 读不到才退回缓存 gradleForSign。
+      let gradlePkg = gradleForSign;
+      if (root) {
+        const fresh = await readProjectFile(root, "app/build.gradle");
+        if (fresh) gradlePkg = fresh;
+      }
       let pkg = activeProject?.name ? packageOf(activeProject.name) : "com.axv.app";
-      if (gradleForSign) {
-        const pg = parseGradlePackage(gradleForSign);
+      if (gradlePkg) {
+        const pg = parseGradlePackage(gradlePkg);
         if (pg.applicationId || pg.namespace) pkg = pg.applicationId || pg.namespace || pkg;
       }
       const input = currentSaveInput();
@@ -2575,6 +2583,8 @@ const allDrawableNames = useMemo(() => {
     },
     [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel, docKind, xml],
   );
+  // M220：root 在 doBuildApk 里算（依赖 activeProject），重新读 build.gradle 需要它；
+  // activeProject 在 deps 里，root 跟着变，闭包读到的总是当前值，无需单独加。
 
   const writeGradleForSign = useCallback(
     async (next: string) => {

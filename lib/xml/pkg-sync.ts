@@ -38,19 +38,26 @@ const SRC_ROOTS = ["app/src/main/java", "app/src/main/kotlin"];
  *  找不到 app/src 时退回静态 SRC_ROOTS。纯 IO，不抛错。 */
 async function discoverSrcRoots(source: ProjectSource): Promise<string[]> {
   const out: string[] = [];
-  let variants: string[] = [];
-  try {
-    const kids = await source.listChildren("app/src").catch(() => []);
-    if (Array.isArray(kids)) variants = kids.filter((e) => e.kind === "dir").map((e) => e.name);
-  } catch {
-    /* 退静态 */
-  }
-  if (variants.length === 0) return [...SRC_ROOTS];
-  for (const v of variants) {
-    for (const lang of ["java", "kotlin"]) {
-      const rel = `app/src/${v}/${lang}`;
-      const probe = await source.listChildren(rel).catch(() => null);
-      if (Array.isArray(probe)) out.push(rel);
+  const seen = new Set<string>();
+  // 两套布局：多模块 app/src/<v>/xxx 与单模块 src/<v>/xxx
+  for (const base of ["app/src", "src"]) {
+    let variants: string[] = [];
+    try {
+      const kids = await source.listChildren(base).catch(() => []);
+      if (Array.isArray(kids)) variants = kids.filter((e) => e.kind === "dir").map((e) => e.name);
+    } catch {
+      /* 跳过 */
+    }
+    for (const v of variants) {
+      for (const lang of ["java", "kotlin"]) {
+        const rel = `${base}/${v}/${lang}`;
+        if (seen.has(rel)) continue;
+        const probe = await source.listChildren(rel).catch(() => null);
+        if (Array.isArray(probe)) {
+          seen.add(rel);
+          out.push(rel);
+        }
+      }
     }
   }
   // 保底：至少含 main 的两路（即使 probe 失败也不丢主路径）

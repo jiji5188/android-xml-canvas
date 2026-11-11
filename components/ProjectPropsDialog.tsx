@@ -31,6 +31,8 @@ export interface ProjectPropsDialogProps {
   onRenameProject?: (item: WsProject, dir: string, app: string) => Promise<{ ok: boolean; msg: string }>;
   /** 任何写操作完成后回调（让列表刷新） */
   onSaved: () => void;
+  /** M219c：包名同步成功后回传旧/新包名（供父层重映射当前打开文件的路径） */
+  onPkgSynced?: (oldPkg: string, newPkg: string) => void;
 }
 
 interface GradleFile {
@@ -214,6 +216,8 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
                   })
                 : tt("包名已同步：{n} 个源码文件，{mv}", { n: sync.files.length, mv }),
             );
+            // M219c：回传旧/新包名，让父层把“当前打开文件”的路径重映射到新目录。
+            p.onPkgSynced?.(origin.pkg, pkg);
           }
         }
       }

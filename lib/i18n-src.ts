@@ -1469,6 +1469,8 @@ export const SRC_EN: SrcDict = {
   "全部替换": "Replace all",
   "包名已同步：{n} 个源码文件，{mv}": "Package name synced: {n} source files, {mv}",
   "包名是嵌套关系（如 com.a → com.a.b），内容已改，目录层次请手动调整": "Package name is nested (e.g. com.a → com.a.b); content updated, adjust folder hierarchy manually",
+  "包名已改，当前文件《{name}》没找到新路径，请手动重新打开": "Package renamed; file \"{name}\" not found at the new path, please reopen it manually",
+  "包名已改，《{name}》已切换到新路径 {rel}": "Package renamed; \"{name}\" switched to new path {rel}",
   "{base}（已编译 {n} 个 Java 类）": "{base} (compiled {n} Java classes)",
   "{base}（项目无 .java，生成的是布局壳，不运行任何逻辑）": "{base} (no .java files, layout shell only, no logic runs)",
   "打包完成：{name}（已编译 {n} 个 Java 类）": "APK built: {name} (compiled {n} Java classes)",

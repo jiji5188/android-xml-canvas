@@ -843,6 +843,11 @@ export function XmlEditor() {
   });
   /** M37b：当前打开的工程内相对路径（判断是不是布局文件，以及非布局文件写回哪里） */
   const [openRel, setOpenRel] = useState<string | null>(null);
+  // M219c：当前打开文件的路径（ref 版，供同步回调闭包读最新值）
+  const openRelRef = useRef<string | null>(null);
+  useEffect(() => {
+    openRelRef.current = openRel;
+  }, [openRel]);
   const patchEditorTheme = useCallback((patch: Partial<EditorTheme>) => {
     setEditorTheme((t) => ({ ...t, ...patch }));
   }, []);
@@ -2699,6 +2704,62 @@ const allDrawableNames = useMemo(() => {
       if (src) void loadEntry(src, entry);
     },
     [loadEntry],
+  );
+
+  /** M219c：包名同步后，把“当前打开文件”的路径重映射到新包目录（如果它在旧包目录里）。
+   *  否则编辑器 buffer 指向旧路径，Ctrl+S 会把旧包目录 + 旧 package 声明重新写回来。
+   *  嵌套改名（com.a → com.a.b）不重映射（目录没动），也不动 buffer。 */
+  const handlePkgSynced = useCallback(
+    (oldPkg: string, newPkg: string) => {
+      const cur = openRelRef.current;
+      const src = activeProjectRef.current?.source;
+      if (!cur || !src) return;
+      if (!newPkg || !oldPkg || newPkg === oldPkg) return;
+      const oldDir = oldPkg.replace(/\./g, "/");
+      const newDir = newPkg.replace(/\./g, "/");
+      // 嵌套改名不能自动挪（M219b 已 guard），不重映射
+      if (newDir.startsWith(oldDir + "/") || newDir === oldDir) return;
+      // 通用匹配：<任何源码根>/(java|kotlin)/<旧包路径>/...（不限 app/ 与 main）
+      const m = cur.match(/^(.*\/(?:java|kotlin))\/(.+)$/);
+      if (!m) return; // 不在 java/kotlin 源树里（如 manifest/strings）→ 路径没变，不动
+      const root = m[1];
+      const rest = m[2];
+      if (!(rest === oldDir || rest.startsWith(oldDir + "/"))) return; // 不在旧包目录下
+      {
+        const tail = rest.slice(oldDir.length).replace(/^\//, "");
+        const newRel = tail ? `${root}/${newDir}/${tail}` : `${root}/${newDir}`;
+        // 重读盘上内容（同步后已是新 package 声明）并接管为当前文件
+        void (async () => {
+          const text = await src.readText(newRel).catch(() => null);
+          if (text === null) {
+            setWsMsg(tt("包名已改，当前文件《{name}》没找到新路径，请手动重新打开", { name: cur.split("/").pop() || "" }));
+            setOpenRel(null);
+            return;
+          }
+          setXmlAndTrack(text);
+          saveBaseline(newRel, text);
+          setWsActiveName(cur.split("/").pop() || "");
+          setOpenRel(newRel);
+          try {
+            const ap = activeProjectRef.current;
+            if (ap?.source) {
+              lsSetJson(LS_KEY_LAST_FILE, {
+                dirPath: ap.dirPath ?? null,
+                rootPath: ap.rootPath ?? null,
+                project: ap.name,
+                rel: newRel,
+                name: newRel.split("/").pop() || "",
+              });
+              writeLastRel(ap.dirPath || ap.name, newRel);
+            }
+          } catch {
+            /* 静默 */
+          }
+          setWsMsg(tt("包名已改，《{name}》已切换到新路径 {rel}", { name: newRel.split("/").pop() || "", rel: newRel }));
+        })();
+      }
+    },
+    [openRelRef, setXmlAndTrack, setWsMsg, setWsActiveName, setOpenRel],
   );
 
   /** 激活一个已打开的项目：切到「当前项目」tab，并自动载入主布局（找不到就只显示结构树） */
@@ -5157,6 +5218,7 @@ const findResolved = findResolvedNode;
               onRefreshProject={() => void refreshActiveProject()}
               fileOps={activeProject ? fileOpsCtxOf(activeProject) : null}
               onFilesChanged={() => setProjectRev((n) => n + 1)}
+              onPkgSynced={handlePkgSynced}
               checkDeleteImpact={checkDeleteImpact}
               onRenameResource={onRenameResource}
               onFillIconAttr={onFillIconAttr}

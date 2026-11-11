@@ -121,6 +121,10 @@ export interface ProjectPanelProps {
   /** M46：写操作完成后通知外部刷新（+1 projectRev 即可） */
   onFilesChanged?: () => void;
 
+  /** M219c：包名同步完成后回传旧/新包名，让外部把“当前打开文件”的路径重映射到新目录，
+   *  否则编辑器 buffer 还指向旧路径，Ctrl+S 会把旧包目录和旧 package 声明重新写回来。 */
+  onPkgSynced?: (oldPkg: string, newPkg: string) => void;
+
   /**
    * M101：删除前的影响面查询 —— 给一个资源符号（如 `drawable/bg_card`），
    * 返回“被几处引用 + 前 3 处位置”；查不到或没实现返回 null。
@@ -1580,6 +1584,7 @@ function ProjectsTab({ p }: { p: ProjectPanelProps }) {
                   setPropsFor(null);
                   void p.onRefresh();
                 }}
+                onPkgSynced={p.onPkgSynced}
                 onClose={() => setPropsFor(null)}
               />
             ) : null}

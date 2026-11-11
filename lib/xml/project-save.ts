@@ -91,6 +91,30 @@ export async function readProjectFile(
   }
 }
 
+/** M220b：工程里 build.gradle 的候选路径（有 app/ 前缀优先，Groovy 优先于 KTS）。
+ *  顺序与 ai-facts.ts 保持一致：app/build.gradle → app/build.gradle.kts → build.gradle → build.gradle.kts。
+ *  这样 Android Studio 建出来的 KTS 工程、以及没有 app/ 前缀的老布局都能读到。 */
+export const GRADLE_CANDIDATES = [
+  "app/build.gradle",
+  "app/build.gradle.kts",
+  "build.gradle",
+  "build.gradle.kts",
+] as const;
+
+/** M220b：读工程 build.gradle（可能是 KTS / 可能在根目录）。
+ *  返回文本 + 实际命中的相对路径：写回时要用同一个文件，不能一律写 app/build.gradle
+ *  （否则 KTS 工程会凭空多出一个新的 Groovy 文件，改的还不起作用）。 */
+export async function readAppGradle(
+  root: ProjectSaveRoot | null,
+): Promise<{ text: string; rel: string } | null> {
+  if (!root) return null;
+  for (const rel of GRADLE_CANDIDATES) {
+    const text = await readProjectFile(root, rel);
+    if (text) return { text, rel };
+  }
+  return null;
+}
+
 /** M189：判断工程里某个文件存不存在（keystore 这种二进制也适用）。
  *  native 走 readBase64Async（能读字节就知道文件在），老壳退回同步 readText；
  *  handle 跟逐个 getFileHandle 看能不能拿到。 */

@@ -2531,8 +2531,8 @@ public class MainActivity extends Activity {
     * @return "none"（项目无 Java 源码，打包布局壳）或 "java:<n>"（编译并注入了 n 个 dex）
     *          失败时直接抛 IOException，由上层中止打包（M216：不再静默退化成壳）
     */
-   private String compileProjectJava(JSONArray javaSources, String launchActivity, File root, File genDir,
-            String pkg, StringBuilder log, java.util.List<byte[]> extraDex, JSONArray resFiles) throws Exception {
+   private String compileProjectJava(JSONArray javaSources, File root, File genDir,
+            StringBuilder log, java.util.List<byte[]> extraDex, JSONArray resFiles) throws Exception {
         if (javaSources == null || javaSources.length() == 0) {
             log.append("项目无 Java 源码：本次打包为布局壳（不运行任何逻辑）\n");
             return "none";
@@ -2543,12 +2543,16 @@ public class MainActivity extends Activity {
         File cacheDir = new File(getCacheDir(), "dxcache");
         if (!cacheDir.isDirectory() && !cacheDir.mkdirs()) { /* ignore */ }
         File cacheFile = new File(cacheDir, fingerprint + ".d");
+        pruneDexCache(cacheDir, 24);
         java.util.List<byte[]> cachedDex = readDexCache(cacheFile);
         if (cachedDex != null && !cachedDex.isEmpty()) {
+            // 命中时把文件时间刷新（下面 prune 按 mtime 留最近的），否则常用缓存会被当旧的删掉
+            cacheFile.setLastModified(System.currentTimeMillis());
             extraDex.addAll(cachedDex);
             log.append("命中编译缓存（").append(cachedDex.size()).append(" 个 dex），跳过 ECJ+D8 编译\n");
             return "java:" + cachedDex.size();
         }
+        pruneDexCache(cacheDir, 24);
         File compDir = ensureCompiler();
             File clsDir = new File(root, "cls");
             File srcDir = new File(root, "srcx");
@@ -2655,6 +2659,24 @@ public class MainActivity extends Activity {
             // 算不了指纹就别缓存（保守），退化成全量编译
             return "nocache";
         }
+    }
+
+    /** M221b：缓存目录清理——只留 mtime 最新的 keep 个 .d（包括 .tmp 垃圾一并清）。
+     *  指纹一变就多一个文件，不清会无限长，最终吃满 /data/data 配额。 */
+    private static void pruneDexCache(File cacheDir, int keep) {
+        File[] fs = cacheDir.listFiles();
+        if (fs == null || fs.length <= keep) return;
+        java.util.List<File> ds = new java.util.ArrayList<>();
+        for (File f : fs) {
+            String n = f.getName();
+            if (n.endsWith(".tmp")) { f.delete(); continue; }
+            if (n.endsWith(".d")) ds.add(f);
+        }
+        if (ds.size() <= keep) return;
+        java.util.Collections.sort(ds, new java.util.Comparator<File>() {
+            public int compare(File a, File b) { return Long.compare(b.lastModified(), a.lastModified()); }
+        });
+        for (int i = keep; i < ds.size(); i++) ds.get(i).delete();
     }
 
     /** M221：读编译缓存。文件格式：[int 数量] 后逐个 [int 长度 + 字节]。任何异常 → null（不用缓存）。
@@ -3016,8 +3038,10 @@ public class MainActivity extends Activity {
             }
             // M213：编译项目 Java（extraDex 已含 payload dex，这里追加编译产物）
             // M216：编译失败会抛异常，中止打包（不再静默退化成壳）；无 Java 时明确标注为布局壳
+            // M221b：pkg / launchActivity 不是编译输入（R.java 由 aapt2 生成，包名与启动页已在 R.java/manifest 体现），
+            // 作为死参数从签名里删掉，免得误以为指纹漏了什么。
             step = "compile";
-            String compileMode = compileProjectJava(javaSources, launchActivity, root, genDir, pkg, log, extraDex, files);
+            String compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files);
             ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), extraDex, packed);
             log.append("注入壳 dex + ").append(extraDex.size()).append(" 个项目 dex，打包后 ")
                     .append(packed.length()).append(" 字节\n");

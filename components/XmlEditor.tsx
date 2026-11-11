@@ -87,7 +87,7 @@ import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { buildApk, hasBuildApk, installApk, shareApkFile, compileModeOf, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
-import { projectSaveRoot, projectFileExists, readProjectFile, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
+import { projectSaveRoot, projectFileExists, readProjectFile, readAppGradle, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
 import { parseAppIconConfig } from "@/lib/xml/app-icon";
 import { nativeBridge } from "@/lib/xml/native-save";
 import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
@@ -2373,6 +2373,8 @@ const allDrawableNames = useMemo(() => {
   /** M212：导入 APK 换资源重签面板 */
   const [repackOpen, setRepackOpen] = useState(false);
   const [gradleForSign, setGradleForSign] = useState<string | null>(null);
+  /** M220b：签名配置实际命中/写回的 gradle 相对路径（KTS 工程、无 app/ 前缀的工程不能写死 app/build.gradle） */
+  const [gradleRelForSign, setGradleRelForSign] = useState<string>("app/build.gradle");
   const [signRootMissing, setSignRootMissing] = useState(false);
   /** M189：keystore 文件是否真存在（不给就是没检查） */
   const [signKeystoreExists, setSignKeystoreExists] = useState<boolean | undefined>(undefined);
@@ -2388,7 +2390,10 @@ const allDrawableNames = useMemo(() => {
   const openSignDialog = useCallback(async () => {
     const root = projectSaveRoot(activeProject);
     // M188c：统一走 readProjectFile（native 用 readTextQueued，web 用目录句柄）
-    const txt = await readProjectFile(root, "app/build.gradle");    // 没有可写根时，读 localStorage 里的草稿
+    // M220b：支持 .kts 与无 app/ 前缀布局，并记住命中的路径供写回
+    const found = await readAppGradle(root);
+    const txt = found?.text ?? null;    // 没有可写根时，读 localStorage 里的草稿
+    setGradleRelForSign(found?.rel ?? "app/build.gradle");
     const missing = !root;
     let use = txt;
     if (missing && !use) {
@@ -2471,8 +2476,9 @@ const allDrawableNames = useMemo(() => {
       // 读不到才退回缓存 gradleForSign。
       let gradlePkg = gradleForSign;
       if (root) {
-        const fresh = await readProjectFile(root, "app/build.gradle");
-        if (fresh) gradlePkg = fresh;
+        // M220b：走 readAppGradle，KTS / 无 app 前缀的工程也能读到真包名（不能只认 app/build.gradle）
+        const fresh = await readAppGradle(root);
+        if (fresh?.text) gradlePkg = fresh.text;
       }
       let pkg = activeProject?.name ? packageOf(activeProject.name) : "com.axv.app";
       if (gradlePkg) {
@@ -2585,6 +2591,7 @@ const allDrawableNames = useMemo(() => {
   );
   // M220：root 在 doBuildApk 里算（依赖 activeProject），重新读 build.gradle 需要它；
   // activeProject 在 deps 里，root 跟着变，闭包读到的总是当前值，无需单独加。
+  // M220b：写回同一个文件（readAppGradle 命中的那个），否则 KTS / 根目录工程会多出一个无效的 app/build.gradle。
 
   const writeGradleForSign = useCallback(
     async (next: string) => {
@@ -2594,7 +2601,7 @@ const allDrawableNames = useMemo(() => {
         try { window.localStorage.setItem(LS_KEY_SIGN_DRAFT, next); } catch { /* ignore */ }
         return true;
       }
-      const ok = await saveProjectFile(root, "app/build.gradle", next);
+      const ok = await saveProjectFile(root, gradleRelForSign, next);
       if (ok) {
         try { window.localStorage.removeItem(LS_KEY_SIGN_DRAFT); } catch { /* ignore */ }
       }
@@ -3760,7 +3767,8 @@ const findResolved = findResolvedNode;
       return;
     }
     const name = activeProject?.name || "project";
-    const gradleTxt = await readProjectFile(projectSaveRoot(activeProject), "app/build.gradle");
+    const found = await readAppGradle(projectSaveRoot(activeProject));
+    const gradleTxt = found?.text ?? null;
     const info = gradleTxt ? readPublishInfo(gradleTxt) : null;
     const sign = gradleTxt ? readSigningFromGradle(gradleTxt) : null;
     setExportNote(tt("正在打包项目…"));

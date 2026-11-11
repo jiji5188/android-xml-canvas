@@ -360,7 +360,8 @@ export async function collectProjectRes(
   // 不声明 aapt2 link 会直接报 attribute not found；无 format 的 <attr> 就能过链。
   const customAttrs = new Set<string>();
   const attrScan = /\s([A-Za-z][\w-]*):([A-Za-z_][\w.-]*)\s*=/g;
-  const attrRefScan = /\?attr\/([A-Za-z0-9_]+)|\?([A-Za-z][A-Za-z0-9_]*)(?![\w:.])/g;
+  const attrRefScan = /\?attr\/([A-Za-z0-9_]+)|\?([A-Za-z][A-Za-z0-9_]*)(?! [\w:.])/g;
+  const itemAttrRe = /<item\b[^>]*\bname="([^"]+)"/g;    // M222：style <item name="xxx"> 也会产生 attr 引用
   for (const f of files) {
     if (!f.text) continue;
     attrScan.lastIndex = 0;
@@ -377,6 +378,15 @@ export async function collectProjectRes(
       const name = m[1] || m[2];
       if (!name || defs.has(`attr/${name}`)) continue;
       customAttrs.add(name);
+    }
+    // M222：带命名空间前缀的 item（android:colorAccent / app:xxx）绝不声明——
+    // aapt2 不接受带命名空间的 <attr> 名，link 会直接炸；android: 是框架属性，其它前缀由 attrScan 处理
+    itemAttrRe.lastIndex = 0;
+    let im: RegExpExecArray | null;
+    while ((im = itemAttrRe.exec(f.text)) !== null) {
+      const n = im[1];
+      if (!n || n.includes(":") || defs.has(`attr/${n}`)) continue;
+      customAttrs.add(n);
     }
   }
 
@@ -444,19 +454,8 @@ export async function collectProjectRes(
     }
   }
 
-  // M159：<item name="xxx"> 写在 style 里时，xxx 会被解析成 attr/xxx，
-  // 库的主题属性（colorPrimary 等）要一并声明，否则 link 报 style attribute not found。
-  const itemAttrRe = /<item\b[^>]*\bname="([^"]+)"/g;
-  for (const f of files) {
-    if (!f.text || !/^values/.test(f.path)) continue;
-    itemAttrRe.lastIndex = 0;
-    let im: RegExpExecArray | null;
-    while ((im = itemAttrRe.exec(f.text)) !== null) {
-      const n = im[1];
-      if (!n || n.includes(":") || defs.has(`attr/${n}`)) continue;
-      customAttrs.add(n);
-    }
-  }
+  // M222：style <item name="xxx"> 扫描已并入上面的 attrScan 循环（itemAttrRe），
+  // 不再单独遍历 values 文件。
 
   for (const key of [...missing]) {
     const slash = key.indexOf("/");

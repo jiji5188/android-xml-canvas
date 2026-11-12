@@ -16,18 +16,10 @@ import { hasAsyncIo, listDirQueued, readBase64Queued, readTextQueued } from "./n
 import { perfTimer } from "./perf-log";
 import { type WsProject } from "./workspace";
 import type { FileOpsCtx } from "./file-ops";
+import { coreSkipDirs, withSkipExtras } from "./skip-dirs";
 
 /** 列目录时跳过的噪声目录（安卓工程里 build/.gradle 体积大且没布局） */
-export const SKIP_DIRS = new Set([
-  ".git",
-  ".gradle",
-  ".idea",
-  "build",
-  "node_modules",
-  ".svn",
-  "__pycache__",
-  ".cxx",
-]);
+const SKIP_DIRS = withSkipExtras(coreSkipDirs, "build", ".svn", "__pycache__");
 
 export interface BrowseEntry {
   kind: "dir" | "file";

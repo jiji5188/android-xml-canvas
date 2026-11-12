@@ -16,6 +16,7 @@
 
 import type { LintIssue } from "./lint";
 import { nearestName } from "./nearest-name";
+import { resRefsIn, stripResExt } from "./res-ref";
 
 /** 检查用到的资源清单（名字不带扩展名、不带 @type/ 前缀） */
 export interface XmlResEnv {
@@ -54,11 +55,11 @@ type CheckType = (typeof CHECK_TYPES)[number];
  */
 const STRICT_TYPES = new Set<CheckType>(["drawable", "mipmap", "layout"]);
 
-const REF_RE = /@([a-z][a-z0-9_-]*)\/([A-Za-z0-9_.]+)/g;
+/* 引用扫描口径统一在 res-ref.ts（与 res-collect 共用一份） */
 
 /** 引用值里的扩展名（@drawable/ic_launcher.png 这种写法少见但见过） */
 function stripExt(name: string): string {
-  return name.replace(/\.(9\.)?(png|jpg|jpeg|webp|gif|xml)$/i, "");
+  return stripResExt(name);
 }
 
 /** 拼写建议的距离阈值：名字越长允许差越多（activity_mian 这种长名允许 2） */
@@ -127,14 +128,12 @@ export function checkXmlResRefs(src: string, env: XmlResEnv): LintIssue[] {
     const line = masked.text;
     if (!line.includes("@")) continue;
 
-    REF_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = REF_RE.exec(line)) !== null) {
-      const type = m[1] as CheckType;
-      if (!CHECK_TYPES.includes(type)) continue; // @android:… / @*android:… 走不到这里，但兜一层
+    for (const ref of resRefsIn(line)) {
+      const type = ref.type as CheckType;
+      if (!CHECK_TYPES.includes(type)) continue; // 口径比检查范围宽，这里再窄一道
       const names = known.get(type);
       if (!names) continue;
-      const rawName = m[2];
+      const rawName = ref.name;
       const name = stripExt(rawName);
       if (names.has(name)) continue;
 
@@ -142,7 +141,7 @@ export function checkXmlResRefs(src: string, env: XmlResEnv): LintIssue[] {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      const from = `@${type}/${rawName}`;
+      const from = ref.raw;
       const sug = nearestName(name, names, maxDistFor(name));
       if (!sug) {
         if (!STRICT_TYPES.has(type)) continue; // string/color 等可能是库里的资源，不猜

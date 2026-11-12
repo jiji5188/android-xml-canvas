@@ -9,10 +9,8 @@
 
 import type { AiFileIo } from "./ai-tools";
 import { scanResDirs } from "./res-index";
+import { resRefsIn, stripResExt } from "./res-ref";
 import type { RenderFile } from "./native-render";
-
-const REF_RE =
-  /@(?!\+)(?!\*?android:)(drawable|mipmap|layout|color|string|dimen|bool|integer|style|plurals|array|string-array|integer-array|fraction|menu|anim|animator|xml|font|interpolator|id)\/([A-Za-z0-9_.]+)/g;
 
 const VALUE_TYPES = new Set([
   "string",
@@ -29,13 +27,8 @@ const VALUE_TYPES = new Set([
 ]);
 
 export function refsIn(text: string): { type: string; name: string }[] {
-  const out: { type: string; name: string }[] = [];
-  let m: RegExpExecArray | null;
-  REF_RE.lastIndex = 0;
-  while ((m = REF_RE.exec(text || "")) !== null) {
-    out.push({ type: m[1], name: m[2].replace(/\.\w+$/, "") });
-  }
-  return out;
+  // 口径统一在 res-ref.ts（与 xml-res-check 共用一份）
+  return resRefsIn(text).map((r) => ({ type: r.type, name: stripResExt(r.name) }));
 }
 
 /** 已经出现在文件清单里的资源（values 里的 <string name> / drawable/name.xml） */

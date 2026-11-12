@@ -462,6 +462,11 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
                       {tt("项目没有 .java 文件，这是布局壳（不运行任何逻辑）")}
                     </div>
                   ) : null}
+                  {apkResult.compileMode === "shell-no-compiler" ? (
+                    <div style={{ opacity: 0.85, fontSize: 11, marginTop: 2, color: "#c0392b" }}>
+                      {tt("⚠ 设备端 Java 编译器不可用，本次为布局壳（Java 逻辑没编进去）")}
+                    </div>
+                  ) : null}
                   <div style={{ opacity: 0.7, wordBreak: "break-all", fontSize: 11 }}>{apkResult.path}</div>
                 </div>
               ) : (

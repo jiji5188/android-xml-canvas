@@ -2781,15 +2781,23 @@ public class MainActivity extends Activity {
         }
         // tool*.bin.gz（1..N，逐个）
         int i = 1;
+        String toolBreakReason = null;
         while (true) {
             File bin = new File(dir, "tool" + i + ".bin");
             byte[] b;
-            try { b = readAssetGz("compiler/tool" + i + ".bin.gz"); } catch (Throwable notFound) { break; }
+            try { b = readAssetGz("compiler/tool" + i + ".bin.gz"); } catch (Throwable notFound) {
+                // M227：记录真实原因（资产缺失/读取异常），不再静默 break
+                toolBreakReason = (i == 1) ? ("读不到 compiler/tool1.bin.gz：" + notFound.getMessage()) : ("compiler/tool" + i + ".bin.gz 读到一半中断：" + notFound.getMessage());
+                break;
+            }
             if (bin.isFile() && bin.length() == b.length) { i++; continue; }
             writeBytes(bin, b);
             if (bin.canWrite()) { bin.setReadOnly(); try { Runtime.getRuntime().exec(new String[]{"chmod","444",bin.getAbsolutePath()}).waitFor(); } catch (Throwable ignored) {} }
             i++;
         }
+        // M227：按内置 manifest.json 逐文件校验（大小 + sha256），缺哪个/坏哪个精确报出来。
+        // 旧包没有 manifest.json 时退化为「至少要有 tool1.bin」。
+        validateCompiler(dir, toolBreakReason, i - 1);
         // M219：ECJ 的诊断消息包（.properties，dex 里被丢光了）。读 compiler/msgs.bin.gz
         // （一个含 4 个 messages.properties 的 zip，外层再 gzip）解到 dir/res/…。
         // 读不到不致命：旧包没这个资源时退化成「没有中文诊断文案」，不影响编译。
@@ -2812,6 +2820,73 @@ public class MainActivity extends Activity {
             if (kids != null) for (File k : kids) rmRec(k);
             f.delete();
         } catch (Throwable ignored) {}
+    }
+
+    /** M227：sha256（hex，小写）。文件读失败 → null（调用方按「无法校验」处理，不阻断）。 */
+    private static String sha256Hex(File f) {
+        try {
+            byte[] data = readFile(f);
+            if (data == null) return null;
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] h = md.digest(data);
+            StringBuilder sb = new StringBuilder(h.length * 2);
+            for (byte x : h) sb.append(String.format("%02x", x));
+            return sb.toString();
+        } catch (Throwable t) { return null; }
+    }
+
+    /** 读 assets 里的 compiler/manifest.json（旧包可能没有）→ 返回解析出的期望文件列表，没有则 null。 */
+    private java.util.List<String[]> readCompilerManifest() {
+        try {
+            byte[] raw = readAssetBytes("compiler/manifest.json");
+            String text = new String(raw, "UTF-8");
+            JSONObject o = new JSONObject(text);
+            JSONArray fs = o.optJSONArray("files");
+            if (fs == null) return null;
+            java.util.List<String[]> out = new java.util.ArrayList<>();
+            for (int i = 0; i < fs.length(); i++) {
+                JSONObject f = fs.getJSONObject(i);
+                out.add(new String[] { f.optString("path", ""), f.optString("sha256", ""), String.valueOf(f.optLong("size", 0)), f.optString("role", "") });
+            }
+            return out;
+        } catch (Throwable t) { return null; }
+    }
+
+    /** M227：校验 cache/compiler 下解出的文件。manifest 里记录的是**解压后**路径+大小+sha256。
+     *  有 manifest → 逐个比；没有 → 只查 tool1 存在。任一不对 → 抛带精确文件名的 IOException。 */
+    private void validateCompiler(File dir, String toolBreakReason, int toolCountExtracted) throws IOException {
+        java.util.List<String[]> manifest = readCompilerManifest();
+        if (manifest != null) {
+            java.util.List<String> problems = new java.util.ArrayList<>();
+            for (String[] e : manifest) {
+                String name = e[0], wantSha = e[1], wantSizeStr = e[2], role = e[3];
+                File local = new File(dir, name);
+                boolean optional = role.equals("i18n"); // msgs/res 缺失不致命（M219）
+                if (!local.exists()) {
+                    if (optional) continue;
+                    problems.add(name + "（" + role + "）缺失");
+                    continue;
+                }
+                if (local.isDirectory()) { if (optional) continue; problems.add(name + "（" + role + "）应为文件但是目录"); continue; }
+                long wantSize;
+                try { wantSize = Long.parseLong(wantSizeStr); } catch (Throwable t) { wantSize = -1; }
+                if (wantSize > 0 && local.length() != wantSize) { problems.add(name + "（" + role + "）大小不符（期望 " + wantSize + " 实际 " + local.length() + "），可能截断"); continue; }
+                if (wantSha.length() == 64) {
+                    String got = sha256Hex(local);
+                    if (got != null && !got.equals(wantSha.toLowerCase())) problems.add(name + "（" + role + "）sha256 不符，文件已损坏");
+                }
+            }
+            if (!problems.isEmpty()) {
+                throw new IOException("编译器资源不完整（" + problems.size() + " 处）：" + String.join("；", problems)
+                        + (toolBreakReason != null ? "；" + toolBreakReason : ""));
+            }
+        } else {
+            // 旧包没有 manifest：至少保证有 tool dex
+            File t1 = new File(dir, "tool1.bin");
+            if (!t1.isFile() || t1.length() == 0) {
+                throw new IOException((toolBreakReason != null ? toolBreakReason : "没找到编译器 dex（tool1.bin）") + "（APK 缺 compiler 资源或旧版无 manifest，请装新版）");
+            }
+        }
     }
 
     /** 建编译器 classloader（多 dex 拼起来），父链上挂个能读 res 目录的 ResClassLoader（M219） */
@@ -3041,7 +3116,22 @@ public class MainActivity extends Activity {
             // M221b：pkg / launchActivity 不是编译输入（R.java 由 aapt2 生成，包名与启动页已在 R.java/manifest 体现），
             // 作为死参数从签名里删掉，免得误以为指纹漏了什么。
             step = "compile";
-            String compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files);
+            String compileMode;
+            try {
+                compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files);
+            } catch (IOException ce) {
+                // M223：区分「编译器工具本身挂了」（缺 dex / 读不到 asset）vs「用户 Java 有真错」。
+                // 工具挂是环境 bug，不该把用户整包打包彻底堵死 → 退化成布局壳并给醒目标记；
+                // 用户 Java 真错（ECJ 报 syntax/type）仍走 M216 的中止（那种异常不走这里，
+                // 因为 ECJ 错误是编译期返回码/日志，不是 IOException）。
+                if (ce.getMessage() != null && ce.getMessage().contains("编译器")) {
+                    log.append("⚠ 设备端 Java 编译器不可用（").append(ce.getMessage())
+                            .append("），本次退化为布局壳（不运行 Java 逻辑）；重打包前请确认 APK 内含 compiler 资源\n");
+                    compileMode = "shell-no-compiler";
+                } else {
+                    throw ce;
+                }
+            }
             ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), extraDex, packed);
             log.append("注入壳 dex + ").append(extraDex.size()).append(" 个项目 dex，打包后 ")
                     .append(packed.length()).append(" 字节\n");

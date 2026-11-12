@@ -133,7 +133,7 @@ export function compileModeOf(r: BuildApkResult | null | undefined): {
     const n = r?.classes ?? Number(cm.slice(5));
     return { mode: "java", classes: Number.isFinite(n) ? n : 0 };
   }
-  if (cm === "none" || cm === "shell") return { mode: "shell", classes: 0 };
+  if (cm === "none" || cm === "shell" || cm === "shell-no-compiler") return { mode: "shell", classes: 0 };
   return { mode: "unknown", classes: 0 };
 }
 

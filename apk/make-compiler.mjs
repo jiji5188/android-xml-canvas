@@ -14,6 +14,7 @@ import fs from "node:fs";
 import zlib from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 
 const apk = path.dirname(fileURLToPath(import.meta.url));
 const SDK = process.env.ANDROID_SDK || "C:\\Users\\admin\\AppData\\Local\\Android\\Sdk";
@@ -147,3 +148,27 @@ if (jarGzSize > 40 * 1048576) {
   console.error("android.jar.gz 过大（>40MB），检查 SDK");
   process.exit(1);
 }
+
+// M227：写 compiler/manifest.json。注意：记录的是**解压后**（落盘到 cache 里）的文件大小 + sha256，
+// 设备端解压到 cache/compiler 后逐个比（tool*.bin / android.jar / res 目录）。
+// 缺哪个/坏哪个精确报出来（治 1.16.88 那个「没找到编译器 dex」静默失败）。
+function sha256OfBytes(buf) { return createHash("sha256").update(buf).digest("hex"); }
+function gzipSizeOfUncompressed(out, gzName) {
+  const gzf = path.join(out, gzName);
+  if (!fs.existsSync(gzf)) return null;
+  return fs.statSync(gzf).size; // 仅用于人读
+}
+const manifest = { id: "ecj-d8", name: "Java 编译器（ECJ + D8）", version: "3.33.0", loader: "dex", files: [] };
+dexFiles.forEach((f, idx) => {
+  const dexFile = path.join(dexDir, f);
+  // 解压后 = 原 dex 字节（cache 里落的是 toolN.bin，就是 dex 本身）
+  const raw = fs.readFileSync(dexFile);
+  manifest.files.push({ path: "tool" + (idx + 1) + ".bin", size: raw.length, sha256: sha256OfBytes(raw), role: "compiler-dex" });
+});
+{
+  const jarRaw = fs.readFileSync(ANDROID_JAR);
+  manifest.files.push({ path: "android.jar", size: jarRaw.length, sha256: sha256OfBytes(jarRaw), role: "classpath" });
+}
+manifest.files.push({ path: "res", size: 0, sha256: "", role: "i18n" }); // msgs 解到 res/ 目录，缺失不致命
+fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+console.log("compiler/manifest.json 已写（" + manifest.files.length + " 文件，记录解压后大小+sha256）");

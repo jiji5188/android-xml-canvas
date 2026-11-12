@@ -84,3 +84,7 @@ tmp-*.mjs
 
 app-*.apk
 app.apk
+
+# M227 插件：大体积编译器文件不入库，走 GitHub Release
+plugins/compilers/*/files/**
+!plugins/compilers/*/files/.gitkeep

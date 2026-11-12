@@ -1,0 +1,32 @@
+{
+  "id": "ecj-d8",
+  "name": "Java 编译器（ECJ + D8）",
+  "version": "3.33.0",
+  "loader": "dex",
+  "files": [
+    {
+      "path": "tool1.bin.gz",
+      "size": 3279529,
+      "sha256": "3b76b664f2e431ecd98c440faba97f7fb6f997ee9251c2b071124c851175171d",
+      "role": "compiler-dex"
+    },
+    {
+      "path": "tool2.bin.gz",
+      "size": 1175202,
+      "sha256": "097549c86af4be80e3060ea484463478160ef64b64a5358d1b8b1bb24ee2aa19",
+      "role": "compiler-dex"
+    },
+    {
+      "path": "android.jar.gz",
+      "size": 24985594,
+      "sha256": "75362e6b4ca744cca3cbad16e54c56051e229fab9ed3aee1faad45fd95e982c0",
+      "role": "classpath"
+    },
+    {
+      "path": "msgs.bin.gz",
+      "size": 29950,
+      "sha256": "1ec2e527567da04415fcdeeadb59660af48fa52af582c3d4610091ddc9110e3b",
+      "role": "i18n"
+    }
+  ]
+}

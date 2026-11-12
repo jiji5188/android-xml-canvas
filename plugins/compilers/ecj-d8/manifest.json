@@ -25,7 +25,7 @@
     {
       "path": "msgs.bin.gz",
       "size": 29950,
-      "sha256": "1ec2e527567da04415fcdeeadb59660af48fa52af582c3d4610091ddc9110e3b",
+      "sha256": "b1bf7874ee96621b4958e628d3a076b157d07be5579eb5642ce6f647d95ac310",
       "role": "i18n"
     }
   ]

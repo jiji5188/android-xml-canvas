@@ -1,6 +1,6 @@
 // test/xml_plugin_fetch.test.ts
 import { describe, it, expect } from "vitest";
-import { pluginUrl, cacheKey, verifyDownload, expectedDownloadBytes, PLUGINS_REPO } from "@/lib/xml/plugin-fetch";
+import { pluginUrl, pluginFileName, manifestUrl, cacheKey, verifyDownload, expectedDownloadBytes, PLUGINS_REPO, PLUGINS_BASE } from "@/lib/xml/plugin-fetch";
 
 const manifest = JSON.stringify({
   id: "ecj-d8",
@@ -15,13 +15,16 @@ const manifest = JSON.stringify({
 });
 
 describe("pluginUrl", () => {
-  it("拼出 GitHub Release 附件 URL", () => {
+  it("拼出 raw 直链", () => {
     const u = pluginUrl("ecj-d8", "3.33.0");
-    expect(u).toBe(`https://github.com/${PLUGINS_REPO}/releases/download/ecj-d8-3.33.0/ecj-d8-3.33.0.zip`);
+    expect(u).toBe(`${PLUGINS_BASE}/ecj-d8-3.33.0.zip`);
+    expect(u).toContain("raw.githubusercontent.com/" + PLUGINS_REPO);
   });
-  it("带 token 时不影响 base（token 走 header）", () => {
-    const u = pluginUrl("kotlin", "1.9", "ghp_xxx");
-    expect(u).toContain("kotlin-1.9/kotlin-1.9.zip");
+  it("文件名可单独取", () => {
+    expect(pluginFileName("kotlin", "1.9")).toBe("kotlin-1.9.zip");
+  });
+  it("manifest URL 按 id/version 分目录", () => {
+    expect(manifestUrl("ecj-d8", "3.33.0")).toBe(`${PLUGINS_BASE}/ecj-d8/3.33.0/manifest.json`);
   });
 });
 

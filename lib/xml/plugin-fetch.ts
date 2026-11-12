@@ -13,10 +13,22 @@ import { parsePluginManifest, checkPlugin, type PluginManifest } from "./plugin"
 
 export const PLUGINS_REPO = "jiji5188/axv-plugins";
 
-/** 构造某插件某版本的 GitHub Release 附件 URL */
-export function pluginUrl(id: string, version: string, token?: string): string {
-  const base = `https://github.com/${PLUGINS_REPO}/releases/download/${id}-${version}/${id}-${version}.zip`;
-  return token ? base + "?" : base;
+/** 下载源基址（raw 直链，public 仓库免鉴权；换 Release 时改这里） */
+export const PLUGINS_BASE = `https://raw.githubusercontent.com/${PLUGINS_REPO}/main`;
+
+/** 构造某插件包的文件名：<id>-<ver>.zip */
+export function pluginFileName(id: string, version: string): string {
+  return `${id}-${version}.zip`;
+}
+
+/** 构造某插件包的下载 URL（raw 直链） */
+export function pluginUrl(id: string, version: string): string {
+  return `${PLUGINS_BASE}/${pluginFileName(id, version)}`;
+}
+
+/** 构造某插件 manifest 的下载 URL */
+export function manifestUrl(id: string, version: string): string {
+  return `${PLUGINS_BASE}/${id}/${version}/manifest.json`;
 }
 
 /** 本地缓存键（按 id+version，防止旧缓存吃到新包） */

@@ -11,6 +11,7 @@
 //   - 跳过 build 产物外的明显无关目录（.git/.gradle/.idea/node_modules）
 
 import type { AiFileIo } from "./ai-tools";
+import { coreSkipDirs as SKIP_DIRS } from "./skip-dirs";
 
 export interface ProjectDexFile {
   /** 相对项目根的路径，仅用于日志/去重 */
@@ -21,8 +22,6 @@ export interface ProjectDexFile {
   base64: string;
   bytes: number;
 }
-
-const SKIP_DIRS = new Set([".git", ".gradle", ".idea", ".cxx", "captures", ".kotlin", "node_modules"]);
 
 export const DEX_MAX_FILES = 8;
 export const DEX_MAX_ONE = 12 * 1024 * 1024;

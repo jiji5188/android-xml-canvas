@@ -3,9 +3,10 @@
 // 只是「读」：不写、不改、不编译。找不到目录就返回空数组，调用方降级成纯 XML 预览。
 
 import type { AiFileIo } from "./ai-tools";
+import { coreSkipDirs, withSkipExtras } from "./skip-dirs";
 
-/** 这些目录不进去（构建产物 / IDE 缓存 / 第三方库源码太多） */
-const SKIP_DIRS = new Set([".git", ".gradle", "build", ".idea", ".cxx", "captures", ".kotlin", "node_modules"]);
+// 不读 build/ 里的源码（build 产物不是源码）；dex 查找例外（见 project-dex.ts）
+const SKIP_DIRS = withSkipExtras(coreSkipDirs, "build");
 
 /** 单文件最多读 400KB（Activity 一般 5~20KB，设上限防大文件卡住手机） */
 const MAX_TEXT = 400 * 1024;

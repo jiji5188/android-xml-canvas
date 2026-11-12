@@ -10,18 +10,10 @@
 
 import type { AiFileIo } from "./ai-tools";
 import { makeZip, downloadBytes, type ZipEntry } from "./zip";
+import { coreSkipDirs, withSkipExtras } from "./skip-dirs";
 
 /** 这些目录整体跳过（构建产物 / VCS / IDE 缓存，没意义还占体积） */
-const SKIP_DIRS = new Set([
-  ".git",
-  ".gradle",
-  "build",
-  ".idea",
-  "node_modules",
-  ".cxx",
-  "captures",
-  ".kotlin",
-]);
+const SKIP_DIRS = withSkipExtras(coreSkipDirs, "build");
 
 /** 单个文件超过 6MB 就不打进去（keystore/jar 一般不会这么大，主要是防误打包） */
 const MAX_FILE_BYTES = 6 * 1024 * 1024;

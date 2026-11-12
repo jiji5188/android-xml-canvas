@@ -10,6 +10,8 @@
 
 export type WorkspaceEntryKind = "dir" | "file";
 
+import { coreSkipDirs, withSkipExtras } from "./skip-dirs";
+
 export interface WorkspaceEntry {
   kind: WorkspaceEntryKind;
   /** 显示名（文件夹名或文件名） */
@@ -192,7 +194,7 @@ export async function requestWorkspacePermission(dir: DirHandle): Promise<boolea
 const LAYOUT_DIR = "layout";
 
 /** 读目录时跳过的噪声目录（安卓工程里 build/.gradle 体积大且没布局） */
-const SKIP_DIRS = new Set([".git", ".gradle", ".idea", "build", "node_modules", ".svn", "__pycache__"]);
+const SKIP_DIRS = withSkipExtras(coreSkipDirs, "build", ".svn", "__pycache__");
 const MAX_DEPTH = 6;
 
 /** 递归数一个目录（含子目录）里的 .xml */

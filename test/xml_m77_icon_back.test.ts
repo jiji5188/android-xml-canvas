@@ -10,7 +10,6 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const css = readFileSync(resolve(process.cwd(), "components/xml-canvas.css"), "utf8");
-const editor = readFileSync(resolve(process.cwd(), "components/IconEditor.tsx"), "utf8");
 const cvEditor = readFileSync(resolve(process.cwd(), "components/IconCanvasEditor.tsx"), "utf8");
 
 /** 抓一条规则体（按选择器精确匹配，取到第一个 } 为止） */
@@ -45,21 +44,20 @@ describe("图标编辑器返回按钮（M77 → M88 统一左侧返回）", () =
 
   it("规则只作用于 .axv-icon-page，不误伤自定义形状编辑器", () => {
     expect(css).not.toMatch(/\.axv-shape-page\s+\.axv-icon-btn\s*\{\s*display:\s*none/);
-    expect(editor).toContain('className="axv-icon-page"');
+    expect(cvEditor).toContain('className="axv-icon-page"');
   });
 
-  it("IconEditor 两处 head 都用返回按钮，且不再留旧的 axv-shape-back", () => {
-    expect(editor.split('className="axv-icon-back"').length - 1).toBe(2);
-    expect(editor).not.toContain("axv-shape-back");
-    expect(editor).toContain('aria-label={tt("返回编辑器")}');
-    expect(editor).toContain('title={tt("返回")}');
+  it("IconCanvasEditor 两处 head 都用返回按钮，且不再留旧的 axv-shape-back", () => {
+    expect(cvEditor.split('className="axv-icon-back"').length - 1).toBe(2);
+    expect(cvEditor).not.toContain("axv-shape-back");
+    expect(cvEditor).toContain('aria-label={tt("返回编辑器")}');
+    expect(cvEditor).toContain('title={tt("返回")}');
   });
 
-  it("M88：页头右上 ✕ 已删除（旧 IconEditor + 画布式 IconCanvasEditor 都不再有）", () => {
-    expect(editor).not.toContain('aria-label="关闭"');
+  it("M88：页头右上 ✕ 已删除（画布式 IconCanvasEditor 不再有）", () => {
     expect(cvEditor).not.toContain("axv-cv-close");
     // 主 head 的撤销/重做仍在，且返回按钮走 M78 的 close（history.back）
     expect(cvEditor).toContain("axv-cv-head-tools");
-    expect(cvEditor).toContain("<button className=\"axv-icon-back\" onClick={close}");
+    expect(cvEditor).toContain('<button className="axv-icon-back" onClick={close}');
   });
 });

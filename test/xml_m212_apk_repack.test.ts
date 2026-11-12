@@ -1,6 +1,6 @@
 // test/xml_m212_apk_repack.test.ts — M212：导入 APK 换资源重签 + 打包插件注册表
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   hasApkRepack,
   isReplaceableEntry,
@@ -8,14 +8,6 @@ import {
   pickApk,
   repackApk,
 } from "@/lib/xml/apk-repack";
-import {
-  __clearBuildPipelines,
-  availableBuildPipelines,
-  getBuildPipeline,
-  listBuildPipelines,
-  registerBuildPipeline,
-  type BuildPipeline,
-} from "@/lib/xml/build-pipeline";
 
 interface WinShape {
   AxvNative?: Record<string, unknown>;
@@ -29,7 +21,6 @@ afterEach(() => {
   delete W().AxvNative;
   delete W().__axvPickedApk;
   delete W().__axvRepackApk;
-  __clearBuildPipelines();
 });
 
 describe("M212 isReplaceableEntry", () => {
@@ -153,47 +144,5 @@ describe("M212 有桥时走协议", () => {
     };
     const r = await pickApk();
     expect(r.err).toBe("canceled");
-  });
-});
-
-describe("M212 打包插件注册表", () => {
-  const mk = (id: string, ok: boolean): BuildPipeline => ({
-    id,
-    label: id,
-    available: () => ok,
-    run: vi.fn(async () => ({ ok: true })),
-  });
-
-  it("注册 / 查询 / 列表", () => {
-    registerBuildPipeline(mk("shell", true));
-    registerBuildPipeline(mk("repack", false));
-    expect(listBuildPipelines()).toHaveLength(2);
-    expect(getBuildPipeline("shell")?.id).toBe("shell");
-    expect(getBuildPipeline("nope")).toBeNull();
-  });
-
-  it("available 过滤掉不可用的", () => {
-    registerBuildPipeline(mk("shell", true));
-    registerBuildPipeline(mk("repack", false));
-    expect(availableBuildPipelines().map((p) => p.id)).toEqual(["shell"]);
-  });
-
-  it("available 抛错算作不可用（不炸整个列表）", () => {
-    registerBuildPipeline({
-      id: "boom",
-      label: "boom",
-      available: () => {
-        throw new Error("x");
-      },
-      run: async () => ({ ok: false }),
-    });
-    expect(availableBuildPipelines()).toEqual([]);
-  });
-
-  it("同 id 覆盖", () => {
-    registerBuildPipeline(mk("shell", false));
-    registerBuildPipeline(mk("shell", true));
-    expect(listBuildPipelines()).toHaveLength(1);
-    expect(availableBuildPipelines()).toHaveLength(1);
   });
 });

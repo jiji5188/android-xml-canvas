@@ -6,12 +6,13 @@ import { resolve } from "node:path";
 const read = (f: string) => readFileSync(resolve(process.cwd(), f), "utf8");
 
 describe("M78 接入护栏", () => {
-  it("IconEditor / DrawableEditor 的返回与关闭都走 useOverlayBack", () => {
+  it("IconCanvasEditor / DrawableEditor 的返回与关闭都走 useOverlayBack", () => {
     // M135：ShapeEditor 退化成 DrawableEditor 的薄封装，不再直接持有 overlay
     // M141：DrawableEditor 的 close 要先过未保存提示，所以经 closeRef 转到 guard
-    const icon = read("components/IconEditor.tsx");
+    // 2026-11-12：旧 IconEditor 已删（被 IconCanvasEditor 取代），护栏跟着换到新编辑器
+    const icon = read("components/IconCanvasEditor.tsx");
     expect(icon).toContain('import { useOverlayBack } from "@/lib/overlay-back";');
-    expect(icon).toContain("const close = useOverlayBack(true, onClose);");
+    expect(icon).toContain("useOverlayBack(true, () => closeRef.current())");
 
     const dw = read("components/DrawableEditor.tsx");
     expect(dw).toContain('import { useOverlayBack } from "@/lib/overlay-back";');
@@ -24,14 +25,10 @@ describe("M78 接入护栏", () => {
     }
   });
 
-  it("hook 必须放在任何 early return 之前（IconEditor 有 if (!model) 早退分支）", () => {
-    const src = read("components/IconEditor.tsx");
-    const hookAt = src.indexOf("const close = useOverlayBack(true, onClose);");
-    const earlyAt = src.indexOf("if (!model) {");
-    expect(hookAt).toBeGreaterThan(0);
-    expect(earlyAt).toBeGreaterThan(0);
-    expect(hookAt).toBeLessThan(earlyAt);
-    // 只允许出现一次（曾经插在早退分支之后，属于 hook 条件调用）
-    expect(src.split("const close = useOverlayBack(true, onClose);").length - 1).toBe(1);
+  it("useOverlayBack 只调用一次（不重复挂 back 监听）", () => {
+    for (const f of ["components/IconCanvasEditor.tsx", "components/DrawableEditor.tsx"]) {
+      const src = read(f);
+      expect(src.split("useOverlayBack(true, () => closeRef.current())").length - 1).toBe(1);
+    }
   });
 });

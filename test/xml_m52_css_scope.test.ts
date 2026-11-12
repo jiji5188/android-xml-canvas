@@ -20,8 +20,8 @@ describe("M52 折叠规则作用域", () => {
     expect(read("components/SettingsPanel.tsx")).toContain('className="axv-rail-scroll axv-settings"');
   });
 
-  it("IconEditor / AboutPanel 用 axv-set-group 但不在 .axv-settings 里 → 不会被折叠", () => {
-    for (const f of ["components/IconEditor.tsx", "components/AboutPanel.tsx"]) {
+  it("IconCanvasEditor / AboutPanel 用 axv-set-group 但不在 .axv-settings 里 → 不会被折叠", () => {
+    for (const f of ["components/IconCanvasEditor.tsx", "components/AboutPanel.tsx"]) {
       const src = read(f);
       expect(src).toContain("axv-set-group");
       expect(src).not.toContain("axv-settings");

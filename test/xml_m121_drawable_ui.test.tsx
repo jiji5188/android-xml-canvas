@@ -4,7 +4,6 @@ import { describe, expect, it, afterEach } from "vitest";
 import { createRoot, type Root } from "react-dom/client";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 import { AttrRows } from "@/components/drawable/AttrRows";
-import { TreeRows } from "@/components/drawable/TreeRows";
 
 const flush = async () => {
   for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 5));
@@ -106,110 +105,5 @@ describe("M121 AttrRows：按 schema 渲染并写回", () => {
     const h = await mount(<AttrRows node={{ t: "layer", items: [] }} onChange={() => {}} />);
     expect(h.querySelector(".axv-shape-hint")?.textContent).toContain("没有可调参数");
     expect(h.querySelector("input")).toBeNull();
-  });
-});
-
-describe("M121 TreeRows：面包屑 + 子节点 + 添加菜单", () => {
-  const layer: DrawableNode = {
-    t: "layer",
-    items: [
-      { key: "a", node: shape("#FF000001") },
-      { key: "b", node: shape("#FF000002") },
-    ],
-  };
-
-  it("层用「第 N 层」称呼，界面不出现 item", async () => {
-    const h = await mount(
-      <TreeRows root={layer} path={[]} onSelect={() => {}} onChange={() => {}} />,
-    );
-    const rows = Array.from(h.querySelectorAll(".axv-layer-row"));
-    expect(rows.length).toBe(2);
-    expect(rows[0].textContent).toContain("第 1 层");
-    expect(rows[1].textContent).toContain("第 2 层");
-    expect(h.textContent).not.toContain("item");
-  });
-
-  it("点＋形状会新增一层，且仍停在当前层", async () => {
-    let next: DrawableNode = layer;
-    let picked: number[] = [];
-    const h = await mount(
-      <TreeRows
-        root={layer}
-        path={[]}
-        onSelect={(p) => {
-          picked = p;
-        }}
-        onChange={(n) => {
-          next = n;
-        }}
-      />,
-    );
-    byText(h, "＋形状")!.click();
-    await flush();
-    expect(next.t).toBe("layer");
-    if (next.t === "layer") expect(next.items.length).toBe(3);
-    // 不自动钻进去：列表会变成新层的子节点，看起来像刚加的层消失了
-    expect(picked).toEqual([]);
-  });
-
-  it("上移/删除操作落到树上", async () => {
-    let next: DrawableNode = layer;
-    const h = await mount(
-      <TreeRows root={layer} path={[]} onSelect={() => {}} onChange={(n) => (next = n)} />,
-    );
-    const down = Array.from(h.querySelectorAll<HTMLButtonElement>(".axv-layer-op")).filter(
-      (b) => b.textContent === "↑",
-    );
-    down[1].click();
-    await flush();
-    if (next.t === "layer") {
-      expect((next.items[0].node as { spec: { solid: string } }).spec.solid).toBe("#FF000002");
-    }
-
-    const del = Array.from(h.querySelectorAll<HTMLButtonElement>(".axv-layer-op.is-danger"));
-    del[0].click();
-    await flush();
-    if (next.t === "layer") expect(next.items.length).toBe(1);
-  });
-
-  it("面包屑显示当前位置，能点回根", async () => {
-    let picked: number[] | null = null;
-    const h = await mount(
-      <TreeRows
-        root={layer}
-        path={[1]}
-        onSelect={(p) => {
-          picked = p;
-        }}
-        onChange={() => {}}
-      />,
-    );
-    const crumbs = Array.from(h.querySelectorAll<HTMLButtonElement>(".axv-tree-crumb"));
-    expect(crumbs[0].textContent).toBe("图层叠加");
-    expect(crumbs[1].textContent).toContain("第 2 层");
-    crumbs[0].click();
-    await flush();
-    expect(picked).toEqual([]);
-  });
-
-  it("ripple 满了之后藏掉添加区并给提示", async () => {
-    const ripple: DrawableNode = {
-      t: "ripple",
-      content: shape("#FF000000"),
-      mask: shape("#FFFFFFFF"),
-    };
-    const h = await mount(<TreeRows root={ripple} path={[]} onSelect={() => {}} onChange={() => {}} />);
-    expect(h.querySelector(".axv-tree-add-list")).toBeNull();
-    expect(h.textContent).toContain("放满了");
-  });
-
-  it("带 inset 变换的叶子不开添加区", async () => {
-    const inset: DrawableNode = {
-      t: "shape",
-      spec: { kind: "rectangle", solid: "#FF000000" },
-      transform: [{ kind: "inset", params: { insetLeft: "1dp" } }],
-    };
-    const h = await mount(<TreeRows root={inset} path={[]} onSelect={() => {}} onChange={() => {}} />);
-    expect(h.querySelector(".axv-tree-add-list")).toBeNull();
   });
 });

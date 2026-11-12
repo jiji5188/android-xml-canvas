@@ -195,6 +195,7 @@ import { ResourcePanel } from "./ResourcePanel";
 import IconCanvasEditor from "./IconCanvasEditor";
 import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/paths";
+import { pxNum, boxOf } from "@/lib/xml/geom";
 // M115：画布多选 · 复制 / 粘贴 / 成组 / 解组
 import {
   collectSnippets,
@@ -3326,27 +3327,6 @@ const allDrawableNames = useMemo(() => {
 
   function shortTag(t: string): string {
   return t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t;
-}
-
-/** style 里的 "123px" / 123 → 数字；百分比、auto 返回 null */
-const pxNum = (v: unknown): number | null => {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  const s = String(v ?? "").trim();
-  if (/^-?[0-9.]+$/.test(s)) return parseFloat(s);
-  const m = /^(-?[0-9.]+)px$/.exec(s);
-  return m ? parseFloat(m[1]) : null;
-};
-
-/** 从渲染模型取绝对盒子（仅当 style 里有 px 定位，即 ConstraintLayout 子项） */
-function boxOf(n: ResolvedNode | null | undefined): CBox | null {
-  if (!n) return null;
-  const width = pxNum(n.style.width);
-  const height = pxNum(n.style.height);
-  if (width === null || height === null) return null;
-  // 未约束的 CL 子项没有 left/top（按静态位置渲染）→ 当 0 处理
-  const left = pxNum(n.style.left) ?? 0;
-  const top = pxNum(n.style.top) ?? 0;
-  return { left, top, width, height };
 }
 
 /** 在渲染模型里按 path 找节点（findResolvedNode 的别名，历史命名保留） */

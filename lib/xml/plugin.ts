@@ -19,6 +19,18 @@ export interface PluginFileEntry {
   role?: string;
 }
 
+/** 一个外置资源条目（不在 zip 里，单独按需下载，如 android.jar 24MB） */
+export interface PluginExternalEntry {
+  /** 落盘文件名（如 "android.jar.gz"） */
+  path: string;
+  /** 下载地址（可多个候选，按序尝试）或单个 URL */
+  url: string | string[];
+  /** 字节数 */
+  size: number;
+  sha256: string;
+  role?: string;
+}
+
 /** 一个插件的清单 */
 export interface PluginManifest {
   /** 插件 id（目录名，如 "ecj-d8"） */
@@ -29,8 +41,10 @@ export interface PluginManifest {
   version: string;
   /** 加载方式（原生据此选 InMemoryDexClassLoader / loadLibrary / ...） */
   loader: "dex" | "native" | "wasm" | "zip";
-  /** 各文件清单 */
+  /** 包内文件清单 */
   files: PluginFileEntry[];
+  /** 外置资源清单（可能为空）：体积大、需单独下载的文件 */
+  external?: PluginExternalEntry[];
 }
 
 export type Severity = "error" | "warn";
@@ -92,7 +106,22 @@ export function parsePluginManifest(id: string, text: string): PluginManifest {
     }
     return { path: ff.path, size: ff.size, sha256: ff.sha256, role: role || undefined };
   });
-  return { id, name: o.name, version: o.version, loader, files };
+  const externals: PluginExternalEntry[] = Array.isArray(o.external)
+    ? (o.external as unknown[]).map((x, i) => {
+        const xx = x as Record<string, unknown>;
+        if (typeof xx.path !== "string" || typeof xx.size !== "number" || typeof xx.sha256 !== "string") {
+          throw new Error("插件 " + id + " 的 external[" + i + "] 缺 path/size/sha256");
+        }
+        if (!/^[a-f0-9]{64}$/.test(xx.sha256)) {
+          throw new Error("插件 " + id + " 的 external[" + i + "] sha256 非法（需 64 位小写 hex）");
+        }
+        const urls = typeof xx.url === "string" ? [xx.url] : Array.isArray(xx.url) ? (xx.url as string[]).filter((u) => typeof u === "string") : [];
+        if (urls.length === 0) throw new Error("插件 " + id + " 的 external[" + i + "] 缺 url");
+        if (xx.size <= 0) throw new Error("插件 " + id + " 的 external[" + i + "] size 必须为正");
+        return { path: xx.path, url: urls.length === 1 ? urls[0] : urls, size: xx.size, sha256: xx.sha256, role: typeof xx.role === "string" ? xx.role : undefined };
+      })
+    : [];
+  return { id, name: o.name, version: o.version, loader, files, external: externals.length > 0 ? externals : undefined };
 }
 
 /**

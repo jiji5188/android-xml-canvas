@@ -194,7 +194,10 @@ run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "buil
   "--add", path.join(apk, "build", "shell.bin.gz"), "assets/shell/shell.bin.gz",
   "--add", path.join(apk, "build", "signer.bin.gz"), "assets/apksig/signer.bin.gz",
   ...fs.readdirSync(path.join(apk, "build", "compiler"))
-    .filter((n) => /^tool\d+\.bin\.gz$/.test(n) || n === "android.jar.gz" || n === "msgs.bin.gz" || n === "manifest.json")
+    // M228：android.jar（23.83MB，58% 体积）默认不打进 APK，首次打包时按需下载。
+    // 需要出「自带 classpath」的调试包时设 AX_SHIP_ANDROID_JAR=1。
+    .filter((n) => (process.env.AX_SHIP_ANDROID_JAR === "1" || n !== "android.jar.gz")
+      && (/^tool\d+\.bin\.gz$/.test(n) || n === "android.jar.gz" || n === "msgs.bin.gz" || n === "manifest.json"))
     .map((n) => ["--add", path.join(apk, "build", "compiler", n), "assets/compiler/" + n])
   .flat()], apk);
 

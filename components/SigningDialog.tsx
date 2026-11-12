@@ -19,6 +19,14 @@ export interface SigningDialogProps {
   onInstallApk?: (path: string) => void;
   /** M197：把打好的 APK 分享出去 */
   onShareApk?: (path: string) => void;
+  /** M228：编译器需按需下载（打包时命中 NEED_PLUGIN_DOWNLOAD）→ 显示下载横幅 */
+  pluginNeed?: boolean;
+  /** M228：下载进度 0-100 */
+  pluginPct?: number;
+  /** M228：正在下载 */
+  pluginBusy?: boolean;
+  /** M228：点「下载编译器」 */
+  onDownloadPlugin?: () => void;
   /** M212：打开「导入 APK 换资源重签名」面板 */
   onOpenRepack?: () => void;
   /** 读项目里 app/build.gradle（没有就 null） */
@@ -59,7 +67,7 @@ const EMPTY: SigningParams = {
   v3: true,
 };
 
-export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onShareApk, onOpenRepack, onWriteGradle, onClose, onNote, stored, onRemember, onForget }: SigningDialogProps) {
+export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onShareApk, onOpenRepack, onWriteGradle, onClose, onNote, stored, onRemember, onForget, pluginNeed, pluginPct, pluginBusy, onDownloadPlugin }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
   // M195：build.gradle 里没写的项（典型：口令）用本机记住的配置补
   const seed = prefill ?? (stored as SigningParams | null);
@@ -406,6 +414,22 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
         {/* M192：一键打包 → 安装调试 */}
         {onBuildApk ? (
           <div className="axv-sign-row" style={{ display: "block", borderTop: "1px solid rgba(0,0,0,.08)", paddingTop: 10 }}>
+            {pluginNeed ? (
+              <div className="axv-sign-plugin" style={{ border: "1px solid #f0b429", background: "#fff8e6", borderRadius: 8, padding: 10, marginBottom: 10 }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>{tt("需先下载编译器（首次约 31MB，仅一次）")}</div>
+                <div style={{ fontSize: 12, color: "#555", marginBottom: 8 }}>{tt("你的项目含 Java 源码，设备上要用 ECJ+D8 真编译。APK 已不含编译器，首次打包需下载。")}</div>
+                {pluginBusy ? (
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ height: 8, background: "#eee", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{ width: Math.max(4, pluginPct ?? 0) + "%", height: "100%", background: "#f0b429", transition: "width .2s" }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: "#777", marginTop: 4 }}>{tt("下载中 {p}%…", { p: String(pluginPct ?? 0) })}</div>
+                  </div>
+                ) : (
+                  <button type="button" className="axv-sign-primary" onClick={() => onDownloadPlugin?.()}>{tt("下载编译器")}</button>
+                )}
+              </div>
+            ) : null}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button
                 type="button"

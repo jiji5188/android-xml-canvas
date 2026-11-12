@@ -17,16 +17,23 @@
       "role": "compiler-dex"
     },
     {
+      "path": "msgs.bin.gz",
+      "size": 29935,
+      "sha256": "8ddbaba4b71dfef68ebc9c07eb8df9fd45eec50a3a9a695059071880e7f5e30d",
+      "role": "i18n"
+    }
+  ],
+  "external": [
+    {
       "path": "android.jar.gz",
+      "url": [
+        "https://ghfast.top/https://raw.githubusercontent.com/jiji5188/axv-plugins/main/ecj-d8/3.33.0/android.jar.gz",
+        "https://gh-proxy.com/https://raw.githubusercontent.com/jiji5188/axv-plugins/main/ecj-d8/3.33.0/android.jar.gz",
+        "https://raw.githubusercontent.com/jiji5188/axv-plugins/main/ecj-d8/3.33.0/android.jar.gz"
+      ],
       "size": 24985594,
       "sha256": "75362e6b4ca744cca3cbad16e54c56051e229fab9ed3aee1faad45fd95e982c0",
       "role": "classpath"
-    },
-    {
-      "path": "msgs.bin.gz",
-      "size": 29950,
-      "sha256": "b1bf7874ee96621b4958e628d3a076b157d07be5579eb5642ce6f647d95ac310",
-      "role": "i18n"
     }
   ]
 }

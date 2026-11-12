@@ -577,6 +577,26 @@ public class MainActivity extends Activity {
             MainActivity.this.shareApkFromProject(path);
         }
 
+        // ===================== M228 插件：编译器按需下载 =====================
+
+        /** 查询插件状态：{"id","installed","bytes","files":[{path,size,ok}],"missing":[]} */
+        @JavascriptInterface
+        public String pluginStatus(String id) {
+            return MainActivity.this.pluginStatusJson(id);
+        }
+
+        /** 异步下载插件（进度走 window.__axvPluginProgress，完成走 window.__axvPluginDone） */
+        @JavascriptInterface
+        public void pluginDownload(String id) {
+            new Thread(() -> MainActivity.this.downloadPlugin(id)).start();
+        }
+
+        /** 清除已下载的编译器（回到「需下载」状态） */
+        @JavascriptInterface
+        public void pluginClear(String id) {
+            MainActivity.this.clearPlugin(id);
+        }
+
         /** M212：导入 APK 选择器（选中后把 apk 拷进 cache，再回话 window.__axvPickedApk(path, result)） */
         @JavascriptInterface
         public void pickApk() {
@@ -2772,6 +2792,19 @@ public class MainActivity extends Activity {
     private File ensureCompiler() throws IOException {
         File dir = new File(getCacheDir(), "compiler");
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("建不了 compiler 目录");
+        // M228 快路径：已从插件装好 → 直接用，不读 assets（为「APK 不含编译器」铺路）
+        if (compilerComplete()) {
+            // 确保 res/ 在（msgs 缺失不致命）
+            File resDir = new File(dir, "res");
+            if (!resDir.isDirectory() && resDir.mkdirs()) { /* ok */ }
+            return dir;
+        }
+        // 内置兜底：APK 里同时有 tool1.bin.gz 与 android.jar.gz 才能离线编译。
+        // M228：android.jar 已改为外置（23.8MB）→ 缺它就报 NEED_PLUGIN_DOWNLOAD，UI 去下载。
+        boolean hasAsset = assetExists("compiler/tool1.bin.gz") && assetExists("compiler/android.jar.gz");
+        if (!hasAsset) {
+            throw new IOException("NEED_PLUGIN_DOWNLOAD:" + pluginStatusJson(PLUGIN_ID));
+        }
         // android.jar.gz
         File jar = new File(dir, "android.jar");
         byte[] jarBytes = readAssetGz("compiler/android.jar.gz"); // 已解压的 jar
@@ -3183,6 +3216,277 @@ public class MainActivity extends Activity {
 
     private static String jsonFail(String step, StringBuilder log) {
         return "{\"ok\":false,\"step\":" + quote(step) + ",\"log\":" + quote(log.toString()) + "}";
+    }
+
+    // ================= M228 插件：编译器按需下载（impl） =================
+
+    /** 编译器安装目录（与 ensureCompiler 共用 cache/compiler） */
+    private File pluginInstallDir() { return new File(getCacheDir(), "compiler"); }
+
+    /** 插件 id/版本常量（首版只有一个编译器插件） */
+    private static final String PLUGIN_ID = "ecj-d8";
+    private static final String PLUGIN_VER = "3.33.0";
+
+    /** 下载源候选（按序尝试，前一个失败才试下一个）。
+     *  国内 raw 常被墙：小文件 jsDelivr 最快，大文件（>20MB）jsDelivr 会 403，需走 ghfast 代理。 */
+    private static final String[] PLUGIN_BASES = {
+        "https://cdn.jsdelivr.net/gh/jiji5188/axv-plugins@main",
+        "https://ghfast.top/https://raw.githubusercontent.com/jiji5188/axv-plugins/main",
+        "https://gh-proxy.com/https://raw.githubusercontent.com/jiji5188/axv-plugins/main",
+        "https://raw.githubusercontent.com/jiji5188/axv-plugins/main",
+    };
+
+    private String pluginStatusJson(String id) {
+        try {
+            File dir = pluginInstallDir();
+            JSONObject o = new JSONObject();
+            JSONArray files = new JSONArray();
+            java.util.List<String> missing = new java.util.ArrayList<>();
+            String[] need = {"tool1.bin", "tool2.bin", "android.jar"};
+            long bytes = 0;
+            for (String n : need) {
+                File f = new File(dir, n);
+                JSONObject e = new JSONObject();
+                boolean ok = f.isFile() && f.length() > 0;
+                e.put("path", n);
+                e.put("size", f.isFile() ? f.length() : 0);
+                e.put("ok", ok);
+                files.put(e);
+                if (ok) bytes += f.length(); else missing.add(n);
+            }
+            o.put("id", id);
+            o.put("installed", missing.isEmpty());
+            o.put("bytes", bytes);
+            o.put("files", files);
+            o.put("missing", new JSONArray(missing));
+            return o.toString();
+        } catch (Throwable t) {
+            return "{\"id\":" + JSONObject.quote(id) + ",\"installed\":false,\"error\":" + JSONObject.quote(String.valueOf(t)) + "}";
+        }
+    }
+
+    private void pluginProgress(String stage, int percent, long got, long total, String msg) {
+        try {
+            JSONObject e = new JSONObject();
+            e.put("stage", stage);
+            e.put("percent", percent);
+            e.put("got", got);
+            e.put("total", total);
+            if (msg != null) e.put("msg", msg);
+            final String js = "window.__axvPluginProgress && window.__axvPluginProgress(" + e.toString() + ");";
+            if (web != null) web.post(() -> web.evaluateJavascript(js, null));
+        } catch (Throwable ignored) {}
+    }
+
+    private void pluginDone(String id, String resultJson) {
+        try {
+            final String js = "window.__axvPluginDone && window.__axvPluginDone(" + JSONObject.quote(id) + "," + resultJson + ");";
+            if (web != null) web.post(() -> web.evaluateJavascript(js, null));
+        } catch (Throwable ignored) {}
+    }
+
+    /** HTTP GET（跟随重定向，30s 超时，可选进度回调）。进度：onProgress(got, total) */
+    private byte[] httpGet(String url, final ProgressListener cb) throws IOException {
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(60000);
+        conn.setInstanceFollowRedirects(true);
+        try {
+            int code = conn.getResponseCode();
+            if (code >= 300 && code < 400) {
+                String loc = conn.getHeaderField("Location");
+                if (loc == null) throw new IOException("HTTP " + code + "（无 Location）");
+                conn.disconnect();
+                return httpGet(loc.startsWith("/") ? url.substring(0, url.indexOf('/', 8)) + loc : loc, cb);
+            }
+            if (code != 200) throw new IOException("HTTP " + code);
+            long total = conn.getContentLengthLong();
+            try (java.io.InputStream in = conn.getInputStream(); java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+                byte[] buf = new byte[65536];
+                long got = 0; int n;
+                while ((n = in.read(buf)) >= 0) {
+                    out.write(buf, 0, n); got += n;
+                    if (cb != null) cb.onProgress(got, total);
+                }
+                return out.toByteArray();
+            }
+        } finally { conn.disconnect(); }
+    }
+
+    private interface ProgressListener { void onProgress(long got, long total); }
+
+    /** 依次试候选 base，第一个 200 就返回；全失败抛最后一个错 */
+    private byte[] httpGetFirst(String relPath, ProgressListener cb) throws IOException {
+        Throwable last = null;
+        for (String base : PLUGIN_BASES) {
+            try {
+                byte[] data = httpGet(base + relPath, cb);
+                if (data != null && data.length > 0) return data;
+                last = new IOException("空响应 " + base + relPath);
+            } catch (Throwable t) { last = t; }
+        }
+        throw new IOException("所有下载源都失败（" + relPath + "）：" + (last == null ? "未知" : String.valueOf(last.getMessage())));
+    }
+
+    private static byte[] gunzip(byte[] gz) throws IOException {
+        try (java.io.ByteArrayInputStream bi = new java.io.ByteArrayInputStream(gz);
+             java.util.zip.GZIPInputStream gi = new java.util.zip.GZIPInputStream(bi);
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            byte[] buf = new byte[65536]; int n;
+            while ((n = gi.read(buf)) >= 0) out.write(buf, 0, n);
+            return out.toByteArray();
+        }
+    }
+
+    private static String sha256Hex(byte[] data) {
+        try {
+            byte[] h = java.security.MessageDigest.getInstance("SHA-256").digest(data);
+            StringBuilder sb = new StringBuilder(h.length * 2);
+            for (byte x : h) sb.append(String.format("%02x", x));
+            return sb.toString();
+        } catch (Throwable t) { return ""; }
+    }
+
+    /** 核心：下载 + 校验 + 解压。@param callId 仅用于原生→JS 回传，下载固定用 PLUGIN_ID/PLUGIN_VER */
+    private void downloadPlugin(String callId) {
+        StringBuilder log = new StringBuilder();
+        try {
+            File dir = pluginInstallDir();
+            File tmp = new File(getCacheDir(), "plugin-tmp");
+            if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("建不了目录 " + dir);
+            rmRec(tmp); tmp.mkdirs();
+
+            // 1) 清单（小文件，jsDelivr 优先）
+            pluginProgress("manifest", 0, 0, 0, "获取插件清单…");
+            byte[] mani = httpGetFirst("/" + PLUGIN_ID + "/" + PLUGIN_VER + "/manifest.json", null);
+            JSONObject m = new JSONObject(new String(mani, "UTF-8"));
+            log.append("清单 OK（").append(m.length()).append("B）\n");
+
+            // 2) 包内文件（4.26MB zip，jsDelivr 优先）
+            pluginProgress("package", 5, 0, 0, "下载编译器包…");
+            final java.util.concurrent.atomic.AtomicLong dlGot = new java.util.concurrent.atomic.AtomicLong(0), dlTotal = new java.util.concurrent.atomic.AtomicLong(0);
+            byte[] zip = httpGetFirst("/" + PLUGIN_ID + "-" + PLUGIN_VER + ".zip", (got, total) -> {
+                dlGot.set(got); if (total > 0) dlTotal.set(total);
+                int pct = total > 0 ? 5 + (int) (got * 40 / total) : 5;
+                pluginProgress("package", pct, got, total, "下载编译器包…");
+            });
+            log.append("包 OK（").append(zip.length / 1048576).append("MB）\n");
+            unzipToDir(zip, new File(tmp, "z"));
+
+            // 3) 逐文件校验 + 解压到安装目录
+            JSONArray mfiles = m.optJSONArray("files");
+            if (mfiles == null) throw new IOException("清单缺 files");
+            for (int i = 0; i < mfiles.length(); i++) {
+                JSONObject f = mfiles.getJSONObject(i);
+                String name = f.optString("path", "");
+                String wantSha = f.optString("sha256", "").toLowerCase();
+                long wantSize = f.optLong("size", 0);
+                File raw = new File(new File(tmp, "z"), name); // zip 内 files/ 被展成 z/<name>
+                if (!raw.isFile()) { log.append("  缺 ").append(name).append("\n"); continue; }
+                byte[] gz = readFile(raw);
+                if (gz == null) { log.append("  读不了 ").append(name).append("\n"); continue; }
+                if (wantSha.length() == 64 && !wantSha.equals(sha256Hex(gz))) throw new IOException(name + " sha256 不符");
+                if (wantSize > 0 && gz.length != wantSize) { log.append("  ").append(name).append(" 大小 ").append(gz.length).append("（期望 ").append(wantSize).append("）\n"); }
+                byte[] rawBytes = gunzip(gz);
+                if (name.endsWith(".bin.gz")) {
+                    writeBytes(new File(dir, name.replace(".bin.gz", ".bin")), rawBytes);
+                } else if (name.equals("msgs.bin.gz")) {
+                    File resDir = new File(dir, "res");
+                    if (resDir.isDirectory()) rmRec(resDir);
+                    resDir.mkdirs();
+                    unzipToDir(rawBytes, resDir);
+                }
+                log.append("  ").append(name).append(" → ").append(rawBytes.length / 1048576).append("MB\n");
+                pluginProgress("install", 50 + i * 10, rawBytes.length, 0, "安装 " + name);
+            }
+
+            // 4) 外置资源（android.jar 24MB，走 ghfast）
+            JSONArray mext = m.optJSONArray("external");
+            if (mext != null) {
+                for (int i = 0; i < mext.length(); i++) {
+                    JSONObject f = mext.getJSONObject(i);
+                    String name = f.optString("path", "");
+                    String wantSha = f.optString("sha256", "").toLowerCase();
+                    long wantSize = f.optLong("size", 0);
+                    JSONArray urls = f.optJSONArray("url");
+                    String baseRel = "/" + PLUGIN_ID + "/" + PLUGIN_VER + "/" + name; // 相对路径，按候选前缀走
+                    pluginProgress("classpath", 85, 0, 0, "下载 classpath（" + (wantSize / 1048576) + "MB）…");
+                    byte[] gz = null;
+                    if (urls != null && urls.length() > 0) {
+                        for (int u = 0; u < urls.length(); u++) {
+                            String url = urls.getString(u);
+                            try { gz = httpGet(url, (got, total) -> { int pct = total > 0 ? 85 + (int) (got * 13 / total) : 85; pluginProgress("classpath", pct, got, total, "下载 classpath…"); }); if (gz != null) break; } catch (Throwable ignored) { }
+                        }
+                    }
+                    if (gz == null) {
+                        gz = httpGetFirst(baseRel, (got, total) -> { int pct = total > 0 ? 85 + (int) (got * 13 / total) : 85; pluginProgress("classpath", pct, got, total, "下载 classpath…"); });
+                    }
+                    if (wantSha.length() == 64 && !wantSha.equals(sha256Hex(gz))) throw new IOException(name + " sha256 不符");
+                    byte[] jarBytes = gunzip(gz);
+                    File jar = new File(dir, "android.jar");
+                    writeBytes(jar, jarBytes);
+                    log.append("  ").append(name).append(" → ").append(jarBytes.length / 1048576).append("MB\n");
+                    pluginProgress("classpath", 98, jarBytes.length, 0, "安装 classpath");
+                }
+            }
+
+            // 5) 写 installed.json（供 ensureCompiler 快路径 + validateCompiler 校验）
+            JSONObject installed = new JSONObject();
+            installed.put("id", PLUGIN_ID);
+            installed.put("version", m.optString("version", ""));
+            JSONArray ilist = new JSONArray();
+            for (String n : new String[]{"tool1.bin", "tool2.bin", "android.jar"}) {
+                File f = new File(dir, n);
+                if (f.isFile() && f.length() > 0) {
+                    JSONObject e = new JSONObject();
+                    e.put("path", n); e.put("size", f.length()); e.put("sha256", sha256Hex(readFile(f)));
+                    ilist.put(e);
+                }
+            }
+            installed.put("files", ilist);
+            writeBytes(new File(dir, "installed.json"), installed.toString().getBytes("UTF-8"));
+
+            pluginProgress("done", 100, 0, 0, "完成");
+            pluginDone(callId, installed.toString());
+            toast("编译器已就绪");
+        } catch (Throwable t) {
+            log.append("\nerr: ").append(t.getMessage());
+            Log.e(TAG, "downloadPlugin fail", t);
+            pluginDone(callId, "{\"ok\":false,\"step\":\"download\",\"log\":" + quote(log.toString()) + "}");
+        }
+    }
+
+    private void clearPlugin(String id) {
+        try {
+            rmRec(pluginInstallDir());
+            rmRec(new File(getCacheDir(), "plugin-tmp"));
+            toast("已清除编译器缓存");
+        } catch (Throwable t) { toast("清除失败：" + t.getMessage()); }
+    }
+
+    /** 快路径判断：cache/compiler 是否已装好（installed.json 或旧版内置） */
+    private boolean compilerComplete() {
+        File dir = pluginInstallDir();
+        File installed = new File(dir, "installed.json");
+        if (installed.isFile()) {
+            byte[] raw = readFile(installed);
+            if (raw != null) {
+                try {
+                JSONObject o = new JSONObject(new String(raw, "UTF-8"));
+                JSONArray fs = o.optJSONArray("files");
+                if (fs != null && fs.length() > 0) {
+                    for (int i = 0; i < fs.length(); i++) {
+                        JSONObject e = fs.getJSONObject(i);
+                        File f = new File(dir, e.optString("path", ""));
+                        if (!f.isFile() || f.length() != e.optLong("size", -1)) return false;
+                    }
+                    return true;
+                }
+                } catch (Throwable ignored) {}
+            }
+        }
+        // 旧版：tool1 + android.jar 都在就算好
+        return new File(dir, "tool1.bin").isFile() && new File(dir, "android.jar").isFile();
     }
 
     /** M192：调系统安装器装刚打出来的包 */

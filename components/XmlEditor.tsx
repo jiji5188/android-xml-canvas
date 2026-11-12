@@ -85,6 +85,7 @@ import { readStoredSigning, writeStoredSigning, clearStoredSigning } from "@/lib
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { buildApk, hasBuildApk, installApk, shareApkFile, compileModeOf, type BuildApkResult } from "@/lib/xml/native-apk";
+import { downloadPlugin, hasPluginSupport, type PluginProgressEvent } from "@/lib/xml/plugin-client";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { projectSaveRoot, projectFileExists, readProjectFile, readAppGradle, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
@@ -2179,6 +2180,30 @@ const allDrawableNames = useMemo(() => {
   /* M192：一键打包成可安装 APK（设备端 aapt2 + 壳 dex + apksig） */
   const [apkBusy, setApkBusy] = useState(false);
   const [apkResult, setApkResult] = useState<BuildApkResult | null>(null);
+  // M228：编译器按需下载（APK 删掉内置编译器后，首次打包需下载）
+  const [pluginNeed, setPluginNeed] = useState(false);
+  const [pluginBusy, setPluginBusy] = useState(false);
+  const [pluginPct, setPluginPct] = useState(0);
+  const doDownloadPlugin = useCallback(async () => {
+    if (pluginBusy) return;
+    if (!hasPluginSupport()) {
+      setExportNote(tt("当前环境不支持下载编译器（需在 App 内）"));
+      return;
+    }
+    setPluginBusy(true);
+    setPluginPct(0);
+    setExportNote(tt("正在下载编译器（首次约 31MB，仅一次）…"));
+    const res = await downloadPlugin("ecj-d8", (e: PluginProgressEvent) => {
+      setPluginPct(e.percent);
+    });
+    setPluginBusy(false);
+    if (res.ok) {
+      setPluginNeed(false);
+      setExportNote(tt("编译器已下载完成，请再点一次「打包并安装 APK"));
+    } else {
+      setExportNote(tt("下载失败（{step}）：{msg}", { step: res.step || "?", msg: res.log || "" }));
+    }
+  }, [pluginBusy]);
   const doBuildApk = useCallback(
     async (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => {
       if (apkBusy) return;
@@ -2291,6 +2316,9 @@ const allDrawableNames = useMemo(() => {
           launchActivity: manifest || "",
         });
         setApkResult(r);
+        // M228：编译器未下载（APK 删内置后）→ 标记需下载，弹层显示下载横幅
+        if (!r.ok && /NEED_PLUGIN_DOWNLOAD/.test(r.log || "")) setPluginNeed(true);
+        else setPluginNeed(false);
         // M216：把编译模式写进状态条，别把“布局壳”当“真跑逻辑的 APK”
         if (r.ok) {
           const base = tt("打包完成：{name}", { name: r.name || "" });
@@ -5487,6 +5515,12 @@ const findResolved = findResolvedNode;
           onOpenRepack={() => {
             setSignDialogOpen(false);
             setRepackOpen(true);
+          }}
+          pluginNeed={pluginNeed}
+          pluginBusy={pluginBusy}
+          pluginPct={pluginPct}
+          onDownloadPlugin={() => {
+            void doDownloadPlugin();
           }}
           onForget={() => {
             clearStoredSigning(activeProject?.name);

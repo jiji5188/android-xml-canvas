@@ -58,15 +58,12 @@ interface ApkBridge {
   shareApk?(path: string): void;
 }
 
-type Resolver = (r: BuildApkResult) => void;
+import { axvNative, ensureGlobalCallback, pendingTable } from "./native-bridge";
 
-const pending = new Map<string, Resolver>();
-let seq = 0;
-let installed = false;
+const table = pendingTable<BuildApkResult>("apk");
 
 function bridge(): ApkBridge | null {
-  if (typeof window === "undefined") return null;
-  return (window as unknown as { AxvNative?: ApkBridge }).AxvNative ?? null;
+  return axvNative<ApkBridge>();
 }
 
 /** 当前环境能不能在设备端打包（网页版永远不能） */
@@ -76,24 +73,22 @@ export function hasBuildApk(): boolean {
 }
 
 function install(): void {
-  if (typeof window === "undefined") return;
-  if (installed && typeof (window as { __axvBuildApk?: unknown }).__axvBuildApk === "function") return;
-  installed = true;
-  (window as unknown as { __axvBuildApk?: (id: string, json: string) => void }).__axvBuildApk = (
-    id: string,
-    json: string,
-  ) => {
-    const fn = pending.get(id);
-    if (!fn) return;
-    pending.delete(id);
-    let r: BuildApkResult;
-    try {
-      r = JSON.parse(json) as BuildApkResult;
-    } catch {
-      r = { ok: false, log: "原生返回的不是合法 JSON：" + String(json).slice(0, 200) };
-    }
-    fn(r);
-  };
+  ensureGlobalCallback("__axvBuildApk", () => {
+    (window as unknown as { __axvBuildApk?: (id: string, json: string) => void }).__axvBuildApk = (
+      id: string,
+      json: string,
+    ) => {
+      const fn = table.take(id);
+      if (!fn) return;
+      let r: BuildApkResult;
+      try {
+        r = JSON.parse(json) as BuildApkResult;
+      } catch {
+        r = { ok: false, log: "原生返回的不是合法 JSON：" + String(json).slice(0, 200) };
+      }
+      fn(r);
+    };
+  });
 }
 
 /** 打包（promise 永远 resolve，错误放在 ok=false + log 里） */
@@ -105,18 +100,18 @@ export function buildApk(input: BuildApkInput): Promise<BuildApkResult> {
       return;
     }
     install();
-    const id = "apk" + ++seq + "-" + Date.now();
-    pending.set(id, resolve);
+    const id = table.nextId();
+    table.put(id, resolve);
     try {
       b.buildInstallApkAsync(id, JSON.stringify(input));
     } catch (e) {
-      pending.delete(id);
+      table.drop(id);
       resolve({ ok: false, step: "env", log: String(e) });
     }
     // 兜底：原生进程异常时不至于永远挂着
     setTimeout(() => {
-      if (pending.has(id)) {
-        pending.delete(id);
+      if (table.pending.has(id)) {
+        table.drop(id);
         resolve({ ok: false, step: "timeout", log: "打包超时（90s 没回话）" });
       }
     }, 90000);

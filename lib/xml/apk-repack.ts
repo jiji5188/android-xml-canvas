@@ -10,6 +10,8 @@
 //   listApkEntries(path) → 同步返回 [{name,size}]（失败返回 "err:..."）
 //   repackApkAsync(id, payload) → 原生回 window.__axvRepackApk(id, "ok:<path>"|"err:step:msg")
 
+import { axvNative, ensureGlobalCallback, pendingTable } from "./native-bridge";
+
 export interface ApkEntry {
   name: string;
   size: number;
@@ -41,8 +43,7 @@ interface RepackBridge {
 }
 
 function bridge(): RepackBridge | null {
-  if (typeof window === "undefined") return null;
-  return (window as unknown as { AxvNative?: RepackBridge }).AxvNative ?? null;
+  return axvNative<RepackBridge>();
 }
 
 export function hasApkRepack(): boolean {
@@ -115,27 +116,22 @@ export function listApkEntries(apkPath: string): { entries: ApkEntry[]; error?: 
   }
 }
 
-const pending = new Map<string, (r: RepackResult) => void>();
-let seq = 0;
-let installed = false;
+const table = pendingTable<RepackResult>("rep");
 
 function install(): void {
-  if (typeof window === "undefined") return;
-  const w = window as unknown as { __axvRepackApk?: (id: string, json: string) => void };
-  if (installed && typeof w.__axvRepackApk === "function") return;
-  installed = true;
-  w.__axvRepackApk = (id: string, raw: string) => {
-    const fn = pending.get(id);
-    if (!fn) return;
-    pending.delete(id);
-    const s = String(raw || "");
-    if (s.startsWith("ok:")) fn({ ok: true, path: s.slice(3) });
-    else if (s.startsWith("err:")) {
-      const rest = s.slice(4);
-      const colon = rest.indexOf(":");
-      fn({ ok: false, step: colon > 0 ? rest.slice(0, colon) : undefined, log: colon > 0 ? rest.slice(colon + 1) : rest });
-    } else fn({ ok: false, log: s.slice(0, 300) });
-  };
+  ensureGlobalCallback("__axvRepackApk", () => {
+    (window as unknown as { __axvRepackApk?: (id: string, json: string) => void }).__axvRepackApk = (id: string, raw: string) => {
+      const fn = table.take(id);
+      if (!fn) return;
+      const s = String(raw || "");
+      if (s.startsWith("ok:")) fn({ ok: true, path: s.slice(3) });
+      else if (s.startsWith("err:")) {
+        const rest = s.slice(4);
+        const colon = rest.indexOf(":");
+        fn({ ok: false, step: colon > 0 ? rest.slice(0, colon) : undefined, log: colon > 0 ? rest.slice(colon + 1) : rest });
+      } else fn({ ok: false, log: s.slice(0, 300) });
+    };
+  });
 }
 
 /** 重打包（promise 永远 resolve） */
@@ -147,18 +143,18 @@ export function repackApk(input: RepackInput): Promise<RepackResult> {
       return;
     }
     install();
-    const id = "rep" + ++seq + "-" + Date.now();
-    pending.set(id, resolve);
+    const id = table.nextId();
+    table.put(id, resolve);
     try {
       b.repackApkAsync(id, JSON.stringify(input));
     } catch (e) {
-      pending.delete(id);
+      table.drop(id);
       resolve({ ok: false, step: "env", log: String(e) });
       return;
     }
     setTimeout(() => {
-      if (pending.has(id)) {
-        pending.delete(id);
+      if (table.pending.has(id)) {
+        table.drop(id);
         resolve({ ok: false, step: "timeout", log: "重打包超时（90s 没回话）" });
       }
     }, 90000);

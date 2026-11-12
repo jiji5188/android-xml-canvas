@@ -3,6 +3,8 @@
 // 由原生写进用户可见目录（默认「下载/XML画板」，也可由用户自选文件夹）。
 // 为什么必须这样：WebView 不支持 blob: 链接的下载，点了完全没反应。
 
+import { axvNativeIf } from "./native-bridge";
+
 export interface AxvNativeBridge {
   /** 保存文件，base64 传输；返回 "ok:<路径>" 或 "err:<原因>" */
   saveFile(name: string, mime: string, base64: string): string;
@@ -64,9 +66,8 @@ declare global {
 }
 
 export function nativeBridge(): AxvNativeBridge | null {
-  if (typeof window === "undefined") return null;
-  const b = window.AxvNative;
-  return b && typeof b.saveFile === "function" ? b : null;
+  // 桥名只在 native-bridge.ts 里出现一次（M188c 教训：手写桥名必错）
+  return axvNativeIf<AxvNativeBridge>((b) => typeof b.saveFile === "function");
 }
 
 /** 是否运行在原生壳里（决定 UI 上要不要显示「保存位置」） */

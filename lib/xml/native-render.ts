@@ -39,15 +39,12 @@ interface RenderBridge {
   renderReal?(id: string, payload: string): void;
 }
 
-type Resolver = (r: RealRenderResult) => void;
+import { axvNative, ensureGlobalCallback, pendingTable } from "./native-bridge";
 
-const pending = new Map<string, Resolver>();
-let seq = 0;
-let installed = false;
+const table = pendingTable<RealRenderResult>("r");
 
 function bridge(): RenderBridge | null {
-  if (typeof window === "undefined") return null;
-  return (window as unknown as { AxvNative?: RenderBridge }).AxvNative ?? null;
+  return axvNative<RenderBridge>();
 }
 
 /** 当前运行环境有没有「设备端真渲染」这个能力（网页版永远没有） */
@@ -57,25 +54,23 @@ export function hasRealRender(): boolean {
 }
 
 function install(): void {
-  if (typeof window === "undefined") return;
   // 每次调用都确保回调还在：WebView 页刷新 / 渲染进程重启会把 window 上的挂回去掉
-  if (installed && typeof (window as { __axvRender?: unknown }).__axvRender === "function") return;
-  installed = true;
-  (window as unknown as { __axvRender?: (id: string, json: string) => void }).__axvRender = (
-    id,
-    json,
-  ) => {
-    const done = pending.get(id);
-    if (!done) return;
-    pending.delete(id);
-    let r: RealRenderResult;
-    try {
-      r = JSON.parse(json) as RealRenderResult;
-    } catch {
-      r = { ok: false, log: "返回的 JSON 解析失败: " + String(json).slice(0, 400) };
-    }
-    done(r);
-  };
+  ensureGlobalCallback("__axvRender", () => {
+    (window as unknown as { __axvRender?: (id: string, json: string) => void }).__axvRender = (
+      id,
+      json,
+    ) => {
+      const done = table.take(id);
+      if (!done) return;
+      let r: RealRenderResult;
+      try {
+        r = JSON.parse(json) as RealRenderResult;
+      } catch {
+        r = { ok: false, log: "返回的 JSON 解析失败: " + String(json).slice(0, 400) };
+      }
+      done(r);
+    };
+  });
 }
 
 const PKG = "com.axv.render";
@@ -392,13 +387,12 @@ export function renderReal(
   }
   const filled = prep.files;
   install();
-  seq += 1;
-  const id = `r${Date.now().toString(36)}${seq}`;
+  const id = table.nextId();
   return new Promise<RealRenderResult>((resolve) => {
     const timer = window.setTimeout(() => {
-      if (pending.delete(id)) resolve({ ok: false, log: "真机渲染超时（25s），aapt2 可能卡住了" });
+      if (table.pending.delete(id)) resolve({ ok: false, log: "真机渲染超时（25s），aapt2 可能卡住了" });
     }, timeoutMs);
-    pending.set(id, (r) => {
+    table.put(id, (r) => {
       window.clearTimeout(timer);
       resolve(r);
     });
@@ -406,7 +400,7 @@ export function renderReal(
       b.renderReal!(id, JSON.stringify({ pkg: PKG, layout: name, files: filled }));
     } catch (e) {
       window.clearTimeout(timer);
-      pending.delete(id);
+      table.drop(id);
       resolve({ ok: false, log: "调用原生失败: " + String(e) });
     }
   });

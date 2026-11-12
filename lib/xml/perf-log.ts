@@ -30,18 +30,19 @@ const PERF_ON =
           const q = new URLSearchParams(window.location.search);
           if (q.get("perf") === "1") return true;
           if (q.get("perf") === "0") return false;
-          return !!(window as unknown as { AxvNative?: LogBridge }).AxvNative?.asyncLog;
+          return !!axvNative<LogBridge>()?.asyncLog;
         } catch {
           return false;
         }
       })();
 
+import { axvNative } from "./native-bridge";
+
 const recent = new Map<string, { at: number; count: number }>();
 const DEDUPE_MS = 1000;
 
 function bridge(): LogBridge | null {
-  if (typeof window === "undefined") return null;
-  return (window as unknown as { AxvNative?: LogBridge }).AxvNative ?? null;
+  return axvNative<LogBridge>();
 }
 
 function fmt(n: number): string {

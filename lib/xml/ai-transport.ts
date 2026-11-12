@@ -13,6 +13,7 @@ import {
   type AiConfig,
   type AiMessage,
 } from "./ai";
+import { axvNativeIf } from "./native-bridge";
 import { finishToolCalls, mergeToolCalls, type FcToolCall } from "./ai-fc";
 
 /* ---------- 原生通道类型 ---------- */
@@ -45,10 +46,7 @@ function webMsgSender(): WebMsgHandlers["axvAi"] | null {
 }
 
 function bridge(): AiNativeBridge | null {
-  if (typeof window === "undefined") return null;
-  const b = (window as unknown as { AxvNative?: AiNativeBridge }).AxvNative;
-  if (!b || typeof b.aiChatStream !== "function") return null;
-  return b;
+  return axvNativeIf<AiNativeBridge>((b) => typeof b.aiChatStream === "function");
 }
 
 /* ---------- M32c：MessagePort 通道（不依赖 JS 桥注册表） ---------- */

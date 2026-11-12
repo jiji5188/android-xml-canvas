@@ -432,10 +432,12 @@ interface NativeFsBridge {
   getWorkspaceInfo?(): string;
 }
 
+import { axvNative } from "./native-bridge";
+
 /** APK 里把相对路径映射到默认工作目录；越界由 Java 侧再兜一层 */
 export function createNativeIo(projectRootRel?: string): AiFileIo | null {
   if (typeof window === "undefined") return null;
-  const b = (window as unknown as { AxvNative?: NativeFsBridge }).AxvNative;
+  const b = axvNative<NativeFsBridge>();
   if (!b || typeof b.listDir !== "function" || typeof b.readText !== "function") return null;
 
   const root = b.getDefaultWorkspace?.() || "";

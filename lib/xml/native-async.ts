@@ -13,6 +13,7 @@
  */
 
 import { perfMark } from "./perf-log";
+import { axvNative, ensureGlobalCallback, pendingTable } from "./native-bridge";
 
 interface AsyncIoBridge {
   readTextAsync?(id: string, target: string): void;
@@ -27,15 +28,10 @@ interface AsyncIoBridge {
   getWorkspaceInfoAsync?(id: string): void;
 }
 
-type Resolver = (value: string | null) => void;
-
-const pending = new Map<string, Resolver>();
-let seq = 0;
-let installed = false;
+const table = pendingTable<string | null>("io");
 
 function bridge(): AsyncIoBridge | null {
-  if (typeof window === "undefined") return null;
-  return (window as unknown as { AxvNative?: AsyncIoBridge }).AxvNative ?? null;
+  return axvNative<AsyncIoBridge>();
 }
 
 /** 当前 APK 是否支持异步 IO（三种都给全了才算） */
@@ -69,17 +65,16 @@ export function hasListTopQuick(): boolean {
 }
 
 function install(): void {
-  if (installed || typeof window === "undefined") return;
-  installed = true;
-  (window as unknown as { __axvIo?: (id: string, payload: string | null) => void }).__axvIo = (
-    id,
-    payload,
-  ) => {
-    const f = pending.get(id);
-    if (!f) return;
-    pending.delete(id);
-    f(payload ?? null);
-  };
+  ensureGlobalCallback("__axvIo", () => {
+    (window as unknown as { __axvIo?: (id: string, payload: string | null) => void }).__axvIo = (
+      id,
+      payload,
+    ) => {
+      const f = table.take(id);
+      if (!f) return;
+      f(payload ?? null);
+    };
+  });
 }
 
 /* ---------------- 串行队列 ---------------- */
@@ -102,15 +97,15 @@ function call(kind: "readTextAsync" | "readBase64Async" | "listDirAsync" | "list
   const fn = b?.[kind];
   if (!b || typeof fn !== "function") return Promise.resolve(null);
   install();
-  const id = `io${Date.now().toString(36)}${(seq++).toString(36)}`;
+  const id = table.nextId();
   const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
   return new Promise<string | null>((resolve) => {
     const timer = setTimeout(() => {
-      pending.delete(id);
+      table.drop(id);
       perfMark("io.timeout", `${kind} ${timeoutMs}ms`);
       resolve(null);
     }, timeoutMs);
-    pending.set(id, (v) => {
+    table.put(id, (v) => {
       clearTimeout(timer);
       // M59：量 JNI 往返（Java 后台线程 + 回传 eval 的总时间）
       const ms = (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
@@ -124,7 +119,7 @@ function call(kind: "readTextAsync" | "readBase64Async" | "listDirAsync" | "list
       else (fn as (id: string, arg: string) => void).call(b, id, arg ?? "");
     } catch {
       clearTimeout(timer);
-      pending.delete(id);
+      table.drop(id);
       resolve(null);
     }
   });
@@ -180,7 +175,6 @@ export function yieldToUi(): Promise<void> {
 
 /** 测试用：清掉队列与挂起表 */
 export function __resetAsyncIoForTest(): void {
-  pending.clear();
+  for (const k of [...table.pending.keys()]) table.drop(k);
   queue = Promise.resolve();
-  installed = false;
 }

@@ -12,6 +12,7 @@
 // 纯函数，Node 可单测。
 
 import { TAG_TO_CLASS } from "./java-res-env";
+import { lineOf, lineStarts } from "./text-pos";
 
 /** View 基类方法（所有控件都有） */
 const VIEW_METHODS = [
@@ -201,20 +202,7 @@ function maskCode(src: string): string {
   return out.join("");
 }
 
-function lineStarts(src: string): number[] {
-  const starts = [0];
-  for (let i = 0; i < src.length; i++) if (src[i] === "\n") starts.push(i + 1);
-  return starts;
-}
-
-function lineOf(starts: number[], at: number): number {
-  let lo = 0, hi = starts.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (starts[mid] <= at) lo = mid; else hi = mid - 1;
-  }
-  return lo + 1;
-}
+// 行号工具统一在 text-pos.ts
 
 /**
  * 检查「变量.方法名」里的方法名是否像控件 API 的拼写错误。

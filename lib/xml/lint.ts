@@ -4,6 +4,7 @@
 
 import { childRuleOf, isRootOnlyTag, shortTag } from "./child-rules";
 import { namespaceIssues } from "./namespace";
+import { lineOf, lineStarts } from "./text-pos";
 
 export interface LintIssue {
   line: number;
@@ -25,28 +26,11 @@ export interface LintIssue {
  * lintXml 里每个标签都调一次 → 000 个控件的布局单次 lint 170ms。
  * 新：一次性建行首偏移表 + 二分查，170ms -> 2ms。
  */
-function buildLineStarts(src: string): number[] {
-  const starts = [0];
-  for (let i = 0; i < src.length; i++) {
-    if (src.charCodeAt(i) === 10) starts.push(i + 1);
-  }
-  return starts;
-}
-
-function lineOf(starts: number[], offset: number): number {
-  let lo = 0;
-  let hi = starts.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (starts[mid] <= offset) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo + 1;
-}
+/* 行号工具统一在 text-pos.ts（lineStarts / lineOf / colOf） */
 
 export function lintXml(src: string): LintIssue[] {
   const issues: LintIssue[] = [];
-  const starts = buildLineStarts(src);
+  const starts = lineStarts(src);
   const lineAt = (offset: number) => lineOf(starts, offset);
   // M12：命名空间错（android:cornerRadius 这类）→ aapt 编译不过，导出时会被自动改成 app:
   for (const ns of namespaceIssues(src)) {

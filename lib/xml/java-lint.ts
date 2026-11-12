@@ -17,6 +17,7 @@ import { nearestName } from "./nearest-name";
 import { extractJavaSymbols, findUnknownSymbols } from "./java-symbols";
 import { findAssignMismatches } from "./java-assign";
 import { findCaseMismatches } from "./java-case";
+import { lineOf, lineStarts } from "./text-pos";
 
 // M179:输出侧复用了这个方法(XML 资源引用检查也用),从 shared 模块 re-export 兼容旧引用
 export { nearestName };
@@ -286,22 +287,7 @@ function mask(src: string, isKotlin = false): Masked {
   return { code: out.join(""), inStr, openAt: open ? (open.at ?? 0) : null };
 }
 
-function lineStarts(src: string): number[] {
-  const starts = [0];
-  for (let i = 0; i < src.length; i++) if (src[i] === "\n") starts.push(i + 1);
-  return starts;
-}
-
-function lineOf(starts: number[], offset: number): number {
-  let lo = 0;
-  let hi = starts.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (starts[mid] <= offset) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo + 1;
-}
+/* 行号工具统一在 text-pos.ts（lineStarts / lineOf / colOf） */
 
 /** 主检查入口 */
 export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] {

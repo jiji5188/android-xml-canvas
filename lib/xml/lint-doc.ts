@@ -58,24 +58,9 @@ export function codeDocKind(xml: string, path?: string | null): CodeDocKind {
   return "other";
 }
 
-/* ── 行号工具 ── */
+/* ── 行号工具（统一在 text-pos.ts）── */
 
-function lineStarts(src: string): number[] {
-  const out = [0];
-  for (let i = 0; i < src.length; i++) if (src.charCodeAt(i) === 10) out.push(i + 1);
-  return out;
-}
-
-function lineAt(starts: number[], offset: number): number {
-  let lo = 0;
-  let hi = starts.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (starts[mid] <= offset) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo + 1;
-}
+import { lineOf as lineAt, lineStarts } from "./text-pos";
 
 /* ── manifest ── */
 

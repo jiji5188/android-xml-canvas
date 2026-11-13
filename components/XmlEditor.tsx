@@ -2245,6 +2245,12 @@ const allDrawableNames = useMemo(() => {
   /* M192：一键打包成可安装 APK（设备端 aapt2 + 壳 dex + apksig） */
   const [apkBusy, setApkBusy] = useState(false);
   const [apkResult, setApkResult] = useState<BuildApkResult | null>(null);
+  /** M237：带自动消失的提示（打包结果不能永久挂在屏幕上挡操作） */
+  const noteTimed = useCallback((msg: string, ms = 6000) => {
+    if (noteTimerRef.current) window.clearTimeout(noteTimerRef.current);
+    setExportNote(msg);
+    noteTimerRef.current = window.setTimeout(() => setExportNote(""), ms);
+  }, []);
   const doBuildApk = useCallback(
     async (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => {
       if (apkBusy) return;
@@ -2339,7 +2345,7 @@ const allDrawableNames = useMemo(() => {
         const prep = prepareFiles(layout, files);
         if (prep.blocked) {
           setApkResult({ ok: false, step: "compile", log: prep.blocked });
-          setExportNote(tt("打包失败：{msg}", { msg: "compile" }));
+          noteTimed(tt("打包失败：{msg}", { msg: "compile" }), 12000);
           return;
         }
         const r = await buildApk({
@@ -2360,28 +2366,31 @@ const allDrawableNames = useMemo(() => {
         });
         setApkResult(r);
         // M216：把编译模式写进状态条，别把“布局壳”当“真跑逻辑的 APK”
+        // M237：成功/失败提示必须自动消失，之前没有定时器会永久挂在屏幕上挡操作
         if (r.ok) {
           const base = tt("打包完成：{name}", { name: r.name || "" });
           const cm = compileModeOf(r);
-          if (cm.mode === "java") {
-            setExportNote(tt("{base}（已编译 {n} 个 Java 类）", { base, n: String(cm.classes) }));
+          if (cm.mode === "java" && cm.classes > 0) {
+            noteTimed(tt("{base}（已编译 {n} 个 Java 类）", { base, n: String(cm.classes) }), 8000);
+          } else if (cm.mode === "java") {
+            noteTimed(tt("{base}（⚠ 未注入 Java dex，实际还是布局壳）", { base }), 12000);
           } else if (cm.mode === "shell") {
-            setExportNote(tt("{base}（项目无 .java，生成的是布局壳，不运行任何逻辑）", { base }));
+            noteTimed(tt("{base}（项目无 .java，生成的是布局壳，不运行任何逻辑）", { base }), 10000);
           } else {
-            setExportNote(base);
+            noteTimed(base, 8000);
           }
         } else {
-          setExportNote(tt("打包失败（{step}）", { step: r.step || "?" }));
+          noteTimed(tt("打包失败（{step}）", { step: r.step || "?" }), 12000);
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setApkResult({ ok: false, step: "js", log: msg });
-        setExportNote(tt("打包失败：{msg}", { msg }));
+        noteTimed(tt("打包失败：{msg}", { msg }), 12000);
       } finally {
         setApkBusy(false);
       }
     },
-    [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel, docKind, xml],
+    [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel, docKind, xml, noteTimed],
   );
   // M220：root 在 doBuildApk 里算（依赖 activeProject），重新读 build.gradle 需要它；
   // activeProject 在 deps 里，root 跟着变，闭包读到的总是当前值，无需单独加。

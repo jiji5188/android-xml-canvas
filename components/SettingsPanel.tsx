@@ -27,6 +27,8 @@ import {
   type EditorTheme,
 } from "@/lib/xml/editor-theme";
 import { ColorField } from "./ColorField";
+import { PluginPanel } from "./PluginPanel";
+import type { PluginEnabledMap } from "@/lib/plugin/store";
 
 export interface SettingsPanelProps {
   tr: (key: string, fallback: string) => string;
@@ -80,6 +82,10 @@ export interface SettingsPanelProps {
 
   // 数据
   onSaveXml: () => void;
+
+  // M233：插件（内置编辑器的启用/禁用）
+  pluginsEnabled: PluginEnabledMap;
+  onTogglePlugin: (id: string, on: boolean) => void;
 }
 
 export function SettingsPanel(p: SettingsPanelProps) {
@@ -525,6 +531,22 @@ export function SettingsPanel(p: SettingsPanelProps) {
           </span>
           {tt("清空本机缓存并重启")}
         </button>
+      </div>
+
+      {/* ===== M233：插件（内置编辑器启用/禁用） ===== */}
+      <div className={groupCls(7)}>
+        <button
+          type="button"
+          className="axv-set-label"
+          aria-expanded={isOpen(7)}
+          onClick={() => toggle(7)}
+        >
+          <span className="msr axv-set-caret" aria-hidden="true">
+            chevron_right
+          </span>
+          {tr("set.plugins", "插件")}
+        </button>
+        <PluginPanel enabled={p.pluginsEnabled} onToggle={p.onTogglePlugin} />
       </div>
     </div>
   );

@@ -176,6 +176,7 @@ import { CanvasStage } from "./CanvasStage";
 import { APP_VERSION } from "@/lib/version";
 import { AboutPanel } from "@/components/AboutPanel";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { loadPluginEnabled, togglePluginEnabled, type PluginEnabledMap } from "@/lib/plugin/store";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
 import { loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
@@ -651,6 +652,11 @@ export function XmlEditor() {
     }
   });
   const [showIssues, setShowIssues] = useState(true);
+
+  // M233：内置编辑器插件的启用状态（drawable / icon）。关掉后资源树点对应类型回退代码编辑。
+  const [pluginEnabled, setPluginEnabled] = useState<PluginEnabledMap>(loadPluginEnabled);
+  const onTogglePlugin = (id: string, on: boolean) =>
+    setPluginEnabled((cur) => togglePluginEnabled(id, on, cur));
 
   /* ===== M100：安卓返回键 =====
    * 注册顺序 = 层级从下到上：先左栅面板，再子页面，最后弹窗。
@@ -4992,6 +4998,8 @@ const findResolved = findResolvedNode;
               onEditorColor={patchEditorColor}
               onResetEditorTheme={resetEditorTheme}
               onSaveXml={saveProject}
+              pluginsEnabled={pluginEnabled}
+              onTogglePlugin={onTogglePlugin}
             />
           )}
 
@@ -5538,6 +5546,7 @@ const findResolved = findResolvedNode;
       {resShape ? (
         <PluginEditorHost
           kind="drawable"
+          enabled={pluginEnabled}
           props={{
             name: resShape.name,
             existingXml: resShape.xml,
@@ -5580,6 +5589,7 @@ const findResolved = findResolvedNode;
       {resIcon ? (
         <PluginEditorHost
           kind="icon"
+          enabled={pluginEnabled}
           props={{
             name: resIcon.name,
             existingXml: resIcon.xml,

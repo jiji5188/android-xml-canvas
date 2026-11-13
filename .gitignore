@@ -90,3 +90,7 @@ plugins/compilers/*/files/**
 !plugins/compilers/*/files/.gitkeep
 
 tmp-plugins-push/
+
+# cleanup 2026-11-13: 不入库
+tmp*
+apk/tmp-classes/

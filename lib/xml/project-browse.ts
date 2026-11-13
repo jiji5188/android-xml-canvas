@@ -232,7 +232,7 @@ export function webProjectSource(root: unknown, name: string): ProjectSource {
           if (e.kind === "directory") {
             if (SKIP_DIRS.has(lower)) continue;
             dirs.push({ kind: "dir", name: e.name, rel: joinRel(rel, e.name), handle: e });
-          } else if (/\.xml$/i.test(e.name) || (isIconDirRel(rel) && isImageName(e.name)) || (isJavaDirRel(rel) && isJavaSrcName(e.name))) {
+          } else if (/\.xml$/i.test(e.name) || (isIconDirRel(rel) && isImageName(e.name)) || isJavaSrcName(e.name)) {
             files.push({ kind: "file", name: e.name, rel: joinRel(rel, e.name), handle: e });
           }
         }
@@ -330,7 +330,7 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
               if (it.kind === "dir") {
                 if (SKIP_DIRS.has(it.name.toLowerCase())) continue;
                 out.push({ kind: "dir", name: it.name, rel: joinRel(rel, it.name) });
-              } else if (/\.xml$/i.test(it.name) || (isIconDirRel(rel) && isImageName(it.name)) || (isJavaDirRel(rel) && isJavaSrcName(it.name))) {
+              } else if (/\.xml$/i.test(it.name) || (isIconDirRel(rel) && isImageName(it.name)) || isJavaSrcName(it.name)) {
                 out.push({ kind: "file", name: it.name, rel: joinRel(rel, it.name), target: it.path });
               }
             }
@@ -352,7 +352,7 @@ export function nativeProjectSource(name: string, all: WsProject[], rootDir?: st
         if (!it.rel.startsWith(prefix)) continue;
         const rest = it.rel.slice(prefix.length);
         if (!rest || rest.includes("/")) continue;
-        if (it.kind === "file" && !/\.xml$/i.test(it.name) && !(isIconDirRel(rel) && isImageName(it.name)) && !(isJavaDirRel(rel) && isJavaSrcName(it.name))) continue;
+        if (it.kind === "file" && !/\.xml$/i.test(it.name) && !(isIconDirRel(rel) && isImageName(it.name)) && !isJavaSrcName(it.name)) continue;
         out.push({ kind: it.kind, name: it.name, rel: it.rel, target: it.target });
       }
       return [...sortEntries(out.filter((e) => e.kind === "dir")), ...sortEntries(out.filter((e) => e.kind === "file"))];

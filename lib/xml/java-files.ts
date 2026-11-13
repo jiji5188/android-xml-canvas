@@ -19,25 +19,41 @@ export async function loadProjectJavaFiles(
   io: AiFileIo | null | undefined,
   maxDepth = 8,
 ): Promise<{ rel: string; text: string }[]> {
-  if (!io) return [];
+  if (!io) {
+    console.log("[loadProjectJava] io is null, returning []");
+    return [];
+  }
   const out: { rel: string; text: string }[] = [];
   let budget = MAX_FILES;
 
   const walk = async (rel: string, depth: number): Promise<void> => {
     if (depth > maxDepth || budget <= 0) return;
     const r = await io.list(rel);
-    if (!r.ok) return;
+    if (!r.ok) {
+      console.log("[loadProjectJava] list failed at", rel, "-", r.error);
+      return;
+    }
+    console.log("[loadProjectJava] list(" + rel + ") →", r.items?.length, "items:", r.items?.map((x) => x.kind + ":" + x.name).join(", ") || "(empty)");
     for (const it of r.items ?? []) {
       if (budget <= 0) return;
       if (it.kind === "dir") {
         const seg = it.rel.replace(/\\/g, "/").split("/").pop() ?? "";
-        if (SKIP_DIRS.has(seg.toLowerCase())) continue;
+        if (SKIP_DIRS.has(seg.toLowerCase())) {
+          console.log("[loadProjectJava] SKIP dir", it.rel);
+          continue;
+        }
         await walk(it.rel, depth + 1);
         continue;
       }
-      if (!isCode(it.rel)) continue;
+      if (!isCode(it.rel)) {
+        continue;
+      }
+      console.log("[loadProjectJava] FOUND code file:", it.rel);
       const t = await io.read(it.rel);
-      if (!t.ok || typeof t.text !== "string") continue;
+      if (!t.ok || typeof t.text !== "string") {
+        console.log("[loadProjectJava] read failed:", it.rel, t.error);
+        continue;
+      }
       if (t.text.length > MAX_TEXT) continue;
       out.push({ rel: it.rel, text: t.text });
       budget--;
@@ -45,5 +61,6 @@ export async function loadProjectJavaFiles(
   };
 
   await walk("", 0);
+  console.log("[loadProjectJava] total found:", out.length);
   return out;
 }

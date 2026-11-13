@@ -177,6 +177,7 @@ import { APP_VERSION } from "@/lib/version";
 import { AboutPanel } from "@/components/AboutPanel";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { loadPluginEnabled, togglePluginEnabled, type PluginEnabledMap } from "@/lib/plugin/store";
+import { installPlugin, loadInstalledPlugins, type InstalledPlugin } from "@/lib/plugin/installer";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
 import { loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
@@ -657,6 +658,36 @@ export function XmlEditor() {
   const [pluginEnabled, setPluginEnabled] = useState<PluginEnabledMap>(loadPluginEnabled);
   const onTogglePlugin = (id: string, on: boolean) =>
     setPluginEnabled((cur) => togglePluginEnabled(id, on, cur));
+
+  // M234：第三方插件安装
+  const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
+  const [installBusy, setInstallBusy] = useState(false);
+  const [installNote, setInstallNote] = useState("");
+  // 启动时把 IndexedDB 里已装的插件重新加载 + 注册
+  useEffect(() => {
+    let alive = true;
+    loadInstalledPlugins().then((list) => {
+      if (alive) setInstalledPlugins(list);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const onInstallPlugin = (manifestUrl: string) => {
+    setInstallBusy(true);
+    setInstallNote("");
+    installPlugin(manifestUrl)
+      .then((p) => {
+        setInstalledPlugins((cur) => (cur.some((x) => x.id === p.id) ? cur.map((x) => (x.id === p.id ? p : x)) : [...cur, p]));
+        setInstallNote(tt("已安装：{name}", { name: p.name }));
+        // 新装的第三方插件默认启用
+        setPluginEnabled((cur) => ({ ...cur, [p.id]: true }));
+      })
+      .catch((e: unknown) => {
+        setInstallNote(String((e as Error)?.message || e));
+      })
+      .finally(() => setInstallBusy(false));
+  };
 
   /* ===== M100：安卓返回键 =====
    * 注册顺序 = 层级从下到上：先左栅面板，再子页面，最后弹窗。
@@ -5000,6 +5031,10 @@ const findResolved = findResolvedNode;
               onSaveXml={saveProject}
               pluginsEnabled={pluginEnabled}
               onTogglePlugin={onTogglePlugin}
+              installedPlugins={installedPlugins}
+              onInstallPlugin={onInstallPlugin}
+              installBusy={installBusy}
+              installNote={installNote}
             />
           )}
 

@@ -14,20 +14,20 @@ import { EditorRegistry, type EditorKind } from "./plugin-registry";
 const LS_KEY = "axv.plugin.enabled";
 
 /** 内置插件的固定清单（和 registerBuiltinEditors 一致）。新增内置插件要同步这里 */
-const BUILTIN_IDS = ["axv:editor:drawable", "axv:editor:icon"];
+export const BUILTIN_PLUGIN_IDS = ["axv:editor:drawable", "axv:editor:icon"];
 
 export type PluginEnabledMap = Record<string, boolean>;
 
 /** 读 localStorage。没存过的（新装）默认全启用 */
 export function loadPluginEnabled(): PluginEnabledMap {
   const defaults: PluginEnabledMap = {};
-  for (const id of BUILTIN_IDS) defaults[id] = true;
+  for (const id of BUILTIN_PLUGIN_IDS) defaults[id] = true;
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return defaults;
     const parsed: Record<string, unknown> = JSON.parse(raw);
     // 合并：解析出来的覆盖默认（允许关闭）；没出现的保留默认
-    for (const id of BUILTIN_IDS) {
+    for (const id of BUILTIN_PLUGIN_IDS) {
       if (typeof parsed[id] === "boolean") defaults[id] = parsed[id];
     }
     return defaults;

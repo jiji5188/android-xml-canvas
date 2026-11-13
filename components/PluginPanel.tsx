@@ -8,6 +8,7 @@
 
 import { t as tt } from "@/lib/i18n-src";
 import { EditorRegistry } from "@/lib/plugin/plugin-registry";
+import { BUILTIN_PLUGIN_IDS } from "@/lib/plugin/store";
 import type { PluginEnabledMap } from "@/lib/plugin/store";
 
 export interface PluginEntry {
@@ -16,7 +17,7 @@ export interface PluginEntry {
   builtin: boolean;
 }
 
-/** 取当前已注册的全部插件条目（顺序 = 注册顺序） */
+/** 取当前已注册的全部插件条目（顺序 = 注册顺序）。内置 vs 第三方用 BUILTIN_PLUGIN_IDS 判 */
 export function listPlugins(): PluginEntry[] {
   // 注册表没暴露 byId 列表，用 kinds 去重 + get 取
   const seen = new Set<string>();
@@ -25,11 +26,7 @@ export function listPlugins(): PluginEntry[] {
     const m = EditorRegistry.resolve(kind);
     if (!m || seen.has(m.id)) continue;
     seen.add(m.id);
-    out.push({ id: m.id, label: m.label || m.id, builtin: true });
-  }
-  // 没注册的内置（理论上不会，但保险）
-  for (const id of ["axv:editor:drawable", "axv:editor:icon"]) {
-    if (!seen.has(id)) out.push({ id, label: id, builtin: true });
+    out.push({ id: m.id, label: m.label || m.id, builtin: BUILTIN_PLUGIN_IDS.includes(m.id) });
   }
   return out;
 }
@@ -48,7 +45,10 @@ export function PluginPanel({ enabled, onToggle }: Props) {
         return (
           <div key={p.id} className="axv-plugin-item">
             <div className="axv-plugin-meta">
-              <b>{p.label}</b>
+              <b>
+                {p.label}
+                {p.builtin ? null : <span className="axv-plugin-tag">{tt("第三方")}</span>}
+              </b>
               <span className="axv-plugin-id">{p.id}</span>
             </div>
             <label className="axv-plugin-toggle">

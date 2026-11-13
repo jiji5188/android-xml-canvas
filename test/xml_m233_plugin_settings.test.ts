@@ -22,8 +22,8 @@ describe("M233 设置面板插件分组", () => {
   it("PluginPanel 列出内置插件 + 开关", () => {
     const s = rd("components/PluginPanel.tsx");
     expect(s).toContain("listPlugins");
-    expect(s).toContain("axv:editor:drawable");
-    expect(s).toContain("axv:editor:icon");
+    expect(s).toContain("BUILTIN_PLUGIN_IDS");
+    expect(s).toContain("axv-plugin-tag");
     expect(s).toContain('type="checkbox"');
     expect(s).toContain("已禁用");
   });

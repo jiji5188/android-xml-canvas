@@ -2184,6 +2184,8 @@ const allDrawableNames = useMemo(() => {
   const [pluginNeed, setPluginNeed] = useState(false);
   const [pluginBusy, setPluginBusy] = useState(false);
   const [pluginPct, setPluginPct] = useState(0);
+  const lastBuildArgsRef = useRef<{ storeFile: string; storePass: string; alias: string; keyPass?: string } | null>(null);
+  const doBuildApkRef = useRef<(o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => Promise<void> | void>(null);
   const doDownloadPlugin = useCallback(async () => {
     if (pluginBusy) return;
     if (!hasPluginSupport()) {
@@ -2199,13 +2201,18 @@ const allDrawableNames = useMemo(() => {
     setPluginBusy(false);
     if (res.ok) {
       setPluginNeed(false);
-      setExportNote(tt("编译器已下载完成，请再点一次「打包并安装 APK"));
+      setExportNote(tt("编译器已下载完成，自动重新打包…"));
+      // 自动重打上一次那个包（下载完不用手动再点一次）
+      if (lastBuildArgsRef.current && doBuildApkRef.current) {
+        void doBuildApkRef.current(lastBuildArgsRef.current);
+      }
     } else {
       setExportNote(tt("下载失败（{step}）：{msg}", { step: res.step || "?", msg: res.log || "" }));
     }
   }, [pluginBusy]);
   const doBuildApk = useCallback(
     async (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => {
+      lastBuildArgsRef.current = o;
       if (apkBusy) return;
       setApkResult(null);
       if (!hasBuildApk()) {
@@ -2343,6 +2350,7 @@ const allDrawableNames = useMemo(() => {
     },
     [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel, docKind, xml],
   );
+  doBuildApkRef.current = doBuildApk; // M228：供 doDownloadPlugin 下载完成后自动重打
   // M220：root 在 doBuildApk 里算（依赖 activeProject），重新读 build.gradle 需要它；
   // activeProject 在 deps 里，root 跟着变，闭包读到的总是当前值，无需单独加。
   // M220b：写回同一个文件（readAppGradle 命中的那个），否则 KTS / 根目录工程会多出一个无效的 app/build.gradle。

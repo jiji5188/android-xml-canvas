@@ -673,18 +673,19 @@ export function XmlEditor() {
       alive = false;
     };
   }, []);
-  const onInstallPlugin = (manifestUrl: string) => {
+  const onInstallPlugin = (manifestUrl: string): Promise<void> => {
     setInstallBusy(true);
     setInstallNote("");
-    installPlugin(manifestUrl)
+    return installPlugin(manifestUrl)
       .then((p) => {
         setInstalledPlugins((cur) => (cur.some((x) => x.id === p.id) ? cur.map((x) => (x.id === p.id ? p : x)) : [...cur, p]));
         setInstallNote(tt("已安装：{name}", { name: p.name }));
-        // 新装的第三方插件默认启用
         setPluginEnabled((cur) => ({ ...cur, [p.id]: true }));
       })
       .catch((e: unknown) => {
-        setInstallNote(String((e as Error)?.message || e));
+        const msg = String((e as Error)?.message || e);
+        setInstallNote(msg);
+        throw new Error(msg); // 让弹窗也能 catch
       })
       .finally(() => setInstallBusy(false));
   };

@@ -553,70 +553,67 @@ export function SettingsPanel(p: SettingsPanelProps) {
           {tr("set.plugins", "插件")}
         </button>
         <PluginPanel enabled={p.pluginsEnabled} onToggle={p.onTogglePlugin} />
-        {/* M234：安装第三方插件 */}
-        <div className="axv-plugin-install">
-          <div className="axv-set-sub">{tt("安装插件")}</div>
-          <input
-            className="axv-plugin-url"
-            type="text"
-            placeholder="https://cdn.jsdelivr.net/gh/…/manifest.json"
-            defaultValue="https://cdn.jsdelivr.net/gh/jiji5188/axv-plugins@main/editors/ref-finder/manifest.json"
-            ref={(el) => {
-              if (el) (el as HTMLInputElement).dataset.initial = "";
-            }}
-            onInput={(e) => {
-              (e.target as HTMLInputElement).dataset.last = (e.target as HTMLInputElement).value;
-            }}
-            data-installurl=""
-          />
-          <button
-            className="axv-set-btn"
-            disabled={p.installBusy}
-            onClick={() => {
-              const inp = document.querySelector(".axv-plugin-url") as HTMLInputElement | null;
-              const url = (inp && inp.value.trim()) || "";
-              if (!url) return;
-              p.onInstallPlugin(url);
-            }}
-          >
-            {p.installBusy ? tt("安装中…") : tt("安装")}
-          </button>
-          {p.installNote ? <div className="axv-set-hint">{p.installNote}</div> : null}
-          {p.installedPlugins.length > 0 ? (
-            <div className="axv-installed">
-              <b>{tt("已安装第三方插件")}</b>
-              {p.installedPlugins.map((pl) => (
-                <div key={pl.id} className="axv-installed-item axv-installed-col">
-                  <div className="axv-installed-row">
-                    <b>{pl.name}</b>
-                    <button
-                      className="axv-set-btn axv-set-btn-mini"
-                      onClick={() => {
-                        const sel = '[data-run="' + pl.id + '"]';
-                        const box = document.querySelector(sel) as HTMLElement | null;
-                        if (!box) return;
-                        const bare = (
-                          window as { __axvBareEditors?: Record<string, { mount: (el: HTMLElement, p: unknown, b: unknown) => void }> }
-                        ).__axvBareEditors?.[pl.id];
-                        if (!bare) {
-                          box.textContent = tt("插件未注册（刷新后需重新安装）");
-                          return;
-                        }
-                        box.textContent = "";
-                        box.style.display = "block";
-                        bare.mount(box, { name: "ic_launcher" }, null);
-                      }}
-                    >
-                      {tt("试运行")}
-                    </button>
-                  </div>
-                  <span className="axv-plugin-id">{pl.id} {pl.version ? "v" + pl.version : ""}</span>
-                  <div data-run={pl.id} className="axv-plugin-runbox" style={{ display: "none" }} />
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        {/* M234：安装第三方插件（弹窗，不占面板空间） */}
+        <button
+          type="button"
+          className="axv-set-btn"
+          onClick={() => {
+            const existing = document.getElementById("axv-plugin-install-dlg") as HTMLDialogElement | null;
+            const dlg: HTMLDialogElement = existing ?? (() => {
+              const d = document.createElement("dialog") as HTMLDialogElement;
+              d.id = "axv-plugin-install-dlg";
+              d.className = "axv-plugin-dlg";
+              d.innerHTML =
+                '<h3 style="margin:0 0 10px;font-size:14px;font-weight:600;">' +
+                tt("安装插件") +
+                "</h3>" +
+                '<input id="axv-plugin-url" type="text" placeholder="https://cdn.jsdelivr.net/gh/…/manifest.json" value="https://cdn.jsdelivr.net/gh/jiji5188/axv-plugins@main/editors/ref-finder/manifest.json" style="width:100%;padding:6px 8px;border:1px solid var(--axv-outline,#999);border-radius:6px;font:12px system-ui;background:var(--axv-surface,#fff);color:var(--axv-on-surface,#222);" />' +
+                '<div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end;"><button id="axv-plugin-cancel" style="padding:5px 14px;border:1px solid var(--axv-outline,#999);border-radius:6px;background:transparent;cursor:pointer;font:12px system-ui;">' +
+                tt("取消") +
+                '</button><button id="axv-plugin-ok" style="padding:5px 14px;border:none;border-radius:6px;background:var(--axv-primary,#4a90d9);color:#fff;cursor:pointer;font:12px system-ui;font-weight:600;">' +
+                tt("安装") +
+                '</button></div>' +
+                '<div id="axv-plugin-note" style="margin-top:8px;font-size:11px;color:var(--axv-on-surface-variant,#666);min-height:16px;"></div>';
+              document.body.appendChild(d);
+              d.querySelector("#axv-plugin-cancel")!.addEventListener("click", () => d.close());
+              d.querySelector("#axv-plugin-ok")!.addEventListener("click", async () => {
+                const url = (d.querySelector("#axv-plugin-url") as HTMLInputElement).value.trim();
+                if (!url) return;
+                const okBtn = d.querySelector("#axv-plugin-ok") as HTMLButtonElement;
+                const note = d.querySelector("#axv-plugin-note") as HTMLDivElement;
+                okBtn.disabled = true;
+                okBtn.textContent = tt("安装中…");
+                note.textContent = "";
+                try {
+                  await p.onInstallPlugin(url);
+                  note.textContent = tt("已安装");
+                  setTimeout(() => d.close(), 600);
+                } catch (e: unknown) {
+                  note.textContent = String((e as Error)?.message || e);
+                } finally {
+                  okBtn.disabled = false;
+                  okBtn.textContent = tt("安装");
+                }
+              });
+              return d;
+            })();
+            dlg.querySelector("#axv-plugin-note")!.textContent = "";
+            dlg.showModal();
+          }}
+        >
+          {tt("安装插件")}
+        </button>
+        {p.installedPlugins.length > 0 ? (
+          <div className="axv-installed">
+            <b>{tt("已安装第三方插件")}</b>
+            {p.installedPlugins.map((pl) => (
+              <div key={pl.id} className="axv-installed-item">
+                <b>{pl.name}</b>
+                <span className="axv-plugin-id">{pl.id} {pl.version ? "v" + pl.version : ""}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

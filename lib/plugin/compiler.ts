@@ -11,6 +11,7 @@
 export interface CompilerPluginInfo {
   id: string;
   name: string;
+  language: string; // "java" | "kotlin" | "c" | "cpp" | "html" | "ts" | "js"
   version: string;
   source: "builtin" | "remote";
   manifestUrl: string;
@@ -30,6 +31,7 @@ export async function fetchCompilerInfo(): Promise<CompilerPluginInfo | null> {
     const m = (await r.json()) as {
       id: string;
       name?: string;
+      language?: string;
       version?: string;
       loader?: string;
       files?: Array<{ path: string }>;
@@ -37,6 +39,7 @@ export async function fetchCompilerInfo(): Promise<CompilerPluginInfo | null> {
     return {
       id: m.id || "compiler",
       name: m.name || "Java 编译器（ECJ + D8）",
+      language: m.language || "java",
       version: m.version || "unknown",
       source: "remote",
       manifestUrl: COMPILER_MANIFEST_URL,
@@ -52,6 +55,7 @@ export async function fetchCompilerInfo(): Promise<CompilerPluginInfo | null> {
 export const BUILTIN_COMPILER: CompilerPluginInfo = {
   id: "compiler-ecj-d8",
   name: "Java 编译器（ECJ + D8）",
+  language: "java",
   version: "3.33.0",
   source: "builtin",
   manifestUrl: COMPILER_MANIFEST_URL,

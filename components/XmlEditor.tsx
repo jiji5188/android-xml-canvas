@@ -676,7 +676,7 @@ export function XmlEditor() {
   }, []);
 
   // M235：编译器插件（内置）
-  const [compilerInfo, setCompilerInfo] = useState({ id: BUILTIN_COMPILER.id, name: BUILTIN_COMPILER.name, version: BUILTIN_COMPILER.version, source: BUILTIN_COMPILER.source });
+  const [compilerInfo, setCompilerInfo] = useState({ id: BUILTIN_COMPILER.id, name: BUILTIN_COMPILER.name, language: BUILTIN_COMPILER.language, version: BUILTIN_COMPILER.version, source: BUILTIN_COMPILER.source });
   const [compilerBusy, setCompilerBusy] = useState(false);
   const [compilerNote, setCompilerNote] = useState("");
   const onCheckCompilerUpdate = () => {

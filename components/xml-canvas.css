@@ -4748,6 +4748,16 @@ body.axv-lt-dragging .axv-lt-row {
   color: var(--axv-on-primary,#fff);
   vertical-align: middle;
 }
+.axv-plugin-src {
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--axv-outline);
+  color: var(--axv-on-surface-variant);
+  vertical-align: middle;
+}
 .axv-plugin-id {
   font-size: 11px;
   color: var(--axv-on-surface-variant);

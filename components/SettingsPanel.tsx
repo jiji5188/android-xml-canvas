@@ -93,7 +93,7 @@ export interface SettingsPanelProps {
   installBusy: boolean;
   installNote: string;
   // M235：编译器插件
-  compilerInfo: { id: string; name: string; version: string; source: string };
+  compilerInfo: { id: string; name: string; language: string; version: string; source: string };
   compilerBusy: boolean;
   compilerNote: string;
   onCheckCompilerUpdate: () => void;
@@ -563,7 +563,8 @@ export function SettingsPanel(p: SettingsPanelProps) {
           <div className="axv-plugin-meta">
             <b>
               {p.compilerInfo.name}
-              <span className="axv-plugin-tag">{p.compilerInfo.source === "builtin" ? tt("内置") : tt("已安装")}</span>
+              <span className="axv-plugin-tag">{p.compilerInfo.language}</span>
+              <span className="axv-plugin-src">{p.compilerInfo.source === "builtin" ? tt("内置") : tt("已安装")}</span>
             </b>
             <span className="axv-plugin-id">{p.compilerInfo.id} v{p.compilerInfo.version}</span>
           </div>

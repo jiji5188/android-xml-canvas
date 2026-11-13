@@ -55,22 +55,20 @@ describe("M141 useUnsavedGuard 契约", () => {
 });
 
 describe("M141 接线：两个子页面都装了拦截", () => {
-  it("drawable 编辑器：返回走 guard，且脏 = 内容变了或改了资源名", () => {
+  it("drawable 编辑器：返回走 guard（M230 useEditorGuard），且脏 = 内容变了或改了资源名", () => {
     const s = rd("components/DrawableEditor.tsx");
-    expect(s).toContain("useUnsavedGuard");
+    expect(s).toContain('import { useEditorGuard } from "./useEditorGuard";');
     expect(s).toContain("dirty: xml !== baseXml || name !== initialNameRef.current");
-    expect(s).toContain("const close = () => guard.requestClose(onClose)");
-    expect(s).toContain("useOverlayBack(true, () => closeRef.current())");
+    expect(s).toContain("const close = () => guard.close()");
     expect(s).toContain("{guard.dialog}");
   });
 
-  it("图标编辑器：返回/取消走 guard，系统返回键也拦", () => {
+  it("图标编辑器：返回/取消走 guard（M230 useEditorGuard），系统返回键也拦", () => {
     const s = rd("components/IconCanvasEditor.tsx");
-    expect(s).toContain("useUnsavedGuard");
-    expect(s).toContain("const close = () => guard.requestClose(onClose)");
-    expect(s).toContain("closeRef.current = () => guard.requestClose(onClose)");
-    expect(s).toContain("useOverlayBack(true, () => closeRef.current())");
-    expect(s).toContain("hint: tt(\"这个图标\")");
+    expect(s).toContain('import { useEditorGuard } from "./useEditorGuard";');
+    expect(s).toContain("const close = () => guard.close()");
+    expect(s).toContain("closeRef.current = () => guard.close()");
+    expect(s).toContain('hint: tt("这个图标")');
   });
 
   it("图标编辑器只在内容/名字真变了才算脏（撤销回原地不该弹）", () => {

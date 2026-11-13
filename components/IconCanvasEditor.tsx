@@ -9,13 +9,10 @@
 
 import { t as tt } from "@/lib/i18n-src";
 import { cleanResNameInput, sanitizeResName, applyResNamePrefix } from "@/lib/xml/resname";
-import { hasRealRender, renderReal } from "@/lib/xml/native-render";
-import { buildResourcePreviewFiles } from "@/lib/xml/res-preview";
 import { buildAppIcon } from "@/lib/xml/app-icon";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useOverlayBack } from "@/lib/overlay-back";
 import { buildVectorXml, parseVectorModel, nextRotation } from "@/lib/xml/vector-edit";
 import {
   bakeGroupTransform,
@@ -44,7 +41,8 @@ import {
   type Mat,
 } from "@/lib/xml/canvas-shapes";
 import { IconPickerPanel } from "./IconPickerPanel";
-import { useUnsavedGuard } from "./UnsavedGuard";
+import { useEditorGuard } from "./useEditorGuard";
+import { useRealPreview } from "./useRealPreview";
 import { textToPathData } from "@/lib/xml/text-to-path";
 import { ColorPicker } from "./ColorPicker";
 import { parseColorOr } from "@/lib/xml/color-argb";
@@ -181,9 +179,9 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [tool, setTool] = useState<Tool>("select");
   const [resName, setResName] = useState(name);
   const [err, setErr] = useState("");
-  /** M158：aapt2 真预览进行中 / 结果 */
-  const [realBusy, setRealBusy] = useState(false);
+  /** M158：aapt2 真预览结果提示（进行中 / 动作统一在 useRealPreview） */
   const [realNote, setRealNote] = useState("");
+  const real = useRealPreview({});
   /** M135：XML 代码框默认一直展开 */
   const showRaw = true;
   const [picking, setPicking] = useState(false);
@@ -254,9 +252,8 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
 
   // M78：系统返回键也能关；必须放在任何 early return 之前
-  // M141：返回前过一遍未保存提示（closeRef 在拿到 guard 之后回填）
+  // M230：未保存守卫 + 返回键由 useEditorGuard 统一接管（closeRef 保留给键盘 Esc / 早期路径用）
   const closeRef = useRef<() => void>(() => {});
-  useOverlayBack(true, () => closeRef.current());
 
   /* ---------------- 历史 ---------------- */
   const snapshot = useCallback((): Snapshot => ({ meta, shapes }), [meta, shapes]);
@@ -1241,14 +1238,15 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   /** M141：未保存提示 —— 画布动过（或改过资源名）就算脏，和初始快照比内容，不拿引用比 */
   const baseJson = useRef(JSON.stringify(initial));
   const dirty = JSON.stringify({ meta, shapes }) !== baseJson.current || resName !== name;
-  const guard = useUnsavedGuard({
+  const guard = useEditorGuard({
     dirty,
     onSave: () => save(),
     canSave: Boolean(resName.trim()) && !err,
     hint: tt("这个图标"),
+    onClose,
   });
-  const close = () => guard.requestClose(onClose);
-  closeRef.current = () => guard.requestClose(onClose);
+  const close = () => guard.close();
+  closeRef.current = () => guard.close();
 
   const save = () => {
     // M158：图标资源统一带 ic_ 前缀（已有 ic_xxx 不重复叠加）
@@ -1307,31 +1305,11 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
   };
 
   /* ===== M158：aapt2 真预览（图标 = 24/48/96dp 三档 ImageView） ===== */
-  const doRealPreview = () => {
-    if (realBusy) return;
+  /** M230：真预览动作统一在 useRealPreview 里，这里只留结果提示 */
+  const doRealPreview = async () => {
     const safe = sanitizeResName(applyResNamePrefix(resName, "vector"), "ic");
-    const preview = buildResourcePreviewFiles(safe, outXml, "icon");
-    setRealBusy(true);
-    setRealNote(tt("正在用设备上的 aapt2 编译…"));
-    void renderReal(preview.layoutName, preview.files)
-      .then((r) => {
-        setRealBusy(false);
-        setRealNote(
-          r.ok
-            ? tt("真机预览：资源包 {kb} KB（编译 {ms} ms），已打开真控件页", {
-                kb: Math.round((r.bytes ?? 0) / 1024),
-                ms: r.ms ?? 0,
-              })
-            : tt("真机预览失败（{stage}）：{log}", {
-                stage: r.stage || tt("未知"),
-                log: (r.log || "").slice(0, 260),
-              }),
-        );
-      })
-      .catch((e) => {
-        setRealBusy(false);
-        setRealNote(tt("真机预览失败：{reason}", { reason: String(e) }));
-      });
+    const r = await real.run({ name: safe, xml: outXml, kind: "icon" });
+    setRealNote(r.message);
   };
 
   /* ===== M171：设为应用图标 =====
@@ -2485,14 +2463,14 @@ export default function IconCanvasEditor({ name, xml, onClose, onSave, existingN
               {tt("设为应用图标")}
             </button>
           ) : null}
-          {hasRealRender() ? (
+          {real.show ? (
             <button
               className="axv-btn axv-ghost"
-              onClick={doRealPreview}
-              disabled={realBusy}
+              onClick={() => void doRealPreview()}
+              disabled={real.busy}
               title={tt("用设备上的 aapt2 真编译这个图标，再用系统 ImageView 渲染")}
             >
-              {realBusy ? tt("编译中…") : tt("真机预览")}
+              {real.busy ? tt("编译中…") : tt("真机预览")}
             </button>
           ) : null}
           <button className="axv-btn axv-ghost" onClick={close}>{tt("取消")}</button>

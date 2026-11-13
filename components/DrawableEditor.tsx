@@ -13,7 +13,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
-import { useOverlayBack } from "@/lib/overlay-back";
 import type { DrawableNode } from "@/lib/xml/drawable-node";
 import { parseDrawable } from "@/lib/xml/drawable-node";
 import { rootInfo, ROOT_TAGS, ROOT_LABELS, ROOT_WARN } from "@/lib/xml/drawable-root";
@@ -24,11 +23,9 @@ import { nodeAt, replaceAt, breadcrumb, parentOf, setSlot, slotOf, addChild, clo
 import { validateDrawable } from "@/lib/xml/drawable-schema";
 import { DRAWABLE_PRESETS } from "@/lib/xml/drawable-presets";
 import { cleanResNameInput, resNameFromValue, sanitizeResName, applyResNamePrefix, defaultResName, resNamePrefix } from "@/lib/xml/resname";
-import { hasRealRender, renderReal } from "@/lib/xml/native-render";
-import { buildResourcePreviewFiles } from "@/lib/xml/res-preview";
-import { collectProjectRes } from "@/lib/xml/res-collect";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
-import { useUnsavedGuard } from "@/components/UnsavedGuard";
+import { useEditorGuard } from "./useEditorGuard";
+import { useRealPreview } from "./useRealPreview";
 import { DrawablePreview } from "./DrawablePreview";
 import { focusDoc } from "@/lib/xml/drawable-focus";
 import { AttrRows } from "./drawable/AttrRows";
@@ -154,8 +151,8 @@ export function DrawableEditor({
   const [name, setName] = useState<string>(() => resNameFromValue(value) || defaultResName(info.tag));
   /** M158：结构树剪贴板（复制整层，可反复粘贴） */
   const [clip, setClip] = useState<DrawableNode | null>(null);
-  /** M158：aapt2 真预览的进行中 / 结果提示 */
-  const [realBusy, setRealBusy] = useState(false);
+  /** M230：真机预览统一走 useRealPreview（收集嵌套引用 + aapt2 编译 + 打开真控件页） */
+  const real = useRealPreview({ io, docRel });
   /** M141：打开时的资源名，改名也算「有未保存的修改」 */
   const initialNameRef = useRef(name);
   const [presetOpen, setPresetOpen] = useState(false);
@@ -186,10 +183,6 @@ export function DrawableEditor({
     setFormOpen(!narrow);
   }, [narrow]);
 
-  // M141：系统返回键也要能拦（closeRef 在拿到 guard 之后回填）
-  const closeRef = useRef<() => void>(() => {});
-  useOverlayBack(true, () => closeRef.current());
-
   const xml = useMemo(() => buildDrawable(root), [root]);
   /** M141：打开时的 XML 基线 —— 用内容比，不拿对象引用比（撤销回原地不应该算脏） */
   const baseXml = useRef(xml).current;
@@ -203,15 +196,15 @@ export function DrawableEditor({
   const focused = path.length > 0;
   const nameConflicts = existingNames.includes(name) && !existingXml;
 
-  /** M141：有未保存改动就拦一下（子页面返回 / 取消 / 系统返回键） */
-  const guard = useUnsavedGuard({
+  /** M230：有未保存改动就拦一下（子页面返回 / 取消 / 系统返回键），统一在 useEditorGuard 里 */
+  const guard = useEditorGuard({
     dirty: xml !== baseXml || name !== initialNameRef.current,
     onSave: () => save(),
     canSave: Boolean(name.trim()) && !nameConflicts && (readonly || errors.length === 0),
     hint: tt("这个 drawable"),
+    onClose,
   });
-  const close = () => guard.requestClose(onClose);
-  closeRef.current = () => guard.requestClose(onClose);
+  const close = () => guard.close();
 
   const mutate = (next: DrawableNode) => {
     setUndoStack((s) => [...s, root]);
@@ -242,37 +235,16 @@ export function DrawableEditor({
   };
 
   /* ===== M158：资源真预览（设备端 aapt2 → ResourcesLoader → LayoutInflater） ===== */
-  const doRealPreview = () => {
-    if (realBusy) return;
+  /** M230：真预览动作统一在 useRealPreview 里，这里只留结果提示 */
+  const doRealPreview = async () => {
     const useName = existingXml ? name : applyResNamePrefix(name, currentRoot);
-    const preview = buildResourcePreviewFiles(useName, buildDrawable(root), "drawable", res?.drawableXml ?? null);
-    setRealBusy(true);
-    setRootNote(tt("正在收集嵌套引用，然后用设备上的 aapt2 编译…"));
-    void collectProjectRes(io ?? null, docRel ?? null, preview.files)
-      .then((c) => renderReal(preview.layoutName, c.files))
-      .then((r) => {
-        setRealBusy(false);
-        if (r.ok) {
-          setRootNote(
-            tt("真机预览：{n} 个文件 → 资源包 {kb} KB（编译 {ms} ms），已打开真控件页", {
-              n: r.files ?? 0,
-              kb: Math.round((r.bytes ?? 0) / 1024),
-              ms: r.ms ?? 0,
-            }),
-          );
-        } else {
-          setRootNote(
-            tt("真机预览失败（{stage}）：{log}", {
-              stage: r.stage || tt("未知"),
-              log: (r.log || "").slice(0, 260),
-            }),
-          );
-        }
-      })
-      .catch((e) => {
-        setRealBusy(false);
-        setRootNote(tt("真机预览失败：{reason}", { reason: String(e) }));
-      });
+    const r = await real.run({
+      name: useName,
+      xml: buildDrawable(root),
+      kind: "drawable",
+      refXml: res?.drawableXml ?? null,
+    });
+    setRootNote(r.message);
   };
   const undo = () => {
     if (undoStack.length === 0) return;
@@ -745,14 +717,14 @@ export function DrawableEditor({
           </span>
         </span>
         <span style={{ display: "flex", gap: 8 }}>
-          {hasRealRender() ? (
+          {real.show ? (
             <button
               className="axv-btn axv-ghost"
-              onClick={doRealPreview}
-              disabled={realBusy || readonly}
+              onClick={() => void doRealPreview()}
+              disabled={real.busy || readonly}
               title={tt("用设备上的 aapt2 真编译这个资源，再用系统控件渲染（不是 CSS 近似）")}
             >
-              {realBusy ? tt("编译中…") : tt("真机预览")}
+              {real.busy ? tt("编译中…") : tt("真机预览")}
             </button>
           ) : null}
           <button className="axv-btn axv-ghost" onClick={close}>

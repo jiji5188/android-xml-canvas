@@ -190,9 +190,8 @@ import { autoConstrain, hasConstraints, nextViewId, type CBox, type SibInfo } fr
 import { collectMeasurements, inspectorWarningsOf } from "@/lib/xml/inspector";
 import type { MeasuredNode } from "@/lib/xml/inspector";
 import { ResImagePreview } from "./ResImagePreview";
-import { ShapeEditor } from "./ShapeEditor";
+import { PluginEditorHost } from "./PluginEditorHost";
 import { ResourcePanel } from "./ResourcePanel";
-import IconCanvasEditor from "./IconCanvasEditor";
 import { renameAsset, renameReferences } from "@/lib/xml/asset-refs";
 import { findResolvedNode, splitPath, stripNs, collectIds } from "@/lib/xml/paths";
 import { pxNum, boxOf } from "@/lib/xml/geom";
@@ -5537,17 +5536,22 @@ const findResolved = findResolvedNode;
 
       {/* M4u：资源树里的 drawable xml → 绘制编辑器（保存回写 generatedDrawables） */}
       {resShape ? (
-        <ShapeEditor
-          attrName="background"
-          value={`@drawable/${resShape.name}`}
-          existingXml={resShape.xml}
-          existingNames={allDrawableNames}
-          forceTree={resShape.forceTree}
-          res={resExtrasAll}
-          io={aiFileIo}
-          docRel={openRel}
-          onClose={() => setResShape(null)}
-          onSave={(resourceName, shapeXml) => {
+        <PluginEditorHost
+          kind="drawable"
+          props={{
+            name: resShape.name,
+            existingXml: resShape.xml,
+            existingNames: allDrawableNames,
+            res: resExtrasAll,
+            io: aiFileIo,
+            docRel: openRel,
+            extra: {
+              attrName: "background",
+              value: `@drawable/${resShape.name}`,
+              forceTree: resShape.forceTree,
+            },
+            onClose: () => setResShape(null),
+            onSave: (resourceName, shapeXml) => {
             const safe = sanitizeResName(resourceName, "bg");
             setGeneratedDrawables((m) => ({ ...m, [safe]: shapeXml }));
             setResShape(null);
@@ -5568,19 +5572,30 @@ const findResolved = findResolvedNode;
               setExportNote(tt("已保存 res/drawable/{file}", { file }));
               window.setTimeout(() => setExportNote(" "), 3200);
             }
-          }}
+          }}}
         />
       ) : null}
 
       {/* M11j：生成的图标 → 图标编辑器（颜色 / 尺寸 / 路径 / 旋转） */}
       {resIcon ? (
-        <IconCanvasEditor
-          name={resIcon.name}
-          xml={resIcon.xml}
-          existingNames={allDrawableNames}
-          onClose={() => setResIcon(null)}
-          initialAppIcon={appIconInit ?? undefined}
-          onAppIcon={({ files, bgColor, contentDp }) => {
+        <PluginEditorHost
+          kind="icon"
+          props={{
+            name: resIcon.name,
+            existingXml: resIcon.xml,
+            existingNames: allDrawableNames,
+            onClose: () => setResIcon(null),
+            extra: {
+              initialAppIcon: appIconInit ?? undefined,
+              onAppIcon: ({
+                files,
+                bgColor,
+                contentDp,
+              }: {
+                files: { path: string; text: string }[];
+                bgColor: string;
+                contentDp: number;
+              }) => {
             // M171：把 4 个图标文件存起来（给 res.zip / 真机渲染用），有项目就直接写进它的 res/
             const map: Record<string, string> = {};
             for (const f of files) map[f.path] = f.text;
@@ -5615,8 +5630,9 @@ const findResolved = findResolvedNode;
               );
               window.setTimeout(() => setExportNote(""), 6000);
             }
-          }}
-          onSave={(safeName, iconXml) => {
+            }
+            },
+          onSave: (safeName, iconXml) => {
             const oldName = resIcon.name;
             setGeneratedDrawables((m) => {
               const next = { ...m };
@@ -5645,7 +5661,7 @@ const findResolved = findResolvedNode;
               setExportNote(tt("已保存 res/drawable/{file}", { file }));
               window.setTimeout(() => setExportNote(" "), 3200);
             }
-          }}
+          }}}
         />
       ) : null}
 

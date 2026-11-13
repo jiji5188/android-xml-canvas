@@ -33,12 +33,14 @@ export interface EditorMountProps {
   onSave: (resourceName: string, xml: string) => void;
   /** 关闭回调 */
   onClose: () => void;
-  /** @drawable 引用真渲染用：项目 res 资源源（名 → xml/dataURL） */
-  res?: Record<string, string> | null;
+  /** @drawable 引用真渲染用：项目 res 资源源（形状由各编辑器自己定，宿主透传） */
+  res?: unknown | null;
   /** 真预览时递归收集嵌套引用的 IO */
   io?: unknown | null;
   /** 当前打开文档的相对路径 */
   docRel?: string | null;
+  /** 编辑器专属透传参数（宿主不解释，各适配器自己取） */
+  extra?: Record<string, unknown>;
 }
 
 /** 一个编辑器插件的声明。Component 是懒加载的，首屏不把所有编辑器打进 bundle */

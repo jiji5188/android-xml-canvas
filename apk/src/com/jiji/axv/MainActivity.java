@@ -2776,13 +2776,15 @@ public class MainActivity extends Activity {
     private File ensureCompiler() throws IOException {
         File dir = new File(getCacheDir(), "compiler");
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("建不了 compiler 目录");
+        // M229：每次强制清空重解。内置完整版 assets 里一定有全套编译器，清空能彻底
+        // 甩掉历史残留（只读旧文件 / 半截下载 / 旧版 cache）导致的 writeBytes 写入失败。
+        try { rmRec(dir); } catch (Throwable ignored) {}
+        if (!dir.mkdirs()) throw new IOException("重建 compiler 目录失败");
         // android.jar.gz（M228 回退：编译器内置，离线可编译）
         File jar = new File(dir, "android.jar");
         byte[] jarBytes = readAssetGz("compiler/android.jar.gz"); // 已解压的 jar
-        if (!jar.isFile() || jar.length() != jarBytes.length) {
-            writeBytes(jar, jarBytes);
-            if (jar.canWrite()) { jar.setReadOnly(); try { Runtime.getRuntime().exec(new String[]{"chmod","444",jar.getAbsolutePath()}).waitFor(); } catch (Throwable ignored) {} }
-        }
+        writeBytes(jar, jarBytes);
+        if (jar.canWrite()) { jar.setReadOnly(); try { Runtime.getRuntime().exec(new String[]{"chmod","444",jar.getAbsolutePath()}).waitFor(); } catch (Throwable ignored) {} }
         // tool*.bin.gz（1..N，逐个）
         int i = 1;
         String toolBreakReason = null;

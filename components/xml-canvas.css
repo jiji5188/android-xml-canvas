@@ -4835,8 +4835,13 @@ body.axv-lt-dragging .axv-lt-row {
   background: var(--axv-surface);
 }
 
-/* M234：安装插件弹窗 */
+/* M234：安装插件弹窗（居中） */
 .axv-plugin-dlg {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
   border: none;
   border-radius: 12px;
   padding: 16px;
@@ -4845,9 +4850,11 @@ body.axv-lt-dragging .axv-lt-row {
   background: var(--axv-surface,#fff);
   color: var(--axv-on-surface,#222);
   box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  z-index: 9999;
 }
 .axv-plugin-dlg::backdrop {
   background: rgba(0,0,0,.35);
+  backdrop-filter: blur(2px);
 }
 .axv-set-btn {
   display: flex;

@@ -2595,7 +2595,10 @@ public class MainActivity extends Activity {
             }
             log.append("编译 ").append(files.size()).append(" 个 java + ").append(rFiles.size()).append(" 个 R.java\n");
             File androidJar = new File(compDir, "android.jar");
-            if (!androidJar.isFile()) throw new IOException("缺 android.jar（编译器资源没装齐）");
+            if (!androidJar.isFile() || androidJar.length() < 1024 * 1024) {
+                // M228：classpath 缺失/不完整（旧版残留）→ 让 UI 走「下载编译器」修复
+                throw new IOException("NEED_PLUGIN_DOWNLOAD:" + pluginStatusJson(PLUGIN_ID));
+            }
             // ECJ
             java.lang.ClassLoader cl = compilerLoader(compDir);
             Class<?> ecj = cl.loadClass("com.jiji.axv.compiler.EcjBridge");
@@ -3153,11 +3156,14 @@ public class MainActivity extends Activity {
             try {
                 compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files);
             } catch (IOException ce) {
+                final String cm2 = ce.getMessage() == null ? "" : ce.getMessage();
+                // M228：编译器缺失/不完整 → 不降级成壳，抛给上层让 UI 弹「下载编译器」
+                if (cm2.startsWith("NEED_PLUGIN_DOWNLOAD")) throw ce;
                 // M223：区分「编译器工具本身挂了」（缺 dex / 读不到 asset）vs「用户 Java 有真错」。
                 // 工具挂是环境 bug，不该把用户整包打包彻底堵死 → 退化成布局壳并给醒目标记；
                 // 用户 Java 真错（ECJ 报 syntax/type）仍走 M216 的中止（那种异常不走这里，
                 // 因为 ECJ 错误是编译期返回码/日志，不是 IOException）。
-                if (ce.getMessage() != null && ce.getMessage().contains("编译器")) {
+                if (cm2.contains("编译器") || cm2.contains("android.jar") || cm2.contains("compiler")) {
                     log.append("⚠ 设备端 Java 编译器不可用（").append(ce.getMessage())
                             .append("），本次退化为布局壳（不运行 Java 逻辑）；重打包前请确认 APK 内含 compiler 资源\n");
                     compileMode = "shell-no-compiler";
@@ -3347,6 +3353,17 @@ public class MainActivity extends Activity {
         } catch (Throwable t) { return ""; }
     }
 
+    /** 覆盖写：目标可能是上次安装留下的只读文件（setReadOnly 444）→ 先解除只读再删再写 */
+    private static void writeBytesForce(File f, byte[] data) throws IOException {
+        try {
+            if (f.exists()) {
+                if (!f.canWrite()) { f.setWritable(true); }
+                if (!f.delete()) throw new IOException("删不了旧文件 " + f.getName());
+            }
+        } catch (SecurityException se) { /* 下面写会报具体错 */ }
+        writeBytes(f, data);
+    }
+
     /** 核心：下载 + 校验 + 解压。@param callId 仅用于原生→JS 回传，下载固定用 PLUGIN_ID/PLUGIN_VER */
     private void downloadPlugin(String callId) {
         StringBuilder log = new StringBuilder();
@@ -3389,7 +3406,7 @@ public class MainActivity extends Activity {
                 if (wantSize > 0 && gz.length != wantSize) { log.append("  ").append(name).append(" 大小 ").append(gz.length).append("（期望 ").append(wantSize).append("）\n"); }
                 byte[] rawBytes = gunzip(gz);
                 if (name.endsWith(".bin.gz")) {
-                    writeBytes(new File(dir, name.replace(".bin.gz", ".bin")), rawBytes);
+                    writeBytesForce(new File(dir, name.replace(".bin.gz", ".bin")), rawBytes);
                 } else if (name.equals("msgs.bin.gz")) {
                     File resDir = new File(dir, "res");
                     if (resDir.isDirectory()) rmRec(resDir);
@@ -3424,7 +3441,7 @@ public class MainActivity extends Activity {
                     if (wantSha.length() == 64 && !wantSha.equals(sha256Hex(gz))) throw new IOException(name + " sha256 不符");
                     byte[] jarBytes = gunzip(gz);
                     File jar = new File(dir, "android.jar");
-                    writeBytes(jar, jarBytes);
+                    writeBytesForce(jar, jarBytes);
                     log.append("  ").append(name).append(" → ").append(jarBytes.length / 1048576).append("MB\n");
                     pluginProgress("classpath", 98, jarBytes.length, 0, "安装 classpath");
                 }
@@ -3444,7 +3461,7 @@ public class MainActivity extends Activity {
                 }
             }
             installed.put("files", ilist);
-            writeBytes(new File(dir, "installed.json"), installed.toString().getBytes("UTF-8"));
+            writeBytesForce(new File(dir, "installed.json"), installed.toString().getBytes("UTF-8"));
 
             pluginProgress("done", 100, 0, 0, "完成");
             pluginDone(callId, installed.toString());

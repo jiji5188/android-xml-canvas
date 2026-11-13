@@ -1662,7 +1662,9 @@ const allDrawableNames = useMemo(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const files = await loadProjectJavaFiles(aiFileIo);
+        const files = await loadProjectJavaFiles(aiFileIo, 8, {
+          nativeRoot: activeProject?.rootPath || activeProject?.dirPath || null,
+        });
         if (!cancelled) setRunJavaFiles(files);
       } catch {
         if (!cancelled) setRunJavaFiles([]);
@@ -2315,7 +2317,9 @@ const allDrawableNames = useMemo(() => {
         }
         // M213：设备端真编译——把项目 Java/Kotlin 源码交给设备上的 ECJ+D8，产出 dex 注进包
         setExportNote(tt("正在收集 Java 源码…"));
-        const javaSrc = await loadProjectJavaFiles(aiFileIo);
+        const javaSrc = await loadProjectJavaFiles(aiFileIo, 8, {
+          nativeRoot: activeProject?.rootPath || activeProject?.dirPath || null,
+        });
         // M217：当前正在编辑的 Java/Kotlin 可能还没保存 —— 用编辑器正文覆盖磁盘旧版，
         // 否则「明明改了代码，打出来的包却没变化」，且没有任何提示。
         const javaSrcMapped = javaSrc.map((j) => ({ path: j.rel, code: j.text }));

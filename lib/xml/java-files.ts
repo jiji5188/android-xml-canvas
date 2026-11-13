@@ -4,6 +4,8 @@
 
 import type { AiFileIo } from "./ai-tools";
 import { coreSkipDirs, withSkipExtras } from "./skip-dirs";
+import { hasAsyncIo, listDirQueued } from "./native-async";
+import { nativeBridge } from "./native-save";
 
 // 不读 build/ 里的源码（build 产物不是源码）；dex 查找例外（见 project-dex.ts）
 const SKIP_DIRS = withSkipExtras(coreSkipDirs, "build");
@@ -15,19 +17,53 @@ const MAX_FILES = 60;
 
 const isCode = (rel: string) => /\.(java|kt|kts)$/i.test(rel);
 
+// M236：Native 全量递归（绕过 listChildren 的 UI 过滤），
+// 当 aiFileIo 扫不到任何 .java 时 fallback 到这里。
+async function nativeWalk(
+  rootDir: string,
+  maxDepth: number,
+  onFound: (rel: string) => Promise<void>,
+  budget: { remaining: number },
+): Promise<void> {
+  const walk = async (abs: string, rel: string, depth: number): Promise<void> => {
+    if (depth > maxDepth || budget.remaining <= 0) return;
+    let json: string | null = null;
+    try {
+      json = hasAsyncIo() ? await listDirQueued(abs) : (nativeBridge()?.listDir?.(abs) ?? null);
+    } catch {
+      return;
+    }
+    if (!json) return;
+    let parsed: { ok?: boolean; items?: { name: string; kind: string; path?: string }[] };
+    try { parsed = JSON.parse(json); } catch { return; }
+    if (!parsed?.ok || !Array.isArray(parsed.items)) return;
+    for (const it of parsed.items) {
+      if (budget.remaining <= 0) return;
+      const childRel = rel ? rel + "/" + it.name : it.name;
+      if (it.kind === "dir") {
+        const seg = it.name.toLowerCase();
+        if (SKIP_DIRS.has(seg)) continue;
+        await walk(it.path || (abs + "/" + it.name), childRel, depth + 1);
+      } else if (isCode(childRel)) {
+        budget.remaining--;
+        await onFound(childRel);
+      }
+    }
+  };
+  await walk(rootDir, "", 0);
+}
+
 export async function loadProjectJavaFiles(
   io: AiFileIo | null | undefined,
   maxDepth = 8,
+  extra?: { nativeRoot?: string | null },
 ): Promise<{ rel: string; text: string }[]> {
-  if (!io) {
-    console.log("[loadProjectJava] io is null, returning []");
-    return [];
-  }
   const out: { rel: string; text: string }[] = [];
   let budget = MAX_FILES;
 
   const walk = async (rel: string, depth: number): Promise<void> => {
     if (depth > maxDepth || budget <= 0) return;
+    if (!io) return;
     const r = await io.list(rel);
     if (!r.ok) {
       console.log("[loadProjectJava] list failed at", rel, "-", r.error);
@@ -45,9 +81,7 @@ export async function loadProjectJavaFiles(
         await walk(it.rel, depth + 1);
         continue;
       }
-      if (!isCode(it.rel)) {
-        continue;
-      }
+      if (!isCode(it.rel)) continue;
       console.log("[loadProjectJava] FOUND code file:", it.rel);
       const t = await io.read(it.rel);
       if (!t.ok || typeof t.text !== "string") {
@@ -61,6 +95,20 @@ export async function loadProjectJavaFiles(
   };
 
   await walk("", 0);
+
+  // M236：aiFileIo 扫不到任何 .java 时，fallback 到 Native 全量递归
+  if (out.length === 0 && extra?.nativeRoot) {
+    console.log("[loadProjectJava] aiFileIo found 0, trying native fallback at", extra.nativeRoot);
+    const nb = { remaining: MAX_FILES };
+    await nativeWalk(extra.nativeRoot, maxDepth, async (rel) => {
+      const t = await (io?.read(rel) ?? Promise.resolve({ ok: false as const }));
+      if (!t.ok || typeof t.text !== "string" || t.text.length > MAX_TEXT) return;
+      console.log("[loadProjectJava] NATIVE FOUND:", rel);
+      out.push({ rel, text: t.text });
+      nb.remaining--;
+    }, nb);
+  }
+
   console.log("[loadProjectJava] total found:", out.length);
   return out;
 }

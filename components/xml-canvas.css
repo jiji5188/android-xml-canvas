@@ -4856,6 +4856,24 @@ body.axv-lt-dragging .axv-lt-row {
   background: rgba(0,0,0,.35);
   backdrop-filter: blur(2px);
 }
+
+/* M235：编译器插件项 */
+.axv-compiler-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: var(--axv-surface);
+}
+.axv-compiler-item .axv-plugin-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .axv-set-btn {
   display: flex;
   align-items: center;

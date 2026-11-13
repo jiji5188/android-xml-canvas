@@ -89,9 +89,14 @@ export interface SettingsPanelProps {
   onTogglePlugin: (id: string, on: boolean) => void;
   // M234：安装第三方插件
   installedPlugins: InstalledPlugin[];
-  onInstallPlugin: (manifestUrl: string) => void;
+  onInstallPlugin: (manifestUrl: string) => Promise<void>;
   installBusy: boolean;
   installNote: string;
+  // M235：编译器插件
+  compilerInfo: { id: string; name: string; version: string; source: string };
+  compilerBusy: boolean;
+  compilerNote: string;
+  onCheckCompilerUpdate: () => void;
 }
 
 export function SettingsPanel(p: SettingsPanelProps) {
@@ -553,6 +558,25 @@ export function SettingsPanel(p: SettingsPanelProps) {
           {tr("set.plugins", "插件")}
         </button>
         <PluginPanel enabled={p.pluginsEnabled} onToggle={p.onTogglePlugin} />
+        {/* M235：编译器插件（内置/可更新） */}
+        <div className="axv-compiler-item">
+          <div className="axv-plugin-meta">
+            <b>
+              {p.compilerInfo.name}
+              <span className="axv-plugin-tag">{p.compilerInfo.source === "builtin" ? tt("内置") : tt("已安装")}</span>
+            </b>
+            <span className="axv-plugin-id">{p.compilerInfo.id} v{p.compilerInfo.version}</span>
+          </div>
+          <button
+            type="button"
+            className="axv-set-btn axv-set-btn-mini"
+            disabled={p.compilerBusy}
+            onClick={p.onCheckCompilerUpdate}
+          >
+            {p.compilerBusy ? tt("检查中…") : tt("检查更新")}
+          </button>
+          {p.compilerNote ? <div className="axv-set-hint">{p.compilerNote}</div> : null}
+        </div>
         {/* M234：安装第三方插件（弹窗，不占面板空间） */}
         <button
           type="button"

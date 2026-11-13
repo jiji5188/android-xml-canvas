@@ -178,6 +178,7 @@ import { AboutPanel } from "@/components/AboutPanel";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { loadPluginEnabled, togglePluginEnabled, type PluginEnabledMap } from "@/lib/plugin/store";
 import { installPlugin, loadInstalledPlugins, type InstalledPlugin } from "@/lib/plugin/installer";
+import { BUILTIN_COMPILER } from "@/lib/plugin/compiler";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
 import { loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
@@ -673,6 +674,32 @@ export function XmlEditor() {
       alive = false;
     };
   }, []);
+
+  // M235：编译器插件（内置）
+  const [compilerInfo, setCompilerInfo] = useState({ id: BUILTIN_COMPILER.id, name: BUILTIN_COMPILER.name, version: BUILTIN_COMPILER.version, source: BUILTIN_COMPILER.source });
+  const [compilerBusy, setCompilerBusy] = useState(false);
+  const [compilerNote, setCompilerNote] = useState("");
+  const onCheckCompilerUpdate = () => {
+    setCompilerBusy(true);
+    setCompilerNote("");
+    import("@/lib/plugin/compiler").then(({ fetchCompilerInfo }) => {
+      fetchCompilerInfo()
+        .then((info) => {
+          if (info) {
+            setCompilerInfo({ ...info, source: info.version !== "3.33.0" ? "remote" : "builtin" });
+            setCompilerNote(
+              info.version === "3.33.0"
+                ? tt("已是最新版本 v{v}", { v: info.version })
+                : tt("发现新版本 v{v}（APK 端下载后重启生效）", { v: info.version })
+            );
+          } else {
+            setCompilerNote(tt("拉取 manifest 失败，检查网络"));
+          }
+        })
+        .catch(() => setCompilerNote(tt("拉取 manifest 失败")))
+        .finally(() => setCompilerBusy(false));
+    }).catch(() => setCompilerBusy(false));
+  };
   const onInstallPlugin = (manifestUrl: string): Promise<void> => {
     setInstallBusy(true);
     setInstallNote("");
@@ -5036,6 +5063,10 @@ const findResolved = findResolvedNode;
               onInstallPlugin={onInstallPlugin}
               installBusy={installBusy}
               installNote={installNote}
+              compilerInfo={compilerInfo}
+              compilerBusy={compilerBusy}
+              compilerNote={compilerNote}
+              onCheckCompilerUpdate={onCheckCompilerUpdate}
             />
           )}
 

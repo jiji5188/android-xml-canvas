@@ -17,7 +17,7 @@ import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { prepareFiles } from "@/lib/xml/native-render";
-import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest } from "@/lib/xml/find-launcher";
+import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, parseManifestLauncher } from "@/lib/xml/find-launcher";
 import { collectProjectLibs } from "@/lib/xml/project-libs";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
@@ -178,6 +178,12 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         });
         const javaSrcMapped = javaSrc.map((j) => ({ path: j.rel, code: j.text }));
         const javaSources = withCurrentSource(javaSrcMapped, relNow, xml);
+        // M268：Java 源码 package 声明的多数决——权威包名
+        const domPkg = dominantJavaPackage(javaSources);
+        if (domPkg && domPkg !== pkg) {
+          pushBuildLog(false, tt("包名不一致提示"), tt("Java 源码声明的包名是 {p}，但当前配置是 {c}。已按源码包名打包，请尽快同步 manifest/build.gradle。", { p: domPkg, c: pkg }));
+          pkg = domPkg;
+        }
         // M266：项目依赖库（libs/*.jar|aar）→ 设备端 ECJ classpath
         setExportNote(tt("正在收集依赖库…"));
         const libsRes = await collectProjectLibs(aiFileIo, activeProject?.rootPath || activeProject?.dirPath || null);
@@ -189,6 +195,18 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         // M262：同时把项目 manifest 原文读出来给 BuildApkHelper 用（aapt2 link 不再合成清单）
         const manifestInfo = await readProjectManifest(aiFileIo, pkg);
         let manifest = manifestInfo.launcher || "";
+        // M268：把 manifest 里的 package 强制对齐到权威 pkg（Java 源码多数包名）
+        let manifestTextForBuild = manifestInfo.text;
+        if (manifestInfo.text) {
+          const forced = forceManifestPkg(manifestInfo.text, pkg);
+          if (forced.changed) {
+            manifestTextForBuild = forced.text;
+            pushBuildLog(false, tt("manifest 包名已对齐"), tt("manifest 里的 package 属性已从旧值改为 {p}（与 Java 源码一致）", { p: pkg }));
+          }
+        }
+        if (!manifest && manifestTextForBuild) {
+          manifest = parseManifestLauncher(manifestTextForBuild, pkg);
+        }
         if (!manifest && javaSources.length) {
           manifest = deriveLauncherFromSources(javaSources, pkg);
           if (manifest) setExportNote(tt("清单里没找到 launcher，已从源码推断入口：{n}", { n: manifest }));
@@ -218,7 +236,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           extraDex: dexFiles,
           javaSources,
           launchActivity: manifest || "",
-          manifestText: manifestInfo.text || "",
+          manifestText: manifestTextForBuild || "",
           libs: libsRes.libs.length ? libsRes.libs.map((l) => ({ path: l.rel, base64: l.base64 })) : undefined,
         });
         setApkResult(r);

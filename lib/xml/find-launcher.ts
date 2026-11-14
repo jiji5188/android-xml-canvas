@@ -83,6 +83,46 @@ export async function findLauncherActivity(
   return parseManifestLauncher(text, pkg);
 }
 
+/** M268：把 manifest 里的 package="..." 强制改成指定值；缺了就插到 <manifest 开标签里。返回 [新文本, 是否改过] */
+export function forceManifestPkg(
+  text: string,
+  pkg: string,
+): { text: string; changed: boolean } {
+  if (!text || !pkg) return { text, changed: false };
+  const hasPkg = /(?:android:)?package\s*=\s*["']([^"']*)["']/i.test(text);
+  let out: string;
+  if (hasPkg) {
+    out = text.replace(
+      /((?:android:)?package\s*=\s*)["'][^"']*["']/i,
+      `$1"${pkg}"`,
+    );
+  } else {
+    // 插到 <manifest ...> 开标签里（在 > 前）
+    out = text.replace(/(<manifest\b[^>]*)(>)/i, (_m, a, b) =>
+      a + ` package="${pkg}"` + b,
+    );
+  }
+  return { text: out, changed: out !== text };
+}
+
+/** M268：从 Java 源码里统计出最常见的 package 声明（多数决） */
+export function dominantJavaPackage(
+  sources: { path: string; code: string }[],
+): string {
+  const counts = new Map<string, number>();
+  for (const s of sources) {
+    const m = s.code.match(/^\s*package\s+([\w.]+)(?:\s*;)?/m);
+    if (!m) continue;
+    counts.set(m[1], (counts.get(m[1]) || 0) + 1);
+  }
+  let best = "";
+  let bestN = 0;
+  for (const [k, n] of counts) {
+    if (n > bestN) { best = k; bestN = n; }
+  }
+  return best;
+}
+
 /** 纯文本版：给定 manifest 原文 + 包名，解析 MAIN/LAUNCHER 的 Activity 全限定名 */
 export function parseManifestLauncher(
   text: string,

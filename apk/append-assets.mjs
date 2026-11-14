@@ -76,6 +76,27 @@ function main() {
   })(assetsDir, "");
   for (const e of extras) files.push(e);
 
+  // M267：支持 --add-dir <本地目录> <zip内路径前缀>，把目录里所有文件作为 zip 条目追加
+  // 用法：--add-dir apk/vendor/androidx assets/androidx
+  // 这样 aar/jar 也能像 assets/www 一样以 STORE 方式塞进 APK。
+  let dirIdx = 0;
+  while ((dirIdx = args.indexOf("--add-dir", dirIdx + 1)) !== -1) {
+    const srcDir = path.resolve(args[dirIdx + 1]);
+    const zipPrefix = args[dirIdx + 2];
+    dirIdx += 3;
+    if (!fs.existsSync(srcDir)) {
+      console.warn("--add-dir 源目录不存在：" + srcDir);
+      continue;
+    }
+    (function walkDir(d, rel) {
+      for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+        const r = rel ? rel + "/" + e.name : e.name;
+        if (e.isDirectory()) walkDir(path.join(d, e.name), r);
+        else files.push({ src: path.join(d, e.name), name: zipPrefix.replace(/\\/g, "/") + "/" + r });
+      }
+    })(srcDir, "");
+  }
+
   const buf = fs.readFileSync(apkPath);
   const { cdOffset, cdSize } = findEocd(buf);
   if (cdOffset + cdSize !== buf.length - 22) {

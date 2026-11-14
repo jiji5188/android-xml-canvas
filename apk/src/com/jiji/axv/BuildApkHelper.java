@@ -200,9 +200,13 @@ public class BuildApkHelper {
                 }
             }
             step = "compile";
+            // M267：androidx 插件包（assets/androidx/）→ 解压到 cache，拼进 ECJ classpath
+            logStage(log, "androidx 插件包");
+            List<String> androidxJars = ensureAndroidx(root, log);
+            log.append("androidx 插件包 ").append(androidxJars.size()).append(" 个 class\n");
             String compileMode;
             try {
-                compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files, libs);
+                compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files, libs, androidxJars);
             } catch (IOException ce) {
                 final String cm2 = ce.getMessage() == null ? "" : ce.getMessage();
                 appendResMissLog(log);
@@ -330,7 +334,7 @@ public class BuildApkHelper {
 
     private String compileProjectJava(JSONArray javaSources, File root, File genDir,
                                       StringBuilder log, java.util.List<byte[]> extraDex, JSONArray resFiles,
-                                      JSONArray libs) throws Exception {
+                                      JSONArray libs, List<String> androidxJars) throws Exception {
         if (javaSources == null || javaSources.length() == 0) {
             log.append("项目无 Java 源码：本次打包为布局壳（不运行任何逻辑）\n");
             return "none";
@@ -405,10 +409,15 @@ public class BuildApkHelper {
                 } catch (Throwable ignored) { }
             }
         }
-        // 拼 classpath：android.jar + 项目 libs
+        // 拼 classpath：android.jar + 项目 libs + androidx 插件包（M267）
         StringBuilder cp = new StringBuilder(androidJar.getAbsolutePath());
         for (String j : libJars) cp.append(File.pathSeparator).append(j);
-        log.append("ECJ classpath：android.jar + ").append(libJars.size()).append(" 个项目 libs\n");
+        int androidxCount = 0;
+        if (androidxJars != null) {
+            for (String a : androidxJars) { cp.append(File.pathSeparator).append(a); androidxCount++; }
+        }
+        log.append("ECJ classpath：android.jar + ").append(libJars.size()).append(" 项目 libs + ")
+                .append(androidxCount).append(" androidx\n");
         java.lang.ClassLoader cl = compilerLoader(compDir);
         Class<?> ecj = cl.loadClass("com.jiji.axv.compiler.EcjBridge");
         java.util.List<String> ecjLog = new java.util.ArrayList<>();
@@ -811,6 +820,65 @@ public class BuildApkHelper {
         return replaced;
     }
 
+    /** M267：把 assets/androidx/ 下的 jar/aar 落到 root/androidx/，aar 取 classes.jar，
+     *  返回可用于 classpath 的 jar 列表。已存在则跳过（幂等）。 */
+    private List<String> ensureAndroidx(File root, StringBuilder log) {
+        List<String> out = new ArrayList<>();
+        try {
+            android.content.res.AssetManager am = ctx.getAssets();
+            String[] entries;
+            try {
+                entries = am.list("androidx");
+            } catch (Throwable e) {
+                log.append("androidx 插件包不存在（APK 未内置），跳过\n");
+                return out;
+            }
+            if (entries == null || entries.length == 0) {
+                log.append("androidx 插件包为空，跳过\n");
+                return out;
+            }
+            File outDir = new File(root, "androidx");
+            outDir.mkdirs();
+            int added = 0;
+            for (String name : entries) {
+                try {
+                    if (name.endsWith(".jar")) {
+                        File dst = new File(outDir, name);
+                        if (!dst.isFile() || dst.length() == 0) {
+                            try (InputStream is = am.open("androidx/" + name);
+                                 FileOutputStream fos = new FileOutputStream(dst)) {
+                                copyStream(is, fos);
+                            }
+                        }
+                        out.add(dst.getAbsolutePath());
+                        added++;
+                    } else if (name.endsWith(".aar")) {
+                        File aarDst = new File(outDir, name);
+                        if (!aarDst.isFile() || aarDst.length() == 0) {
+                            try (InputStream is = am.open("androidx/" + name);
+                                 FileOutputStream fos = new FileOutputStream(aarDst)) {
+                                copyStream(is, fos);
+                            }
+                        }
+                        String base = name.substring(0, name.length() - 4);
+                        File classes = new File(outDir, base + "-classes.jar");
+                        File extracted = extractClassesJar(aarDst, classes);
+                        if (extracted != null) {
+                            out.add(extracted.getAbsolutePath());
+                            added++;
+                        } else {
+                            log.append("  ! ").append(name).append(" 无 classes.jar，跳过\n");
+                        }
+                    }
+                } catch (Throwable ignored) { }
+            }
+            log.append("androidx 插件包解压 ").append(added).append("/ ").append(entries.length).append(" 个到 ").append(outDir).append("\n");
+        } catch (Throwable t) {
+            log.append("androidx 插件包处理失败：").append(t.getMessage()).append("\n");
+        }
+        return out;
+    }
+
     /** M266：从 aar（zip）里抽出 classes.jar；失败返回 null */
     private File extractClassesJar(File aar, File outJar) {
         try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(aar)) {
@@ -1047,6 +1115,13 @@ public class BuildApkHelper {
         try (FileOutputStream fos = new FileOutputStream(f)) {
             fos.write(data);
         }
+    }
+
+    /** M267：流拷贝（assets → 文件） */
+    private static void copyStream(InputStream in, OutputStream out) throws IOException {
+        byte[] buf = new byte[64 * 1024];
+        int n;
+        while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
     }
 
     private byte[] readAssetGz(String name) {

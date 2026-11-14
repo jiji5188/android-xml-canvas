@@ -55,6 +55,16 @@ if (fs.existsSync(previewRes)) {
   console.warn("⚠ 未找到 foundation/out/preview-res.apk，PreviewActivity 会报资源缺失");
 }
 console.log("assets 拷贝完成：", fs.readdirSync(www).length, "个顶层项");
+// M267：androidx 插件包（apk/vendor/androidx/）不进 assets/www（会被 aapt2 打两次），
+//  由 build.mjs 的 append-assets.mjs --add-dir 直接以 STORE 追加到 APK 的 assets/androidx/。
+const vendorAndroidx = path.join(apk, "vendor", "androidx");
+if (fs.existsSync(vendorAndroidx)) {
+  const cnt = fs.readdirSync(vendorAndroidx).length;
+  const sz = fs.readdirSync(vendorAndroidx).reduce((s, f) => s + fs.statSync(path.join(vendorAndroidx, f)).size, 0);
+  console.log("androidx 插件包（vendor/androidx）：", cnt, "个文件，", (sz / 1024).toFixed(0), "KB，将追加到 assets/androidx/");
+} else {
+  console.warn("⚠ 未找到 apk/vendor/androidx（先跑 node apk/make-androidx.mjs），APK 将不含 androidx 插件包");
+}
 
 // 3) aapt2 compile + link（-A 把 assets 打进去）
 fs.rmSync(path.join(apk, "build"), { recursive: true, force: true });
@@ -199,7 +209,11 @@ run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "buil
     .filter((n) => (process.env.AX_SHIP_ANDROID_JAR !== "0" || n !== "android.jar.gz")
       && (/^tool\d+\.bin\.gz$/.test(n) || n === "android.jar.gz" || n === "msgs.bin.gz" || n === "manifest.json"))
     .map((n) => ["--add", path.join(apk, "build", "compiler", n), "assets/compiler/" + n])
-  .flat()], apk);
+  .flat(),
+  // M267：androidx 插件包（vendor/androidx/）→ 追加到 assets/androidx/（STORE，AssetManager 可读）
+  ...(fs.existsSync(path.join(apk, "vendor", "androidx"))
+    ? ["--add-dir", path.join(apk, "vendor", "androidx"), "assets/androidx"]
+    : [])], apk);
 
 // 7) zipalign + 签名
 const keystore = path.join(apk, "debug.keystore");

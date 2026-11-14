@@ -97,3 +97,5 @@ apk/tmp-classes/
 
 *.log
 logs/
+*.dex
+# stray build artifacts

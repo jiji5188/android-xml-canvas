@@ -165,6 +165,7 @@ public class BuildApkHelper {
                 compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files);
             } catch (IOException ce) {
                 final String cm2 = ce.getMessage() == null ? "" : ce.getMessage();
+                appendResMissLog(log);
                 if (cm2.contains("编译器") || cm2.contains("android.jar") || cm2.contains("compiler")) {
                     log.append("⚠ 设备端 Java 编译器不可用（").append(ce.getMessage())
                             .append("），本次退化为布局壳（不运行 Java 逻辑）；重打包前请确认 APK 内含 compiler 资源\n");
@@ -176,6 +177,7 @@ public class BuildApkHelper {
             ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), extraDex, packed);
             log.append("注入壳 dex + ").append(extraDex.size()).append(" 个项目 dex，打包后 ")
                     .append(packed.length()).append(" 字节\n");
+            appendResMissLog(log);
 
             step = "sign";
             File signedTmp = new File(root, "signed.apk");
@@ -461,26 +463,71 @@ public class BuildApkHelper {
         java.nio.ByteBuffer[] bb = new java.nio.ByteBuffer[els.size()];
         for (int k = 0; k < els.size(); k++) bb[k] = java.nio.ByteBuffer.wrap(els.get(k));
         File resDir = new File(compDir, "res");
-        java.lang.ClassLoader resLoader = new ResClassLoader(resDir, ctx.getClassLoader());
+        java.io.File missLog = new java.io.File(ctx.getCacheDir(), "ecj-res-miss.log");
+        // M248：res 缺了/读不到时写这份日志，设备端能回读定位（不再盲猜）
+        try { if (missLog.exists()) missLog.delete(); } catch (Throwable ignored) {}
+        java.lang.ClassLoader resLoader = new ResClassLoader(resDir, ctx.getClassLoader(), missLog);
         java.lang.ClassLoader cl = new dalvik.system.InMemoryDexClassLoader(bb, null, resLoader);
         // 顺带把 TCCL 指到它，避免 ECJ 内部用线程 classloader 找资源时绕过父链
         Thread.currentThread().setContextClassLoader(cl);
         return cl;
     }
 
-    /** 只服务 res 目录的资源 ClassLoader（ECJ 的 ResourceBundle.getBundle 靠它） */
+    /** 只服务 res 目录的资源 ClassLoader（ECJ 的 Parser 表 / 消息包都靠它）。
+     *  M248：ECJ 请求资源名可能是「全限定路径」（org/eclipse/.../parser1.rsc）也可能是
+     *  「裸文件名」（parser1.rsc，当 ECJ 用 classloader.getResourceAsStream 而非 class.getResource）。
+     *  之前只做 exact(root/name) 匹配，裸文件名就 null → Parser 静态初始化 NPE（inStream null）。
+     *  现在建索引：按 (全路径 / 后缀 / basename) 多级匹配，并记 miss 日志供定位。 */
     private static final class ResClassLoader extends java.lang.ClassLoader {
         private final File root;
-        ResClassLoader(File root, java.lang.ClassLoader parent) { super(parent); this.root = root; }
+        private volatile java.util.Map<String, File> index; // key: 全相对路径 & basename → 文件
+        private final File missLog;
+        ResClassLoader(File root, java.lang.ClassLoader parent, File logFile) { super(parent); this.root = root; this.missLog = logFile; }
+
+        private void buildIndex() {
+            java.util.HashMap<String, File> m = new java.util.HashMap<>();
+            walk(root, "", m);
+            this.index = m;
+        }
+        private void walk(File dir, String rel, java.util.Map<String, File> m) {
+            File[] fs = dir.listFiles();
+            if (fs == null) return;
+            for (File f : fs) {
+                String r = rel.isEmpty() ? f.getName() : (rel + "/" + f.getName());
+                if (f.isDirectory()) walk(f, r, m);
+                else {
+                    m.put(r, f);                                   // 全路径（正斜杠）
+                    m.putIfAbsent(f.getName(), f);                  // basename
+                    int slash = r.lastIndexOf('/');
+                    if (slash > 0) m.putIfAbsent(r.substring(slash + 1), f); // 包尾相对
+                }
+            }
+        }
+        private File resolve(String name) {
+            if (name == null || name.isEmpty()) return null;
+            // 去前导 /，统一正斜杠
+            String n = name.startsWith("/") ? name.substring(1) : name;
+            if (index == null) { buildIndex(); }
+            File f = index.get(n);
+            if (f == null) f = index.get(n.replace('/', java.io.File.separatorChar));
+            if (f == null) f = index.get(n.substring(n.lastIndexOf('/') + 1)); // basename 兜底
+            if (f == null) f = index.get(n.replace('/', java.io.File.separatorChar).substring(n.replace('/', java.io.File.separatorChar).lastIndexOf('/') + 1));
+            if (f == null) logMiss(n);
+            return f;
+        }
+        private void logMiss(String name) {
+            try (java.io.FileWriter w = new java.io.FileWriter(missLog, true)) {
+                w.write("res miss: " + name + "\n");
+            } catch (Throwable ignored) { }
+        }
         @Override public java.net.URL findResource(String name) {
-            java.io.File f = new java.io.File(root, name.replace('/', java.io.File.separatorChar));
-            return f.isFile() ? safeUrl(f) : null;
+            java.io.File f = resolve(name);
+            return f != null ? safeUrl(f) : null;
         }
         @Override public java.io.InputStream getResourceAsStream(String name) {
-            try {
-                java.io.File f = new java.io.File(root, name.replace('/', java.io.File.separatorChar));
-                return f.isFile() ? new java.io.FileInputStream(f) : null;
-            } catch (Throwable t) { return null; }
+            java.io.File f = resolve(name);
+            if (f == null) return null;
+            try { return new java.io.FileInputStream(f); } catch (Throwable t) { return null; }
         }
         @Override public java.net.URL getResource(String name) {
             java.net.URL u = findResource(name);
@@ -530,6 +577,19 @@ public class BuildApkHelper {
         }
     }
     // ===== 工具方法 =====
+
+    /** 把设备端 ResClassLoader 的资源 miss 日志追加进构建日志（定位 ECJ 资源加载问题） */
+    private void appendResMissLog(StringBuilder log) {
+        try {
+            File f = new File(ctx.getCacheDir(), "ecj-res-miss.log");
+            if (f.isFile() && f.length() > 0) {
+                byte[] data = readFile(f);
+                if (data != null && data.length > 0) {
+                    log.append("res-miss: ").append(new String(data, StandardCharsets.UTF_8)).append('\n');
+                }
+            }
+        } catch (Throwable ignored) { }
+    }
 
     private File defaultOutDir() {
         // 和 MainActivity.defaultDir() 保持一致：外部存储 /AndroidUIIDE/Project/build

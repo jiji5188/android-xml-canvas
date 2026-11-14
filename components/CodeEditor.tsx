@@ -59,7 +59,7 @@ import { java } from "@codemirror/lang-java";
 import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
 import { computeSuggest } from "@/lib/xml/keyword-suggest";
-import { computeJavaSuggest, JAVA_SYMBOLS } from "@/lib/xml/java-vocab";
+import { computeJavaSuggest, JAVA_SYMBOLS, importForType, buildImportInsertMany } from "@/lib/xml/java-vocab";
 import { KIND_LABEL, KIND_NAME, type SuggestKind } from "@/lib/xml/suggest-kind";
 import { estimateSuggestSize, placeSuggest, type Placement } from "@/lib/xml/suggest-position";
 import { tokenAt } from "@/lib/xml/ref-token";
@@ -584,10 +584,29 @@ export function CodeEditor({
     if (!v) return;
     const sel = v.state.selection.main;
     const pos = sel.from + insert.length - back;
+    const docStr = v.state.doc.toString();
+    // M273：Java 片段里用到已知类型（View/Toast/Intent/Handler…）且文件没 import → 顺手补上
+    const changes: { from: number; to?: number; insert: string }[] = [];
+    let anchor = pos;
+    if (langRef.current === "java") {
+      const names = new Set<string>();
+      for (const m of insert.matchAll(/\b([A-Z][A-Za-z0-9_$]*)\b/g)) names.add(m[1]);
+      const fqns: string[] = [];
+      for (const n of names) {
+        const fqn = importForType(n);
+        if (fqn) fqns.push(fqn);
+      }
+      const imp = buildImportInsertMany(docStr, fqns);
+      if (imp && imp.pos <= sel.from) {
+        changes.push({ from: imp.pos, insert: imp.text });
+        anchor += imp.text.length;
+      }
+    }
+    changes.push({ from: sel.from, to: sel.to, insert });
     // M76:一次 dispatch 完成(两次会变成两步撤销)
     v.dispatch({
-      changes: { from: sel.from, to: sel.to, insert },
-      selection: { anchor: pos },
+      changes,
+      selection: { anchor },
       userEvent: "input",
     });
     v.focus();
@@ -681,9 +700,24 @@ export function CodeEditor({
       const from = Math.max(0, head - s.prefix.length);
       lastAcceptRef.current = Date.now();
       setSugBoth(null);
+      const docStr = v.state.doc.toString();
+      const changes: { from: number; to?: number; insert: string }[] = [];
+      let anchor = from + item.length;
+      // M273：选中一个类（如 TextView）且文件没 import → 自动补 import 声明
+      if (langRef.current === "java") {
+        const fqn = importForType(item);
+        if (fqn) {
+          const imp = buildImportInsertMany(docStr, [fqn]);
+          if (imp && imp.pos <= from) {
+            changes.push({ from: imp.pos, insert: imp.text });
+            anchor += imp.text.length;
+          }
+        }
+      }
+      changes.push({ from, to: head, insert: item });
       v.dispatch({
-        changes: { from, to: head, insert: item },
-        selection: { anchor: from + item.length },
+        changes,
+        selection: { anchor },
         userEvent: "input.complete",
       });
       v.focus();

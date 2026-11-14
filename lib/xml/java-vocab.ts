@@ -256,7 +256,218 @@ export const JAVA_SYMBOLS: JavaSymbol[] = [
   { label: "switch", insert: "switch () {\n    case 0:\n      break;\n    default:\n      break;\n}", back: 1, title: "switch 分支" },
   { label: "Activity", insert: "public class MainActivity extends Activity {\n\n    @Override\n    protected void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        setContentView(R.layout.activity_main);\n    }\n}", back: 1, title: "Activity 模板" },
   { label: "Fragment", insert: "public class MyFragment extends Fragment {\n\n    @Override\n    public void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n    }\n}", back: 1, title: "Fragment 模板" },
+  // M273：常用代码块（选了一整块插，光标停在要填的地方；用到的类会自动 import）
+  {
+    label: "onClick",
+    insert: "setOnClickListener(new View.OnClickListener() {\n    @Override\n    public void onClick(View v) {\n        \n    }\n});",
+    back: 10,
+    title: "点击事件 setOnClickListener（光标在 onClick 内）",
+  },
+  {
+    label: "toast",
+    insert: 'Toast.makeText(this, "", Toast.LENGTH_SHORT).show();',
+    back: 30,
+    title: "Toast 短提示（光标在引号内）",
+  },
+  {
+    label: "intent",
+    insert: "Intent intent = new Intent(this, SecondActivity.class);\nstartActivity(intent);",
+    back: 0,
+    title: "跳转 Activity（改 SecondActivity 为实际类）",
+  },
+  {
+    label: "handler",
+    insert: "new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {\n    @Override\n    public void run() {\n        \n    }\n}, 1000);",
+    back: 16,
+    title: "延时任务 postDelayed（光标在 run 内）",
+  },
+  {
+    label: "dialog",
+    insert: 'new AlertDialog.Builder(this)\n    .setTitle("")\n    .setMessage("")\n    .setPositiveButton("确定", null)\n    .show();',
+    back: 0,
+    title: "AlertDialog 弹框",
+  },
 ];
+
+/** 简单类名 → 完整 import 路径（M273：选中候选时自动补 import）
+ *  只收「包路径确定」的类；androidx / support 两派歧义的（AppCompatActivity / Fragment /
+ *  RecyclerView / ConstraintLayout 等）故意不收——猜错插错反而把编译搞坏。
+ *  java.lang 下的类本来就不用 import，不进表。
+ */
+export const JAVA_IMPORTS: Record<string, string> = {
+  // android.widget
+  TextView: "android.widget.TextView",
+  Button: "android.widget.Button",
+  ImageView: "android.widget.ImageView",
+  ImageButton: "android.widget.ImageButton",
+  EditText: "android.widget.EditText",
+  CheckBox: "android.widget.CheckBox",
+  RadioButton: "android.widget.RadioButton",
+  RadioGroup: "android.widget.RadioGroup",
+  Switch: "android.widget.Switch",
+  ProgressBar: "android.widget.ProgressBar",
+  SeekBar: "android.widget.SeekBar",
+  Toast: "android.widget.Toast",
+  LinearLayout: "android.widget.LinearLayout",
+  FrameLayout: "android.widget.FrameLayout",
+  RelativeLayout: "android.widget.RelativeLayout",
+  TableLayout: "android.widget.TableLayout",
+  TableRow: "android.widget.TableRow",
+  ScrollView: "android.widget.ScrollView",
+  HorizontalScrollView: "android.widget.HorizontalScrollView",
+  ListView: "android.widget.ListView",
+  GridView: "android.widget.GridView",
+  Spinner: "android.widget.Spinner",
+  ArrayAdapter: "android.widget.ArrayAdapter",
+  BaseAdapter: "android.widget.BaseAdapter",
+  Adapter: "android.widget.Adapter",
+  Toolbar: "android.widget.Toolbar",
+  // android.view
+  View: "android.view.View",
+  ViewGroup: "android.view.ViewGroup",
+  LayoutInflater: "android.view.LayoutInflater",
+  Gravity: "android.view.Gravity",
+  MotionEvent: "android.view.MotionEvent",
+  Menu: "android.view.Menu",
+  MenuItem: "android.view.MenuItem",
+  // android.content
+  Context: "android.content.Context",
+  Intent: "android.content.Intent",
+  SharedPreferences: "android.content.SharedPreferences",
+  DialogInterface: "android.content.DialogInterface",
+  ContentValues: "android.content.ContentValues",
+  // android.os
+  Bundle: "android.os.Bundle",
+  Handler: "android.os.Handler",
+  Looper: "android.os.Looper",
+  Message: "android.os.Message",
+  HandlerThread: "android.os.HandlerThread",
+  Build: "android.os.Build",
+  // android.app
+  Activity: "android.app.Activity",
+  Dialog: "android.app.Dialog",
+  AlertDialog: "android.app.AlertDialog",
+  Application: "android.app.Application",
+  Service: "android.app.Service",
+  // android.util / graphics / net / text
+  Log: "android.util.Log",
+  SparseArray: "android.util.SparseArray",
+  DisplayMetrics: "android.util.DisplayMetrics",
+  Bitmap: "android.graphics.Bitmap",
+  Color: "android.graphics.Color",
+  Paint: "android.graphics.Paint",
+  Canvas: "android.graphics.Canvas",
+  Rect: "android.graphics.Rect",
+  Uri: "android.net.Uri",
+  TextWatcher: "android.text.TextWatcher",
+  Editable: "android.text.Editable",
+  InputType: "android.text.InputType",
+  // java.util
+  List: "java.util.List",
+  ArrayList: "java.util.ArrayList",
+  LinkedList: "java.util.LinkedList",
+  Map: "java.util.Map",
+  HashMap: "java.util.HashMap",
+  LinkedHashMap: "java.util.LinkedHashMap",
+  TreeMap: "java.util.TreeMap",
+  Set: "java.util.Set",
+  HashSet: "java.util.HashSet",
+  TreeSet: "java.util.TreeSet",
+  Queue: "java.util.Queue",
+  Deque: "java.util.Deque",
+  Collections: "java.util.Collections",
+  Arrays: "java.util.Arrays",
+  Objects: "java.util.Objects",
+  Optional: "java.util.Optional",
+  Iterator: "java.util.Iterator",
+  // java.io / concurrent
+  IOException: "java.io.IOException",
+  File: "java.io.File",
+  FileInputStream: "java.io.FileInputStream",
+  FileOutputStream: "java.io.FileOutputStream",
+  InputStream: "java.io.InputStream",
+  OutputStream: "java.io.OutputStream",
+  BufferedReader: "java.io.BufferedReader",
+  BufferedWriter: "java.io.BufferedWriter",
+  ExecutorService: "java.util.concurrent.ExecutorService",
+  Executors: "java.util.concurrent.Executors",
+};
+
+/** 简单类名 → 该 import 的完整路径；不需 import（java.lang / 未知类）返回 null */
+export function importForType(name: string): string | null {
+  return JAVA_IMPORTS[name] || null;
+}
+
+export interface ImportInsert {
+  /** 插入点（原文绝对偏移） */
+  pos: number;
+  /** 要插入的文本（可能多行 import） */
+  text: string;
+}
+
+/**
+ * M273：算出「把这些类 import 进去」要插在哪个位置、插什么。
+ * 规则：
+ *   - 已经 import（精确或通配）→ 跳过
+ *   - 同名类已 import 了别的包 → 跳过（插进去会撞简单类名，编译更糟）
+ *   - 插入点：最后一个 import 行之后 > package 行之后 > 文件开头
+ * 全部已满足时返回 null。
+ */
+export function buildImportInsertMany(doc: string, fqns: string[]): ImportInsert | null {
+  const targets = fqns.filter((f) => !!f);
+  if (!targets.length) return null;
+  const lines = doc.split("\n");
+  const isImport = (t: string) => /^import\s+[\w.*]+\s*;/.test(t.trim());
+  const isPkg = (t: string) => /^package\s+[\w.]+\s*;/.test(t.trim());
+
+  const exact = new Set<string>();
+  const wildcard = new Set<string>();
+  const simpleToFqn = new Map<string, string>();
+  for (const l of lines) {
+    const t = l.trim();
+    const w = t.match(/^import\s+([\w.]+)\.\*\s*;/);
+    if (w) { wildcard.add(w[1]); continue; }
+    const m = t.match(/^import\s+([\w.]+)\s*;/);
+    if (m) {
+      const fqn = m[1];
+      exact.add(fqn);
+      simpleToFqn.set(fqn.slice(fqn.lastIndexOf(".") + 1), fqn);
+    }
+  }
+
+  const need: string[] = [];
+  for (const fqn of targets) {
+    const pkg = fqn.slice(0, fqn.lastIndexOf("."));
+    const simple = fqn.slice(fqn.lastIndexOf(".") + 1);
+    if (exact.has(fqn)) continue;
+    if (wildcard.has(pkg)) continue;
+    const other = simpleToFqn.get(simple);
+    if (other && other !== fqn) continue; // 同名类已在别包，别插
+    if (!need.includes(fqn)) need.push(fqn);
+  }
+  if (!need.length) return null;
+
+  // 插入点：最后一个 import 之后；没有 import 就 package 之后；再没有就文件开头
+  let lastImport = -1;
+  let pkgLine = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (isPkg(t)) { pkgLine = i; continue; }
+    if (isImport(t)) { lastImport = i; continue; }
+    // 骨架之外遇到第一行内容就停（注释行不算）
+    if (t && !t.startsWith("//") && !t.startsWith("/*") && !t.startsWith("*")) break;
+  }
+  let lineIdx = 0;
+  if (lastImport >= 0) lineIdx = lastImport + 1;
+  else if (pkgLine >= 0) lineIdx = pkgLine + 1;
+
+  let pos = 0;
+  for (let i = 0; i < lineIdx && i < lines.length; i++) pos += lines[i].length + 1;
+  if (lineIdx >= lines.length) pos = doc.length;
+
+  const text = need.map((f) => `import ${f};\n`).join("");
+  return { pos, text };
+}
 
 const WORD = /[A-Za-z0-9_$]/;
 

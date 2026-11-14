@@ -343,6 +343,12 @@ public class BuildApkHelper {
         java.util.Collections.addAll(ecjArgsList, "-source", "11", "-target", "11", "-nowarn",
                 "-encoding", "UTF-8", "-classpath", androidJar.getAbsolutePath(),
                 "-d", clsDir.getAbsolutePath());
+        // M251：-proc:none 关注解处理器（APT）。ECJ 的 initializeAnnotationProcessorManager 会
+        // 加载 javax.annotation.processing.* / javax.tools.*（JDK java.compiler 模块，Android 没有），
+        // 报 NoClassDefFoundError: ProcessingEnvironment。我们的 Java 是布局胶水不用 APT，
+        // 关掉绕开整组依赖；R.java 是我们自己生成的，不依赖 ECJ APT。
+        // 注意：必须是单个 token「-proc:none」（拆开成 -proc / none 两个参数 ECJ 报 Unrecognized）。
+        ecjArgsList.add("-proc:none");
         for (File f : files) ecjArgsList.add(f.getAbsolutePath());
         ecjArgsList.addAll(rFiles);
         String[] ecjArgs = ecjArgsList.toArray(new String[0]);

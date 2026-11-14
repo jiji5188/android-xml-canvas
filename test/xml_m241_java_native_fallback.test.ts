@@ -32,9 +32,12 @@ describe("loadProjectJavaFiles M241 native 兜底", () => {
   it("io 扫不到、native 全量递归能拿到 .java", async () => {
     // io.list 返回空（模拟 io 通道失效），nativeRoot 给绝对路径
     const io = {
-      list: async () => ({ ok: true, items: [] }),
+      rootLabel: () => "/root",
+      canWrite: false,
+      list: async () => ({ ok: true, items: [] as { name: string; kind: string; rel?: string }[] }),
       read: async () => ({ ok: false, error: "no io" }),
-    };
+      write: async () => ({ ok: false, error: "no" }),
+    } as never;
     // 原生 listDir 在 /root 列出一个 .java 文件
     nativeDirJson = JSON.stringify({
       ok: true,
@@ -51,9 +54,12 @@ describe("loadProjectJavaFiles M241 native 兜底", () => {
 
   it("io 已扫到 + native 兜底，去重不重复", async () => {
     const io = {
-      list: async () => ({ ok: true, items: [] }),
+      rootLabel: () => "/root",
+      canWrite: false,
+      list: async () => ({ ok: true, items: [] as { name: string; kind: string; rel?: string }[] }),
       read: async (rel: string) => ({ ok: true, text: "io:" + rel }),
-    };
+      write: async () => ({ ok: false, error: "no" }),
+    } as never;
     // io 这轮 list 空，out 空；native 给两个 .java
     nativeDirJson = JSON.stringify({
       ok: true,
@@ -73,9 +79,12 @@ describe("loadProjectJavaFiles M241 native 兜底", () => {
 
   it("没给 nativeRoot 时不触发 native 兜底（纯 io 通道）", async () => {
     const io = {
-      list: async () => ({ ok: true, items: [] }),
+      rootLabel: () => "/root",
+      canWrite: false,
+      list: async () => ({ ok: true, items: [] as { name: string; kind: string; rel?: string }[] }),
       read: async () => ({ ok: false, error: "no" }),
-    };
+      write: async () => ({ ok: false, error: "no" }),
+    } as never;
     const res = await loadProjectJavaFiles(io, 8, { nativeRoot: null });
     // nativeDirJson 没设（null），且没 nativeRoot → out 空
     expect(res.length).toBe(0);

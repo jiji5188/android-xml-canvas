@@ -84,7 +84,8 @@ import { hasRealRender, renderReal, prepareFiles } from "@/lib/xml/native-render
 import { readStoredSigning, writeStoredSigning, clearStoredSigning } from "@/lib/xml/sign-store";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
-import { buildApk, hasBuildApk, installApk, shareApkFile, compileModeOf, type BuildApkResult } from "@/lib/xml/native-apk";
+import { useBuildApk } from "./use-build-apk";
+import { installApk, shareApkFile, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { projectSaveRoot, projectFileExists, readProjectFile, readAppGradle, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
@@ -670,7 +671,9 @@ export function XmlEditor() {
     loadInstalledPlugins().then((list) => {
       if (alive) setInstalledPlugins(list);
     });
-    return () => {
+    
+
+  return () => {
       alive = false;
     };
   }, []);
@@ -2243,155 +2246,15 @@ const allDrawableNames = useMemo(() => {
   );
 
   /* M192：一键打包成可安装 APK（设备端 aapt2 + 壳 dex + apksig） */
-  const [apkBusy, setApkBusy] = useState(false);
-  const [apkResult, setApkResult] = useState<BuildApkResult | null>(null);
   /** M237：带自动消失的提示（打包结果不能永久挂在屏幕上挡操作） */
   const noteTimed = useCallback((msg: string, ms = 6000) => {
     if (noteTimerRef.current) window.clearTimeout(noteTimerRef.current);
     setExportNote(msg);
     noteTimerRef.current = window.setTimeout(() => setExportNote(""), ms);
   }, []);
-  const doBuildApk = useCallback(
-    async (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => {
-      if (apkBusy) return;
-      setApkResult(null);
-      if (!hasBuildApk()) {
-        setApkResult({ ok: false, step: "env", log: tt("当前环境不支持打包（网页版没有 aapt2/apksig），请在手机上操作") });
-        return;
-      }
-      const b = nativeBridge();
-      const root = projectSaveRoot(activeProject);
-      const base = root?.kind === "native" ? root.base.replace(/[/\\]+$/, "") : b?.getDefaultWorkspace?.() || "";
-      if (!base) {
-        setApkResult({ ok: false, step: "keystore", log: tt("没有可写的项目目录") });
-        return;
-      }
-      const clean = (o.storeFile || "").replace(/\\/g, "/").replace(/^\/+/, "");
-      const keystore = clean ? `${base}/${clean}` : "";
-      // 包名：优先读 build.gradle 的 applicationId，读不到退回项目名推导
-      // M220：gradleForSign 是「打开签名弹层时」读到的缓存，若用户之后在项目属性改了包名
-      // （写回磁盘），缓存就过期了 → 打包用的是旧包名。所以打包时再读一次磁盘为准，
-      // 读不到才退回缓存 gradleForSign。
-      let gradlePkg = gradleForSign;
-      if (root) {
-        // M220b：走 readAppGradle，KTS / 无 app 前缀的工程也能读到真包名（不能只认 app/build.gradle）
-        const fresh = await readAppGradle(root);
-        if (fresh?.text) gradlePkg = fresh.text;
-      }
-      let pkg = activeProject?.name ? packageOf(activeProject.name) : "com.axv.app";
-      if (gradlePkg) {
-        const pg = parseGradlePackage(gradlePkg);
-        if (pg.applicationId || pg.namespace) pkg = pg.applicationId || pg.namespace || pkg;
-      }
-      const input = currentSaveInput();
-      setApkBusy(true);
-      setExportNote(tt("正在收集资源…"));
-      try {
-        // M192f：当前编辑的可能是 MainActivity.java（Java 代码），不能把编辑器正文当布局写盘
-        // —— 否则 layout/activity_main.xml 里装的是 Java，aapt2 报 syntax error。
-        // M192g：collectProjectRes 只按引用收集，不会把 layout/ 整目录带上，所以得自己列 layout 目录挑。
-        const openRelNorm = (openRel || input.name || "").replace(/\\/g, "/");
-        const relLayout = openRelNorm.match(/(?:^|\/)layout(?:-[^/]+)?\/(.+)\.xml$/i);
-        const isLayoutDoc = docKind === "layout" && !!relLayout;
-        let layout = isLayoutDoc && relLayout ? relLayout[1] : "";
-        let baseInput = input;
-        if (!layout) {
-          const want = (xml.match(/R\.layout\.([A-Za-z_][A-Za-z0-9_]*)/) || [])[1] || "";
-          const picked = await pickProjectLayout(aiFileIo, openRel, want);
-          if (!picked) {
-            setApkResult({
-              ok: false,
-              step: "compile",
-              log: tt("项目里没找到布局文件（layout/*.xml）。请先在左侧资源新建或打开一个布局，再打包。"),
-            });
-            setExportNote(tt("打包失败：{msg}", { msg: "compile" }));
-            return;
-          }
-          layout = picked.name;
-          // 把真实布局内容当成当前文档送去收集（否则 layout/ 里根本没有这个文件）
-          baseInput = { ...input, name: picked.rel, xml: picked.text };
-        }
-        const collected = await collectProjectRes(aiFileIo, openRel, buildRealRenderFiles(baseInput));
-        // M217：当前文档有未保存改动时，用编辑器里的内容覆盖同名资源（strings.xml 这类）
-        const relNow = (openRel || input.name || "").replace(/\\/g, "/");
-        const files = /\\.xml$/i.test(relNow) ? withCurrentXml(collected.files, relNow, xml) : collected.files;
-        // M211：收集项目里已编译的 dex（没找到就是空数组，不影响正常打包）
-        const dexGot = await collectProjectDex(aiFileIo);
-        const dexFiles = numberDexFiles(dexGot).map((d) => ({ name: d.name, base64: d.base64 }));
-        if (dexGot.length) {
-          setExportNote(tt("发现 {n} 个已编译 dex，一起打进包", { n: dexGot.length }));
-        }
-        // M213：设备端真编译——把项目 Java/Kotlin 源码交给设备上的 ECJ+D8，产出 dex 注进包
-        setExportNote(tt("正在收集 Java 源码…"));
-        const javaSrc = await loadProjectJavaFiles(aiFileIo, 8, {
-          nativeRoot: activeProject?.rootPath || activeProject?.dirPath || null,
-        });
-        // M217：当前正在编辑的 Java/Kotlin 可能还没保存 —— 用编辑器正文覆盖磁盘旧版，
-        // 否则「明明改了代码，打出来的包却没变化」，且没有任何提示。
-        const javaSrcMapped = javaSrc.map((j) => ({ path: j.rel, code: j.text }));
-        // M217：当前正在编辑的 Java/Kotlin 可能还没保存 —— 用编辑器正文覆盖磁盘旧版，
-        // 否则「明明改了代码，打出来的包却没变化」，且没有任何提示。
-        const javaSources = withCurrentSource(javaSrcMapped, relNow, xml);
-        // 启动 Activity：项目清单里的 launcher Activity（有就用它，没有设备端退回 ShellActivity）
-        const manifest = javaSources.length ? await findLauncherActivity(aiFileIo) : "";
-        if (javaSources.length) setExportNote(tt("{n} 个 Java/Kotlin 源码将在设备上编译", { n: javaSources.length }));
-        // M217：明确告知用户「编辑器里没保存的改动也会一起打进包」，消除「改了没生效」的疑惑
-        if (javaSources !== javaSrcMapped && javaSources.length) {
-          setExportNote(tt("{f} 还没保存，这次打包用的是编辑器里的最新内容", { f: (relNow.split("/").pop() || relNow) }));
-        }
-        setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
-        // M192e：与真机渲染用同一套洗法（补占位、去重、include 命名空间…）
-        // 不洗直接打包的话，aapt2 会在 layout 上报 syntax error
-        const prep = prepareFiles(layout, files);
-        if (prep.blocked) {
-          setApkResult({ ok: false, step: "compile", log: prep.blocked });
-          noteTimed(tt("打包失败：{msg}", { msg: "compile" }), 12000);
-          return;
-        }
-        const r = await buildApk({
-          pkg,
-          layout,
-          appName: signAppName || layout,
-          files: prep.files,
-          keystore,
-          storePass: o.storePass,
-          alias: o.alias,
-          keyPass: o.keyPass,
-          outName: `${pkg}-${layout}.apk`,
-          // M211：把项目里已有的 classes*.dex 一起打进包（自定义控件才能 inflate）
-          extraDex: dexFiles,
-          // M213：设备端真编译——项目源码 + 启动 Activity
-          javaSources,
-          launchActivity: manifest || "",
-        });
-        setApkResult(r);
-        // M216：把编译模式写进状态条，别把“布局壳”当“真跑逻辑的 APK”
-        // M237：成功/失败提示必须自动消失，之前没有定时器会永久挂在屏幕上挡操作
-        if (r.ok) {
-          const base = tt("打包完成：{name}", { name: r.name || "" });
-          const cm = compileModeOf(r);
-          if (cm.mode === "java" && cm.classes > 0) {
-            noteTimed(tt("{base}（已编译 {n} 个 Java 类）", { base, n: String(cm.classes) }), 8000);
-          } else if (cm.mode === "java") {
-            noteTimed(tt("{base}（⚠ 未注入 Java dex，实际还是布局壳）", { base }), 12000);
-          } else if (cm.mode === "shell") {
-            noteTimed(tt("{base}（项目无 .java，生成的是布局壳，不运行任何逻辑）", { base }), 10000);
-          } else {
-            noteTimed(base, 8000);
-          }
-        } else {
-          noteTimed(tt("打包失败（{step}）", { step: r.step || "?" }), 12000);
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setApkResult({ ok: false, step: "js", log: msg });
-        noteTimed(tt("打包失败：{msg}", { msg }), 12000);
-      } finally {
-        setApkBusy(false);
-      }
-    },
-    [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel, docKind, xml, noteTimed],
-  );
+  // M238：打包逻辑拆到 useBuildApk（components/use-build-apk.ts），
+  // 这里只保留 noteTimed + hook 调用（放在 currentSaveInput 之后）。
+  // 下面在 return 之前插入 const { apkBusy, apkResult, doBuildApk } = useBuildApk({...});
   // M220：root 在 doBuildApk 里算（依赖 activeProject），重新读 build.gradle 需要它；
   // activeProject 在 deps 里，root 跟着变，闭包读到的总是当前值，无需单独加。
   // M220b：写回同一个文件（readAppGradle 命中的那个），否则 KTS / 根目录工程会多出一个无效的 app/build.gradle。
@@ -3948,6 +3811,20 @@ const findResolved = findResolvedNode;
     extras: resExtrasAll,
     extraRes: appIconRes,
   });
+  // M238：打包 hook（放在 currentSaveInput 之后，闭包能拿到 buildSaveInput）
+  const { apkBusy, apkResult, doBuildApk } = useBuildApk({
+    activeProject,
+    gradleForSign,
+    signAppName,
+    aiFileIo,
+    openRel,
+    docKind,
+    xml,
+    buildSaveInput: currentSaveInput,
+    noteTimed,
+    setExportNote,
+  });
+
 
   /** M36：当前打开项目的可写根（有则保存一律落进 <项目>/app/src/main/res/） */
   const projRoot = useMemo(() => projectSaveRoot(activeProject), [activeProject]);

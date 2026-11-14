@@ -17,7 +17,7 @@ import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { prepareFiles } from "@/lib/xml/native-render";
-import { findLauncherActivity } from "@/lib/xml/find-launcher";
+import { deriveLauncherFromSources, findLauncherActivity } from "@/lib/xml/find-launcher";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
 import { t as tt } from "@/lib/i18n-src";
@@ -170,7 +170,13 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         });
         const javaSrcMapped = javaSrc.map((j) => ({ path: j.rel, code: j.text }));
         const javaSources = withCurrentSource(javaSrcMapped, relNow, xml);
-        const manifest = javaSources.length ? await findLauncherActivity(aiFileIo) : "";
+        // M258：清单里找不到 MAIN/LAUNCHER 时，从源码推入口（extends Activity 的那个类）——
+        //  否则 ShellActivity 拿不到 axv.launcher，永远停在壳上，用户代码跑不起来。
+        let manifest = javaSources.length ? await findLauncherActivity(aiFileIo) : "";
+        if (!manifest && javaSources.length) {
+          manifest = deriveLauncherFromSources(javaSources, pkg);
+          if (manifest) setExportNote(tt("清单里没找到 launcher，已从源码推断入口：{n}", { n: manifest }));
+        }
         if (javaSources.length) setExportNote(tt("{n} 个 Java/Kotlin 源码将在设备上编译", { n: javaSources.length }));
         if (javaSources !== javaSrcMapped && javaSources.length) {
           setExportNote(tt("{f} 还没保存，这次打包用的是编辑器里的最新内容", { f: (relNow.split("/").pop() || relNow) }));

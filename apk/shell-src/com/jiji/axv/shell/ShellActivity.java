@@ -54,12 +54,16 @@ public class ShellActivity extends Activity {
                 Class.forName(launcher);
                 android.content.Intent it = new android.content.Intent();
                 it.setClassName(this, launcher);
+                android.util.Log.i("AxvShell", "M258 转发到项目 launcher：" + launcher);
                 startActivity(it);
                 finish();
                 return;
             } catch (Throwable notCompiled) {
-                // 类不在包里（没编译成功 / 没源码）→ 继续走本地 inflate
+                // 类不在包里（没编译成功 / 没源码 / dex 未加载）→ 继续走本地 inflate，并打日志方便排查
+                android.util.Log.w("AxvShell", "M258 launcher 类不在包里：" + launcher + " → 退壳 inflate", notCompiled);
             }
+        } else {
+            android.util.Log.i("AxvShell", "M258 未拿到项目 launcher（meta-data 空）→ 退壳 inflate。axv.launcher=" + launcher);
         }
 
         int id = 0;

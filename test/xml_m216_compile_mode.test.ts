@@ -5,34 +5,40 @@ import { describe, it, expect } from "vitest";
 import { compileModeOf } from "@/lib/xml/native-apk";
 
 describe("M216 compileModeOf", () => {
-  it("java:N → 真编译模式，类数取 classes 字段", () => {
-    expect(compileModeOf({ ok: true, compileMode: "java:2", classes: 2 })).toEqual({ mode: "java", classes: 2 });
+  it("java:N → 真编译模式（老格式，N=dex 数，classes 从字符串兜底）", () => {
+    expect(compileModeOf({ ok: true, compileMode: "java:2", classes: 2 })).toEqual({ mode: "java", classes: 2, dex: 2 });
   });
 
-  it("java:N 但缺 classes 字段时从字符串里兜底解析", () => {
-    expect(compileModeOf({ ok: true, compileMode: "java:3" })).toEqual({ mode: "java", classes: 3 });
+  it("M254 新格式 java:<classes>:<dex> → 分别取 classes/dex", () => {
+    expect(compileModeOf({ ok: true, compileMode: "java:11:1" })).toEqual({ mode: "java", classes: 11, dex: 1 });
+    // 缓存命中：classes=0 但 dex=1（不是壳）
+    expect(compileModeOf({ ok: true, compileMode: "java:0:1" })).toEqual({ mode: "java", classes: 0, dex: 1 });
+  });
+
+  it("java:N 但缺 classes 字段时从字符串里兜底解析（dex=N）", () => {
+    expect(compileModeOf({ ok: true, compileMode: "java:3" })).toEqual({ mode: "java", classes: 3, dex: 3 });
   });
 
   it("none → 布局壳模式（要明确提示用户不会跑逻辑）", () => {
-    expect(compileModeOf({ ok: true, compileMode: "none" })).toEqual({ mode: "shell", classes: 0 });
+    expect(compileModeOf({ ok: true, compileMode: "none" })).toEqual({ mode: "shell", classes: 0, dex: 0 });
   });
 
   it("兼容 shell 别名", () => {
-    expect(compileModeOf({ ok: true, compileMode: "shell" })).toEqual({ mode: "shell", classes: 0 });
+    expect(compileModeOf({ ok: true, compileMode: "shell" })).toEqual({ mode: "shell", classes: 0, dex: 0 });
   });
 
   it("老版本 APK 不带字段 → unknown（不能断言是壳）", () => {
-    expect(compileModeOf({ ok: true })).toEqual({ mode: "unknown", classes: 0 });
-    expect(compileModeOf(null)).toEqual({ mode: "unknown", classes: 0 });
-    expect(compileModeOf(undefined)).toEqual({ mode: "unknown", classes: 0 });
+    expect(compileModeOf({ ok: true })).toEqual({ mode: "unknown", classes: 0, dex: 0 });
+    expect(compileModeOf(null)).toEqual({ mode: "unknown", classes: 0, dex: 0 });
+    expect(compileModeOf(undefined)).toEqual({ mode: "unknown", classes: 0, dex: 0 });
   });
 
   it("坏数据不抛（java:abc / 空串）", () => {
-    expect(compileModeOf({ ok: true, compileMode: "java:abc" })).toEqual({ mode: "java", classes: 0 });
-    expect(compileModeOf({ ok: true, compileMode: "" })).toEqual({ mode: "unknown", classes: 0 });
+    expect(compileModeOf({ ok: true, compileMode: "java:abc" })).toEqual({ mode: "java", classes: 0, dex: 0 });
+    expect(compileModeOf({ ok: true, compileMode: "" })).toEqual({ mode: "unknown", classes: 0, dex: 0 });
   });
 
   it("失败结果不会被误判成 java", () => {
-    expect(compileModeOf({ ok: false, step: "compile", log: "ECJ: ..." })).toEqual({ mode: "unknown", classes: 0 });
+    expect(compileModeOf({ ok: false, step: "compile", log: "ECJ: ..." })).toEqual({ mode: "unknown", classes: 0, dex: 0 });
   });
 });

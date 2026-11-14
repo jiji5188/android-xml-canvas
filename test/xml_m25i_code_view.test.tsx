@@ -99,6 +99,14 @@ describe("XmlCodeView — 显隐与位置", () => {
     expect((render({ isMobile: true }).tree as El).props.style).toBeUndefined();
   });
 
+  it("M256：手机端抽屉展开时底边上移，让出抽屉高度", () => {
+    const el = render({ isMobile: true, drawerOpen: true }).tree as El;
+    expect(el.props.style.bottom).toBe("calc(12px + 42vh)");
+    // 桌面端不受抽屉影响
+    const d = render({ isMobile: false, drawerOpen: true }).tree as El;
+    expect(d.props.style.bottom).toBeUndefined();
+  });
+
   it("编辑器拿到 value / 焦点行 / 错误", () => {
     const { all } = render();
     const ed = all.find((e) => e.type === CodeEditor);

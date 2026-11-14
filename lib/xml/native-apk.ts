@@ -46,9 +46,9 @@ export interface BuildApkResult {
   /** 失败阶段：pkg / keystore / files / write / aapt2 / compile / link / pack / sign / output */
   step?: string;
   log?: string;
-  /** M216："none" = 无 Java 源码的布局壳；"java:<n>" = 真编译并注入了 <n> 个 dex */
+  /** M216："none" = 无 Java 源码的布局壳；M254："java:<classes>:<dex>" = 编译了 <classes> 个类并注入 <dex> 个 dex（缓存命中时 classes=0）；老包 "java:<n>" = <n> 个 dex */
   compileMode?: string;
-  /** M216：编译并注入的 dex 数量（只有 compileMode 以 java: 开头时才有意义） */
+  /** M216：编译并注入的 dex 数量（只有 compileMode 以 java: 开头时才有意义；M254 起优先用 compileMode 解析） */
   classes?: number;
 }
 
@@ -86,9 +86,29 @@ function install(): void {
       } catch {
         r = { ok: false, log: "原生返回的不是合法 JSON：" + String(json).slice(0, 200) };
       }
+      // M254：ECJ 会刷一堆 "res-miss: ... messages_zh.properties" 资源缺失告警（无害但刷屏），
+      // 展示前滤掉，只留真正有意义的日志行；连续空行压缩掉
+      if (r.log) r.log = cleanBuildLog(r.log);
       fn(r);
     };
   });
+}
+
+/** M254：滤掉 ECJ 的 res-miss 告警行 + 压缩连续空行（这些不影响构建，纯噪音） */
+export function cleanBuildLog(log: string): string {
+  if (!log) return log;
+  const lines = log
+    .split("\n")
+    .filter((l) => !/^\s*res-miss:/.test(l) && !/^\s*res miss:/.test(l));
+  // 压缩 ≥2 个连续空行为 1 个
+  return lines
+    .reduce<string[]>((acc, l) => {
+      if (l.trim() === "" && acc[acc.length - 1] === "") return acc;
+      acc.push(l);
+      return acc;
+    }, [""] as string[])
+    .join("\n")
+    .replace(/\n\s*$/, "");
 }
 
 /** 打包（promise 永远 resolve，错误放在 ok=false + log 里） */
@@ -126,15 +146,24 @@ export function buildApk(input: BuildApkInput): Promise<BuildApkResult> {
  */
 export function compileModeOf(r: BuildApkResult | null | undefined): {
   mode: "java" | "shell" | "unknown";
+  /** 真编译的 .class 个数（M254 起由原生上报；缓存命中时未知记 0） */
   classes: number;
+  /** 注入的 dex 个数（>0 就是真的能跑逻辑） */
+  dex: number;
 } {
   const cm = r?.compileMode || "";
   if (cm.startsWith("java:")) {
-    const n = r?.classes ?? Number(cm.slice(5));
-    return { mode: "java", classes: Number.isFinite(n) ? n : 0 };
+    const rest = cm.slice(5);
+    // M254：新格式 java:<classes>:<dex>；老包只有 java:<n>（那时 n 是 dex 数）
+    const parts = rest.split(":");
+    const a = Number(parts[0]);
+    const b = parts.length > 1 ? Number(parts[1]) : a;
+    const classes = Number.isFinite(a) ? a : 0;
+    const dex = Number.isFinite(b) ? b : 0;
+    return { mode: "java", classes, dex };
   }
-  if (cm === "none" || cm === "shell" || cm === "shell-no-compiler") return { mode: "shell", classes: 0 };
-  return { mode: "unknown", classes: 0 };
+  if (cm === "none" || cm === "shell" || cm === "shell-no-compiler") return { mode: "shell", classes: 0, dex: 0 };
+  return { mode: "unknown", classes: 0, dex: 0 };
 }
 
 /** 调系统安装器（需要原生支持；返回是否调起成功） */

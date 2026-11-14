@@ -202,8 +202,16 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           pushBuildLog(true, tt("打包成功"), r.log, undefined, r.bytes, r.ms);
           const base = tt("打包完成：{name}", { name: r.name || "" });
           const cm = compileModeOf(r);
-          if (cm.mode === "java" && cm.classes > 0) {
-            noteTimed(tt("{base}（已编译 {n} 个 Java 类）", { base, n: String(cm.classes) }), 8000);
+          const dex = cm.dex || 0;
+          const classes = cm.classes || 0;
+          if (cm.mode === "java" && dex > 0) {
+            // M254：真的注入了 dex（>0）就是能跑逻辑——哪怕 classes=0（编译缓存命中，class 数未知）
+            noteTimed(
+              classes > 0
+                ? tt("{base}（已编译 {n} 个 Java 类，注入 {d} 个 dex）", { base, n: String(classes), d: String(dex) })
+                : tt("{base}（命中编译缓存，注入 {d} 个 dex）", { base, d: String(dex) }),
+              8000,
+            );
           } else if (cm.mode === "java") {
             noteTimed(tt("{base}（⚠ 未注入 Java dex，实际还是布局壳）", { base }), 12000);
           } else if (cm.mode === "shell") {

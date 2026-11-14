@@ -304,7 +304,8 @@ public class BuildApkHelper {
             cacheFile.setLastModified(System.currentTimeMillis());
             extraDex.addAll(cachedDex);
             log.append("命中编译缓存（").append(cachedDex.size()).append(" 个 dex），跳过 ECJ+D8 编译\n");
-            return "java:" + cachedDex.size();
+            // M254：格式 java:<classes>:<dex>——缓存命中时 class 数未知记 0（不是「没编译出东西」）
+            return "java:0:" + cachedDex.size();
         }
         pruneDexCache(cacheDir, 24);
         File compDir = ensureCompiler();
@@ -401,7 +402,8 @@ public class BuildApkHelper {
         }
         log.append("设备端编译成功，注入 ").append(n).append(" 个 dex（").append(total / 1024).append(" KB）\n");
         if (n > 0) writeDexCache(cacheFile, dexFiles);
-        return "java:" + n;
+        // M254：java:<classes>:<dex>，UI 才能说「编译了 N 个类、注入 M 个 dex」
+        return "java:" + classFiles.size() + ":" + n;
     }
 
     // ===== 编译器管理 =====

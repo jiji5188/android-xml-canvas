@@ -112,6 +112,8 @@ export function mergeProjectExtras(a: ResourceExtras | null, b: ResourceExtras |
     drawableXml: { ...a.drawableXml, ...b.drawableXml },
     // M210：layouts 也合并（a 是快速通道里当前文档引用的，b 是全量扫描；缺一边都会少 id）
     layouts: { ...(a.layouts || {}), ...(b.layouts || {}) },
+    // M256：全项目 @+id 也合并（menu/navigation 里的 id）
+    ids: [...new Set([...(a.ids || []), ...(b.ids || [])])],
     styles: { ...a.styles, ...b.styles },
     vectorNames: [...new Set([...a.vectorNames, ...b.vectorNames])],
     valuesXml,
@@ -260,6 +262,25 @@ export async function loadProjectResIndex(
       if (seen.has(rel) || layoutsRead >= MAX_LAYOUTS || reads >= MAX_READS) continue;
       reads++;
       layoutsRead++;
+      const text = await readText(io, resRel, rel);
+      if (text != null) {
+        seen.add(rel);
+        items.push(textItem(rel, text));
+      }
+    }
+  }
+
+  // M256：menu / navigation / xml 目录也要扫——NavigationView 菜单项、nav 图里的
+  //  @+id（如 nav_home）常定义在 res/menu/*.xml，以前只扫 layout 导致 R.id 误报
+  const idDirs = dirs.filter((d) => /^(menu|navigation|xml)(-|$)/.test(d));
+  let idReads = 0;
+  const MAX_ID_DIRS = 40;
+  for (const d of idDirs) {
+    for (const rel of await listDir(io, resRel, d)) {
+      if (!/\.xml$/i.test(rel)) continue;
+      if (seen.has(rel) || idReads >= MAX_ID_DIRS || reads >= MAX_READS) continue;
+      reads++;
+      idReads++;
       const text = await readText(io, resRel, rel);
       if (text != null) {
         seen.add(rel);

@@ -11621,3 +11621,6 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-repack-fileinput { display: none; }
 .axv-repack-busy { margin-top: 8px; }
 .axv-repack-go[aria-disabled='true'] { opacity: 0.5; }
+
+/* M256锛氭娊灞夊睍寮€鏃?绉诲姑绔?浠ｇ爜鍖哄簳杈?inset 鍔ㄦ€佷笂绉伙紝娑堥櫎閬╃洊锛堥粯璁?12px锛屾娊灞夊睍寮€鍚庣敱 inline 瑕嗙洊鎴?calc(12px+42vh)锛?*/
+.axv-mob-xml { transition: bottom 0.22s ease; }

@@ -121,6 +121,21 @@ describe("lintJava + 项目资源", () => {
     expect(msgs).toContain("R.color.primry");
   });
 
+  it("extraIds 直接并入 ids（menu/navigation 里的 @+id，不用重解析 xml）", () => {
+    const env = collectResEnv({
+      layouts: {},
+      extraIds: ["nav_home", "nav_settings"],
+    });
+    expect(env.ids).toContain("nav_home");
+    expect(env.ids).toContain("nav_settings");
+    // 代码里用这些 id 不再误报
+    const out = lintJava(
+      `public class A { void f() { findViewById(R.id.nav_home); } }`,
+      { ids: env.ids },
+    );
+    expect(out.filter((i) => i.code === "rid").length).toBe(0);
+  });
+
   it("不传 res 就完全不查（不打扰）", () => {
     const src = `public class A { void f() { int c = R.color.nothing; } }`;
     expect(lintJava(src, {}).some((i) => i.code === "rtype")).toBe(false);

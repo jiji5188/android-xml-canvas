@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codeOnlyNotice, detectDocKind, kindOfPath, localTag, rootTagOf } from "@/lib/xml/doc-kind";
+import { codeOnlyNotice, detectDocKind, kindOfPath, localTag, looksLikeJavaSource, looksLikeKotlin, rootTagOf } from "@/lib/xml/doc-kind";
 
 const MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
 <!-- 应用清单 -->
@@ -86,5 +86,36 @@ describe("M37b codeOnlyNotice 文案", () => {
   it("文件名带完整路径也能取出短名", () => {
     expect(codeOnlyNotice("res/values/strings.xml").title.startsWith("strings.xml")).toBe(true);
     expect(codeOnlyNotice("").title.length).toBeGreaterThan(0);
+  });
+});
+
+describe("M255 looksLikeJavaSource / looksLikeKotlin（按内容嗅探，防 XML 规则误伤 Java/Kotlin）", () => {
+  const KOTLIN_FRAGMENT = [
+    "if (System.currentTimeMillis() - backPressedTime < EXIT_INTERVAL) {",
+    "    super.onBackPressed()",
+    "} else {",
+    "    backPressedTime = System.currentTimeMillis()",
+    "    Toast.makeText(this, \"再按一次退出应用\", Toast.LENGTH_SHORT).show()",
+    "}",
+  ].join("\n");
+
+  it("Kotlin 片段（无 package/class 头，靠 Toast/System/this 强信号）被认出来", () => {
+    expect(looksLikeJavaSource(KOTLIN_FRAGMENT)).toBe(true);
+    expect(looksLikeKotlin(KOTLIN_FRAGMENT)).toBe(true); // 全篇 0 分号
+  });
+
+  it("带 class 头的 Java 被认出", () => {
+    expect(looksLikeJavaSource("package com.x;\nimport android.app.Activity;\npublic class A extends Activity {\n}")).toBe(true);
+    expect(looksLikeKotlin("public class A extends Activity {\n}")).toBe(false); // 有 ; 且无 val/fun
+  });
+
+  it("XML 布局不被误认成 Java", () => {
+    expect(looksLikeJavaSource(LAYOUT)).toBe(false);
+    expect(looksLikeJavaSource(MANIFEST)).toBe(false);
+  });
+
+  it("空串 / 纯空白不报 Java", () => {
+    expect(looksLikeJavaSource("")).toBe(false);
+    expect(looksLikeJavaSource("   \n  ")).toBe(false);
   });
 });

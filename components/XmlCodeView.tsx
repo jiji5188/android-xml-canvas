@@ -16,6 +16,8 @@ import { ManifestEditor } from "./ManifestEditor";
 export interface XmlCodeViewProps {
   open: boolean;
   isMobile: boolean;
+  /** M256：手机端日志抽屉展开时，代码区底边要上移让出抽屉高度，别被遮 */
+  drawerOpen?: boolean;
   leftOpen: boolean;
   rightOpen: boolean;
 
@@ -59,7 +61,10 @@ export function XmlCodeView(props: XmlCodeViewProps) {
       className="axv-mob-xml"
       style={
         props.isMobile
-          ? undefined
+          ? // M256：手机端默认不写内联位置（走 CSS）；仅抽屉展开时抬底边，让出抽屉高度（mobile 抽屉高 42vh）
+            props.drawerOpen
+            ? { bottom: "calc(12px + 42vh)" }
+            : undefined
           : {
               left: (props.leftOpen ? 320 : 0) + 16,
               right: (props.rightOpen ? 320 : 0) + 16,

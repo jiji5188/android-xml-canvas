@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { validateSigning, readSigningFromGradle, applySigningToGradle, defaultAppGradle, type SigningParams } from "@/lib/xml/signing";
+import { compileModeOf } from "@/lib/xml/native-apk";
 import { checkPublish, readPublishInfo, setPublishVersion } from "@/lib/xml/gradle-publish";
 import { setGradlePackage } from "@/lib/xml/project-info";
 import type { StoredSigning } from "@/lib/xml/sign-store";
@@ -61,8 +62,7 @@ const EMPTY: SigningParams = {
 
 export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onShareApk, onOpenRepack, onWriteGradle, onClose, onNote, stored, onRemember, onForget }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
-  // M239：构建日志抽屉（成功时也能看全过程，定位哪一步没编译 Java）
-  const [showBuildLog, setShowBuildLog] = useState(false);
+  // M257：构建日志已统一走抽屉「构建日志」tab，弹窗不再内嵌日志（showBuildLog 状态已废）
   // M195：build.gradle 里没写的项（典型：口令）用本机记住的配置补
   const seed = prefill ?? (stored as SigningParams | null);
   const [alias, setAlias] = useState(seed?.alias || EMPTY.alias);
@@ -456,7 +456,23 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
                   })}
                   {apkResult.compileMode?.startsWith("java:") ? (
                     <div style={{ opacity: 0.8, fontSize: 11, marginTop: 2 }}>
-                      {tt("已编译 {n} 个 Java 类并注入 dex", { n: String(apkResult.classes ?? 0) })}
+                      {(() => {
+                        // M254：从 compileMode 解析 classes/dex（原生不一定带 classes 字段）
+                        const cm = compileModeOf({
+                          ok: true,
+                          compileMode: apkResult.compileMode,
+                          classes: apkResult.classes,
+                        });
+                        const classes = cm.classes || 0;
+                        const dex = cm.dex || 0;
+                        if (dex <= 0) return tt("⚠ 未注入 Java dex，实际还是布局壳");
+                        if (classes > 0)
+                          return tt("已编译 {n} 个 Java 类，注入 {d} 个 dex", {
+                            n: String(classes),
+                            d: String(dex),
+                          });
+                        return tt("命中编译缓存，注入 {d} 个 dex", { d: String(dex) });
+                      })()}
                     </div>
                   ) : null}
                   {apkResult.compileMode === "none" ? (
@@ -470,50 +486,18 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
                     </div>
                   ) : null}
                   <div style={{ opacity: 0.7, wordBreak: "break-all", fontSize: 11 }}>{apkResult.path}</div>
-                  {apkResult.log ? (
-                    <div style={{ marginTop: 4 }}>
-                      <button
-                        type="button"
-                        style={{ fontSize: 11, padding: "2px 8px", cursor: "pointer", background: "transparent", border: "1px solid currentColor", borderRadius: 4, opacity: 0.75 }}
-                        onClick={() => setShowBuildLog((v) => !v)}
-                      >
-                        {showBuildLog ? tt("收起构建日志") : tt("查看构建日志（全过程）")}
-                      </button>
-                      {showBuildLog ? (
-                        <pre
-                          style={{
-                            marginTop: 4,
-                            fontSize: 10,
-                            maxHeight: 240,
-                            overflow: "auto",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-all",
-                            background: "rgba(0,0,0,0.04)",
-                            padding: 6,
-                            borderRadius: 4,
-                          }}
-                        >
-                          {apkResult.log}
-                        </pre>
-                      ) : null}
-                    </div>
-                  ) : null}
+                  {/* M257：构建全过程日志不再塞在弹窗里，统一在「问题/日志 → 构建日志」抽屉 tab */}
+                  <div style={{ opacity: 0.7, fontSize: 11, marginTop: 4 }}>
+                    {tt("构建日志已输出到下方「问题/日志 → 构建日志」面板")}
+                  </div>
                 </div>
               ) : (
                 <div className="axv-sign-issue axv-sign-issue-error" style={{ marginTop: 6, display: "block" }}>
                   <div>{tt("打包失败（{step}）", { step: apkResult.step || "?" })}</div>
-                  <pre
-                    style={{
-                      margin: "6px 0 0",
-                      fontSize: 11,
-                      maxHeight: 160,
-                      overflow: "auto",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-all",
-                    }}
-                  >
-                    {apkResult.log || ""}
-                  </pre>
+                  {/* M257：完整日志在「问题/日志 → 构建日志」抽屉里看，弹窗只给短提示 */}
+                  <div style={{ opacity: 0.75, fontSize: 11, marginTop: 4 }}>
+                    {tt("详细日志在下方「问题/日志 → 构建日志」面板")}
+                  </div>
                 </div>
               )
             ) : null}

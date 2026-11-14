@@ -109,6 +109,8 @@ export interface CollectEnvInput {
   mipmaps?: Iterable<string>;
   /** 布局文件名（无扩展名），不给就从 layouts 的键推 */
   layoutNames?: Iterable<string>;
+  /** M256：全项目（含 menu/navigation）收集到的 @+id 名，直接并入 ids（不重解析） */
+  extraIds?: Iterable<string>;
 }
 
 /** 汇总成一份资源清单 */
@@ -124,6 +126,8 @@ export function collectResEnv(input: CollectEnvInput): JavaResEnv {
 
   for (const xml of Object.values(input.layouts ?? {})) mergeLayout(xml);
   if (input.currentLayoutXml) mergeLayout(input.currentLayoutXml);
+  // M256：直接并入全项目扫到的 @+id（menu/navigation 等，不用重解析 xml）
+  if (input.extraIds) for (const id of input.extraIds) ids.add(id);
 
   const layoutNames = new Set<string>();
   if (input.layoutNames) for (const n of input.layoutNames) layoutNames.add(stripExt(n));

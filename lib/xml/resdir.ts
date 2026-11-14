@@ -51,6 +51,8 @@ export interface ResourceExtras {
   tree?: ResTreeDir;
   /** res/layout/*.xml 全文缓存（点击树里布局文件 → 画到预览） */
   layouts?: Record<string, string>;
+  /** M256：项目里所有 XML（含 menu/navigation/xml 等）里出现过的 @+id 名，防 R.id.xxx 误报 */
+  ids?: string[];
 }
 
 export interface ResUploadItem {
@@ -156,6 +158,12 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
   const stringsByLocale: Record<string, Record<string, string>> = {};
   /** 同名图片按密度择优：name → {score, url} */
   const best = new Map<string, { score: number; url: string }>();
+  /** M256：全项目 XML 里出现过的 @+id 名（防 R.id 误报），从所有读过的 xml 收集 */
+  const allIds = new Set<string>();
+  const collectIds = (text: string) => {
+    if (!text) return;
+    for (const m of text.matchAll(/@\+id\/([A-Za-z_][\w.]*)/g)) allIds.add(m[1]);
+  };
 
   for (const item of files) {
     const rel = relPath(item);
@@ -177,6 +185,7 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
       // M92/M93：非默认限定符只接「夜间」和「语言」两套，其余（-v21/-land/-sw600dp）仍然忽略
       if (!isDefault && !info.night && !info.locale) continue;
       const text = await item.file.text();
+      collectIds(text);
 
       if (isDefault) {
         if (/<(string|dimen|color)[\s>]/.test(text)) {
@@ -224,6 +233,7 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
     const layoutDirName = dir.split("/").pop() || "";
     if (file.endsWith(".xml") && /^layout(-|$)/.test(layoutDirName)) {
       const text = await item.file.text();
+      collectIds(text);
       extras.layouts = extras.layouts || {};
       const isDefaultLayout = /^layout(-[A-Za-z0-9]+)?$/.test(layoutDirName) && layoutDirName === "layout";
       // 默认 layout/ 优先；其他变体不覆盖已有的同名
@@ -236,6 +246,7 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
     // ---- drawable / mipmap 下的 xml（vector / shape / selector / ripple / layer-list / adaptive-icon …）----
     if (file.endsWith(".xml") && (looksDrawable || /(^|\/)(drawable|mipmap)/.test(rel))) {
       const text = await item.file.text();
+      collectIds(text);
       const name = file.replace(/\.xml$/i, "");
       // M4v：**所有** drawable/mipmap 里的 xml 都存原文。
       // 以前 vector 只记名字不存全文 → 资源选择弹窗列表里看不到、画布只能画紫虚线占位。
@@ -251,6 +262,17 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
       }
       // vector 也进 drawableXml：resolveDrawable 和资源选择弹窗都靠它拿 xml 原文
       if (!extras.drawableXml[name]) extras.drawableXml[name] = text;
+      extras.sourceFiles.push(rel);
+      upsertTree(tree, rel, item.file, text);
+      continue;
+    }
+
+    // M256：其它 res 下的 xml（menu/navigation/xml/anim/animator/color/font 等）——
+    //  不渲染、不入树展示，但里面的 @+id（如 NavigationView 的 menu 项、nav 图）要给 R.id 查表，
+    //  否则 R.id.nav_home 这种在 menu 里声明的 id 会误报「项目里不存在」
+    if (file.endsWith(".xml")) {
+      const text = await item.file.text();
+      collectIds(text);
       extras.sourceFiles.push(rel);
       upsertTree(tree, rel, item.file, text);
       continue;
@@ -285,6 +307,7 @@ export async function buildResourceExtras(files: ResUploadItem[]): Promise<Resou
   if (Object.keys(stringsByLocale).length > 0) extras.stringsByLocale = stringsByLocale;
 
   extras.tree = tree as ResTreeDir;
+  if (allIds.size) extras.ids = [...allIds].sort();
   return extras;
 }
 

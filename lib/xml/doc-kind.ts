@@ -147,6 +147,55 @@ export function isValuesPath(relOrName?: string | null): boolean {
   return /(^|\/)res\/values[^/]*\/[^/]+\.xml$/i.test(p) || /(^|\/)values[^/]*\/[^/]+\.xml$/i.test(p);
 }
 
+/** M255：按内容嗅探 Java/Kotlin 源码（文件名不可靠/缺失时的兜底，防 XML 规则误伤）。
+ *  高置信度信号：package/import 行、class/interface/object/fun 声明、Kotlin 的 val/var/fun。
+ *  前提：首个代码字符不是 `<`（XML 文档不可能以 package/class/fun 打头）。 */
+export function looksLikeJavaSource(src: string): boolean {
+  if (!src) return false;
+  const head = src.slice(0, 6000);
+  // 去掉开头的注解/注释/空白，看第一个代码字符
+  const stripped = head.replace(/^(?:\s*(?:@\w+(?:\([^)]*\))?\s*)|(?:\/\*[\s\S]*?\*\/)|(?:\/\/[^\n]*)|(?:\s)+)*?/, "");
+  if (stripped.startsWith("<")) return false; // XML 文档
+  // 1) package / import（Java/Kotlin 都有）
+  if (/^[\s\S]*?(?:^|\n)\s*(package|import)\s+[\w.*]+/m.test(head)) {
+    // 必须是真 import（后面跟 ; 或 Kotlin 无分号）且不是 XML 属性名
+    if (/(?:^|\n)\s*import\s+[\w.*]+/m.test(head)) return true;
+    if (/(?:^|\n)\s*package\s+[\w.]+/m.test(head)) return true;
+  }
+  // 2) 类/接口/对象/record 声明
+  if (/(?:^|\n)\s*(?:(?:public|private|protected|internal|abstract|final|open|sealed|data|static|enum)\s+)*(class|interface|object|record)\s+[A-Za-z_]\w*/.test(head)) return true;
+  // 3) Kotlin fun
+  if (/(?:^|\n)\s*(?:(?:public|private|protected|internal|override|suspend|inline|open|abstract|final|static)\s+)*fun\s+[A-Za-z_]\w*\s*[<(]/.test(head)) return true;
+  // 4) 大量以 ; 结尾的语句 + 括号（Java 特征）—— 保守：至少 3 行
+  const semiLines = (head.match(/;\s*(\n|$)/g) || []).length;
+  if (semiLines >= 3 && /\b(?:void|int|String|boolean|long|double|float|var)\b/.test(head)) return true;
+  // 5) 强 Android/Java 信号（即使片段没有 class 头也认出来）：R.xxx / android.* / androidx.* /
+  //    Toast/Log/System 等调用—— 这些绝不出现在 XML 布局里
+  if (/(?:\bR\s*\.\s*(?:id|layout|drawable|string|color|dimen|mipmap|style|anim|raw|array|menu|attr)\b|\bandroidx?\s*\.\s*\w+|\bToast\s*\.\s*makeText\b|\bLog\s*\.\s*(?:d|i|w|e|v)\s*\(|\bSystem\s*\.\s*currentTimeMillis\s*\(|\bthis\s*\.\s*(?:findViewById|getApplicationContext|runOnUiThread|getResources|getSharedPreferences)\b|\bgetSupportActionBar\s*\(|\bsetContentView\s*\()/g.test(head)) return true;
+  return false;
+}
+
+/** M255：按内容判断是不是 Kotlin（决定 lintJava 的 isKotlin 参数，文件名没扩展名时兜底） */
+export function looksLikeKotlin(src: string): boolean {
+  if (!src) return false;
+  const head = src.slice(0, 8000);
+  if (/(?:^|\n)\s*fun\s+[A-Za-z_]\w*\s*[<(]/.test(head)) return true;
+  if (/(?:^|\n)\s*(?:val|var)\s+[A-Za-z_]\w*\s*[:=]/.test(head)) return true;
+  if (/\bval\s+[A-Za-z_]\w*/.test(head) && !/;\s*$/.test(head.replace(/\n/g, "\n"))) {
+    // 有 val/var 且整体几乎没分号 → Kotlin 风格
+    const semis = (head.match(/;/g) || []).length;
+    if (semis < 5) return true;
+  }
+  // M255：Java/Kotlin 特征但全篇 0 分号且没有 class/interface/enum/record 声明头 → 几乎必是
+  // Kotlin（Java 文件通常有 class 头；0 分号 + 无 class 头 + 有 this./super./赋值 = Kotlin 方法体）
+  if (looksLikeJavaSource(head)) {
+    const semis = (head.match(/;/g) || []).length;
+    const hasClassHeader = /\b(?:class|interface|enum|record)\s+[A-Za-z_]\w*/.test(head);
+    if (semis === 0 && !hasClassHeader) return true;
+  }
+  return false;
+}
+
 /** 给界面用的人话说明 */export function codeOnlyNotice(name: string): { title: string; msg: string } {
   const n = (name || "").replace(/\\/g, "/").split("/").pop() || "该文件";
   if (n === "AndroidManifest.xml") {

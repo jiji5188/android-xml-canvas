@@ -91,7 +91,7 @@ import { collectProjectRes } from "@/lib/xml/res-collect";
 import { projectSaveRoot, projectFileExists, readProjectFile, readAppGradle, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
 import { parseAppIconConfig } from "@/lib/xml/app-icon";
 import { nativeBridge } from "@/lib/xml/native-save";
-import { codeOnlyNotice, detectDocKind } from "@/lib/xml/doc-kind";
+import { codeOnlyNotice, detectDocKind, looksLikeJavaSource, looksLikeKotlin } from "@/lib/xml/doc-kind";
 import { isValuesPath } from "@/lib/xml/doc-kind";
 import { looksLikeValuesDoc } from "@/lib/xml/values-edit";
 import { isManifestPath, looksLikeManifest } from "@/lib/xml/manifest-edit";
@@ -1606,10 +1606,19 @@ const allDrawableNames = useMemo(() => {
     () => (openRel || saveOrigin?.name || "").split(/[\\/]/).pop() || "",
     [openRel, saveOrigin?.name],
   );
-  const isJavaFile = useMemo(() => isJavaLikePath(codeFileName), [codeFileName]);
+  // M255：文件名不可靠/缺失时，按内容嗅探 Java/Kotlin（否则 .kt 代码会被 XML 规则跑 → 「非法标签名」误报）
+  const isJavaByContent = useMemo(() => looksLikeJavaSource(xml), [xml]);
+  const isJavaFile = useMemo(
+    () => isJavaLikePath(codeFileName) || (isJavaByContent && !/\.(xml|layout|drawable|menu|values)\b/i.test(codeFileName)),
+    [codeFileName, isJavaByContent],
+  );
+  const isKotlinLike = useMemo(
+    () => (/\.kts?$/i.test(codeFileName) ? true : looksLikeKotlin(xml) && isJavaByContent),
+    [codeFileName, xml, isJavaByContent],
+  );
   const javaOutline = useMemo(
-    () => (isJavaFile ? parseOutline(xml, /\.kts?$/i.test(codeFileName)) : undefined),
-    [isJavaFile, xml, codeFileName],
+    () => (isJavaFile ? parseOutline(xml, isKotlinLike) : undefined),
+    [isJavaFile, xml, isKotlinLike],
   );
   /** 代码编辑器光标行（函数列表里高亮「你在这儿」） */
   const [codeCursor, setCodeCursor] = useState(0);
@@ -1832,6 +1841,8 @@ const allDrawableNames = useMemo(() => {
       currentLayoutXml: docKind === "layout" ? xml : null,
       valuesFiles: valuesText.trim() ? { "values.xml": valuesText } : undefined,
       drawables,
+      // M256：全项目（含 menu/navigation）扫到的 @+id 并入，防 R.id.nav_home 误报
+      extraIds: resExtras?.ids,
     });
   }, [resExtras, generatedDrawables, docKind, xml, sampleValues]);
 
@@ -1876,7 +1887,7 @@ const allDrawableNames = useMemo(() => {
       let out: LintIssue[];
       if (isJavaFile) {
         out = lintJava(lintSrc, {
-          isKotlin: /\.kt(s)?$/i.test(codeFileName),
+          isKotlin: isKotlinLike,
           // M177：把项目里真实存在的资源喂进去，R.id / R.layout / findViewById 类型才能真校验
           ids: javaResEnv.ids,
           res: {
@@ -1923,7 +1934,7 @@ const allDrawableNames = useMemo(() => {
       console.error("[axv] 结构检查失败", e); // i18n-ignore
       return [] as LintIssue[];
     }
-  }, [lintSrc, codeOnly, isJavaFile, codeFileName, openRel, saveOrigin?.name, currentFile?.name, xmlResSig]);
+  }, [lintSrc, codeOnly, isJavaFile, isKotlinLike, codeFileName, openRel, saveOrigin?.name, currentFile?.name, xmlResSig]);
   /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
   const lintErrCount = useMemo(() => {
     try {
@@ -3491,6 +3502,8 @@ const findResolved = findResolvedNode;
   >([]);
   // M252：打包（APK）完成后，把日志推进抽屉并自动打开到「构建日志」tab（不再只塞在签名弹窗）
   const [apkForceView, setApkForceView] = useState<{ open: boolean; tab: "problems" | "build-log" } | null>(null);
+  // M256：抽屉展开状态（手机端代码区要腾出高度，别被遮）
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const pushApkBuildLog = useCallback(
     (entry: { id: string; ok: boolean; stage: string; ms?: number; log?: string; files?: number; bytes?: number }) => {
       setBuildLogs((prev) => [entry, ...prev].slice(0, 20));
@@ -4715,6 +4728,7 @@ const findResolved = findResolvedNode;
         onGotoLine={(ln) => gotoLine(ln)}
         buildLogs={buildLogs}
         forceView={apkForceView}
+        onOpenChange={setDrawerOpen}
         insetLeft={isMobile ? undefined : leftOpen ? 320 : 0}
         insetRight={isMobile ? undefined : rightOpen ? 320 : 0}
         statusSlot={
@@ -4751,6 +4765,7 @@ const findResolved = findResolvedNode;
       <XmlCodeView
         open={mobileTab === "xml" || mobileTab === "values"}
         isMobile={isMobile}
+        drawerOpen={drawerOpen}
         leftOpen={leftOpen}
         rightOpen={rightOpen}
         value={xml}

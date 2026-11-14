@@ -49,10 +49,18 @@ export interface ProblemsDrawerProps {
    *  传 `{ open: true, tab: "build-log" }` 时打开构建日志 tab；传 null 表示取消强制。
    *  用户手动切 tab/收起后，本 prop 的强制效果解除（不锁死）。 */
   forceView?: { open: boolean; tab: DrawerPanel } | null;
+  /** M256：抽屉展开/收起时回调，父组件可用它调高度（手机端避免遮住代码区） */
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, insetLeft, insetRight, tr, forceView }: ProblemsDrawerProps) {
-  const [open, setOpen] = useState(false);
+export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, insetLeft, insetRight, tr, forceView, onOpenChange }: ProblemsDrawerProps) {
+  const [open, setOpenRaw] = useState(false);
+  // M256：包装 setter，同步通知父组件（手机端要调代码区高度避免被遮）
+  const setOpen = (next: boolean | ((o: boolean) => boolean)) => {
+    const v = typeof next === "function" ? next(open) : next;
+    setOpenRaw(v);
+    onOpenChange?.(v);
+  };
   const [tab, setTab] = useState<DrawerPanel>("problems");
   // M252：外部强制查看（打包完成后自动打开到对应 tab）。用一个 ref 记上一次的
   // forceView，变化时同步 open/tab；用户手动操作后会解除锁定。

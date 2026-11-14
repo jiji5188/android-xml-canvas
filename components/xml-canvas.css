@@ -11250,6 +11250,17 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   display: inline-block;
 }
 
+/* M260：最新一条构建日志默认展开，给个左侧强调条让人一眼看到「这次的输出」 */
+.axv-drawer-logcard-latest {
+  box-shadow: inset 3px 0 0 var(--axv-primary, #4f8cff);
+}
+.axv-drawer-logcard-latest.axv-drawer-logcard-err {
+  box-shadow: inset 3px 0 0 var(--axv-danger, #ff5b5b);
+}
+.axv-drawer-logcard-latest pre.axv-drawer-log {
+  max-height: 40vh;
+}
+
 
 /* M189 版本信息 + 发布前检查 */
 .axv-sign-sep {

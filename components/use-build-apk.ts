@@ -110,14 +110,19 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
       if (apkBusy) return;
       setApkResult(null);
       if (!hasBuildApk()) {
-        setApkResult({ ok: false, step: "env", log: tt("当前环境不支持打包（网页版没有 aapt2/apksig），请在手机上操作") });
+        const msg = tt("当前环境不支持打包（网页版没有 aapt2/apksig），请在手机上操作");
+        setApkResult({ ok: false, step: "env", log: msg });
+        // M260：早失败也要进抽屉构建日志，否则用户只看到弹窗短提示，无处回看
+        pushBuildLog(false, tt("打包失败（env）"), msg);
         return;
       }
       const b = nativeBridge();
       const root = projectSaveRoot(activeProject);
       const base = root?.kind === "native" ? root.base.replace(/[/\\]+$/, "") : b?.getDefaultWorkspace?.() || "";
       if (!base) {
-        setApkResult({ ok: false, step: "keystore", log: tt("没有可写的项目目录") });
+        const msg = tt("没有可写的项目目录");
+        setApkResult({ ok: false, step: "keystore", log: msg });
+        pushBuildLog(false, tt("打包失败（keystore）"), msg);
         return;
       }
       const clean = (o.storeFile || "").replace(/\\/g, "/").replace(/^\/+/, "");
@@ -145,11 +150,13 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           const want = (xml.match(/R\.layout\.([A-Za-z_][A-Za-z0-9_]*)/) || [])[1] || "";
           const picked = await pickProjectLayout(aiFileIo, openRel, want);
           if (!picked) {
+            const msg = tt("项目里没找到布局文件（layout/*.xml）。请先在左侧资源新建或打开一个布局，再打包。");
             setApkResult({
               ok: false,
               step: "compile",
-              log: tt("项目里没找到布局文件（layout/*.xml）。请先在左侧资源新建或打开一个布局，再打包。"),
+              log: msg,
             });
+            pushBuildLog(false, tt("打包失败（compile）"), msg);
             setExportNote(tt("打包失败：{msg}", { msg: "compile" }));
             return;
           }

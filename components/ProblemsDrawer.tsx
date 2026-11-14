@@ -154,13 +154,18 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, in
               </ul>
             )
           ) : (
-            /* M188b：构建日志（真机渲染 pipeline 的结构化输出） */
+            /* M188b：构建日志；M260：最新一条默认展开（编译/打包输出点开抽屉就能直接看到），旧条目折叠 */
             buildLogs && buildLogs.length > 0 ? (
               <div className="axv-drawer-logwrap">
-                {buildLogs.slice(0, 20).map((l) => (
+                {buildLogs.slice(0, 20).map((l, i) => (
                   <details
                     key={l.id}
-                    className={"axv-drawer-logcard" + (l.ok ? "" : " axv-drawer-logcard-err")}
+                    open={i === 0}
+                    className={
+                      "axv-drawer-logcard" +
+                      (l.ok ? "" : " axv-drawer-logcard-err") +
+                      (i === 0 ? " axv-drawer-logcard-latest" : "")
+                    }
                   >
                     <summary>
                       <span className="axv-drawer-logdot" aria-hidden="true" />
@@ -168,7 +173,7 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, in
                       {typeof l.ms === "number" ? " · " + l.ms + "ms" : ""}
                       {l.ok ? "" : " · " + tr("drawer.log.fail", "失败")}
                     </summary>
-                    <pre className="axv-drawer-log">{l.log || l.logFile || ""}</pre>
+                    <pre className="axv-drawer-log">{l.log || l.logFile || tr("drawer.log.none", "本次没有输出日志")}</pre>
                   </details>
                 ))}
               </div>

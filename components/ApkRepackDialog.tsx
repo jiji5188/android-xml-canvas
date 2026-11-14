@@ -35,6 +35,8 @@ export interface ApkRepackDialogProps {
   onDone?: (path: string) => void;
   /** 顶部提示（例如签名配置没填全） */
   onNote?: (msg: string) => void;
+  /** M260：重签失败时把完整日志推进抽屉「构建日志」tab（弹窗里只留短提示） */
+  onBuildLog?: (entry: { id: string; ok: boolean; stage: string; log?: string }) => void;
 }
 
 interface PickState {
@@ -61,7 +63,7 @@ function kb(n: number): string {
   return `${Math.max(1, Math.round(n / 1024))} KB`;
 }
 
-export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackDialogProps) {
+export function ApkRepackDialog({ signing, onClose, onDone, onNote, onBuildLog }: ApkRepackDialogProps) {
   const supported = useMemo(() => hasApkRepack(), []);
   const [apkPath, setApkPath] = useState("");
   const [apkName, setApkName] = useState("");
@@ -172,7 +174,18 @@ export function ApkRepackDialog({ signing, onClose, onDone, onNote }: ApkRepackD
         setOkPath(r.path);
         onDone?.(r.path);
       } else {
-        setErr(`${r.step ? `[${r.step}] ` : ""}${r.log || tt("重打包失败")}`);
+        // M260：完整日志进抽屉「构建日志」，弹窗只给一行短提示（别把整段编译/打包输出塞在报错框里）
+        onBuildLog?.({
+          id: `repack-${Date.now()}`,
+          ok: false,
+          stage: tt("重签失败（{step}）", { step: r.step || "?" }),
+          log: r.log,
+        });
+        setErr(
+          tt("重签失败（{step}）：详细日志在下方「问题/日志 → 构建日志」面板", {
+            step: r.step || tt("未知"),
+          }),
+        );
       }
     } catch (e) {
       setErr(String(e));

@@ -5507,6 +5507,7 @@ const findResolved = findResolvedNode;
             setExportNote(tt("重签名完成：{name}", { name: p.split(/[\\/]/).pop() || "" }));
           }}
           onNote={(m) => setExportNote(m)}
+          onBuildLog={pushApkBuildLog}
         />
       )}
       {editingTheme ? (

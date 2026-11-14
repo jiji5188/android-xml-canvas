@@ -331,10 +331,19 @@ public class BuildApkHelper {
         java.lang.ClassLoader cl = compilerLoader(compDir);
         Class<?> ecj = cl.loadClass("com.jiji.axv.compiler.EcjBridge");
         java.util.List<String> ecjLog = new java.util.ArrayList<>();
-        String[] ecjArgs = new String[] {
-            "-source", "11", "-target", "11", "-nowarn", "-encoding", "UTF-8",
-            "-classpath", androidJar.getAbsolutePath(),
-            "-d", clsDir.getAbsolutePath() };
+        // ⚠ M243（关键 bug）：以前这里只传选项、**没把源码文件加进去**！
+        // ECJ 收到「无源码」→ 打印 usage 然后返回 true；D8 拿到 0 个 .class →
+        // 最终显示「已编译 0 个 Java 类」并打出 31KB 的壳包。源码必须显式当参数传。
+        java.util.List<String> ecjArgsList = new java.util.ArrayList<>();
+        java.util.Collections.addAll(ecjArgsList, "-source", "11", "-target", "11", "-nowarn",
+                "-encoding", "UTF-8", "-classpath", androidJar.getAbsolutePath(),
+                "-bootclasspath", androidJar.getAbsolutePath(),
+                "-d", clsDir.getAbsolutePath());
+        for (File f : files) ecjArgsList.add(f.getAbsolutePath());
+        ecjArgsList.addAll(rFiles);
+        String[] ecjArgs = ecjArgsList.toArray(new String[0]);
+        log.append("ECJ 参数：源码 ").append(files.size()).append(" + R.java ").append(rFiles.size())
+                .append("（共 ").append(ecjArgs.length).append(" 个参数）\n");
         java.lang.reflect.Method ecjCompile = ecj.getMethod("compile", String[].class, java.util.List.class);
         boolean ecjOk = Boolean.valueOf((Boolean) ecjCompile.invoke(null, ecjArgs, ecjLog));
         if (!ecjOk || ecjLog.size() > 0) {
@@ -345,6 +354,12 @@ public class BuildApkHelper {
         dexDir.mkdirs();
         java.util.List<String> classFiles = new java.util.ArrayList<>();
         walkClass(clsDir, classFiles);
+        // ECJ 说成功但一个 class 都没出 → 参数/源码有问题，必须中止而不是静默出壳包
+        if (classFiles.isEmpty()) {
+            throw new IOException("ECJ 没产出任何 .class（源码进行了 " + files.size()
+                    + " 个，请检查文件是否真的写到了 srcx/ 并带 .java 扩展名）");
+        }
+        log.append("ECJ 产出 ").append(classFiles.size()).append(" 个 .class\n");
         Class<?> d8 = cl.loadClass("com.jiji.axv.compiler.D8Bridge");
         java.util.List<String> d8Log = new java.util.ArrayList<>();
         java.util.List<String> d8Args = new java.util.ArrayList<>();

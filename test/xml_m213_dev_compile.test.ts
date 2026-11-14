@@ -101,4 +101,13 @@ describe("M242 签名/编译器加载器契约（防猜写回归）", () => {
     expect(helper).toContain("dex 转换失败");
     expect(helper).toContain("40L * 1024 * 1024");
   });
+
+  // M243 护栏：设备端曾长期「已编译 0 个 Java 类」——根因是 ECJ 参数只传选项、
+  // 没把源码文件加进去 → ECJ 打印 usage 返回 true → D8 零输入 → 打出壳包。
+  it("ECJ 参数必须包含源码文件 + R.java（M243）", () => {
+    expect(helper).toContain("for (File f : files) ecjArgsList.add(f.getAbsolutePath())");
+    expect(helper).toContain("ecjArgsList.addAll(rFiles)");
+    expect(helper).toContain("-bootclasspath");
+    expect(helper).toContain("ECJ 没产出任何 .class");
+  });
 });

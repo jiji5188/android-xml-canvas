@@ -446,7 +446,7 @@ public class BuildApkHelper {
         java.lang.reflect.Method ecjCompile = ecj.getMethod("compile", String[].class, java.util.List.class);
         boolean ecjOk = Boolean.valueOf((Boolean) ecjCompile.invoke(null, ecjArgs, ecjLog));
         if (!ecjOk || ecjLog.size() > 0) {
-            log.append(fmtEcjLog(ecjLog, 60));
+            log.append(fmtEcjLog(ecjLog, 60, androidxJars != null && !androidxJars.isEmpty()));
         }
         if (!ecjOk) throw new IOException("Java 编译失败（看上面 ECJ 的报错行）—— 已中止打包，不会偷偷生成只显示布局的壳包");
         logStage(log, "dex 链接（D8）");
@@ -710,7 +710,7 @@ public class BuildApkHelper {
     /** M266：把 ECJ 的批量编译输出压成「按文件归类的错误清单」。
      *  ECJ 原始一行一条（错误 + 源码行 + 箭头 + 消息），89 个文件能刷 5000 行，
      *  直接截断会把后面的错误吞掉。这里解析成结构化条目，同类消息去重，并给出缺依赖提示。 */
-    private static String fmtEcjLog(java.util.List<String> raw, int maxEntries) {
+    private static String fmtEcjLog(java.util.List<String> raw, int maxEntries, boolean hasAndroidxBuiltIn) {
         if (raw == null || raw.isEmpty()) return "";
         java.util.List<String> lines = new java.util.ArrayList<>();
         for (String s : raw) {
@@ -796,7 +796,24 @@ public class BuildApkHelper {
                 sb.append(p);
                 if (i >= 8) break;
             }
-            sb.append("\n  处理方法：把对应的 .jar/.aar 放进项目 libs/ 目录，再重新打包（会自动加进 classpath）。\n");
+            sb.append("\n");
+            // M270：给用户明确的「下载什么、放哪里」引导
+            sb.append("  需手动下载放进项目 libs/ 目录的包：\n");
+            int j = 0;
+            for (String p : missingPkgs) {
+                if (j++ >= 6) { sb.append("    …（还有 ").append(missingPkgs.size() - 6).append(" 个未列）\n"); break; }
+                sb.append("    - ").append(p).append("  →  ");
+                if (p.startsWith("androidx.")) {
+                    String art = p.substring("androidx.".length()).split("\\.")[0];
+                    sb.append("androidx:").append(art).append("（Google Maven 下载 .aar/.jar）\n");
+                } else {
+                    sb.append("搜「").append(p).append("」的官方 jar，放到 libs/\n");
+                }
+            }
+            sb.append("  放进 libs/ 后重新打包会自动加进 classpath（无需改代码）\n");
+            if (hasAndroidxBuiltIn) {
+                sb.append("  （内置 androidx 插件包已覆盖常用 1.0.0 基础库；上面列出的是插件包没含的库/版本）\n");
+            }
         }
         return sb.toString();
     }

@@ -276,22 +276,34 @@ const cmTheme = EditorView.theme({
   ".cm-foldGutter .cm-gutterElement": {
     cursor: "pointer",
     display: "inline-flex",
+    alignItems: "center",
     justifyContent: "center",
     minWidth: "18px",
   },
-  ".cm-foldGutter .cm-gutterElement::before": {
+  // 隐藏 CM 自带的 › / ‹ 字符（图标由下面两个伪元素画）
+  ".cm-foldGutter .cm-gutterElement > span": {
+    font-size: 0,
+    line-height: 0,
+    display: inline-block,
+    width: 100%,
+    height: 100%,
+  },
+  ".cm-foldGutter .cm-gutterElement::after": {
     content: "",
+    position: "absolute",
     width: 0,
     height: 0,
     borderLeft: "5px solid var(--axv-on-surface-variant, rgba(0, 0, 0, 0.45))",
     borderTop: "4px solid transparent",
     borderBottom: "4px solid transparent",
-    display: "inline-block",
-    transition: "transform 0.15s ease",
+    display: "block",
   },
-  ".cm-foldGutter .cm-gutterElement[data-\"folded\"]::before": {
-    // 折叠态：箭头向右 ▶（data-folded 值即被折叠的行数，统一样式）
+  ".cm-foldGutter .cm-gutterElement:not([data-\"folded\"])::after": {
+    // 展开态（span.title = Unfold line）：向下箭头 ▼
     transform: "rotate(90deg)",
+  },
+  ".cm-foldGutter .cm-gutterElement[data-\"folded\"]::after": {
+    // 折叠态（span.title = Fold line，data-folded 值 = 被折叠行数）：向右箭头 ▶
     borderLeftColor: "var(--axv-on-surface, rgba(0, 0, 0, 0.75))",
   },
   ".cm-fix-gutter .cm-gutterElement": {

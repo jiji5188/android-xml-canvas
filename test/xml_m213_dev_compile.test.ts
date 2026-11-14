@@ -86,8 +86,20 @@ describe("M242 签名/编译器加载器契约（防猜写回归）", () => {
 
   it("编译器 dex 内存加载 + ECJ 资源父链（InMemoryDexClassLoader + ResClassLoader 服务 res/）", () => {
     expect(helper).toContain("new dalvik.system.InMemoryDexClassLoader(bb, null, resLoader)");
-    expect(helper).toContain("new ResClassLoader(resDir, ctx.getClassLoader())");
+    expect(helper).toContain("new ResClassLoader(resDir, ctx.getClassLoader(), missLog)");
     expect(helper).toContain("setContextClassLoader(cl)");
+  });
+
+  // M250/M251：设备端 ECJ 运行时依赖修复的防回归契约
+  it("M250：SourceVersion 桩是 enum（修 ART VerifyError 期望 java.lang.Enum 父类型）", () => {
+    const src = fs.readFileSync(path.join(repo, "apk/compiler-src/javax/lang/model/SourceVersion.java"), "utf8");
+    expect(src).toContain("public enum SourceVersion");
+    // 不能是普通 final class（supertype 缺 Enum → VerifyError）
+    expect(src).not.toContain("public final class SourceVersion");
+  });
+
+  it("M251：ECJ 带 -proc:none 关 APT（绕开 javax.annotation.processing / javax.tools 依赖）", () => {
+    expect(helper).toContain('"-proc:none"');
   });
 
   it("ensureCompiler 每次清空重解 + manifest 逐文件校验（sha256）", () => {

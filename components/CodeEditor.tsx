@@ -254,8 +254,8 @@ function foldChevronSvg(open: boolean) {
   path.setAttribute(
     "d",
     open
-      ? "M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" // keyboard_arrow_down
-      : "M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z", // keyboard_arrow_right
+      ? "M12.53 16.28a0.75 0.75 0 0 1-1.06 0l-7.5-7.5a0.75 0.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a0.75 0.75 0 1 1 1.06 1.06l-7.5 7.5Z"
+      : "M16.28 11.47a0.75 0.75 0 0 1 0 1.06l-7.5 7.5a0.75 0.75 0 0 1-1.06-1.06L14.69 12 7.72 5.03a0.75 0.75 0 0 1 1.06-1.06l7.5 7.5Z",
   );
   svg.appendChild(path);
   return svg;

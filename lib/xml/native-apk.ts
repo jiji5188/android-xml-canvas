@@ -34,6 +34,8 @@ export interface BuildApkInput {
   launchActivity?: string;
   /** M262：项目 AndroidManifest.xml 原文（设备端 aapt2 link 直接用它，不再合成只含 ShellActivity 的清单） */
   manifestText?: string;
+  /** M266：项目自带的依赖库（.jar / .aar），设备端 ECJ 编译时加进 classpath，解决 androidx/jxl 等引用 */
+  libs?: { path: string; base64: string }[];
 }
 
 export interface BuildApkResult {

@@ -12,8 +12,8 @@ const SKIP_DIRS = withSkipExtras(coreSkipDirs, "build");
 
 /** 单文件最多读 400KB（Activity 一般 5~20KB，设上限防大文件卡住手机） */
 const MAX_TEXT = 400 * 1024;
-/** 最多读 60 个文件 */
-const MAX_FILES = 60;
+/** M266：最多读 400 个文件（以前 60，大项目会漏类 → “cannot be resolved to a type”） */
+const MAX_FILES = 400;
 
 const isCode = (rel: string) => /\.(java|kt|kts)$/i.test(rel);
 

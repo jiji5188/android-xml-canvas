@@ -43,6 +43,7 @@ public class BuildApkHelper {
             String label = p.optString("appName", "AXV App");
             String outName = p.optString("outName", "");
             JSONArray javaSources = p.optJSONArray("javaSources");
+            JSONArray libs = p.optJSONArray("libs");
             String launchActivity = p.optString("launchActivity", "");
             String manifestText = p.optString("manifestText", "");
             String ksPath = p.optString("keystore", "");
@@ -201,7 +202,7 @@ public class BuildApkHelper {
             step = "compile";
             String compileMode;
             try {
-                compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files);
+                compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files, libs);
             } catch (IOException ce) {
                 final String cm2 = ce.getMessage() == null ? "" : ce.getMessage();
                 appendResMissLog(log);
@@ -328,7 +329,8 @@ public class BuildApkHelper {
     // ===== 编译 =====
 
     private String compileProjectJava(JSONArray javaSources, File root, File genDir,
-                                      StringBuilder log, java.util.List<byte[]> extraDex, JSONArray resFiles) throws Exception {
+                                      StringBuilder log, java.util.List<byte[]> extraDex, JSONArray resFiles,
+                                      JSONArray libs) throws Exception {
         if (javaSources == null || javaSources.length() == 0) {
             log.append("项目无 Java 源码：本次打包为布局壳（不运行任何逻辑）\n");
             return "none";
@@ -370,6 +372,43 @@ public class BuildApkHelper {
         if (!androidJar.isFile() || androidJar.length() < 1024 * 1024) {
             throw new IOException("缺 android.jar（编译器资源没装齐，无法编译 Java）");
         }
+        // M266：把项目自带的 libs/*.aar 里的 classes.jar 展开，加进 ECJ classpath（解决 androidx/jxl 等引用）
+        java.util.List<String> libJars = new java.util.ArrayList<>();
+        if (libs != null) {
+            for (int i = 0; i < libs.length(); i++) {
+                JSONObject lj = libs.optJSONObject(i);
+                if (lj == null) continue;
+                String libPath = lj.optString("path", "");
+                byte[] libData = lj.optJSONArray("data") == null ? null : null;
+                // 约定：libs 元素形如 {"path":"libs/bc.jar","base64":"..."} 或 {"path":"libs/androidx-core.aar"}
+                String b64 = lj.optString("base64", "");
+                if (libPath.isEmpty() || b64.isEmpty()) continue;
+                try {
+                    byte[] data = Base64.decode(b64, Base64.NO_WRAP);
+                    if (data == null || data.length == 0) continue;
+                    if (libPath.endsWith(".jar")) {
+                        File jf = new File(root, "libs");
+                        jf.mkdirs();
+                        File dst = new File(jf, libPath.replace('/', java.io.File.separatorChar));
+                        dst.getParentFile().mkdirs();
+                        writeBytes(dst, data);
+                        libJars.add(dst.getAbsolutePath());
+                    } else if (libPath.endsWith(".aar")) {
+                        // aar 是 zip，取 classes.jar 再展开/当 jar 用
+                        File af = new File(root, "libs/aar");
+                        af.mkdirs();
+                        File dst = new File(af, libPath.substring(0, libPath.length() - 4) + ".aar");
+                        writeBytes(dst, data);
+                        File innerJar = extractClassesJar(dst, new File(af, libPath.substring(0, libPath.length() - 4) + "-classes.jar"));
+                        if (innerJar != null) libJars.add(innerJar.getAbsolutePath());
+                    }
+                } catch (Throwable ignored) { }
+            }
+        }
+        // 拼 classpath：android.jar + 项目 libs
+        StringBuilder cp = new StringBuilder(androidJar.getAbsolutePath());
+        for (String j : libJars) cp.append(File.pathSeparator).append(j);
+        log.append("ECJ classpath：android.jar + ").append(libJars.size()).append(" 个项目 libs\n");
         java.lang.ClassLoader cl = compilerLoader(compDir);
         Class<?> ecj = cl.loadClass("com.jiji.axv.compiler.EcjBridge");
         java.util.List<String> ecjLog = new java.util.ArrayList<>();
@@ -381,7 +420,7 @@ public class BuildApkHelper {
         // Android 运行时缺失（M244 的降到 8 没绕开，ECJ 无条件 link 该类）；现在该桩类
         // 随 compiler dex 一起进 APK，11 可以正常用。
         java.util.Collections.addAll(ecjArgsList, "-source", "11", "-target", "11", "-nowarn",
-                "-encoding", "UTF-8", "-classpath", androidJar.getAbsolutePath(),
+                "-encoding", "UTF-8", "-classpath", cp.toString(),
                 "-d", clsDir.getAbsolutePath());
         // M251：-proc:none 关注解处理器（APT）。ECJ 的 initializeAnnotationProcessorManager 会
         // 加载 javax.annotation.processing.* / javax.tools.*（JDK java.compiler 模块，Android 没有），
@@ -398,7 +437,7 @@ public class BuildApkHelper {
         java.lang.reflect.Method ecjCompile = ecj.getMethod("compile", String[].class, java.util.List.class);
         boolean ecjOk = Boolean.valueOf((Boolean) ecjCompile.invoke(null, ecjArgs, ecjLog));
         if (!ecjOk || ecjLog.size() > 0) {
-            logRaw(log, String.join("\n", ecjLog), 80);
+            log.append(fmtEcjLog(ecjLog, 60));
         }
         if (!ecjOk) throw new IOException("Java 编译失败（看上面 ECJ 的报错行）—— 已中止打包，不会偷偷生成只显示布局的壳包");
         logStage(log, "dex 链接（D8）");
@@ -416,7 +455,7 @@ public class BuildApkHelper {
         java.util.List<String> d8Log = new java.util.ArrayList<>();
         java.util.List<String> d8Args = new java.util.ArrayList<>();
         d8Args.add("--release"); d8Args.add("--min-api"); d8Args.add("24");
-        d8Args.add("--lib"); d8Args.add(androidJar.getAbsolutePath());
+        d8Args.add("--lib"); d8Args.add(cp.toString());
         d8Args.add("--output"); d8Args.add(dexDir.getAbsolutePath());
         d8Args.addAll(classFiles);
         java.lang.reflect.Method d8Method = d8.getMethod("dex", String[].class, java.util.List.class);
@@ -641,19 +680,116 @@ public class BuildApkHelper {
         return "  " + s;
     }
 
-    /** M263：把外部工具输出按行格式化进 log（跳过空行，截断到 capLines 行） */
+    /** M263：把外部工具输出按行格式化进 log（跳过空行/分隔行，截断到 capLines 行） */
     private static void logRaw(StringBuilder log, String raw, int capLines) {
         if (raw == null || raw.isEmpty()) return;
         String[] lines = raw.split("\n");
         int shown = 0;
+        int total = 0;
         for (String line : lines) {
-            if (line.isEmpty()) continue;
+            String t = line.trim();
+            if (t.isEmpty() || t.matches("^-{3,}$")) continue;
+            total++;
             log.append(fmtLine(line)).append('\n');
-            if (++shown >= capLines) {
-                log.append("  …（已截断，原始共 ").append(lines.length).append(" 行）\n");
-                break;
+            if (++shown >= capLines) break;
+        }
+        if (total > shown) {
+            log.append("  …（已截断：只显示前 ").append(shown).append(" 行，共 ").append(total).append(" 行）\n");
+        }
+    }
+
+    /** M266：把 ECJ 的批量编译输出压成「按文件归类的错误清单」。
+     *  ECJ 原始一行一条（错误 + 源码行 + 箭头 + 消息），89 个文件能刷 5000 行，
+     *  直接截断会把后面的错误吞掉。这里解析成结构化条目，同类消息去重，并给出缺依赖提示。 */
+    private static String fmtEcjLog(java.util.List<String> raw, int maxEntries) {
+        if (raw == null || raw.isEmpty()) return "";
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        for (String s : raw) {
+            if (s == null) continue;
+            for (String p : s.split("\n")) lines.add(p);
+        }
+        java.util.regex.Pattern head = java.util.regex.Pattern.compile(
+                "^\\s*[0-9]+\\.\\s+(ERROR|WARNING)\\s+in\\s+(.+?)\\s+\\(at line ([0-9]+)\\)\\s*$");
+        java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, Integer>> byFile = new java.util.LinkedHashMap<>();
+        java.util.LinkedHashSet<String> missingPkgs = new java.util.LinkedHashSet<>();
+        int errors = 0, warnings = 0;
+        String curFile = null;
+        boolean curIsError = true;
+        boolean msgTaken = false;
+        for (String l : lines) {
+            java.util.regex.Matcher m = head.matcher(l);
+            if (m.find()) {
+                curIsError = "ERROR".equals(m.group(1));
+                if (curIsError) errors++; else warnings++;
+                String full = m.group(2).replace('\\', '/');
+                curFile = full.substring(full.lastIndexOf('/') + 1);
+                java.util.LinkedHashMap<String, Integer> bucket = byFile.get(curFile);
+                if (bucket == null) { bucket = new java.util.LinkedHashMap<>(); byFile.put(curFile, bucket); }
+                msgTaken = false;
+                continue;
+            }
+            if (curFile == null || msgTaken) continue;
+            String t = l.trim();
+            if (t.isEmpty() || t.startsWith("^") || t.matches("^-{3,}$")) continue;
+            if (l.startsWith("\t") || l.startsWith("    ")) continue; // 源码片段行
+            // 到了消息行
+            msgTaken = true;
+            String msg = t;
+            java.util.regex.Matcher imp = java.util.regex.Pattern
+                    .compile("^The import ([A-Za-z0-9_.]+) cannot be resolved")
+                    .matcher(msg);
+            if (imp.find()) {
+                String fq = imp.group(1);
+                int dot = fq.lastIndexOf('.');
+                String pkg = dot > 0 ? fq.substring(0, dot) : fq;
+                String[] seg = pkg.split("\\.");
+                String root = seg.length >= 2 ? seg[0] + "." + seg[1] : pkg;
+                if (!root.startsWith("java.") && !root.startsWith("javax.") && !root.startsWith("android.")) {
+                    missingPkgs.add(root);
+                }
+            }
+            java.util.LinkedHashMap<String, Integer> bucket = byFile.get(curFile);
+            if (bucket != null) {
+                Integer old = bucket.get(msg);
+                bucket.put(msg, old == null ? 1 : old + 1);
             }
         }
+        StringBuilder sb = new StringBuilder();
+        sb.append("ECJ 结果：").append(errors).append(" 个错误");
+        if (warnings > 0) sb.append("、").append(warnings).append(" 个警告");
+        sb.append("，涉及 ").append(byFile.size()).append(" 个文件（同类消息已合并）\n");
+        int shown = 0;
+        outer:
+        for (java.util.Map.Entry<String, java.util.LinkedHashMap<String, Integer>> fe : byFile.entrySet()) {
+            sb.append("● ").append(fe.getKey()).append('\n');
+            int perFile = 0;
+            for (java.util.Map.Entry<String, Integer> me : fe.getValue().entrySet()) {
+                if (shown >= maxEntries) {
+                    sb.append("  …（还有更多文件/错误未展示）\n");
+                    break outer;
+                }
+                sb.append("    ").append(me.getKey());
+                if (me.getValue() > 1) sb.append("（×").append(me.getValue()).append("）");
+                sb.append('\n');
+                shown++;
+                if (++perFile >= 4) {
+                    int rest = fe.getValue().size() - perFile;
+                    if (rest > 0) sb.append("    …（本文件还有 ").append(rest).append(" 条）\n");
+                    break;
+                }
+            }
+        }
+        if (!missingPkgs.isEmpty()) {
+            sb.append("缺依赖提示：以下第三方包不在编译 classpath —— ");
+            int i = 0;
+            for (String p : missingPkgs) {
+                if (i++ > 0) sb.append("、");
+                sb.append(p);
+                if (i >= 8) break;
+            }
+            sb.append("\n  处理方法：把对应的 .jar/.aar 放进项目 libs/ 目录，再重新打包（会自动加进 classpath）。\n");
+        }
+        return sb.toString();
     }
 
     /** M263：项目 manifest 缺 package 属性时，在 <manifest> 开标签里补上（aapt2 正规清单必需） */
@@ -673,6 +809,21 @@ public class BuildApkHelper {
         String replaced = text.substring(0, m.start()) + newOpenTag + text.substring(m.end());
         log.append("项目清单缺 package，已补 package=\"").append(pkg).append("\"\n");
         return replaced;
+    }
+
+    /** M266：从 aar（zip）里抽出 classes.jar；失败返回 null */
+    private File extractClassesJar(File aar, File outJar) {
+        try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(aar)) {
+            java.util.zip.ZipEntry e = zf.getEntry("classes.jar");
+            if (e == null) return null;
+            try (InputStream is = zf.getInputStream(e)) {
+                byte[] buf = readAll(is);
+                writeBytes(outJar, buf);
+            }
+            return outJar;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     private void appendResMissLog(StringBuilder log) {

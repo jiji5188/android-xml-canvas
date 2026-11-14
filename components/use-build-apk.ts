@@ -18,6 +18,7 @@ import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { prepareFiles } from "@/lib/xml/native-render";
 import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest } from "@/lib/xml/find-launcher";
+import { collectProjectLibs } from "@/lib/xml/project-libs";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
 import { t as tt } from "@/lib/i18n-src";
@@ -177,6 +178,12 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         });
         const javaSrcMapped = javaSrc.map((j) => ({ path: j.rel, code: j.text }));
         const javaSources = withCurrentSource(javaSrcMapped, relNow, xml);
+        // M266：项目依赖库（libs/*.jar|aar）→ 设备端 ECJ classpath
+        setExportNote(tt("正在收集依赖库…"));
+        const libsRes = await collectProjectLibs(aiFileIo, activeProject?.rootPath || activeProject?.dirPath || null);
+        if (libsRes.libs.length) {
+          setExportNote(tt("发现 {n} 个依赖库，一起加进 classpath", { n: String(libsRes.libs.length) }));
+        }
         // M258：清单里找不到 MAIN/LAUNCHER 时，从源码推入口（extends Activity 的那个类）——
         //  否则 ShellActivity 拿不到 axv.launcher，永远停在壳上，用户代码跑不起来。
         // M262：同时把项目 manifest 原文读出来给 BuildApkHelper 用（aapt2 link 不再合成清单）
@@ -212,6 +219,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           javaSources,
           launchActivity: manifest || "",
           manifestText: manifestInfo.text || "",
+          libs: libsRes.libs.length ? libsRes.libs.map((l) => ({ path: l.rel, base64: l.base64 })) : undefined,
         });
         setApkResult(r);
         if (r.ok) {

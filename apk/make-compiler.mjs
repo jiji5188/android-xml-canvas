@@ -143,7 +143,7 @@ const jarEntries = execFileSync(path.join(JBR, "jar.exe"), ["tf", ecjJar], { enc
   .map((s) => s.trim())
   .filter(Boolean);
 const MSGS = jarEntries.filter(
-  (e) => e.startsWith("org/eclipse/") && (e.endsWith(".rsc") || e.endsWith(".properties"))
+  (e) => e.startsWith("org/eclipse/") && (e.endsWith(".rsc") || e.endsWith(".properties") || e.endsWith(".props"))
 );
 if (MSGS.length < 10) {
   console.error("ECJ 资源太少（" + MSGS.length + " 个），检查 ecj.jar 是否完整");

@@ -14,6 +14,49 @@ const CANDIDATES = [
   "src/main/AndroidManifest.xml",
 ];
 
+export interface ProjectManifestInfo {
+  /** 项目里找到的 manifest 相对路径；没找到 = "" */
+  rel: string;
+  /** manifest 全文（BOM/编码已去掉）；没找到 = "" */
+  text: string;
+  /** 从 manifest 里解析出的包名（package 或 namespace）；解析不到 = "" */
+  pkg: string;
+  /** MAIN/LAUNCHER 对应的 Activity 全限定名；没有 = "" */
+  launcher: string;
+}
+
+/**
+ * M262：把项目 AndroidManifest.xml 原文读出来给设备端打包用（aapt2 link 会直接用它，
+ * 不再让 BuildApkHelper 自己合成一份只含 ShellActivity 的清单）。
+ * 同时返回解析出的 launcher，方便调用方判断是否还需要源码兜底。
+ */
+export async function readProjectManifest(
+  io: AiFileIo | null | undefined,
+  fallbackPkg = "",
+): Promise<ProjectManifestInfo> {
+  if (!io) return { rel: "", text: "", pkg: fallbackPkg, launcher: "" };
+  let rel = "";
+  let text = "";
+  for (const cand of CANDIDATES) {
+    try {
+      const r = await io.read(cand);
+      if (r.ok && r.text && /<manifest/i.test(r.text)) {
+        rel = cand;
+        text = r.text;
+        break;
+      }
+    } catch {
+      /* try next */
+    }
+  }
+  if (!text) return { rel: "", text: "", pkg: fallbackPkg, launcher: "" };
+  const pkgM =
+    text.match(/(?:android:)?package\s*=\s*["']([^"']+)["']/i) ||
+    text.match(/namespace\s*=\s*["']([^"']+)["']/i);
+  const pkg = pkgM?.[1] || fallbackPkg || "";
+  const launcher = parseManifestLauncher(text, pkg);
+  return { rel, text, pkg, launcher };
+}
 export async function findLauncherActivity(
   io: AiFileIo | null | undefined,
   /** M258：manifest 没写 package（新版 Gradle 用 build.gradle 的 namespace）时，用构建包名兑底拼相对类名 */
@@ -21,9 +64,9 @@ export async function findLauncherActivity(
 ): Promise<string> {
   if (!io) return "";
   let text = "";
-  for (const rel of CANDIDATES) {
+  for (const cand of CANDIDATES) {
     try {
-      const r = await io.read(rel);
+      const r = await io.read(cand);
       if (r.ok && r.text && /<manifest/i.test(r.text)) {
         text = r.text;
         break;
@@ -33,50 +76,47 @@ export async function findLauncherActivity(
     }
   }
   if (!text) return "";
-  const pkgM = text.match(/(?:android:)?package\s*=\s*["']([^"']+)["']/i) || text.match(/namespace\s*=\s*["']([^"']+)["']/i);
-  // M258：manifest 没 package/namespace（常见于新项目）→ 用传入的构建包名兑底，否则 .MainActivity 解析不出全限定名
+  const pkgM =
+    text.match(/(?:android:)?package\s*=\s*["']([^"']+)["']/i) ||
+    text.match(/namespace\s*=\s*["']([^"']+)["']/i);
   const pkg = pkgM?.[1] || fallbackPkg || "";
+  return parseManifestLauncher(text, pkg);
+}
 
-  // 归一化：android:name=".Foo" → 补包名；包名拿不到时相对名无法全限定 → 退空（交给源码兑底）
+/** 纯文本版：给定 manifest 原文 + 包名，解析 MAIN/LAUNCHER 的 Activity 全限定名 */
+export function parseManifestLauncher(
+  text: string,
+  pkg: string,
+): string {
+  if (!text) return "";
   const resolveName = (raw: string): string => {
     if (!raw) return "";
     if (raw.startsWith(".")) {
-      if (!pkg) return ""; // 相对名但没包名，拼不出全限定 → 交给 deriveLauncherFromSources
+      if (!pkg) return "";
       return pkg + "." + raw.slice(1);
     }
     return raw;
   };
-
-  // 逐个扫 <activity> / <activity-alias> 开标签，按起点切出整块（到 </activity> 或 </activity-alias>），
-  // 检查 MAIN + LAUNCHER；alias 额外把 name 解析成 targetActivity
   const tagRe = /<(activity-alias|activity)\b[^>]*>/gi;
   let m: RegExpExecArray | null;
   while ((m = tagRe.exec(text))) {
     const kind = m[1];
     const openTag = m[0];
-    const startIdx = m.index; // 开标签在原文里的真实起点（不是 indexOf 猜的）
-
-    // 自闭合开标签（<activity ... />）不可能带子 intent-filter → 块就是它自己，直接不命中
+    const startIdx = m.index;
     const selfClosing = /\/\s*>$/.test(openTag.trim());
-
     const nameM = openTag.match(/android:name\s*=\s*"([^"]+)"/i);
     if (!nameM) continue;
-    if (selfClosing) continue; // 没法带 MAIN/LAUNCHER 子节点
-
-    // 切出整块：从开标签结束往后找对应的 </xxx>
+    if (selfClosing) continue;
     const closeRe = new RegExp("</" + kind + "\\s*>", "i");
     closeRe.lastIndex = startIdx + openTag.length;
     const after = text.slice(startIdx + openTag.length);
     const closeM = closeRe.exec(after);
     const blockEnd = closeM ? startIdx + openTag.length + closeM.index + closeM[0].length : text.length;
     const block = text.slice(startIdx, blockEnd);
-
     const hasMain = /<action\b[^>]*android:name\s*=\s*"android\.intent\.action\.MAIN"/i.test(block);
     const hasLauncher = /<category\b[^>]*android:name\s*=\s*"android\.intent\.category\.LAUNCHER"/i.test(block);
     if (!hasMain || !hasLauncher) continue;
-
     let name = nameM[1];
-    // M258：alias 的 android:name 是别名本身，真入口在 android:targetActivity
     if (kind === "activity-alias") {
       const targetM = openTag.match(/android:targetActivity\s*=\s*"([^"]+)"/i);
       if (targetM) name = targetM[1];

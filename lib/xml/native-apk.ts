@@ -32,6 +32,8 @@ export interface BuildApkInput {
   javaSources?: { path: string; code: string }[];
   /** M213：启动 Activity 全限定名（项目清单里的 launcher；没有就退回壳 Activity） */
   launchActivity?: string;
+  /** M262：项目 AndroidManifest.xml 原文（设备端 aapt2 link 直接用它，不再合成只含 ShellActivity 的清单） */
+  manifestText?: string;
 }
 
 export interface BuildApkResult {

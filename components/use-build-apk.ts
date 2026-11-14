@@ -17,7 +17,7 @@ import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { prepareFiles } from "@/lib/xml/native-render";
-import { deriveLauncherFromSources, findLauncherActivity } from "@/lib/xml/find-launcher";
+import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest } from "@/lib/xml/find-launcher";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
 import { t as tt } from "@/lib/i18n-src";
@@ -179,7 +179,9 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         const javaSources = withCurrentSource(javaSrcMapped, relNow, xml);
         // M258：清单里找不到 MAIN/LAUNCHER 时，从源码推入口（extends Activity 的那个类）——
         //  否则 ShellActivity 拿不到 axv.launcher，永远停在壳上，用户代码跑不起来。
-        let manifest = javaSources.length ? await findLauncherActivity(aiFileIo, pkg) : "";
+        // M262：同时把项目 manifest 原文读出来给 BuildApkHelper 用（aapt2 link 不再合成清单）
+        const manifestInfo = await readProjectManifest(aiFileIo, pkg);
+        let manifest = manifestInfo.launcher || "";
         if (!manifest && javaSources.length) {
           manifest = deriveLauncherFromSources(javaSources, pkg);
           if (manifest) setExportNote(tt("清单里没找到 launcher，已从源码推断入口：{n}", { n: manifest }));
@@ -209,6 +211,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           extraDex: dexFiles,
           javaSources,
           launchActivity: manifest || "",
+          manifestText: manifestInfo.text || "",
         });
         setApkResult(r);
         if (r.ok) {

@@ -44,6 +44,7 @@ public class BuildApkHelper {
             String outName = p.optString("outName", "");
             JSONArray javaSources = p.optJSONArray("javaSources");
             String launchActivity = p.optString("launchActivity", "");
+            String manifestText = p.optString("manifestText", "");
             String ksPath = p.optString("keystore", "");
             String storePass = p.optString("storePass", "");
             String alias = p.optString("alias", "");
@@ -93,20 +94,52 @@ public class BuildApkHelper {
             log.append("资源 ").append(written).append(" 个文件\n");
 
             File man = new File(root, "AndroidManifest.xml");
-            writeUtf8(man, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-                    + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"" + pkg + "\">\n"
-                    + "  <uses-sdk android:minSdkVersion=\"24\" android:targetSdkVersion=\"34\" />\n"
-                    + "  <application android:label=\"" + xmlAttr(label) + "\">\n"
-                    + "    <activity android:name=\"com.jiji.axv.shell.ShellActivity\" android:exported=\"true\">\n"
-                    + "      <meta-data android:name=\"axv.layout\" android:value=\"" + xmlAttr(layout) + "\" />\n"
-                    + "      <meta-data android:name=\"axv.launcher\" android:value=\"" + xmlAttr(launchActivity) + "\" />\n"
-                    + "      <intent-filter>\n"
-                    + "        <action android:name=\"android.intent.action.MAIN\" />\n"
-                    + "        <category android:name=\"android.intent.category.LAUNCHER\" />\n"
-                    + "      </intent-filter>\n"
-                    + "    </activity>\n"
-                    + "  </application>\n"
-                    + "</manifest>\n");
+            // M262：优先用项目里的 AndroidManifest.xml 原文（aapt2 link 会直接读它，不再合成只含 ShellActivity 的清单）。
+            // 项目没清单 / 没把 manifestText 传过来 → 退回合成清单（老行为，布局壳还能跑）。
+            if (manifestText == null || manifestText.trim().isEmpty()) {
+                writeUtf8(man, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                        + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"" + pkg + "\">\n"
+                        + "  <uses-sdk android:minSdkVersion=\"24\" android:targetSdkVersion=\"34\" />\n"
+                        + "  <application android:label=\"" + xmlAttr(label) + "\">\n"
+                        + "    <activity android:name=\"com.jiji.axv.shell.ShellActivity\" android:exported=\"true\">\n"
+                        + "      <meta-data android:name=\"axv.layout\" android:value=\"" + xmlAttr(layout) + "\" />\n"
+                        + "      <meta-data android:name=\"axv.launcher\" android:value=\"" + xmlAttr(launchActivity) + "\" />\n"
+                        + "      <intent-filter>\n"
+                        + "        <action android:name=\"android.intent.action.MAIN\" />\n"
+                        + "        <category android:name=\"android.intent.category.LAUNCHER\" />\n"
+                        + "      </intent-filter>\n"
+                        + "    </activity>\n"
+                        + "  </application>\n"
+                        + "</manifest>\n");
+            } else {
+                // 项目清单没有 MAIN/LAUNCHER 时，把 ShellActivity 注进去兑底（老行为），否则装完没有图标/打不开
+                String content = manifestText;
+                boolean hasLauncher =
+                        content.contains("android.intent.action.MAIN") &&
+                                content.contains("android.intent.category.LAUNCHER");
+                if (!hasLauncher) {
+                    String shellBlock =
+                            "    <activity android:name=\"com.jiji.axv.shell.ShellActivity\" android:exported=\"true\">\n"
+                                    + "      <meta-data android:name=\"axv.layout\" android:value=\"" + xmlAttr(layout) + "\" />\n"
+                                    + "      <meta-data android:name=\"axv.launcher\" android:value=\"" + xmlAttr(launchActivity) + "\" />\n"
+                                    + "      <intent-filter>\n"
+                                    + "        <action android:name=\"android.intent.action.MAIN\" />\n"
+                                    + "        <category android:name=\"android.intent.category.LAUNCHER\" />\n"
+                                    + "      </intent-filter>\n"
+                                    + "    </activity>\n";
+                    int appIdx = content.lastIndexOf("</application>");
+                    if (appIdx > 0) {
+                        content = content.substring(0, appIdx) + shellBlock + content.substring(appIdx);
+                    } else {
+                        int manIdx = content.lastIndexOf("</manifest>");
+                        if (manIdx > 0) {
+                            content = content.substring(0, manIdx) + shellBlock + content.substring(manIdx);
+                        }
+                    }
+                }
+                writeUtf8(man, content);
+                log.append("使用项目 AndroidManifest.xml（").append(manifestText.length()).append(" 字符）\n");
+            }
 
             step = "aapt2";
             File bin = new File(ctx.getApplicationInfo().nativeLibraryDir, "libaapt2.so");

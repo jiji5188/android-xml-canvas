@@ -95,9 +95,11 @@ public class BuildApkHelper {
 
             File man = new File(root, "AndroidManifest.xml");
             // M262：优先用项目里的 AndroidManifest.xml 原文（aapt2 link 会直接读它，不再合成只含 ShellActivity 的清单）。
+            // M263：项目清单缺 package 属性时自动补上（aapt2 正规清单必需，否则报 warning/error）。
             // 项目没清单 / 没把 manifestText 传过来 → 退回合成清单（老行为，布局壳还能跑）。
+            String manContent;
             if (manifestText == null || manifestText.trim().isEmpty()) {
-                writeUtf8(man, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                manContent = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                         + "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"" + pkg + "\">\n"
                         + "  <uses-sdk android:minSdkVersion=\"24\" android:targetSdkVersion=\"34\" />\n"
                         + "  <application android:label=\"" + xmlAttr(label) + "\">\n"
@@ -110,9 +112,10 @@ public class BuildApkHelper {
                         + "      </intent-filter>\n"
                         + "    </activity>\n"
                         + "  </application>\n"
-                        + "</manifest>\n");
+                        + "</manifest>\n";
+                manContent = ensureManifestPkg(manContent, pkg, log);
             } else {
-                // 项目清单没有 MAIN/LAUNCHER 时，把 ShellActivity 注进去兑底（老行为），否则装完没有图标/打不开
+                // 项目清单没有 MAIN/LAUNCHER 时，把 ShellActivity 注进去兜底（老行为），否则装完没有图标/打不开
                 String content = manifestText;
                 boolean hasLauncher =
                         content.contains("android.intent.action.MAIN") &&
@@ -137,9 +140,10 @@ public class BuildApkHelper {
                         }
                     }
                 }
-                writeUtf8(man, content);
-                log.append("使用项目 AndroidManifest.xml（").append(manifestText.length()).append(" 字符）\n");
+                manContent = ensureManifestPkg(content, pkg, log);
             }
+            writeUtf8(man, manContent);
+            log.append("使用 AndroidManifest.xml（").append(manContent.length()).append(" 字符）\n");
 
             step = "aapt2";
             File bin = new File(ctx.getApplicationInfo().nativeLibraryDir, "libaapt2.so");
@@ -149,12 +153,14 @@ public class BuildApkHelper {
             File genDir = new File(root, "gen");
             File customPkg = new File(root, ".pkg");
             writeUtf8(customPkg, pkg + "\n");
+            logStage(log, "资源编译（aapt2 compile）");
             int c1 = runAapt2(bin, root, new String[] { "compile", "--dir", resDir.getAbsolutePath(),
                     "-o", compiled.getAbsolutePath() }, log);
             if (c1 != 0) {
                 dumpLayoutHeads(resDir, log);
                 return jsonFail("compile", log);
             }
+            logStage(log, "资源链接（aapt2 link）");
             File unsigned = new File(root, "unsigned.apk");
             int c2 = runAapt2(bin, root, new String[] { "link", "-o", unsigned.getAbsolutePath(),
                     "-I", fw.getAbsolutePath(),
@@ -388,12 +394,14 @@ public class BuildApkHelper {
         String[] ecjArgs = ecjArgsList.toArray(new String[0]);
         log.append("ECJ 参数：源码 ").append(files.size()).append(" + R.java ").append(rFiles.size())
                 .append("（共 ").append(ecjArgs.length).append(" 个参数）\n");
+        logStage(log, "Java 编译（ECJ）");
         java.lang.reflect.Method ecjCompile = ecj.getMethod("compile", String[].class, java.util.List.class);
         boolean ecjOk = Boolean.valueOf((Boolean) ecjCompile.invoke(null, ecjArgs, ecjLog));
         if (!ecjOk || ecjLog.size() > 0) {
-            log.append("ECJ: ").append(String.join("\n", ecjLog).substring(0, Math.min(2000, String.join("\n", ecjLog).length()))).append("\n");
+            logRaw(log, String.join("\n", ecjLog), 80);
         }
         if (!ecjOk) throw new IOException("Java 编译失败（看上面 ECJ 的报错行）—— 已中止打包，不会偷偷生成只显示布局的壳包");
+        logStage(log, "dex 链接（D8）");
         File dexDir = new File(root, "jex");
         dexDir.mkdirs();
         java.util.List<String> classFiles = new java.util.ArrayList<>();
@@ -414,7 +422,7 @@ public class BuildApkHelper {
         java.lang.reflect.Method d8Method = d8.getMethod("dex", String[].class, java.util.List.class);
         boolean d8Ok = Boolean.valueOf((Boolean) d8Method.invoke(null, d8Args.toArray(new String[0]), d8Log));
         if (!d8Ok || d8Log.size() > 0) {
-            log.append("D8: ").append(String.join("\n", d8Log)).append("\n");
+            logRaw(log, String.join("\n", d8Log), 40);
         }
         if (!d8Ok) throw new IOException("dex 转换失败（见上面 D8 日志）—— 已中止打包");
         File[] dexFiles = dexDir.listFiles();
@@ -620,6 +628,53 @@ public class BuildApkHelper {
     // ===== 工具方法 =====
 
     /** 把设备端 ResClassLoader 的资源 miss 日志追加进构建日志（定位 ECJ 资源加载问题） */
+    /** M263：构建日志分节标题 */
+    private static void logStage(StringBuilder log, String title) {
+        log.append("\n== ").append(title).append(" ==\n");
+    }
+
+    /** M263：格式化一行输出（截断超长行） */
+    private static String fmtLine(String s) {
+        if (s == null) return "";
+        s = s.trim();
+        if (s.length() > 180) s = s.substring(0, 177) + "...";
+        return "  " + s;
+    }
+
+    /** M263：把外部工具输出按行格式化进 log（跳过空行，截断到 capLines 行） */
+    private static void logRaw(StringBuilder log, String raw, int capLines) {
+        if (raw == null || raw.isEmpty()) return;
+        String[] lines = raw.split("\n");
+        int shown = 0;
+        for (String line : lines) {
+            if (line.isEmpty()) continue;
+            log.append(fmtLine(line)).append('\n');
+            if (++shown >= capLines) {
+                log.append("  …（已截断，原始共 ").append(lines.length).append(" 行）\n");
+                break;
+            }
+        }
+    }
+
+    /** M263：项目 manifest 缺 package 属性时，在 <manifest> 开标签里补上（aapt2 正规清单必需） */
+    private static String ensureManifestPkg(String text, String pkg, StringBuilder log) {
+        if (text == null || pkg == null || pkg.isEmpty()) return text;
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("<manifest\\b[^>]*>", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(text);
+        if (!m.find()) return text;
+        String openTag = m.group();
+        if (java.util.regex.Pattern.compile("package\\s*=", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(openTag)
+                .find()) {
+            return text;
+        }
+        String newOpenTag = openTag.substring(0, openTag.length() - 1) + " package=\"" + pkg + "\">";
+        String replaced = text.substring(0, m.start()) + newOpenTag + text.substring(m.end());
+        log.append("项目清单缺 package，已补 package=\"").append(pkg).append("\"\n");
+        return replaced;
+    }
+
     private void appendResMissLog(StringBuilder log) {
         try {
             File f = new File(ctx.getCacheDir(), "ecj-res-miss.log");
@@ -648,8 +703,9 @@ public class BuildApkHelper {
         Process pr = pb.start();
         byte[] out = readAll(pr.getInputStream());
         int code = pr.waitFor();
-        log.append("$ aapt2 ").append(args[0]).append(" exit=").append(code).append('\n')
-                .append(new String(out, StandardCharsets.UTF_8).substring(0, Math.min(800, out.length))).append('\n');
+        log.append("$ aapt2 ").append(args[0]).append(" ").append(String.join(" ", java.util.Arrays.asList(args).subList(1, args.length))).append('\n');
+        log.append("  exit=").append(code).append('\n');
+        logRaw(log, new String(out, StandardCharsets.UTF_8), 80);
         return code;
     }
 

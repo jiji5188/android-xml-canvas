@@ -55,12 +55,18 @@ console.log("ECJ:", fs.statSync(ecjJar).size, "字节");
 
 // 2) 编译两个桥（它们依赖 ecj.jar / d8.jar，但只装进「编译器 classloader」）
 const bridgeSrc = [];
+const stubSrc = [];
 (function walk(dir) {
   if (!fs.existsSync(dir)) return;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p);
-    else if (e.name.endsWith(".java")) bridgeSrc.push(p);
+    else if (e.name.endsWith(".java")) {
+      // M245：javax.lang.model.* 桩类单独用 --release 8 编（release 11 时 JDK 自带同名类会冲突）
+      const norm = p.split(path.sep).join("/");
+      if (/[/\\]javax[/\\]/.test(p)) stubSrc.push(p);
+      else bridgeSrc.push(p);
+    }
   }
 })(path.join(apk, "compiler-src"));
 if (bridgeSrc.length === 0) {
@@ -76,6 +82,15 @@ run(path.join(JBR, "javac.exe"), [
   "-classpath", [ecjJar, D8_JAR, ANDROID_JAR].join(";"),
   "-d", bridgeCls, ...bridgeSrc,
 ]);
+// M245：javax.lang.model 桩（SourceVersion 等）——Android 运行时缺这些类，ECJ link 到就 NoClassDefFoundError；
+// 随 compiler dex 一起打进 APK。用 --release 8 编（release 11 时 JDK 自带的同名类会撞）。
+if (stubSrc.length > 0) {
+  console.log("编译 javax.lang.model 桩：" + stubSrc.map((s) => path.basename(s)).join(", "));
+  run(path.join(JBR, "javac.exe"), [
+    "--release", "8", "-encoding", "UTF-8", "-nowarn",
+    "-d", bridgeCls, ...stubSrc,
+  ]);
+}
 
 // 3) d8：桥 + ECJ + D8 一起 → 一个 classloader 里的多 dex（D8 会在超 64K 方法时自动拆）
 const dexDir = path.join(out, "dex");

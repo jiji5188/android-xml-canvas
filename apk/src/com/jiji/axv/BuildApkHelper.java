@@ -335,11 +335,10 @@ public class BuildApkHelper {
         // ECJ 收到「无源码」→ 打印 usage 然后返回 true；D8 拿到 0 个 .class →
         // 最终显示「已编译 0 个 Java 类」并打出 31KB 的壳包。源码必须显式当参数传。
         java.util.List<String> ecjArgsList = new java.util.ArrayList<>();
-        // M244：source/target 降到 8。
-        // ECJ 在 compliance 9+ 会走 module 系统并引用 javax.lang.model.SourceVersion，
-        // 而 Android 运行时没有这个类 → NoClassDefFoundError。降到 8 可避开该路径。
-        // 目标 App 的 Java 代码是布局胶水层，8 足够；D8 仍按 min-api 24 出 dex。
-        java.util.Collections.addAll(ecjArgsList, "-source", "8", "-target", "8", "-nowarn",
+        // M245：source/target 回到 11。真正的阻塞是 javax.lang.model.SourceVersion 在
+        // Android 运行时缺失（M244 的降到 8 没绕开，ECJ 无条件 link 该类）；现在该桩类
+        // 随 compiler dex 一起进 APK，11 可以正常用。
+        java.util.Collections.addAll(ecjArgsList, "-source", "11", "-target", "11", "-nowarn",
                 "-encoding", "UTF-8", "-classpath", androidJar.getAbsolutePath(),
                 "-d", clsDir.getAbsolutePath());
         for (File f : files) ecjArgsList.add(f.getAbsolutePath());

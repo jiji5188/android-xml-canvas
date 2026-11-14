@@ -337,7 +337,6 @@ public class BuildApkHelper {
         java.util.List<String> ecjArgsList = new java.util.ArrayList<>();
         java.util.Collections.addAll(ecjArgsList, "-source", "11", "-target", "11", "-nowarn",
                 "-encoding", "UTF-8", "-classpath", androidJar.getAbsolutePath(),
-                "-bootclasspath", androidJar.getAbsolutePath(),
                 "-d", clsDir.getAbsolutePath());
         for (File f : files) ecjArgsList.add(f.getAbsolutePath());
         ecjArgsList.addAll(rFiles);

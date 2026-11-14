@@ -107,7 +107,9 @@ describe("M242 签名/编译器加载器契约（防猜写回归）", () => {
   it("ECJ 参数必须包含源码文件 + R.java（M243）", () => {
     expect(helper).toContain("for (File f : files) ecjArgsList.add(f.getAbsolutePath())");
     expect(helper).toContain("ecjArgsList.addAll(rFiles)");
-    expect(helper).toContain("-bootclasspath");
+    // M243b：compliance 9+ 不支持 -bootclasspath（ECJ 会报 "not supported at compliance level 9 and above"），
+    // 必须去掉；java.* 由运行时 ART 的类解析，android.* 走 -classpath android.jar。
+    expect(helper).not.toContain("-bootclasspath");
     expect(helper).toContain("ECJ 没产出任何 .class");
   });
 });

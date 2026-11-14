@@ -155,6 +155,31 @@ export function rPackageFromSources(
   return pick(importCounts) || pick(samePkgCounts);
 }
 
+/**
+ * M272：列出所有引用 R 的包名（多包共存时要用）——包括导入 R 的包、同包直接用 R 的包。
+ * 用户项目可能反编译后多包共存（com.momo.ReturnSystem / ReturnSystem2 / ReturnSystem3），
+ * 单个 R.java 满足不了，设备端按这个清单给每个包复制一份 R.java。
+ */
+export function rPackagesFromSources(
+  sources: { path: string; code: string }[],
+): string[] {
+  const set = new Set<string>();
+  for (const s of sources) {
+    const pkgM = s.code.match(/^\s*package\s+([\w.]+)(?:\s*;)?/m);
+    const filePkg = pkgM ? pkgM[1] : "";
+    const importRs = s.code.matchAll(/^\s*import\s+([\w.]+)\.R\s*;/gm);
+    let found = false;
+    for (const m of importRs) {
+      set.add(m[1]);
+      found = true;
+    }
+    if (!found && filePkg && /\bR\.(layout|id|drawable|string|menu|navigation|mipmap|raw|anim|animator|color|font|style|array)\b/.test(s.code)) {
+      set.add(filePkg);
+    }
+  }
+  return [...set];
+}
+
 /** 纯文本版：给定 manifest 原文 + 包名，解析 MAIN/LAUNCHER 的 Activity 全限定名 */
 export function parseManifestLauncher(
   text: string,

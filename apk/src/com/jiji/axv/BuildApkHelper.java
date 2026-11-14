@@ -175,6 +175,36 @@ public class BuildApkHelper {
             if (c2 != 0) return jsonFail("link", log);
             if (!unsigned.isFile()) return jsonFail("link", log);
 
+            // M272：项目可能多个包都引用 R（改包名改一半 / 反编译工程多包共存）。
+            // aapt2 只生成 --custom-package 对应的那一个 R.java → 其余包 import xxx.R 全报错。
+            // 按客户端给的 rPackages，把生成的 R.java 复制到每个包（内容相同，只改 package 行）。
+            JSONArray rPkgs = p.optJSONArray("rPackages");
+            if (rPkgs != null && rPkgs.length() > 0) {
+                java.util.List<String> genR = new java.util.ArrayList<>();
+                walkJava(genDir, genR);
+                String rText = null;
+                for (String rp : genR) {
+                    if (rp.endsWith("/R.java") || rp.endsWith("\\R.java")) {
+                        rText = readUtf8(new File(rp));
+                        break;
+                    }
+                }
+                if (rText != null) {
+                    int made = 0;
+                    for (int i = 0; i < rPkgs.length(); i++) {
+                        String ep = rPkgs.optString(i, "");
+                        if (ep == null || ep.isEmpty() || ep.equals(pkg)) continue;
+                        String body = rText.replaceFirst("(?m)^package\\s+[\\w.]+\\s*;", "package " + ep + ";");
+                        File dst = new File(genDir, ep.replace('.', '/') + "/R.java");
+                        File parent = dst.getParentFile();
+                        if (parent != null) parent.mkdirs();
+                        writeUtf8(dst, body);
+                        made++;
+                    }
+                    if (made > 0) log.append("R.java 复制到 ").append(made).append(" 个额外包（多包引用 R）\n");
+                }
+            }
+
             step = "pack";
             File packed = new File(root, "packed.apk");
             java.util.List<byte[]> extraDex = new java.util.ArrayList<>();
@@ -1142,6 +1172,22 @@ public class BuildApkHelper {
              OutputStreamWriter osw = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
             osw.write(text);
         }
+    }
+
+    /** M272：按 UTF-8 读文件全文（去 BOM） */
+    private static String readUtf8(File f) throws IOException {
+        byte[] buf = new byte[(int) f.length()];
+        try (FileInputStream fis = new FileInputStream(f)) {
+            int off = 0;
+            while (off < buf.length) {
+                int n = fis.read(buf, off, buf.length - off);
+                if (n <= 0) break;
+                off += n;
+            }
+        }
+        String s = new String(buf, StandardCharsets.UTF_8);
+        if (!s.isEmpty() && s.charAt(0) == '\uFEFF') s = s.substring(1);
+        return s;
     }
 
     private static void writeBytes(File f, byte[] data) throws IOException {

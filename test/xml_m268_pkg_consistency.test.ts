@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { forceManifestPkg, dominantJavaPackage, rPackageFromSources } from "../lib/xml/find-launcher";
+import { forceManifestPkg, dominantJavaPackage, rPackageFromSources, rPackagesFromSources } from "../lib/xml/find-launcher";
 
 describe("forceManifestPkg (M268)", () => {
   it("改已有 package 属性", () => {
@@ -101,5 +101,24 @@ describe("rPackageFromSources (M271)", () => {
 
   it("完全没 R 引用 → 空（调用方回退）", () => {
     expect(rPackageFromSources([{ path: "a.java", code: "package p;\nclass A{}" }])).toBe("");
+  });
+});
+
+describe("rPackagesFromSources (M272)", () => {
+  it("多包共存都列出来", () => {
+    const srcs = [
+      { path: "a.java", code: "package com.momo.ReturnSystem;\nimport com.momo.ReturnSystem.R;\nclass A{int x=R.layout.a;}" },
+      { path: "b.java", code: "package com.momo.ReturnSystem3;\nimport com.momo.ReturnSystem3.R;\nclass B{int x=R.layout.b;}" },
+      { path: "c.java", code: "package com.momo.ReturnSystem2;\nclass C{int x=R.id.c;}" },
+    ];
+    const out = rPackagesFromSources(srcs);
+    expect(out).toContain("com.momo.ReturnSystem");
+    expect(out).toContain("com.momo.ReturnSystem3");
+    expect(out).toContain("com.momo.ReturnSystem2");
+    expect(out.length).toBe(3);
+  });
+
+  it("没引用 → 空数组", () => {
+    expect(rPackagesFromSources([{ path: "a.java", code: "package p;\nclass A{}" }])).toEqual([]);
   });
 });

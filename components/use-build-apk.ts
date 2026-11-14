@@ -17,7 +17,7 @@ import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { prepareFiles } from "@/lib/xml/native-render";
-import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
+import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, rPackagesFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
 import { collectProjectLibs } from "@/lib/xml/project-libs";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
@@ -240,6 +240,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           launchActivity: manifest || "",
           manifestText: manifestTextForBuild || "",
           libs: libsRes.libs.length ? libsRes.libs.map((l) => ({ path: l.rel, base64: l.base64 })) : undefined,
+          rPackages: rPackagesFromSources(javaSources),
         });
         setApkResult(r);
         if (r.ok) {

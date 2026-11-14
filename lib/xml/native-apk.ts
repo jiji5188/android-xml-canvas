@@ -36,6 +36,8 @@ export interface BuildApkInput {
   manifestText?: string;
   /** M266：项目自带的依赖库（.jar / .aar），设备端 ECJ 编译时加进 classpath，解决 androidx/jxl 等引用 */
   libs?: { path: string; base64: string }[];
+  /** M272：项目里引用 R 的包名清单（多包共存/反编译工程），设备端给每个包复制一份 R.java */
+  rPackages?: string[];
 }
 
 export interface BuildApkResult {

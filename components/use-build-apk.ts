@@ -43,6 +43,16 @@ export interface UseBuildApkDeps {
   noteTimed: (msg: string, ms?: number) => void;
   /** 提示 toast（进度类，不自动消失，会被下一个 noteTimed 顶掉） */
   setExportNote: (msg: string) => void;
+  /** M252：打包完成后把完整日志推进左侧「构建日志」抽屉（不再只塞在签名弹窗里） */
+  onBuildLog?: (entry: {
+    id: string;
+    ok: boolean;
+    stage: string;
+    ms?: number;
+    log?: string;
+    files?: number;
+    bytes?: number;
+  }) => void;
 }
 
 export interface UseBuildApkReturn {
@@ -66,7 +76,31 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
     buildSaveInput,
     noteTimed,
     setExportNote,
+    onBuildLog,
   } = deps;
+
+  // M252：把一次打包（含成功/失败）的完整日志推进左侧抽屉「构建日志」tab。
+  // 之前日志只存在 apkResult 里、只能在签名弹窗的 <pre> 里看；现在进抽屉，
+  // 跟其它构建日志统一在一个滚动容器（.axv-drawer-body）里，方便回看/复制。
+  const pushBuildLog = (
+    ok: boolean,
+    stage: string,
+    log: string | undefined,
+    files?: number,
+    bytes?: number,
+    ms?: number,
+  ) => {
+    if (!onBuildLog) return;
+    onBuildLog({
+      id: `apk-${Date.now()}`,
+      ok,
+      stage,
+      log,
+      files,
+      bytes,
+      ms,
+    });
+  };
 
   const [apkBusy, setApkBusy] = useState(false);
   const [apkResult, setApkResult] = useState<BuildApkResult | null>(null);
@@ -145,6 +179,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         const prep = prepareFiles(layout, files);
         if (prep.blocked) {
           setApkResult({ ok: false, step: "compile", log: prep.blocked });
+          pushBuildLog(false, tt("打包失败（compile）"), prep.blocked);
           noteTimed(tt("打包失败：{msg}", { msg: "compile" }), 12000);
           return;
         }
@@ -164,6 +199,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         });
         setApkResult(r);
         if (r.ok) {
+          pushBuildLog(true, tt("打包成功"), r.log, undefined, r.bytes, r.ms);
           const base = tt("打包完成：{name}", { name: r.name || "" });
           const cm = compileModeOf(r);
           if (cm.mode === "java" && cm.classes > 0) {
@@ -176,17 +212,19 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
             noteTimed(base, 8000);
           }
         } else {
+          pushBuildLog(false, tt("打包失败（{step}）", { step: r.step || "?" }), r.log);
           noteTimed(tt("打包失败（{step}）", { step: r.step || "?" }), 12000);
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setApkResult({ ok: false, step: "js", log: msg });
+        pushBuildLog(false, tt("打包失败（js）"), msg);
         noteTimed(tt("打包失败：{msg}", { msg }), 12000);
       } finally {
         setApkBusy(false);
       }
     },
-    [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel, docKind, xml, buildSaveInput, noteTimed, setExportNote],
+    [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel, docKind, xml, buildSaveInput, noteTimed, setExportNote, onBuildLog],
   );
 
   return { apkBusy, apkResult, doBuildApk };

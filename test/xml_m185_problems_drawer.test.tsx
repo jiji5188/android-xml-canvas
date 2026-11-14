@@ -112,4 +112,23 @@ describe("M185 底部抽屉", () => {
     expect(cards[0].textContent).toContain("120ms");
     expect(cards[1].textContent).toContain("88ms");
   });
+
+  it("M252：forceView 自动打开到指定 tab（打包完成后把日志推进抽屉）", async () => {
+    const h = await mount(
+      <ProblemsDrawer
+        problems={[]}
+        onGotoLine={() => {}}
+        tr={tr}
+        buildLogs={[{ id: "apk-1", ok: false, stage: "打包失败（compile）", log: "ECJ: ..." }]}
+        forceView={{ open: true, tab: "build-log" }}
+      />,
+    );
+    // forceView 生效后：body 已打开且当前在 build-log tab（渲染出日志卡片，而非问题空态）
+    expect(h.querySelector(".axv-drawer-body")).not.toBeNull();
+    const logcard = h.querySelector(".axv-drawer-logcard");
+    expect(logcard).not.toBeNull();
+    expect(logcard!.textContent).toContain("打包失败（compile）");
+    // 问题空态不应出现（说明 tab 确实切到 build-log）
+    expect(h.querySelector(".axv-drawer-empty")).toBeNull();
+  });
 });

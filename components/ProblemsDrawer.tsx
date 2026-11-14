@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 /**
  * M185：通用「底部抽屉 + tab 容器」(ROADMAP L0.5 第22条)
@@ -45,11 +45,27 @@ export interface ProblemsDrawerProps {
   insetLeft?: number;
   insetRight?: number;
   tr: (key: string, fallback: string, vars?: Record<string, string | number>) => string;
+  /** M252：外部强制查看（如打包完成后）—— 指定 open + tab，会临时把抽屉打开到对应 tab。
+   *  传 `{ open: true, tab: "build-log" }` 时打开构建日志 tab；传 null 表示取消强制。
+   *  用户手动切 tab/收起后，本 prop 的强制效果解除（不锁死）。 */
+  forceView?: { open: boolean; tab: DrawerPanel } | null;
 }
 
-export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, insetLeft, insetRight, tr }: ProblemsDrawerProps) {
+export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, insetLeft, insetRight, tr, forceView }: ProblemsDrawerProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<DrawerPanel>("problems");
+  // M252：外部强制查看（打包完成后自动打开到对应 tab）。用一个 ref 记上一次的
+  // forceView，变化时同步 open/tab；用户手动操作后会解除锁定。
+  const lastForce = useRef<typeof forceView>(null);
+  useEffect(() => {
+    if (forceView && forceView !== lastForce.current) {
+      if (forceView.open) {
+        setOpen(true);
+        setTab(forceView.tab);
+      }
+      lastForce.current = forceView;
+    }
+  }, [forceView]);
 
   const n = problems.length;
   const insetStyle =

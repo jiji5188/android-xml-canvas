@@ -3489,6 +3489,15 @@ const findResolved = findResolvedNode;
       bytes?: number;
     }[]
   >([]);
+  // M252：打包（APK）完成后，把日志推进抽屉并自动打开到「构建日志」tab（不再只塞在签名弹窗）
+  const [apkForceView, setApkForceView] = useState<{ open: boolean; tab: "problems" | "build-log" } | null>(null);
+  const pushApkBuildLog = useCallback(
+    (entry: { id: string; ok: boolean; stage: string; ms?: number; log?: string; files?: number; bytes?: number }) => {
+      setBuildLogs((prev) => [entry, ...prev].slice(0, 20));
+      setApkForceView({ open: true, tab: "build-log" });
+    },
+    [],
+  );
 
   const doRealRender = () => {
     if (realRenderBusy) return;
@@ -3823,6 +3832,7 @@ const findResolved = findResolvedNode;
     buildSaveInput: currentSaveInput,
     noteTimed,
     setExportNote,
+    onBuildLog: pushApkBuildLog,
   });
 
 
@@ -4704,6 +4714,7 @@ const findResolved = findResolvedNode;
         problems={(lints ?? []).map((l) => ({ line: l.line ?? 1, msg: l.message }))}
         onGotoLine={(ln) => gotoLine(ln)}
         buildLogs={buildLogs}
+        forceView={apkForceView}
         insetLeft={isMobile ? undefined : leftOpen ? 320 : 0}
         insetRight={isMobile ? undefined : rightOpen ? 320 : 0}
         statusSlot={

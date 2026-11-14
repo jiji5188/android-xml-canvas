@@ -134,28 +134,36 @@ fs.writeFileSync(jarGz, zlib.gzipSync(fs.readFileSync(ANDROID_JAR), { level: 9 }
 // ECJ 一初始化就 ResourceBundle.getBundle(...batch.messages)，找不到会抛 MissingResourceException
 // （"Can't find bundle ... locale zh_CN"）。把这 4 个包从 ecj.jar 里抠出来打成 zip 再 gzip，
 // 设备端解到 cache/compiler/res 并挂到编译器 classloader 父链（MainActivity.ResClassLoader）。
-const MSGS = [
-  "org/eclipse/jdt/internal/compiler/batch/messages.properties",
-  "org/eclipse/jdt/internal/compiler/problem/messages.properties",
-  "org/eclipse/jdt/internal/compiler/messages.properties",
-  "org/eclipse/jdt/internal/antadapter/messages.properties",
-];
+// M246：ECJ 的 Parser 静态初始化会读 parser*.rsc（.rsc 是 ECJ 的词法/语法解析恢复资源），
+// 还有各包的 messages.properties。之前只带 4 个 properties，漏了 89 个 .rsc → 设备端
+// ExceptionInInitializerError: missing file parser1.rsc。改成把 ecj.jar 里 org/eclipse/ 下
+// 所有 .rsc + .properties 全部抠出来打进 msgs.bin.gz。
+const jarEntries = execFileSync(path.join(JBR, "jar.exe"), ["tf", ecjJar], { encoding: "utf8" })
+  .split(/\r?\n/)
+  .map((s) => s.trim())
+  .filter(Boolean);
+const MSGS = jarEntries.filter(
+  (e) => e.startsWith("org/eclipse/") && (e.endsWith(".rsc") || e.endsWith(".properties"))
+);
+if (MSGS.length < 10) {
+  console.error("ECJ 资源太少（" + MSGS.length + " 个），检查 ecj.jar 是否完整");
+  process.exit(1);
+}
 const msgsDir = path.join(out, "msgs");
 fs.rmSync(msgsDir, { recursive: true, force: true });
 fs.mkdirSync(msgsDir, { recursive: true });
+let msgMissing = 0;
 for (const rel of MSGS) {
   // jar xf 不支持 -C，用 cwd 定位提取目录；entry 用正斜杠
   execFileSync(path.join(JBR, "jar.exe"), ["xf", ecjJar, rel], { cwd: msgsDir, stdio: "ignore" });
-  if (!fs.existsSync(path.join(msgsDir, rel.replace(/\//g, path.sep)))) {
-    console.error("ECJ 里找不到 " + rel);
-    process.exit(1);
-  }
+  if (!fs.existsSync(path.join(msgsDir, rel.replace(/\//g, path.sep)))) msgMissing++;
 }
+if (msgMissing > 0) console.warn("  警告：" + msgMissing + " 个 ECJ 资源没解出来");
 const msgsZip = path.join(out, "msgs.zip");
 execFileSync(path.join(JBR, "jar.exe"), ["cf", msgsZip, "-C", msgsDir, "org"], { stdio: "ignore" });
 const msgsGz = path.join(out, "msgs.bin.gz");
 fs.writeFileSync(msgsGz, zlib.gzipSync(fs.readFileSync(msgsZip), { level: 9 }));
-console.log(`  msgs.bin.gz ${fs.statSync(msgsGz).size} 字节（${MSGS.length} 个 ECJ 消息包）`);
+console.log(`  msgs.bin.gz ${fs.statSync(msgsGz).size} 字节（${MSGS.length} 个 ECJ 资源：.rsc + .properties）`);
 
 const jarGzSize = fs.statSync(jarGz).size;
 console.log(`compiler 资源就绪：${dexFiles.length} 个 tool dex（共 ${(toolBytes / 1048576).toFixed(2)} MB）+ android.jar.gz ${(jarGzSize / 1048576).toFixed(2)} MB`);

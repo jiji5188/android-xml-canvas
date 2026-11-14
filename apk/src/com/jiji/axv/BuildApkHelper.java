@@ -215,6 +215,75 @@ public class BuildApkHelper {
         }
     }
 
+    /** M240：导入 APK 换资源 + 重签名（委托自 MainActivity.repackApk）。
+     *  payload: { apk, replacements: [{name, base64}], keystore, storePass, alias, keyPass, outName }
+     *  返回 ok:<path> / err:<step>:<msg>
+     */
+    public String repack(String payloadJson) {
+        StringBuilder log = new StringBuilder();
+        String step = "init";
+        try {
+            JSONObject p = new JSONObject(payloadJson);
+            String apk = p.optString("apk", "");
+            String ksPath = p.optString("keystore", "");
+            String storePass = p.optString("storePass", "");
+            String alias = p.optString("alias", "");
+            String keyPass = p.optString("keyPass", "");
+            String outName = p.optString("outName", "");
+            File src = new File(apk);
+            if (!src.isFile()) return "err:src:找不到源 APK";
+            if (ksPath.isEmpty() || !new File(ksPath).isFile()) return "err:keystore:找不到 keystore";
+
+            java.util.Map<String, byte[]> reps = new java.util.HashMap<>();
+            JSONArray rl = p.optJSONArray("replacements");
+            if (rl != null) {
+                for (int i = 0; i < rl.length(); i++) {
+                    JSONObject r = rl.optJSONObject(i);
+                    if (r == null) continue;
+                    String nm = r.optString("name", "");
+                    String b64 = r.optString("base64", "");
+                    if (nm.isEmpty() || b64.isEmpty()) continue;
+                    if (nm.contains("..")) continue;
+                    try {
+                        reps.put(nm, Base64.decode(b64, Base64.NO_WRAP));
+                    } catch (IllegalArgumentException bad) {
+                        // 跳过坏 base64，继续
+                    }
+                }
+            }
+
+            step = "pack";
+            File work = new File(ctx.getCacheDir(), "repack");
+            deleteTree(work);
+            work.mkdirs();
+            File packed = new File(work, "packed.apk");
+            int n = ApkPack.repack(src, reps, packed);
+            log.append("重打包 ").append(n).append(" 个条目（换了 ").append(reps.size()).append(" 个）\n");
+
+            step = "sign";
+            File signed = new File(work, "signed.apk");
+            String sr = signWithApksig(packed, signed, ksPath, storePass, alias, keyPass);
+            if (!sr.startsWith("ok:")) return "err:sign:" + (sr.startsWith("err:") ? sr.substring(4) : sr);
+
+            step = "output";
+            File outDir = defaultOutDir();
+            if (!outDir.isDirectory() && !outDir.mkdirs()) throw new IOException("建不了输出目录");
+            String name = outName.isEmpty() ? "repacked.apk" : outName;
+            if (!name.endsWith(".apk")) name = name + ".apk";
+            File out = new File(outDir, name);
+            try (FileOutputStream fos = new FileOutputStream(out);
+                 FileInputStream fis = new FileInputStream(signed)) {
+                byte[] buf = new byte[64 * 1024];
+                int r;
+                while ((r = fis.read(buf)) > 0) fos.write(buf, 0, r);
+            }
+            log.append("输出 ").append(out.length()).append(" 字节\n");
+            return "ok:" + out.getAbsolutePath();
+        } catch (Throwable t) {
+            return "err:" + step + ":" + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+        }
+    }
+
     // ===== 编译 =====
 
     private String compileProjectJava(JSONArray javaSources, File root, File genDir,
@@ -395,7 +464,8 @@ public class BuildApkHelper {
 
     // ===== 签名 =====
 
-    private String signWithApksig(File inApk, File outApk, String ksPath, String storePass, String alias, String keyPass) {
+    /** M240：repack 也用得到，提成 public 供 MainActivity 委托 */
+    public String signWithApksig(File inApk, File outApk, String ksPath, String storePass, String alias, String keyPass) {
         File dir = new File(ctx.getCacheDir(), "apksig");
         if (!dir.isDirectory() && !dir.mkdirs()) return "err:建不了 apksig 目录";
         File dex = new File(dir, "signer.dex");

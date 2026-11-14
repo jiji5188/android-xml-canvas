@@ -240,6 +240,38 @@ const fixGutter = gutter({
 /** M209：行号 → 该行的可修问题（供 fixGutter 的 markers 读） */
 const fixIssuesByLineRef = { current: new Map<number, LintIssue>() };
 
+/** M259：折叠箭头改用内联 SVG（Material Symbols 的 keyboard_arrow_down / right 形状）
+ *  不依赖任何图标字体，WebView 离线也能画。 */
+function foldChevronSvg(open: boolean) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", "16");
+  svg.setAttribute("height", "16");
+  svg.setAttribute("fill", "currentColor");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute(
+    "d",
+    open
+      ? "M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" // keyboard_arrow_down
+      : "M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z", // keyboard_arrow_right
+  );
+  svg.appendChild(path);
+  return svg;
+}
+
+/** M259：用 foldGutter 的 markerDOM 钩子换成 SVG 图标 */
+const svgFoldGutter = foldGutter({
+  markerDOM: (open) => {
+    const span = document.createElement("span");
+    span.className = "cm-axv-fold-marker";
+    span.title = open ? tt("折叠此行") : tt("展开此行");
+    span.appendChild(foldChevronSvg(open));
+    return span;
+  },
+});
+
 /* ===== 主题:全吃 CSS 变量,设置面板改色即时生效 ===== */
 const cmTheme = EditorView.theme({
   "&": {
@@ -278,33 +310,18 @@ const cmTheme = EditorView.theme({
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    minWidth: "18px",
+    minWidth: "20px",
+    padding: "0 2px",
   },
-  // 隐藏 CM 自带的 › / ‹ 字符（图标由下面两个伪元素画）
-  ".cm-foldGutter .cm-gutterElement > span": {
-    fontSize: 0,
-    lineHeight: 0,
-    display: "inline-block",
-    width: "100%",
-    height: "100%",
+  ".cm-foldGutter .cm-axv-fold-marker": {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "var(--axv-on-surface-variant, rgba(0, 0, 0, 0.45))",
+    transition: "color 0.15s ease",
   },
-  ".cm-foldGutter .cm-gutterElement::after": {
-    content: "",
-    position: "absolute",
-    width: 0,
-    height: 0,
-    borderLeft: "5px solid var(--axv-on-surface-variant, rgba(0, 0, 0, 0.45))",
-    borderTop: "4px solid transparent",
-    borderBottom: "4px solid transparent",
-    display: "block",
-  },
-  ".cm-foldGutter .cm-gutterElement:not([data-\"folded\"])::after": {
-    // 展开态（span.title = Unfold line）：向下箭头 ▼
-    transform: "rotate(90deg)",
-  },
-  ".cm-foldGutter .cm-gutterElement[data-\"folded\"]::after": {
-    // 折叠态（span.title = Fold line，data-folded 值 = 被折叠行数）：向右箭头 ▶
-    borderLeftColor: "var(--axv-on-surface, rgba(0, 0, 0, 0.75))",
+  ".cm-foldGutter .cm-gutterElement:hover .cm-axv-fold-marker": {
+    color: "var(--axv-on-surface, rgba(0, 0, 0, 0.78))",
   },
   ".cm-fix-gutter .cm-gutterElement": {
     cursor: "default",
@@ -736,7 +753,7 @@ export function CodeEditor({
         highlightActiveLineGutter(),
         highlightSpecialChars(),
         // M209：代码折叠（XML 嵌套 / Java 方法体）
-        foldGutter(),
+        svgFoldGutter,
         // M209：选中一个词，全文件同名出现处高亮
         highlightSelectionMatches({ minSelectionLength: 2, highlightWordAroundCursor: false }),
         // M209：显示空白字符开关

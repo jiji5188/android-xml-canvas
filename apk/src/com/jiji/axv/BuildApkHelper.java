@@ -388,8 +388,12 @@ public class BuildApkHelper {
         if (manifestJson == null) {
             throw new IOException("没找到 compiler/manifest.json（旧包没有 manifest：至少保证有 tool dex）");
         }
-        try { new JSONObject(manifestJson); } catch (org.json.JSONException ignored) { }
-        JSONObject mf = null;
+        JSONObject mf;
+        try {
+            mf = new JSONObject(manifestJson);
+        } catch (org.json.JSONException je) {
+            throw new IOException("compiler/manifest.json 解析失败: " + je.getMessage());
+        }
         String wantSha = mf.optString("sha256", "");
         String toolBreakReason = null;
         int toolCountExtracted = 0;

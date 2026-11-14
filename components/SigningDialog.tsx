@@ -61,6 +61,8 @@ const EMPTY: SigningParams = {
 
 export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, appName, iconDefault, onMakeKeystore, onBuildApk, apkBusy, apkResult, onInstallApk, onShareApk, onOpenRepack, onWriteGradle, onClose, onNote, stored, onRemember, onForget }: SigningDialogProps) {
   const prefill = gradleText ? readSigningFromGradle(gradleText) : null;
+  // M239：构建日志抽屉（成功时也能看全过程，定位哪一步没编译 Java）
+  const [showBuildLog, setShowBuildLog] = useState(false);
   // M195：build.gradle 里没写的项（典型：口令）用本机记住的配置补
   const seed = prefill ?? (stored as SigningParams | null);
   const [alias, setAlias] = useState(seed?.alias || EMPTY.alias);
@@ -468,6 +470,34 @@ export function SigningDialog({ gradleText, rootMissing, pkg, keystoreExists, ap
                     </div>
                   ) : null}
                   <div style={{ opacity: 0.7, wordBreak: "break-all", fontSize: 11 }}>{apkResult.path}</div>
+                  {apkResult.log ? (
+                    <div style={{ marginTop: 4 }}>
+                      <button
+                        type="button"
+                        style={{ fontSize: 11, padding: "2px 8px", cursor: "pointer", background: "transparent", border: "1px solid currentColor", borderRadius: 4, opacity: 0.75 }}
+                        onClick={() => setShowBuildLog((v) => !v)}
+                      >
+                        {showBuildLog ? tt("收起构建日志") : tt("查看构建日志（全过程）")}
+                      </button>
+                      {showBuildLog ? (
+                        <pre
+                          style={{
+                            marginTop: 4,
+                            fontSize: 10,
+                            maxHeight: 240,
+                            overflow: "auto",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-all",
+                            background: "rgba(0,0,0,0.04)",
+                            padding: 6,
+                            borderRadius: 4,
+                          }}
+                        >
+                          {apkResult.log}
+                        </pre>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="axv-sign-issue axv-sign-issue-error" style={{ marginTop: 6, display: "block" }}>

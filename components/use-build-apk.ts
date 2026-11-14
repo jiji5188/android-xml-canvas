@@ -17,7 +17,7 @@ import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { prepareFiles } from "@/lib/xml/native-render";
-import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, parseManifestLauncher } from "@/lib/xml/find-launcher";
+import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
 import { collectProjectLibs } from "@/lib/xml/project-libs";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
@@ -178,10 +178,12 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         });
         const javaSrcMapped = javaSrc.map((j) => ({ path: j.rel, code: j.text }));
         const javaSources = withCurrentSource(javaSrcMapped, relNow, xml);
-        // M268：Java 源码 package 声明的多数决——权威包名
-        const domPkg = dominantJavaPackage(javaSources);
+        // M271：R.java 的包名以「源码实际引用 R 的地方」为准（最准），
+        // 其次才是 package 声明多数决。改包名改一半时，R 引用方暴露真实期望包。
+        const rPkg = rPackageFromSources(javaSources);
+        const domPkg = rPkg || dominantJavaPackage(javaSources);
         if (domPkg && domPkg !== pkg) {
-          pushBuildLog(false, tt("包名不一致提示"), tt("Java 源码声明的包名是 {p}，但当前配置是 {c}。已按源码包名打包，请尽快同步 manifest/build.gradle。", { p: domPkg, c: pkg }));
+          pushBuildLog(false, tt("包名不一致提示"), tt("源码引用 R 的包是 {p}，但当前配置是 {c}。已按 {p} 生成 R.java 并打包，请同步 manifest/build.gradle。", { p: domPkg, c: pkg }));
           pkg = domPkg;
         }
         // M266：项目依赖库（libs/*.jar|aar）→ 设备端 ECJ classpath

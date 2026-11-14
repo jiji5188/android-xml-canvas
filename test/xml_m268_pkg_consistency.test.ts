@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { forceManifestPkg, dominantJavaPackage } from "../lib/xml/find-launcher";
+import { forceManifestPkg, dominantJavaPackage, rPackageFromSources } from "../lib/xml/find-launcher";
 
 describe("forceManifestPkg (M268)", () => {
   it("改已有 package 属性", () => {
@@ -65,5 +65,41 @@ describe("dominantJavaPackage (M268)", () => {
 
   it("Kotlin 的 package 行也能认", () => {
     expect(dominantJavaPackage([{ path: "A.kt", code: "package com.kt.x\n\nclass A" }])).toBe("com.kt.x");
+  });
+});
+
+describe("rPackageFromSources (M271)", () => {
+  it("显式 import 新包 R 优先于多数旧包", () => {
+    const srcs = [
+      // 多数文件还在旧包
+      { path: "a.java", code: "package com.momo.ReturnSystem;\nimport com.momo.ReturnSystem.R;\nclass A{int x=R.layout.a;}" },
+      { path: "b.java", code: "package com.momo.ReturnSystem;\nclass B{}" },
+      { path: "c.java", code: "package com.momo.ReturnSystem;\nclass C{}" },
+      // 少数文件 import 新包 R
+      { path: "TableAdapter.java", code: "package com.momo.ReturnSystem3;\nimport com.momo.ReturnSystem3.R;\nclass T{}" },
+    ];
+    expect(rPackageFromSources(srcs)).toBe("com.momo.ReturnSystem");
+    // 多数 import 旧包 → 取多数
+  });
+
+  it("import R 的包取多数", () => {
+    const srcs = [
+      { path: "a.java", code: "package p;\nimport com.momo.ReturnSystem3.R;\nclass A{}" },
+      { path: "b.java", code: "package p;\nimport com.momo.ReturnSystem3.R;\nclass B{}" },
+      { path: "c.java", code: "package p;\nimport com.old.R;\nclass C{}" },
+    ];
+    expect(rPackageFromSources(srcs)).toBe("com.momo.ReturnSystem3");
+  });
+
+  it("没 import 时，同包直接用 R.layout 的文件包名", () => {
+    const srcs = [
+      { path: "Home.java", code: "package com.app.x;\nclass H{int a=R.layout.home;}" },
+      { path: "Home2.java", code: "package com.app.x;\nclass H2{int b=R.id.b;}" },
+    ];
+    expect(rPackageFromSources(srcs)).toBe("com.app.x");
+  });
+
+  it("完全没 R 引用 → 空（调用方回退）", () => {
+    expect(rPackageFromSources([{ path: "a.java", code: "package p;\nclass A{}" }])).toBe("");
   });
 });

@@ -123,6 +123,38 @@ export function dominantJavaPackage(
   return best;
 }
 
+/**
+ * M271：推断 R.java 应该生成在哪个包——以「源码实际引用 R 的地方」为准。
+ * 比 dominantJavaPackage 更准：改包名只改了一半时，多数 java 还在旧包，
+ * 但 R 的引用方（import xxx.R 或同包用 R.layout）会暴露真实期望的包。
+ * 优先级：
+ *   1) 显式 `import <pkg>.R;` 出现的包（取多数）
+ *   2) 没 import 但同包直接用 R.layout 的文件所在 package（取多数）
+ *   3) 都拿不到 → ""（调用方回退 dominantJavaPackage / 配置包名）
+ */
+export function rPackageFromSources(
+  sources: { path: string; code: string }[],
+): string {
+  const importCounts = new Map<string, number>();
+  const samePkgCounts = new Map<string, number>();
+  for (const s of sources) {
+    const pkgM = s.code.match(/^\s*package\s+([\w.]+)(?:\s*;)?/m);
+    const filePkg = pkgM ? pkgM[1] : "";
+    const importR = s.code.match(/^\s*import\s+([\w.]+)\.R\s*;/m);
+    if (importR) {
+      importCounts.set(importR[1], (importCounts.get(importR[1]) || 0) + 1);
+    } else if (filePkg && /\bR\.(layout|id|drawable|string|menu|navigation|mipmap|raw|anim|animator|color|font|style|array)\b/.test(s.code)) {
+      samePkgCounts.set(filePkg, (samePkgCounts.get(filePkg) || 0) + 1);
+    }
+  }
+  const pick = (m: Map<string, number>): string => {
+    let best = "", bestN = 0;
+    for (const [k, n] of m) if (n > bestN) { best = k; bestN = n; }
+    return best;
+  };
+  return pick(importCounts) || pick(samePkgCounts);
+}
+
 /** 纯文本版：给定 manifest 原文 + 包名，解析 MAIN/LAUNCHER 的 Activity 全限定名 */
 export function parseManifestLauncher(
   text: string,

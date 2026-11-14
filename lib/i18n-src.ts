@@ -1462,6 +1462,7 @@ export const SRC_EN: SrcDict = {
   "发现 {n} 个依赖库，一起加进 classpath": "Found {n} dependency libraries; added to classpath",
   "包名不一致提示": "Package name mismatch",
   "Java 源码声明的包名是 {p}，但当前配置是 {c}。已按源码包名打包，请尽快同步 manifest/build.gradle。": "Java sources declare package {p} but config says {c}. Built with source package; sync manifest/build.gradle soon.",
+  "源码引用 R 的包是 {p}，但当前配置是 {c}。已按 {p} 生成 R.java 并打包，请同步 manifest/build.gradle。": "Sources reference R in {p} but config says {c}. R.java generated under {p}; sync manifest/build.gradle.",
   "manifest 包名已对齐": "Manifest package aligned",
   "manifest 里的 package 属性已从旧值改为 {p}（与 Java 源码一致）": "Manifest package attr changed to {p} (matches Java sources)",
   "{f} 还没保存，这次打包用的是编辑器里的最新内容": "{f} is not saved; this build uses the latest content in the editor",

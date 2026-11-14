@@ -206,7 +206,7 @@ public class BuildApkHelper {
             log.append("androidx 插件包 ").append(androidxJars.size()).append(" 个 class\n");
             String compileMode;
             try {
-                compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files, libs, androidxJars);
+                compileMode = compileProjectJava(javaSources, root, genDir, log, extraDex, files, libs, androidxJars, pkg);
             } catch (IOException ce) {
                 final String cm2 = ce.getMessage() == null ? "" : ce.getMessage();
                 appendResMissLog(log);
@@ -334,7 +334,7 @@ public class BuildApkHelper {
 
     private String compileProjectJava(JSONArray javaSources, File root, File genDir,
                                       StringBuilder log, java.util.List<byte[]> extraDex, JSONArray resFiles,
-                                      JSONArray libs, List<String> androidxJars) throws Exception {
+                                      JSONArray libs, List<String> androidxJars, String appPkg) throws Exception {
         if (javaSources == null || javaSources.length() == 0) {
             log.append("项目无 Java 源码：本次打包为布局壳（不运行任何逻辑）\n");
             return "none";
@@ -446,7 +446,7 @@ public class BuildApkHelper {
         java.lang.reflect.Method ecjCompile = ecj.getMethod("compile", String[].class, java.util.List.class);
         boolean ecjOk = Boolean.valueOf((Boolean) ecjCompile.invoke(null, ecjArgs, ecjLog));
         if (!ecjOk || ecjLog.size() > 0) {
-            log.append(fmtEcjLog(ecjLog, 60, androidxJars != null && !androidxJars.isEmpty()));
+            log.append(fmtEcjLog(ecjLog, 60, androidxJars != null && !androidxJars.isEmpty(), appPkg));
         }
         if (!ecjOk) throw new IOException("Java 编译失败（看上面 ECJ 的报错行）—— 已中止打包，不会偷偷生成只显示布局的壳包");
         logStage(log, "dex 链接（D8）");
@@ -710,7 +710,7 @@ public class BuildApkHelper {
     /** M266：把 ECJ 的批量编译输出压成「按文件归类的错误清单」。
      *  ECJ 原始一行一条（错误 + 源码行 + 箭头 + 消息），89 个文件能刷 5000 行，
      *  直接截断会把后面的错误吞掉。这里解析成结构化条目，同类消息去重，并给出缺依赖提示。 */
-    private static String fmtEcjLog(java.util.List<String> raw, int maxEntries, boolean hasAndroidxBuiltIn) {
+    private static String fmtEcjLog(java.util.List<String> raw, int maxEntries, boolean hasAndroidxBuiltIn, String appPkg) {
         if (raw == null || raw.isEmpty()) return "";
         java.util.List<String> lines = new java.util.ArrayList<>();
         for (String s : raw) {
@@ -720,7 +720,8 @@ public class BuildApkHelper {
         java.util.regex.Pattern head = java.util.regex.Pattern.compile(
                 "^\\s*[0-9]+\\.\\s+(ERROR|WARNING)\\s+in\\s+(.+?)\\s+\\(at line ([0-9]+)\\)\\s*$");
         java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, Integer>> byFile = new java.util.LinkedHashMap<>();
-        java.util.LinkedHashSet<String> missingPkgs = new java.util.LinkedHashSet<>();
+        java.util.LinkedHashSet<String> missingPkgsRaw = new java.util.LinkedHashSet<>();
+        java.util.List<String> missingPkgs = new java.util.ArrayList<>();
         int errors = 0, warnings = 0;
         String curFile = null;
         boolean curIsError = true;
@@ -754,7 +755,7 @@ public class BuildApkHelper {
                 String[] seg = pkg.split("\\.");
                 String root = seg.length >= 2 ? seg[0] + "." + seg[1] : pkg;
                 if (!root.startsWith("java.") && !root.startsWith("javax.") && !root.startsWith("android.")) {
-                    missingPkgs.add(root);
+                    missingPkgsRaw.add(root);
                 }
             }
             java.util.LinkedHashMap<String, Integer> bucket = byFile.get(curFile);
@@ -786,6 +787,22 @@ public class BuildApkHelper {
                     if (rest > 0) sb.append("    …（本文件还有 ").append(rest).append(" 条）\n");
                     break;
                 }
+            }
+        }
+        // M271：过滤掉「项目自己的包」——appPkg 的前缀/自身不该当缺依赖列出来
+        if (!missingPkgsRaw.isEmpty()) {
+            missingPkgs.addAll(missingPkgsRaw);
+            if (appPkg != null && !appPkg.isEmpty()) {
+                java.util.List<String> keep = new java.util.ArrayList<>();
+                for (String p : missingPkgs) {
+                    if (p.equals(appPkg)) continue;
+                    if (appPkg.startsWith(p + ".")) continue;   // p 是 appPkg 的父前缀
+                    if (p.startsWith(appPkg + ".")) continue;   // p 在 appPkg 下面
+                    String[] seg = p.split("\\.");
+                    if (seg.length < 2 && !p.startsWith("androidx.")) continue;
+                    keep.add(p);
+                }
+                missingPkgs = keep;
             }
         }
         if (!missingPkgs.isEmpty()) {

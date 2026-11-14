@@ -4,7 +4,7 @@
 
 import type { AiFileIo } from "./ai-tools";
 import { coreSkipDirs, withSkipExtras } from "./skip-dirs";
-import { hasAsyncIo, listDirQueued } from "./native-async";
+import { hasAsyncIo, listDirQueued, readTextQueued } from "./native-async";
 import { nativeBridge } from "./native-save";
 
 // 不读 build/ 里的源码（build 产物不是源码）；dex 查找例外（见 project-dex.ts）
@@ -53,6 +53,27 @@ async function nativeWalk(
   await walk(rootDir, "", 0);
 }
 
+// M241：native 全量递归时直接用原生 readText 读文件（绕开 io.read 可能因路径/权限失败）
+async function nativeReadText(rel: string, nativeRoot: string, io: AiFileIo | null | undefined): Promise<string | null> {
+  const abs = nativeRoot.replace(/\/+$/, "") + "/" + rel;
+  try {
+    if (hasAsyncIo()) {
+      const t = await readTextQueued(abs);
+      return t == null ? null : t;
+    }
+    const b = nativeBridge() as { readText?: (p: string) => string | null } | null;
+    const t = b?.readText?.(abs);
+    return t == null ? null : t;
+  } catch {
+    // 原生读不到再退回 io.read（web 通道）
+    if (io) {
+      const r = await io.read(rel);
+      if (r.ok && typeof r.text === "string") return r.text;
+    }
+    return null;
+  }
+}
+
 export async function loadProjectJavaFiles(
   io: AiFileIo | null | undefined,
   maxDepth = 8,
@@ -96,15 +117,18 @@ export async function loadProjectJavaFiles(
 
   await walk("", 0);
 
-  // M236：aiFileIo 扫不到任何 .java 时，fallback 到 Native 全量递归
-  if (out.length === 0 && extra?.nativeRoot) {
-    console.log("[loadProjectJava] aiFileIo found 0, trying native fallback at", extra.nativeRoot);
+  // M241：只要给了 nativeRoot 就用原生全量递归兜底（不再只在 out 为空时触发），
+  // 用原生 readText 读文件；再把 io 扫到的去重合并，保证 Java 文件不漏。
+  if (extra?.nativeRoot) {
+    const found = new Set(out.map((x) => x.rel));
     const nb = { remaining: MAX_FILES };
     await nativeWalk(extra.nativeRoot, maxDepth, async (rel) => {
-      const t = await (io?.read(rel) ?? Promise.resolve({ ok: false as const }));
-      if (!t.ok || typeof t.text !== "string" || t.text.length > MAX_TEXT) return;
+      if (found.has(rel)) return;
+      const text = await nativeReadText(rel, extra.nativeRoot!, io);
+      if (text == null || text.length > MAX_TEXT) return;
       console.log("[loadProjectJava] NATIVE FOUND:", rel);
-      out.push({ rel, text: t.text });
+      found.add(rel);
+      out.push({ rel, text });
       nb.remaining--;
     }, nb);
   }

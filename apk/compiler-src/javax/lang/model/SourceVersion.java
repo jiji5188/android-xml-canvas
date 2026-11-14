@@ -1,45 +1,47 @@
 package javax.lang.model;
 
 /**
- * M245：设备端 ECJ 桩。
+ * M249→M250：设备端 ECJ 桩（改为 enum）。
  *
- * 背景：make-compiler 把 ECJ 本体 dex 进 Android 的 tool dex，但 Android（ART）运行时
- * 没有 `java.compiler` 模块，也就没有 `javax.lang.model.*`。ECJ 的 batch.Main 在解析
- * `-source/-target`、以及 9+ 的 module 路径时会 link 到 `javax.lang.model.SourceVersion`，
- * 于是 `NoClassDefFoundError: Ljavax/lang/model/SourceVersion`。
+ * 背景：make-compiler 把 ECJ 本体 dex 进 Android tool dex，但 ART 没有 `javax.lang.model.*`
+ * （那是 JDK `java.compiler` 模块专属）。ECJ 会 link `javax.lang.model.SourceVersion`。
  *
- * 这里放一份与 JDK API 兼容的最小实现，随 compiler dex 一起打进 APK，运行时由
- * 「编译器 classloader」加载（和 ECJ 同 dex，天然可见），ECJ 就能正常 link。
+ * 关键修正（M250）：真实 `javax.lang.model.SourceVersion` 是 **enum**。之前我写成普通
+ * `final class`，导致 ART 字节码验证 `BatchAnnotationProcessorManager.configure` 时
+ * 期望该类型是 `java.lang.Enum` 子类型（ECJ 按 enum 语义编译）→
+ * `VerifyError: register v1 has type SourceVersion but expected java.lang.Enum`。
+ * 改成 enum 后 supertype 链含 Enum，验证通过。
  *
- * 只覆盖 ECJ 真正用到的静态成员与方法；不引入对 java.* 以外类的依赖。
+ * API 面：覆盖 ECJ 真正用的 静态常量 / latest / valueOf / isSupported / major / minor。
  */
-public final class SourceVersion {
+public enum SourceVersion {
 
-    public static final SourceVersion RELEASE_1_3  = valueOf("1.3");
-    public static final SourceVersion RELEASE_1_4  = valueOf("1.4");
-    public static final SourceVersion RELEASE_1_5  = valueOf("1.5");
-    public static final SourceVersion RELEASE_1_6  = valueOf("1.6");
-    public static final SourceVersion RELEASE_1_7  = valueOf("1.7");
-    public static final SourceVersion RELEASE_1_8  = valueOf("1.8");
-    public static final SourceVersion RELEASE_9    = valueOf("9");
-    public static final SourceVersion RELEASE_10   = valueOf("10");
-    public static final SourceVersion RELEASE_11   = valueOf("11");
-    public static final SourceVersion RELEASE_12   = valueOf("12");
-    public static final SourceVersion RELEASE_13   = valueOf("13");
-    public static final SourceVersion RELEASE_14   = valueOf("14");
-    public static final SourceVersion RELEASE_15   = valueOf("15");
-    public static final SourceVersion RELEASE_16   = valueOf("16");
-    public static final SourceVersion RELEASE_17   = valueOf("17");
-    public static final SourceVersion RELEASE_18   = valueOf("18");
-    public static final SourceVersion RELEASE_19   = valueOf("19");
+    RELEASE_1_3(1, 3),
+    RELEASE_1_4(1, 4),
+    RELEASE_1_5(1, 5),
+    RELEASE_1_6(1, 6),
+    RELEASE_1_7(1, 7),
+    RELEASE_1_8(1, 8),
+    RELEASE_9(9, 0),
+    RELEASE_10(10, 0),
+    RELEASE_11(11, 0),
+    RELEASE_12(12, 0),
+    RELEASE_13(13, 0),
+    RELEASE_14(14, 0),
+    RELEASE_15(15, 0),
+    RELEASE_16(16, 0),
+    RELEASE_17(17, 0),
+    RELEASE_18(18, 0),
+    RELEASE_19(19, 0);
 
-    /** ECJ 3.33 最高支持 19 */
-    private static final SourceVersion LATEST = RELEASE_19;
+    /** ECJ 3.33 最高支持到 19 */
+    public static final SourceVersion LATEST = RELEASE_19;
+    public static final SourceVersion EARLIEST = RELEASE_1_3;
 
     private final int major;
     private final int minor;
 
-    private SourceVersion(int major, int minor) {
+    SourceVersion(int major, int minor) {
         this.major = major;
         this.minor = minor;
     }
@@ -49,14 +51,16 @@ public final class SourceVersion {
     }
 
     public static boolean isSupported(int major, int minor) {
-        return valueOf(major + "." + minor) != null;
+        return lookup(major + "." + minor) != null;
     }
 
     public static boolean isSupported(String v) {
-        return valueOf(v) != null;
+        return lookup(v) != null;
     }
 
-    public static SourceVersion valueOf(String v) {
+    /** 与 JDK 语义对齐：匹配不到返回 null（JDK 真实 valueOf 是 Enum.valueOf，找不到会抛 IAE；
+     *  但 ECJ 这里主要拿它做「能不能编译到这个 level」的判断，null 更安全，不炸）。 */
+    private static SourceVersion lookup(String v) {
         if (v == null || v.isEmpty()) return null;
         int dot = v.indexOf('.');
         int major, minor;
@@ -75,11 +79,8 @@ public final class SourceVersion {
             }
             minor = 0;
         }
-        if (major == 1) {
-            return (minor >= 3 && minor <= 8) ? new SourceVersion(major, minor) : null;
-        }
-        if (major >= 9 && major <= 19) {
-            return (minor == 0) ? new SourceVersion(major, minor) : null;
+        for (SourceVersion sv : values()) {
+            if (sv.major == major && sv.minor == minor) return sv;
         }
         return null;
     }

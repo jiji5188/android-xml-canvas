@@ -353,180 +353,165 @@ public class BuildApkHelper {
         d8Args.add("--output"); d8Args.add(dexDir.getAbsolutePath());
         d8Args.addAll(classFiles);
         java.lang.reflect.Method d8Method = d8.getMethod("dex", String[].class, java.util.List.class);
-        d8Method.invoke(null, d8Args.toArray(new String[0]), d8Log);
-        log.append("D8: ").append(String.join("\n", d8Log)).append("\n");
-        File[] dexFiles = dexDir.listFiles();
-        java.util.Arrays.sort(dexFiles, (a, b) -> a.getName().compareTo(b.getName()));
-        int n = 0;
-        if (dexFiles != null) {
-            for (File df : dexFiles) {
-                if (!df.getName().matches("classes\\d*\\.dex")) continue;
-                byte[] data = readFile(df);
-                if (data.length < 8 || data.length > 12 * 1024 * 1024) continue;
-                if (data[0] != 'd' || data[1] != 'e' || data[2] != 'x') continue;
-                extraDex.add(data);
-                n++;
-            }
+        boolean d8Ok = Boolean.valueOf((Boolean) d8Method.invoke(null, d8Args.toArray(new String[0]), d8Log));
+        if (!d8Ok || d8Log.size() > 0) {
+            log.append("D8: ").append(String.join("\n", d8Log)).append("\n");
         }
-        log.append("设备端编译成功，注入 ").append(n).append(" 个 dex（").append(
-                extraDex.stream().mapToLong(d -> d.length).sum() / 1024).append(" KB）\n");
+        if (!d8Ok) throw new IOException("dex 转换失败（见上面 D8 日志）—— 已中止打包");
+        File[] dexFiles = dexDir.listFiles();
+        if (dexFiles == null) dexFiles = new File[0];
+        java.util.Arrays.sort(dexFiles, (a, b) -> a.getName().compareTo(b.getName()));
+        // 护栏（同 M211）：≤ 12MB/个、总 ≤ 40MB、dex 魔数
+        long total = 0;
+        int n = 0;
+        for (File df : dexFiles) {
+            if (!df.getName().matches("classes\\d*\\.dex")) continue;
+            byte[] data = readFile(df);
+            if (data == null || data.length < 8 || data.length > 12 * 1024 * 1024) continue;
+            if (data[0] != 'd' || data[1] != 'e' || data[2] != 'x') continue;
+            if (total + data.length > 40L * 1024 * 1024) break;
+            extraDex.add(data);
+            total += data.length;
+            n++;
+        }
+        log.append("设备端编译成功，注入 ").append(n).append(" 个 dex（").append(total / 1024).append(" KB）\n");
         if (n > 0) writeDexCache(cacheFile, dexFiles);
         return "java:" + n;
     }
 
     // ===== 编译器管理 =====
+    // M242：以下 ensureCompiler / compilerLoader / ResClassLoader / signWithApksig 都是
+    // MainActivity 里的原实现逐字移植。之前那版是我按签名猜的简写，dex 根本没加载进去，
+    // 真机上签名直接 NPE（Class 为 null）。别再手写，缺什么就从 MainActivity 抄。
 
     private File ensureCompiler() throws IOException {
         File dir = new File(ctx.getCacheDir(), "compiler");
-        if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("建不了 compiler 缓存目录");
-        String manifestJson;
-        try (InputStream in = ctx.getAssets().open("compiler/manifest.json")) {
-            manifestJson = new String(readAssetBytes(in), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            manifestJson = null;
+        if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("建不了 compiler 目录");
+        // M229：每次强制清空重解，甩掉历史残留（只读旧文件 / 半截下载 / 旧版 cache）
+        try { deleteTree(dir); } catch (Throwable ignored) {}
+        if (!dir.mkdirs()) throw new IOException("重建 compiler 目录失败");
+        File jar = new File(dir, "android.jar");
+        byte[] jarBytes = readAssetGz("compiler/android.jar.gz");
+        if (jarBytes == null) throw new IOException("APK 内缺 compiler/android.jar.gz（先在设置里下载/内置编译器资源）");
+        writeBytes(jar, jarBytes);
+        if (jar.canWrite()) {
+            jar.setReadOnly();
+            try { Runtime.getRuntime().exec(new String[]{"chmod","444",jar.getAbsolutePath()}).waitFor(); } catch (Throwable ignored) {}
         }
-        if (manifestJson == null) {
-            throw new IOException("没找到 compiler/manifest.json（旧包没有 manifest：至少保证有 tool dex）");
-        }
-        JSONObject mf;
-        try {
-            mf = new JSONObject(manifestJson);
-        } catch (org.json.JSONException je) {
-            throw new IOException("compiler/manifest.json 解析失败: " + je.getMessage());
-        }
-        String wantSha = mf.optString("sha256", "");
+        int i = 1;
         String toolBreakReason = null;
-        int toolCountExtracted = 0;
-        for (int i = 1; i <= 2; i++) {
-            String key = "tool" + i + ".bin.gz";
-            byte[] gz = readAssetGz("compiler/" + key);
-            if (gz == null) {
-                toolBreakReason = "缺 " + key;
+        while (true) {
+            File binFile = new File(dir, "tool" + i + ".bin");
+            byte[] b = readAssetGz("compiler/tool" + i + ".bin.gz");
+            if (b == null) {
+                toolBreakReason = (i == 1) ? "读不到 compiler/tool1.bin.gz" : ("compiler/tool" + i + ".bin.gz 读到一半中断");
                 break;
             }
-            byte[] raw = unGzip(gz);
-            if (raw.length < 8) { toolBreakReason = key + " 解压后太小"; break; }
-            File f = new File(dir, "tool" + i + ".bin");
-            writeBytes(f, raw);
-            toolCountExtracted++;
+            writeBytes(binFile, b);
+            if (binFile.canWrite()) {
+                binFile.setReadOnly();
+                try { Runtime.getRuntime().exec(new String[]{"chmod","444",binFile.getAbsolutePath()}).waitFor(); } catch (Throwable ignored) {}
+            }
+            i++;
         }
-        if (toolBreakReason != null) throw new IOException(toolBreakReason + "（APK 缺 compiler 资源或旧版无 manifest）");
-        byte[] androidGz = readAssetGz("compiler/android.jar.gz");
-        if (androidGz != null) {
-            writeBytes(new File(dir, "android.jar"), unGzip(androidGz));
+        validateCompiler(dir, toolBreakReason, i - 1);
+        // M219：ECJ 诊断消息包（.properties 在 dex 里被丢光了）解到 dir/res/…
+        try {
+            File resDir = new File(dir, "res");
+            byte[] msgs = readAssetGz("compiler/msgs.bin.gz");
+            if (resDir.isDirectory()) { File[] old = resDir.listFiles(); if (old != null) for (File x : old) deleteTree(x); }
+            resDir.mkdirs();
+            unzipToDir(msgs, resDir);
+        } catch (Throwable ignored) {
+            // 资源缺失/解包失败：不阻断编译
         }
-        byte[] msgsGz = readAssetGz("compiler/msgs.bin.gz");
-        if (msgsGz != null) {
-            writeBytes(new File(dir, "msgs.bin"), unGzip(msgsGz));
-        }
-        validateCompiler(dir, toolBreakReason, toolCountExtracted);
         return dir;
     }
 
+    /** 建编译器 classloader（多 dex 内存加载），父链挂 ResClassLoader 供 ECJ 找消息包 */
     private java.lang.ClassLoader compilerLoader(File compDir) throws IOException {
         java.util.List<byte[]> els = new java.util.ArrayList<>();
-        for (int i = 1; i <= 2; i++) {
-            File tool = new File(compDir, "tool" + i + ".bin");
-            if (!tool.isFile()) continue;
-            els.add(readFile(tool));
+        int i = 1;
+        while (true) {
+            File b = new File(compDir, "tool" + i + ".bin");
+            if (!b.isFile()) break;
+            byte[] data = readFile(b);
+            if (data == null || data.length == 0) break;
+            els.add(data);
+            i++;
         }
         if (els.isEmpty()) throw new IOException("没找到编译器 dex（tool*.bin）");
-        File msgDir = new File(compDir, "msgs");
-        byte[] msgs = null;
-        File msgFile = new File(compDir, "msgs.bin");
-        if (msgFile.isFile()) msgs = readFile(msgFile);
-        if (msgs != null) {
-            File msgDest = new File(msgDir, "batchmessages.properties");
-            if (!msgDest.isFile() || msgDest.length() != msgs.length) {
-                msgDir.mkdirs();
-                writeBytes(msgDest, msgs);
-            }
-        }
-        return new ResClassLoader(els, msgDir);
+        java.nio.ByteBuffer[] bb = new java.nio.ByteBuffer[els.size()];
+        for (int k = 0; k < els.size(); k++) bb[k] = java.nio.ByteBuffer.wrap(els.get(k));
+        File resDir = new File(compDir, "res");
+        java.lang.ClassLoader resLoader = new ResClassLoader(resDir, ctx.getClassLoader());
+        java.lang.ClassLoader cl = new dalvik.system.InMemoryDexClassLoader(bb, null, resLoader);
+        // 顺带把 TCCL 指到它，避免 ECJ 内部用线程 classloader 找资源时绕过父链
+        Thread.currentThread().setContextClassLoader(cl);
+        return cl;
     }
 
-    static class ResClassLoader extends java.lang.ClassLoader {
+    /** 只服务 res 目录的资源 ClassLoader（ECJ 的 ResourceBundle.getBundle 靠它） */
+    private static final class ResClassLoader extends java.lang.ClassLoader {
         private final File root;
-        ResClassLoader(java.util.List<byte[]> dexBlobs, File resRoot) {
-            super(ResClassLoader.class.getClassLoader());
-            this.root = resRoot;
-            loadAll(dexBlobs);
+        ResClassLoader(File root, java.lang.ClassLoader parent) { super(parent); this.root = root; }
+        @Override public java.net.URL findResource(String name) {
+            java.io.File f = new java.io.File(root, name.replace('/', java.io.File.separatorChar));
+            return f.isFile() ? safeUrl(f) : null;
         }
-        private void loadAll(java.util.List<byte[]> blobs) {
-            for (byte[] b : blobs) defineClass(null, b, 0, b.length);
+        @Override public java.io.InputStream getResourceAsStream(String name) {
+            try {
+                java.io.File f = new java.io.File(root, name.replace('/', java.io.File.separatorChar));
+                return f.isFile() ? new java.io.FileInputStream(f) : null;
+            } catch (Throwable t) { return null; }
         }
-        @Override
-        protected Class<?> findClass(String name) {
-            byte[] b = findClassBytes(name);
-            if (b == null) return null;
-            return defineClass(name, b, 0, b.length);
+        @Override public java.net.URL getResource(String name) {
+            java.net.URL u = findResource(name);
+            if (u != null) return u;
+            return super.getResource(name);
         }
-        private byte[] findClassBytes(String name) {
-            return null;
+        private static java.net.URL safeUrl(java.io.File f) {
+            try { return f.toURI().toURL(); } catch (Throwable t) { return null; }
         }
     }
 
     // ===== 签名 =====
 
-    /** M240：repack 也用得到，提成 public 供 MainActivity 委托 */
+    /** apksig 签名（assets/apksig/signer.bin.gz → DexClassLoader → SigningBridge.sign 静态方法） */
     public String signWithApksig(File inApk, File outApk, String ksPath, String storePass, String alias, String keyPass) {
-        File dir = new File(ctx.getCacheDir(), "apksig");
-        if (!dir.isDirectory() && !dir.mkdirs()) return "err:建不了 apksig 目录";
-        File dex = new File(dir, "signer.dex");
-        byte[] want = readAssetGz("apksig/signer.bin.gz");
-        if (want == null) return "err:缺 apksig/signer.bin.gz";
-        if (!dex.isFile() || dex.length() != want.length) {
-            try { writeBytes(dex, want); } catch (IOException ex) { return "err:write dex failed"; }
-        }
-        if (Build.VERSION.SDK_INT >= 34) {
+        try {
+            File dir = new File(ctx.getCacheDir(), "apksig");
+            if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("建不了缓存目录: " + dir);
+            File dex = new File(dir, "signer.dex");
+            // assets 里存的是 .bin（厂商安装扫描对 APK 内的 dex 文件敏感），运行时落到 cache 再当 dex 用
+            byte[] want = readAssetGz("apksig/signer.bin.gz");
+            if (want == null) throw new IOException("缺 assets/apksig/signer.bin.gz");
+            if (!dex.isFile() || dex.length() != want.length) writeBytes(dex, want);
+            // Android 14（API 34）起禁止动态加载可写 dex：写完立刻改只读（旧的可写文件也补一刀）
             if (dex.canWrite()) {
                 if (!dex.setReadOnly()) {
-                    Process ch = null;
                     try {
-                        ch = Runtime.getRuntime().exec(new String[] { "chmod", "444", dex.getAbsolutePath() });
-                        ch.waitFor();
-                    } catch (Exception ignored) {
-                    }
+                        Runtime.getRuntime().exec(new String[] { "chmod", "444", dex.getAbsolutePath() }).waitFor();
+                    } catch (Throwable ignored) {}
                 }
-                if (dex.canWrite()) return "err:dex 文件无法设为只读（Android 14+ 要求）: " + dex.getAbsolutePath();
             }
-        }
-        File oat = new File(dir, "oat");
-        java.lang.ClassLoader cl;
-        try {
-            cl = new DexClassLoader2(dex.getAbsolutePath(), oat.getAbsolutePath(), null, ctx.getClassLoader());
+            if (dex.canWrite()) throw new IOException("dex 文件无法设为只读（Android 14+ 要求）: " + dex.getAbsolutePath());
+            File oat = new File(dir, "oat");
+            if (!oat.isDirectory()) oat.mkdirs();
+            dalvik.system.DexClassLoader cl = new dalvik.system.DexClassLoader(
+                    dex.getAbsolutePath(), oat.getAbsolutePath(), null, ctx.getClassLoader());
+            Class<?> c = Class.forName("com.jiji.axv.sign.SigningBridge", true, cl);
+            java.lang.reflect.Method m = c.getMethod("sign", String.class, String.class, String.class,
+                    String.class, String.class, String.class, int.class);
+            Object r = m.invoke(null, inApk.getAbsolutePath(), outApk.getAbsolutePath(), ksPath,
+                    storePass, alias, keyPass, Integer.valueOf(24));
+            return String.valueOf(r);
         } catch (Throwable t) {
-            return "err:加载 apksig 失败：" + t.getMessage();
-        }
-        try {
-            Class<?> sb = cl.loadClass("com.jiji.axv.sign.SigningBridge");
-            Object inst = sb.getConstructor().newInstance();
-            java.lang.reflect.Method m = sb.getMethod("sign", File.class, File.class, String.class, String.class, String.class, String.class, boolean.class, boolean.class, boolean.class);
-            String r = String.valueOf(m.invoke(inst, inApk, outApk, ksPath, storePass, alias, keyPass, true, true, true));
-            return r;
-        } catch (Exception e) {
-            return "err:" + e.getMessage();
+            Throwable cause = t.getCause() == null ? t : t.getCause();
+            String msg = cause.getMessage();
+            return "err:" + (msg == null ? cause.getClass().getSimpleName() : msg);
         }
     }
-
-    // DexClassLoader 的简单封装（避免直接 import dalvik）
-    private static class DexClassLoader2 extends java.lang.ClassLoader {
-        DexClassLoader2(String dexPath, String oatDir, String libDir, ClassLoader parent) {
-            super(parent);
-            try {
-                Class<?> cl = Class.forName("dalvik.system.BaseDexClassLoader");
-                java.lang.reflect.Constructor<?> ctor = cl.getConstructor(String.class, String.class, String.class, ClassLoader.class);
-                Object inst = ctor.newInstance(dexPath, oatDir, libDir, parent);
-                // 把 parent 的已加载类委托给自己
-            } catch (Exception ignored) {
-            }
-        }
-        @Override
-        protected Class<?> findClass(String name) {
-            return null;
-        }
-    }
-
     // ===== 工具方法 =====
 
     private File defaultOutDir() {
@@ -577,69 +562,111 @@ public class BuildApkHelper {
         return "{\"ok\":false,\"step\":" + JSONObject.quote(step) + ",\"log\":" + JSONObject.quote(log.toString()) + "}";
     }
 
+    /** M221：编译缓存指纹。sha1(排序后的 java 源码 path+content + 排序后的资源文件 path)。
+     *  资源只取路径：R.java 字段由资源名/类型决定，内容字节不影响 id。 */
     private static String compileFingerprint(JSONArray javaSources, JSONArray resFiles) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            for (int i = 0; i < javaSources.length(); i++) {
-                JSONObject j = javaSources.getJSONObject(i);
-                md.update(j.optString("path", "").getBytes(StandardCharsets.UTF_8));
-                md.update((byte) 0);
-                md.update(j.optString("code", "").getBytes(StandardCharsets.UTF_8));
-                md.update((byte) 0);
-            }
-            if (resFiles != null) {
-                for (int i = 0; i < resFiles.length(); i++) {
-                    JSONObject f = resFiles.getJSONObject(i);
-                    md.update(f.optString("path", "").getBytes(StandardCharsets.UTF_8));
-                    md.update((byte) 0);
+            MessageDigest md = MessageDigest.getInstance("SHA-1");
+            java.util.List<String> js = new java.util.ArrayList<>();
+            if (javaSources != null) {
+                for (int i = 0; i < javaSources.length(); i++) {
+                    JSONObject j = javaSources.getJSONObject(i);
+                    js.add(j.optString("path", "") + "\u0001" + j.optString("code", ""));
                 }
             }
-            StringBuilder sb = new StringBuilder();
-            for (byte b : md.digest()) sb.append(String.format("%02x", b));
-            return sb.toString();
-        } catch (Exception e) {
-            return "fallback_" + System.nanoTime();
+            java.util.Collections.sort(js);
+            for (String s : js) md.update(s.getBytes(StandardCharsets.UTF_8));
+            java.util.List<String> rs = new java.util.ArrayList<>();
+            if (resFiles != null) {
+                for (int i = 0; i < resFiles.length(); i++) {
+                    rs.add(resFiles.getJSONObject(i).optString("path", ""));
+                }
+            }
+            java.util.Collections.sort(rs);
+            for (String s : rs) md.update(s.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : md.digest()) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (Throwable t) {
+            return "nocache";
         }
     }
 
+    /** M221b：只留 mtime 最新的 keep 个 .d（.tmp 垃圾一并清） */
     private static void pruneDexCache(File cacheDir, int keep) {
-        File[] files = cacheDir.listFiles((d, n) -> n.endsWith(".d"));
-        if (files == null || files.length <= keep) return;
-        java.util.Arrays.sort(files, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
-        for (int i = keep; i < files.length; i++) files[i].delete();
+        File[] fs = cacheDir.listFiles();
+        if (fs == null || fs.length <= keep) return;
+        java.util.List<File> ds = new java.util.ArrayList<>();
+        for (File f : fs) {
+            String n = f.getName();
+            if (n.endsWith(".tmp")) { f.delete(); continue; }
+            if (n.endsWith(".d")) ds.add(f);
+        }
+        if (ds.size() <= keep) return;
+        java.util.Collections.sort(ds, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+        for (int i = keep; i < ds.size(); i++) ds.get(i).delete();
     }
 
     private static java.util.List<byte[]> readDexCache(File cacheFile) {
-        if (!cacheFile.isFile()) return null;
+        if (cacheFile == null || !cacheFile.isFile()) return null;
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(cacheFile)))) {
             int n = in.readInt();
             if (n <= 0 || n > 16) return null;
             java.util.List<byte[]> out = new java.util.ArrayList<>();
+            long total = 0;
             for (int i = 0; i < n; i++) {
                 int len = in.readInt();
                 if (len < 8 || len > 12 * 1024 * 1024) return null;
+                total += len;
+                if (total > 40L * 1024 * 1024) return null;
                 byte[] data = new byte[len];
                 in.readFully(data);
+                if (data[0] != 'd' || data[1] != 'e' || data[2] != 'x') return null;
                 out.add(data);
             }
             return out;
-        } catch (Exception e) {
+        } catch (Throwable t) {
             return null;
         }
     }
 
+    /** M221：写编译缓存（护栏口径与注入 extraDex 一致；先写 .tmp 再改名，避免半截文件） */
     private static void writeDexCache(File cacheFile, File[] dexFiles) {
-        if (dexFiles == null) return;
-        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(cacheFile)))) {
-            out.writeInt(dexFiles.length);
+        if (cacheFile == null) return;
+        java.util.List<byte[]> picked = new java.util.ArrayList<>();
+        long total = 0;
+        if (dexFiles != null) {
             for (File df : dexFiles) {
+                if (df == null || !df.isFile()) continue;
                 if (!df.getName().matches("classes\\d*\\.dex")) continue;
                 byte[] data = readFile(df);
-                if (data.length < 8 || data.length > 12 * 1024 * 1024) continue;
+                if (data == null || data.length < 8 || data.length > 12 * 1024 * 1024) continue;
+                if (data[0] != 'd' || data[1] != 'e' || data[2] != 'x') continue;
+                if (total + data.length > 40L * 1024 * 1024) break;
+                picked.add(data);
+                total += data.length;
+            }
+        }
+        if (picked.isEmpty()) return;
+        File tmp = new File(cacheFile.getParentFile(), cacheFile.getName() + ".tmp");
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(tmp)))) {
+            out.writeInt(picked.size());
+            for (byte[] data : picked) {
                 out.writeInt(data.length);
                 out.write(data);
             }
-        } catch (Exception ignored) {
+            out.flush();
+        } catch (Throwable t) {
+            tmp.delete();
+            return;
+        }
+        if (!tmp.renameTo(cacheFile)) {
+            tmp.delete();
+            try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(cacheFile)))) {
+                out.writeInt(picked.size());
+                for (byte[] data : picked) { out.writeInt(data.length); out.write(data); }
+                out.flush();
+            } catch (Throwable ignored) { }
         }
     }
 
@@ -742,24 +769,106 @@ public class BuildApkHelper {
         return (s == null ? "" : s).replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
-    private boolean validateCompiler(File dir, String toolBreakReason, int toolCountExtracted) {
-        // 校验 tool dex 魔数 + android.jar 大小
-        for (int i = 1; i <= toolCountExtracted; i++) {
-            File tool = new File(dir, "tool" + i + ".bin");
-            if (!tool.isFile() || tool.length() < 8) return false;
-            try {
-                byte[] head = new byte[3];
-                try (FileInputStream in = new FileInputStream(tool)) {
-                    in.read(head);
+    /** M227：校验 cache/compiler 下的文件。manifest 记录的是**解压后**路径+大小+sha256。
+     *  有 manifest → 逐个比；没有 → 只查 tool1。任一不对 → 抛带文件名的 IOException。 */
+    private void validateCompiler(File dir, String toolBreakReason, int toolCountExtracted) throws IOException {
+        java.util.List<String[]> manifest = readCompilerManifest();
+        if (manifest != null) {
+            java.util.List<String> problems = new java.util.ArrayList<>();
+            for (String[] e : manifest) {
+                String name = e[0], wantSha = e[1], wantSizeStr = e[2], role = e[3];
+                File local = new File(dir, name);
+                boolean optional = "i18n".equals(role); // msgs/res 缺失不致命（M219）
+                if (!local.exists()) {
+                    if (optional) continue;
+                    problems.add(name + "（" + role + "）缺失");
+                    continue;
                 }
-                if (head[0] != 'd' || head[1] != 'e' || head[2] != 'x') return false;
-            } catch (IOException ignored) {
-                return false;
+                if (local.isDirectory()) { if (optional) continue; problems.add(name + "（" + role + "）应为文件但是目录"); continue; }
+                long wantSize;
+                try { wantSize = Long.parseLong(wantSizeStr); } catch (Throwable t) { wantSize = -1; }
+                if (wantSize > 0 && local.length() != wantSize) {
+                    problems.add(name + "（" + role + "）大小不符（期望 " + wantSize + " 实际 " + local.length() + "），可能截断");
+                    continue;
+                }
+                if (wantSha.length() == 64) {
+                    String got = sha256Hex(local);
+                    if (got != null && !got.equalsIgnoreCase(wantSha)) problems.add(name + "（" + role + "）sha256 不符，文件已损坏");
+                }
+            }
+            if (!problems.isEmpty()) {
+                throw new IOException("编译器资源不完整（" + problems.size() + " 处）：" + String.join("；", problems)
+                        + (toolBreakReason != null ? "；" + toolBreakReason : ""));
+            }
+        } else {
+            File t1 = new File(dir, "tool1.bin");
+            if (!t1.isFile() || t1.length() == 0) {
+                throw new IOException((toolBreakReason != null ? toolBreakReason : "没找到编译器 dex（tool1.bin）")
+                        + "（APK 缺 compiler 资源或旧版无 manifest，请装新版）");
             }
         }
-        File aj = new File(dir, "android.jar");
-        if (aj.isFile() && aj.length() < 1024 * 1024) return false;
-        return true;
+    }
+
+    /** 读 assets/compiler/manifest.json → [[path, sha256, size, role], …]，没有则 null */
+    private java.util.List<String[]> readCompilerManifest() {
+        try (InputStream in = ctx.getAssets().open("compiler/manifest.json")) {
+            String text = new String(readAssetBytes(in), StandardCharsets.UTF_8);
+            JSONObject o = new JSONObject(text);
+            JSONArray fs = o.optJSONArray("files");
+            if (fs == null) return null;
+            java.util.List<String[]> out = new java.util.ArrayList<>();
+            for (int i = 0; i < fs.length(); i++) {
+                JSONObject f = fs.getJSONObject(i);
+                out.add(new String[] { f.optString("path", ""), f.optString("sha256", ""),
+                        String.valueOf(f.optLong("size", 0)), f.optString("role", "") });
+            }
+            return out;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** M227：sha256（hex 小写），读失败 → null（调用方按「无法校验」处理） */
+    private static String sha256Hex(File f) {
+        try {
+            byte[] data = readFile(f);
+            if (data == null) return null;
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            StringBuilder sb = new StringBuilder();
+            for (byte x : md.digest(data)) sb.append(String.format("%02x", x));
+            return sb.toString();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** 把 zip（可能是 gzip 过的 zip）解到目录，条目路径做 ../ 防护 */
+    private static void unzipToDir(byte[] data, File destDir) throws IOException {
+        if (data == null || data.length == 0) return;
+        byte[] zip = data;
+        if (data.length >= 2 && data[0] == (byte) 0x1f && data[1] == (byte) 0x8b) zip = unGzip(data);
+        java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(zip));
+        try {
+            java.util.zip.ZipEntry e;
+            while ((e = zis.getNextEntry()) != null) {
+                if (e.isDirectory()) continue;
+                File out = new File(destDir, e.getName());
+                String canon = out.getCanonicalPath();
+                if (!canon.startsWith(destDir.getCanonicalPath() + File.separator) && !canon.equals(destDir.getCanonicalPath())) {
+                    zis.closeEntry();
+                    continue;
+                }
+                out.getParentFile().mkdirs();
+                try (FileOutputStream fos = new FileOutputStream(out)) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = zis.read(buf)) > 0) fos.write(buf, 0, n);
+                }
+                zis.closeEntry();
+            }
+        } finally {
+            try { zis.close(); } catch (Throwable ignored) { }
+        }
     }
 
     private static byte[] readAll(InputStream in) throws IOException {

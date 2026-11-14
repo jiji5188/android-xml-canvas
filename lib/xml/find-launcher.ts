@@ -14,7 +14,11 @@ const CANDIDATES = [
   "src/main/AndroidManifest.xml",
 ];
 
-export async function findLauncherActivity(io: AiFileIo | null | undefined): Promise<string> {
+export async function findLauncherActivity(
+  io: AiFileIo | null | undefined,
+  /** M258：manifest 没写 package（新版 Gradle 用 build.gradle 的 namespace）时，用构建包名兑底拼相对类名 */
+  fallbackPkg = "",
+): Promise<string> {
   if (!io) return "";
   let text = "";
   for (const rel of CANDIDATES) {
@@ -30,12 +34,16 @@ export async function findLauncherActivity(io: AiFileIo | null | undefined): Pro
   }
   if (!text) return "";
   const pkgM = text.match(/(?:android:)?package\s*=\s*["']([^"']+)["']/i) || text.match(/namespace\s*=\s*["']([^"']+)["']/i);
-  const pkg = pkgM?.[1] || "";
+  // M258：manifest 没 package/namespace（常见于新项目）→ 用传入的构建包名兑底，否则 .MainActivity 解析不出全限定名
+  const pkg = pkgM?.[1] || fallbackPkg || "";
 
-  // 归一化：android:name=".Foo" → 补包名
+  // 归一化：android:name=".Foo" → 补包名；包名拿不到时相对名无法全限定 → 退空（交给源码兑底）
   const resolveName = (raw: string): string => {
     if (!raw) return "";
-    if (raw.startsWith(".")) return (pkg ? pkg + "." : "") + raw.slice(1);
+    if (raw.startsWith(".")) {
+      if (!pkg) return ""; // 相对名但没包名，拼不出全限定 → 交给 deriveLauncherFromSources
+      return pkg + "." + raw.slice(1);
+    }
     return raw;
   };
 

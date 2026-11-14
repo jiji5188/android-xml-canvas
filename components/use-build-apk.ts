@@ -172,7 +172,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         const javaSources = withCurrentSource(javaSrcMapped, relNow, xml);
         // M258：清单里找不到 MAIN/LAUNCHER 时，从源码推入口（extends Activity 的那个类）——
         //  否则 ShellActivity 拿不到 axv.launcher，永远停在壳上，用户代码跑不起来。
-        let manifest = javaSources.length ? await findLauncherActivity(aiFileIo) : "";
+        let manifest = javaSources.length ? await findLauncherActivity(aiFileIo, pkg) : "";
         if (!manifest && javaSources.length) {
           manifest = deriveLauncherFromSources(javaSources, pkg);
           if (manifest) setExportNote(tt("清单里没找到 launcher，已从源码推断入口：{n}", { n: manifest }));

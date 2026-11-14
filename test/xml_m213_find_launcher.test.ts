@@ -98,6 +98,18 @@ describe("M213 findLauncherActivity", () => {
     });
     expect(await findLauncherActivity(io)).toBe("com.x.MainActivity");
   });
+  it("M258：manifest 没 package（新版 Gradle namespace 在 gradle 里）→ 用 fallbackPkg 兑底拼包名", async () => {
+    const io = mkIo({
+      "AndroidManifest.xml": `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application>
+        <activity android:name=".MainActivity" android:exported="true">
+          <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+        </activity></application></manifest>`,
+    });
+    // 不传 fallbackPkg → 解析不出包名，返回空（或裸 MainActivity）
+    expect(await findLauncherActivity(io)).toBe("");
+    // 传构建包名 com.myapp → 正确拼成全限定名
+    expect(await findLauncherActivity(io, "com.myapp")).toBe("com.myapp.MainActivity");
+  });
 });
 
 describe("M258 deriveLauncherFromSources（清单没 launcher 时的兑底）", () => {

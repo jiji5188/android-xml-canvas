@@ -272,6 +272,35 @@ const cmTheme = EditorView.theme({
     minWidth: "30px",
     textAlign: "right",
   },
+  // M259：折叠 gutter 的展开/收起箭头图标（CM 给可折叠行加 data-folded 属性）
+  ".cm-foldGutter .cm-gutterElement": {
+    cursor: "pointer",
+    display: "inline-flex",
+    justifyContent: "center",
+    minWidth: "18px",
+  },
+  ".cm-foldGutter .cm-gutterElement::before": {
+    content: "",
+    width: 0,
+    height: 0,
+    borderLeft: "5px solid var(--axv-on-surface-variant, rgba(0, 0, 0, 0.45))",
+    borderTop: "4px solid transparent",
+    borderBottom: "4px solid transparent",
+    display: "inline-block",
+    transition: "transform 0.15s ease",
+  },
+  ".cm-foldGutter .cm-gutterElement[data-\"folded\"]::before": {
+    // 折叠态：箭头向右 ▶（data-folded 值即被折叠的行数，统一样式）
+    transform: "rotate(90deg)",
+    borderLeftColor: "var(--axv-on-surface, rgba(0, 0, 0, 0.75))",
+  },
+  ".cm-fix-gutter .cm-gutterElement": {
+    cursor: "default",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: "18px",
+  },
   ".cm-activeLine": {
     // M50:背景改由 cmCurLineBg(独立负层)画。
     // 这里必须留透明:内容层背景会盖住选区层(z-index:-2),

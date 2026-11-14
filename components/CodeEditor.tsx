@@ -282,11 +282,11 @@ const cmTheme = EditorView.theme({
   },
   // 隐藏 CM 自带的 › / ‹ 字符（图标由下面两个伪元素画）
   ".cm-foldGutter .cm-gutterElement > span": {
-    font-size: 0,
-    line-height: 0,
-    display: inline-block,
-    width: 100%,
-    height: 100%,
+    fontSize: 0,
+    lineHeight: 0,
+    display: "inline-block",
+    width: "100%",
+    height: "100%",
   },
   ".cm-foldGutter .cm-gutterElement::after": {
     content: "",

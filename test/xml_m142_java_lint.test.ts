@@ -47,3 +47,44 @@ describe("M142 Java 文件不再套 XML 校验", () => {
     expect(issues.some((i) => i.sev === "error")).toBe(true);
   });
 });
+
+describe("M253 被分号割裂的标识符（extends Activ;ity）要报 error", () => {
+  it("用户的真实片段：extends Activ;ity 报 syntax error", () => {
+    const code = [
+      "package com.myapp;",
+      "",
+      "import android.os.Bundle;",
+      "import android.widget.Button;",
+      "import android.view.View;",
+      "import android.widget.TextView;",
+      "",
+      "public class MainActivity extends Activ;ity {",
+      "",
+      "    @Override",
+    ].join("\n");
+    const issues = lintJava(code);
+    const syntax = issues.filter((i) => i.code === "syntax");
+    expect(syntax.length).toBeGreaterThan(0);
+    expect(syntax[0].sev).toBe("error");
+    // 圈住的是整个坏标识符 Activ;ity，不是只画分号
+    expect(syntax[0].msg).toContain("Activ;ity");
+    expect(syntax[0].line).toBe(8);
+  });
+
+  it("普通合法代码不报 syntax（不误伤）", () => {
+    const code = [
+      "public class A {",
+      "    int x = 1;",
+      "    void f() { int y = 2; }",
+      "}",
+    ].join("\n");
+    const issues = lintJava(code);
+    expect(issues.filter((i) => i.code === "syntax")).toHaveLength(0);
+  });
+
+  it("字符串里的分号割裂不报（mask 已抹掉）", () => {
+    const code = ['public class A { String s = "ab;cd"; }'].join("\n");
+    const issues = lintJava(code);
+    expect(issues.filter((i) => i.code === "syntax")).toHaveLength(0);
+  });
+});

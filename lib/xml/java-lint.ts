@@ -46,7 +46,8 @@ export interface JavaLintIssue {
     | "voidret"
     | "assign"
     | "unusedimport"
-    | "case";
+    | "case"
+    | "syntax";
   msg: string;
   /** M179:能自动修复时给出 from → to */
   fix?: { from: string; to: string };
@@ -316,7 +317,38 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
     });
   }
 
-  // 2) 括号平衡。字面量没闭合时跳过,避免误导
+  // 2) M253：被 `;` 割裂的标识符（`extends Activ;ity`、`foo;bar` 这类 typo）。
+  //    高置信度信号：分号前后紧贴着标识符字符（/\w;\w/）—— Java/Kotlin 里分号不会
+  //    出现在词中间。之前这类行被当成「class 声明行」整行跳过，零报警。
+  if (!opts.isKotlin) {
+    // 逐行找 `;` 前后都是词字符的位置（跳过字符串/注释：用 masked，里面字面量已抹掉）
+    const mlines = masked.code.split("\n");
+    for (let i = 0; i < mlines.length; i++) {
+      const ln = mlines[i];
+      // 找 词字符;词字符（`;` 前面是 \w、后面是 \w）
+      const m = /[\w$];[\w$]/.exec(ln);
+      if (!m) continue;
+      const at = m.index; // 分号前一字符位置
+      const lineNo = i + 1;
+      // 报在 分号前那段的末尾（把整个坏标识符圈出来更清楚）：往前找词首、往后找词尾
+      let s = at;
+      while (s > 0 && /[\w$]/.test(ln[s - 1])) s--;
+      let e = at + 2; // 分号后第一字符
+      while (e < ln.length && /[\w$]/.test(ln[e])) e++;
+      const bad = ln.slice(s, e); // 如 "Activ;ity"
+      issues.push({
+        line: lineNo,
+        col: s + 1,
+        len: bad.length,
+        sev: "error",
+        code: "syntax",
+        msg: `「${bad}」里有分号割裂的标识符（分号不会出现在词中间）——是不是打错字了？`,
+      });
+      break; // 同一处只报一次，避免一行多个分号刷屏
+    }
+  }
+
+  // 3) 括号平衡。字面量没闭合时跳过,避免误导
   if (!lastQuoteLine) {
     const stack: { ch: string; at: number }[] = [];
     const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };

@@ -35,7 +35,24 @@ public final class EcjBridge {
             ok = main.compile(args);
             if (main.globalErrorsCount > 0) ok = false;
         } catch (Throwable t) {
+            // M247：只打 toString 看不到根因。把异常链 + 关键堆栈都打出来，
+            // 设备端才能定位是缺哪个资源 / 哪个静态初始化挂了。
             pw.println("ECJ 内部异常：" + t);
+            Throwable c = t.getCause();
+            int depth = 0;
+            while (c != null && depth < 8) {
+                pw.println("  caused by: " + c);
+                c = c.getCause();
+                depth++;
+            }
+            StringWriter sws = new StringWriter();
+            t.printStackTrace(new PrintWriter(sws));
+            for (String line : sws.toString().split("\n")) {
+                if (line.contains("com.jiji.axv") || line.contains("org.eclipse.jdt")
+                        || line.contains("javax.lang") || line.contains("Caused")) {
+                    pw.println("  " + line);
+                }
+            }
             ok = false;
         }
         pw.flush();

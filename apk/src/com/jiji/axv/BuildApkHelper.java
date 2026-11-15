@@ -46,6 +46,8 @@ public class BuildApkHelper {
             JSONArray libs = p.optJSONArray("libs");
             String launchActivity = p.optString("launchActivity", "");
             String manifestText = p.optString("manifestText", "");
+            // M286：JS 侧已把 provider 节点插进项目清单；只有合成清单的分支才需要 Java 侧再插一次
+            boolean axvLog = p.optBoolean("axvLog", false);
             String ksPath = p.optString("keystore", "");
             String storePass = p.optString("storePass", "");
             String alias = p.optString("alias", "");
@@ -119,6 +121,20 @@ public class BuildApkHelper {
                         + "  </application>\n"
                         + "</manifest>\n";
                 manContent = ensureManifestPkg(manContent, pkg, log);
+                // M286：合成清单分支里把运行日志 provider 也挂上（JS 侧对已有清单已插过，不会重复）
+                if (axvLog) {
+                    String prov =
+                            "    <provider\n"
+                                    + "        android:name=\"" + pkg + ".axvlog.AxvLogProvider\"\n"
+                                    + "        android:authorities=\"" + pkg + ".axvlog.provider\"\n"
+                                    + "        android:exported=\"false\"\n"
+                                    + "        android:initOrder=\"1000\" />\n";
+                    int appEnd = manContent.lastIndexOf("</application>");
+                    if (appEnd > 0) {
+                        manContent = manContent.substring(0, appEnd) + prov + manContent.substring(appEnd);
+                    }
+                    log.append("已注入 AXV 运行日志抽屉（provider 挂到合成清单）\n");
+                }
             } else {
                 // 项目清单没有 MAIN/LAUNCHER 时，把 ShellActivity 注进去兜底（老行为），否则装完没有图标/打不开
                 String content = manifestText;

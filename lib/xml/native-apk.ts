@@ -38,6 +38,8 @@ export interface BuildApkInput {
   libs?: { path: string; base64: string }[];
   /** M272：项目里引用 R 的包名清单（多包共存/反编译工程），设备端给每个包复制一份 R.java */
   rPackages?: string[];
+  /** M286：是否注入「运行日志抽屉」（日志/生命周期/崩溃），默认 false */
+  axvLog?: boolean;
 }
 
 export interface BuildApkResult {

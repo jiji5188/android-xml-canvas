@@ -20,6 +20,7 @@ import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { prepareFiles } from "@/lib/xml/native-render";
 import type { RenderFile } from "@/lib/xml/native-render";
 import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, rPackagesFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
+import { axvRuntimeSources, injectAxvLogProvider } from "@/lib/xml/axv-runtime";
 import { collectProjectLibs } from "@/lib/xml/project-libs";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
@@ -228,6 +229,20 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           setExportNote(tt("{f} 还没保存，这次打包用的是编辑器里的最新内容", { f: (relNow.split("/").pop() || relNow) }));
         }
         setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
+        // M286：往包里注入「运行日志抽屉」（provider + 生命周期/崩溃钩子 + 半屏抽屉）
+        let javaSourcesForBuild = javaSources;
+        let axvLogOn = false;
+        if (javaSources.length) {
+          const rt = axvRuntimeSources(pkg);
+          javaSourcesForBuild = [...javaSources, ...rt];
+          const inj = injectAxvLogProvider(manifestTextForBuild, pkg);
+          manifestTextForBuild = inj.text;
+          axvLogOn = true;
+          pushBuildLog(false, tt("已注入运行日志抽屉"),
+            inj.injected
+              ? tt("生成的 APK 左上角会多一个「▤ 日志」把手：运行你的 App 时点开就能看生命周期/崩溃/自定义日志，长按把手可隐藏。", {})
+              : tt("已生成日志类，但清单里没找到 <application> 无法挂上 provider（注入失败：{r}）。App 仍能跑，只是没有日志抽屉。", { r: String(inj.reason || "?") }));
+        }
         const prep = prepareFiles(layout, files);
         if (prep.blocked) {
           setApkResult({ ok: false, step: "compile", log: prep.blocked });
@@ -284,9 +299,10 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           keyPass: o.keyPass,
           outName: `${pkg}-${layout}.apk`,
           extraDex: dexFiles,
-          javaSources,
+          javaSources: javaSourcesForBuild,
           launchActivity: manifest || "",
           manifestText: manifestTextForBuild || "",
+          axvLog: axvLogOn,
           libs: libsRes.libs.length ? libsRes.libs.map((l) => ({ path: l.rel, base64: l.base64 })) : undefined,
           rPackages: rPackagesFromSources(javaSources),
         });

@@ -317,6 +317,11 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         // M287：编译前先自动修机械错（补 import / 修 R 大小写），修了什么写进日志
         let javaSourcesForBuild = javaSources;
         let axvLogOn = false;
+        if (!isRelease) {
+          pushBuildLog(true, tt("调试签名"),
+            tt("调试包使用 /AndroidUIIDE/axv-debug.keystore（首次打包自动生成，之后每次复用同一个调试签名）。", {}),
+            undefined, undefined, undefined, "info");
+        }
         if (javaSources.length) {
           const fixed = autofixJavaSources(javaSources, { resIndex, pkg });
           javaSourcesForBuild = fixed.sources;

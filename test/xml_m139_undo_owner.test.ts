@@ -17,7 +17,11 @@ import {
 
 const root = path.resolve(__dirname, "..");
 const codeEditor = fs.readFileSync(path.join(root, "components/CodeEditor.tsx"), "utf8");
-const xmlEditor = fs.readFileSync(path.join(root, "components/XmlEditor.tsx"), "utf8");
+// M305：撤销/重做域抽到 use-diff-history.ts，源码检查改读那个文件
+const diffHistorySrc = fs.readFileSync(
+  path.join(root, "components/use-diff-history.ts"),
+  "utf8",
+);
 
 describe("M139 CM6 不再自带撤销栈", () => {
   it("没有 history() 扩展", () => {
@@ -38,19 +42,19 @@ describe("M139 CM6 不再自带撤销栈", () => {
 
 describe("M139 app 撤销前先提交未入栈的输入", () => {
   it("定义了 commitPendingText 并比较 histRef.cur", () => {
-    expect(xmlEditor).toContain("const commitPendingText");
-    const i = xmlEditor.indexOf("const commitPendingText");
-    const body = xmlEditor.slice(i, i + 360);
+    expect(diffHistorySrc).toContain("const commitPendingText");
+    const i = diffHistorySrc.indexOf("const commitPendingText");
+    const body = diffHistorySrc.slice(i, i + 360);
     expect(body).toContain("liveXmlRef.current");
     expect(body).toContain("histRef.current.cur");
     expect(body).toContain("commitHistory(pending)");
   });
 
   it("undo 和 redo 都先调它，再动 diffHistory", () => {
-    for (const fn of ["const undo = () => {", "const redo = () => {"]) {
-      const i = xmlEditor.indexOf(fn);
+    for (const fn of ["const undo = useCallback(() => {", "const redo = useCallback(() => {"] ) {
+      const i = diffHistorySrc.indexOf(fn);
       expect(i).toBeGreaterThan(-1);
-      const body = xmlEditor.slice(i, i + 420);
+      const body = diffHistorySrc.slice(i, i + 420);
       const pending = body.indexOf("commitPendingText()");
       const move = body.indexOf(fn.includes("undo") ? "diffHistoryUndo" : "diffHistoryRedo");
       expect(pending).toBeGreaterThan(-1);

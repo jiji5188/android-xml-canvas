@@ -15,9 +15,10 @@ import { packageOf } from "@/lib/xml/new-project";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
-import { buildResNameIndex, missingResourceRefs, collectExternalImports, missingLibPackages } from "@/lib/xml/resource-refs";
+import { buildResNameIndex, missingResourceRefs, collectExternalImports, missingLibPackages, stubMissingRefs } from "@/lib/xml/resource-refs";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { prepareFiles } from "@/lib/xml/native-render";
+import type { RenderFile } from "@/lib/xml/native-render";
 import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, rPackagesFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
 import { collectProjectLibs } from "@/lib/xml/project-libs";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
@@ -235,22 +236,29 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           return;
         }
         // M278/P2：打包前预检查——代码引用的 R.xxx 资源在 res/ 里是否都齐，缺的提前列出来
+        let buildFiles: RenderFile[] = prep.files;
         try {
           const resNames = prep.files.map((f) => f.path);
           const valuesTexts: Record<string, string> = {};
           for (const f of prep.files) {
-            if (f.path.startsWith("values") && typeof f.text === "string") valuesTexts[f.path] = f.text;
+            // M284：layout/menu 里的 @+id/x 也算 id 声明，全部 xml 文本都传进去
+            if (/\.xml$/i.test(f.path) && typeof f.text === "string") valuesTexts[f.path] = f.text;
           }
           const idx = buildResNameIndex(resNames, valuesTexts);
           const missing = missingResourceRefs(javaSources.map((j) => j.code), idx);
           if (missing.length) {
             const top = missing.slice(0, 12).map((m) => `${m.type}/${m.name}(${m.files}文件)`).join("、");
-            pushBuildLog(false, tt("资源预检查（不阻断，仅提示）"),
+            // M284：不只警告——自动补占位让编译能过，并明确告知哪些是占位（运行时可能还是找不到控件）
+            const stub = stubMissingRefs(prep.files, missing);
+            buildFiles = stub.files;
+            pushBuildLog(false, tt("资源预检查（已自动补占位）"),
               tt("代码里引用了 res/ 里找不到的资源：{l}{more}",
                 { l: top, more: missing.length > 12 ? `（还有 ${missing.length - 12} 个）` : "" }) +
                 "\n" +
-                tt("这些会 ECJ 报「cannot be resolved or is not a field」。可补 res/ 资源、放 aar 进 libs/、或改代码不用它们。",
-                {}));
+                tt("已自动生成占位（{n} 个）让编译通过：{s}",
+                  { n: stub.stubbed.length, s: stub.stubbed.slice(0, 20).join("、") }) +
+                "\n" +
+                tt("注意：占位只保证编译过，运行时 findViewById 仍可能返回 null。要么在 layout 里真加上 android:id，要么改代码不用它们。", {}));
           }
           // P2：第三方依赖预检查——import 的顶层包在 libs 里对不上就提示
           const extImports = collectExternalImports(javaSources.map((j) => j.code), [pkg]);
@@ -269,7 +277,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           pkg,
           layout,
           appName: signAppName || layout,
-          files: prep.files,
+          files: buildFiles,
           keystore,
           storePass: o.storePass,
           alias: o.alias,

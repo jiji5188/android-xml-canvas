@@ -12,6 +12,13 @@ export interface ProjectFile {
   xml: string;
   /** 最近修改时间（ms），用于按时间排序展示 */
   updatedAt: number;
+  /** M293：外部项目文件（左侧栏打开的）来源信息；没有 = 纯内存新建文件 */
+  ext?: {
+    rel?: string;
+    target?: string;
+    handle?: unknown;
+    sourceId?: string;
+  };
 }
 
 export interface Project {
@@ -129,7 +136,16 @@ export function switchFile(p: Project, id: string): Project {
 
 /** 项目 → 可持久化的 JSON（体积护栏由调用方控制） */
 export function serializeProject(p: Project): string {
-  return JSON.stringify(p);
+  // M293：ext.handle 是 FileSystemFileHandle，不可 JSON 序列化，落盘前剥掉
+  const safe = {
+    ...p,
+    files: p.files.map((f) =>
+      f.ext
+        ? { ...f, ext: { rel: f.ext.rel, target: f.ext.target, sourceId: f.ext.sourceId } }
+        : f,
+    ),
+  };
+  return JSON.stringify(safe);
 }
 
 /** 反序列化：字段缺失/损坏时返回 null，由调用方回落到单文件模式 */
@@ -148,6 +164,15 @@ export function parseProject(raw: string | null | undefined): Project | null {
         name: normalizeFileName(f.name),
         xml: f.xml,
         updatedAt: typeof f.updatedAt === "number" ? f.updatedAt : 0,
+        ...(f.ext && typeof f.ext === "object"
+          ? {
+              ext: {
+                rel: typeof f.ext.rel === "string" ? f.ext.rel : undefined,
+                target: typeof f.ext.target === "string" ? f.ext.target : undefined,
+                sourceId: typeof f.ext.sourceId === "string" ? f.ext.sourceId : undefined,
+              },
+            }
+          : {}),
       });
     }
     if (clean.length === 0) return null;

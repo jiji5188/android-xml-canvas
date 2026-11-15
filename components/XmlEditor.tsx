@@ -166,6 +166,7 @@ import {
   updateFileXml,
   MAX_FILES,
   type Project,
+  type ProjectFile,
 } from "@/lib/xml/multi-file";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { toCompatXml } from "@/lib/xml/compat";
@@ -1717,6 +1718,25 @@ const allDrawableNames = useMemo(() => {
     else if (codeOnly) setMobileTab("xml");
   }, [hasViewTab, codeOnly, docKey]);
 
+  /** M293：切到某个文件 tab 后，同步外部来源状态（openRel / saveOrigin） */
+  const applyExternalState = useCallback((f: ProjectFile | undefined) => {
+    if (!f) return;
+    if (f.ext?.rel) {
+      setOpenRel(f.ext.rel);
+      if (f.ext.target) setSaveOrigin({ kind: "native", target: f.ext.target, name: f.name });
+      else if (f.ext.handle) setSaveOrigin({ kind: "handle", handle: f.ext.handle, name: f.name });
+      else setSaveOrigin(null);
+    } else {
+      setOpenRel(null);
+      setSaveOrigin(null);
+    }
+  }, []);
+
+  /** M293：活动文件变化时，把外部来源（openRel / saveOrigin）同步到当前文件 */
+  useEffect(() => {
+    applyExternalState(activeFile(project));
+  }, [project.activeId, applyExternalState]);
+
   /** M57：共享解析结果 —— 模型 / 图层树 / 结构检查共用一棵语法树，不再各 parse 一次
    *  ⚠ 必须在下面 model 的 useMemo **之前**声明：render 时 memo 主体立即执行，
    *    若引用后面才声明的 const 会报 "Cannot access 'parsedDoc' before initialization"（TDZ） */
@@ -2365,30 +2385,61 @@ const allDrawableNames = useMemo(() => {
   setXmlAndTrackRef.current = setXmlAndTrack;
 
   /** M25d：把一个条目载入画布（记住来源，保存时写回原文件） */
+  /** M293：从左侧项目树打开文件 —— 统一走「文件 tab」：已开过的切 tab，没开过的加 tab */
   const loadEntry = useCallback(
     async (source: ProjectSource, entry: BrowseEntry) => {
       try {
+        const extMeta = { rel: entry.rel, target: entry.target, handle: entry.handle, sourceId: source.name };
+        const cur = projectRef.current;
+        const existing = cur.files.find(
+          (f) => (entry.rel && f.ext?.rel === entry.rel) || (entry.target && f.ext?.target === entry.target),
+        );
+        if (existing) {
+          flushTextTimer();
+          setProject((p) => switchFile(updateFileXml(p, p.activeId, xmlRef.current), existing.id));
+          setXml(existing.xml);
+          histRef.current = diffHistoryInit(existing.xml);
+          syncHist();
+          setSelectedPath(null);
+          saveBaseline(existing.ext?.rel || existing.ext?.target || existing.name, existing.xml);
+          setWsActiveName(existing.name);
+          setOpenRel(existing.ext?.rel ?? null);
+          if (existing.ext?.target) setSaveOrigin({ kind: "native", target: existing.ext.target, name: existing.name });
+          else if (existing.ext?.handle) setSaveOrigin({ kind: "handle", handle: existing.ext.handle as any, name: existing.name });
+          else setSaveOrigin(null);
+          setWsMsg(tt("已打开 {name}", { name: existing.name }));
+          setWsActiveName(existing.name);
+          return;
+        }
         const text = await source.readText(entry.rel);
         if (text === null) {
           setWsMsg(tt("打不开《{name}》：文件已不存在或目录权限被收回", { name: entry.name }));
           return;
         }
-        setXmlAndTrack(text);
-        // M201：把「打开时的磁盘内容」记成基线 —— 之后别人在电脑上改了、我们再保存时能拦下来
+        flushTextTimer();
+        setProject((p) => {
+          const { project: next, id } = addFile(p, entry.name, text);
+          if (!id) return p;
+          return {
+            ...next,
+            files: next.files.map((f) => (f.id === id ? { ...f, ext: extMeta } : f)),
+          };
+        });
+        setXml(text);
+        histRef.current = diffHistoryInit(text);
+        syncHist();
+        setSelectedPath(null);
         saveBaseline(entry.rel || entry.target || entry.name, text);
-        // M25b：结构树里标「正在编辑」用
         setWsActiveName(entry.name);
-        // M37b：记住工程内相对路径（非布局文件保存/判定都靠它）
         setOpenRel(entry.rel || null);
-        // M21：记住来源，保存时优先写回原路径
         if (entry.target) setSaveOrigin({ kind: "native", target: entry.target, name: entry.name });
         else if (entry.handle) setSaveOrigin({ kind: "handle", handle: entry.handle, name: entry.name });
         else setSaveOrigin(null);
         setWsMsg(tt("已打开 {name}", { name: entry.name }));
+        setWsActiveName(entry.name);
       } catch (e) {
         setWsMsg(tt("打开失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }));
       }
-      // M144：记住「当前项目里打开的文件」，重开 App 直接回到这一页（用户要求：不要每次都重新选）
       try {
         const cur = activeProjectRef.current;
         if (cur?.source && entry.rel) {
@@ -2405,7 +2456,7 @@ const allDrawableNames = useMemo(() => {
         /* 静默 */
       }
     },
-    [setXmlAndTrack],
+    [flushTextTimer],
   );
 
   /** 当前项目的浏览源（用 ref 拿，避免面板回调闭包里拿到旧值） */
@@ -2917,8 +2968,7 @@ const allDrawableNames = useMemo(() => {
           histRef.current = diffHistoryInit(target.xml);
           syncHist();
           setSelectedPath(null);
-          // M37b：吓得切到内置文件后，不再算「从工程里打开的文件」
-          setOpenRel(null);
+          applyExternalState(target);
         }
         return next;
       });
@@ -2977,6 +3027,7 @@ const allDrawableNames = useMemo(() => {
       histRef.current = diffHistoryInit(target.xml);
       syncHist();
       setSelectedPath(null);
+      applyExternalState(target);
       return next;
     });
     setExportNote(tt("已删除「{name}」", { name: cur.name }));
@@ -2996,6 +3047,7 @@ const allDrawableNames = useMemo(() => {
       histRef.current = diffHistoryInit(target.xml);
       syncHist();
       setSelectedPath(null);
+      applyExternalState(target);
       return next;
     });
     setExportNote(tt("已关闭「{name}」", { name: cur.name }));
@@ -4251,6 +4303,8 @@ const findResolved = findResolvedNode;
   /** M27：保存基线（用于状态条「未保存」提示） */
   const xmlRef = useRef(xml);
   xmlRef.current = xml;
+  const projectRef = useRef(project);
+  projectRef.current = project;
   const [savedMark, setSavedMark] = useState<string>(() => xml);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const markSaved = useCallback((text: string) => {

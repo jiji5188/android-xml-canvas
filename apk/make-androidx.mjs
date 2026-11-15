@@ -86,11 +86,20 @@ function findInTransforms(name) {
 
 function findInModules(name) {
   if (!fs.existsSync(m2Dir)) return null;
-  const art = name.split("-")[0];
-  const groupDir = path.join(m2Dir, "androidx." + art);
+  // 拆分「artifact[-version]」：version 形如 1.0.0 / 2.0.0（末尾是 数字.数字.数字 或数字），
+  // artifact 名本身可含 '-'（如 annotation-experimental）。旧实现 name.split('-')[0]
+  // 会把 annotation-experimental 错拆成 annotation，再去 androidx.annotation 组里随便抓第一个 jar
+  // → 抓到 plain annotation，跟 annotation-1.0.0 重复（同一文件两个名字）→ D8 报 AnimRes defined multiple times。
+  const m = /^(.+)-(\d+(?:\.\d+){1,3})(?:-\d+)?$/.exec(name); // artifact-version(-build)
+  const art = m ? m[1] : name;
+  const groupDir = path.join(m2Dir, "androidx." + art.split("-")[0]);
   if (!fs.existsSync(groupDir)) return null;
+  // modules-2 布局：组目录下有以 artifact 名命名的子目录（…/androidx.annotation/annotation-experimental/1.0.0/<hash>/xxx.aar）。
+  // 只进 artifact 名严格匹配的子目录，别跨到同组的其它 artifact。
+  const artDir = path.join(groupDir, art);
+  const startDir = fs.existsSync(artDir) ? artDir : groupDir;
   const walk = (dir, depth) => {
-    if (depth > 5) return null;
+    if (depth > 6) return null;
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return null; }
     for (const e of entries) {
@@ -104,7 +113,7 @@ function findInModules(name) {
     }
     return null;
   };
-  return walk(groupDir, 0);
+  return walk(startDir, 0);
 }
 
 let added = 0, skipped = 0, totalBytes = 0;
@@ -129,6 +138,20 @@ for (const name of WANT) {
 }
 
 const files = fs.readdirSync(outDir).filter((f) => /\.(jar|aar)$/.test(f));
-const allBytes = files.reduce((s, f) => s + fs.statSync(path.join(outDir, f)).size, 0);
-console.log(`\n收集完成：新增 ${added} / 跳过 ${skipped} / 共 ${files.length} 个文件，${(allBytes / 1024).toFixed(0)}KB`);
+// M283：按内容 sha256 去重——同一个 jar 被以两个名字收集（如 annotation vs annotation-experimental
+// 因缓存错位变成同一文件）会让 D8 报「Type X defined multiple times」。保留名字更长（更具体）的那个，删其余。
+import crypto from "node:crypto";
+const byHash = new Map(); // hash -> { name, size }
+for (const f of [...files].sort((a, b) => b.length - a.length)) {
+  const p = path.join(outDir, f);
+  const h = crypto.createHash("sha256").update(fs.readFileSync(p)).digest("hex");
+  if (!byHash.has(h)) { byHash.set(h, { name: f, size: fs.statSync(p).size }); continue; }
+  const kept = byHash.get(h);
+  if (f.length > kept.name.length) { byHash.set(h, { name: f, size: fs.statSync(p).size }); } // 更具体的名字胜出
+  fs.rmSync(p);
+  console.log("  去重删 " + f + "（与 " + kept.name + " 同内容，保留更长名）");
+}
+const files2 = fs.readdirSync(outDir).filter((f) => /\.(jar|aar)$/.test(f));
+const allBytes = files2.reduce((s, f) => s + fs.statSync(path.join(outDir, f)).size, 0);
+console.log(`\n收集完成：新增 ${added} / 跳过 ${skipped} / 去重后 ${files2.length} 个文件，${(allBytes / 1024).toFixed(0)}KB`);
 console.log("输出目录：" + outDir);

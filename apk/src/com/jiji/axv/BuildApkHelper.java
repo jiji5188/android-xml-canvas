@@ -518,8 +518,11 @@ public class BuildApkHelper {
         d8Args.add("--lib"); d8Args.add(androidJar.getAbsolutePath());
         d8Args.add("--output"); d8Args.add(dexDir.getAbsolutePath());
         d8Args.addAll(classFiles);
-        for (String j : libJars) d8Args.add(j);
-        if (androidxJars != null) for (String a : androidxJars) d8Args.add(a);
+        // M283：去重——同一个 jar 可能被以两个名字进 assets/androidx（历史缓存错位）或 libs/+androidx 重叠，
+        // 两个不同路径同内容 → R8 报「Type X defined multiple times」。按「长度+前 64KB 摘要」去重（便宜，不读全文件）。
+        java.util.List<String> jarSigs = new java.util.ArrayList<>();
+        for (String j : libJars) addDedupedJar(d8Args, j, jarSigs, log);
+        if (androidxJars != null) for (String a : androidxJars) addDedupedJar(d8Args, a, jarSigs, log);
         java.lang.reflect.Method d8Method = d8.getMethod("dex", String[].class, java.util.List.class);
         boolean d8Ok = Boolean.valueOf((Boolean) d8Method.invoke(null, d8Args.toArray(new String[0]), d8Log));
         if (!d8Ok || d8Log.size() > 0) {
@@ -1435,6 +1438,45 @@ public class BuildApkHelper {
             return sb.toString();
         } catch (Throwable t) {
             return null;
+        }
+    }
+
+    /** M283：D8 程序输入去重。按「文件长度 + 前 64KB 的摘要」判同内容，避免同一 jar 被两个不同
+     *  名字/路径重复喂进 D8（R8 报「Type X defined multiple times」）。
+     *  返回 true=已加入 d8Args，false=与已加的同内容，跳过。 */
+    private static boolean addDedupedJar(java.util.List<String> d8Args, String jarPath, java.util.List<String> sigs, StringBuilder log) {
+        if (jarPath == null || jarPath.isEmpty()) return false;
+        File f = new File(jarPath);
+        if (!f.isFile()) return false;
+        try {
+            long len = f.length();
+            byte[] head = new byte[(int) Math.min(65536, len)];
+            int read = 0;
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(f)) {
+                while (read < head.length) {
+                    int r = fis.read(head, read, head.length - read);
+                    if (r < 0) break;
+                    read += r;
+                }
+            }
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
+            md.update(head, 0, read);
+            StringBuilder hex = new StringBuilder();
+            for (byte b : md.digest()) hex.append(String.format("%02x", b));
+            String sig = len + ":" + hex;
+            synchronized (sigs) {
+                if (sigs.contains(sig)) {
+                    log.append("  去重：跳过与已加 jar 同内容的 ").append(new File(jarPath).getName()).append("\n");
+                    return false;
+                }
+                sigs.add(sig);
+            }
+            d8Args.add(jarPath);
+            return true;
+        } catch (Throwable t) {
+            // 读不到就原样加入（不阻断编译），靠 make-androidx 去重做主防线
+            d8Args.add(jarPath);
+            return true;
         }
     }
 

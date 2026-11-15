@@ -456,7 +456,8 @@ export function AttrPanel({
         ) : null}
       </div>
 
-      {/* M3e：层级（elevation）专用控件——比在属性行里手打数字好找 */}
+      {/* M3e：层级（elevation）专用控件——比在属性行里手打数字好找；绘制资源节点（item/shape/selector…）不适用 */}
+      {!(tag === "item" || tag === "selector" || tag === "layer-list" || tag === "shape" || tag === "ripple" || tag === "inset" || tag === "vector") ? (
       <div className="axv-elev">
         <div className="axv-elev-head">
           <span className="axv-elev-title">{tt("层级")}</span>
@@ -490,6 +491,7 @@ export function AttrPanel({
           ))}
         </div>
       </div>
+      ) : null}
 
       {/* M3a：属性 / 文档页签 */}
       <div className="axv-attr-tabs" role="tablist">

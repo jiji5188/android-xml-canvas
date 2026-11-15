@@ -100,6 +100,24 @@ export const ATTR_CATALOG: AttrSpec[] = [
   { name: "layout", editor: "string", default: "@layout/", group: "控件", desc: "include 引用的布局", tags: ["include"] },
   { name: "inputType", editor: "enum", options: ["text", "number", "phone", "textEmailAddress", "textPassword", "textWebEditText"], default: "text", group: "控件", tags: ["EditText"] },
 
+  // ===== 绘制资源 item（selector / layer-list / inset）=====
+  { name: "left", editor: "dimen", default: "0dp", group: "外观", desc: "左边距（layer-list item）", tags: ["item"] },
+  { name: "top", editor: "dimen", default: "0dp", group: "外观", desc: "上边距（layer-list item）", tags: ["item"] },
+  { name: "right", editor: "dimen", default: "0dp", group: "外观", desc: "右边距（layer-list item）", tags: ["item"] },
+  { name: "bottom", editor: "dimen", default: "0dp", group: "外观", desc: "下边距（layer-list item）", tags: ["item"] },
+  { name: "width", editor: "dimen", default: "match_parent", group: "外观", desc: "item 宽度（layer-list）", tags: ["item"] },
+  { name: "height", editor: "dimen", default: "match_parent", group: "外观", desc: "item 高度（layer-list）", tags: ["item"] },
+  { name: "alpha", editor: "number", default: "1", group: "外观", desc: "透明度（layer-list item）", tags: ["item"] },
+  { name: "drawable", editor: "string", default: "@drawable/", group: "外观", desc: "引用 drawable 资源（selector/layer-list item）", tags: ["item"] },
+  { name: "state_pressed", editor: "bool", default: "false", group: "控件", desc: "按下状态（selector）", tags: ["item"] },
+  { name: "state_focused", editor: "bool", default: "false", group: "控件", desc: "聚焦状态（selector）", tags: ["item"] },
+  { name: "state_enabled", editor: "bool", default: "true", group: "控件", desc: "可用状态（selector）", tags: ["item"] },
+  { name: "state_selected", editor: "bool", default: "false", group: "控件", desc: "选中状态（selector）", tags: ["item"] },
+  { name: "state_checked", editor: "bool", default: "false", group: "控件", desc: "勾选状态（selector）", tags: ["item"] },
+  { name: "state_activated", editor: "bool", default: "false", group: "控件", desc: "激活状态（selector）", tags: ["item"] },
+  { name: "state_hovered", editor: "bool", default: "false", group: "控件", desc: "悬停状态（selector）", tags: ["item"] },
+  { name: "state_window_focused", editor: "bool", default: "false", group: "控件", desc: "窗口聚焦状态（selector）", tags: ["item"] },
+
   // ===== 其他 =====
   { name: "tag", editor: "string", default: "", group: "其他" },
 ];

@@ -1102,7 +1102,8 @@ export const SRC_EN: SrcDict = {
   "我的项目": "My project",
   "项目文件（多文件切换）": "Project files (switch between files)",
   "文件": "File",
-  "项目文件": "Project files",
+  "项目文件": "Project files",  "清单": "Manifest",
+
   "文件操作": "File actions",
   "＋ 新建文件…": "＋ New file…",
   "✎ 重命名当前文件…": "✎ Rename current file…",

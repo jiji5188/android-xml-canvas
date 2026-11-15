@@ -4680,7 +4680,7 @@ const findResolved = findResolvedNode;
           <div className="axv-mob-tabs-inner" role="tablist" aria-label={tt("视图")}>
           {/* M291：文件 tab 面板（原来两个 select 的位置）；打开/新建文件自动出现同名 tab */}
           {fileTabs}
-          {/* M42：values 资源才有「视图」—— 键值对表格页（.axv-val），紧跟「代码」后面 */}
+          {/* M42/M291：values / manifest 资源才有「视图」—— 键值对 / 清单表格页，紧跟文件 tab 后面 */}
           {hasViewTab && (
             <button
               role="tab"
@@ -4691,8 +4691,8 @@ const findResolved = findResolvedNode;
                 setMobileTab("values");
               }}
             >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>table_chart</span>
-              {tt("视图")}
+              <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>{viewKind === "manifest" ? "data_object" : "table_chart"}</span>
+              {tt(viewKind === "manifest" ? "清单" : "资源")}
             </button>
           )}
           {/* M42/M291：「预览」只在当前文件是 XML 布局时出现 */}

@@ -223,6 +223,12 @@ import { ApkRepackDialog } from "./ApkRepackDialog";
 import { readSigningFromGradle } from "@/lib/xml/signing";
 import { LeftRail, type LeftView } from "./LeftRail";
 import { ProblemsDrawer } from "./ProblemsDrawer";
+import {
+  subscribeRuntimeLog,
+  installRuntimeLogBridge,
+  clearRuntimeLog,
+  type RuntimeLogEntry,
+} from "@/lib/xml/runtime-log";
 import { Inspector } from "./Inspector";
 import { StatusBar } from "./StatusBar";
 import { LayerTree } from "./LayerTree";
@@ -3501,7 +3507,19 @@ const findResolved = findResolvedNode;
     }[]
   >([]);
   // M252：打包（APK）完成后，把日志推进抽屉并自动打开到「构建日志」tab（不再只塞在签名弹窗）
-  const [apkForceView, setApkForceView] = useState<{ open: boolean; tab: "problems" | "build-log" } | null>(null);
+  const [apkForceView, setApkForceView] = useState<{ open: boolean; tab: "problems" | "build-log" | "runtime" } | null>(null);
+  // M288：运行日志（被打出来的 App 通过广播发到编辑器的），给抽屉「运行日志」tab
+  const [runtimeLogs, setRuntimeLogs] = useState<RuntimeLogEntry[]>([]);
+  useEffect(() => {
+    installRuntimeLogBridge();
+    const unsub = subscribeRuntimeLog((entries) => setRuntimeLogs([...entries].reverse()));
+    return () => {
+      unsub();
+    };
+  }, []);
+  const clearRuntimeLogsCb = useCallback(() => {
+    clearRuntimeLog();
+  }, []);
   // M256：抽屉展开状态（手机端代码区要腾出高度，别被遮）
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pushApkBuildLog = useCallback(
@@ -4727,6 +4745,8 @@ const findResolved = findResolvedNode;
         problems={(lints ?? []).map((l) => ({ line: l.line ?? 1, msg: l.message }))}
         onGotoLine={(ln) => gotoLine(ln)}
         buildLogs={buildLogs}
+        runtimeLogs={runtimeLogs}
+        onClearRuntimeLog={clearRuntimeLogsCb}
         forceView={apkForceView}
         onOpenChange={setDrawerOpen}
         insetLeft={isMobile ? undefined : leftOpen ? 320 : 0}

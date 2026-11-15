@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { runtimeLogText, type RuntimeLogEntry } from "@/lib/xml/runtime-log";
 
 /**
  * M185：通用「底部抽屉 + tab 容器」(ROADMAP L0.5 第22条)
@@ -7,7 +8,7 @@ import React, { useState, useEffect, useRef } from "react";
  * - 不挤占画布：absolute 定位在画布区底部，收起时只剩一条 28px 把手
  */
 
-export type DrawerPanel = "problems" | "build-log";
+export type DrawerPanel = "problems" | "build-log" | "runtime";
 
 interface DrawerTabDef {
   key: DrawerPanel;
@@ -18,6 +19,7 @@ interface DrawerTabDef {
 const TABS: DrawerTabDef[] = [
   { key: "problems", label: "问题", icon: "warning_amber" }, // i18n-ignore
   { key: "build-log", label: "构建日志", icon: "terminal" }, // i18n-ignore
+  { key: "runtime", label: "运行日志", icon: "bug_report" }, // i18n-ignore
 ];
 
 /** M188b：一条构建日志（真机渲染等） */
@@ -37,8 +39,12 @@ export interface ProblemsDrawerProps {
   problems: { line: number; msg: string }[];
   /** 点击某条问题 → 跳代码行 */
   onGotoLine: (line: number) => void;
-  /** M188b：构建日志列表（新在前）；没有就不显示小点 */
+  /** M191：构建日志列表（新在前）；没有就不显示小点 */
   buildLogs?: BuildLogEntry[];
+  /** M288：被打出来的 App 通过广播发过来的运行日志 */
+  runtimeLogs?: RuntimeLogEntry[];
+  /** M288：清空运行日志 */
+  onClearRuntimeLog?: () => void;
   /** M193：状态信息（文件名/未保存/问题数/设备/缩放）—— 合并进把手条，不再单独占一行 */
   statusSlot?: React.ReactNode;
   /** M193d：桌面侧栏展开时让出宽度（手机不传） */
@@ -53,7 +59,7 @@ export interface ProblemsDrawerProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, insetLeft, insetRight, tr, forceView, onOpenChange }: ProblemsDrawerProps) {
+export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, onClearRuntimeLog, statusSlot, insetLeft, insetRight, tr, forceView, onOpenChange }: ProblemsDrawerProps) {
   const [open, setOpenRaw] = useState(false);
   // M256：包装 setter，同步通知父组件（手机端要调代码区高度避免被遮）
   const setOpen = (next: boolean | ((o: boolean) => boolean)) => {
@@ -126,12 +132,60 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, in
             {t.key === "build-log" && buildLogs && buildLogs.length > 0 ? (
               <span className="axv-drawer-badge axv-drawer-badge-log" aria-hidden="true" />
             ) : null}
+            {t.key === "runtime" && runtimeLogs && runtimeLogs.length > 0 ? (
+              <span className="axv-drawer-badge">{runtimeLogs.length > 99 ? "99+" : runtimeLogs.length}</span>
+            ) : null}
           </button>
         ))}
       </div>
       {open ? (
         <div className="axv-drawer-body">
-          {tab === "problems" ? (
+          {tab === "runtime" ? (
+            /* M288：运行日志（生成的 APK 广播过来的生命周期/崩溃/自定义日志） */
+            runtimeLogs && runtimeLogs.length > 0 ? (
+              <div className="axv-drawer-logwrap">
+                <div className="axv-drawer-logbar">
+                  <span className="axv-drawer-line">
+                    {tr("drawer.runtime.count", "{n} 条", { n: runtimeLogs.length })}
+                  </span>
+                  <button
+                    type="button"
+                    className="axv-drawer-logcopy"
+                    onClick={() => {
+                      const txt = runtimeLogText(runtimeLogs);
+                      void (async () => {
+                        try {
+                          await navigator.clipboard.writeText(txt);
+                        } catch {
+                          const ta = document.createElement("textarea");
+                          ta.value = txt;
+                          ta.style.position = "fixed";
+                          ta.style.opacity = "0";
+                          document.body.appendChild(ta);
+                          ta.select();
+                          document.execCommand("copy");
+                          ta.remove();
+                        }
+                      })();
+                    }}
+                  >
+                    {tr("drawer.log.copy", "复制")}
+                  </button>
+                  <button type="button" className="axv-drawer-logcopy" onClick={() => onClearRuntimeLog?.()}>
+                    {tr("drawer.runtime.clear", "清空")}
+                  </button>
+                </div>
+                <pre className="axv-drawer-log">{runtimeLogText(runtimeLogs)}</pre>
+              </div>
+            ) : (
+              <div className="axv-drawer-empty">
+                {tr(
+                  "drawer.runtime.empty",
+                  "还没有收到运行日志：在手机上运行你打包出来的 App，日志会自动出现在这里（同一个 App 内发送，无需连接电脑）。",
+                )}
+              </div>
+            )
+          ) : tab === "problems" ? (
             n === 0 ? (
               <div className="axv-drawer-empty">{tr("drawer.none", "当前没有检测到问题")}</div>
             ) : (

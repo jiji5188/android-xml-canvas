@@ -37,6 +37,7 @@ import android.app.Application;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
@@ -69,10 +70,18 @@ public final class ${AXV_LOG_CLASS} {
     private static boolean installed;
     private static Thread.UncaughtExceptionHandler prevHandler;
 
+    /** M288：广播给 AXV 编辑器（真机同机装机时，日志直接进编辑器抽屉的「运行日志」tab） */
+    private static final String AXV_EDITOR_PKG = "com.jiji.axv";
+    private static final String AXV_LOG_ACTION = "com.jiji.axv.RUNTIME_LOG";
+    private static Context sAppCtx;
+
     private ${AXV_LOG_CLASS}() {
     }
 
-    /** 记一条日志（线程安全）。异常里也别调，避免递归。 */
+    /** 记一条日志（线程安全）。
+     *  M286：进内存环形缓冲 + logcat（tag AXV）
+     *  M288：同时广播给 AXV 编辑器 → 编辑器抽屉「运行日志」tab 直接看
+     *  异常里也别调，避免递归。 */
     public static void log(String msg) {
         String m = msg == null ? "null" : msg;
         String line = FMT.format(new Date()) + "  " + m;
@@ -83,6 +92,27 @@ public final class ${AXV_LOG_CLASS} {
             }
         }
         Log.i(TAG, m);
+        broadcastToEditor(m);
+    }
+
+    /** M288：广播一条日志给编辑器（失败静默，绝不影响用户 App） */
+    private static void broadcastToEditor(final String m) {
+        final Context c = sAppCtx;
+        if (c == null) {
+            return;
+        }
+        try {
+            Intent it = new Intent(AXV_LOG_ACTION);
+            // setPackage 限定了唯一收件人，别的 App 收不到（也不需要任何权限）
+            it.setPackage(AXV_EDITOR_PKG);
+            it.putExtra("appPkg", c.getPackageName());
+            it.putExtra("line", m);
+            it.putExtra("level", m.startsWith("E/") ? "crash" : "log");
+            it.putExtra("ts", System.currentTimeMillis());
+            c.sendBroadcast(it);
+        } catch (Throwable t) {
+            /* 广播不被允许 / 编辑器没装 → 静默，不影响 App */
+        }
     }
 
     /** 由 AxvLogProvider.onCreate 调用；重复调用无副作用。 */
@@ -95,6 +125,7 @@ public final class ${AXV_LOG_CLASS} {
             return;
         }
         final Context appCtx = ctx.getApplicationContext();
+        sAppCtx = appCtx;
         ui = new Handler(Looper.getMainLooper());
         prevHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {

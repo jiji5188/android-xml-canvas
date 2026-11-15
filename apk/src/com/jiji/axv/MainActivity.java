@@ -2,6 +2,9 @@ package com.jiji.axv;
 
 import android.app.Activity;
 import android.content.ContentValues;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -259,6 +262,57 @@ public class MainActivity extends Activity {
             return;
         }
         web.loadUrl(HOST + "/xml/");
+        registerRuntimeLogReceiver();
+    }
+
+    /* ===== M288：接收「被打出来的 App」广播的运行日志 → 灌进编辑器抽屉「运行日志」tab ===== */
+    private static final String ACTION_RUNTIME_LOG = "com.jiji.axv.RUNTIME_LOG";
+    private BroadcastReceiver runtimeLogRx;
+
+    private void registerRuntimeLogReceiver() {
+        if (runtimeLogRx != null) {
+            return;
+        }
+        runtimeLogRx = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context c, Intent it) {
+                if (it == null || !ACTION_RUNTIME_LOG.equals(it.getAction())) {
+                    return;
+                }
+                final String line = it.getStringExtra("line");
+                if (line == null || line.length() == 0) {
+                    return;
+                }
+                String js;
+                try {
+                    JSONObject o = new JSONObject();
+                    o.put("appPkg", it.getStringExtra("appPkg") == null ? "" : it.getStringExtra("appPkg"));
+                    o.put("line", line);
+                    o.put("level", it.getStringExtra("level") == null ? "log" : it.getStringExtra("level"));
+                    long ts = it.getLongExtra("ts", 0L);
+                    o.put("ts", ts > 0 ? ts : System.currentTimeMillis());
+                    js = "window.__axvRuntimeLog && window.__axvRuntimeLog(" + JSONObject.quote(o.toString()) + ");";
+                } catch (Exception e) {
+                    return;
+                }
+                final String jsFinal = js;
+                if (web != null) {
+                    web.post(() -> web.evaluateJavascript(jsFinal, null));
+                }
+            }
+        };
+        IntentFilter f = new IntentFilter(ACTION_RUNTIME_LOG);
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                // Android 13+：动态注册非系统广播必须显式声明导出（日志来自别的 App）
+                registerReceiver(runtimeLogRx, f, Context.RECEIVER_EXPORTED);
+            } else {
+                registerReceiver(runtimeLogRx, f);
+            }
+        } catch (Throwable t) {
+            android.util.Log.w("AxvLogRx", "register failed: " + t);
+            runtimeLogRx = null;
+        }
     }
 
     /**
@@ -3647,6 +3701,14 @@ public class MainActivity extends Activity {
             if (parent != null) parent.removeView(web);
             web.destroy();
             web = null;
+        }
+        if (runtimeLogRx != null) {
+            try {
+                unregisterReceiver(runtimeLogRx);
+            } catch (Throwable t) {
+                /* 没注册成功 / 已注销 */
+            }
+            runtimeLogRx = null;
         }
         super.onDestroy();
     }

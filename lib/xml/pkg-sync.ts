@@ -36,7 +36,7 @@ const SRC_ROOTS = ["app/src/main/java", "app/src/main/kotlin"];
 
 /** 动态发现源码根：枚举 app/src/<variant>/{java,kotlin}（含 main / debug / release / test / androidTest / flavor）
  *  找不到 app/src 时退回静态 SRC_ROOTS。纯 IO，不抛错。 */
-async function discoverSrcRoots(source: ProjectSource): Promise<string[]> {
+export async function discoverSrcRoots(source: ProjectSource): Promise<string[]> {
   const out: string[] = [];
   const seen = new Set<string>();
   // 两套布局：多模块 app/src/<v>/xxx 与单模块 src/<v>/xxx

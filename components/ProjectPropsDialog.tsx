@@ -16,7 +16,7 @@ import { readAppName, setAppName } from "@/lib/xml/project-rename";
 import { addGradleDep, listGradleDeps, parseGradlePackage, removeGradleDep, setGradlePackage } from "@/lib/xml/project-info";
 import { saveProjectFile, type ProjectSaveRoot } from "@/lib/xml/project-save";
 import type { FileOpsCtx } from "@/lib/xml/file-ops";
-import { syncPkgInSource } from "@/lib/xml/pkg-sync";
+import { detectPkgState, suggestOldPkgs, unifyPackageTo } from "@/lib/xml/pkg-rename";
 import { Overlay } from "@/components/TreeFileMenu";
 
 export interface ProjectPropsDialogProps {
@@ -56,6 +56,8 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
   const [depInput, setDepInput] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pkgWarn, setPkgWarn] = useState("");
+
 
   // 原始值（判断哪些字段真改了）
   const [origin, setOrigin] = useState({ dir: p.item.name, appName: "", pkg: "" });
@@ -110,6 +112,18 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
         setAppNameInput(an);
         setOrigin({ dir: p.item.name, appName: an, pkg: pkgVal });
         if (!g && !s) setLoadMsg(tt("没找到 build.gradle / strings.xml，只能改项目名。"));
+        // M274：打开时探测全项目包名，若有残留多个包名就给提示（保存时会自动统一）
+        if (g) {
+          const st = await detectPkgState(p.source, g.text).catch(() => null);
+          if (alive && st && !st.consistent) {
+            const olds = suggestOldPkgs(st, pkgVal);
+            const parts = st.sourcePkgs.slice(0, 4).map((x) => `${x.pkg}(${x.count})`).join("、");
+            setPkgWarn(
+              tt("检测到 {n} 个不同包名：{l}。保存时会把 {o} 全部统一为新包名。",
+                { n: olds.length, l: parts, o: olds.slice(0, 3).join("、") }),
+            );
+          }
+        }
       } finally {
         if (alive) setLoading(false);
       }
@@ -196,27 +210,46 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
           return;
         }
         setGradle({ ...gradle, text: r.text });
-        // M209：同步 .java/.kt 的 package 声明 + 按包名建的源码目录
+        // M274：一次把所有「残留包名」（不止 gradle 那一个）统一到新包名，
+        //  源码 / manifest / gradle / 源码目录全改，ReturnSystem/2/3 共存这种后遗症一并清掉
         if (p.saveRoot) {
-          const sync = await syncPkgInSource(p.source, origin.pkg, pkg, p.saveRoot, p.fileOpsCtx ?? null);
-          if (sync.files.length > 0 || sync.moved || sync.manifests.length > 0) {
-            const mv = sync.moved
-              ? tt("目录已移动")
-              : sync.moveWarn === "pkg-move-unsupported"
-                ? tt("需手动改目录名")
-                : sync.moveWarn === "pkg-nested-rename"
-                  ? tt("包名是嵌套关系（如 com.a → com.a.b），内容已改，目录层次请手动调整")
-                  : tt("未能自动移动目录（{r}）", { r: sync.moveWarn || "" });
-            setMsg(
-              sync.manifests.length > 0
-                ? tt("包名已同步：{n} 个源码文件 + {m} 个 AndroidManifest，{mv}", {
-                    n: sync.files.length,
-                    m: sync.manifests.length,
-                    mv,
-                  })
-                : tt("包名已同步：{n} 个源码文件，{mv}", { n: sync.files.length, mv }),
-            );
-            // M219c：回传旧/新包名，让父层把“当前打开文件”的路径重映射到新目录。
+          const state = await detectPkgState(p.source, gradle.text).catch(() => null);
+          const olds = state ? suggestOldPkgs(state, pkg) : [origin.pkg].filter(Boolean);
+          const unify = await unifyPackageTo(
+            p.source,
+            p.saveRoot,
+            p.fileOpsCtx ?? null,
+            pkg,
+            olds,
+            gradle.rel,
+          );
+          const didSomething =
+            unify.files.length > 0 ||
+            unify.manifests.length > 0 ||
+            unify.gradles.length > 0 ||
+            unify.movedDirs.length > 0;
+          if (didSomething) {
+            const parts: string[] = [];
+            parts.push(tt("{n} 个源码文件", { n: unify.files.length }));
+            if (unify.manifests.length) parts.push(tt("{n} 个 AndroidManifest", { n: unify.manifests.length }));
+            if (unify.gradles.length) parts.push(tt("{n} 个 build.gradle", { n: unify.gradles.length }));
+            const mvText = unify.movedDirs.length
+              ? tt("{n} 个目录已合并", { n: unify.movedDirs.length })
+              : unify.warnings.includes("pkg-move-unsupported")
+                ? tt("目录需手动改（本环境不支持自动移动）")
+                : "";
+            if (mvText) parts.push(mvText);
+            let base = tt("包名已统一：{s}", { s: parts.join("，") });
+            if (state && !state.consistent) {
+              base += tt("（检测到 {n} 个旧包名 {l}", { n: olds.length, l: olds.join("、") }) + "）";
+            }
+            if (unify.conflicts.length) {
+              base += tt("\n冲突 {n} 处：{l}", { n: unify.conflicts.length, l: unify.conflicts.slice(0, 4).join("、") });
+            }
+            setMsg(base);
+            for (const o of olds) p.onPkgSynced?.(o, pkg);
+          } else {
+            setMsg(tt("包名未变（没找到需要同步的旧包名）"));
             p.onPkgSynced?.(origin.pkg, pkg);
           }
         }
@@ -288,6 +321,7 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
                   placeholder="com.example.app"
                   onChange={(e) => setPkg(e.target.value)}
                 />
+                {pkgWarn ? <div className="axv-saveas-hint axv-pkg-warn">{pkgWarn}</div> : null}
               </label>
 
               {/* 依赖列表 */}

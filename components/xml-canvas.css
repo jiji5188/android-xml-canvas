@@ -7216,6 +7216,8 @@ button.axv-ws-caret:hover {
 .axv-saveas-title { font-size: 15px; font-weight: 700; color: var(--axv-title); }
 .axv-saveas-hint { margin-top: 8px; font-size: 12px; line-height: 1.6; color: var(--axv-desc); }
 .axv-saveas-hint code { background: var(--axv-surface-sunken); border-radius: 4px; padding: 0 4px; }
+/* M274：包名残留提示（检测到多个不同包名时） */
+.axv-pkg-warn { color: var(--axv-warn, #d97706); font-weight: 500; }
 /* M201：外部改动冲突弹窗里的文件路径 */
 .axv-conflict-path {
   display: block;

@@ -1176,6 +1176,16 @@ export const SRC_EN: SrcDict = {
   "包名已同步：{n} 个源码文件 + {m} 个 AndroidManifest，{mv}":
     "Package synced: updated {n} source file(s) + {m} AndroidManifest file(s), {mv}",
   "需手动改目录名": "rename the source folder manually",
+  "检测到 {n} 个不同包名：{l}。保存时会把 {o} 全部统一为新包名。":
+    "Found {n} different package names: {l}. On save, {o} will all be unified to the new package.",
+  "包名已统一：{s}": "Package unified: {s}",
+  "{n} 个源码文件": "{n} source file(s)",
+  "{n} 个 AndroidManifest": "{n} AndroidManifest file(s)",
+  "{n} 个 build.gradle": "{n} build.gradle file(s)",
+  "{n} 个目录已合并": "{n} folder(s) merged",
+  "目录需手动改（本环境不支持自动移动）": "folder rename needs to be done manually (auto-move not supported here)",
+  "冲突 {n} 处：{l}": "{n} conflict(s): {l}",
+  "包名未变（没找到需要同步的旧包名）": "package unchanged (no old package name found to sync)",
   "此行有可自动修复的问题": "This line has an auto-fixable issue",
   "资源 {name}（{where}）": "Resource {name} ({where})",
   "{kind} {name} · L{line}": "{kind} {name} · L{line}",

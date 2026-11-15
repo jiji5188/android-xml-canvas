@@ -190,6 +190,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { SaveAsDialog, ConflictDialog } from "./SmallDialogs";
 import { useFileImport } from "./use-file-import";
 import { useWorkspaceRefresh } from "./use-workspace-refresh";
+import { useProjectCreate } from "./use-project-create";
 import { NewProjectDialog } from "./NewProjectDialog";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
@@ -2087,130 +2088,21 @@ const allDrawableNames = useMemo(() => {
   /** M24/M31i：新建项目 —— 应用内建一个带 activity_main.xml 的项目，
    *  并在工作目录里直接落盘完整 Android 工程结构：项目名/app/src/main/...
    *  M176：pkg 可选（用户手填的包名），缺省 com.example.<项目名> */
-  const createNewProject = useCallback(
-    async (rawName: string, pkg?: string) => {
-      const name = safeProjectName(rawName);
-      const pkgErr = validatePackageName(pkg ?? "");
-      if (pkgErr) {
-        setExportNote(tt(pkgErr));
-        window.setTimeout(() => setExportNote(" "), 4000);
-        return;
-      }
-      const finalPkg = pkg!.trim();
-      const tpl = [
-        '<?xml version="1.0" encoding="utf-8"?>',
-        '<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"',
-        '    android:layout_width="match_parent"',
-        '    android:layout_height="match_parent"',
-        '    android:gravity="center"',
-        '    android:orientation="vertical">',
-        '',
-        '    <TextView',
-        '        android:id="@+id/tv_hello"',
-        '        android:layout_width="wrap_content"',
-        '        android:layout_height="wrap_content"',
-        `        android:text="Hello ${name}!"`,
-        '        android:textSize="20sp" />',
-        '',
-        '</LinearLayout>',
-        '',
-      ].join("\n");
-
-      // 先把应用内状态切过去（落盘失败也不影响继续编辑）
-      setProject((p) => ({ ...createProject(name, { name: "activity_main.xml", xml: tpl }), name }));
-      setXmlAndTrack(tpl);
-      setSelectedPath(null);
-      setSaveOrigin(null);
-      setActiveProject({ name, source: null });
-      setProjectTab("current");
-      setNewProjOpen(false);
-
-      // M31i：落盘。native 用默认工作目录（绝对路径）；用户曾自选目录时 Bridge 只能写默认目录，
-      // web 用已授权的工作目录句柄；SAF 自选目录写不了，只能保留应用内项目
-      setNewProjBusy(true);
-      const icon = newProjIcon;
-      setNewProjIcon(null);
-      let io: ReturnType<typeof nativeNewProjectIO> | (Awaited<ReturnType<typeof webNewProjectIO>>) | null;
-      let usedNativeDefault = false;
-      let customNote = "";
-      let nativeRoot = "";
-      try {
-        // M35：不依赖可能滞后的 wsState，直接用刚查的 wsInfo；native 时即便 custom 也写默认目录
-        const info = await wsInfo();
-        if (info.mode === "native" && info.defaultPath) {
-          io = nativeNewProjectIO(info.defaultPath, name);
-          usedNativeDefault = true;
-          nativeRoot = info.defaultPath;
-          if (info.custom) customNote = tt("（你自选过工作目录，但原生桥只能写默认目录，项目建在 AndroidUIIDE/Project 下）");
-          if (!info.allFiles) customNote += tt(" 未拿到「所有文件访问」权限，可能写不进去");
-        } else if (info.mode === "web") {
-          io = await webNewProjectIO(name);
-        } else {
-          io = null;
-        }
-
-        if (!io) {
-          setExportNote(tt("已新建项目《{name}》（仅应用内）{note}· 当前目录不支持直接写入，点「保存」可导出文件", { name, note: customNote }));
-          window.setTimeout(() => setExportNote(" "), 5200);
-          setNewProjBusy(false);
-          return;
-        }
-
-        // M176：已有同名项目目录 → 不覆盖，要求换名（之前会落进同一个 app/ 目录，造成重名无效）
-        if (usedNativeDefault) {
-          const exist = nativeVerifyProject(nativeRoot, name);
-          if (exist > 0) {
-            setExportNote(tt("工作目录里已有名为《{name}》的项目，请换个项目名（否则会写进同一目录）", { name }));
-            window.setTimeout(() => setExportNote(" "), 7000);
-            setNewProjBusy(false);
-            return;
-          }
-        }
-
-        const res = await createAndroidProject(io, name, {
-          iconBase64: icon?.base64,
-          iconMime: icon?.mime,
-          pkg: finalPkg,
-        });
-        // M35：native 落盘后再 listDir 验一层，确认真的写进去了（没权限/失败时 0）
-        if (usedNativeDefault) {
-          const dirCount = nativeVerifyProject(nativeRoot, name);
-          if (dirCount === 0) {
-            setExportNote(tt("《{name}》工程已生成但目录里没写进任何文件{note}。请确认已授予「所有文件访问」权限", { name, note: customNote }));
-            window.setTimeout(() => setExportNote(" "), 7000);
-            setNewProjBusy(false);
-            return;
-          }
-        }
-        if (res.ok) {
-          setExportNote(tt("已创建《{name}》· {n} 个文件已写入 {dir}/{note}", { name, n: res.written, dir: name + "/app/src/main/", note: customNote }));
-          // M46c：新建项目也要带上目录根，否则结构树写操作（重命名/移动/删除）全被置灰
-          if (usedNativeDefault) {
-            const projDir = `${nativeRoot.replace(/\/+$/, "")}/${name}`;
-            setActiveProject((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    dirPath: projDir,
-                    rootPath: projDir,
-                    source: nativeProjectSource(name, [], projDir),
-                  }
-                : prev,
-            );
-          }
-          window.setTimeout(() => void refreshWorkspace({ quiet: true }), 400);
-        } else {
-          setExportNote(tt("《{name}》已创建，但有 {n} 个文件没写进去（{first} 等）{note}", { name, n: res.failed.length, first: res.failed[0], note: customNote }));
-        }
-      } catch (e) {
-        setExportNote(tt("《{name}》已创建，落盘失败：{msg}", { name, msg: e instanceof Error ? e.message : String(e) }));
-      } finally {
-        setNewProjBusy(false);
-        window.setTimeout(() => setExportNote(" "), 5200);
-      }
-    },
-    [setXmlAndTrack, newProjIcon, refreshWorkspace],
-  );
+  /** M310：新建项目（校验包名 + native/web 双路落盘）→ components/use-project-create.ts */
+  const { createNewProject } = useProjectCreate(() => ({
+    setExportNote,
+    setProject,
+    setXmlAndTrack,
+    setSelectedPath,
+    setSaveOrigin,
+    setActiveProject,
+    setProjectTab,
+    setNewProjOpen,
+    setNewProjBusy,
+    newProjIcon,
+    setNewProjIcon,
+    refreshWorkspace,
+  }));
 
   /** M176：改项目名称（目录名）与 app 名称（strings.xml 的 app_name）。
    *  路径约定 工作目录/<项目名>/app/src/... —— 改项目名要真改目录（native only），

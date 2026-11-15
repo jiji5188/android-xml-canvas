@@ -317,24 +317,47 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
     });
   }
 
-  // 2) M253：被 `;` 割裂的标识符（`extends Activ;ity`、`foo;bar` 这类 typo）。
-  //    高置信度信号：分号前后紧贴着标识符字符（/\w;\w/）—— Java/Kotlin 里分号不会
-  //    出现在词中间。之前这类行被当成「class 声明行」整行跳过，零报警。
+  // 2) M253：被 `;` 割裂的标识符（`extends Activ;ity` 这类 typo）。
+  //    高置信度信号：分号前后**都是字母**（`/[A-Za-z];[A-Za-z]/`）——Java/Kotlin 里分号
+  //    不会出现在词中间。M275：
+  //      · 只认「字母;字母」。`for(int i=0;i<n;i++)` 里的 `0;i`（数字;字母）/ `);i`（右括号;
+  //        字母）全是 for 循环的正常分隔符，以前 `\w;\w` 会把它们误报成「割裂标识符」。
+  //      · 若这一行是 `for(...)` 头（括号里的 `;` 是循环分隔符），整行跳过。
   if (!opts.isKotlin) {
-    // 逐行找 `;` 前后都是词字符的位置（跳过字符串/注释：用 masked，里面字面量已抹掉）
     const mlines = masked.code.split("\n");
+    // 判断某分号是否落在 for( ... ) 的括号里（是则属循环分隔符，不报）
+    const inForParens = (ln: string, semi: number): boolean => {
+      const forIdx = ln.search(/\bfor\s*\(/);
+      if (forIdx < 0) return false;
+      const open = ln.indexOf("(", forIdx);
+      if (open < 0) return false;
+      let depth = 0;
+      for (let k = open; k < ln.length; k++) {
+        if (ln[k] === "(") depth++;
+        else if (ln[k] === ")") {
+          depth--;
+          if (depth === 0) return semi > open && semi < k; // 在该 for 括号内
+        }
+      }
+      return false;
+    };
     for (let i = 0; i < mlines.length; i++) {
       const ln = mlines[i];
-      // 找 词字符;词字符（`;` 前面是 \w、后面是 \w）
-      const m = /[\w$];[\w$]/.exec(ln);
-      if (!m) continue;
-      const at = m.index; // 分号前一字符位置
+      // 逐处找 `字母;字母`（; 位置必须不落在 for 括号里）
+      let at = -1;
+      const re = /[A-Za-z];[A-Za-z]/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(ln)) !== null) {
+        const semi = m.index + 1;
+        if (!inForParens(ln, semi)) { at = semi; break; }
+      }
+      if (at < 0) continue;
       const lineNo = i + 1;
-      // 报在 分号前那段的末尾（把整个坏标识符圈出来更清楚）：往前找词首、往后找词尾
-      let s = at;
-      while (s > 0 && /[\w$]/.test(ln[s - 1])) s--;
-      let e = at + 2; // 分号后第一字符
-      while (e < ln.length && /[\w$]/.test(ln[e])) e++;
+      // 把整个坏标识符圈出来：往前找字母首、往后找字母尾
+      let s = at - 1;
+      while (s > 0 && /[A-Za-z_$]/.test(ln[s - 1])) s--;
+      let e = at + 1;
+      while (e < ln.length && /[A-Za-z_$]/.test(ln[e])) e++;
       const bad = ln.slice(s, e); // 如 "Activ;ity"
       issues.push({
         line: lineNo,
@@ -344,7 +367,7 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
         code: "syntax",
         msg: `「${bad}」里有分号割裂的标识符（分号不会出现在词中间）——是不是打错字了？`,
       });
-      break; // 同一处只报一次，避免一行多个分号刷屏
+      break; // 同一行只报一次，避免刷屏
     }
   }
 

@@ -87,4 +87,37 @@ describe("M253 被分号割裂的标识符（extends Activ;ity）要报 error", 
     const issues = lintJava(code);
     expect(issues.filter((i) => i.code === "syntax")).toHaveLength(0);
   });
+
+  it("M275：for 循环的 `;` 是分隔符，不误报（用户的 for(int io=0;io<hb.length();io++)）", () => {
+    const code = [
+      "public class A {",
+      "    void f(String hb) {",
+      "        for(int io=0;io<hb.length();io++){",
+      "        }",
+      "    }",
+      "}",
+    ].join("\n");
+    const issues = lintJava(code);
+    expect(issues.filter((i) => i.code === "syntax")).toHaveLength(0);
+  });
+
+  it("M275：紧凑 for(int i=0;i<n;i++) 也不误报（n;i 都是字母但在 for 括号里）", () => {
+    const code = [
+      "public class A {",
+      "    void f(int n) {",
+      "        for(int i=0;i<n;i++) { x(); }",
+      "    }",
+      "}",
+    ].join("\n");
+    const issues = lintJava(code);
+    expect(issues.filter((i) => i.code === "syntax")).toHaveLength(0);
+  });
+
+  it("M275：真正的 extends Activ;ity 仍然报（不在 for 括号里）", () => {
+    const code = "public class A extends Activ;ity {}";
+    const issues = lintJava(code);
+    const syntax = issues.filter((i) => i.code === "syntax");
+    expect(syntax.length).toBeGreaterThan(0);
+    expect(syntax[0].msg).toContain("Activ;ity");
+  });
 });

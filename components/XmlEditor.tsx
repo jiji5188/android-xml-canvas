@@ -4059,14 +4059,10 @@ const findResolved = findResolvedNode;
     onBuildLog: pushApkBuildLog,
   });
 
-  /** M290：工具栏「打包并运行」—— 默认签名一键打包，成功后自动调系统安装器 */
+  /** M290：工具栏「打包并运行」—— 默认签名一键打包；doBuildApk 成功后会自动调安装/分享 */
   const doBuildAndRun = useCallback(async () => {
-    const r = await doBuildApk({ storeFile: "", storePass: "", alias: "", keyPass: "" });
-    if (r?.ok && r.path) {
-      const inst = installApk(r.path);
-      setExportNote(inst.ok ? tt("已调起系统安装器") : tt("安装失败：{msg}", { msg: inst.msg || "" }));
-    }
-  }, [doBuildApk, setExportNote]);
+    await doBuildApk({ storeFile: "", storePass: "", alias: "", keyPass: "" });
+  }, [doBuildApk]);
 
 
   /** M36：当前打开项目的可写根（有则保存一律落进 <项目>/app/src/main/res/） */

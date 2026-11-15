@@ -7,7 +7,7 @@
 
 import { useCallback, useState } from "react";
 import type { BuildApkResult } from "@/lib/xml/native-apk";
-import { buildApk, hasBuildApk, compileModeOf } from "@/lib/xml/native-apk";
+import { buildApk, hasBuildApk, compileModeOf, installApk, shareApkFile } from "@/lib/xml/native-apk";
 import { nativeBridge } from "@/lib/xml/native-save";
 import { projectSaveRoot, readAppGradle } from "@/lib/xml/project-save";
 import { parseGradlePackage } from "@/lib/xml/project-info";
@@ -330,21 +330,34 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           const cm = compileModeOf(r);
           const dex = cm.dex || 0;
           const classes = cm.classes || 0;
+          let suffix = "";
           if (cm.mode === "java" && dex > 0) {
-            // M254：真的注入了 dex（>0）就是能跑逻辑——哪怕 classes=0（编译缓存命中，class 数未知）
-            noteTimed(
-              classes > 0
-                ? tt("{base}（已编译 {n} 个 Java 类，注入 {d} 个 dex）", { base, n: String(classes), d: String(dex) })
-                : tt("{base}（命中编译缓存，注入 {d} 个 dex）", { base, d: String(dex) }),
-              8000,
-            );
+            suffix = classes > 0
+              ? tt("（已编译 {n} 个 Java 类，注入 {d} 个 dex）", { n: String(classes), d: String(dex) })
+              : tt("（命中编译缓存，注入 {d} 个 dex）", { d: String(dex) });
           } else if (cm.mode === "java") {
-            noteTimed(tt("{base}（⚠ 未注入 Java dex，实际还是布局壳）", { base }), 12000);
+            suffix = tt("（⚠ 未注入 Java dex，实际还是布局壳）");
           } else if (cm.mode === "shell") {
-            noteTimed(tt("{base}（项目无 .java，生成的是布局壳，不运行任何逻辑）", { base }), 10000);
-          } else {
-            noteTimed(base, 8000);
+            suffix = tt("（项目无 .java，生成的是布局壳，不运行任何逻辑）");
           }
+          // 打包成功后自动引导安装/分享
+          let installMsg = "";
+          if (r.path) {
+            const inst = installApk(r.path);
+            if (inst.ok) {
+              installMsg = tt("已调起系统安装器");
+            } else {
+              const sh = shareApkFile(r.path);
+              if (sh.ok) {
+                installMsg = tt("已调起分享（可发到微信/QQ/文件）");
+              } else {
+                installMsg = tt("APK 已生成：{path}（当前环境无法自动安装/分享，请手动复制路径）", { path: r.path });
+              }
+            }
+          } else {
+            installMsg = tt("APK 已生成：{name}", { name: r.name || "" });
+          }
+          noteTimed(base + suffix + (installMsg ? "\n" + installMsg : ""), 12000);
         } else {
           pushBuildLog(false, tt("打包失败（{step}）", { step: r.step || "?" }), r.log);
           noteTimed(tt("打包失败（{step}）", { step: r.step || "?" }), 12000);

@@ -512,9 +512,14 @@ public class BuildApkHelper {
         java.util.List<String> d8Log = new java.util.ArrayList<>();
         java.util.List<String> d8Args = new java.util.ArrayList<>();
         d8Args.add("--release"); d8Args.add("--min-api"); d8Args.add("24");
-        d8Args.add("--lib"); d8Args.add(cp.toString());
+        // M281：--lib 只能给「单个平台 jar」（android.jar）。以前把 cp.toString()（冒号串）
+        // 整条塞给 --lib，R8 当成一个不存在的文件 → NoSuchFileException。修正：
+        //   --lib 只传 android.jar；依赖 jar（项目 libs + androidx）当 R8 的「程序输入」一起 dex（R8 直接吃 jar/dex）
+        d8Args.add("--lib"); d8Args.add(androidJar.getAbsolutePath());
         d8Args.add("--output"); d8Args.add(dexDir.getAbsolutePath());
         d8Args.addAll(classFiles);
+        for (String j : libJars) d8Args.add(j);
+        if (androidxJars != null) for (String a : androidxJars) d8Args.add(a);
         java.lang.reflect.Method d8Method = d8.getMethod("dex", String[].class, java.util.List.class);
         boolean d8Ok = Boolean.valueOf((Boolean) d8Method.invoke(null, d8Args.toArray(new String[0]), d8Log));
         if (!d8Ok || d8Log.size() > 0) {

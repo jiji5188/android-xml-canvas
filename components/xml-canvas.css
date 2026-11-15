@@ -11760,3 +11760,112 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 
 /* M256锛氭娊灞夊睍寮€鏃?绉诲姑绔?浠ｇ爜鍖哄簳杈?inset 鍔ㄦ€佷笂绉伙紝娑堥櫎閬╃洊锛堥粯璁?12px锛屾娊灞夊睍寮€鍚庣敱 inline 瑕嗙洊鎴?calc(12px+42vh)锛?*/
 .axv-mob-xml { transition: bottom 0.22s ease; }
+
+
+/* M294：新建文件两步对话框 */
+.axv-newfile-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 16px;
+}
+.axv-newfile-panel {
+  width: 100%;
+  max-width: 340px;
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--axv-panel-bg, #fff);
+  color: var(--axv-text, #111827);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  padding: 14px;
+  box-sizing: border-box;
+}
+.axv-newfile-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.axv-newfile-back {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  color: inherit;
+  padding: 4px;
+}
+.axv-newfile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.axv-newfile-cat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+}
+.axv-newfile-cat:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.axv-newfile-field {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+}
+.axv-newfile-field input,
+.axv-newfile-field select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.axv-newfile-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.axv-newfile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.axv-newfile-btn {
+  padding: 8px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+}
+.axv-newfile-btn.primary {
+  background: var(--axv-primary, #04409f);
+  color: var(--axv-on-primary, #fff);
+  border-color: transparent;
+}

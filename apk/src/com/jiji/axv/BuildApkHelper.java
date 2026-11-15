@@ -94,6 +94,10 @@ public class BuildApkHelper {
             }
             log.append("资源 ").append(written).append(" 个文件\n");
 
+            // M278/P1-1：aar 不只给 classpath，res/ 也要合并进 aapt2 资源目录
+            // （androidx aar 的 theme/drawable 等资源之前没进 aapt2，导致 R.style.* 等缺失）
+            mergeAarRes(libs, resDir, log);
+
             File man = new File(root, "AndroidManifest.xml");
             // M262：优先用项目里的 AndroidManifest.xml 原文（aapt2 link 会直接读它，不再合成只含 ShellActivity 的清单）。
             // M263：项目清单缺 package 属性时自动补上（aapt2 正规清单必需，否则报 warning/error）。
@@ -402,6 +406,20 @@ public class BuildApkHelper {
             walkJava(genDir, rFiles);
         }
         log.append("编译 ").append(files.size()).append(" 个 java + ").append(rFiles.size()).append(" 个 R.java\n");
+        // M278/P0-1：打印完整源码清单（文件名）+ 预检查（收到的 vs 实际落盘的），方便排查漏文件
+        int written = files.size();
+        int received = javaSources.length();
+        if (written < received) {
+            log.append("[预检查] 收到 ").append(received).append(" 个源码，实际落盘 ").append(written)
+                    .append(" 个，").append(received - written).append(" 个被丢弃（路径含 .. 或为空），请核对项目源码\n");
+        }
+        StringBuilder fl = new StringBuilder();
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (File f : files) {
+            String n = f.getName();
+            if (!names.contains(n)) { names.add(n); if (fl.length() > 0) fl.append(' '); fl.append(n); }
+        }
+        log.append("  源码清单（").append(files.size()).append(" 个，去重 ").append(names.size()).append(" 名）：").append(fl.toString()).append("\n");
         File androidJar = new File(compDir, "android.jar");
         if (!androidJar.isFile() || androidJar.length() < 1024 * 1024) {
             throw new IOException("缺 android.jar（编译器资源没装齐，无法编译 Java）");
@@ -994,6 +1012,49 @@ public class BuildApkHelper {
     }
 
     /** M266：从 aar（zip）里抽出 classes.jar；失败返回 null */
+    /** M278/P1-1：把 libs 里 aar 的 res/** 合并进 aapt2 资源目录（drawable/values 等）。
+     *  同名资源：项目自己的优先（先写 aar，后写项目——这里在写完项目 res 之后调，
+     *  所以 aar 的 res 不覆盖已有同名文件，只补缺的）。 */
+    private void mergeAarRes(JSONArray libs, File resDir, StringBuilder log) {
+        if (libs == null || libs.length() == 0) return;
+        int total = 0;
+        for (int i = 0; i < libs.length(); i++) {
+            JSONObject lj = libs.optJSONObject(i);
+            if (lj == null) continue;
+            String libPath = lj.optString("path", "");
+            String b64 = lj.optString("base64", "");
+            if (!libPath.endsWith(".aar") || b64.isEmpty()) continue;
+            try {
+                byte[] data = Base64.decode(b64, Base64.NO_WRAP);
+                if (data == null || data.length == 0) continue;
+                File aarTmp = new File(resDir, ".aar" + i + ".tmp");
+                writeBytes(aarTmp, data);
+                int n = 0;
+                try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(aarTmp)) {
+                    java.util.Enumeration<? extends java.util.zip.ZipEntry> en = zf.entries();
+                    while (en.hasMoreElements()) {
+                        java.util.zip.ZipEntry ze = en.nextElement();
+                        String name = ze.getName();
+                        if (ze.isDirectory() || !name.startsWith("res/")) continue;
+                        String rel = name.substring(4); // 去 res/ 前缀 → 直接进 resDir
+                        File dst = new File(resDir, rel);
+                        if (dst.exists()) continue; // 项目自己的优先
+                        dst.getParentFile().mkdirs();
+                        try (InputStream is = zf.getInputStream(ze)) {
+                            writeBytes(dst, readAll(is));
+                        }
+                        n++;
+                    }
+                } finally {
+                    aarTmp.delete();
+                }
+                total += n;
+                if (n > 0) log.append("aar res 合并：").append(libPath).append(" → ").append(n).append(" 个资源\n");
+            } catch (Throwable ignored) { }
+        }
+        if (total > 0) log.append("aar 资源共合并 ").append(total).append(" 个进 aapt2 目录\n");
+    }
+
     private File extractClassesJar(File aar, File outJar) {
         try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(aar)) {
             java.util.zip.ZipEntry e = zf.getEntry("classes.jar");

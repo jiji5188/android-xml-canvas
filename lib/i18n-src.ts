@@ -1178,6 +1178,12 @@ export const SRC_EN: SrcDict = {
   "需手动改目录名": "rename the source folder manually",
   "检测到 {n} 个不同包名：{l}。保存时会把 {o} 全部统一为新包名。":
     "Found {n} different package names: {l}. On save, {o} will all be unified to the new package.",
+  "Java 源码收集": "Java source collection",
+  "资源预检查（不阻断，仅提示）": "Resource pre-check (non-blocking, info only)",
+  "代码里引用了 res/ 里找不到的资源：{l}{more}": "Code references resources not found in res/: {l}{more}",
+  "依赖预检查（不阻断，仅提示）": "Dependency pre-check (non-blocking, info only)",
+  "代码 import 了这些第三方包，但 libs/ 里没找到对应 jar/aar：{l}{more}": "Code imports these third-party packages but no matching jar/aar found in libs/: {l}{more}",
+  "请把这些依赖的 jar 放进项目 libs/ 目录再打包。": "Put these dependencies' jars into the project libs/ directory, then build again.",
   "包名已统一：{s}": "Package unified: {s}",
   "{n} 个源码文件": "{n} source file(s)",
   "{n} 个 AndroidManifest": "{n} AndroidManifest file(s)",

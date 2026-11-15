@@ -15,6 +15,7 @@ import { packageOf } from "@/lib/xml/new-project";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
+import { buildResNameIndex, missingResourceRefs, collectExternalImports, missingLibPackages } from "@/lib/xml/resource-refs";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { prepareFiles } from "@/lib/xml/native-render";
 import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, rPackagesFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
@@ -173,8 +174,16 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           setExportNote(tt("发现 {n} 个已编译 dex，一起打进包", { n: dexGot.length }));
         }
         setExportNote(tt("正在收集 Java 源码…"));
-        const javaSrc = await loadProjectJavaFiles(aiFileIo, 8, {
+        const javaSrc = await loadProjectJavaFiles(aiFileIo, 30, {
           nativeRoot: activeProject?.rootPath || activeProject?.dirPath || null,
+        }, (rp) => {
+          // M278/P0-1：把「扫到几个 / 跳过了哪些 / 为什么」推进构建日志，漏文件时可排查
+          if (rp.skipped.length || rp.truncated) {
+            const parts = ["收集 Java 源码：成功 " + rp.collected + " 个"];
+            if (rp.truncated) parts.push("触到上限（" + rp.maxFiles + " 文件 / 深度 " + rp.maxDepth + "）");
+            if (rp.skipped.length) parts.push("跳过 " + rp.skipped.length + " 个：" + rp.skipped.slice(0, 10).map((s) => s.rel + "（" + s.reason + "）").join("、") + (rp.skipped.length > 10 ? " 等" : "") + "）");
+            pushBuildLog(rp.skipped.length > 0, tt("Java 源码收集"), parts.join("\n"));
+          }
         });
         const javaSrcMapped = javaSrc.map((j) => ({ path: j.rel, code: j.text }));
         const javaSources = withCurrentSource(javaSrcMapped, relNow, xml);
@@ -225,6 +234,37 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           noteTimed(tt("打包失败：{msg}", { msg: "compile" }), 12000);
           return;
         }
+        // M278/P2：打包前预检查——代码引用的 R.xxx 资源在 res/ 里是否都齐，缺的提前列出来
+        try {
+          const resNames = prep.files.map((f) => f.path);
+          const valuesTexts: Record<string, string> = {};
+          for (const f of prep.files) {
+            if (f.path.startsWith("values") && typeof f.text === "string") valuesTexts[f.path] = f.text;
+          }
+          const idx = buildResNameIndex(resNames, valuesTexts);
+          const missing = missingResourceRefs(javaSources.map((j) => j.code), idx);
+          if (missing.length) {
+            const top = missing.slice(0, 12).map((m) => `${m.type}/${m.name}(${m.files}文件)`).join("、");
+            pushBuildLog(false, tt("资源预检查（不阻断，仅提示）"),
+              tt("代码里引用了 res/ 里找不到的资源：{l}{more}",
+                { l: top, more: missing.length > 12 ? `（还有 ${missing.length - 12} 个）` : "" }) +
+                "\n" +
+                tt("这些会 ECJ 报「cannot be resolved or is not a field」。可补 res/ 资源、放 aar 进 libs/、或改代码不用它们。",
+                {}));
+          }
+          // P2：第三方依赖预检查——import 的顶层包在 libs 里对不上就提示
+          const extImports = collectExternalImports(javaSources.map((j) => j.code));
+          const libPaths = libsRes.libs.map((l) => l.rel);
+          const missLibs = missingLibPackages(extImports, libPaths);
+          if (missLibs.length) {
+            const top = missLibs.slice(0, 10).join("、");
+            pushBuildLog(false, tt("依赖预检查（不阻断，仅提示）"),
+              tt("代码 import 了这些第三方包，但 libs/ 里没找到对应 jar/aar：{l}{more}",
+                { l: top, more: missLibs.length > 10 ? `（还有 ${missLibs.length - 10} 个）` : "" }) +
+                "\n" +
+                tt("请把这些依赖的 jar 放进项目 libs/ 目录再打包。", {}));
+          }
+        } catch (e) { /* 预检查失败不阻断 */ }
         const r = await buildApk({
           pkg,
           layout,

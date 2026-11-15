@@ -10,10 +10,12 @@ import { nativeBridge } from "./native-save";
 // 不读 build/ 里的源码（build 产物不是源码）；dex 查找例外（见 project-dex.ts）
 const SKIP_DIRS = withSkipExtras(coreSkipDirs, "build");
 
-/** 单文件最多读 400KB（Activity 一般 5~20KB，设上限防大文件卡住手机） */
-const MAX_TEXT = 400 * 1024;
-/** M266：最多读 400 个文件（以前 60，大项目会漏类 → “cannot be resolved to a type”） */
-const MAX_FILES = 400;
+/** M278：单文件最多读 2MB（以前 400KB，大反编译文件会被静默丢弃） */
+const MAX_TEXT = 2 * 1024 * 1024;
+/** M278：最多读 2000 个文件（以前 400，大项目会漏类；配合日志能看出是否截断） */
+const MAX_FILES = 2000;
+/** M278：递归深度放宽到 30（以前 8，深层包目录会被整支剪掉） */
+export const MAX_DEPTH = 30;
 
 const isCode = (rel: string) => /\.(java|kt|kts)$/i.test(rel);
 
@@ -74,42 +76,58 @@ async function nativeReadText(rel: string, nativeRoot: string, io: AiFileIo | nu
   }
 }
 
+// M278：收集报告——打包日志要能看出「扫到几个、跳过了哪些、为什么跳」，
+// 否则漏文件时无从排查（P0-1 的核心诉求）。
+export interface JavaCollectReport {
+  collected: number;
+  /** 因深度/预算/读失败/过大而被跳过的文件（rel + 原因） */
+  skipped: { rel: string; reason: string }[];
+  truncated: boolean; // 是否触到了 MAX_FILES / MAX_DEPTH 上限
+  maxDepth: number;
+  maxFiles: number;
+  maxText: number;
+  nativeWalkUsed: boolean;
+}
+
 export async function loadProjectJavaFiles(
   io: AiFileIo | null | undefined,
-  maxDepth = 8,
+  maxDepth = MAX_DEPTH,
   extra?: { nativeRoot?: string | null },
+  onReport?: (r: JavaCollectReport) => void,
 ): Promise<{ rel: string; text: string }[]> {
   const out: { rel: string; text: string }[] = [];
+  const skipped: { rel: string; reason: string }[] = [];
   let budget = MAX_FILES;
+  let truncated = false;
+  let nativeWalkUsed = false;
 
   const walk = async (rel: string, depth: number): Promise<void> => {
-    if (depth > maxDepth || budget <= 0) return;
+    if (depth > maxDepth) { truncated = true; return; }
+    if (budget <= 0) { truncated = true; return; }
     if (!io) return;
     const r = await io.list(rel);
     if (!r.ok) {
       console.log("[loadProjectJava] list failed at", rel, "-", r.error);
       return;
     }
-    console.log("[loadProjectJava] list(" + rel + ") →", r.items?.length, "items:", r.items?.map((x) => x.kind + ":" + x.name).join(", ") || "(empty)");
     for (const it of r.items ?? []) {
-      if (budget <= 0) return;
+      if (budget <= 0) { truncated = true; break; }
       if (it.kind === "dir") {
         const seg = it.rel.replace(/\\/g, "/").split("/").pop() ?? "";
-        if (SKIP_DIRS.has(seg.toLowerCase())) {
-          console.log("[loadProjectJava] SKIP dir", it.rel);
-          continue;
-        }
+        if (SKIP_DIRS.has(seg.toLowerCase())) continue;
         await walk(it.rel, depth + 1);
         continue;
       }
       if (!isCode(it.rel)) continue;
-      console.log("[loadProjectJava] FOUND code file:", it.rel);
       const t = await io.read(it.rel);
       if (!t.ok || typeof t.text !== "string") {
-        console.log("[loadProjectJava] read failed:", it.rel, t.error);
+        skipped.push({ rel: it.rel, reason: "读不到（" + (t.error || "io.read 失败") + "）" });
         continue;
       }
-      if (t.text.length > MAX_TEXT) continue;
+      if (t.text.length > MAX_TEXT) {
+        skipped.push({ rel: it.rel, reason: "文件 " + Math.round(t.text.length / 1024) + "KB 超过 " + Math.round(MAX_TEXT / 1024) + "KB 上限" });
+        continue;
+      }
       out.push({ rel: it.rel, text: t.text });
       budget--;
     }
@@ -117,22 +135,25 @@ export async function loadProjectJavaFiles(
 
   await walk("", 0);
 
-  // M241：只要给了 nativeRoot 就用原生全量递归兜底（不再只在 out 为空时触发），
+  // M241/M278：只要给了 nativeRoot 就用原生全量递归兜底（不再只在 out 为空时触发），
   // 用原生 readText 读文件；再把 io 扫到的去重合并，保证 Java 文件不漏。
   if (extra?.nativeRoot) {
+    nativeWalkUsed = true;
     const found = new Set(out.map((x) => x.rel));
     const nb = { remaining: MAX_FILES };
     await nativeWalk(extra.nativeRoot, maxDepth, async (rel) => {
       if (found.has(rel)) return;
+      if (nb.remaining <= 0) { truncated = true; return; }
       const text = await nativeReadText(rel, extra.nativeRoot!, io);
-      if (text == null || text.length > MAX_TEXT) return;
-      console.log("[loadProjectJava] NATIVE FOUND:", rel);
+      if (text == null) { skipped.push({ rel, reason: "原生/nativeReadText 读不到" }); return; }
+      if (text.length > MAX_TEXT) { skipped.push({ rel, reason: "文件 " + Math.round(text.length / 1024) + "KB 超限" }); return; }
       found.add(rel);
       out.push({ rel, text });
       nb.remaining--;
     }, nb);
+    if (nb.remaining <= 0) truncated = true;
   }
 
-  console.log("[loadProjectJava] total found:", out.length);
+  onReport?.({ collected: out.length, skipped, truncated, maxDepth, maxFiles: MAX_FILES, maxText: MAX_TEXT, nativeWalkUsed });
   return out;
 }

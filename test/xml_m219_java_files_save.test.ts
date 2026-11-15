@@ -59,8 +59,8 @@ describe("loadProjectJavaFiles（M199）", () => {
     expect(out.map((f) => f.text)).toEqual(["public class Main {}", "fun main() {}"]);
   });
 
-  it("跳过 SKIP_DIRS（build/.git 等）与超 400KB 的大文件", async () => {
-    const big = "x".repeat(400 * 1024 + 1);
+  it("跳过 SKIP_DIRS（build/.git 等）与超 2MB 的大文件", async () => {
+    const big = "x".repeat(2 * 1024 * 1024 + 1); // M278：单文件上限从 400KB 提到 2MB
     const io = fakeIo(
       {
         "": [

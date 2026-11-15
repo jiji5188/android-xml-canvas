@@ -186,6 +186,7 @@ import { useEditorTheme } from "./use-editor-theme";
 import { useCanvasZoom } from "./use-canvas-zoom";
 import { useCanvasAssets } from "./use-canvas-assets";
 import { useDiffHistory } from "./use-diff-history";
+import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { NewProjectDialog } from "./NewProjectDialog";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
@@ -898,55 +899,19 @@ export function XmlEditor() {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // ===== 键盘快捷键：Ctrl/⌘ + Z 撤销 / Y 重做 / S 保存 / F 格式化 / C,V,D,G 多选操作 =====
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = e.ctrlKey || e.metaKey;
-      if (!mod) return;
-      const k = e.key.toLowerCase();
-      // M115：在输入框 / 代码编辑器里不接 C V D G（那里要能正常复制粘贴文本）
-      const t = e.target as HTMLElement | null;
-      const inEditing =
-        !!t &&
-        (t.tagName === "INPUT" ||
-          t.tagName === "TEXTAREA" ||
-          t.isContentEditable ||
-          !!t.closest?.(".cm-editor"));
-      if (k === "z") {
-        e.preventDefault();
-        if (e.shiftKey) redo();
-        else undo();
-      } else if (k === "y") {
-        e.preventDefault();
-        redo();
-      } else if (k === "s") {
-        e.preventDefault();
-        saveProject();
-      } else if (k === "f") {
-        e.preventDefault();
-        doFormat();
-      } else if (!inEditing && k === "c") {
-        // M115：复制选中的控件（没选中就不拦，留给浏览器）
-        if (!selectedPath) return;
-        e.preventDefault();
-        copySelection();
-      } else if (!inEditing && k === "v") {
-        if (!selectedPath) return;
-        e.preventDefault();
-        pasteSelection();
-      } else if (!inEditing && k === "d") {
-        if (!selectedPath) return;
-        e.preventDefault();
-        duplicateSelection();
-      } else if (!inEditing && k === "g") {
-        e.preventDefault();
-        if (e.shiftKey) ungroupSelection();
-        else groupSelection();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
+  // M306：键盘快捷键 → components/useKeyboardShortcuts.ts
+  useKeyboardShortcuts(() => ({
+    undo,
+    redo,
+    save: saveProject,
+    format: doFormat,
+    copy: copySelection,
+    paste: pasteSelection,
+    duplicate: duplicateSelection,
+    group: groupSelection,
+    ungroup: ungroupSelection,
+    selectedPath,
+  }));
 
   // ===== 自动保存：xml / 历史 / 资源 / 项目 变更即写 localStorage（防抖 400ms） =====
   useEffect(() => {

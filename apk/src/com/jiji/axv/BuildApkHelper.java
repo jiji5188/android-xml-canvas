@@ -27,6 +27,11 @@ public class BuildApkHelper {
     private static final String TAG = "BuildApkHelper";
     private final Context ctx;
 
+    /** M298：调试包默认签名（放在 /AndroidUIIDE/ 下，没有就自动生成） */
+    private static final String DEBUG_KESTORE_NAME = "axv-debug.keystore";
+    private static final String DEBUG_ALIAS = "androiddebugkey";
+    private static final String DEBUG_STORE_PASS = "android";
+
     public BuildApkHelper(Context ctx) {
         this.ctx = ctx.getApplicationContext();
     }
@@ -58,7 +63,17 @@ public class BuildApkHelper {
                 return "{\"ok\":false,\"step\":\"pkg\",\"log\":\"包名不合法: " + pkg.replace("\"", "") + "\"}";
             }
             if (ksPath.isEmpty() || !new File(ksPath).isFile()) {
-                return "{\"ok\":false,\"step\":\"keystore\",\"log\":\"找不到 keystore 文件，先在弹层里生成一个\"}";
+                // M298：调试包不再要求用户先生成 keystore —— 自动用 /AndroidUIIDE/axv-debug.keystore
+                // （没有就现场生成）。发布包（JS 侧传了 keystore）保持原校验。
+                File dbg = ensureDebugKeystore(log);
+                if (dbg == null) {
+                    return "{\"ok\":false,\"step\":\"keystore\",\"log\":\"没有可用的调试签名，且自动生成失败（看构建日志）。请在签名弹层里指定 keystore\"}";
+                }
+                ksPath = dbg.getAbsolutePath();
+                storePass = DEBUG_STORE_PASS;
+                alias = DEBUG_ALIAS;
+                keyPass = DEBUG_STORE_PASS;
+                log.append("使用调试签名：").append(ksPath).append('\n');
             }
             if (files == null || files.length() == 0) {
                 return "{\"ok\":false,\"step\":\"files\",\"log\":\"没有资源文件\"}";
@@ -328,7 +343,14 @@ public class BuildApkHelper {
             String outName = p.optString("outName", "");
             File src = new File(apk);
             if (!src.isFile()) return "err:src:找不到源 APK";
-            if (ksPath.isEmpty() || !new File(ksPath).isFile()) return "err:keystore:找不到 keystore";
+            if (ksPath.isEmpty() || !new File(ksPath).isFile()) {
+                File dbg = ensureDebugKeystore(log);
+                if (dbg == null) return "err:keystore:没有可用的调试签名，且自动生成失败";
+                ksPath = dbg.getAbsolutePath();
+                storePass = DEBUG_STORE_PASS;
+                alias = DEBUG_ALIAS;
+                keyPass = DEBUG_STORE_PASS;
+            }
 
             java.util.Map<String, byte[]> reps = new java.util.HashMap<>();
             JSONArray rl = p.optJSONArray("replacements");
@@ -1110,6 +1132,26 @@ public class BuildApkHelper {
         java.io.File ext = android.os.Environment.getExternalStorageDirectory();
         File d = new File(ext, "AndroidUIIDE/Project/build");
         return d;
+    }
+
+    /** M298：调试默认签名 /AndroidUIIDE/axv-debug.keystore，没有就自动生成 */
+    private File ensureDebugKeystore(StringBuilder log) {
+        java.io.File ext = android.os.Environment.getExternalStorageDirectory();
+        File dir = new File(ext, "AndroidUIIDE");
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            log.append("建不了 ").append(dir).append("，调试签名自动生成失败\n");
+            return null;
+        }
+        File ks = new File(dir, DEBUG_KESTORE_NAME);
+        if (ks.isFile() && ks.length() > 0) return ks;
+        try {
+            KeystoreMaker.make(ks.getAbsolutePath(), DEBUG_ALIAS, DEBUG_STORE_PASS, "AXV Debug", "Android", 30);
+            log.append("已自动生成调试签名：").append(ks.getAbsolutePath()).append('\n');
+            return ks;
+        } catch (Throwable t) {
+            log.append("调试签名自动生成失败：").append(String.valueOf(t.getMessage())).append('\n');
+            return null;
+        }
     }
 
     private static int runAapt2(File bin, File cwd, String[] args, StringBuilder log) throws Exception {

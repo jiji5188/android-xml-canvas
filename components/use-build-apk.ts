@@ -311,28 +311,37 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
               undefined, undefined, undefined, "info");
           }
         } catch (e) { /* 预检查失败不阻断 */ }
+        // M298：有自定义 keystore = 发布包 → 不注入调试日志抽屉；没 keystore = 调试包 → 默认自动调试 keystore + 日志抽屉
+        const isRelease = !!o.storeFile.trim();
         // M286：往包里注入「运行日志抽屉」（provider + 生命周期/崩溃钩子 + 半屏抽屉）
         // M287：编译前先自动修机械错（补 import / 修 R 大小写），修了什么写进日志
         let javaSourcesForBuild = javaSources;
         let axvLogOn = false;
         if (javaSources.length) {
           const fixed = autofixJavaSources(javaSources, { resIndex, pkg });
+          javaSourcesForBuild = fixed.sources;
           if (fixed.reports.length) {
             const lines = fixed.reports.slice(0, 12).map((r) => `${r.path}\n    ${r.fixes.join("\n    ")}`);
             pushBuildLog(true, tt("编译前自动修复（{n} 个文件）", { n: fixed.reports.length }), lines.join("\n\n") +
               (fixed.reports.length > 12 ? `\n…还有 ${fixed.reports.length - 12} 个文件` : ""),
               undefined, undefined, undefined, "info");
           }
-          const rt = axvRuntimeSources(pkg);
-          javaSourcesForBuild = [...fixed.sources, ...rt];
-          const inj = injectAxvLogProvider(manifestTextForBuild, pkg);
-          manifestTextForBuild = inj.text;
-          axvLogOn = true;
-          pushBuildLog(true, tt("已注入运行日志抽屉"),
-            inj.injected
-              ? tt("生成的 APK 左上角会多一个「▤ 日志」把手：运行你的 App 时点开就能看生命周期/崩溃/自定义日志，长按把手可隐藏。", {})
-              : tt("已生成日志类，但清单里没找到 <application> 无法挂上 provider（注入失败：{r}）。App 仍能跑，只是没有日志抽屉。", { r: String(inj.reason || "?") }),
-            undefined, undefined, undefined, "info");
+          if (!isRelease) {
+            const rt = axvRuntimeSources(pkg);
+            javaSourcesForBuild = [...javaSourcesForBuild, ...rt];
+            const inj = injectAxvLogProvider(manifestTextForBuild, pkg);
+            manifestTextForBuild = inj.text;
+            axvLogOn = true;
+            pushBuildLog(true, tt("已注入运行日志抽屉"),
+              inj.injected
+                ? tt("生成的 APK 左上角会多一个「▤ 日志」把手：运行你的 App 时点开就能看生命周期/崩溃/自定义日志，长按把手可隐藏。", {})
+                : tt("已生成日志类，但清单里没找到 <application> 无法挂上 provider（注入失败：{r}）。App 仍能跑，只是没有日志抽屉。", { r: String(inj.reason || "?") }),
+              undefined, undefined, undefined, "info");
+          } else {
+            pushBuildLog(true, tt("发布包模式（未注入调试日志）"),
+              tt("当前指定了自定义 keystore，按发布包处理：不往 App 里植入「▤ 日志」抽屉，保持包体干净。", {}),
+              undefined, undefined, undefined, "info");
+          }
         }
         const r = await buildApk({
           pkg,

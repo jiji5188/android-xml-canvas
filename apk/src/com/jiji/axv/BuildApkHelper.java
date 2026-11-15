@@ -752,6 +752,9 @@ public class BuildApkHelper {
         java.util.LinkedHashMap<String, java.util.LinkedHashMap<String, Integer>> byFile = new java.util.LinkedHashMap<>();
         java.util.LinkedHashSet<String> missingPkgsRaw = new java.util.LinkedHashSet<>();
         java.util.List<String> missingPkgs = new java.util.ArrayList<>();
+        // M277：两类额外归集——缺资源（改 res/ 能修） vs 缺类（要补 jar）
+        java.util.LinkedHashMap<String, Integer> missingRes = new java.util.LinkedHashMap<>();
+        java.util.LinkedHashMap<String, Integer> missingTypes = new java.util.LinkedHashMap<>();
         int errors = 0, warnings = 0;
         String curFile = null;
         boolean curIsError = true;
@@ -787,6 +790,29 @@ public class BuildApkHelper {
                 if (!root.startsWith("java.") && !root.startsWith("javax.") && !root.startsWith("android.")) {
                     missingPkgsRaw.add(root);
                 }
+            }
+            // M277：`Xxx cannot be resolved or is not a field` → 缺资源（R.xxx 引用不到）
+            java.util.regex.Matcher resm = java.util.regex.Pattern
+                    .compile("^([A-Za-z_][A-Za-z0-9_]*)\\s+cannot be resolved or is not a field")
+                    .matcher(msg);
+            if (resm.find()) {
+                String name = resm.group(1);
+                Integer old = missingRes.get(name);
+                missingRes.put(name, old == null ? 1 : old + 1);
+            }
+            // M277：`Xxx cannot be resolved to a type` → 缺类（多半是没引入的库）
+            java.util.regex.Matcher tym = java.util.regex.Pattern
+                    .compile("^([A-Za-z_][A-Za-z0-9_]*)\\s+cannot be resolved to a type")
+                    .matcher(msg);
+            if (tym.find()) {
+                String name = tym.group(1);
+                Integer old = missingTypes.get(name);
+                missingTypes.put(name, old == null ? 1 : old + 1);
+            }
+            // M277：`The type java.lang.invoke.X cannot be resolved` 类是编译器自身问题，别算到用户头上
+            if (msg.startsWith("The type java.") || msg.startsWith("The type javax.")) {
+                curFile = null;
+                continue;
             }
             java.util.LinkedHashMap<String, Integer> bucket = byFile.get(curFile);
             if (bucket != null) {
@@ -861,6 +887,30 @@ public class BuildApkHelper {
             if (hasAndroidxBuiltIn) {
                 sb.append("  （内置 androidx 插件包已覆盖常用 1.0.0 基础库；上面列出的是插件包没含的库/版本）\n");
             }
+        }
+        // M277：缺类（cannot be resolved to a type）——不是资源问题，多半要补 jar
+        if (!missingTypes.isEmpty()) {
+            sb.append("缺类提示（这些类当前任何 jar 里都没有，多半是没引入的第三方库）：\n");
+            int k = 0;
+            for (java.util.Map.Entry<String, Integer> e : missingTypes.entrySet()) {
+                if (k++ >= 8) { sb.append("    …（还有 ").append(missingTypes.size() - 8).append(" 个）\n"); break; }
+                sb.append("    - ").append(e.getKey());
+                if (e.getValue() > 1) sb.append("（×").append(e.getValue()).append("）");
+                sb.append("\n");
+            }
+        }
+        // M277：缺资源（drawable/string/layout 等 R.xxx 引用不到）——要补 res/ 文件
+        if (!missingRes.isEmpty()) {
+            sb.append("缺资源提示（R.drawable/R.string/R.layout … 在项目 res/ 里找不到）：\n");
+            int k = 0;
+            for (java.util.Map.Entry<String, Integer> e : missingRes.entrySet()) {
+                if (k++ >= 10) { sb.append("    …（还有 ").append(missingRes.size() - 10).append(" 个）\n"); break; }
+                sb.append("    - ").append(e.getKey());
+                if (e.getValue() > 1) sb.append("（×").append(e.getValue()).append("）");
+                sb.append("\n");
+            }
+            sb.append("  这些是原工程的图标/布局/字符串没被反编译出来的，需要把对应文件补进 res/ 下的\n");
+            sb.append("  drawable*/layout/values/raw 等目录（或改代码不用它们）。\n");
         }
         return sb.toString();
     }

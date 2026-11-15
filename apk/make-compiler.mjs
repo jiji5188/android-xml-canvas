@@ -127,8 +127,27 @@ dexFiles.forEach((f, i) => {
 });
 
 // 5) android.jar → gz（编译 classpath 用；解压到 cache 即可，无需 dex）
+// M277：SDK 的 android.jar 缺 java.lang.invoke.LambdaMetafactory / SerializedLambda
+// （AGP 靠 build-tools/core-lambda-stubs.jar 补）。ECJ 编译带 lambda 的源码
+// （含 androidx 里用 lambda 的类）会报 “LambdaMetafactory cannot be resolved,
+// indirectly referenced from required .class files”。把这两个类合进 android.jar 再 gz。
+const CORE_LAMBDA_STUBS = path.join(SDK, "build-tools", BT, "core-lambda-stubs.jar");
 const jarGz = path.join(out, "android.jar.gz");
-fs.writeFileSync(jarGz, zlib.gzipSync(fs.readFileSync(ANDROID_JAR), { level: 9 }));
+const mergedJar = path.join(out, "android-merged.jar");
+let androidJarForGz = ANDROID_JAR;
+if (fs.existsSync(CORE_LAMBDA_STUBS)) {
+  const tmpDir = path.join(out, "lambda-stub");
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+  fs.mkdirSync(tmpDir, { recursive: true });
+  // 只抽 android.jar 里缺的类（其余如 MethodHandle 已有，不覆盖）
+  const want = ["java/lang/invoke/LambdaMetafactory.class", "java/lang/invoke/SerializedLambda.class"];
+  execFileSync(path.join(JBR, "jar.exe"), ["xf", CORE_LAMBDA_STUBS, ...want], { cwd: tmpDir });
+  fs.copyFileSync(ANDROID_JAR, mergedJar);
+  execFileSync(path.join(JBR, "jar.exe"), ["uf", mergedJar, ...want], { cwd: tmpDir, stdio: "inherit" });
+  androidJarForGz = mergedJar;
+  console.log("android.jar 已合入 LambdaMetafactory / SerializedLambda（编译 lambda 用）");
+}
+fs.writeFileSync(jarGz, zlib.gzipSync(fs.readFileSync(androidJarForGz), { level: 9 }));
 
 // 5.5) M219：ECJ 的诊断消息包（.properties）。D8 dex 时把这些 .properties 丢光了，
 // ECJ 一初始化就 ResourceBundle.getBundle(...batch.messages)，找不到会抛 MissingResourceException

@@ -253,7 +253,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
                 {}));
           }
           // P2：第三方依赖预检查——import 的顶层包在 libs 里对不上就提示
-          const extImports = collectExternalImports(javaSources.map((j) => j.code));
+          const extImports = collectExternalImports(javaSources.map((j) => j.code), [pkg]);
           const libPaths = libsRes.libs.map((l) => l.rel);
           const missLibs = missingLibPackages(extImports, libPaths);
           if (missLibs.length) {

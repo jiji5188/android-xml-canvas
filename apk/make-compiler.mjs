@@ -208,7 +208,9 @@ dexFiles.forEach((f, idx) => {
   manifest.files.push({ path: "tool" + (idx + 1) + ".bin", size: raw.length, sha256: sha256OfBytes(raw), role: "compiler-dex" });
 });
 {
-  const jarRaw = fs.readFileSync(ANDROID_JAR);
+  // M279：记录**实际打进 android.jar.gz 的那个**（M277 合入 LambdaMetafactory 后是 mergedJar），
+  // 不是 SDK 原始 ANDROID_JAR——否则真机校验大小对不上（27092450 vs 27259370）→ 误判「不完整」退化壳
+  const jarRaw = fs.readFileSync(androidJarForGz);
   manifest.files.push({ path: "android.jar", size: jarRaw.length, sha256: sha256OfBytes(jarRaw), role: "classpath" });
 }
 manifest.files.push({ path: "res", size: 0, sha256: "", role: "i18n" }); // msgs 解到 res/ 目录，缺失不致命

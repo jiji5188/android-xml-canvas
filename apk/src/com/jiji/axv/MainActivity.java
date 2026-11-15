@@ -2792,8 +2792,10 @@ public class MainActivity extends Activity {
             File bin = new File(dir, "tool" + i + ".bin");
             byte[] b;
             try { b = readAssetGz("compiler/tool" + i + ".bin.gz"); } catch (Throwable notFound) {
-                // M227：记录真实原因（资产缺失/读取异常），不再静默 break
-                toolBreakReason = (i == 1) ? ("读不到 compiler/tool1.bin.gz：" + notFound.getMessage()) : ("compiler/tool" + i + ".bin.gz 读到一半中断：" + notFound.getMessage());
+                // M279：tool dex 数量是变的（1..N）。探到第 i 个资产不存在 = **正常结束**，
+                // 不是错误。只有 i==1（连 tool1 都没）才是真的资源缺失。
+                if (i > 1) break;
+                toolBreakReason = "读不到 compiler/tool1.bin.gz：" + notFound.getMessage();
                 break;
             }
             if (bin.isFile() && bin.length() == b.length) { i++; continue; }

@@ -66,8 +66,9 @@ export function collectResourceRefs(code: string): { type: string; name: string 
   return out;
 }
 
-/** 扫 Java 源码里的第三方 import（jxl / com.google / org.apache 等，非 android/androidx/java 开头） */
-export function collectExternalImports(codes: string[]): string[] {
+/** 扫 Java 源码里的第三方 import（jxl / com.google / org.apache 等，非 android/androidx/java 开头）
+ * @param ownPackages 项目自己的包前缀（如 ["com.momo", "com.jiji.axv"]），这些不算外部依赖 */
+export function collectExternalImports(codes: string[], ownPackages: string[] = []): string[] {
   const set = new Set<string>();
   const re = /\bimport\s+(?:static\s+)?([a-z][\w.]*)/g;
   for (const c of codes) {
@@ -78,7 +79,11 @@ export function collectExternalImports(codes: string[]): string[] {
       // 顶层：jxl → "jxl"；com.google → "com.google"；android/androidx/java/javax/kotlin 过滤
       const top = segs[0];
       if (/^(android|androidx|java|javax|kotlin)$/.test(top)) continue;
+      // org.json / org.w3c 是 Android 框架自带（android.jar 里有），不需第三方 jar
+      if (full.startsWith("org.json.") || full.startsWith("org.w3c.")) continue;
       const pkg = top.match(/^(com|org|io|net|io)$/i) ? segs.slice(0, 2).join(".") : top;
+      // 项目自己的包（import com.momo.xxx.R / com.momo.xxx.YourClass）不算外部依赖
+      if (ownPackages.some((o) => pkg === o || pkg.startsWith(o + ".") || full.startsWith(o + "."))) continue;
       set.add(pkg);
     }
   }

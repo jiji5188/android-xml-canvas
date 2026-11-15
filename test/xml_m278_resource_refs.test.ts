@@ -52,14 +52,19 @@ describe("missingResourceRefs", () => {
 });
 
 describe("collectExternalImports / missingLibPackages", () => {
-  it("抓出 jxl / com.google，过滤 android/androidx/java", () => {
+  it("抓出 jxl / com.google，过滤 android/androidx/java/org.json/org.w3c", () => {
     const imp = collectExternalImports([
-      "import jxl.Workbook;\nimport com.google.gson.Gson;\nimport android.os.Bundle;\nimport androidx.core.content.ContextCompat;\nimport java.io.File;",
+      "import jxl.Workbook;\nimport com.google.gson.Gson;\nimport android.os.Bundle;\nimport androidx.core.content.ContextCompat;\nimport java.io.File;\nimport org.json.JSONObject;\nimport org.w3c.dom.Node;",
     ]);
     expect(imp).toContain("jxl");
     expect(imp).toContain("com.google");
     expect(imp).not.toContain("android");
     expect(imp).not.toContain("java");
+    expect(imp.filter(x => x.startsWith("org.json") || x.startsWith("org.w3c"))).toEqual([]);
+  });
+  it("项目自己的包（com.momo）不算外部依赖", () => {
+    const imp = collectExternalImports(["import com.momo.ReturnSystem3.R; import com.momo.ReturnSystem3.TableAdapter;"], ["com.momo"]);
+    expect(imp).toEqual([]);
   });
   it("libs 里有 google/jxl 的 jar → 不算缺；libs 空 → 全缺", () => {
     expect(missingLibPackages(["com.google", "jxl"], ["libs/google-gson.jar", "libs/jxl-2.6.jar"])).toEqual([]);

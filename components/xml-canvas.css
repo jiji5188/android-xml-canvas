@@ -11261,7 +11261,23 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 }
 .axv-drawer-logcard-latest pre.axv-drawer-log {
   max-height: 40vh;
+  background: color-mix(in srgb, #f9a7a7 45%, transparent);
 }
+/* M276：构建日志卡片 summary 里的「复制」按钮 */
+.axv-drawer-logcopy {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--axv-primary, #4f8cff);
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--axv-primary, #4f8cff) 40%, transparent);
+  border-radius: 5px;
+  background: transparent;
+  flex: none;
+  margin-left: 8px;
+}
+.axv-drawer-logcopy:hover { background: color-mix(in srgb, var(--axv-primary, #4f8cff) 12%, transparent); }
+.axv-drawer-logcopy.axv-drawer-logcopy-ok { color: var(--axv-success, #2ea043); border-color: color-mix(in srgb, var(--axv-success, #2ea043) 40%, transparent); }
 
 
 /* M189 版本信息 + 发布前检查 */

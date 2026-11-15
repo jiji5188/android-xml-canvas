@@ -172,6 +172,40 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, statusSlot, in
                       {l.stage || tr("drawer.log.render", "真机渲染")}
                       {typeof l.ms === "number" ? " · " + l.ms + "ms" : ""}
                       {l.ok ? "" : " · " + tr("drawer.log.fail", "失败")}
+                      <button
+                        type="button"
+                        className="axv-drawer-logcopy"
+                        title={tr("drawer.log.copy", "复制构建日志")}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const txt = l.log || l.logFile || "";
+                          void (async () => {
+                            try {
+                              await navigator.clipboard.writeText(txt);
+                            } catch {
+                              // 旧 WebView 没有 clipboard API，退化成 textarea 复制
+                              const ta = document.createElement("textarea");
+                              ta.value = txt;
+                              ta.style.position = "fixed";
+                              ta.style.opacity = "0";
+                              document.body.appendChild(ta);
+                              ta.select();
+                              document.execCommand("copy");
+                              ta.remove();
+                            }
+                          })();
+                          const btn = e.currentTarget as HTMLElement;
+                          btn.classList.add("axv-drawer-logcopy-ok");
+                          btn.textContent = tr("drawer.log.copied", "已复制");
+                          window.setTimeout(() => {
+                            btn.classList.remove("axv-drawer-logcopy-ok");
+                            btn.textContent = tr("drawer.log.copy", "复制");
+                          }, 1600);
+                        }}
+                      >
+                        {tr("drawer.log.copy", "复制")}
+                      </button>
                     </summary>
                     <pre className="axv-drawer-log">{l.log || l.logFile || tr("drawer.log.none", "本次没有输出日志")}</pre>
                   </details>

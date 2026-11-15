@@ -2726,6 +2726,8 @@ export const SRC_EN: SrcDict = {
   "新建文件": "New file",
   "重命名当前文件": "Rename current file",
   "删除当前文件": "Delete current file",
+  "已关闭「{name}」": "Closed “{name}”",
+
 
 };
 

@@ -305,7 +305,8 @@ export function XmlEditor() {
 
   const currentFile = activeFile(project);
   /** M290：多文件 tab 面板 —— 每个项目文件一个 tab，名字就是文件名；点 tab 切换当前文件。
-   *  取代原来的「文件切换 / 示例项目」两个 select（窄屏放不下且操作藏得深）。 */
+   *  取代原来的「文件切换 / 示例项目」两个 select（窄屏放不下且操作藏得深）。
+   *  M291：长按 / 右键 tab 弹上下文菜单（保存 / 重命名 / 关闭 / 删除）。 */
   const fileTabs = (
     <div className="axv-filetabs" role="tablist" aria-label={tt("项目文件")}>
       {project.files.map((f) => (
@@ -316,7 +317,34 @@ export function XmlEditor() {
           aria-selected={f.id === project.activeId}
           className={"axv-filetab" + (f.id === project.activeId ? " on" : "")}
           title={f.name}
-          onClick={() => selectFile(f.id)}
+          onClick={() => {
+            selectFile(f.id);
+            setMobileTab("xml");
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            openFileTabMenu(f.id, f.name, e.clientX, e.clientY);
+          }}
+          onPointerDown={(e) => {
+            // 长按 500ms 触发（移动端主要交互；桌面端右键也能触发）
+            if (e.pointerType === "mouse") return;
+            const start = { x: e.clientX, y: e.clientY };
+            const timer = window.setTimeout(() => {
+              openFileTabMenu(f.id, f.name, start.x, start.y);
+            }, 500);
+            const cancel = () => {
+              window.clearTimeout(timer);
+              window.removeEventListener("pointerup", cancel);
+              window.removeEventListener("pointercancel", cancel);
+              window.removeEventListener("pointermove", move);
+            };
+            const move = (ev: PointerEvent) => {
+              if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 12) cancel();
+            };
+            window.addEventListener("pointerup", cancel);
+            window.addEventListener("pointercancel", cancel);
+            window.addEventListener("pointermove", move);
+          }}
         >
           <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>description</span>
           <span className="axv-filetab-name">{f.name}</span>
@@ -330,24 +358,6 @@ export function XmlEditor() {
         onClick={() => newFile()}
       >
         <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>add</span>
-      </button>
-      <button
-        type="button"
-        className="axv-filetab-act"
-        title={tt("重命名当前文件")}
-        aria-label={tt("重命名当前文件")}
-        onClick={() => renameActiveFile()}
-      >
-        <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>drive_file_rename_outline</span>
-      </button>
-      <button
-        type="button"
-        className="axv-filetab-act"
-        title={tt("删除当前文件")}
-        aria-label={tt("删除当前文件")}
-        onClick={() => deleteActiveFile()}
-      >
-        <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>delete</span>
       </button>
     </div>
   );
@@ -2973,6 +2983,25 @@ const allDrawableNames = useMemo(() => {
     window.setTimeout(() => setExportNote(""), 2400);
   }, [flushTextTimer, project, xml]);
 
+  /** M291：关闭当前文件 tab（不确认、不删盘，仅从项目里摘掉；剩最后一个时不动） */
+  const closeActiveFile = useCallback(() => {
+    const cur = activeFile(project);
+    if (!cur || project.files.length <= 1) return;
+    flushTextTimer();
+    setProject((p) => {
+      const withSaved = updateFileXml(p, p.activeId, xml);
+      const next = removeFile(withSaved, cur.id);
+      const target = activeFile(next)!;
+      setXml(target.xml);
+      histRef.current = diffHistoryInit(target.xml);
+      syncHist();
+      setSelectedPath(null);
+      return next;
+    });
+    setExportNote(tt("已关闭「{name}」", { name: cur.name }));
+    window.setTimeout(() => setExportNote(""), 2400);
+  }, [flushTextTimer, project, xml]);
+
   /** 手敲代码：最新文本先进 ref（不阻塞输入），状态防抖 250ms 落一次，历史 500ms 合并 */
   const onChangeXmlText = useCallback(
     (next: string) => {
@@ -4109,6 +4138,45 @@ const findResolved = findResolvedNode;
     setSaveAsOpen(true);
   };
 
+  // M291：文件 tab 的长按 / 右键上下文菜单
+  const [fileTabMenu, setFileTabMenu] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
+  const openFileTabMenu = useCallback((id: string, name: string, x: number, y: number) => {
+    setFileTabMenu({ id, name, x, y });
+  }, []);
+  const closeFileTabMenu = useCallback(() => {
+    setFileTabMenu(null);
+  }, []);
+  const fileTabMenuAction = useCallback(
+    (kind: "save" | "rename" | "close" | "delete") => {
+      const cur = activeFile(project);
+      if (cur?.id !== fileTabMenu?.id) closeFileTabMenu();
+      if (kind === "save") void doSave();
+      else if (kind === "rename") renameActiveFile();
+      else if (kind === "close") closeActiveFile();
+      else if (kind === "delete") deleteActiveFile();
+      closeFileTabMenu();
+    },
+    [fileTabMenu, project, doSave, renameActiveFile, closeActiveFile, deleteActiveFile, closeFileTabMenu],
+  );
+  useEffect(() => {
+    if (!fileTabMenu) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if ((t as HTMLElement).closest?.(".axv-filetab-menu")) return;
+      closeFileTabMenu();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeFileTabMenu();
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [fileTabMenu, closeFileTabMenu]);
+
   const confirmSaveAs = async () => {
     const raw = saveAsName.trim() || "activity_main.xml";
     const name = /\.xml$/i.test(raw) ? raw : `${raw}.xml`;
@@ -4610,21 +4678,8 @@ const findResolved = findResolvedNode;
           }
         >
           <div className="axv-mob-tabs-inner" role="tablist" aria-label={tt("视图")}>
-          {/* M290：文件 tab 面板（原来两个 select 的位置）；打开/新建文件自动出现同名 tab */}
+          {/* M291：文件 tab 面板（原来两个 select 的位置）；打开/新建文件自动出现同名 tab */}
           {fileTabs}
-          {/* M31e：「XML 代码」改叫「代码」并挪到「预览」前面 —— 以后要在这里接 Java 代码显示 */}
-          <button
-            role="tab"
-            aria-selected={mobileTab === "xml"}
-            className={mobileTab === "xml" ? "on" : ""}
-            onClick={() => {
-              flushXml(); // M57：切 tab 前把最新文本落状态，预览/视图才能看到刚输的内容
-              setMobileTab("xml");
-            }}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>code_xml</span>
-            {tt("代码")}
-          </button>
           {/* M42：values 资源才有「视图」—— 键值对表格页（.axv-val），紧跟「代码」后面 */}
           {hasViewTab && (
             <button
@@ -4640,8 +4695,8 @@ const findResolved = findResolvedNode;
               {tt("视图")}
             </button>
           )}
-          {/* M42：「预览」只在能画布局的文档上出现（manifest / values / menu 等不显示） */}
-          {!codeOnly && (
+          {/* M42/M291：「预览」只在当前文件是 XML 布局时出现 */}
+          {docKind === "layout" && (
             <button
               role="tab"
               aria-selected={mobileTab === "preview"}
@@ -4656,6 +4711,26 @@ const findResolved = findResolvedNode;
             </button>
           )}
           </div>
+          {fileTabMenu && (
+            <div
+              className="axv-filetab-menu"
+              style={{ position: "fixed", left: fileTabMenu.x, top: fileTabMenu.y, width: 150, zIndex: 200 }}
+              role="menu"
+            >
+              <button role="menuitem" aria-label={tt("保存")} onClick={() => fileTabMenuAction("save")}>
+                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>save</span>{tt("保存")}
+              </button>
+              <button role="menuitem" aria-label={tt("重命名")} onClick={() => fileTabMenuAction("rename")}>
+                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>drive_file_rename_outline</span>{tt("重命名")}
+              </button>
+              <button role="menuitem" aria-label={tt("关闭")} onClick={() => fileTabMenuAction("close")}>
+                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>close</span>{tt("关闭")}
+              </button>
+              <button role="menuitem" aria-label={tt("删除")} onClick={() => fileTabMenuAction("delete")}>
+                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>delete</span>{tt("删除")}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

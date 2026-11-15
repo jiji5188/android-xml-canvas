@@ -183,6 +183,7 @@ import { loadPluginEnabled, togglePluginEnabled, type PluginEnabledMap } from "@
 import { installPlugin, loadInstalledPlugins, type InstalledPlugin } from "@/lib/plugin/installer";
 import { BUILTIN_COMPILER } from "@/lib/plugin/compiler";
 import { useEditorTheme } from "./use-editor-theme";
+import { useCanvasZoom } from "./use-canvas-zoom";
 import { NewProjectDialog } from "./NewProjectDialog";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
@@ -446,13 +447,6 @@ export function XmlEditor() {
   const [resShape, setResShape] = useState<{ name: string; xml: string; forceTree?: boolean } | null>(null);
   /** M4u：从资源树里点开的图片预览 */
   const [resImage, setResImage] = useState<{ rel: string; name: string; url: string } | null>(null);
-  const [scale, setScale] = useState(1);
-  /** M6g：缩放锚点（Ctrl+滚轮/双指捻合后把鼠标下的点维持在原位） */
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const scaleRef = useRef(scale);
-  scaleRef.current = scale;
-  const zoomAnchor = useRef<{ cx: number; cy: number; px: number; py: number } | null>(null);
-  const [zoomHud, setZoomHud] = useState<number | null>(null);
   /** M2r：预览设备尺寸（手机竖屏/横屏/平板…），持久化到 localStorage */
   const [deviceId, setDeviceId] = useState<string>(
     () => (typeof window !== "undefined" ? window.localStorage.getItem("axv.device") ?? "phone" : "phone"),
@@ -910,6 +904,10 @@ export function XmlEditor() {
   // M30b：默认落在「XML 代码」tab
   const [mobileTab, setMobileTab] = useState<"preview" | "xml" | "values">("xml");
 
+  // M303：画布缩放域（scale/zoomHud/手势/快捷键）→ components/use-canvas-zoom.ts
+  const { scale, setScale, scaleRef, stageRef, zoomAnchor, zoomHud, setZoomHud, applyZoom } =
+    useCanvasZoom({ phoneRef, mobileTab });
+
   /** M56：代码 tab 时不需要渲染模型 —— 只在 preview/values 视图才把解析结果交给渲染管线，
    *   这样代码 tab 连续打字时 parse/buildRenderModel/实测回路全不跑（代码高亮不受影响，
    *   那是 CM6 自己的增量解析器，跟这条管线无关）。切回预览/停手后才重新算。 */
@@ -917,117 +915,6 @@ export function XmlEditor() {
   const parsedForRender = previewActive ? parsedXml : "";
 
 
-  /** M6g：统一的缩放入口（带钳位 + 锚点）。anchor 传鼠标/双指中心的视口坐标 */
-  const ZOOM_MIN = 0.25;
-  const ZOOM_MAX = 2;
-  const ZOOM_STEP = 0.1;
-  const applyZoom = useCallback(
-    (next: number, anchor?: { cx: number; cy: number }) => {
-      const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(next * 100) / 100));
-      const ph = phoneRef.current;
-      if (anchor && ph) {
-        const r = ph.getBoundingClientRect();
-        if (r.width > 4 && r.height > 4) {
-          zoomAnchor.current = {
-            cx: anchor.cx,
-            cy: anchor.cy,
-            px: (anchor.cx - r.left) / r.width,
-            py: (anchor.cy - r.top) / r.height,
-          };
-        }
-      }
-      setScale(z);
-      setZoomHud(z);
-    },
-    [],
-  );
-
-  /** 缩放后纠正滚动位置：把锚点那个内容点拉回鼠标处 */
-  useEffect(() => {
-    const a = zoomAnchor.current;
-    zoomAnchor.current = null;
-    const st = stageRef.current;
-    const ph = phoneRef.current;
-    if (!a || !st || !ph) return;
-    const r = ph.getBoundingClientRect();
-    st.scrollLeft += r.left + a.px * r.width - a.cx;
-    st.scrollTop += r.top + a.py * r.height - a.cy;
-  }, [scale]);
-
-  /** 缩放百分比浮层：停手 900ms 后自动消失 */
-  useEffect(() => {
-    if (zoomHud === null) return;
-    const t = window.setTimeout(() => setZoomHud(null), 900);
-    return () => window.clearTimeout(t);
-  }, [zoomHud]);
-
-  /** M6g：Ctrl/Cmd+滚轮、双指捏合（必须原生非 passive 监听才能 preventDefault） */
-  useEffect(() => {
-    if (mobileTab !== "preview") return;
-    const st = stageRef.current;
-    if (!st) return;
-    let pinch0 = 0;
-    let pinchScale0 = 1;
-    const dist = (t: TouchList) =>
-      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-    const mid = (t: TouchList) => ({
-      cx: (t[0].clientX + t[1].clientX) / 2,
-      cy: (t[0].clientY + t[1].clientY) / 2,
-    });
-    const onWheel = (e: WheelEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-      e.preventDefault();
-      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
-      const mag = Math.abs(e.deltaY * unit);
-      const step = ZOOM_STEP * Math.min(3, Math.max(0.5, mag / 100));
-      applyZoom(scaleRef.current - Math.sign(e.deltaY) * step, { cx: e.clientX, cy: e.clientY });
-    };
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 2) return;
-      pinch0 = dist(e.touches);
-      pinchScale0 = scaleRef.current;
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 2 || pinch0 <= 0) return;
-      e.preventDefault();
-      applyZoom(pinchScale0 * (dist(e.touches) / pinch0), mid(e.touches));
-    };
-    const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) pinch0 = 0;
-    };
-    st.addEventListener("wheel", onWheel, { passive: false });
-    st.addEventListener("touchstart", onTouchStart, { passive: true });
-    st.addEventListener("touchmove", onTouchMove, { passive: false });
-    st.addEventListener("touchend", onTouchEnd, { passive: true });
-    st.addEventListener("touchcancel", onTouchEnd, { passive: true });
-    return () => {
-      st.removeEventListener("wheel", onWheel);
-      st.removeEventListener("touchstart", onTouchStart);
-      st.removeEventListener("touchmove", onTouchMove);
-      st.removeEventListener("touchend", onTouchEnd);
-      st.removeEventListener("touchcancel", onTouchEnd);
-    };
-  }, [mobileTab, applyZoom]);
-
-  /** M6g：快捷键 Ctrl/Cmd + = / - / 0 控制画布缩放 */
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-      const k = e.key;
-      if (k === "=" || k === "+") {
-        e.preventDefault();
-        applyZoom(scaleRef.current + ZOOM_STEP);
-      } else if (k === "-" || k === "_") {
-        e.preventDefault();
-        applyZoom(scaleRef.current - ZOOM_STEP);
-      } else if (k === "0") {
-        e.preventDefault();
-        applyZoom(1);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [applyZoom]);
   const [histInfo, setHistInfo] = useState({ canUndo: false, canRedo: false });
 
   /* ===== 撤销 / 重做（M59：diff 栈）=====

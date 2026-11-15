@@ -21,6 +21,7 @@ import { prepareFiles } from "@/lib/xml/native-render";
 import type { RenderFile } from "@/lib/xml/native-render";
 import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, rPackagesFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
 import { axvRuntimeSources, injectAxvLogProvider } from "@/lib/xml/axv-runtime";
+import { autofixJavaSources } from "@/lib/xml/java-autofix";
 import { collectProjectLibs } from "@/lib/xml/project-libs";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
@@ -229,20 +230,6 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           setExportNote(tt("{f} 还没保存，这次打包用的是编辑器里的最新内容", { f: (relNow.split("/").pop() || relNow) }));
         }
         setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
-        // M286：往包里注入「运行日志抽屉」（provider + 生命周期/崩溃钩子 + 半屏抽屉）
-        let javaSourcesForBuild = javaSources;
-        let axvLogOn = false;
-        if (javaSources.length) {
-          const rt = axvRuntimeSources(pkg);
-          javaSourcesForBuild = [...javaSources, ...rt];
-          const inj = injectAxvLogProvider(manifestTextForBuild, pkg);
-          manifestTextForBuild = inj.text;
-          axvLogOn = true;
-          pushBuildLog(false, tt("已注入运行日志抽屉"),
-            inj.injected
-              ? tt("生成的 APK 左上角会多一个「▤ 日志」把手：运行你的 App 时点开就能看生命周期/崩溃/自定义日志，长按把手可隐藏。", {})
-              : tt("已生成日志类，但清单里没找到 <application> 无法挂上 provider（注入失败：{r}）。App 仍能跑，只是没有日志抽屉。", { r: String(inj.reason || "?") }));
-        }
         const prep = prepareFiles(layout, files);
         if (prep.blocked) {
           setApkResult({ ok: false, step: "compile", log: prep.blocked });
@@ -252,6 +239,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         }
         // M278/P2：打包前预检查——代码引用的 R.xxx 资源在 res/ 里是否都齐，缺的提前列出来
         let buildFiles: RenderFile[] = prep.files;
+        let resIndex: Map<string, Set<string>> | null = null;
         try {
           const resNames = prep.files.map((f) => f.path);
           const valuesTexts: Record<string, string> = {};
@@ -260,6 +248,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
             if (/\.xml$/i.test(f.path) && typeof f.text === "string") valuesTexts[f.path] = f.text;
           }
           const idx = buildResNameIndex(resNames, valuesTexts);
+          resIndex = idx;
           const missing = missingResourceRefs(javaSources.map((j) => j.code), idx);
           if (missing.length) {
             const top = missing.slice(0, 12).map((m) => `${m.type}/${m.name}(${m.files}文件)`).join("、");
@@ -288,6 +277,27 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
                 tt("请把这些依赖的 jar 放进项目 libs/ 目录再打包。", {}));
           }
         } catch (e) { /* 预检查失败不阻断 */ }
+        // M286：往包里注入「运行日志抽屉」（provider + 生命周期/崩溃钩子 + 半屏抽屉）
+        // M287：编译前先自动修机械错（补 import / 修 R 大小写），修了什么写进日志
+        let javaSourcesForBuild = javaSources;
+        let axvLogOn = false;
+        if (javaSources.length) {
+          const fixed = autofixJavaSources(javaSources, { resIndex, pkg });
+          if (fixed.reports.length) {
+            const lines = fixed.reports.slice(0, 12).map((r) => `${r.path}\n    ${r.fixes.join("\n    ")}`);
+            pushBuildLog(false, tt("编译前自动修复（{n} 个文件）", { n: fixed.reports.length }), lines.join("\n\n") +
+              (fixed.reports.length > 12 ? `\n…还有 ${fixed.reports.length - 12} 个文件` : ""));
+          }
+          const rt = axvRuntimeSources(pkg);
+          javaSourcesForBuild = [...fixed.sources, ...rt];
+          const inj = injectAxvLogProvider(manifestTextForBuild, pkg);
+          manifestTextForBuild = inj.text;
+          axvLogOn = true;
+          pushBuildLog(false, tt("已注入运行日志抽屉"),
+            inj.injected
+              ? tt("生成的 APK 左上角会多一个「▤ 日志」把手：运行你的 App 时点开就能看生命周期/崩溃/自定义日志，长按把手可隐藏。", {})
+              : tt("已生成日志类，但清单里没找到 <application> 无法挂上 provider（注入失败：{r}）。App 仍能跑，只是没有日志抽屉。", { r: String(inj.reason || "?") }));
+        }
         const r = await buildApk({
           pkg,
           layout,

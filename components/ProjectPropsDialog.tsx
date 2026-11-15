@@ -227,12 +227,15 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
             unify.files.length > 0 ||
             unify.manifests.length > 0 ||
             unify.gradles.length > 0 ||
-            unify.movedDirs.length > 0;
+            unify.movedDirs.length > 0 ||
+            unify.resClassRefs.length > 0 ||
+            unify.assetsHints.length > 0;
           if (didSomething) {
             const parts: string[] = [];
             parts.push(tt("{n} 个源码文件", { n: unify.files.length }));
             if (unify.manifests.length) parts.push(tt("{n} 个 AndroidManifest", { n: unify.manifests.length }));
             if (unify.gradles.length) parts.push(tt("{n} 个 build.gradle", { n: unify.gradles.length }));
+            if (unify.resClassRefs.length) parts.push(tt("{n} 个 res 类名引用已替换", { n: unify.resClassRefs.length }));
             const mvText = unify.movedDirs.length
               ? tt("{n} 个目录已合并", { n: unify.movedDirs.length })
               : unify.warnings.includes("pkg-move-unsupported")
@@ -245,6 +248,10 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
             }
             if (unify.conflicts.length) {
               base += tt("\n冲突 {n} 处：{l}", { n: unify.conflicts.length, l: unify.conflicts.slice(0, 4).join("、") });
+            }
+            if (unify.assetsHints.length) {
+              base += tt("\n⚠ assets 里 {n} 个文件疑似硬编码旧包名（未自动改，请自查）：{l}",
+                { n: unify.assetsHints.length, l: unify.assetsHints.slice(0, 4).join("、") });
             }
             setMsg(base);
             for (const o of olds) p.onPkgSynced?.(o, pkg);

@@ -210,6 +210,10 @@ export interface UnifyResult {
   conflicts: string[];
   /** 非致命告警（web 不支持移动目录等） */
   warnings: string[];
+  /** M280：res/xml 里替换过的自定义 View/Fragment 全限定类名引用（文件列表） */
+  resClassRefs: string[];
+  /** M280：assets 等文本里发现旧包名硬编码的文件（仅提示，不自动改——避免误伤字符串字面量） */
+  assetsHints: string[];
 }
 
 /** 递归建目录（rel 相对项目根，逐段 createEntry；已存在则忽略失败） */
@@ -293,6 +297,26 @@ async function moveTreeInto(
   }
 }
 
+/** M280：列 assets（或任意目录）下的文本文件，用于硬编码包名扫描。限深度+数量防卡。 */
+async function listAssetsTextFiles(source: ProjectSource, root: string): Promise<string[]> {
+  const out: string[] = [];
+  const re = /\.(json|js|ts|xml|properties|conf|txt|ini|yaml|yml|gradle)$/i;
+  let depth = 0;
+  const walk = async (rel: string): Promise<void> => {
+    depth++;
+    if (depth > 12 || out.length > 500) return;
+    const kids = await listEntriesSafe(source, rel);
+    for (const e of kids) {
+      const full = rel ? `${rel}/${e.name}` : e.name;
+      if (e.kind === "dir") await walk(full);
+      else if (re.test(e.name)) out.push(full);
+    }
+    depth--;
+  };
+  await walk(root);
+  return out;
+}
+
 async function listEntriesSafe(source: ProjectSource, rel: string) {
   try {
     const r = await source.listChildren(rel);
@@ -300,6 +324,25 @@ async function listEntriesSafe(source: ProjectSource, rel: string) {
   } catch {
     return [];
   }
+}
+
+/** M280：列项目里所有 res 目录（多模块 app/src/<v>/res + 单模块 src/<v>/res） */
+async function discoverResDirs(source: ProjectSource): Promise<string[]> {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const base of ["app/src", "src"]) {
+    let variants: string[] = [];
+    try {
+      const kids = await source.listChildren(base).catch(() => []);
+      if (Array.isArray(kids)) variants = kids.filter((e) => e.kind === "dir").map((e) => e.name);
+    } catch { /* 跳过 */ }
+    for (const v of variants) {
+      const rel = `${base}/${v}/res`;
+      const probe = await listEntriesSafe(source, rel);
+      if (probe.length && !seen.has(rel)) { seen.add(rel); out.push(rel); }
+    }
+  }
+  return out;
 }
 
 /**
@@ -322,6 +365,8 @@ export async function unifyPackageTo(
     movedDirs: [],
     conflicts: [],
     warnings: [],
+    resClassRefs: [],
+    assetsHints: [],
   };
   const tgt = (target || "").trim();
   if (!tgt) {
@@ -402,6 +447,40 @@ export async function unifyPackageTo(
           else res.gradles.push(gRel);
         }
       }
+    }
+  }
+
+  // 3.5) M280/清单§3：res 里 xml（layout/anim 等）的自定义 View/Fragment 全限定类名引用
+  //  以及 §4：assets 等文本里硬编码的旧包名（仅提示，不自动改——字符串字面量不能误伤）。
+  //  普通 @id / @drawable 资源引用不受包名变更影响，不动。
+  {
+    const resDirs = await discoverResDirs(source);
+    for (const dir of resDirs) {
+      const files = await listAllTextFiles(source, dir);
+      for (const rel of files) {
+        if (!/\.xml$/i.test(rel)) continue;
+        const text = await source.readText(rel).catch(() => null);
+        if (!text) continue;
+        let next = text;
+        let hit = false;
+        for (const o of Object.keys(map)) {
+          // 只替换「类全限定名引用」场景：android:name="com.old.X"（自定义 View/Fragment/Provider）
+          const r = rewritePkgMap(next, { [o]: tgt });
+          if (r.changed) { next = r.text; hit = true; }
+        }
+        if (hit && saveRoot) {
+          const ok = await saveProjectFile(saveRoot, rel, next);
+          if (!ok) res.ok = false;
+          else res.resClassRefs.push(rel);
+        }
+      }
+    }
+    // assets：扫文本文件里的旧包名，列出提示（不自动替换）
+    const assetFiles = await listAssetsTextFiles(source, "assets");
+    for (const rel of assetFiles) {
+      const text = await source.readText(rel).catch(() => null);
+      if (!text) continue;
+      if (Object.keys(map).some((o) => text.includes(o))) res.assetsHints.push(rel);
     }
   }
 

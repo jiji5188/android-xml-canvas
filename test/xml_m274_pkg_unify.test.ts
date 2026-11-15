@@ -217,3 +217,38 @@ describe("unifyPackageTo", () => {
     expect(writes.size).toBe(0);
   });
 });
+
+describe("unifyPackageTo M280（res 类名引用 + assets 硬编码提示）", () => {
+  function resFiles(): Record<string, string> {
+    return {
+      "app/build.gradle": GRADLE,
+      "app/src/main/AndroidManifest.xml": MANIFEST,
+      "app/src/main/java/com/momo/ReturnSystem/MainActivity.java":
+        "package com.momo.ReturnSystem;\n\nclass MainActivity {}\n",
+      "app/src/main/res/layout/toolbar.xml":
+        `<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android">\n  <com.momo.ReturnSystem.view.BottomBar android:id="@+id/bb"/>\n  <com.momo.ReturnSystem2.fragments.HomeFragment/>\n</LinearLayout>\n`,
+      "assets/config.json": '{"pkg": "com.momo.ReturnSystem", "name": "x"}',
+    };
+  }
+
+  it("res xml 里自定义 View/Fragment 全限定类名被替换进 resClassRefs", async () => {
+    const src = fakeSource(resFiles());
+    const st = await detectPkgState(src);
+    const olds = suggestOldPkgs(st, "com.momo.ReturnSystem3");
+    const res = await unifyPackageTo(src, { kind: "native", base: "/tmp/x" }, null, "com.momo.ReturnSystem3", olds);
+    const xml = writes.get("app/src/main/res/layout/toolbar.xml")!;
+    expect(xml).toContain("com.momo.ReturnSystem3.view.BottomBar");
+    expect(xml).toContain("com.momo.ReturnSystem3.fragments.HomeFragment");
+    expect(res.resClassRefs).toContain("app/src/main/res/layout/toolbar.xml");
+  });
+
+  it("assets 硬编码旧包名只列提示、不自动改", async () => {
+    const src = fakeSource(resFiles());
+    const st = await detectPkgState(src);
+    const olds = suggestOldPkgs(st, "com.momo.ReturnSystem3");
+    const res = await unifyPackageTo(src, { kind: "native", base: "/tmp/x" }, null, "com.momo.ReturnSystem3", olds);
+    expect(res.assetsHints).toContain("assets/config.json");
+    // assets 本身没被写（不在 writes 里）
+    expect(writes.has("assets/config.json")).toBe(false);
+  });
+});

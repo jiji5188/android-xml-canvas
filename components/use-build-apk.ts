@@ -52,6 +52,7 @@ export interface UseBuildApkDeps {
   onBuildLog?: (entry: {
     id: string;
     ok: boolean;
+    level?: "ok" | "fail" | "info";
     stage: string;
     ms?: number;
     log?: string;
@@ -68,6 +69,28 @@ export interface UseBuildApkReturn {
 
 /** M188b：没可写根时签名配置存 localStorage 草稿 */
 const LS_KEY_SIGN_DRAFT = "axv-sign-draft";
+
+/** M297：从构建日志里提取前 N 条关键错误，用于 toast 快速定位 */
+function extractTopErrors(log: string, n: number): string {
+  if (!log) return "";
+  const lines = log.split(/\n/);
+  const interesting: string[] = [];
+  for (const raw of lines) {
+    const l = raw.trim();
+    if (!l) continue;
+    // ECJ / aapt2 / D8 常见错误行
+    if (/(ERROR|error:|FATAL|cannot be resolved|unresolved reference|error|Error|Exception|failed|失败)/i.test(l)) {
+      interesting.push(l);
+      if (interesting.length >= n) break;
+    }
+  }
+  if (interesting.length === 0) {
+    // 没匹配到就取后几行非空行
+    const tail = lines.filter(Boolean).slice(-n);
+    return tail.map((l) => "  " + l).join("\n");
+  }
+  return interesting.map((l) => "  " + l).join("\n");
+}
 
 export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
   const {
@@ -94,11 +117,13 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
     files?: number,
     bytes?: number,
     ms?: number,
+    level?: "ok" | "fail" | "info",
   ) => {
     if (!onBuildLog) return;
     onBuildLog({
       id: `apk-${Date.now()}`,
       ok,
+      level: level || (ok ? "ok" : "fail"),
       stage,
       log,
       files,
@@ -192,7 +217,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
                   more: rp.skipped.length > 10 ? "…" : "",
                 }),
               );
-            pushBuildLog(rp.skipped.length > 0, tt("Java 源码收集"), parts.join("\n"));
+            pushBuildLog(true, tt("Java 源码收集"), parts.join("\n"), undefined, undefined, undefined, "info");
           }
         });
         const javaSrcMapped = javaSrc.map((j) => ({ path: j.rel, code: j.text }));
@@ -202,7 +227,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         const rPkg = rPackageFromSources(javaSources);
         const domPkg = rPkg || dominantJavaPackage(javaSources);
         if (domPkg && domPkg !== pkg) {
-          pushBuildLog(false, tt("包名不一致提示"), tt("源码引用 R 的包是 {p}，但当前配置是 {c}。已按 {p} 生成 R.java 并打包，请同步 manifest/build.gradle。", { p: domPkg, c: pkg }));
+          pushBuildLog(true, tt("包名不一致提示"), tt("源码引用 R 的包是 {p}，但当前配置是 {c}。已按 {p} 生成 R.java 并打包，请同步 manifest/build.gradle。", { p: domPkg, c: pkg }), undefined, undefined, undefined, "info");
           pkg = domPkg;
         }
         // M266：项目依赖库（libs/*.jar|aar）→ 设备端 ECJ classpath
@@ -222,7 +247,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           const forced = forceManifestPkg(manifestInfo.text, pkg);
           if (forced.changed) {
             manifestTextForBuild = forced.text;
-            pushBuildLog(false, tt("manifest 包名已对齐"), tt("manifest 里的 package 属性已从旧值改为 {p}（与 Java 源码一致）", { p: pkg }));
+            pushBuildLog(true, tt("manifest 包名已对齐"), tt("manifest 里的 package 属性已从旧值改为 {p}（与 Java 源码一致）", { p: pkg }), undefined, undefined, undefined, "info");
           }
         }
         if (!manifest && manifestTextForBuild) {
@@ -262,14 +287,15 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
             // M284：不只警告——自动补占位让编译能过，并明确告知哪些是占位（运行时可能还是找不到控件）
             const stub = stubMissingRefs(prep.files, missing);
             buildFiles = stub.files;
-            pushBuildLog(false, tt("资源预检查（已自动补占位）"),
+            pushBuildLog(true, tt("资源预检查（已自动补占位）"),
               tt("代码里引用了 res/ 里找不到的资源：{l}{more}",
                 { l: top, more: missing.length > 12 ? `（还有 ${missing.length - 12} 个）` : "" }) +
                 "\n" +
                 tt("已自动生成占位（{n} 个）让编译通过：{s}",
                   { n: stub.stubbed.length, s: stub.stubbed.slice(0, 20).join("、") }) +
                 "\n" +
-                tt("注意：占位只保证编译过，运行时 findViewById 仍可能返回 null。要么在 layout 里真加上 android:id，要么改代码不用它们。", {}));
+                tt("注意：占位只保证编译过，运行时 findViewById 仍可能返回 null。要么在 layout 里真加上 android:id，要么改代码不用它们。", {}),
+              undefined, undefined, undefined, "info");
           }
           // P2：第三方依赖预检查——import 的顶层包在 libs 里对不上就提示
           const extImports = collectExternalImports(javaSources.map((j) => j.code), [pkg]);
@@ -277,11 +303,12 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           const missLibs = missingLibPackages(extImports, libPaths);
           if (missLibs.length) {
             const top = missLibs.slice(0, 10).join("、");
-            pushBuildLog(false, tt("依赖预检查（不阻断，仅提示）"),
+            pushBuildLog(true, tt("依赖预检查（不阻断，仅提示）"),
               tt("代码 import 了这些第三方包，但 libs/ 里没找到对应 jar/aar：{l}{more}",
                 { l: top, more: missLibs.length > 10 ? `（还有 ${missLibs.length - 10} 个）` : "" }) +
                 "\n" +
-                tt("请把这些依赖的 jar 放进项目 libs/ 目录再打包。", {}));
+                tt("请把这些依赖的 jar 放进项目 libs/ 目录再打包。", {}),
+              undefined, undefined, undefined, "info");
           }
         } catch (e) { /* 预检查失败不阻断 */ }
         // M286：往包里注入「运行日志抽屉」（provider + 生命周期/崩溃钩子 + 半屏抽屉）
@@ -292,18 +319,20 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           const fixed = autofixJavaSources(javaSources, { resIndex, pkg });
           if (fixed.reports.length) {
             const lines = fixed.reports.slice(0, 12).map((r) => `${r.path}\n    ${r.fixes.join("\n    ")}`);
-            pushBuildLog(false, tt("编译前自动修复（{n} 个文件）", { n: fixed.reports.length }), lines.join("\n\n") +
-              (fixed.reports.length > 12 ? `\n…还有 ${fixed.reports.length - 12} 个文件` : ""));
+            pushBuildLog(true, tt("编译前自动修复（{n} 个文件）", { n: fixed.reports.length }), lines.join("\n\n") +
+              (fixed.reports.length > 12 ? `\n…还有 ${fixed.reports.length - 12} 个文件` : ""),
+              undefined, undefined, undefined, "info");
           }
           const rt = axvRuntimeSources(pkg);
           javaSourcesForBuild = [...fixed.sources, ...rt];
           const inj = injectAxvLogProvider(manifestTextForBuild, pkg);
           manifestTextForBuild = inj.text;
           axvLogOn = true;
-          pushBuildLog(false, tt("已注入运行日志抽屉"),
+          pushBuildLog(true, tt("已注入运行日志抽屉"),
             inj.injected
               ? tt("生成的 APK 左上角会多一个「▤ 日志」把手：运行你的 App 时点开就能看生命周期/崩溃/自定义日志，长按把手可隐藏。", {})
-              : tt("已生成日志类，但清单里没找到 <application> 无法挂上 provider（注入失败：{r}）。App 仍能跑，只是没有日志抽屉。", { r: String(inj.reason || "?") }));
+              : tt("已生成日志类，但清单里没找到 <application> 无法挂上 provider（注入失败：{r}）。App 仍能跑，只是没有日志抽屉。", { r: String(inj.reason || "?") }),
+            undefined, undefined, undefined, "info");
         }
         const r = await buildApk({
           pkg,
@@ -360,7 +389,14 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           noteTimed(base + suffix + (installMsg ? "\n" + installMsg : ""), 12000);
         } else {
           pushBuildLog(false, tt("打包失败（{step}）", { step: r.step || "?" }), r.log);
-          noteTimed(tt("打包失败（{step}）", { step: r.step || "?" }), 12000);
+          const topErr = extractTopErrors(r.log || "", 3);
+          noteTimed(
+            tt("打包失败（{step}）", { step: r.step || "?" }) +
+            (topErr ? "\n" + topErr : "") +
+            "\n" +
+            tt("详细错误在「问题/日志」抽屉 →「构建日志」查看", {}),
+            15000,
+          );
         }
         return r;
       } catch (e) {

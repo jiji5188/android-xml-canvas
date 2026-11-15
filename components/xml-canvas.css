@@ -11329,6 +11329,10 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-drawer-logcard-err {
   border-color: color-mix(in srgb, var(--axv-danger, #ff5b5b) 55%, transparent);
 }
+/* M297：普通提示（注入日志/预检查/自动修复）既不是成功也不是失败，用中性色 */
+.axv-drawer-logcard-info {
+  border-color: color-mix(in srgb, var(--axv-accent, #4f8cff) 35%, transparent);
+}
 .axv-drawer-logcard summary {
   cursor: pointer;
   font-size: 12px;
@@ -11366,9 +11370,16 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-drawer-logcard-latest.axv-drawer-logcard-err {
   box-shadow: inset 3px 0 0 var(--axv-danger, #ff5b5b);
 }
-.axv-drawer-logcard-latest pre.axv-drawer-log {
+.axv-drawer-logcard-latest.axv-drawer-logcard-info {
+  box-shadow: inset 3px 0 0 var(--axv-accent, #4f8cff);
+}
+/* M297：红色日志底只在「真的失败」时出现；以前所有最新一条都染红，成功也像报错 */
+.axv-drawer-logcard-latest.axv-drawer-logcard-err pre.axv-drawer-log {
   max-height: 40vh;
   background: color-mix(in srgb, #f9a7a7 45%, transparent);
+}
+.axv-drawer-logcard-latest pre.axv-drawer-log {
+  max-height: 40vh;
 }
 /* M276：构建日志卡片 summary 里的「复制」按钮 */
 .axv-drawer-logcopy {

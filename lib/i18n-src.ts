@@ -1102,6 +1102,7 @@ export const SRC_EN: SrcDict = {
   "我的项目": "My project",
   "项目文件（多文件切换）": "Project files (switch between files)",
   "库管理": "Libraries",
+  "详细错误在「问题/日志」抽屉 →「构建日志」查看": "See details in the Problems/Logs drawer → Build log",
   "（已编译 {n} 个 Java 类，注入 {d} 个 dex）": "(compiled {n} Java classes, injected {d} dex)",
   "（命中编译缓存，注入 {d} 个 dex）": "(hit compile cache, injected {d} dex)",
   "（⚠ 未注入 Java dex，实际还是布局壳）": "(⚠ no Java dex injected, still a layout shell)",

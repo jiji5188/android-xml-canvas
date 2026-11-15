@@ -26,6 +26,8 @@ const TABS: DrawerTabDef[] = [
 export interface BuildLogEntry {
   id: string;
   ok: boolean;
+  /** M297：info = 普通提示（绿色/红色都不合适），不显示「失败」 */
+  level?: "ok" | "fail" | "info";
   stage?: string;
   ms?: number;
   log?: string;
@@ -214,7 +216,7 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, o
                     open={i === 0}
                     className={
                       "axv-drawer-logcard" +
-                      (l.ok ? "" : " axv-drawer-logcard-err") +
+                      (l.ok ? "" : l.level === "info" ? " axv-drawer-logcard-info" : " axv-drawer-logcard-err") +
                       (i === 0 ? " axv-drawer-logcard-latest" : "")
                     }
                   >
@@ -222,7 +224,7 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, o
                       <span className="axv-drawer-logdot" aria-hidden="true" />
                       {l.stage || tr("drawer.log.render", "真机渲染")}
                       {typeof l.ms === "number" ? " · " + l.ms + "ms" : ""}
-                      {l.ok ? "" : " · " + tr("drawer.log.fail", "失败")}
+                      {l.ok || l.level === "info" ? "" : " · " + tr("drawer.log.fail", "失败")}
                       <button
                         type="button"
                         className="axv-drawer-logcopy"

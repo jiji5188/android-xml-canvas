@@ -5,7 +5,7 @@
 
 import type { ReactNode } from "react";
 
-export type LeftView = "parts" | "layers" | "ai" | "code" | "res" | "assets" | "settings" | "about";
+export type LeftView = "parts" | "layers" | "ai" | "code" | "res" | "assets" | "libs" | "settings" | "about";
 
 interface RailItem {
   view: LeftView;
@@ -21,6 +21,7 @@ const TOP_ITEMS: RailItem[] = [
   { view: "ai", icon: "auto_awesome", titleKey: "rail.ai", fallback: "AI 助手" }, // i18n-ignore
   { view: "assets", icon: "category", titleKey: "rail.resources", fallback: "资源" }, // i18n-ignore
   { view: "res", icon: "folder_open", titleKey: "rail.res", fallback: "项目管理" }, // i18n-ignore
+  { view: "libs", icon: "inventory_2", titleKey: "rail.libs", fallback: "库管理" }, // i18n-ignore
 ];
 
 /** 下半部分：设置 / 关于（中间用弹性空隙顶到底部） */
@@ -36,6 +37,7 @@ const TITLES: Record<LeftView, { key: string; fallback: string }> = {
   code: { key: "rail.code", fallback: "XML 代码" }, // i18n-ignore
   res: { key: "rail.res", fallback: "项目管理" }, // i18n-ignore
   assets: { key: "rail.resources", fallback: "资源" }, // i18n-ignore
+  libs: { key: "rail.libs", fallback: "库管理" }, // i18n-ignore
   settings: { key: "rail.settings", fallback: "设置" }, // i18n-ignore
   about: { key: "rail.about", fallback: "关于" }, // i18n-ignore
 };

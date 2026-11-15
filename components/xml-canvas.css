@@ -11869,3 +11869,151 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   color: var(--axv-on-primary, #fff);
   border-color: transparent;
 }
+
+/* M295：库管理面板 */
+.axv-libs-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.axv-libs-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.axv-libs-tabs button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.axv-libs-tabs button.on {
+  background: rgba(0,0,0,0.06);
+  font-weight: 600;
+}
+.axv-libs-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+}
+.axv-libs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+.axv-libs-btn.primary {
+  background: var(--axv-primary, #04409f);
+  color: var(--axv-on-primary, #fff);
+  border-color: transparent;
+}
+.axv-libs-list {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 8px 12px;
+}
+.axv-libs-empty {
+  padding: 16px 8px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(0,0,0,0.5);
+}
+.axv-libs-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+}
+.axv-libs-item:hover {
+  background: rgba(0,0,0,0.04);
+}
+.axv-libs-item-text {
+  min-width: 0;
+  flex: 1;
+}
+.axv-libs-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-libs-item-rel {
+  font-size: 11px;
+  color: rgba(0,0,0,0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-libs-loading {
+  padding: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(0,0,0,0.5);
+}
+.axv-libs-dl-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 16px;
+}
+.axv-libs-dl-panel {
+  width: 100%;
+  max-width: 320px;
+  background: var(--axv-panel-bg, #fff);
+  color: var(--axv-text, #111827);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+  box-sizing: border-box;
+}
+.axv-libs-dl-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.axv-libs-field {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(0,0,0,0.6);
+}
+.axv-libs-field input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 9px;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.axv-libs-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(0,0,0,0.55);
+}
+.axv-libs-dl-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}

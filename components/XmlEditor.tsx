@@ -224,6 +224,7 @@ import { SigningDialog } from "./SigningDialog";
 import { ApkRepackDialog } from "./ApkRepackDialog";
 import { readSigningFromGradle } from "@/lib/xml/signing";
 import { LeftRail, type LeftView } from "./LeftRail";
+import { LibsPanel } from "./LibsPanel";
 import { ProblemsDrawer } from "./ProblemsDrawer";
 import {
   subscribeRuntimeLog,
@@ -5179,6 +5180,19 @@ const findResolved = findResolvedNode;
               resExtras={resExtras}
               onOpenDrawable={(_rel, name, xml) => setResShape({ name, xml })}
               onPreviewImage={(rel, name, url) => setResImage({ rel, name, url })}
+            />
+          )}
+
+          {leftView === "libs" && (
+            <LibsPanel
+              tr={tr}
+              aiFileIo={aiFileIo}
+              nativeProjectRoot={activeProject?.source?.rootPath ?? null}
+              refreshKey={projectRev}
+              onNote={(text) => {
+                setExportNote(text);
+                window.setTimeout(() => setExportNote(" "), 3200);
+              }}
             />
           )}
 

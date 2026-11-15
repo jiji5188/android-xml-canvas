@@ -183,6 +183,7 @@ import { loadPluginEnabled, togglePluginEnabled, type PluginEnabledMap } from "@
 import { installPlugin, loadInstalledPlugins, type InstalledPlugin } from "@/lib/plugin/installer";
 import { BUILTIN_COMPILER } from "@/lib/plugin/compiler";
 import { useEditorTheme } from "./use-editor-theme";
+import { NewProjectDialog } from "./NewProjectDialog";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
 import { loadLangPref, saveLangPref, resolveLang, makeT, type LangPref } from "@/lib/i18n";
@@ -5419,134 +5420,27 @@ const findResolved = findResolvedNode;
         </div>
       ) : null}
 
-      {/* M24：新建项目对话框 */}
-      {newProjOpen ? (
-        <div
-          className="axv-saveas-mask"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setNewProjOpen(false);
-          }}
-        >
-          <div className="axv-saveas-card">
-            <div className="axv-saveas-title">{tr("proj.newTitle", "新建项目")}</div>
-            <div className="axv-saveas-hint">
-              {tr(
-                "proj.newHint",
-                tt("会在工作目录里直接建出完整工程：项目名/app/src/main/{java,res,AndroidManifest.xml} + gradle 文件。不选图标就用默认自适应图标。"),
-              )}
-            </div>
-            <label className="axv-saveas-field">
-              <span>{tr("proj.newName", "项目名")}</span>
-              <input
-                className="axv-saveas-input axv-newproj-input"
-                value={newProjName}
-                autoFocus
-                spellCheck={false}
-                placeholder="MyApp"
-                onChange={(e) => setNewProjName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void createNewProject(newProjName, newProjPkg);
-                  if (e.key === "Escape") setNewProjOpen(false);
-                }}
-              />
-            </label>
-            {/* M176：包名（选填，留空按项目名自动 com.example.xxx） */}
-            <label className="axv-saveas-field">
-              <span>{tr("proj.newPkg", "包名")}</span>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <input
-                  className="axv-saveas-input"
-                  style={{ flex: 1 }}
-                  value={newProjPkg}
-                  spellCheck={false}
-                  placeholder={`com.example.${safeProjectName(newProjName).toLowerCase().replace(/_+/g, "")}`}
-                  onChange={(e) => setNewProjPkg(e.target.value)}
-                />
-                {newProjPkg ? (
-                  <button
-                    type="button"
-                    className="axv-ws-link"
-                    title={tr("proj.newPkgReset", "清空，按项目名自动生成")}
-                    onClick={() => setNewProjPkg("")}
-                  >
-                    {tr("proj.newPkgReset", "清空")}
-                  </button>
-                ) : null}
-              </div>
-              <span className="axv-saveas-subhint">
-                {tr(
-                  "proj.newPkgHint",
-                  tt("选填。留空则按项目名自动生成 com.example.{name}，写进 build.gradle 的 namespace / applicationId。"),
-                )}
-              </span>
-            </label>
-            {/* M31i：项目图标（不选就是默认自适应图标） */}
-            <div className="axv-saveas-field axv-newproj-iconrow">
-              <span>{tr("proj.newIcon", "项目图标")}</span>
-              <div className="axv-newproj-iconbox">
-                <span className="axv-newproj-iconprev" aria-hidden="true">
-                  {newProjIcon ? (
-                    <img src={newProjIcon.dataUrl} alt="" />
-                  ) : (
-                    <img src={DEFAULT_ICON_URL} alt="" />
-                  )}
-                </span>
-                <label className="axv-set-btn axv-newproj-iconpick">
-                  {tr("proj.newPickIcon", "选图片…")}
-                  <input
-                    type="file"
-                    accept="image/png,image/webp,image/jpeg"
-                    hidden
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = "";
-                      if (!f) return;
-                      if (f.size > 2 * 1024 * 1024) {
-                        setExportNote(tt("图标建议小于 2MB"));
-                        window.setTimeout(() => setExportNote(" "), 3000);
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        const dataUrl = String(reader.result || "");
-                        const comma = dataUrl.indexOf(",");
-                        if (comma < 0) return;
-                        setNewProjIcon({
-                          dataUrl,
-                          base64: dataUrl.slice(comma + 1),
-                          mime: f.type || "image/png",
-                        });
-                      };
-                      reader.readAsDataURL(f);
-                    }}
-                  />
-                </label>
-                {newProjIcon ? (
-                  <button className="axv-ws-link" onClick={() => setNewProjIcon(null)}>
-                    {tr("proj.newIconReset", "用默认")}
-                  </button>
-                ) : (
-                  <span className="axv-newproj-icontip">{tr("proj.newIconTip", "默认图标")}</span>
-                )}
-              </div>
-            </div>
-            <div className="axv-saveas-btns">
-              <button className="axv-set-btn" onClick={() => setNewProjOpen(false)} disabled={newProjBusy}>
-                {tr("save.cancel", "取消")}
-              </button>
-              <button
-                className="axv-set-btn axv-saveas-ok axv-newproj-ok"
-                onClick={() => void createNewProject(newProjName, newProjPkg)}
-                disabled={newProjBusy || (newProjPkg.trim() !== "" && validatePackageName(newProjPkg) !== null)}
-              >
-                {newProjBusy ? tr("proj.newBusy", "创建中…") : tr("proj.newOk", "创建项目")}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* M24/M302：新建项目对话框 → components/NewProjectDialog.tsx */}
+      <NewProjectDialog
+        open={newProjOpen}
+        name={newProjName}
+        pkg={newProjPkg}
+        icon={newProjIcon}
+        busy={newProjBusy}
+        defaultIconUrl={DEFAULT_ICON_URL}
+        tr={tr}
+        onClose={() => setNewProjOpen(false)}
+        setName={setNewProjName}
+        setPkg={setNewProjPkg}
+        setIcon={setNewProjIcon}
+        create={(n, p) => void createNewProject(n, p)}
+        safeName={safeProjectName}
+        validatePkg={validatePackageName}
+        onToast={(m) => {
+          setExportNote(m);
+          window.setTimeout(() => setExportNote(" "), 3000);
+        }}
+      />
 
       {imgExportOpen ? (
         <ExportImageModal

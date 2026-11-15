@@ -193,6 +193,7 @@ import { useWorkspaceRefresh } from "./use-workspace-refresh";
 import { useProjectCreate } from "./use-project-create";
 import { useProjectRename } from "./use-project-rename";
 import { useSaveDomain } from "./use-save-domain";
+import { useExportRender } from "./use-export-render";
 import { NewProjectDialog } from "./NewProjectDialog";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
@@ -2750,77 +2751,22 @@ const findResolved = findResolvedNode;
    *  避免别处打开工程时「找不到图标文件」。*/
   /** M190：导出整个可编译项目（zip）——手机上没有 Gradle/JDK，出 release 包得拿到电脑上，
    *  所以这里把整个项目（含二进制资源）打包，附一份打包说明。 */
-  const doExportProject = async () => {
-    const io = aiFileIo;
-    if (!io) {
-      flashNote(tt("先打开一个项目目录，再导出"), 3200);
-      return;
-    }
-    const name = activeProject?.name || "project";
-    const found = await readAppGradle(projectSaveRoot(activeProject));
-    const gradleTxt = found?.text ?? null;
-    const info = gradleTxt ? readPublishInfo(gradleTxt) : null;
-    const sign = gradleTxt ? readSigningFromGradle(gradleTxt) : null;
-    setExportNote(tt("正在打包项目…"));
-    try {
-      const r = await exportProjectZip({
-        io,
-        projectName: name,
-        pkg: info?.applicationId || info?.namespace || null,
-        versionName: info?.versionName || null,
-        storeFile: sign?.storeFile || null,
-        alias: sign?.alias || null,
-      });
-      if (!r.ok) {
-        setExportNote(tt("导出失败：{reason}", { reason: r.error || "未知错误" }));
-        return;
-      }
-      setExportNote(
-        tt("已导出 {name}（{n} 个文件，{mb} MB）", {
-          name: r.filename || "",
-          n: r.files,
-          mb: (r.bytes / 1024 / 1024).toFixed(2),
-        }) + (r.skipped.length ? tt("；跳过 {n} 项（见包内「跳过文件清单.txt」）", { n: r.skipped.length }) : ""),
-      );
-      window.setTimeout(() => setExportNote(""), 6000);
-    } catch (e) {
-      setExportNote(tt("导出失败：{reason}", { reason: e instanceof Error ? e.message : String(e) }));
-    }
-  };
+  /** M313：导出/真机渲染域（doExportProject / doDownloadResZip / doRealRender）→ components/use-export-render.ts */
+  const { doExportProject, doDownloadResZip, doRealRender } = useExportRender(() => ({
+    aiFileIo,
+    flashNote,
+    activeProject,
+    setExportNote,
+    codeOnly,
+    projRoot,
+    currentSaveInput,
+    bumpResCache,
+    openRel,
+    realRenderBusy,
+    setRealRenderBusy,
+    setBuildLogs,
+  }));
 
-  const doDownloadResZip = () => {
-    // M37b：非布局文件没有「res 包」概念，直接阻止
-    if (codeOnly) {
-      flashNote(tt("当前文件不是布局，无法导出 res 包；直接「保存」写回原文件即可"), 4600);
-      return;
-    }
-    // M36：有打开的项目 → 直接写进它的 res 目录，不再丢一个 res.zip 在工作目录根
-    if (projRoot) {
-      void saveResFiles(projRoot, buildSaveFiles(currentSaveInput())).then((r) => {
-        if (r.ok && r.written > 0) bumpResCache();
-        setExportNote(
-          r.ok
-            ? tt("已写入《{name}》的 app/src/main/res/：{n}/{total} 个文件", { name: activeProject?.name || tt("项目"), n: r.written, total: r.total }) +
-                (r.failed.length ? tt("（失败 {n}）", { n: r.failed.length }) : "")
-            : tt("写入项目失败：{reason}", { reason: r.failed[0] || tt("目录不可写") }),
-        );
-        window.setTimeout(() => setExportNote(""), 4800);
-      });
-      return;
-    }
-    const { count, missing } = downloadResZip(currentSaveInput());
-    setExportNote(
-      tt("已导出 res.zip（{n} 个文件）", { n: count }) +
-        (missing.length
-          ? tt("；还有 {n} 个 @drawable 引用未覆盖：{list}{more}（需上传 res 目录补齐）", { n: missing.length, list: missing.slice(0, 5).join(", "), more: missing.length > 5 ? " …" : "" })
-          : tt("；布局里引用的图标资源已全部包含")),
-    );
-    window.setTimeout(() => setExportNote(""), 4200);
-  };
-
-  /** M154：真机渲染——把当前 xml + 依赖资源交给设备端 aapt2 现场编译，
-   *  再用系统 LayoutInflater 渲染（不是 CSS 模拟，能对照出 canvas 的偏差）。
-   *  M158：编译前先从项目 res 里按引用递归补齐（资源列表里有的文件，之前没进文件清单）。 */
   /** M188b：构建日志（真机渲染 pipeline，新在前），给底部抽屉「构建日志」tab */
   const [buildLogs, setBuildLogs] = useState<
     {
@@ -2857,73 +2803,6 @@ const findResolved = findResolvedNode;
     },
     [],
   );
-
-  const doRealRender = () => {
-    if (realRenderBusy) return;
-    const input = currentSaveInput();
-    const name = (input.name || "activity_main.xml").replace(/\.xml$/i, "");
-    const base = buildRealRenderFiles(input);
-    setRealRenderBusy(true);
-    setExportNote(tt("正在收集布局引用的资源…"));
-    void collectProjectRes(aiFileIo, openRel, base)
-      .then((collected) => {
-        const stubNote = collected.stubbed?.length
-          ? tt("；{n} 个资源项目里没有，已用透明占位顶住", { n: collected.stubbed.length })
-          : "";
-        setExportNote(
-          (collected.added
-            ? tt("已补齐 {n} 个项目资源，正在用设备上的 aapt2 编译…", { n: collected.added })
-            : tt("正在用设备上的 aapt2 编译资源包…")) + stubNote,
-        );
-        return renderReal(name, collected.files);
-      })
-      .then((r) => {
-        setRealRenderBusy(false);
-        setBuildLogs((prev) =>
-          [
-            {
-              id: String(Date.now()),
-              ok: !!r.ok,
-              stage: r.ok
-                ? tt("真机渲染")
-                : tt("真机渲染（{stage}）", { stage: r.stage || tt("未知") }),
-              ms: r.ms,
-              log: r.log,
-              logFile: r.logFile,
-              files: r.files,
-              bytes: r.bytes,
-            },
-            ...prev,
-          ].slice(0, 20),
-        );
-        if (r.ok) {
-          setExportNote(
-            tt("真机渲染：{n} 个文件 → 资源包 {kb} KB（编译 {ms} ms），已打开真控件预览\n日志：{log}", {
-              n: r.files ?? 0,
-              kb: Math.round((r.bytes ?? 0) / 1024),
-              ms: r.ms ?? 0,
-              log: r.logFile || tt("（无）"),
-            }),
-          );
-        } else {
-          setExportNote(
-            tt("真机渲染失败（{stage}）：{log}\n完整日志：{file}", {
-              stage: r.stage || tt("未知"),
-              // M170：错误正文都在日志尾部（前面是 framework/compile 的例行行），
-              // 显示尾部 700 字比显示前 300 字有用得多
-              log: "…" + (r.log || "").slice(-700),
-              file: r.logFile || tt("（写日志失败）"),
-            }),
-          );
-        }
-        window.setTimeout(() => setExportNote(""), r.ok ? 5200 : 12000);
-      })
-      .catch((e) => {
-        setRealRenderBusy(false);
-        setExportNote(tt("真机渲染失败：{reason}", { reason: String(e) }));
-        window.setTimeout(() => setExportNote(""), 8000);
-      });
-  };
 
   const clearRes = () => {
     setResExtras(null);

@@ -184,6 +184,7 @@ import { installPlugin, loadInstalledPlugins, type InstalledPlugin } from "@/lib
 import { BUILTIN_COMPILER } from "@/lib/plugin/compiler";
 import { useEditorTheme } from "./use-editor-theme";
 import { useCanvasZoom } from "./use-canvas-zoom";
+import { useCanvasAssets } from "./use-canvas-assets";
 import { NewProjectDialog } from "./NewProjectDialog";
 import { ThemeEditor } from "@/components/ThemeEditor";
 import { ProjectPanel } from "@/components/ProjectPanel";
@@ -439,52 +440,8 @@ export function XmlEditor() {
   }, []);
   /** M101：toast 定时器（连续提示时先清上一个，避免新提示被旧定时器提前抹掉） */
   const noteTimerRef = useRef<number | null>(null);
-  /** M11j：正在编辑的生成图标（vector） */
-  const [resIcon, setResIcon] = useState<{ name: string; xml: string; attr?: string } | null>(
-    null
-  );
-  /** M4u：从资源树里直接打开的「绘制编辑器」（drawable/*.xml） */
-  const [resShape, setResShape] = useState<{ name: string; xml: string; forceTree?: boolean } | null>(null);
-  /** M4u：从资源树里点开的图片预览 */
-  const [resImage, setResImage] = useState<{ rel: string; name: string; url: string } | null>(null);
-  /** M2r：预览设备尺寸（手机竖屏/横屏/平板…），持久化到 localStorage */
-  const [deviceId, setDeviceId] = useState<string>(
-    () => (typeof window !== "undefined" ? window.localStorage.getItem("axv.device") ?? "phone" : "phone"),
-  );
-  const device = deviceById(deviceId);
-
-  const changeDevice = (id: string) => {
-    setDeviceId(id);
-    try { window.localStorage.setItem("axv.device", id); } catch { /* 静默 */ }
-  };
-
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
-  const [leftView, setLeftView] = useState<LeftView>("parts");
-  /* ===== M20m：图层锁定（锁定后画布点不中、不能拖动/上下移） ===== */
-  const [lockedPaths, setLockedPaths] = useState<Set<string>>(new Set());
-  const toggleLockPath = useCallback((path: string) => {
-    setLockedPaths((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  }, []);
-  /** 自己或任一祖先被锁定 → 视为锁定（路径形如 #0/1/2） */
-  const isPathLocked = useCallback(
-    (path: string) => {
-      let cur = path;
-      for (;;) {
-        if (lockedPaths.has(cur)) return true;
-        const i = cur.lastIndexOf("/");
-        if (i < 0) return false;
-        cur = cur.slice(0, i);
-      }
-    },
-    [lockedPaths],
-  );
-
+  // M304：画布资产/设备/面板状态域（resIcon/resShape/resImage + device + 锁定 + 面板开合）→ components/use-canvas-assets.ts
+  const { resIcon, setResIcon, resShape, setResShape, resImage, setResImage, deviceId, device, changeDevice, leftOpen, setLeftOpen, rightOpen, setRightOpen, leftView, setLeftView, lockedPaths, toggleLockPath, isPathLocked } = useCanvasAssets();
   /* ===== M16i：工作目录 ===== */
   const [projectTab, setProjectTab] = useState<"projects" | "current">("current");
   const [wsState, setWsState] = useState<WsInfo | null>(null);

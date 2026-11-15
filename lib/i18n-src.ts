@@ -1183,6 +1183,8 @@ export const SRC_EN: SrcDict = {
   "代码里引用了 res/ 里找不到的资源：{l}{more}": "Code references resources not found in res/: {l}{more}",
   "{n} 个 res 类名引用已替换": "{n} res class-name refs replaced",
   "⚠ assets 里 {n} 个文件疑似硬编码旧包名（未自动改，请自查）：{l}": "⚠ {n} files in assets likely hardcode the old package name (not auto-changed, review them): {l}",
+  "⚠ build.gradle 未同步：{m}（请手动改 namespace/applicationId）": "⚠ build.gradle not synced: {m} (edit namespace/applicationId manually)",
+  "没找到 build.gradle": "build.gradle not found",
   "代码 import 了这些第三方包，但 libs/ 里没找到对应 jar/aar：{l}{more}": "Code imports these third-party packages but no matching jar/aar found in libs/: {l}{more}",
   "请把这些依赖的 jar 放进项目 libs/ 目录再打包。": "Put these dependencies' jars into the project libs/ directory, then build again.",
   "包名已统一：{s}": "Package unified: {s}",

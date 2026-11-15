@@ -381,7 +381,9 @@ export async function unifyPackageTo(
     if (raw.some((q) => q !== p && p.startsWith(q + "."))) continue;
     map[p] = tgt;
   }
-  if (!Object.keys(map).length) return res;
+  // M282：以前 map 空就直接 return，导致「源码已是新包名、只差 gradle」的情况下 gradle 也不改。
+  // 现在：map 空时源码/manifest 各段自然是 no-op（rewritePkgMap 空 map 返回 unchanged），
+  // 但仍会跑 gradle / res / assets 同步。
 
   // 1) 源码 + xml 内容
   const srcRoots = await discoverSrcRoots(source);
@@ -432,19 +434,34 @@ export async function unifyPackageTo(
   }
 
   // 3) build.gradle 的 namespace / applicationId
-  const gRel = gradleRel || GRADLE_CANDIDATES.find(() => true);
-  if (gRel) {
-    const gText = await source.readText(gRel).catch(() => null);
-    if (gText) {
+  // M282：以前 blindly 用 gradleRel 或第一个候选，读不到 / 改不动就静默跳过，
+  // 用户以为「包名改了但 gradle 没变」。现在：逐个候选找存在的、失败给明确告警。
+  {
+    const cands = gradleRel ? [gradleRel, ...GRADLE_CANDIDATES] : GRADLE_CANDIDATES;
+    let gRel: string | null = null;
+    let gText: string | null = null;
+    for (const rel of cands) {
+      const t = await source.readText(rel).catch(() => null);
+      if (t) { gRel = rel; gText = t; break; }
+    }
+    if (!gRel || !gText) {
+      res.warnings.push("gradle-not-found");
+    } else {
       const r = setGradlePackage(gText, tgt);
-      if (r.ok && r.text !== gText) {
+      if (!r.ok) {
+        res.warnings.push(`gradle-unsupported:${gRel}:${r.msg || ""}`);
+      } else if (r.text !== gText) {
         if (!saveRoot) {
           res.ok = false;
           res.warnings.push("no-save-root");
         } else {
           const ok = await saveProjectFile(saveRoot, gRel, r.text);
-          if (!ok) res.ok = false;
-          else res.gradles.push(gRel);
+          if (!ok) {
+            res.ok = false;
+            res.warnings.push(`gradle-save-failed:${gRel}`);
+          } else {
+            res.gradles.push(gRel);
+          }
         }
       }
     }

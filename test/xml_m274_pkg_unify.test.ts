@@ -252,3 +252,39 @@ describe("unifyPackageTo M280（res 类名引用 + assets 硬编码提示）", (
     expect(writes.has("assets/config.json")).toBe(false);
   });
 });
+
+describe("unifyPackageTo M282（gradle 同步不再被静默跳过）", () => {
+  it("map 空（源码已是新包名）仍同步 gradle", async () => {
+    const files: Record<string, string> = {
+      "app/build.gradle": GRADLE,
+      "app/src/main/java/com/a/Main.java": "package com.a;\nclass Main{}",
+    };
+    const src = fakeSource(files);
+    // 目标 com.a 已是源码包名 → map 空；但 gradle 是 com.momo.ReturnSystem2 → 仍要改到 com.a
+    const res = await unifyPackageTo(src, { kind: "native", base: "/tmp/x" }, null, "com.a", []);
+    expect(res.gradles).toContain("app/build.gradle");
+    const g = writes.get("app/build.gradle")!;
+    expect(g).toContain('namespace "com.a"');
+    expect(g).toContain('applicationId "com.a"');
+  });
+
+  it("没找到 build.gradle → 明确告警 gradle-not-found", async () => {
+    const files: Record<string, string> = {
+      "app/src/main/java/com/a/Main.java": "package com.a;\nclass Main{}",
+    };
+    const src = fakeSource(files);
+    const res = await unifyPackageTo(src, { kind: "native", base: "/tmp/x" }, null, "com.b", ["com.a"]);
+    expect(res.warnings).toContain("gradle-not-found");
+  });
+
+  it("gradle 里没有 namespace/applicationId → 告警 gradle-unsupported", async () => {
+    const files: Record<string, string> = {
+      "app/build.gradle": "plugins { id 'com.android.application' }\nandroid { compileSdk 35 }",
+      "app/src/main/java/com/a/Main.java": "package com.a;\nclass Main{}",
+    };
+    const src = fakeSource(files);
+    const res = await unifyPackageTo(src, { kind: "native", base: "/tmp/x" }, null, "com.b", ["com.a"]);
+    expect(res.warnings.some((w) => w.startsWith("gradle-unsupported:"))).toBe(true);
+    expect(res.gradles).toEqual([]);
+  });
+});

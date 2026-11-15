@@ -203,12 +203,17 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
         }
       }
       // 3) 包名：gradle 的 namespace/applicationId + 源码 package 声明 + 源码目录
+      // M282：修复「改了包名但 build.gradle 没变」——以前第 4 步用 gradle.text（React state
+      // 闭包里还是旧值，setGradle 只是排队更新）把旧内容写回磁盘，覆盖了 unify 刚改好的 gradle。
+      // 改：用局部变量 gradleTextToSave 记新文本，第 4 步写它。
+      let gradleTextToSave: string | null = gradle ? gradle.text : null;
       if (gradle && pkg && pkg !== origin.pkg) {
         const r = setGradlePackage(gradle.text, pkg);
         if (!r.ok) {
           setMsg(r.msg || tt("包名写入失败"));
           return;
         }
+        gradleTextToSave = r.text;
         setGradle({ ...gradle, text: r.text });
         // M274：一次把所有「残留包名」（不止 gradle 那一个）统一到新包名，
         //  源码 / manifest / gradle / 源码目录全改，ReturnSystem/2/3 共存这种后遗症一并清掉
@@ -253,6 +258,12 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
               base += tt("\n⚠ assets 里 {n} 个文件疑似硬编码旧包名（未自动改，请自查）：{l}",
                 { n: unify.assetsHints.length, l: unify.assetsHints.slice(0, 4).join("、") });
             }
+            const gw = unify.warnings.find((w) => w.startsWith("gradle-"));
+            if (gw) {
+              base += tt("\n⚠ build.gradle 未同步：{m}（请手动改 namespace/applicationId）", {
+                m: gw === "gradle-not-found" ? tt("没找到 build.gradle") : gw.replace(/^gradle-\w+:/, ""),
+              });
+            }
             setMsg(base);
             for (const o of olds) p.onPkgSynced?.(o, pkg);
           } else {
@@ -262,8 +273,9 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
         }
       }
       // 4) 依赖（gradle 正文已在内存里改过）
-      if (gradle) {
-        const ok = await saveRel(p, gradle.rel, gradle.text);
+      // M282：必须写 gradleTextToSave（含包名新值），不能写闭包里的 gradle.text（旧值）
+      if (gradle && gradleTextToSave !== null) {
+        const ok = await saveRel(p, gradle.rel, gradleTextToSave);
         if (!ok) {
           setMsg(tt("build.gradle 写入失败（可能没有写权限）。"));
           return;
@@ -273,7 +285,7 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
       p.onSaved();
       // 保留第 3 步的包名同步详情（「已保存」会把具体结果冲掉）：
       // 有同步结果就展示它，没有就展示「已保存」
-      setMsg(msg.startsWith("包名已同步") ? msg : tt("已保存"));
+      setMsg(msg.startsWith("包名已") ? msg : tt("已保存"));
       window.setTimeout(() => p.onClose(), 550);
     } finally {
       setBusy(false);

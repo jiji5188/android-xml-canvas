@@ -8,6 +8,7 @@
 // 纯数据 + 纯函数，方便单测；不做语义分析，只按前缀过滤 + 去重。
 
 import { extractJavaTokens, type SuggestKind } from "./suggest-kind";
+import { KNOWN_METHODS } from "./java-methods";
 
 export interface JavaSymbol {
   label: string;
@@ -393,6 +394,85 @@ export const JAVA_IMPORTS: Record<string, string> = {
   Executors: "java.util.concurrent.Executors",
 };
 
+/** M285：按「接收者类型」给的成员方法表（`button.` → 先看 Button/TextView 的方法）。
+ *  只收最常见的那些类，避免表太大；每个类 10~30 个高频方法。
+ *  未列出的类回退到全局 JAVA_METHODS + KNOWN_METHODS。 */
+export const JAVA_TYPE_METHODS: Record<string, string[]> = {
+  TextView: [
+    "setText", "getText", "setTextColor", "setTextSize", "setTextStyle", "setGravity", "setHint",
+    "setSingleLine", "setMaxLines", "setLines", "setEllipsize", "setTypeface", "setMovementMethod",
+    "setError", "setErrorEnabled", "append", "getLineCount", "getTextLength", "getSelectedText",
+    "selectAll", "setSelection", "setOnEditorActionListener", "setInputType", "isEditable", "isFocused",
+  ],
+  EditText: [
+    "setText", "getText", "setHint", "setMaxLines", "setSingleLine", "setCursorVisible", "setSelection",
+    "selectAll", "setInputType", "addTextChangedListener", "getEditableText", "setImeOptions", "setError",
+  ],
+  Button: [
+    "setText", "getText", "setOnClickListener", "setOnLongClickListener", "setEnabled", "isEnabled", "setAllCaps",
+    "setPadding", "setBackgroundResource", "setVisibility", "setVisibility", "getBackground", "invalidate", "post",
+  ],
+  ImageView: [
+    "setImageResource", "setImageDrawable", "setImageBitmap", "setImageURI", "setScaleType", "setColorFilter",
+    "setAdjustViewBounds", "setImageMatrix", "getDrawable", "isAdjustViewBounds", "setOnLongClickListener",
+  ],
+  View: [
+    "setVisibility", "getVisibility", "setEnabled", "isEnabled", "setAlpha", "setTag", "getTag", "setId", "getId",
+    "setBackgroundColor", "setBackgroundResource", "setLayoutParams", "getLayoutParams", "setPadding", "post", "postDelayed",
+    "requestLayout", "invalidate", "setOnClickListener", "setOnLongClickListener", "performClick", "getWidth", "getHeight",
+    "getLocationOnScreen", "getMeasuredWidth", "getMeasuredHeight", "setVisibility", "requestFocus", "clearFocus", "isSelected", "setSelected",
+  ],
+  ViewGroup: [
+    "addView", "removeView", "removeAllViews", "getChildAt", "getChildCount", "indexOfChild", "getChildFor",
+    "requestChildFocus", "setChildrenDrawnWithPadding", "getChildCount", "getChildAt", "addView", "removeViewAt",
+  ],
+  LinearLayout: ["setOrientation", "getOrientation", "addView", "setWeightSum", "getWeightSum", "setDividerDrawable"],
+  ScrollView: ["setScrollView", "getVerticalScrollOffset", "fullScroll", "setFocusable"],
+  RecyclerView: [
+    "setAdapter", "getAdapter", "setLayoutManager", "getLayoutManager", "scrollToPosition", "scrollToPosition",
+    "scrollBy", "getScrollState", "addOnScrollListener", "removeOnScrollListener", "setHasFixedSize", "getItemCount",
+  ],
+  ListView: ["setAdapter", "getAdapter", "setOnItemClickListener", "setOnItemLongClickListener", "setSelection", "getSelectedPosition"],
+  AlertDialog: ["show", "dismiss", "setMessage", "setTitle", "setPositiveButton", "setNegativeButton", "setNeutralButton", "setCancelable", "isShowing"],
+  Intent: [
+    "putExtra", "getStringExtra", "getIntExtra", "getBooleanExtra", "putExtras", "getAction", "setAction", "getCategories",
+    "setData", "setComponent", "addFlags", "getFlags", "setPackage", "setClassName", "setType", "getType", "hasExtra",
+    "removeExtra", "putParcelable", "getParcelableExtra", "putStringArrayListExtra", "setResult", "setResultCode", "getResultCode",
+  ],
+  Bundle: ["putString", "getString", "putInt", "getInt", "putBoolean", "getBoolean", "putLong", "getLong", "putFloat", "getFloat", "putParcelable", "getParcelable", "containsKey", "keySet", "size", "isEmpty", "get", "remove", "clear", "putStringArrayList", "getStringArrayList", "putIntArrayList"],
+  SharedPreferences: ["getString", "getInt", "getBoolean", "getLong", "getFloat", "getAll", "contains", "edit", "registerOnSharedPreferenceChangeListener", "unregisterOnSharedPreferenceChangeListener"],
+  "SharedPreferences.Editor": ["putString", "putInt", "putBoolean", "putLong", "putFloat", "putStringSet", "putNull", "remove", "commit", "apply", "clear", "contains", "getAll", "asMap"],
+  Handler: ["post", "postDelayed", "removeCallbacks", "sendEmptyMessage", "sendEmptyMessageDelayed", "sendMessage", "sendMessageDelayed", "removeCallbacksAndMessages", "hasMessages"],
+  Thread: ["start", "run", "sleep", "join", "getName", "setName", "setPriority", "getPriority", "isAlive", "isInterrupted", "interrupt", "yield", "join"],
+  Cursor: ["moveToFirst", "moveToNext", "moveToPrevious", "moveToPosition", "moveToLast", "isFirst", "isLast", "isBeforeFirst", "isAfterLast", "getCount", "getPosition", "getColumnCount", "getColumnIndex", "getColumnIndexOrThrow", "getColumnName", "getColumnName", "getInt", "getLong", "getFloat", "getDouble", "getString", "getBlob", "isNull", "close", "requery"],
+  ContentValues: ["put", "putNull", "containsKey", "keySet", "size", "clear", "get", "getAsInteger", "getAsString", "getAsLong", "getAsBoolean", "getAsDouble"],
+  Context: ["getSharedPreferences", "getResources", "getApplicationContext", "getSystemService", "getString", "getstring", "startActivity", "startService", "stopService", "registerReceiver", "unregisterReceiver", "getFilesDir", "getCacheDir", "getAssets", "openFileInput", "openFileOutput", "getPackageName", "getBaseContext", "sendBroadcast"],
+  Activity: [
+    "setContentView", "findViewById", "finish", "startActivity", "startActivityForResult", "getIntent", "setResult",
+    "onCreate", "onStart", "onResume", "onPause", "onStop", "onDestroy", "runOnUiThread", "getSharedPreferences", "getResources",
+    "getApplicationContext", "getSystemService", "getTitle", "setTitle", "getWindow", "setSoftInputMode", "setResult", "onBackPressed",
+    "isFinishing", "isDestroyed", "getSupportFragmentManager", "getFragmentManager", "onActivityResult", "requestPermissions", "recreate",
+  ],
+  Log: ["d", "i", "w", "e", "v", "printStackTrace", "isLoggable"],
+  Uri: ["parse", "toString", "getScheme", "getHost", "getPath", "getPathSegments", "getQueryParameter", "getQueryParameterNames", "getFragment", "buildUpon", "appendPath", "appendQueryParameter", "build", "encodeUri", "decodeUri"],
+  Bitmap: ["getWidth", "getHeight", "getPixel", "setPixel", "copy", "copyPixelBitmap", "recycle", "isRecycled", "compress", "getByteCount", "getAllocationByteCount", "getDensity", "copyDensity"],
+  String: ["length", "charAt", "substring", "toLowerCase", "toUpperCase", "trim", "isEmpty", "isBlank", "replace", "replaceAll", "split", "join", "format", "valueOf", "parseInt", "compareTo", "contains", "startsWith", "endsWith", "equals", "equalsIgnoreCase", "hashCode", "toString", "getBytes", "concat"],
+  Integer: ["parseInt", "toString", "valueOf", "compareTo", "compare", "max", "min", "abs", "sum", "decode", "toHexString", "toBinaryString", "rotateLeft", "highestOneBit", "numToDigits", "size"],
+  Long: ["parseLong", "toString", "valueOf", "compare", "compareTo", "max", "min", "abs", "decode", "toHexString", "size"],
+  Double: ["parseDouble", "toString", "valueOf", "compare", "compareTo", "max", "min", "abs", "NaN", "isInfinite", "isFinite", "toHexString", "size"],
+  Math: ["abs", "max", "min", "floor", "ceil", "round", "sqrt", "pow", "sin", "cos", "tan", "atan2", "log", "exp", "random", "E", "PI", "toInt"],
+  List: ["add", "remove", "get", "set", "size", "isEmpty", "contains", "indexOf", "iterator", "toArray", "add", "addAll", "clear", "containsAll", "isEmpty", "listIterator", "removeAt", "subList"],
+  Map: ["get", "put", "remove", "containsKey", "containsValue", "keySet", "values", "entrySet", "size", "isEmpty", "clear", "getOrDefault", "putIfAbsent", "computeIfAbsent", "merge", "forEach"],
+  Collections: ["sort", "reverse", "shuffle", "unmodifiableList", "unmodifiableMap", "emptyList", "emptyMap", "singletonList", "singletonMap", "synchronizedList", "frequency", "max", "min", "fill"],
+  Arrays: ["toString", "copyOf", "copyOfRange", "fill", "sort", "asList", "isAllocated", "equals", "binarySearch", "deepEquals", "setAll"],
+};
+
+/** 简单名 → 完整方法名映射表里没列出的，回退用 KNOWN_METHODS */
+export function methodsForType(type: string): string[] {
+  const arr = JAVA_TYPE_METHODS[type];
+  return arr ? [...arr] : [];
+}
+
 /** 简单类名 → 该 import 的完整路径；不需 import（java.lang / 未知类）返回 null */
 export function importForType(name: string): string | null {
   return JAVA_IMPORTS[name] || null;
@@ -516,7 +596,22 @@ export function computeJavaSuggest(
 
   if (inComment(doc, offset) || inString(doc, offset)) return null;
 
-  const { prefix } = wordBefore(doc, offset);
+  // M285：检测 `receiver.` 后的方法调用 —— 根据 receiver 的声明类型给成员方法表
+  let receiver: string | null = null;
+  let receiverType: string | null = null;
+  const { prefix, start: prefixStart } = wordBefore(doc, offset);
+  if (prefixStart > 0 && doc[prefixStart - 1] === ".") {
+    // 当前词紧跟在 . 后面 → 取 . 左边的标识符
+    let rs = prefixStart - 1;
+    while (rs > 0 && /[A-Za-z0-9_]/.test(doc[rs - 1])) rs--;
+    receiver = doc.slice(rs, prefixStart - 1);
+    if (receiver && receiver !== "this" && /^[A-Za-z_]\w*$/.test(receiver)) {
+      // 在文件里找 `X receiver` 声明拿到 X（跳过 receiver 自身那行，找类型）
+      const declRe = new RegExp("\\b([A-Za-z_][\\w.]*)\\s+" + receiver + "\\b\\s*[=(]");
+      const dm = declRe.exec(doc);
+      if (dm) receiverType = dm[1].replace(/^.*\./, "");
+    }
+  }
   const isAt = prefix.startsWith("@");
   const body = isAt ? prefix.slice(1) : prefix;
   if (body.length < 2 && !isAt) return null;
@@ -539,6 +634,14 @@ export function computeJavaSuggest(
     addAll(JAVA_KEYWORDS, "decl");
     addAll(JAVA_TYPES, "class");
     addAll(JAVA_METHODS, "method");
+    addAll(KNOWN_METHODS, "method"); // M285：高频白名单全量进候选（以前只有 JAVA_METHODS 里那几十条）
+    // M285：有接收者且能认出类型 → 该类的高频成员方法排在最前（比全局表更准）
+    if (receiverType && receiver !== "this") {
+      const recv = methodsForType(receiverType);
+      // 逆序 unshift，保持原数组顺序（setText 在数组前 → 排在前）
+      for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method" });
+      pool.unshift({ text: receiverType, kind: "class" });
+    }
   }
 
   const lower = body.toLowerCase();

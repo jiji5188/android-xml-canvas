@@ -179,10 +179,7 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, o
               </div>
             ) : (
               <div className="axv-drawer-empty">
-                {tr(
-                  "drawer.runtime.empty",
-                  "还没有收到运行日志：在手机上运行你打包出来的 App，日志会自动出现在这里（同一个 App 内发送，无需连接电脑）。",
-                )}
+                {tr("drawer.runtime.empty", "还没有收到运行日志：在手机上运行你打包出来的 App，日志会自动出现在这里（同一个 App 内发送，无需连接电脑）。")}
               </div>
             )
           ) : tab === "problems" ? (

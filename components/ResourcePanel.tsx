@@ -496,7 +496,7 @@ export function ResourcePanel(props: ResourcePanelProps) {
                 type="button"
                 className="axv-rp-file"
                 onClick={() => void clickIconFile(it)}
-                title={(it.name || "") + (copies > 1 ? ` (${copies} 份密度副本)` : "") + " · " + t("双击编辑")}
+                title={((it.name || "") + (copies > 1 ? " " + t("{n} 份密度副本", { n: copies }) : "") + " · " + t("双击编辑"))}
               >
                 <IconThumb entry={it} source={source ?? null} />
                 <span className="axv-rp-file-name">{it.name}</span>

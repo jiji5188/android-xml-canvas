@@ -207,6 +207,7 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
       // 闭包里还是旧值，setGradle 只是排队更新）把旧内容写回磁盘，覆盖了 unify 刚改好的 gradle。
       // 改：用局部变量 gradleTextToSave 记新文本，第 4 步写它。
       let gradleTextToSave: string | null = gradle ? gradle.text : null;
+        let pkgDetail: string | null = null; // M289：第 3 步的包名同步详情（非空就展示它，否则展示「已保存」）
       if (gradle && pkg && pkg !== origin.pkg) {
         const r = setGradlePackage(gradle.text, pkg);
         if (!r.ok) {
@@ -265,6 +266,7 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
               });
             }
             setMsg(base);
+          pkgDetail = base;
             for (const o of olds) p.onPkgSynced?.(o, pkg);
           } else {
             setMsg(tt("包名未变（没找到需要同步的旧包名）"));
@@ -285,7 +287,7 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
       p.onSaved();
       // 保留第 3 步的包名同步详情（「已保存」会把具体结果冲掉）：
       // 有同步结果就展示它，没有就展示「已保存」
-      setMsg(msg.startsWith("包名已") ? msg : tt("已保存"));
+      setMsg(pkgDetail ?? tt("已保存"));
       window.setTimeout(() => p.onClose(), 550);
     } finally {
       setBusy(false);

@@ -75,6 +75,12 @@ public final class ${AXV_LOG_CLASS} {
     private static final String AXV_LOG_ACTION = "com.jiji.axv.RUNTIME_LOG";
     private static Context sAppCtx;
 
+    /** M289：设备语言不是中文时抽屉/日志文案走英文（Locale 在类加载时定一次） */
+    private static final boolean EN_UI = !"zh".equalsIgnoreCase(Locale.getDefault().getLanguage());
+    static String L(String zh, String en) {
+        return EN_UI ? en : zh;
+    }
+
     private ${AXV_LOG_CLASS}() {
     }
 
@@ -132,7 +138,7 @@ public final class ${AXV_LOG_CLASS} {
             @Override
             public void uncaughtException(Thread t, Throwable e) {
                 try {
-                    log("E/未捕获异常 " + e);
+                    log(L("E/未捕获异常 ", "E/Uncaught ") + e);
                     StackTraceElement[] st = e.getStackTrace();
                     int n = st.length < 14 ? st.length : 14;
                     for (int i = 0; i < n; i++) {
@@ -141,7 +147,7 @@ public final class ${AXV_LOG_CLASS} {
                     Throwable c = e.getCause();
                     int guard = 0;
                     while (c != null && guard++ < 5) {
-                        log("E/原因 " + c);
+                        log(L("E/原因 ", "E/Caused by ") + c);
                         c = c.getCause();
                     }
                 } catch (Throwable ignore) {
@@ -155,29 +161,29 @@ public final class ${AXV_LOG_CLASS} {
             ((Application) appCtx).registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
                 @Override
                 public void onActivityCreated(Activity a, Bundle b) {
-                    log("生命周期 onCreate → " + name(a));
+                    log(L("生命周期 onCreate → ", "onCreate → ") + name(a));
                     attach(a);
                 }
 
                 @Override
                 public void onActivityStarted(Activity a) {
-                    log("生命周期 onStart → " + name(a));
+                    log(L("生命周期 onStart → ", "onStart → ") + name(a));
                 }
 
                 @Override
                 public void onActivityResumed(Activity a) {
-                    log("生命周期 onResume → " + name(a));
+                    log(L("生命周期 onResume → ", "onResume → ") + name(a));
                     attach(a);
                 }
 
                 @Override
                 public void onActivityPaused(Activity a) {
-                    log("生命周期 onPause → " + name(a));
+                    log(L("生命周期 onPause → ", "onPause → ") + name(a));
                 }
 
                 @Override
                 public void onActivityStopped(Activity a) {
-                    log("生命周期 onStop → " + name(a));
+                    log(L("生命周期 onStop → ", "onStop → ") + name(a));
                 }
 
                 @Override
@@ -186,11 +192,11 @@ public final class ${AXV_LOG_CLASS} {
 
                 @Override
                 public void onActivityDestroyed(Activity a) {
-                    log("生命周期 onDestroy → " + name(a));
+                    log(L("生命周期 onDestroy → ", "onDestroy → ") + name(a));
                 }
             });
         }
-        log("AXV 运行日志已启用：点左上角「▤ 日志」查看，长按把手可隐藏");
+        log(L("AXV 运行日志已启用：点左上角「▤ 日志」查看，长按把手可隐藏", "AXV runtime log enabled: tap the Log tab at top-left to view; long-press it to hide"));
     }
 
     /** 日志条数 */
@@ -263,7 +269,7 @@ public final class ${AXV_LOG_CLASS} {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         final TextView handle = new TextView(act);
-        handle.setText("▤ 日志");
+        handle.setText(L("▤ 日志", "▤ Log"));
         handle.setTextSize(11f);
         handle.setTextColor(0xFFFFFFFF);
         handle.setPadding(dp(act, 10), dp(act, 5), dp(act, 10), dp(act, 5));
@@ -288,13 +294,13 @@ public final class ${AXV_LOG_CLASS} {
         head.setBackgroundColor(0xFF1E1E1E);
         head.setPadding(dp(act, 10), dp(act, 4), dp(act, 6), dp(act, 4));
         final TextView title = new TextView(act);
-        title.setText("AXV 运行日志");
+        title.setText(L("AXV 运行日志", "AXV Runtime Log"));
         title.setTextColor(0xFFFFFFFF);
         title.setTextSize(12f);
         head.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView clearBtn = btn(act, "清空");
-        TextView copyBtn = btn(act, "复制");
-        TextView hideBtn = btn(act, "收起");
+        TextView clearBtn = btn(act, L("清空", "Clear"));
+        TextView copyBtn = btn(act, L("复制", "Copy"));
+        TextView hideBtn = btn(act, L("收起", "Hide"));
         head.addView(clearBtn);
         head.addView(copyBtn);
         head.addView(hideBtn);
@@ -318,7 +324,7 @@ public final class ${AXV_LOG_CLASS} {
                     return;
                 }
                 body.setText(dump(400));
-                title.setText("AXV 运行日志 (" + size() + ")");
+                title.setText(L("AXV 运行日志 ", "AXV Runtime Log ") + "(" + size() + ")");
                 sc.post(new Runnable() {
                     @Override
                     public void run() {
@@ -346,7 +352,7 @@ public final class ${AXV_LOG_CLASS} {
             public boolean onLongClick(View v) {
                 panel.setVisibility(View.GONE);
                 handle.setVisibility(View.GONE);
-                log("日志把手已隐藏（重启 App 后恢复）");
+                log(L("日志把手已隐藏（重启 App 后恢复）", "Log tab hidden (restarts when the app restarts)"));
                 return true;
             }
         });
@@ -360,8 +366,8 @@ public final class ${AXV_LOG_CLASS} {
             @Override
             public void onClick(View v) {
                 clear();
-                body.setText("(已清空)");
-                title.setText("AXV 运行日志 (0)");
+                body.setText(L("(已清空)", "(cleared)"));
+                title.setText(L("AXV 运行日志 (0)", "AXV Runtime Log (0)"));
             }
         });
         copyBtn.setOnClickListener(new View.OnClickListener() {
@@ -370,11 +376,11 @@ public final class ${AXV_LOG_CLASS} {
                 try {
                     ClipboardManager cm = (ClipboardManager) act.getSystemService(Context.CLIPBOARD_SERVICE);
                     if (cm != null) {
-                        cm.setPrimaryClip(ClipData.newPlainText("AXV 运行日志", dump(400)));
-                        log("日志已复制到剪贴板");
+                        cm.setPrimaryClip(ClipData.newPlainText(L("AXV 运行日志", "AXV Runtime Log"), dump(400)));
+                        log(L("日志已复制到剪贴板", "Log copied to clipboard"));
                     }
                 } catch (Throwable e) {
-                    log("E/复制失败 " + e);
+                    log(L("E/复制失败 ", "E/Copy failed ") + e);
                 }
             }
         });

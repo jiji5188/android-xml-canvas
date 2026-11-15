@@ -182,9 +182,16 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         }, (rp) => {
           // M278/P0-1：把「扫到几个 / 跳过了哪些 / 为什么」推进构建日志，漏文件时可排查
           if (rp.skipped.length || rp.truncated) {
-            const parts = ["收集 Java 源码：成功 " + rp.collected + " 个"];
-            if (rp.truncated) parts.push("触到上限（" + rp.maxFiles + " 文件 / 深度 " + rp.maxDepth + "）");
-            if (rp.skipped.length) parts.push("跳过 " + rp.skipped.length + " 个：" + rp.skipped.slice(0, 10).map((s) => s.rel + "（" + s.reason + "）").join("、") + (rp.skipped.length > 10 ? " 等" : "") + "）");
+            const parts: string[] = [tt("收集 Java 源码：成功 {n} 个", { n: rp.collected })];
+            if (rp.truncated) parts.push(tt("触到上限（{f} 文件 / 深度 {d}）", { f: rp.maxFiles, d: rp.maxDepth }));
+            if (rp.skipped.length)
+              parts.push(
+                tt("跳过 {n} 个：{l}{more}", {
+                  n: rp.skipped.length,
+                  l: rp.skipped.slice(0, 10).map((s) => s.rel + "（" + s.reason + "）").join("、"),
+                  more: rp.skipped.length > 10 ? "…" : "",
+                }),
+              );
             pushBuildLog(rp.skipped.length > 0, tt("Java 源码收集"), parts.join("\n"));
           }
         });

@@ -10,6 +10,7 @@
 
 import { ViewSettingsMenu } from "./ViewSettingsMenu";
 import { ToolbarMoreMenu, type MoreItem } from "./ToolbarMoreMenu";
+import { ToolbarRunMenu, type RunMenuItem } from "./ToolbarRunMenu";
 import { t as tt } from "@/lib/i18n-src";
 
 export type ToolbarProps = {
@@ -53,6 +54,10 @@ export type ToolbarProps = {
   realRenderAvailable?: boolean;
   realRenderBusy?: boolean;
   onRealRender?: () => void;
+  /** M290：能否在当前环境打包（hasBuildApk）——「打包并运行 / 签名发布」两项的开关 */
+  canBuildApk?: boolean;
+  /** M290：一键打包（默认签名）并安装到本机 */
+  onBuildRun?: () => void;
   onFormat: () => void;
   /** M140：历史版本快照面板（可选，不传就不画按钮） */
   onHistory?: () => void;
@@ -97,6 +102,8 @@ export function Toolbar(props: ToolbarProps) {
     realRenderAvailable,
     realRenderBusy,
     onRealRender,
+    canBuildApk,
+    onBuildRun,
     onFormat,
     onSign,
     canSign,
@@ -129,15 +136,6 @@ export function Toolbar(props: ToolbarProps) {
   if (hasRes) {
     moreItems.push({ key: "clearres", icon: "hide_image", label: tt("清除 res"), onClick: onClearRes });
   }
-  if (canSign) {
-    moreItems.push({
-      key: "sign",
-      icon: "key",
-      label: tt("签名与发布"),
-      hint: tt("别名 / 口令 / keystore 路径 / scheme 开关"),
-      onClick: () => onSign?.(),
-    });
-  }
   if (canExportProject) {
     moreItems.push({
       key: "exportproj",
@@ -157,6 +155,46 @@ export function Toolbar(props: ToolbarProps) {
       onClick: onChangeWorkspace,
     });
   }
+
+  /* M290：运行 ▾ 的四个菜单项。不可用的能力灰显 + 说明，不隐藏（用户要能看懂差异） */
+  const apkOnlyHint = tt("仅 APK 端可用");
+  const runItems: RunMenuItem[] = [
+    {
+      key: "run-sim",
+      icon: "smart_display",
+      label: tt("模拟界面"),
+      hint: tt("前端轻量预览，不调用 AAPT2 编译"),
+      onClick: onRun,
+    },
+    {
+      key: "run-compile",
+      icon: "android",
+      label: tt("布局编译预览"),
+      hint: tt("单独编译资源，渲染布局"),
+      disabled: !realRenderAvailable,
+      disabledHint: apkOnlyHint,
+      onClick: () => onRealRender?.(),
+    },
+    {
+      key: "run-build",
+      icon: "rocket_launch",
+      label: tt("打包并运行"),
+      hint: tt("完整项目编译，安装到真机"),
+      disabled: !canBuildApk,
+      disabledHint: apkOnlyHint,
+      onClick: () => onBuildRun?.(),
+    },
+    {
+      key: "run-sign",
+      icon: "verified",
+      label: tt("签名打包发布"),
+      hint: tt("输出正式签名 APK"),
+      disabled: !canSign || !canBuildApk,
+      disabledHint: apkOnlyHint,
+      onClick: () => onSign?.(),
+    },
+  ];
+
   return (
     <div
       className="axv-toolbar-v2"
@@ -220,26 +258,8 @@ export function Toolbar(props: ToolbarProps) {
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>image</span>
           </button>
-          <button
-            className="axv-tb-btn axv-tb-run"
-            title={tt("运行调试：全屏交互预览，可点控件跳布局（Esc 退出）")}
-            aria-label={tt("运行")}
-            onClick={onRun}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>play_arrow</span>
-          </button>
-          {realRenderAvailable && onRealRender ? (
-            <button
-              className="axv-tb-btn"
-              title={tt("真机渲染：用设备上的 aapt2 现场编译资源，再用系统 LayoutInflater 渲染（对比 CSS 模拟用）")}
-              aria-label={tt("真机渲染")}
-              aria-busy={realRenderBusy ? true : undefined}
-              disabled={realRenderBusy}
-              onClick={onRealRender}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>android</span>
-            </button>
-          ) : null}
+          {/* M290：运行按钮改成四选一菜单（模拟界面 / 布局编译预览 / 打包并运行 / 签名打包发布） */}
+          <ToolbarRunMenu busy={realRenderBusy || undefined} items={runItems} />
           <button
             className="axv-tb-btn"
             title={tt("格式化代码（重排缩进，保留注释）")}

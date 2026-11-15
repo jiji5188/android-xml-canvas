@@ -63,7 +63,7 @@ export interface UseBuildApkDeps {
 export interface UseBuildApkReturn {
   apkBusy: boolean;
   apkResult: BuildApkResult | null;
-  doBuildApk: (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => Promise<void>;
+  doBuildApk: (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => Promise<BuildApkResult | undefined>;
 }
 
 /** M188b：没可写根时签名配置存 localStorage 草稿 */
@@ -349,11 +349,14 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           pushBuildLog(false, tt("打包失败（{step}）", { step: r.step || "?" }), r.log);
           noteTimed(tt("打包失败（{step}）", { step: r.step || "?" }), 12000);
         }
+        return r;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        setApkResult({ ok: false, step: "js", log: msg });
+        const bad: BuildApkResult = { ok: false, step: "js", log: msg };
+        setApkResult(bad);
         pushBuildLog(false, tt("打包失败（js）"), msg);
         noteTimed(tt("打包失败：{msg}", { msg }), 12000);
+        return bad;
       } finally {
         setApkBusy(false);
       }

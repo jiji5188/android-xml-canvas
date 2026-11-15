@@ -85,7 +85,7 @@ import { readStoredSigning, writeStoredSigning, clearStoredSigning } from "@/lib
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { useBuildApk } from "./use-build-apk";
-import { installApk, shareApkFile, type BuildApkResult } from "@/lib/xml/native-apk";
+import { installApk, shareApkFile, hasBuildApk, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { projectSaveRoot, projectFileExists, readProjectFile, readAppGradle, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
@@ -303,46 +303,53 @@ export function XmlEditor() {
   /** 多文件项目：文件列表 + 当前激活文件（内容以 xml 为准，切换时回写） */
   const [project, setProject] = useState<Project>(() => bootRef.current!.project);
 
-  /** M9：文件切换器下拉框（桌面/移动共用的一个 select）：
-   *  选项 = 项目里的文件 + 4 个操作项；选中操作项立即执行并弹回当前文件 */
-  const fileSelectValue = "";
-  const onFileSelect = (v: string) => {
-    if (v === "") return;
-    if (v === "action:new") { newFile(); return; }
-    if (v === "action:rename") { renameActiveFile(); return; }
-    if (v === "action:delete") { deleteActiveFile(); return; }
-    selectFile(v);
-  };
   const currentFile = activeFile(project);
-  /** M9：文件切换下拉框（桌面/移动共用）：项目里的文件 + 3 个操作项 */
-  const fileSelect = (
-    <select
-      className="axv-tb-select axv-tab-sample"
-      title={tt("项目文件（多文件切换）")}
-      value=""
-      onChange={(e) => {
-        const v = e.target.value;
-        if (!v) return;
-        if (v === "action:new") newFile();
-        else if (v === "action:rename") renameActiveFile();
-        else if (v === "action:delete") deleteActiveFile();
-        else selectFile(v);
-      }}
-    >
-      <option value="">{`${currentFile?.name ?? tt("文件")} ▾`}</option>
-      <optgroup label={tt("项目文件")}>
-        {project.files.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.id === project.activeId ? "● " : "○ "} {f.name}
-          </option>
-        ))}
-      </optgroup>
-      <optgroup label={tt("文件操作")}>
-        <option value="action:new">{tt("＋ 新建文件…")}</option>
-        <option value="action:rename">{tt("✎ 重命名当前文件…")}</option>
-        <option value="action:delete">{tt("🗑 删除当前文件")}</option>
-      </optgroup>
-    </select>
+  /** M290：多文件 tab 面板 —— 每个项目文件一个 tab，名字就是文件名；点 tab 切换当前文件。
+   *  取代原来的「文件切换 / 示例项目」两个 select（窄屏放不下且操作藏得深）。 */
+  const fileTabs = (
+    <div className="axv-filetabs" role="tablist" aria-label={tt("项目文件")}>
+      {project.files.map((f) => (
+        <button
+          key={f.id}
+          type="button"
+          role="tab"
+          aria-selected={f.id === project.activeId}
+          className={"axv-filetab" + (f.id === project.activeId ? " on" : "")}
+          title={f.name}
+          onClick={() => selectFile(f.id)}
+        >
+          <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>description</span>
+          <span className="axv-filetab-name">{f.name}</span>
+        </button>
+      ))}
+      <button
+        type="button"
+        className="axv-filetab-act"
+        title={tt("新建文件")}
+        aria-label={tt("新建文件")}
+        onClick={() => newFile()}
+      >
+        <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>add</span>
+      </button>
+      <button
+        type="button"
+        className="axv-filetab-act"
+        title={tt("重命名当前文件")}
+        aria-label={tt("重命名当前文件")}
+        onClick={() => renameActiveFile()}
+      >
+        <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>drive_file_rename_outline</span>
+      </button>
+      <button
+        type="button"
+        className="axv-filetab-act"
+        title={tt("删除当前文件")}
+        aria-label={tt("删除当前文件")}
+        onClick={() => deleteActiveFile()}
+      >
+        <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>delete</span>
+      </button>
+    </div>
   );
   /** 解析用（低优先级）：敲代码时让输入不卡，解析滞后几帧 */
   const parsedXml = useDeferredValue(xml);
@@ -3866,6 +3873,15 @@ const findResolved = findResolvedNode;
     onBuildLog: pushApkBuildLog,
   });
 
+  /** M290：工具栏「打包并运行」—— 默认签名一键打包，成功后自动调系统安装器 */
+  const doBuildAndRun = useCallback(async () => {
+    const r = await doBuildApk({ storeFile: "", storePass: "", alias: "", keyPass: "" });
+    if (r?.ok && r.path) {
+      const inst = installApk(r.path);
+      setExportNote(inst.ok ? tt("已调起系统安装器") : tt("安装失败：{msg}", { msg: inst.msg || "" }));
+    }
+  }, [doBuildApk, setExportNote]);
+
 
   /** M36：当前打开项目的可写根（有则保存一律落进 <项目>/app/src/main/res/） */
   const projRoot = useMemo(() => projectSaveRoot(activeProject), [activeProject]);
@@ -4594,6 +4610,8 @@ const findResolved = findResolvedNode;
           }
         >
           <div className="axv-mob-tabs-inner" role="tablist" aria-label={tt("视图")}>
+          {/* M290：文件 tab 面板（原来两个 select 的位置）；打开/新建文件自动出现同名 tab */}
+          {fileTabs}
           {/* M31e：「XML 代码」改叫「代码」并挪到「预览」前面 —— 以后要在这里接 Java 代码显示 */}
           <button
             role="tab"
@@ -4637,36 +4655,6 @@ const findResolved = findResolvedNode;
               {tt("预览")}
             </button>
           )}
-          {/* M30b：两个下拉框挪到两个 tab 按钮后面 */}
-          <select
-            className="axv-tb-select axv-tab-sample"
-            title={tt("载入完整示例项目（布局 + 自带图标/背景资源）")}
-            value=""
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) return;
-              if (v.startsWith("blank:")) applyBlankTemplate(v.slice(6));
-              else applySampleProject(v);
-            }}
-            style={{ margin: "0 8px" }}
-          >
-            <option value="">{tt("示例项目…")}</option>
-            <optgroup label={tt("完整示例（带资源）")}>
-              {SAMPLE_PROJECTS.map((p) => (
-                <option key={p.key} value={p.key}>
-                  {p.name} · {p.library.split(" + ")[0]}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label={tt("新建（空白）")}>
-              {SAMPLE_BLANKS.map((b) => (
-                <option key={b.key} value={`blank:${b.key}`}>
-                  {b.name}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-          {fileSelect}
           </div>
         </div>
       )}
@@ -5125,6 +5113,8 @@ const findResolved = findResolvedNode;
         }}
         onRun={() => setRunOpen(true)}
         realRenderAvailable={realRenderAvailable}
+        canBuildApk={hasBuildApk()}
+        onBuildRun={() => void doBuildAndRun()}
         realRenderBusy={realRenderBusy}
         onRealRender={doRealRender}
         onFormat={doFormat}

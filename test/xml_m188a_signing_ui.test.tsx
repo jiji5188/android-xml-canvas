@@ -41,33 +41,39 @@ function props(over: Partial<ToolbarProps> = {}): ToolbarProps {
   };
 }
 
-function menuItems(node: ReactNode): Array<{ key: string; label: string; onClick: () => void }> {
-  let out: Array<{ key: string; label: string; onClick: () => void }> = [];
+function allMenus(node: ReactNode): Array<Array<{ key: string; label: string; onClick: () => void; disabled?: boolean }>> {
+  const out: Array<Array<{ key: string; label: string; onClick: () => void; disabled?: boolean }>> = [];
   const walk = (n: ReactNode) => {
     if (Array.isArray(n)) return n.forEach((c) => walk(c as ReactNode));
     if (!isValidElement(n)) return;
     const el = n as unknown as El;
     const p = el.props as Record<string, unknown>;
-    if (Array.isArray(p.items)) out = p.items as typeof out;
+    if (Array.isArray(p.items)) out.push(p.items as Array<{ key: string; label: string; onClick: () => void; disabled?: boolean }>);
     walk(p.children as ReactNode);
   };
   walk(node);
   return out;
 }
 
+/** M290：签名入口已从「更多」菜单移到运行 ▾ 菜单（key = run-sign） */
+function signItem(node: ReactNode) {
+  return allMenus(node).flat().find((i) => i.key === "run-sign" || i.key === "sign");
+}
+
 describe("M188a Toolbar 签名项", () => {
-  it("canSign=false 时不出现「签名与发布」", () => {
+  it("canSign=false 时签名项禁用", () => {
     const tree = Toolbar(props({ canSign: false }));
-    const items = menuItems(tree as unknown as ReactNode);
-    expect(items.some((i) => i.key === "sign")).toBe(false);
+    const it0 = signItem(tree as unknown as ReactNode);
+    expect(it0).toBeDefined();
+    expect(it0!.disabled).toBe(true);
   });
 
-  it("canSign=true 时出现，点击触发 onSign", () => {
+  it("canSign=true 时可用，点击触发 onSign", () => {
     const onSign = vi.fn();
-    const tree = Toolbar(props({ canSign: true, onSign }));
-    const items = menuItems(tree as unknown as ReactNode);
-    const it0 = items.find((i) => i.key === "sign");
+    const tree = Toolbar(props({ canSign: true, onSign, canBuildApk: true }));
+    const it0 = signItem(tree as unknown as ReactNode);
     expect(it0).toBeDefined();
+    expect(it0!.disabled).toBeFalsy();
     it0!.onClick();
     expect(onSign).toHaveBeenCalledTimes(1);
   });

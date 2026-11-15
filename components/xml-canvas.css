@@ -2274,6 +2274,56 @@ body.axv-lt-dragging .axv-lt-row {
   background: var(--axv-primary);
   color: var(--axv-on-primary);
 }
+
+/* M290：多文件 tab 面板（替代原来的文件切换/示例项目 select） */
+.axv-filetabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.axv-filetab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 12px 12px 0 0;
+  background: transparent;
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.axv-filetab .axv-filetab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.axv-filetab.on {
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+}
+.axv-filetab-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.axv-filetab-act:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
 /* tab 涔嬮棿鐨勭ず渚嬩笅鎷夋 */
 .axv-tab-sample {
   height: 24px;
@@ -10431,6 +10481,28 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* M290：运行 ▾ 菜单的禁用态、忙碌态 */
+.axv-tb-menu-item-off,
+.axv-tb-menu-item:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+.axv-tb-menu-item-off:hover,
+.axv-tb-menu-item:disabled:hover {
+  background: transparent;
+}
+.axv-tb-menu-hint-off {
+  opacity: 0.9;
+}
+.axv-tb-busy .msr {
+  animation: axv-tb-spin 1.1s linear infinite;
+}
+@keyframes axv-tb-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* M173锛氬乏鏍?AI 鍔╂墜鐨勮嚜瀹氫箟鎻忚竟鐭㈤噺 */

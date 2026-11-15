@@ -2710,6 +2710,23 @@ export const SRC_EN: SrcDict = {
   // M289 补 3
   "{n} 份密度副本": "{n} density variant(s)",
 
+  // M290 运行 ▾ 菜单
+  "模拟界面": "Simulated UI",
+  "前端轻量预览，不调用 AAPT2 编译": "Lightweight front-end preview, no AAPT2 compile",
+  "布局编译预览": "Layout compile preview",
+  "单独编译资源，渲染布局": "Compile resources only, render layout",
+  "打包并运行": "Build & run",
+  "完整项目编译，安装到真机": "Full project build, install on device",
+  "签名打包发布": "Signed release build",
+  "输出正式签名 APK": "Output a properly signed APK",
+  "仅 APK 端可用": "APK environment only",
+  "运行 ▾：模拟界面 / 编译预览 / 打包运行 / 签名发布": "Run ▾: Simulate / Compile preview / Build & run / Signed release",
+
+  // M290 文件 tab 操作
+  "新建文件": "New file",
+  "重命名当前文件": "Rename current file",
+  "删除当前文件": "Delete current file",
+
 };
 
 /** 繁體 —— 只登记与英文不同的；没登记的先走英文兜底（见 t()） */

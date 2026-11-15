@@ -13,7 +13,7 @@ import type { StoredSigning } from "@/lib/xml/sign-store";
 
 export interface SigningDialogProps {
   /** M192：一键打包成可安装 APK（设备端 aapt2 + 壳 dex + apksig 签名） */
-  onBuildApk?: (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => Promise<void>;
+  onBuildApk?: (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => Promise<import("@/lib/xml/native-apk").BuildApkResult | undefined>;
   apkBusy?: boolean;
   apkResult?: { ok: boolean; path?: string; name?: string; bytes?: number; ms?: number; step?: string; log?: string; compileMode?: string; classes?: number } | null;
   /** M192：调系统安装器装刚打出来的包 */

@@ -41,18 +41,23 @@ function props(over: Partial<ToolbarProps> = {}): ToolbarProps {
 
 type El = { type: unknown; props: Record<string, unknown> };
 
-/** M173：菜单项现在是 ToolbarMoreMenu 的 props.items，不再直接展开成按钮 */
-function menuItems(node: ReactNode): Array<{ key: string; label: string; title?: string; onClick: () => void }> {
-  let out: Array<{ key: string; label: string; title?: string; onClick: () => void }> = [];
+type MenuIt = { key: string; label: string; title?: string; onClick: () => void; disabled?: boolean; icon?: string; disabledHint?: string };
+
+function menuItems(node: ReactNode): MenuIt[] {
+  let out: MenuIt[] = [];
+  const found: MenuIt[][] = [];
   const walk = (n: ReactNode) => {
     if (Array.isArray(n)) return n.forEach((c) => walk(c as ReactNode));
     if (!isValidElement(n)) return;
     const el = n as unknown as El;
     const p = el.props as Record<string, unknown>;
-    if (Array.isArray(p.items)) out = p.items as typeof out;
+    if (Array.isArray(p.items)) found.push(p.items as MenuIt[]);
     walk(p.children as ReactNode);
   };
   walk(node);
+  // 「更多」菜单特征：含 open 且不含 run-sim；「运行」菜单特征：含 run-sim
+  const moreMenu = found.find((arr) => arr.some((it) => it.key === "open") && !arr.some((it) => it.key === "run-sim"));
+  out = moreMenu ?? found[0] ?? [];
   return out;
 }
 
@@ -77,7 +82,25 @@ function render(over: Partial<ToolbarProps> = {}) {
   const labels = all.map((e) => String(e.props["aria-label"]));
   const items = menuItems(tree as unknown as ReactNode);
   const item = (label: string) => items.find((it) => it.label === label);
-  return { p, tree, all, by, labels, items, item };
+  // M290：运行菜单（key 以 run- 开头）
+  const allItemArrays = collectAllItems(tree as unknown as ReactNode);
+  const runArr = allItemArrays.find((arr) => arr.some((it) => it.key === "run-sim")) ?? [];
+  const runItem = (label: string) => runArr.find((it) => it.label === label);
+  return { p, tree, all, by, labels, items, item, runArr, runItem };
+}
+
+function collectAllItems(node: ReactNode): MenuIt[][] {
+  const out: MenuIt[][] = [];
+  const walk = (n: ReactNode) => {
+    if (Array.isArray(n)) return n.forEach((c) => walk(c as ReactNode));
+    if (!isValidElement(n)) return;
+    const el = n as unknown as El;
+    const p = el.props as Record<string, unknown>;
+    if (Array.isArray(p.items)) out.push(p.items as MenuIt[]);
+    walk(p.children as ReactNode);
+  };
+  walk(node);
+  return out;
 }
 
 describe("Toolbar — 侧栏按钮", () => {
@@ -158,8 +181,8 @@ describe("Toolbar — res / 原生容器相关按钮的显隐（M173 起在「�
 
 describe("Toolbar — 主要动作接线", () => {
   it("保存 / 打开 / 复制 / 导出预览图 / 运行 / 格式化 各自触发对应回调", () => {
-    const { by, item, p } = render();
-    for (const label of ["保存", "导出预览图", "运行", "格式化"]) {
+    const { by, item, p, runItem } = render();
+    for (const label of ["保存", "导出预览图", "格式化"]) {
       const b = by(label);
       expect(b, label).toBeDefined();
       (b!.props.onClick as () => void)();
@@ -167,6 +190,10 @@ describe("Toolbar — 主要动作接线", () => {
     // M173：打开 / 复制 移到了「更多」菜单
     item("打开 XML 文件")!.onClick();
     item("复制 XML")!.onClick();
+    // M290：运行按钮变成「运行 ▾」菜单，点击菜单第一项（模拟界面）触发 onRun
+    const runSim = runItem("模拟界面");
+    expect(runSim).toBeDefined();
+    runSim!.onClick();
     expect(p.onSave).toHaveBeenCalledTimes(1);
     expect(p.onOpenFile).toHaveBeenCalledTimes(1);
     expect(p.onCopyXml).toHaveBeenCalledTimes(1);
@@ -217,5 +244,45 @@ describe("Toolbar — 主要动作接线", () => {
     expect(found).toHaveLength(1);
     expect(found[0].deviceId).toBe("pixel_7");
     expect(found[0].scale).toBe(1.2);
+  });
+});
+
+describe("Toolbar — M290 运行 ▾ 菜单", () => {
+  it("四项齐全且顺序固定", () => {
+    const { runArr } = render();
+    expect(runArr.map((i) => i.label)).toEqual(["模拟界面", "布局编译预览", "打包并运行", "签名打包发布"]);
+  });
+
+  it("Web 端（无 realRenderAvailable / canBuildApk）三项禁用，模拟界面可用", () => {
+    const { runArr } = render({ realRenderAvailable: false, canBuildApk: false, canSign: false });
+    const sim = runArr.find((i) => i.key === "run-sim");
+    expect(sim?.disabled).toBeFalsy();
+    const compile = runArr.find((i) => i.key === "run-compile");
+    const build = runArr.find((i) => i.key === "run-build");
+    const sign = runArr.find((i) => i.key === "run-sign");
+    expect(compile?.disabled).toBe(true);
+    expect(build?.disabled).toBe(true);
+    expect(sign?.disabled).toBe(true);
+    expect(compile?.disabledHint).toContain("APK");
+  });
+
+  it("APK 端且有签名配置时四项均可用", () => {
+    const { p, runArr } = render({
+      realRenderAvailable: true,
+      onRealRender: vi.fn(),
+      canBuildApk: true,
+      onBuildRun: vi.fn(),
+      canSign: true,
+      onSign: vi.fn(),
+    });
+    for (const it of runArr) expect(it.disabled, it.key).toBeFalsy();
+    runArr.find((i) => i.key === "run-sim")!.onClick();
+    runArr.find((i) => i.key === "run-compile")!.onClick();
+    runArr.find((i) => i.key === "run-build")!.onClick();
+    runArr.find((i) => i.key === "run-sign")!.onClick();
+    expect(p.onRun).toHaveBeenCalledTimes(1);
+    expect(p.onRealRender).toHaveBeenCalledTimes(1);
+    expect(p.onBuildRun).toHaveBeenCalledTimes(1);
+    expect(p.onSign).toHaveBeenCalledTimes(1);
   });
 });

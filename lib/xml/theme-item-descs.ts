@@ -81,9 +81,39 @@ const EXTRA_DESCS: ThemeItemDesc[] = [
   { attr: "android:windowActionBar", desc: "是否显示 ActionBar", type: "bool" }, // i18n-ignore
 ];
 
+/** M339：styles.xml 控件样式里 <item> 的常用属性（android: 控件属性） */
+export const STYLE_ITEM_DESCS: ThemeItemDesc[] = [
+  { attr: "android:background", desc: "控件背景", type: "color" }, // i18n-ignore
+  { attr: "android:backgroundTint", desc: "背景着色", type: "color" }, // i18n-ignore
+  { attr: "android:textColor", desc: "文字颜色", type: "color" }, // i18n-ignore
+  { attr: "android:textColorHint", desc: "提示文字颜色", type: "color" }, // i18n-ignore
+  { attr: "android:textSize", desc: "文字大小", type: "dimen" }, // i18n-ignore
+  { attr: "android:textStyle", desc: "文字样式 normal|bold|italic", type: "text" }, // i18n-ignore
+  { attr: "android:padding", desc: "内边距", type: "dimen" }, // i18n-ignore
+  { attr: "android:paddingLeft", desc: "左内边距", type: "dimen" }, // i18n-ignore
+  { attr: "android:paddingRight", desc: "右内边距", type: "dimen" }, // i18n-ignore
+  { attr: "android:paddingTop", desc: "上内边距", type: "dimen" }, // i18n-ignore
+  { attr: "android:paddingBottom", desc: "下内边距", type: "dimen" }, // i18n-ignore
+  { attr: "android:paddingHorizontal", desc: "左右内边距", type: "dimen" }, // i18n-ignore
+  { attr: "android:paddingVertical", desc: "上下内边距", type: "dimen" }, // i18n-ignore
+  { attr: "android:layout_width", desc: "布局宽 wrap_content/match_parent/dp", type: "other" }, // i18n-ignore
+  { attr: "android:layout_height", desc: "布局高 wrap_content/match_parent/dp", type: "other" }, // i18n-ignore
+  { attr: "android:gravity", desc: "内部对齐", type: "other" }, // i18n-ignore
+  { attr: "android:elevation", desc: "阴影高程", type: "dimen" }, // i18n-ignore
+  { attr: "android:rippleColor", desc: "波纹颜色", type: "color" }, // i18n-ignore
+  { attr: "android:strokeColor", desc: "描边颜色", type: "color" }, // i18n-ignore
+  { attr: "android:strokeWidth", desc: "描边宽度", type: "dimen" }, // i18n-ignore
+  { attr: "android:radius", desc: "圆角半径", type: "dimen" }, // i18n-ignore
+  { attr: "android:maxLines", desc: "最大行数", type: "other" }, // i18n-ignore
+  { attr: "android:singleLine", desc: "单行模式", type: "bool" }, // i18n-ignore
+  { attr: "android:clickable", desc: "是否可点击 true/false", type: "bool" }, // i18n-ignore
+  { attr: "android:focusable", desc: "是否可获取焦点 true/false", type: "bool" }, // i18n-ignore
+];
+
 const MAP = new Map<string, ThemeItemDesc>();
 for (const d of EXTRA_DESCS) MAP.set(d.attr, d);
 for (const d of THEME_ITEM_DESCS) MAP.set(d.attr, d);
+for (const d of STYLE_ITEM_DESCS) MAP.set(d.attr, d);
 
 /** 是否有 `android:` 前缀 */
 function hasAndroidPrefix(s: string): boolean {

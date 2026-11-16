@@ -129,19 +129,20 @@ describe("mergeProjectExtras", () => {
   });
 });
 
-describe("buildResBundle / wrapValues", () => {
-  it("导出时即使 valuesXml 有重复也不写重复定义", () => {
+describe("buildResBundle：values 拆标准文件 + 去重", () => {
+  it("导出时即使 valuesXml 有重复也不写重复定义，且按类型分文件", () => {
     const bloat = [COLORS, STRINGS, COLORS, STRINGS].join("\n");
     const entries = buildResBundle({
       layoutXml: '<?xml version="1.0" encoding="utf-8"?>\n<LinearLayout/>',
       extras: extras(bloat),
     });
-    const values = entries.find((e) => e.path === "values/res_values.xml");
-    expect(values).toBeTruthy();
-    const text = values!.text ?? "";
-    expect(text.match(/name="brand"/g)).toHaveLength(1);
-    expect(text.match(/name="app_name"/g)).toHaveLength(1);
-    // 包一层 resources，且没嵌套
-    expect(text.match(/<resources>/g)).toHaveLength(1);
+    const paths = entries.map((e) => e.path);
+    expect(paths).not.toContain("values/res_values.xml");
+    const colors = entries.find((e) => e.path === "values/colors.xml")!.text ?? "";
+    const strs = entries.find((e) => e.path === "values/strings.xml")!.text ?? "";
+    expect(colors.match(/name="brand"/g)).toHaveLength(1);
+    expect(strs.match(/name="app_name"/g)).toHaveLength(1);
+    expect(colors.match(/<resources>/g)).toHaveLength(1);
+    expect(strs.match(/<resources>/g)).toHaveLength(1);
   });
 });

@@ -4,6 +4,7 @@
 import type { ResourceExtras, ResTreeDir, ResTreeFile } from "./resdir";
 import type { ZipEntry } from "./zip";
 import { dedupeValuesFragment } from "./values-merge";
+import { splitValuesIntoStandardFiles } from "./values-split";
 
 export interface BundleInput {
   /** 已规范化（带声明）的布局 XML 全文 */
@@ -65,9 +66,20 @@ export function buildResBundle(input: BundleInput): ZipEntry[] {  const entries:
     if (extras.tree) walk(extras.tree);
   }
 
-  // 3) values：把上传的 values 片段拆回文件太脆，统一写 values/res_values.xml（可被 Android 读取）
+  // 3) values：按元素类型拆成标准 7 文件（strings/colors/dimens/integers/arrays/styles/themes），
+  //    不再全塞一个 res_values.xml（用户 2026-11-17 明确要求）。
+  //    先整体去重（M183c 防越滚越大），再按类型分文件；空的文件不生成。
   if (extras?.valuesXml && extras.valuesXml.trim()) {
-    push("values/res_values.xml", wrapValues(extras.valuesXml));
+    const deduped = dedupeValuesFragment(
+      extras.valuesXml
+        .replace(/<\?xml[^>]*\?>/gi, "")
+        .replace(/<\/?resources[^>]*>/gi, "")
+        .replace(/<macro\b[^>]*\/>/gi, "")
+        .replace(/<macro\b[^>]*>[\s\S]*?<\/macro>/gi, "")
+        .trim(),
+    );
+    const split = splitValuesIntoStandardFiles(deduped);
+    for (const [p, t] of Object.entries(split)) push(p, t);
   }
 
   // 3.5) M171：工具生成的非 drawable 资源（mipmap-anydpi-v26 的应用图标）按原路径写
@@ -119,23 +131,6 @@ function rank(p: string): number {
   if (p.startsWith("drawable/")) return 1;
   if (p.startsWith("values/")) return 3;
   return 2;
-}
-
-/** 把零散的 <string>/<dimen>/<color> 标签包一层 <resources>
- *  M183c：包之前先按 kind/name 去重 —— 旧版直接把整个片段塞进去，
- *  valuesXml 里一旦有重复（多次合并累积出来的）就会写出几千条重复定义。 */
-function wrapValues(fragment: string): string {
-  const body = dedupeValuesFragment(
-    fragment
-      .replace(/<\?xml[^>]*\?>/gi, "")
-      .replace(/<\/?resources[^>]*>/gi, "")
-      // M12c：<macro> 是 AAPT2 新特性，AIDE 内嵌的老 aapt 遇到会直接
-      // “Found tag macro where item is expected”→ 导出时丢掉（宏只影响 gradle 层，预览/编译不需要）
-      .replace(/<macro\b[^>]*\/>/gi, "")
-      .replace(/<macro\b[^>]*>[\s\S]*?<\/macro>/gi, "")
-      .trim(),
-  );
-  return `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n${body}\n</resources>\n`;
 }
 
 /** 从布局里扫出引用的 @drawable/@mipmap 名（用于导出前提示缺哪些资源） */

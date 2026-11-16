@@ -72,23 +72,28 @@ describe("M3g res 包组装", () => {
     expect(entries.map((e) => e.path)).toContain("drawable/bg_card.xml");
   });
 
-  it("values 片段包成 values/res_values.xml", () => {
+  it("values 片段按类型拆成标准文件（color→values/colors.xml，不再 res_values.xml）", () => {
     const entries = buildResBundle({
       layoutXml: "<x/>",
       extras: {
         drawables: {},
         vectorNames: [],
         drawableXml: {},
-        valuesXml: '<color name="brand">#123456</color>',
+        valuesXml:
+          '<color name="brand">#123456</color><string name="title">Hi</string><dimen name="gap">8dp</dimen>',
         styles: {},
         sourceFiles: [],
-        counts: { images: 0, vectors: 0, values: 1, styles: 0, shapes: 0 },
+        counts: { images: 0, vectors: 0, values: 3, styles: 0, shapes: 0 },
       },
     });
-    const v = entries.find((e) => e.path === "values/res_values.xml");
-    expect(v).toBeTruthy();
-    expect(v!.text).toContain("<resources>");
-    expect(v!.text).toContain('name="brand"');
+    const paths = entries.map((e) => e.path);
+    expect(paths).not.toContain("values/res_values.xml");
+    const colors = entries.find((e) => e.path === "values/colors.xml");
+    expect(colors!.text).toContain('name="brand"');
+    const strs = entries.find((e) => e.path === "values/strings.xml");
+    expect(strs!.text).toContain('name="title"');
+    const dimens = entries.find((e) => e.path === "values/dimens.xml");
+    expect(dimens!.text).toContain('name="gap"');
   });
 
   it("同路径不重复打包", () => {

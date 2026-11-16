@@ -60,6 +60,10 @@ public class PreviewActivity extends Activity {
             if (l != null && !l.isEmpty()) layoutName = l;
             if (a != null && !a.isEmpty()) apkPath = a;
         }
+        // M317：主题预览——JS 可传 theme（预设 style 名，如 Theme.MyApp）；
+        // 不传就 fallback Theme.MyApp → manifest application theme
+        String themeName = getIntent() != null ? getIntent().getStringExtra("theme") : null;
+        if (themeName != null && themeName.isEmpty()) themeName = null;
         final boolean builtin = RES_PKG.equals(pkgName);
 
         LinearLayout page = new LinearLayout(this);
@@ -87,6 +91,9 @@ public class PreviewActivity extends Activity {
                 way = "AssetManager.addAssetPath(反射)";
             }
             Resources res = getResources();
+            // M317：应用主题——从资源包里找 theme style id，applyStyle 后再 inflate，
+            // 这样按钮/底色/文字色跟预设主题一致（1:1 观感）。找不到就跳过，绝不让预览崩。
+            String appliedTheme = applyAppTheme(res, themeName);
             int layoutId = res.getIdentifier(layoutName, "layout", pkgName);
             int strId = res.getIdentifier("title", "string", pkgName);
             if (layoutId == 0) throw new IllegalStateException("拿不到 layout id（资源包没挂上？）");
@@ -101,6 +108,7 @@ public class PreviewActivity extends Activity {
                     + "layoutId=0x" + Integer.toHexString(layoutId)
                     + "  title=" + (strId == 0 ? "?" : res.getString(strId))
                     + "\n资源包 " + pkg.length() + " 字节 · inflate OK"
+                    + (appliedTheme != null ? "\n主题已应用：" + appliedTheme : "")
                     + (stubCount > 0 ? "（" + stubCount + " 个第三方控件用平台控件代替）" : "")
                     + "\n下面就是系统真控件：按下去看状态切换和涟漪";
             Log.i(TAG, info);
@@ -270,6 +278,34 @@ public class PreviewActivity extends Activity {
             int n;
             while ((n = in.read(b)) > 0) out.write(b, 0, n);
         }
+    }
+
+    /**
+     * M317：从加载的资源包里取 app 主题 style，applyStyle 后再 inflate。
+     * 候选顺序：JS 传入的 themeName（预设 style 名）→ Theme.MyApp（主题面板写的那个）→ manifest application theme。
+     * 找不到 / applyStyle 失败都返回 null（调用方跳过，不崩预览）。
+     * 返回实际应用的 style 名（带包名）供日志展示。
+     */
+    private String applyAppTheme(Resources res, String themeName) {
+        try {
+            // 候选：JS 传入的预设 style 名（如 Theme.MyApp）→ Theme.MyApp（主题面板默认写的那个）。
+            // manifest application theme 一般是 @style/Theme.MyApp，已覆盖；不额外解析 manifest 避免引入依赖。
+            java.util.List<String> candidates = new java.util.ArrayList<>();
+            if (themeName != null) candidates.add(themeName);
+            candidates.add("Theme.MyApp");
+            for (String name : candidates) {
+                int id = res.getIdentifier(name, "style", pkgName);
+                if (id != 0) {
+                    getTheme().applyStyle(id, true);
+                    Log.i(TAG, "M317 apply theme " + name + " id=0x" + Integer.toHexString(id));
+                    return name;
+                }
+            }
+            Log.i(TAG, "M317 资源包内未找到可应用主题（候选 " + candidates + "），用默认主题");
+        } catch (Throwable t) {
+            Log.w(TAG, "M317 applyStyle 失败，回退默认主题", t);
+        }
+        return null;
     }
 
     private int dp(int v) {

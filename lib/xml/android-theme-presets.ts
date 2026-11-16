@@ -307,3 +307,29 @@ export function writeThemeIntoValues(
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+/**
+ * M317：从 res 文件清单里找出「应用主题」的 style 名，交给原生预览 applyStyle。
+ * 看 values/themes.xml / values/styles.xml，抓所有 <style name>，优先 Theme.MyApp（主题面板写的那个），
+ * 否则优先 name 以 theme 开头的；都没有返回 undefined（PreviewActivity 用默认主题，不崩）。
+ */
+export function findAppThemeStyle(
+  files: { path: string; text?: string }[],
+): string | undefined {
+  for (const f of files) {
+    const isThemeFile =
+      /^values\/(themes|styles)\.xml$/i.test(f.path) ||
+      /^values\/[\w-]*\/(themes|styles)\.xml$/i.test(f.path);
+    if (!isThemeFile) continue;
+    const text = f.text || "";
+    const names: string[] = [];
+    const re = /<style\s+[^>]*name\s*=\s*["']([^"']+)["']/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) names.push(m[1]);
+    if (names.length === 0) continue;
+    if (names.includes("Theme.MyApp")) return "Theme.MyApp";
+    const withTheme = names.find((n) => /(^|\.)theme/i.test(n));
+    return withTheme || names[0];
+  }
+  return undefined;
+}

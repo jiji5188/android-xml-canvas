@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { writeThemeIntoValues, androidThemeById } from "../lib/xml/android-theme-presets";
+import { writeThemeIntoValues, androidThemeById, findAppThemeStyle } from "../lib/xml/android-theme-presets";
 import { buildPalette } from "../lib/xml/theme-palette";
 import { collectThemeAttrs, parseStylesXml } from "../lib/xml/resdir";
 import { androidColorToCss } from "../lib/xml/color-argb";
@@ -41,5 +41,27 @@ describe("M316 主题写回 → 预览调色板链路", () => {
     xml = writeThemeIntoValues(xml, p2);
     const { themeAttrs } = paletteFromThemeXml(xml);
     expect(themeAttrs.colorPrimary).toBe(p2.light.primary);
+  });
+});
+
+describe("findAppThemeStyle（M317 原生预览应用主题）", () => {
+  it("themes.xml 里有 Theme.MyApp → 返回它", () => {
+    const xml =
+      "<resources><style name=\"Theme.MyApp\" parent=\"Theme.Material3.Light\"/></resources>";
+    expect(findAppThemeStyle([{ path: "values/themes.xml", text: xml }])).toBe(
+      "Theme.MyApp",
+    );
+  });
+  it("没有 Theme.MyApp 但有 theme 开头的 style → 返回它", () => {
+    const xml = "<resources><style name=\"Theme.Legacy\"/><style name=\"Btn\"/></resources>";
+    expect(findAppThemeStyle([{ path: "values/styles.xml", text: xml }])).toBe(
+      "Theme.Legacy",
+    );
+  });
+  it("没有主题文件 → undefined（预览不崩）", () => {
+    expect(
+      findAppThemeStyle([{ path: "values/strings.xml", text: "<resources/>" }]),
+    ).toBeUndefined();
+    expect(findAppThemeStyle([])).toBeUndefined();
   });
 });

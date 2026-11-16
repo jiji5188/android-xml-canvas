@@ -10,6 +10,7 @@ import {
   downloadResZip,
 } from "@/lib/xml/save-flow";
 import { renderReal } from "@/lib/xml/native-render";
+import { findAppThemeStyle } from "@/lib/xml/android-theme-presets";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { exportProjectZip } from "@/lib/xml/project-export";
 import { readPublishInfo } from "@/lib/xml/gradle-publish";
@@ -143,7 +144,9 @@ export function useExportRender(getDeps: () => ExportRenderDeps) {
             ? tt("已补齐 {n} 个项目资源，正在用设备上的 aapt2 编译…", { n: collected.added })
             : tt("正在用设备上的 aapt2 编译资源包…")) + stubNote,
         );
-        return renderReal(name, collected.files);
+        // M317：从收集到的 res 文件里找应用主题 style（主题面板写的 Theme.MyApp）
+        const theme = findAppThemeStyle(collected.files as { path: string; text?: string }[]);
+        return renderReal(name, collected.files, 25000, theme);
       })
       .then((r) => {
         setRealRenderBusy(false);

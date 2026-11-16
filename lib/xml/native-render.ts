@@ -375,6 +375,7 @@ export function renderReal(
   layoutName: string,
   files: RenderFile[],
   timeoutMs = 25000,
+  theme?: string,
 ): Promise<RealRenderResult> {
   const b = bridge();
   if (!b || typeof b.renderReal !== "function") {
@@ -397,7 +398,8 @@ export function renderReal(
       resolve(r);
     });
     try {
-      b.renderReal!(id, JSON.stringify({ pkg: PKG, layout: name, files: filled }));
+      // M317：带 theme（预设 style 名）→ PreviewActivity 应用主题，1:1 观感
+      b.renderReal!(id, JSON.stringify({ pkg: PKG, layout: name, files: filled, theme: theme || "" }));
     } catch (e) {
       window.clearTimeout(timer);
       table.drop(id);

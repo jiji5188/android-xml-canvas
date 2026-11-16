@@ -2414,6 +2414,8 @@ public class MainActivity extends Activity {
         JSONObject p = new JSONObject(payloadJson);
         String pkg = p.optString("pkg", "com.axv.render");
         String layout = p.optString("layout", "activity_main");
+        // M317：主题（预设 style 名，如 Theme.MyApp）→ 传给 PreviewActivity 应用主题
+        String theme = p.optString("theme", "");
         JSONArray files = p.optJSONArray("files");
         if (files == null || files.length() == 0) throw new IOException("payload 里没有文件");
 
@@ -2493,12 +2495,14 @@ public class MainActivity extends Activity {
 
         final String fpkg = pkg;
         final String flayout = layout;
+        final String ftheme = theme;
         runOnUiThread(() -> {
             try {
                 Intent it = new Intent(MainActivity.this, PreviewActivity.class);
                 it.putExtra("apk", outApk.getAbsolutePath());
                 it.putExtra("pkg", fpkg);
                 it.putExtra("layout", flayout);
+                if (ftheme != null && !ftheme.isEmpty()) it.putExtra("theme", ftheme);
                 startActivity(it);
             } catch (Throwable t) {
                 Log.e(TAG, "open preview fail", t);

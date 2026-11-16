@@ -33,6 +33,10 @@ public class ThemePreviewActivity extends Activity {
     private boolean fNoActionBar = false;
     private boolean fFullscreen = false;
 
+    /** M328：预设调色板（与主题面板/写入 themes.xml 的 colorPrimary 等一致） */
+    private boolean hasPalette = false;
+    private int cP = 0xFF888888, cOnP = 0xFFFFFFFF, cSec = 0xFFAAAAAA, cSurf = 0xFFFFFFFF, cOnSurf = 0xFF000000;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,6 +46,7 @@ public class ThemePreviewActivity extends Activity {
         String paletteJson = getIntent() != null ? getIntent().getStringExtra("palette") : null;
         boolean isDialog = "dialog".equals(kind);
         applyFeatures(getIntent());
+        applyPalette(paletteJson);
 
         int themeId = resolveThemeStyle(parent);
 
@@ -63,6 +68,18 @@ public class ThemePreviewActivity extends Activity {
             return;
         }
 
+        // M328：壳里没有 Material/AppCompat 资源，系统等价主题自带色与预设不同 -> 显式套预设色
+        if (hasPalette) {
+            getWindow().setBackgroundDrawable(new ColorDrawable(cSurf));
+            if (!fFullscreen) {
+                try { getWindow().setStatusBarColor(cP); } catch (Exception ignore) { }
+            }
+            if (!fNoActionBar) {
+                android.app.ActionBar ab = getActionBar();
+                if (ab != null) ab.setBackgroundDrawable(new ColorDrawable(cP));
+            }
+        }
+
         // ---- 极简：配色块 + 标题栏/全屏说明 ----
         ScrollView sv = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
@@ -73,11 +90,14 @@ public class ThemePreviewActivity extends Activity {
         TextView title = new TextView(this);
         title.setText(parent == null || parent.isEmpty() ? "主题预览" : parent);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        if (hasPalette) title.setTextColor(cOnSurf);
         root.addView(title);
 
         TextView sub = new TextView(this);
-        sub.setText("背景与文字颜色由主题自身决定；下面标出该预设的配色");
+        sub.setText("配色按预设写入 themes.xml 的颜色渲染（与真机 App 一致）");
         sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        sub.setAlpha(0.7f);
+        if (hasPalette) sub.setTextColor(cOnSurf);
         root.addView(sub, topParams(4));
 
         // 配色块
@@ -103,6 +123,7 @@ public class ThemePreviewActivity extends Activity {
         TextView l2 = new TextView(this);
         l2.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         l2.setText("全屏：" + (fFullscreen ? "是（隐藏状态栏）" : "否"));
+        if (hasPalette) { l1.setTextColor(cOnSurf); l2.setTextColor(cOnSurf); }
         status.addView(l1, topParams(16));
         status.addView(l2, topParams(4));
         root.addView(status);
@@ -171,6 +192,21 @@ public class ThemePreviewActivity extends Activity {
                 .create();
         dlg.setCanceledOnTouchOutside(true);
         dlg.show();
+    }
+
+    /** M328：解析预设调色板（ARGB 字符串） */
+    private void applyPalette(String paletteJson) {
+        if (paletteJson == null || paletteJson.isEmpty()) return;
+        try {
+            JSONObject p = new JSONObject(paletteJson);
+            cP = parseArgb(p.optString("primary", "#FF888888"));
+            cOnP = parseArgb(p.optString("onPrimary", "#FFFFFFFF"));
+            cSec = parseArgb(p.optString("secondary", "#FFAAAAAA"));
+            cSurf = parseArgb(p.optString("surface", "#FFFFFFFF"));
+            cOnSurf = parseArgb(p.optString("onSurface", "#FF000000"));
+            hasPalette = true;
+        } catch (Exception ignore) {
+        }
     }
 
     private void applyFeatures(android.content.Intent in) {

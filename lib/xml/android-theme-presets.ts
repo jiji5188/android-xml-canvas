@@ -63,7 +63,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "appcompat",
     group: "appcompat",
-    name: "AppCompat（深色）",
+    name: "AppCompat · 深色",
     parent: "Theme.AppCompat",
     note: "最基础的深色主题，旧 App 默认观感：方角按钮、经典 Material 1 控件",
     light: pal("#FF9E9E9E", "#FF000000", "#FF009688", "#FF303030", "#FFFFFFFF", "#FFB0BEC5"),
@@ -72,7 +72,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "appcompat-light",
     group: "appcompat",
-    name: "AppCompat · Light",
+    name: "AppCompat · 浅色",
     parent: "Theme.AppCompat.Light",
     note: "浅色经典主题，白底黑字 + 灰主色，适合信息密集界面",
     light: pal("#FF757575", "#FFFFFFFF", "#FF009688", "#FFFFFFFF", "#FF212121", "#FF616161"),
@@ -80,7 +80,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "appcompat-dark",
     group: "appcompat",
-    name: "AppCompat · Dark",
+    name: "AppCompat · 深色",
     parent: "Theme.AppCompat",
     note: "深色经典主题，深灰底浅字",
     light: pal("#FF9E9E9E", "#FF000000", "#FF009688", "#FF303030", "#FFFFFFFF", "#FFB0BEC5"),
@@ -89,7 +89,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "appcompat-light-noactionbar",
     group: "appcompat",
-    name: "AppCompat · Light.NoActionBar",
+    name: "AppCompat · 浅色无ActionBar",
     parent: "Theme.AppCompat.Light.NoActionBar",
     note: "浅色、无系统 ActionBar，适合自绘 Toolbar / 全屏自定顶部",
     light: pal("#FF757575", "#FFFFFFFF", "#FF009688", "#FFFFFFFF", "#FF212121", "#FF616161"),
@@ -99,7 +99,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "material2",
     group: "material2",
-    name: "Material 2（浅色）",
+    name: "Material 2 · 浅色",
     parent: "Theme.MaterialComponents",
     note: "Material Design 2 标准浅色，紫主色 + 圆角 4dp 按钮 + 阴影",
     light: pal("#FF6200EE", "#FFFFFFFF", "#FF03DAC6", "#FFFFFFFF", "#FF1D1B20", "#FF49454F"),
@@ -107,7 +107,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "material2-light",
     group: "material2",
-    name: "Material 2 · Light",
+    name: "Material 2 · 浅色",
     parent: "Theme.MaterialComponents.Light",
     note: "Material 2 浅色，白底 + 紫主色，最常用",
     light: pal("#FF6200EE", "#FFFFFFFF", "#FF03DAC6", "#FFFFFFFF", "#FF1D1B20", "#FF49454F"),
@@ -115,7 +115,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "material2-dark",
     group: "material2",
-    name: "Material 2 · Dark",
+    name: "Material 2 · 深色",
     parent: "Theme.MaterialComponents",
     note: "Material 2 深色，深灰底 + 浅紫主色",
     light: pal("#BB86C6", "#FF1B1B1F", "#FF03DAC6", "#FF121212", "#FFE0E0E0", "#FFBDBDBD"),
@@ -124,7 +124,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "material2-noactionbar",
     group: "material2",
-    name: "Material 2 · NoActionBar",
+    name: "Material 2 · 无ActionBar",
     parent: "Theme.MaterialComponents.NoActionBar",
     note: "Material 2 无 ActionBar，配合自绘 Toolbar 用",
     light: pal("#FF6200EE", "#FFFFFFFF", "#FF03DAC6", "#FFFFFFFF", "#FF1D1B20", "#FF49454F"),
@@ -134,7 +134,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "material3-light",
     group: "material3",
-    name: "Material 3 · Light",
+    name: "Material 3 · 浅色",
     parent: "Theme.Material3.Light",
     note: "Material 3 浅色，紫罗兰主色 + 胶囊按钮 + 24dp 圆角卡片",
     light: pal("#FF6750A4", "#FFFFFFFF", "#FF625B71", "#FFFDF7FF", "#FF1D1B20", "#FF49454F"),
@@ -142,7 +142,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "material3-dark",
     group: "material3",
-    name: "Material 3 · Dark",
+    name: "Material 3 · 深色",
     parent: "Theme.Material3.Dark",
     note: "Material 3 深色，深紫底 + 浅紫主色，OLED 友好",
     light: pal("#FFD0BCFF", "#FF381E72", "#FFCCC2DC", "#FF141218", "#FFE6E0E9", "#FFCAC4D0"),
@@ -151,7 +151,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "material3-daynight",
     group: "material3",
-    name: "Material 3 · DayNight",
+    name: "Material 3 · 跟随系统",
     parent: "Theme.Material3.DayNight",
     note: "Material 3 跟随系统深浅色，白天浅、夜里深，一套代码",
     light: pal("#FF6750A4", "#FFFFFFFF", "#FF625B71", "#FFFDF7FF", "#FF1D1B20", "#FF49454F"),
@@ -160,7 +160,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "material3-noactionbar",
     group: "material3",
-    name: "Material 3 · NoActionBar",
+    name: "Material 3 · 无ActionBar",
     parent: "Theme.Material3.DynamicColors.Light.NoActionBar",
     note: "Material 3 无 ActionBar + 动态色（跟壁纸取色，Android 12+ 最佳）",
     light: pal("#FF6750A4", "#FFFFFFFF", "#FF625B71", "#FFFDF7FF", "#FF1D1B20", "#FF49454F"),
@@ -178,7 +178,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "system-device-default",
     group: "system",
-    name: "系统 · DeviceDefault",
+    name: "系统 · 厂商默认",
     parent: "@android:style/Theme.DeviceDefault",
     note: "跟随厂商 ROM 默认外观（华为/小米/三星各家风格不同），兼容性最好",
     light: pal("#FF2196F3", "#FFFFFFFF", "#FF2196F3", "#FFFFFFFF", "#FF000000", "#FF757575"),
@@ -195,7 +195,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   {
     id: "system-holo-light",
     group: "system",
-    name: "系统 · Holo.Light",
+    name: "系统 · Holo 浅色",
     parent: "@android:style/Theme.Holo.Light",
     note: "Holo 浅色版，老式白底蓝主色",
     light: pal("#FF33B5E5", "#FFFFFFFF", "#FF33B5E5", "#FFFFFFFF", "#FF000000", "#FF757575"),

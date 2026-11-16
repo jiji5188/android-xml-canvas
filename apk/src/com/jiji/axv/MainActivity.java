@@ -553,6 +553,23 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void openThemePreview(String presetId, String parent, String paletteJson) {
+            // M320：主题面板点「预览」→ 跳专用 ThemePreviewActivity，代码里 setTheme 加载选中主题样式
+            runOnUiThread(() -> {
+                try {
+                    Intent it = new Intent(MainActivity.this, ThemePreviewActivity.class);
+                    it.putExtra("presetId", presetId == null ? "" : presetId);
+                    it.putExtra("parent", parent == null ? "" : parent);
+                    it.putExtra("palette", paletteJson == null ? "" : paletteJson);
+                    startActivity(it);
+                } catch (Throwable t) {
+                    Log.e(TAG, "openThemePreview fail", t);
+                    toast("打开主题预览失败: " + t.getMessage());
+                }
+            });
+        }
+
+        @JavascriptInterface
         public String saveFile(String name, String mime, String base64) {
             try {
                 byte[] data = Base64.decode(base64, Base64.DEFAULT);

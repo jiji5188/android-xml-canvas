@@ -16,6 +16,8 @@ interface Props {
   selectedId?: string;
   /** 选中回调：把预设写进 themes.xml */
   onPick: (preset: AndroidThemePreset) => void;
+  /** M320：点「预览」→ 跳原生主题预览 Activity（仅 APK 端有；没传 = 不显示按钮） */
+  onPreview?: (preset: AndroidThemePreset) => void;
   /** 是否正在应用 */
   busy?: boolean;
 }
@@ -139,7 +141,7 @@ function Mockup({ p, tr }: { p: AndroidThemePreset; tr: Props["tr"] }) {
   );
 }
 
-export function ThemePickerPanel({ tr, selectedId, onPick, busy }: Props) {
+export function ThemePickerPanel({ tr, selectedId, onPick, onPreview, busy }: Props) {
   const [open, setOpen] = useState<Record<ThemeGroup, boolean>>({
     appcompat: true,
     material2: true,
@@ -205,6 +207,39 @@ export function ThemePickerPanel({ tr, selectedId, onPick, busy }: Props) {
                         parent = {p.parent}
                       </div>
                       <div style={{ fontSize: 11, opacity: 0.7, lineHeight: 1.4 }}>{tr(p.note, p.note)}</div>
+                      {onPreview && (
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPreview(p);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              onPreview(p);
+                            }
+                          }}
+                          style={{
+                            marginTop: 6,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 11,
+                            fontWeight: 500,
+                            color: "#fff",
+                            background: "var(--axv-primary)",
+                            borderRadius: 6,
+                            padding: "3px 10px",
+                            cursor: "pointer",
+                            userSelect: "none",
+                            border: "none",
+                          }}
+                        >
+                          ▶ {tr("真预览", "Preview")}
+                        </div>
+                      )}
                     </div>
                   </button>
                 );

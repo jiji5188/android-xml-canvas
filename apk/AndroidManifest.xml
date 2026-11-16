@@ -40,6 +40,12 @@
             </intent-filter>
         </activity>
 
+        <!-- M320：主题专用预览页（从主题面板点「预览」跳过来，代码里 setTheme 加载选中主题样式） -->
+        <activity
+            android:name=".ThemePreviewActivity"
+            android:label="主题预览"
+            android:exported="false" />
+
         <!-- M192：把生成好的 APK 交给系统安装器（Android 7+ 需要 content:// 而不是 file://） -->
         <provider
             android:name=".AxvApkProvider"

@@ -2815,6 +2815,7 @@ export const SRC_EN: SrcDict = {
   "系统 · Holo（经典）": "System · Holo (classic)",
   "系统 · Holo 浅色": "System · Holo.Light",
   "系统 · Material": "System · Material",
+  "真预览": "Native preview",
   "最基础的深色主题，旧 App 默认观感：方角按钮、经典 Material 1 控件": "Most basic dark theme, the default look of old apps: square buttons, classic Material 1 widgets",
   "浅色经典主题，白底黑字 + 灰主色，适合信息密集界面": "Light classic theme, white background + dark text + grey primary, good for information-dense UIs",
   "深色经典主题，深灰底浅字": "Dark classic theme, dark grey background with light text",

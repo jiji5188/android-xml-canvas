@@ -89,6 +89,7 @@ import { installApk, shareApkFile, hasBuildApk, type BuildApkResult } from "@/li
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { ThemePickerPanel } from "./ThemePickerPanel";
+import { openThemePreviewNative } from "@/lib/xml/theme-preview-bridge";
 import { writeThemeIntoValues, type AndroidThemePreset } from "@/lib/xml/android-theme-presets";
 import { projectSaveRoot, projectFileExists, readProjectFile, readAppGradle, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
 import { parseAppIconConfig } from "@/lib/xml/app-icon";
@@ -4079,6 +4080,14 @@ const findResolved = findResolvedNode;
             <ThemePickerPanel
               tr={tr}
               onPick={(preset) => void applyAndroidTheme(preset)}
+              onPreview={
+                // M320：只有 APK 壳（有原生桥）才显示「真预览」按钮；浏览器端 undefined → 不渲染
+                nativeAvailable()
+                  ? (preset) => {
+                      openThemePreviewNative(preset);
+                    }
+                  : undefined
+              }
               busy={themeApplying}
             />
           )}

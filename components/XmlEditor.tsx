@@ -4080,14 +4080,10 @@ const findResolved = findResolvedNode;
             <ThemePickerPanel
               tr={tr}
               onPick={(preset) => void applyAndroidTheme(preset)}
-              onPreview={
-                // M320：只有 APK 壳（有原生桥）才显示「真预览」按钮；浏览器端 undefined → 不渲染
-                nativeAvailable()
-                  ? (preset) => {
-                      openThemePreviewNative(preset);
-                    }
-                  : undefined
-              }
+              onPreview={(preset) => {
+                // M320：APK 壳跳原生主题预览 Activity；浏览器/桌面没有桥 → 静默降级（不跳）
+                openThemePreviewNative(preset);
+              }}
               busy={themeApplying}
             />
           )}

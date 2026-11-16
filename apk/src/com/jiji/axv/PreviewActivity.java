@@ -209,15 +209,19 @@ public class PreviewActivity extends Activity {
         if (v != null) return v;
         stubCount++;
         try {
+            // M318：退壳时一定把 attrs 带上——layout_width/height/layout_margin 这些布局参数
+            // 在 attrs 里，不带壳就是 0×0 看不见，底下挂的子控件整棵跟着丢（“少了一些控件”的根因）。
             if (name.endsWith("ImageView") || name.endsWith("ImageButton")) return new android.widget.ImageView(ctx, attrs);
             if (name.endsWith("Button")) return new android.widget.Button(ctx, attrs);
             if (name.endsWith("TextView") || name.endsWith("EditText")) return new android.widget.TextView(ctx, attrs);
             if (name.endsWith("ScrollView")) return new ScrollView(ctx, attrs);
-            if (name.endsWith("LinearLayout")) return new LinearLayout(ctx);
+            if (name.endsWith("LinearLayout")) return new LinearLayout(ctx, attrs);
+            // 其余一律 FrameLayout + attrs（能撑出 layout 参数，至少可见占位）
+            return new FrameLayout(ctx, attrs);
         } catch (Throwable ignore) {
-            /* 退回 FrameLayout */
+            /* 最后退路：无参 FrameLayout（attrs 构造器极少会炸，不返回 null——null 会让 LayoutInflater 重试未知类抛异常） */
+            return new FrameLayout(ctx);
         }
-        return new FrameLayout(ctx);
     }
 
     private View tryCreate(String name, Context ctx, AttributeSet attrs) {

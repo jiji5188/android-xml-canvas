@@ -37,6 +37,16 @@ export interface AndroidThemePreset {
   dark?: AndroidThemePalette;
 }
 
+/** 主题家族：决定预览样张要复刻哪一代 Android 控件形态 */
+export type ThemeFamily = "appcompat" | "material2" | "material3" | "holo" | "device";
+
+export function themeFamily(p: AndroidThemePreset): ThemeFamily {
+  if (p.group === "material3") return "material3";
+  if (p.group === "material2") return "material2";
+  if (p.group === "appcompat") return "appcompat";
+  return /Holo/i.test(p.parent) ? "holo" : "device";
+}
+
 export const THEME_GROUP_ORDER: ThemeGroup[] = [
   "appcompat",
   "material2",

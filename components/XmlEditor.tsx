@@ -147,7 +147,7 @@ import { readPublishInfo } from "@/lib/xml/gradle-publish";
 import { SAMPLE_PROJECTS, SAMPLE_BLANKS, sampleProjectByKey } from "@/lib/xml/sample-projects";
 
 /** M31：当前打开的项目（name = app 名称；iconUrl = ic_launcher 图标） */
-type ActiveProject = {
+export type ActiveProject = {
   name: string;
   source: ProjectSource | null;
   iconUrl?: string | null;
@@ -173,6 +173,7 @@ import {
 } from "@/lib/xml/multi-file";
 import { NEW_FILE_CATEGORIES, findCategory, findTemplate, renderTemplate, companionLayoutName, LAYOUT_BLANK_LL_EXPORT, type NewFileCategory } from "@/lib/xml/new-file";
 import { useNewFileDialog } from "./use-new-file-dialog";
+import { useSigning } from "./use-signing";
 import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { toCompatXml } from "@/lib/xml/compat";
 import { fixNamespacePrefixes } from "@/lib/xml/namespace";
@@ -1668,117 +1669,16 @@ const allDrawableNames = useMemo(() => {
   /** M188a：签名与发布配置弹层（读写项目里的 app/build.gradle）
    *  M188b：放宽为只要有 activeProject 就能打开；没可写根时配置先暂存 localStorage，
    *  用户保存项目后可再点一次「写入 build.gradle」真正落盘 */
-  const [signDialogOpen, setSignDialogOpen] = useState(false);
+  /** M336c：签名对话框 state+逻辑 → 抽到 components/use-signing.tsx */
+  const signing = useSigning({ activeProject, tt, setExportNote, noteTimerRef });
+  const {
+    signDialogOpen, setSignDialogOpen,
+    gradleForSign, signRootMissing, signKeystoreExists, signAppName, signIconDefault, signStored, setSignStoredRev,
+    openSignDialog, makeKeystoreOnDevice, noteTimed, writeGradleForSign, onRemember, onForget,
+  } = signing;
   /** M212：导入 APK 换资源重签面板 */
   const [repackOpen, setRepackOpen] = useState(false);
-  const [gradleForSign, setGradleForSign] = useState<string | null>(null);
-  /** M220b：签名配置实际命中/写回的 gradle 相对路径（KTS 工程、无 app/ 前缀的工程不能写死 app/build.gradle） */
-  const [gradleRelForSign, setGradleRelForSign] = useState<string>("app/build.gradle");
-  const [signRootMissing, setSignRootMissing] = useState(false);
-  /** M189：keystore 文件是否真存在（不给就是没检查） */
-  const [signKeystoreExists, setSignKeystoreExists] = useState<boolean | undefined>(undefined);
-  const [signAppName, setSignAppName] = useState<string | null>(null);
-  const [signIconDefault, setSignIconDefault] = useState<boolean | undefined>(undefined);
-  const LS_KEY_SIGN_DRAFT = "axv.signing.draft";
-  /** M195：本项目记住的签名配置（按项目名存，build.gradle 读不到时回填） */
-  const [signStoredRev, setSignStoredRev] = useState(0);
-  const signStored = useMemo(
-    () => readStoredSigning(activeProject?.name),
-    [activeProject?.name, signDialogOpen, signStoredRev],
-  );
-  const openSignDialog = useCallback(async () => {
-    const root = projectSaveRoot(activeProject);
-    // M188c：统一走 readProjectFile（native 用 readTextQueued，web 用目录句柄）
-    // M220b：支持 .kts 与无 app/ 前缀布局，并记住命中的路径供写回
-    const found = await readAppGradle(root);
-    const txt = found?.text ?? null;    // 没有可写根时，读 localStorage 里的草稿
-    setGradleRelForSign(found?.rel ?? "app/build.gradle");
-    const missing = !root;
-    let use = txt;
-    if (missing && !use) {
-      try {
-        const draft = window.localStorage.getItem(LS_KEY_SIGN_DRAFT);
-        if (draft) use = draft;
-      } catch { /* ignore */ }
-    }
-    // M189：查一下 keystore 文件在不在（发布前检查用）
-    let exists: boolean | undefined;
-    if (root && use) {
-      const store = readSigningFromGradle(use)?.storeFile || ".axv/release.keystore";
-      exists = await projectFileExists(root, store);
-    }
-    // M189+：读 strings.xml 的 app_name 和 manifest 图标，判断是否还是默认值
-    let appName: string | null = null;
-    let iconDefault: boolean | undefined;
-    if (root) {
-      const strings = await readProjectFile(root, "app/src/main/res/values/strings.xml");
-      appName = strings ? readAppName(strings) : null;
-      const mf = await readProjectFile(root, "app/src/main/AndroidManifest.xml");
-      if (mf) {
-        const m = /android:icon\s*=\s*"([^"]*)"/.exec(mf);
-        const v = m ? m[1] : "";
-        iconDefault = !v || /@(mipmap|drawable)\/ic_launcher(_round)?$/.test(v);
-      }
-    }
-    setGradleForSign(use);
-    setSignRootMissing(missing);
-    setSignKeystoreExists(exists);
-    setSignAppName(appName);
-    setSignIconDefault(iconDefault);
-    setSignDialogOpen(true);
-  }, [activeProject]);
-  /** M191：在设备上生成 keystore（Android 里跑的是真 JVM，只缺 keytool 命令；
-   *  KeystoreMaker.java 用标准 java.security 自己造 PKCS#12，桌面 keytool/apksigner 已验过） */
-  const makeKeystoreOnDevice = useCallback(
-    async (rel: string, o: { alias: string; password: string; cn: string; years: number }) => {
-      const b = nativeBridge();
-      if (!b?.makeKeystore) return { ok: false, msg: tt("当前 APK 版本还不支持在设备上生成，请升级到 1.16.27 以上") };
-      const root = projectSaveRoot(activeProject);
-      const base = root?.kind === "native" ? root.base.replace(/[/\\]+$/, "") : b.getDefaultWorkspace?.() || "";
-      if (!base) return { ok: false, msg: tt("没有可写的项目目录") };
-      const clean = rel.replace(/\\/g, "/").replace(/^\/+/, "");
-      const abs = `${base}/${clean}`;
-      try {
-        const r = b.makeKeystore(abs, o.alias, o.password, o.cn, "Android", o.years);
-        if (r.startsWith("ok:")) return { ok: true, msg: r };
-        return { ok: false, msg: r.replace(/^err:/, "") || tt("生成失败") };
-      } catch (e) {
-        return { ok: false, msg: e instanceof Error ? e.message : String(e) };
-      }
-    },
-    [activeProject],
-  );
 
-  /* M192：一键打包成可安装 APK（设备端 aapt2 + 壳 dex + apksig） */
-  /** M237：带自动消失的提示（打包结果不能永久挂在屏幕上挡操作） */
-  const noteTimed = useCallback((msg: string, ms = 6000) => {
-    if (noteTimerRef.current) window.clearTimeout(noteTimerRef.current);
-    setExportNote(msg);
-    noteTimerRef.current = window.setTimeout(() => setExportNote(""), ms);
-  }, []);
-  // M238：打包逻辑拆到 useBuildApk（components/use-build-apk.ts），
-  // 这里只保留 noteTimed + hook 调用（放在 currentSaveInput 之后）。
-  // 下面在 return 之前插入 const { apkBusy, apkResult, doBuildApk } = useBuildApk({...});
-  // M220：root 在 doBuildApk 里算（依赖 activeProject），重新读 build.gradle 需要它；
-  // activeProject 在 deps 里，root 跟着变，闭包读到的总是当前值，无需单独加。
-  // M220b：写回同一个文件（readAppGradle 命中的那个），否则 KTS / 根目录工程会多出一个无效的 app/build.gradle。
-
-  const writeGradleForSign = useCallback(
-    async (next: string) => {
-      const root = projectSaveRoot(activeProject);
-      if (!root) {
-        // 没可写根：配置存草稿，提示用户保存项目后再写
-        try { window.localStorage.setItem(LS_KEY_SIGN_DRAFT, next); } catch { /* ignore */ }
-        return true;
-      }
-      const ok = await saveProjectFile(root, gradleRelForSign, next);
-      if (ok) {
-        try { window.localStorage.removeItem(LS_KEY_SIGN_DRAFT); } catch { /* ignore */ }
-      }
-      return ok;
-    },
-    [activeProject],
-  );
 
   /** M186：右侧面板当前页签（属性 / 检查器） */
   const [rightTab, setRightTab] = useState<"attrs" | "inspector">("attrs");

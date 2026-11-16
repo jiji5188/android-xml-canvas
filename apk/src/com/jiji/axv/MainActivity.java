@@ -752,7 +752,7 @@ public class MainActivity extends Activity {
         }
 
         /** 解析候选 URL 数组：容错（兼容直接给单串）。返回纯列表，不抛异常。 */
-        private static java.util.List<String> jsonUrlList(String urlsJson) {
+        private java.util.List<String> jsonUrlList(String urlsJson) {
             java.util.List<String> out = new java.util.ArrayList<>();
             if (urlsJson == null) return out;
             String s = urlsJson.trim();

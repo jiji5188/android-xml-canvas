@@ -601,9 +601,9 @@ public class MainActivity extends Activity {
                     return "ok:" + target;
                 }
                 File f = new File(target);
-                String base = defaultDir().getCanonicalPath();
                 String canon = f.getCanonicalPath();
-                if (!canon.startsWith(base)) return "err:超出工作目录";
+                // M337：放开到 allowedRoots（含 /AndroidUIIDE/libs 本地库目录，手动 URL 下载存本地库要走这里）
+                if (!underAllowedRoots(canon)) return "err:超出工作目录";
                 File parent = f.getParentFile();
                 if (parent != null && !parent.exists()) parent.mkdirs();
                 try (OutputStream os = new FileOutputStream(f)) {
@@ -1268,9 +1268,9 @@ public class MainActivity extends Activity {
             try {
                 return fileOpJson((b) -> {
                     File f = new File(b);
-                    String base = defaultDir().getCanonicalPath();
                     String canon = f.getCanonicalPath();
-                    if (!canon.equals(base) && !canon.startsWith(base + File.separator))
+                    // M337：放开到 allowedRoots（含 /AndroidUIIDE/libs 本地库目录）
+                    if (!underAllowedRoots(canon))
                         return "err:超出工作目录";
                     if (f.exists()) return "err:同名已存在";
                     boolean ok;
@@ -1297,11 +1297,10 @@ public class MainActivity extends Activity {
             try {
                 return fileOp2Json((a, b) -> {
                     File f = new File(a), d = new File(b);
-                    String base = defaultDir().getCanonicalPath();
                     String ca = f.getCanonicalPath(), cb = d.getCanonicalPath();
-                    String chk = base + File.separator;
-                    if (!ca.equals(base) && !ca.startsWith(chk)) return "err:源超出工作目录";
-                    if (!cb.equals(base) && !cb.startsWith(chk)) return "err:目标超出工作目录";
+                    // M337：源/目标都放开到 allowedRoots（含本地库目录）
+                    if (!underAllowedRoots(ca)) return "err:源超出工作目录";
+                    if (!underAllowedRoots(cb)) return "err:目标超出工作目录";
                     if (!f.exists()) return "err:源不存在";
                     if (d.exists()) return "err:目标同名已存在";
                     File parent = d.getParentFile();
@@ -1323,12 +1322,10 @@ public class MainActivity extends Activity {
             try {
                 return fileOpJson((b) -> {
                     File f = new File(b);
-                    String base = defaultDir().getCanonicalPath();
                     String canon = f.getCanonicalPath();
-                    String chk = base + File.separator;
-                    if (!canon.equals(base) && !canon.startsWith(chk)) return "err:超出工作目录";
-                    // 不允许删工作目录自身
-                    if (canon.equals(base)) return "err:不能删除工作目录本身";
+                    // M337：放开到 allowedRoots（含本地库目录）；任何允许根自身不可删
+                    if (!underAllowedRoots(canon)) return "err:超出工作目录";
+                    for (String r : allowedRoots()) if (canon.equals(r)) return "err:不能删除根目录本身";
                     if (!f.exists()) return "err:不存在";
                     boolean ok = recursive ? deleteRec(f) : f.delete();
                     JSONObject o = new JSONObject();
@@ -1347,11 +1344,9 @@ public class MainActivity extends Activity {
             try {
                 return fileOp2Json((a, b) -> {
                     File f = new File(a), d = new File(b);
-                    String base = defaultDir().getCanonicalPath();
                     String cb = d.getCanonicalPath();
-                    String chk = base + File.separator;
-                    // M335：源允许在工作目录外（本地库 /AndroidUIIDE/libs 就在项目外），只围目标必须写在工作目录
-                    if (!cb.equals(base) && !cb.startsWith(chk)) return "err:目标超出工作目录";
+                    // M335+M337：源允许在本地库 /AndroidUIIDE/libs（项目外）；目标必须写进工作目录
+                    if (!underAllowedRoots(cb)) return "err:目标超出工作目录";
                     if (!f.exists()) return "err:源不存在";
                     if (d.exists()) return "err:目标同名已存在";
                     boolean ok;
@@ -1684,6 +1679,33 @@ public class MainActivity extends Activity {
         File d = new File(Environment.getExternalStorageDirectory(), "AndroidUIIDE/Project");
         if (!d.exists()) d.mkdirs();
         return d;
+    }
+
+    /** M337：允许访问的根目录集合 —— 项目工作目录 + 同级本地库目录（/AndroidUIIDE/libs）+ 应用私有回退库目录。
+     *  本地库目录在 Project 的**同级**（/AndroidUIIDE/libs），不在 Project 之下，旧护栏只认 Project 子树 →
+     *  listDir/libs 目录被判「超出工作目录」→ 本地库列表永远空。这里放开到「工作目录 + 其父目录/libs + 私有回退目录」。 */
+    private String[] allowedRoots() {
+        java.util.ArrayList<String> out = new java.util.ArrayList<>();
+        try {
+            File proj = defaultDir();
+            out.add(proj.getCanonicalPath());
+            File parent = proj.getParentFile();
+            if (parent != null) out.add(new File(parent, "libs").getCanonicalPath());
+        } catch (Throwable ignore) { }
+        try {
+            File fb = new File(getExternalFilesDir(null), "axv-libs");
+            out.add(fb.getCanonicalPath());
+        } catch (Throwable ignore) { }
+        return out.toArray(new String[0]);
+    }
+
+    /** M337：canon 是否落在允许的根目录内（根自身或子树） */
+    private boolean underAllowedRoots(String canon) {
+        if (canon == null) return false;
+        for (String r : allowedRoots()) {
+            if (canon.equals(r) || canon.startsWith(r + File.separator)) return true;
+        }
+        return false;
     }
 
     private String effectiveLabel() {
@@ -2390,8 +2412,9 @@ public class MainActivity extends Activity {
             }
         }
         File f = new File(target);
-        String base = defaultDir().getCanonicalPath();
-        if (!f.getCanonicalPath().startsWith(base)) return null;
+        String canon = f.getCanonicalPath();
+        // M337：放开到 allowedRoots（含本地库目录，回退拷贝时读本地库要走这里）
+        if (!underAllowedRoots(canon)) return null;
         if (!f.isFile()) return null;
         try (InputStream in = new java.io.FileInputStream(f)) {
             return readAll(in);
@@ -2433,9 +2456,9 @@ public class MainActivity extends Activity {
     private String listDirJson(String path) throws Exception {
         if (path == null) return "{\"ok\":false}";
         File d = new File(path);
-        String base = defaultDir().getCanonicalPath();
         String canon = d.getCanonicalPath();
-        if (!canon.equals(base) && !canon.startsWith(base + File.separator)) return "{\"ok\":false}";
+        // M337：放开到 allowedRoots（含 /AndroidUIIDE/libs 本地库目录，否则本地库列表 listDir 永远空）
+        if (!underAllowedRoots(canon)) return "{\"ok\":false}";
         if (!d.isDirectory()) return "{\"ok\":false}";
         long mt = d.lastModified();
         synchronized (dirCache) {

@@ -296,6 +296,41 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
   },
 ];
 
+export interface ThemePreviewFeatures {
+  /** 预览时是否隐藏 ActionBar（无标题栏主题 / 对话框主题 / 全屏主题） */
+  noActionBar: boolean;
+  /** 预览时是否隐藏状态栏/导航栏（全屏主题） */
+  fullscreen: boolean;
+  /** 对话框弹窗的视觉风格（决定弹窗圆角/按钮形状/标题样式，不同主题不同布局） */
+  dialogStyle: "holo" | "material2" | "material3" | "appcompat" | "system";
+}
+
+/**
+ * M324：从 preset 推断预览特征——无ActionBar/全屏/对话框弹窗风格。
+ * 纯函数，便于单测。规则：
+ *  - noActionBar：parent 含 NoActionBar / 是 dialog 主题 / fullscreen / Material3 默认无 ActionBar
+ *  - fullscreen：parent 含 Fullscreen
+ *  - dialogStyle：按 parent 名归到 holo/material3/material2/appcompat/system 五档，决定弹窗长什么样
+ */
+export function inferPreviewFeatures(p: AndroidThemePreset): ThemePreviewFeatures {
+  const par = p.parent || "";
+  const isDialog = p.kind === "dialog";
+  const hasNoActionBar = /NoActionBar/i.test(par) || isDialog || /Fullscreen/i.test(par);
+  // Material3 全系默认不带 ActionBar
+  const m3NoBar = /Material3/i.test(par);
+  const noActionBar = hasNoActionBar || m3NoBar;
+  const fullscreen = /Fullscreen/i.test(par) || p.id === "material3-fullscreen";
+
+  let dialogStyle: ThemePreviewFeatures["dialogStyle"];
+  if (/Holo/i.test(par)) dialogStyle = "holo";
+  else if (/Material3/i.test(par)) dialogStyle = "material3";
+  else if (/MaterialComponents/i.test(par)) dialogStyle = "material2";
+  else if (/AppCompat/i.test(par)) dialogStyle = "appcompat";
+  else if (/Material/i.test(par)) dialogStyle = "material2"; // 原生 Theme.Material 近似 M2
+  else dialogStyle = "system"; // DeviceDefault 等
+  return { noActionBar, fullscreen, dialogStyle };
+}
+
 /** 按分组折叠（UI 用） */
 export function androidThemeGroups(): { group: ThemeGroup; label: string; items: AndroidThemePreset[] }[] {
   const out: { group: ThemeGroup; label: string; items: AndroidThemePreset[] }[] = [];

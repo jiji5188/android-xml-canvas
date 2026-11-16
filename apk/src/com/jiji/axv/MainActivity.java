@@ -553,9 +553,10 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void openThemePreview(String presetId, String parent, String paletteJson, String kind) {
+        public void openThemePreview(String presetId, String parent, String paletteJson, String kind, String featuresJson) {
             // M320：主题面板点「预览」→ 跳专用 ThemePreviewActivity，代码里 setTheme 加载选中主题样式
             // M321：kind=dialog 时该页会真弹 Dialog（而不是给 Activity 套对话框主题）
+            // M324：featuresJson 携带 {noActionBar,fullscreen,dialogStyle}，预览页据此控制窗口 + 弹窗风格
             runOnUiThread(() -> {
                 try {
                     Intent it = new Intent(MainActivity.this, ThemePreviewActivity.class);
@@ -563,6 +564,7 @@ public class MainActivity extends Activity {
                     it.putExtra("parent", parent == null ? "" : parent);
                     it.putExtra("palette", paletteJson == null ? "" : paletteJson);
                     it.putExtra("kind", kind == null ? "activity" : kind);
+                    it.putExtra("features", featuresJson == null ? "" : featuresJson);
                     startActivity(it);
                 } catch (Throwable t) {
                     Log.e(TAG, "openThemePreview fail", t);

@@ -12,6 +12,10 @@ export type SrcDict = Record<string, string>;
 /** 英文 —— 简体中文原文 → English */
 export const SRC_EN: SrcDict = {
   "跟随系统": "Follow system",
+  "标题栏": "Title",
+  "有标题栏": "Has title bar",
+  "无标题栏": "No title bar",
+  "全屏": "Fullscreen",
   "宽度": "Width",
   "高度": "Height",
   "四周边距": "Margin on all sides",

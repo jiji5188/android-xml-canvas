@@ -43,6 +43,13 @@ export const LIBRARY_CATALOG: LibEntry[] = [
   { group: "com.github.bumptech.glide", artifact: "glide", version: "4.16.0", kind: "thirdparty", isAar: true, note: "图片加载（Glide）" },
   { group: "org.greenrobot", artifact: "eventbus", version: "3.3.1", kind: "thirdparty", isAar: false, note: "事件总线" },
   { group: "com.squareup.okhttp3", artifact: "okhttp", version: "4.12.0", kind: "thirdparty", isAar: false, note: "网络请求（OkHttp）" },
+  // M334：实用补充（二维码/网络/UI 布局）
+  { group: "com.google.zxing", artifact: "core", version: "3.5.3", kind: "thirdparty", isAar: false, note: "二维码/条形码 解码识别与生成（ZXing，QR 扫解就靠它）" },
+  { group: "com.squareup.retrofit2", artifact: "retrofit", version: "3.0.0", kind: "thirdparty", isAar: false, note: "REST 接口（需同时下 okhttp + gson）" },
+  { group: "com.squareup.okio", artifact: "okio", version: "3.9.0", kind: "thirdparty", isAar: false, note: "二进制/网络 IO（okhttp/retrofit 依赖）" },
+  { group: "com.google.android.flexbox", artifact: "flexbox", version: "3.0.0", kind: "androidx", isAar: true, note: "Flexbox 弹性布局（类似网页 flex）" },
+  { group: "androidx.viewpager2", artifact: "viewpager2", version: "1.1.0", kind: "androidx", isAar: true, note: "ViewPager2 滑动分页（基于 RecyclerView）" },
+  { group: "androidx.swiperefreshlayout", artifact: "swiperefreshlayout", version: "1.1.0", kind: "androidx", isAar: true, note: "下拉刷新布局" },
 ];
 
 /** maven 坐标唯一标识（判断是否已下载用） */

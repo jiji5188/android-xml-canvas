@@ -31,7 +31,7 @@ const TOP_ITEMS: RailItem[] = [
   { view: "ai", icon: "auto_awesome", titleKey: "rail.ai", fallback: "AI 助手" }, // i18n-ignore
   { view: "assets", icon: "category", titleKey: "rail.resources", fallback: "资源" }, // i18n-ignore
   { view: "res", icon: "folder_open", titleKey: "rail.res", fallback: "项目管理" }, // i18n-ignore
-  { view: "libs", icon: "inventory_2", titleKey: "rail.libs", fallback: "库管理" }, // i18n-ignore
+  { view: "libs", icon: "inventory_2", titleKey: "rail.libs", fallback: "lib 库管理" }, // i18n-ignore
   { view: "theme", icon: "palette", titleKey: "rail.theme", fallback: "主题" }, // i18n-ignore
 ];
 

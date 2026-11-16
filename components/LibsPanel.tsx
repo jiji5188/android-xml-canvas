@@ -300,7 +300,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           className={tab === "catalog" ? "on" : ""}
           onClick={() => setTab("catalog")}
         >
-          {tr("libs.catalog", "内置目录")}
+          {tr("libs.catalog", "lib 库下载")}
         </button>
       </div>
 

@@ -54,4 +54,13 @@ describe("M330 library-catalog（内置库目录）", () => {
     const ax = groups.find((g) => g.kind === "androidx")!;
     expect(ax.libs.length).toBeGreaterThan(5);
   });
+
+  it("M334 新增二维码/实用库：ZXing + retrofit 在清单里", () => {
+    const zx = LIBRARY_CATALOG.find((e) => e.artifact === "core" && e.group === "com.google.zxing");
+    expect(zx).toBeDefined();
+    expect(zx!.isAar).toBe(false);
+    expect(zx!.note).toContain("二维码");
+    const retrofit = LIBRARY_CATALOG.find((e) => e.artifact === "retrofit");
+    expect(retrofit?.isAar).toBe(false);
+  });
 });

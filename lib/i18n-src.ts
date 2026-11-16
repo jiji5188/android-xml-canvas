@@ -12,7 +12,9 @@ export type SrcDict = Record<string, string>;
 /** 英文 —— 简体中文原文 → English */
 export const SRC_EN: SrcDict = {
   "跟随系统": "Follow system",
+  "lib 库管理": "lib Library Management",
   "内置目录": "Built-in catalog",
+  "lib 库下载": "lib Library Download",
   "正在下载 {lib}…（多镜像）": "Downloading {lib}… (multiple mirrors)",
   "{lib} 已下载（{src}）": "{lib} downloaded ({src})",
   "{lib} 已下载": "{lib} downloaded",

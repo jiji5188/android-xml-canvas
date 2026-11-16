@@ -83,6 +83,7 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
   }, [doc.items, q, kind]);
 
   const commitValue = (it: ValueItem, raw: string, el?: HTMLInputElement) => {
+    if (it.valueFrom < 0) return; // M315：容器分组标题不可改值
     if (raw === it.value) return;
     if (it.kind === "color" && raw.trim() && !isColorValue(raw)) {
       note(tt("颜色值要写 #RRGGBB / #AARRGGBB 或 @color/xxx"));
@@ -259,7 +260,9 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
                 ) : null}
                 <input
                   className="axv-val-value"
-                  defaultValue={it.value}
+                  defaultValue={it.valueFrom < 0 ? "" : it.value}
+                  placeholder={it.valueFrom < 0 ? tt("容器条目，展开见下方子项") : undefined}
+                  disabled={it.valueFrom < 0}
                   aria-label={tt("{name} 值", { name: it.name })}
                   spellCheck={false}
                   onBlur={(e) => commitValue(it, e.target.value, e.target)}

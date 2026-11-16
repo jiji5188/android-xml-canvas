@@ -61,6 +61,51 @@ function displayValue(raw: string): string {
   return m ? m[1] : raw;
 }
 
+/** 容器型条目：内部嵌套 <item>/<attr>，不是单值键值（M315） */
+function isContainerTag(tag: string): boolean {
+  return tag === "style" || tag === "declare-styleable" || tag === "attr";
+}
+
+/** 把容器内部的嵌套 <item>/<attr> 展开成逐行（M315）；值区间对准子元素，保留可编辑 */
+function emitContainerChildren(xml: string, bodyFrom: number, raw: string, items: ValueItem[]) {
+  const re = /<(item|attr)\b([^>]*?)>([\s\S]*?)<\/\1>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(raw))) {
+    const childTag = m[1];
+    const childAttrs = m[2];
+    const childBody = m[3];
+    const childFullLen = m[0].length;
+    const absStart = bodyFrom + m.index;
+    const nameM = /name\s*=\s*("([^"]*)"|'([^']*)')/g.exec(childAttrs);
+    const typeM = /type\s*=\s*("([^"]*)"|'([^']*)')/g.exec(childAttrs);
+    const nameVal = nameM ? nameM[2] || nameM[3] || "" : "";
+    const typeVal = typeM ? typeM[2] || typeM[3] || "" : "";
+    // 开标签长度 = 全长 - 体 - 闭标签（</item> / </attr>）
+    const closeLen = ("</" + childTag + ">").length;
+    const openLen = childFullLen - childBody.length - closeLen;
+    const vFrom = absStart + openLen;
+    const vTo = vFrom + childBody.length;
+    const nameOffset = nameM != null ? childAttrs.indexOf(nameVal) : -1;
+    // 子元素开标签内 name 值起点：absStart + "<item"/"<attr" 长度 + attrs 中 nameVal 偏移
+    const tagLen = ("<" + childTag).length;
+    const nameFrom = nameOffset >= 0 ? absStart + tagLen + nameOffset : vFrom;
+    items.push({
+      tag: childTag === "item" ? "item" : "attr",
+      kind: childTag === "item" ? typeVal || "other" : "attr",
+      name: nameVal,
+      value: displayValue(childBody),
+      valueFrom: vFrom,
+      valueTo: vTo,
+      elemFrom: absStart,
+      elemEnd: absStart + childFullLen,
+      itemType: typeVal || undefined,
+      nameFrom,
+      nameTo: nameFrom + nameVal.length,
+      line: lineAt(xml, absStart),
+    });
+  }
+}
+
 export function parseValues(xml: string): ValuesDoc {
   const items: ValueItem[] = [];
   let closeAt = -1;
@@ -123,8 +168,27 @@ export function parseValues(xml: string): ValuesDoc {
       }
       if (pending && pending.tag === tag && depth === pending.depth + 1) {
         const nameAttr = attrSpan(pending.attrs, pending.attrsStart, "name");
-        if (nameAttr) {
-          const typeAttr = attrSpan(pending.attrs, pending.attrsStart, "type");
+        const typeAttr = attrSpan(pending.attrs, pending.attrsStart, "type");
+        // M315：容器型（style/declare-styleable/attr）展开嵌套 item 逐行，不再整块塞进 value（否则视图显示 &lt;item&gt; 乱码）
+        if (isContainerTag(pending.tag)) {
+          emitContainerChildren(xml, pending.bodyFrom, xml.slice(pending.bodyFrom, at), items);
+          if (nameAttr) {
+            items.push({
+              tag: pending.tag,
+              kind: kindOf(pending.tag, typeAttr?.value),
+              name: nameAttr.value,
+              value: "",
+              valueFrom: -1,
+              valueTo: -1,
+              elemFrom: pending.start,
+              elemEnd: at + whole.length,
+              itemType: typeAttr?.value,
+              nameFrom: nameAttr.from,
+              nameTo: nameAttr.to,
+              line: lineAt(xml, pending.start),
+            });
+          }
+        } else if (nameAttr) {
           const raw = xml.slice(pending.bodyFrom, at);
           items.push({
             tag: pending.tag,
@@ -250,11 +314,14 @@ export function colorForPreview(v: string): string | null {
 
 /** 改某条目的值 */
 export function setItemValue(xml: string, item: ValueItem, nextValue: string): string {
+  // M315：容器分组标题行（valueFrom=-1）不参与值编辑，原样返回，避免 slice(-1) 截断文件
+  if (item.valueFrom < 0 || item.valueTo < item.valueFrom) return xml;
   return xml.slice(0, item.valueFrom) + escValue(nextValue) + xml.slice(item.valueTo);
 }
 
 /** 改某条目的 name（调用方负责查重） */
 export function setItemName(xml: string, item: ValueItem, nextName: string): string {
+  if (item.nameFrom < 0 || item.nameTo < item.nameFrom) return xml;
   return xml.slice(0, item.nameFrom) + nextName + xml.slice(item.nameTo);
 }
 

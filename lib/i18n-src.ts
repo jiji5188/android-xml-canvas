@@ -1665,6 +1665,7 @@ export const SRC_EN: SrcDict = {
   "新颜色": "New color",
   "新资源值": "New resource value",
   "这个文件里还没有资源": "No resources in this file yet",
+"容器条目，展开见下方子项": "Container entry, see sub-items below",
   "没有匹配的条目": "No matching entries",
   "点右上角 + 新建一条。": "Tap + in the top right to create one.",
   "{name} 名称": "{name} name",

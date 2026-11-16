@@ -61,11 +61,17 @@ describe("M39 parseValues", () => {
     expect(xml.slice(d.items[0].valueFrom, d.items[0].valueTo)).toContain("CDATA");
   });
 
-  it("嵌套 style 的子项不会被当成顶层条目", () => {
+  it("嵌套 style 的子项展开成逐行（M315，不再是整块 value）", () => {
     const xml = `<resources><style name="AppTheme" parent="X"><item name="android:textColor">#fff</item></style></resources>`;
     const d = parseValues(xml);
-    expect(d.items.map((i) => i.name)).toEqual(["AppTheme"]);
-    expect(d.items[0].kind).toBe("other");
+    const names = d.items.map((i) => i.name);
+    expect(names).toContain("AppTheme");
+    expect(names).toContain("android:textColor");
+    // 嵌套 item 值干净，不含 <item 乱码
+    const ci = d.items.find((i) => i.name === "android:textColor")!;
+    expect(ci.value).toBe("#fff");
+    const grp = d.items.find((i) => i.name === "AppTheme")!;
+    expect(grp.valueFrom).toBe(-1); // 分组标题不可改值
   });
 
   it("属性里带 > 也不会把标签截断", () => {

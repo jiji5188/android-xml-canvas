@@ -148,3 +148,43 @@ export function themeItemDescText(name: string): string {
 export function themeItemType(name: string): ThemeItemValueType {
   return themeItemDesc(name)?.type || "other";
 }
+
+/** M341：全部已知 item 属性（去重，按 attr 序，给属性名过滤弹窗用） */
+export function allItemDescs(): ThemeItemDesc[] {
+  const seen = new Set<string>();
+  const out: ThemeItemDesc[] = [];
+  for (const d of [...THEME_ITEM_DESCS, ...STYLE_ITEM_DESCS, ...EXTRA_DESCS]) {
+    if (seen.has(d.attr)) continue;
+    seen.add(d.attr);
+    out.push(d);
+  }
+  return out.sort((a, b) => a.attr.localeCompare(b.attr));
+}
+
+/** M341：系统/框架主题名（parent 弹窗列表用；不含第三方，第三方需自己加依赖） */
+export const SYSTEM_PARENT_THEMES: string[] = [
+  "Theme.Material3.Light",
+  "Theme.Material3.Dark",
+  "Theme.Material3.DayNight",
+  "Theme.Material3.Light.NoActionBar",
+  "Theme.Material3.Dark.NoActionBar",
+  "Theme.Material3.DayNight.NoActionBar",
+  "Theme.MaterialComponents.Light",
+  "Theme.MaterialComponents.Dark",
+  "Theme.MaterialComponents.DayNight",
+  "Theme.MaterialComponents.Light.NoActionBar",
+  "Theme.MaterialComponents.Dark.NoActionBar",
+  "Theme.MaterialComponents.DayNight.NoActionBar",
+  "Theme.AppCompat",
+  "Theme.AppCompat.Light",
+  "Theme.AppCompat.DayNight",
+  "Theme.AppCompat.NoActionBar",
+  "Theme.AppCompat.Light.NoActionBar",
+  "@android:style/Theme.Material",
+  "@android:style/Theme.Material.Light",
+  "@android:style/Theme.Material.Light.NoActionBar",
+  "@android:style/Theme.Holo",
+  "@android:style/Theme.Holo.Light",
+  "@android:style/Theme.DeviceDefault",
+  "@android:style/Theme.DeviceDefault.Light",
+];

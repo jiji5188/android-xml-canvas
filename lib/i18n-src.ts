@@ -15,6 +15,14 @@ export const SRC_EN: SrcDict = {
   // M338：themes.xml 结构化视图（样式节点 + 属性配置说明）
   "属性组": "Attribute group",
   "继承父样式 {p}": "inherits {p}",
+  // M341：parent 选择 + 属性名过滤 + 全局重名提示
+  "已继承 {p}": "now inherits {p}",
+  "{name} 继承父样式": "{name} inherits parent style",
+  "已清除 parent": "parent cleared",
+  "属性名（可输入过滤）": "attribute name (type to filter)",
+  "选择或输入系统主题名": "Pick or type a system theme",
+  "资源名 {name} 在其它 values 文件已用过（全局不能重名）": "Resource name \"{name}\" already used in another values file (names must be globally unique)",
+  "名称 {name} 在本文件已存在": "Name \"{name}\" already exists in this file",
   "未写 parent，默认继承系统默认主题": "No parent set, inherits the system default theme",
   "无 parent": "no parent",
   // M3 主色系

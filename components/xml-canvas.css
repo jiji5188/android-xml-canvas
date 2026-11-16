@@ -2890,12 +2890,51 @@ body.axv-lt-dragging .axv-lt-row {
   min-width: 0;
   height: 26px;
   line-height: 26px;
+  padding: 0 8px;
   font-size: 11px;
-  color: var(--axv-on-surface-variant);
+  color: var(--axv-on-surface);
   font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+}
+.axv-val-parent:hover,
+.axv-val-parent:focus {
+  border-color: var(--axv-primary);
+  background: var(--axv-surface);
+  outline: none;
+}
+/* M341：style 容器折叠 + 分组 */
+.axv-val-group {
+  margin-top: 6px;
+  padding: 2px 0 4px 0;
+  border-left: 2px solid color-mix(in srgb, var(--axv-primary) 55%, transparent);
+  background: color-mix(in srgb, var(--axv-primary) 7%, transparent);
+  border-radius: 8px;
+}
+.axv-val-group .axv-val-row.in-style {
+  padding-left: 24px;
+}
+.axv-val-fold {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+  border-radius: 4px;
+  align-self: center;
+}
+.axv-val-fold:hover {
+  color: var(--axv-primary);
+}
+.axv-val-fold .msr {
+  font-size: 15px;
 }
 .axv-val-desc {
   flex: 1 1 100%;

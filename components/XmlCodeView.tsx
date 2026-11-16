@@ -51,6 +51,8 @@ export interface XmlCodeViewProps {
   fileKey?: string;
   /** M39：表格视图给个提示回调 */
   onNote?: (msg: string) => void;
+  /** M341：其它 values 文件已用的顶层资源名（全局重名校验用，不含当前文件） */
+  reservedNames?: string[];
 }
 
 export function XmlCodeView(props: XmlCodeViewProps) {
@@ -87,6 +89,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           xml={props.value}
           onChange={props.onChange}
           onNote={props.onNote}
+          reservedNames={props.reservedNames}
         />
       ) : (
         <CodeEditor

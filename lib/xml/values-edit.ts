@@ -420,9 +420,45 @@ export function appendItem(
   return xml.slice(0, insertAt) + nl + line + nl + xml.slice(insertAt);
 }
 
-/** name 是否已存在（查重用） */
+/** name 是否已存在（查重用；M341：只看顶层资源名——style 内的 <item> 是属性引用，允许同名，不算资源名冲突） */
 export function hasName(doc: ValuesDoc, name: string, except?: ValueItem): boolean {
-  return doc.items.some((i) => i !== except && i.name === name);
+  return doc.items.some((i) => i !== except && !i.inStyle && i.name === name);
+}
+
+/** M341：顶层资源名集合（不含 style 内子项——子项 name 是属性引用，同名合法） */
+export function topLevelResourceNames(doc: ValuesDoc): Set<string> {
+  const out = new Set<string>();
+  for (const i of doc.items) if (!i.inStyle) out.add(i.name);
+  return out;
+}
+
+/** M341：按 style 容器分组（视图折叠展开用）
+ *  每个元素 = { head?: 样式标题行（valueFrom<0）, children: 子项 }
+ *  顶层非 style 条目自成一组（children=[它], head=undefined） */
+export function groupByContainer(doc: ValuesDoc): {
+  head?: ValueItem;
+  children: ValueItem[];
+}[] {
+  const groups: { head?: ValueItem; children: ValueItem[] }[] = [];
+  const headMap = new Map<string, { head?: ValueItem; children: ValueItem[] }>();
+  for (const it of doc.items) {
+    if (it.inStyle) {
+      let g = headMap.get(it.inStyle);
+      if (!g) { g = { children: [] }; headMap.set(it.inStyle, g); }
+      g.children.push(it);
+      continue;
+    }
+    // 顶层条目
+    if (it.valueFrom < 0) {
+      // style 标题行（自身是容器，子项稍后补进去）
+      const g: { head?: ValueItem; children: ValueItem[] } = { head: it, children: [] };
+      groups.push(g);
+      headMap.set(it.name, g);
+    } else {
+      groups.push({ children: [it] });
+    }
+  }
+  return groups;
 }
 
 /** 生成不重名的 name：foo → foo_2 → foo_3 */
@@ -432,6 +468,21 @@ export function uniqueName(doc: ValuesDoc, base: string): string {
   let n = 2;
   while (hasName(doc, `${clean}_${n}`)) n++;
   return `${clean}_${n}`;
+}
+
+/** M341：从一组 values 文件里收顶层资源名（不含 style 内子项；可排除当前文件）
+ *  跨文件全局重名校验用。files = { rel, text } */
+export function topLevelNamesFromFiles(
+  files: { rel: string; text: string }[],
+  excludeRel?: string,
+): string[] {
+  const out = new Set<string>();
+  for (const f of files) {
+    if (excludeRel && f.rel === excludeRel) continue;
+    const doc = parseValues(f.text);
+    for (const i of doc.items) if (!i.inStyle) out.add(i.name);
+  }
+  return [...out];
 }
 
 /** 按内容判断：根节点是不是 <resources>（网页项目里的文件可能没有完整路径） */

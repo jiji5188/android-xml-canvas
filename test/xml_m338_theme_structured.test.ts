@@ -1,9 +1,11 @@
 // @vitest-environment node
 // M338：themes.xml 结构化视图（样式节点 name+parent 在前，属性配置缩进 + 中文说明）
 import { describe, expect, it } from "vitest";
-import { parseValues, removeItem, setItemValue } from "../lib/xml/values-edit";
+import { parseValues, removeItem, setItemValue, groupByContainer, topLevelNamesFromFiles } from "../lib/xml/values-edit";
 import {
   THEME_ITEM_DESCS,
+  allItemDescs,
+  SYSTEM_PARENT_THEMES,
   themeItemDesc,
   themeItemDescText,
   themeItemType,
@@ -93,5 +95,60 @@ describe("M338 parseValues 结构化（样式在前、子项缩进 + 类型补�
     expect(noCp).toContain("<style");
     expect(noCp).toContain("colorOnPrimary");
     expect(noCp).toContain('<item name="windowActionBar">false</item>');
+  });
+
+  it("M341 allItemDescs 去重且含 24 条控件样式属性", () => {
+    const all = allItemDescs();
+    expect(all.length).toBeGreaterThan(30); // 35 主题 + 24 控件 + 10 额外，去重后
+    const names = all.map((d) => d.attr);
+    // 无重复
+    expect(new Set(names).size).toBe(names.length);
+    // 控件属性在
+    expect(names).toContain("android:background");
+    expect(names).toContain("android:padding");
+    expect(names).toContain("android:layout_width");
+    // 主题属性在
+    expect(names).toContain("colorPrimary");
+  });
+
+  it("M341 SYSTEM_PARENT_THEMES 常用系统主题名", () => {
+    expect(SYSTEM_PARENT_THEMES.length).toBeGreaterThanOrEqual(6);
+    expect(SYSTEM_PARENT_THEMES).toContain("Theme.Material3.Light");
+    expect(SYSTEM_PARENT_THEMES).toContain("Theme.Material3.DayNight.NoActionBar");
+    expect(SYSTEM_PARENT_THEMES).toContain("@android:style/Theme.DeviceDefault");
+    expect(new Set(SYSTEM_PARENT_THEMES).size).toBe(SYSTEM_PARENT_THEMES.length);
+  });
+
+  it("M341 groupByContainer：style 容器收拢子项（含折叠）；无子项不折", () => {
+    const d = parseValues(THEMES);
+    const groups = groupByContainer(d);
+    expect(groups).toHaveLength(1);
+    const g = groups[0];
+    // head 是 style 标题行（顶层，inStyle 未设）
+    expect(g.head?.name).toBe("Theme.MyApp");
+    expect(g.children.length).toBe(5);
+    expect(g.children.every((c) => c.inStyle === "Theme.MyApp")).toBe(true);
+  });
+
+  it("M341 topLevelNamesFromFiles：跨文件收顶层名、排除指定文件、不含 style 子项", () => {
+    const colors = `<resources><color name="primary">#FF000000</color></resources>`;
+    const themes = `<resources><style name="Theme.MyApp" parent="Theme.Material.Light"><item name="colorPrimary">#FF0</item></style></resources>`;
+    const all = topLevelNamesFromFiles([
+      { rel: "values/colors.xml", text: colors },
+      { rel: "values/themes.xml", text: themes },
+    ]);
+    expect(all).toContain("primary");      // 顶层 color
+    expect(all).toContain("Theme.MyApp"); // 顶层 style 名
+    expect(all).not.toContain("colorPrimary"); // style 子项不算
+    // 排除当前文件（themes）→ 只剩 colors 的 primary
+    const onlyColors = topLevelNamesFromFiles(
+      [
+        { rel: "values/colors.xml", text: colors },
+        { rel: "values/themes.xml", text: themes },
+      ],
+      "values/themes.xml",
+    );
+    expect(onlyColors).toContain("primary");
+    expect(onlyColors).not.toContain("Theme.MyApp");
   });
 });

@@ -34,7 +34,7 @@ import {
   type MergeMark,
 } from "@/lib/xml/history";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
-import { buildResourceExtras, backfillDrawableXml, type ResourceExtras } from "@/lib/xml/resdir";
+import { buildResourceExtras, backfillDrawableXml, type ResourceExtras, type ResTreeDir, type ResTreeFile } from "@/lib/xml/resdir";
 import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras, invalidateProjectRes } from "@/lib/xml/project-res";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { findLauncherActivity } from "@/lib/xml/find-launcher";
@@ -96,7 +96,7 @@ import { parseAppIconConfig } from "@/lib/xml/app-icon";
 import { nativeBridge } from "@/lib/xml/native-save";
 import { codeOnlyNotice, detectDocKind, looksLikeJavaSource, looksLikeKotlin } from "@/lib/xml/doc-kind";
 import { isValuesPath } from "@/lib/xml/doc-kind";
-import { looksLikeValuesDoc } from "@/lib/xml/values-edit";
+import { looksLikeValuesDoc, topLevelNamesFromFiles } from "@/lib/xml/values-edit";
 import { isManifestPath, looksLikeManifest } from "@/lib/xml/manifest-edit";
 import { pickLang } from "@/lib/xml/editor-lang";
 import { isJavaLikePath, parseOutline } from "@/lib/xml/java-outline";
@@ -3694,6 +3694,27 @@ const findResolved = findResolvedNode;
           // 去重，纯资源名（不带扩展/密度后缀）
           return [...new Set(out)];
         }, [resExtras, generatedDrawables])}
+        reservedNames={useMemo(() => {
+          // M341：整个 res/values 下其它文件的顶层资源名（跨文件全局查重）
+          const tree = resExtras?.tree;
+          if (!tree) return [];
+          const files: { rel: string; text: string }[] = [];
+          const walk = (dir: ResTreeDir) => {
+            for (const child of Object.values(dir.children)) {
+              if ("children" in child) walk(child as ResTreeDir);
+              else {
+                const f = child as ResTreeFile;
+                if (f.rel && f.text && /^values\//i.test(f.rel) && /\.xml$/i.test(f.rel)) {
+                  files.push({ rel: f.rel, text: f.text });
+                }
+              }
+            }
+          };
+          walk(tree);
+          if (files.length === 0) return [];
+          const cur = (openRel || "").replace(/^[^/]*\//, "");
+          return topLevelNamesFromFiles(files, cur);
+        }, [resExtras, openRel])}
         view={mobileTab === "values" ? viewKind ?? "code" : "code"}
         fileKey={openRel || saveOrigin?.name || ""}
         onNote={flashNote}

@@ -109,3 +109,49 @@ describe("M39 ValuesEditor 内容", () => {
     expect(html).toContain("还没有资源");
   });
 });
+
+describe("M341 values 编辑：样式分组/折叠 + parent 输入 + 属性名/parent 过滤列表 + 跨文件重名", () => {
+  const THEMES = `<resources>
+  <style name="Theme.MyApp" parent="Theme.Material3.DayNight.NoActionBar">
+    <item name="colorPrimary">#FF000000</item>
+    <item name="android:background">#111</item>
+  </style>
+</resources>`;
+
+  it("style 容器渲染成可折叠分组（含折叠按钮 + 组内子项）", () => {
+    const html = renderToStaticMarkup(<ValuesEditor xml={THEMES} onChange={() => {}} />);
+    expect(html).toContain("axv-val-group");      // 分组容器
+    expect(html).toContain("axv-val-fold");       // 折叠按钮
+    expect(html).toContain('aria-expanded="true"'); // 默认展开
+    // 子项缩进 + 带父样（class 可能是 "axv-val-row has-desc in-style"，分开断言）
+    expect(html).toContain("axv-val-row");
+    expect(html).toContain("in-style");
+    // 样式行带 parent 输入
+    expect(html).toContain("axv-val-parent");
+    expect(html).toContain("Theme.Material3.DayNight.NoActionBar");
+  });
+
+  it("提供属性名 + parent 两个过滤列表（datalist）", () => {
+    const html = renderToStaticMarkup(<ValuesEditor xml={THEMES} onChange={() => {}} />);
+    expect(html).toContain('id="axv-attr-dl"');
+    expect(html).toContain('id="axv-parent-dl"');
+    // 属性名列表含已知 item 属性
+    expect(html).toContain("android:background");
+    // parent 列表含系统主题
+    expect(html).toContain("@android:style/Theme.Material.Light");
+  });
+
+  it("属性名输入带 list=axv-attr-dl，过滤已知属性", () => {
+    const html = renderToStaticMarkup(<ValuesEditor xml={THEMES} onChange={() => {}} />);
+    expect(html).toContain('list="axv-attr-dl"');
+  });
+
+  it("reservedNames 传入时跨文件重名会拦截改名（纯逻辑走 uniqueName/topLevelNamesFromFiles）", () => {
+    // UI 层：传 reservedNames 不崩，且能渲染
+    const html = renderToStaticMarkup(
+      <ValuesEditor xml={THEMES} onChange={() => {}} reservedNames={["Theme.MyApp"]} />,
+    );
+    expect(html).toContain("Theme.MyApp");
+    expect(html).toContain("axv-val-group");
+  });
+});

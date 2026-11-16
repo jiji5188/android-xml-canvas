@@ -704,9 +704,8 @@ public class MainActivity extends Activity {
             try {
                 if (urlsJson == null || destAbs == null || destAbs.isEmpty()) return "err:参数空";
                 File f = new File(destAbs);
-                String base = defaultDir().getCanonicalPath();
-                String canon = f.getCanonicalPath();
-                if (!canon.startsWith(base)) return "err:只能写到项目目录内";
+                // M332：不限制必须在工作目录（项目 libs 可能在 SAF/全文件访问的任意路径）；
+                //  destAbs 由 JS 自己算（项目相对 libs/），可信，直接写
                 java.util.List<String> urls = jsonUrlList(urlsJson);
                 if (urls.isEmpty()) urls.add(urlsJson.trim());
                 f.getParentFile().mkdirs();

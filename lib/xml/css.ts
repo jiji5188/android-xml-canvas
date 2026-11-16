@@ -920,6 +920,8 @@ export function buildRenderModel(
         style.color = tcRaw || autoFg;
         // M16d：AppCompat 下 M3 的胶囊按钮不存在（默认 4dp 圆角），Material3 才是胶囊
         style.borderRadius = style.borderRadius ?? `${DP(appcompat ? 4 : 20, scale)}px`;
+        // M314-S2：原生按钮带 2dp 投影（M3 为 1dp + 2dp 偏移），之前没画 → 看起来像平贴片
+        style.boxShadow = style.boxShadow ?? `${appcompat ? "0 2px 3px rgba(0,0,0,0.28)" : "0 1px 3px rgba(0,0,0,0.2), 0 2px 6px rgba(0,0,0,0.16)"}`;
         style.fontWeight = 500;
         style.cursor = "pointer";
         // M11x：app:strokeColor + strokeWidth 的 MaterialButton 是「描边按钮」（OutlinedButton），
@@ -941,9 +943,18 @@ export function buildRenderModel(
         }
       }
       if (tag === "EditText" || tag === "AppCompatEditText" || tag === "TextInputEditText") {
-        style.border = style.border ?? "1px solid #E0D9E3";
-        style.borderRadius = style.borderRadius ?? `${DP(8, scale)}px`;
-        style.backgroundColor = style.backgroundColor ?? "#FFFFFF";
+        // M314-S2：原生 Android EditText 默认是「下划线输入框」（1dp 底边线 + 透明底），
+        // 不是 iOS/网页味的整圆角盒子。TextInputEditText（Material）才带背景框。
+        if (tag === "TextInputEditText") {
+          style.border = style.border ?? "none";
+          style.borderRadius = style.borderRadius ?? `${DP(8, scale)}px`;
+          style.backgroundColor = style.backgroundColor ?? "#FFFFFF";
+        } else {
+          style.border = "none";
+          style.borderBottom = `${DP(1, scale)}px solid #BDBDBD`;
+          style.borderRadius = style.borderRadius ?? `0px`;
+          style.backgroundColor = style.backgroundColor ?? "transparent";
+        }
         if (attrs["hint"] && !(attrs["text"] as string)) {
           style.color = "#9A9AA8";
         }

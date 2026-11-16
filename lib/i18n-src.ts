@@ -12,6 +12,17 @@ export type SrcDict = Record<string, string>;
 /** 英文 —— 简体中文原文 → English */
 export const SRC_EN: SrcDict = {
   "跟随系统": "Follow system",
+  "内置目录": "Built-in catalog",
+  "常用库目录：点「下载」即可存入项目 libs/，打包时自动进编译（无需改代码）。": "Common libraries: tap Download to save into your project libs/; they are picked up at build time (no code changes needed).",
+  "正在下载 {lib}…": "Downloading {lib}…",
+  "{lib} 下载失败：{err}（网络不通或源 404）": "{lib} download failed: {err} (network unreachable or 404)",
+  "{lib} 已下载到 {path}（编译自动应用）": "{lib} saved to {path} (applied at build)",
+  "{lib} 保存失败：{err}": "{lib} save failed: {err}",
+  "没有可写的 libs 目录": "No writable libs dir",
+  "没有可写的 libs 目录（需先打开项目）": "No writable libs dir (open a project first)",
+  "下载中…": "Downloading…",
+  "已下载": "Downloaded",
+  "下载": "Download",
   "标题栏": "Title",
   "有标题栏": "Has title bar",
   "无标题栏": "No title bar",

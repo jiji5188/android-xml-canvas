@@ -4,6 +4,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { nativeBridge } from "@/lib/xml/native-save";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
+import {
+  LIBRARY_CATALOG,
+  groupCatalog,
+  libKey,
+  libDownloadUrl,
+  type LibEntry,
+} from "@/lib/xml/library-catalog";
 
 interface LibsPanelProps {
   /** 当前激活项目的 SAF 源（可 list/read）；没有则项目库列不出来 */
@@ -23,7 +30,7 @@ interface LibFile {
   size?: number;
 }
 
-type LibTab = "local" | "project";
+type LibTab = "local" | "project" | "catalog";
 
 function isJarAar(name: string) {
   return /\.(jar|aar)$/i.test(name);
@@ -83,6 +90,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   const [localLibs, setLocalLibs] = useState<LibFile[]>([]);
   const [projectLibs, setProjectLibs] = useState<LibFile[]>([]);
   const [busy, setBusy] = useState(false);
+  const [catBusy, setCatBusy] = useState<Record<string, string>>({}); // libKey -> 'downloading' | 'done' | 'err:msg'
   const [dlOpen, setDlOpen] = useState(false);
   const [dlUrl, setDlUrl] = useState("");
   const [dlName, setDlName] = useState("");
@@ -182,6 +190,53 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
 
   const currentList = tab === "local" ? localLibs : projectLibs;
 
+  /** M330：从内置目录一键下载某个库到项目 libs/（复用 fetchBase64 + native.writeText） */
+  const downloadCat = useCallback(
+    async (e: LibEntry) => {
+      const key = libKey(e);
+      setCatBusy((m) => ({ ...m, [key]: "downloading" }));
+      onNote?.(tr("libs.cat_downloading", "正在下载 {lib}…", { lib: e.artifact }));
+      const r = await fetchBase64(libDownloadUrl(e));
+      if (!r.ok) {
+        setCatBusy((m) => ({ ...m, [key]: "err:" + (r.error || "download failed") }));
+        onNote?.(tr("libs.cat_download_failed", "{lib} 下载失败：{err}（网络不通或源 404）", { lib: e.artifact, err: r.error || "?" }));
+        return;
+      }
+      const fname = e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar");
+      // 保存到项目 libs/（优先项目库，没有就本地库）
+      let targetBase = null;
+      if (nativeProjectRoot && native) targetBase = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
+      if (!targetBase && localDir) targetBase = localDir;
+      if (targetBase && native) {
+        native.createEntry?.(targetBase, true);
+        const target = `${targetBase}/${fname}`;
+        const w = native.writeText?.(target, r.b64);
+        const ok = typeof w === "string" && w.startsWith("ok");
+        if (ok) {
+          setCatBusy((m) => ({ ...m, [key]: "done" }));
+          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载到 {path}（编译自动应用）", { lib: e.artifact, path: target }));
+          void refresh();
+        } else {
+          setCatBusy((m) => ({ ...m, [key]: "err:" + (w || "save failed") }));
+          onNote?.(tr("libs.cat_download_failed", "{lib} 保存失败：{err}", { lib: e.artifact, err: w || "?" }));
+        }
+      } else {
+        setCatBusy((m) => ({ ...m, [key]: "err:" + tr("libs.cat_no_target", "没有可写的 libs 目录") }));
+        onNote?.(tr("libs.cat_no_target", "没有可写的 libs 目录（需先打开项目）"));
+      }
+    },
+    [native, nativeProjectRoot, localDir, onNote, tr, refresh],
+  );
+
+  /** 已下载判定：项目/本地库列表里已有同名文件 */
+  const presentNames = useMemo(() => {
+    const s = new Set<string>();
+    for (const f of [...localLibs, ...projectLibs]) s.add(f.name);
+    return s;
+  }, [localLibs, projectLibs]);
+
+  const catGroups = useMemo(() => groupCatalog(), []);
+
   return (
     <div className="axv-libs-panel">
       <div className="axv-libs-tabs" role="tablist">
@@ -201,6 +256,14 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         >
           {tr("libs.project", "项目库")}
         </button>
+        <button
+          role="tab"
+          aria-selected={tab === "catalog"}
+          className={tab === "catalog" ? "on" : ""}
+          onClick={() => setTab("catalog")}
+        >
+          {tr("libs.catalog", "内置目录")}
+        </button>
       </div>
 
       <div className="axv-libs-actions">
@@ -215,7 +278,53 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       </div>
 
       <div className="axv-libs-list axv-rail-scroll">
-        {currentList.length === 0 ? (
+        {tab === "catalog" ? (
+          <div>
+            <div style={{ fontSize: 11, opacity: 0.6, margin: "4px 6px 8px", lineHeight: 1.5 }}>
+              {tr("libs.catalog_hint", "常用库目录：点「下载」即可存入项目 libs/，打包时自动进编译（无需改代码）。")}
+            </div>
+            {catGroups.map((g) => (
+              <div key={g.kind} style={{ margin: "6px 4px" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.7, margin: "2px 6px 6px" }}>
+                  {g.label}（{g.libs.length}）
+                </div>
+                {g.libs.map((e) => {
+                  const key = libKey(e);
+                  const st = catBusy[key];
+                  const present = presentNames.has(e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar")) || st === "done";
+                  return (
+                    <div key={key} className="axv-libs-item" style={{ alignItems: "center" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
+                          {present && <span style={{ color: "#1a7f37", marginRight: 4 }}>✓</span>}
+                          {e.artifact}
+                          <span style={{ opacity: 0.55, marginLeft: 6, fontSize: 11 }}>{e.version}</span>
+                        </div>
+                        <div className="axv-libs-item-rel" style={{ fontSize: 10, opacity: 0.6 }} title={e.group + ":" + e.artifact + ":" + e.version}>
+                          {e.note}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="axv-libs-btn"
+                        style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
+                        disabled={st === "downloading" || present}
+                        onClick={() => void downloadCat(e)}
+                      >
+                        {st === "downloading" ? tr("libs.downloading", "下载中…") : present ? tr("libs.cat_present", "已下载") : tr("libs.cat_download", "下载")}
+                      </button>
+                      {st && st.startsWith("err:") && (
+                        <span style={{ fontSize: 10, color: "#c62828", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={st.slice(4)}>
+                          ✗ {st.slice(4)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        ) : currentList.length === 0 ? (
           <div className="axv-libs-empty">
             {tr("libs.empty", "暂无库文件")}
             {tab === "project" && !aiFileIo && !nativeProjectRoot

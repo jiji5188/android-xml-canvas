@@ -71,6 +71,7 @@ public class PreviewActivity extends Activity {
         page.setBackgroundColor(0xFFFFFFFF);
 
         String info;
+        String appliedTheme = null;
         View inflated = null;
         try {
             File pkg;
@@ -93,7 +94,8 @@ public class PreviewActivity extends Activity {
             Resources res = getResources();
             // M317：应用主题——从资源包里找 theme style id，applyStyle 后再 inflate，
             // 这样按钮/底色/文字色跟预设主题一致（1:1 观感）。找不到就跳过，绝不让预览崩。
-            String appliedTheme = applyAppTheme(res, themeName);
+            String appliedTheme2 = applyAppTheme(res, themeName);
+            appliedTheme = appliedTheme2;
             int layoutId = res.getIdentifier(layoutName, "layout", pkgName);
             int strId = res.getIdentifier("title", "string", pkgName);
             if (layoutId == 0) throw new IllegalStateException("拿不到 layout id（资源包没挂上？）");
@@ -157,7 +159,9 @@ public class PreviewActivity extends Activity {
         }
 
         setContentView(page);
-        Toast.makeText(this, builtin ? "PreviewActivity 已启动" : "真渲染预览（aapt2 现场编译）", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, builtin ? "PreviewActivity 已启动"
+                : (appliedTheme != null ? "真渲染预览 · 主题 " + appliedTheme : "真渲染预览 · 默认主题（未找到 Theme.MyApp）"),
+                Toast.LENGTH_SHORT).show();
     }
 
     /** M152：按资源包里的 id 名找到 View，给它的背景 Drawable 设 level */

@@ -19,6 +19,8 @@ export interface RenderFile {
 }
 
 import { dedupeValuesFiles, definedValueKeys } from "./res-collect";
+import { findAppThemeStyle } from "./android-theme-presets";
+import { buildPreviewThemeXml, stripStyleBlock } from "./preview-theme";
 
 export interface RealRenderResult {
   ok: boolean;
@@ -368,7 +370,34 @@ export function prepareFiles(
   filled = filled.map((f) =>
     f.text && /^layout(-[^/]+)?\//.test(f.path) ? { ...f, text: fixIncludeLayoutNs(f.text) } : f,
   );
+  // M317b：把 app 主题翻成「只依赖 framework」的等价主题，否则 aapt2 link 解析不出
+  //        AppCompat/Material 的 parent 和 attr（预览资源包只有 framework）
+  filled = applyPreviewTheme(filled);
   return { files: filled };
+}
+
+const THEME_FILE_RE = /^values(\/[^/]+)?\/(themes|styles)\.xml$/i;
+
+/**
+ * M317b：把 app 主题翻成只靠 framework 的等价主题，并剥掉原 themes.xml 里同名 <style>。
+ * 拿不到主题名 / 映射不出东西就原样返回（不让预览因主题而挂）。
+ */
+function applyPreviewTheme(files: RenderFile[]): RenderFile[] {
+  const themeName = findAppThemeStyle(files);
+  if (!themeName) return files;
+  const esc = themeName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const styleInFile = new RegExp(`<style\\b[^>]*\\bname\\s*=\\s*["']${esc}["']`, "i");
+  const src = files.find(
+    (f) => THEME_FILE_RE.test(f.path) && !!f.text && styleInFile.test(f.text),
+  );
+  if (!src || !src.text) return files;
+  const built = buildPreviewThemeXml(src.text, themeName);
+  if (!built) return files;
+  const out = files.map((f) =>
+    f === src ? { ...f, text: stripStyleBlock(f.text, themeName) } : f,
+  );
+  out.push({ path: "values/preview_theme.xml", text: built.xml });
+  return out;
 }
 
 export function renderReal(

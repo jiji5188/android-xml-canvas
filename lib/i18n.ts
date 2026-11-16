@@ -291,15 +291,31 @@ const ja: Dict = {
 const DICTS: Record<LangCode, Dict> = { "zh-Hans": zhHans, "zh-Hant": zhHant, en, ja };
 
 /** 取词：命中返回译文，未命中回退到调用方传入的中文原文 */
+const CJK_RE = /[\u4e00-\u9fff]/;
+
 export function translate(lang: LangCode, key: string, fallback: string, vars?: Record<string, string | number>): string {
-  // M95：新增「中文原文当 key」的回退——没起 key 的旧文案只要在 SRC_* 里登记
-  // 就能被翻译，不用满仓库改名，回填成本从「起名 + 4 语言」降到「只补英文」。
-  const raw =
-    DICTS[lang]?.[key] ??
-    DICTS["zh-Hans"][key] ??
-    (lang !== "zh-Hans" ? SRC_DICTS[lang]?.[key] : undefined) ??
-    SRC_DICTS[lang]?.[fallback] ??
-    fallback;
+  // 两套约定并存：
+  //  A) 老：key = 命名键（err.parseTitle），fallback = 中文原文
+  //  B) 新：key = 中文原文，fallback = 英文
+  // M322：中文界面下 B 的 key 必须原样返回——否则 zhHans 字典没登记时会掉到英文 fallback，
+  //       表现就是「主题面板等新面板一直是英文」。
+  const keyIsChinese = CJK_RE.test(key);
+  let raw: string;
+  if (lang === "zh-Hans") {
+    raw = DICTS["zh-Hans"][key] ?? (keyIsChinese ? key : fallback);
+  } else if (lang === "zh-Hant") {
+    raw =
+      DICTS["zh-Hant"][key] ??
+      SRC_DICTS["zh-Hant"]?.[key] ??
+      (keyIsChinese ? key : SRC_DICTS["zh-Hant"]?.[fallback] ?? fallback);
+  } else {
+    raw =
+      DICTS[lang]?.[key] ??
+      SRC_DICTS[lang]?.[key] ??
+      SRC_DICTS[lang]?.[fallback] ??
+      DICTS["zh-Hans"][key] ??
+      fallback;
+  }
   if (!vars) return raw;
   return raw.replace(/\{(\w+)\}/g, (_m, k: string) => String(vars[k] ?? ""));
 }

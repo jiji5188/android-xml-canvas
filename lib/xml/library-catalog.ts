@@ -30,9 +30,9 @@ export const LIBRARY_CATALOG: LibEntry[] = [
   { group: "androidx.cardview", artifact: "cardview", version: "1.0.0", kind: "androidx", isAar: true, note: "CardView 卡片" },
   { group: "androidx.appcompat", artifact: "appcompat", version: "1.7.0", kind: "androidx", isAar: true, note: "AppCompatActivity / 主题" },
   { group: "androidx.fragment", artifact: "fragment", version: "1.8.4", kind: "androidx", isAar: true, note: "Fragment 分块" },
-  { group: "androidx.lifecycle", artifact: "lifecycle-viewmodel", version: "2.8.6", kind: "androidx", isAar: true, note: "ViewModel 生命周期" },
+  { group: "androidx.lifecycle", artifact: "lifecycle-viewmodel", version: "2.8.6", kind: "androidx", isAar: false, note: "ViewModel 生命周期" },
   { group: "androidx.lifecycle", artifact: "lifecycle-livedata", version: "2.8.4", kind: "androidx", isAar: true, note: "LiveData 数据观察" },
-  { group: "androidx.exoplayer", artifact: "exoplayer", version: "2.19.1", kind: "androidx", isAar: true, note: "ExoPlayer 视频播放" },
+  { group: "com.google.android.exoplayer", artifact: "exoplayer", version: "2.19.1", kind: "androidx", isAar: true, note: "ExoPlayer 视频播放" },
   { group: "androidx.room", artifact: "room-runtime", version: "2.6.1", kind: "androidx", isAar: true, note: "Room 数据库" },
   { group: "androidx.palette", artifact: "palette", version: "1.0.0", kind: "androidx", isAar: true, note: "从图片提取主色" },
 
@@ -42,7 +42,7 @@ export const LIBRARY_CATALOG: LibEntry[] = [
   { group: "com.squareup.picasso", artifact: "picasso", version: "2.8", kind: "thirdparty", isAar: true, note: "图片加载（Picasso）" },
   { group: "com.github.bumptech.glide", artifact: "glide", version: "4.16.0", kind: "thirdparty", isAar: true, note: "图片加载（Glide）" },
   { group: "org.greenrobot", artifact: "eventbus", version: "3.3.1", kind: "thirdparty", isAar: false, note: "事件总线" },
-  { group: "com.squareup.okhttp3", artifact: "okhttp", version: "4.12.0", kind: "thirdparty", isAar: true, note: "网络请求（OkHttp）" },
+  { group: "com.squareup.okhttp3", artifact: "okhttp", version: "4.12.0", kind: "thirdparty", isAar: false, note: "网络请求（OkHttp）" },
 ];
 
 /** maven 坐标唯一标识（判断是否已下载用） */
@@ -74,11 +74,17 @@ export function libDownloadUrl(e: LibEntry): string {
   return mavenBase(e) + "/" + path;
 }
 
+/** M333：局域网镜像（手机跟开发机同网段时最快最稳，手机本来就从这个 IP 下 APK） */
+export const LAN_LIBS_BASE = "http://192.168.31.101:8080/_dl/libs";
+
 /** M331：候选下载 URL 列表（国内镜像优先，最后官方源）——手机直连 dl.google.com 常被墙 */
 export function libDownloadUrls(e: LibEntry): string[] {
-  const path = e.group.replace(/\./g, "/") + "/" + e.artifact + "/" + e.version + "/" + e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar");
+  const fname = e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar");
+  const path = e.group.replace(/\./g, "/") + "/" + e.artifact + "/" + e.version + "/" + fname;
   const isGoogle = e.group.startsWith("androidx.") || e.group.startsWith("com.google.android.");
   const urls: string[] = [];
+  // 0) 局域网镜像（同网段最快最稳）
+  urls.push(LAN_LIBS_BASE + "/" + fname);
   // 1) 阿里云镜像（google / central 分开）
   urls.push("https://maven.aliyun.com/repository/" + (isGoogle ? "google" : "central") + "/" + path);
   // 2) 腾讯云 maven-public（代理 google + central）

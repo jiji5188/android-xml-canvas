@@ -704,49 +704,89 @@ public class MainActivity extends Activity {
             try {
                 if (urlsJson == null || destAbs == null || destAbs.isEmpty()) return "err:参数空";
                 File f = new File(destAbs);
-                // M332：不限制必须在工作目录（项目 libs 可能在 SAF/全文件访问的任意路径）；
-                //  destAbs 由 JS 自己算（项目相对 libs/），可信，直接写
+                // M332：不限制必须在工作目录（项目 libs 可能在 SAF/全文件访问的任意路径）
                 java.util.List<String> urls = jsonUrlList(urlsJson);
                 if (urls.isEmpty()) urls.add(urlsJson.trim());
-                f.getParentFile().mkdirs();
-                String lastErr = "";
+                File dest = ensureDir(f);
+                if (dest == null) {
+                    // M333：项目 libs 路径写不了，退到应用自己的可写目录，让下载至少能成
+                    File fb = new File(getExternalFilesDir(null), "axv-libs");
+                    try { fb.mkdirs(); } catch (Throwable ignore) {}
+                    dest = new File(fb, f.getName());
+                }
+                byte[] data = null;
+                String goodUrl = null;
+                String lastNet = "";
                 for (String u : urls) {
                     if (u == null || u.isEmpty()) continue;
                     try {
                         java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
-                        conn.setConnectTimeout(10000);
-                        conn.setReadTimeout(30000);
+                        conn.setConnectTimeout(12000);
+                        conn.setReadTimeout(60000);
                         conn.setInstanceFollowRedirects(true);
                         int code = conn.getResponseCode();
                         if (code < 200 || code >= 300) {
-                            lastErr = u + " HTTP " + code;
+                            lastNet = u + " HTTP " + code;
                             conn.disconnect();
                             continue;
                         }
-                        long n = 0;
-                        try (java.io.InputStream in = conn.getInputStream();
-                             java.io.OutputStream out = new java.io.BufferedOutputStream(new java.io.FileOutputStream(f))) {
+                        try (java.io.InputStream in = conn.getInputStream()) {
+                            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
                             byte[] buf = new byte[8192];
                             int r;
-                            while ((r = in.read(buf)) != -1) {
-                                out.write(buf, 0, r);
-                                n += r;
-                            }
+                            while ((r = in.read(buf)) != -1) bos.write(buf, 0, r);
+                            data = bos.toByteArray();
                         }
                         conn.disconnect();
-                        if (n < 1024) {
-                            lastErr = u + " 内容过小(" + n + ")";
-                            continue;
-                        }
-                        return "ok:" + n + "@" + u;
+                        if (data.length < 512) { lastNet = u + " 内容过小(" + data.length + ")"; data = null; continue; }
+                        goodUrl = u;
+                        break;
                     } catch (Throwable t) {
-                        lastErr = u + " " + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+                        lastNet = u + " " + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+                        data = null;
                     }
                 }
-                return "err:" + lastErr;
+                if (data == null) return "err:全部源都试了→" + lastNet;
+                // 写文件（目标或 fallback）
+                File wf = dest;
+                try {
+                    wf.getParentFile().mkdirs();
+                    try (java.io.OutputStream out = new java.io.BufferedOutputStream(new java.io.FileOutputStream(wf))) {
+                        out.write(data);
+                    }
+                } catch (Throwable wt) {
+                    // 再退到 cache 目录
+                    try {
+                        File cf = new File(getCacheDir(), "axv-libs");
+                        cf.mkdirs();
+                        wf = new File(cf, f.getName());
+                        try (java.io.OutputStream out = new java.io.BufferedOutputStream(new java.io.FileOutputStream(wf))) {
+                            out.write(data);
+                        }
+                    } catch (Throwable wt2) {
+                        return "err:下载成功(" + data.length + " 字节，" + goodUrl + ")但写入失败→" + (wt2.getMessage() == null ? wt2.getClass().getSimpleName() : wt2.getMessage());
+                    }
+                }
+                boolean fellBack = !wf.getAbsolutePath().equals(f.getAbsolutePath());
+                return "ok:" + data.length + "@" + goodUrl + "@" + wf.getAbsolutePath() + (fellBack ? "@fallback" : "");
             } catch (Throwable t) {
                 String m = t.getMessage();
                 return "err:" + (m == null ? t.getClass().getSimpleName() : m);
+            }
+        }
+
+        /** 能建父目录就返回目标；建不了返回 null（让调用方走 fallback）。 */
+        private File ensureDir(File target) {
+            try {
+                File p = target.getParentFile();
+                if (p != null && !p.exists()) p.mkdirs();
+                // 验证可写（touch 一个小探测文件再删）
+                File probe = new File(p, ".axvprobe" + System.currentTimeMillis());
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(probe)) { fos.write(new byte[1]); }
+                probe.delete();
+                return target;
+            } catch (Throwable t) {
+                return null;
             }
         }
 

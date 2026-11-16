@@ -202,18 +202,39 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       if (nativeProjectRoot && native) targetBase = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
       if (!targetBase && localDir) targetBase = localDir;
       const target = targetBase ? `${targetBase}/${fname}` : null;
-      if (target && native?.downloadLib) {
+      if (target && typeof native?.downloadLib === "function") {
         // 原生多镜像下载（APK）
         const urlsJson = JSON.stringify(libDownloadUrls(e));
-        const r = native.downloadLib(urlsJson, target);
-        if (typeof r === "string" && r.startsWith("ok")) {
-          const src = r.split("@").pop() || "";
+        let r = "";
+        try { r = String(native.downloadLib(urlsJson, target) ?? ""); } catch (e2) { r = "throw:" + String(e2); }
+        if (r.startsWith("ok")) {
+          const parts = r.slice(3).split("@");
+          const savedPath = parts[2] || "";
+          const isFallback = parts[3] === "fallback";
+          // fallback：存到应用目录了，尝试拷回项目 libs（用 writeText）
+          if (isFallback && savedPath && native.writeText && target) {
+            try {
+              const b64 = native.readBase64?.(savedPath);
+              if (b64) {
+                const w = native.writeText(target, b64);
+                if (typeof w === "string" && w.startsWith("ok")) {
+                  setCatBusy((m) => ({ ...m, [key]: "done" }));
+                  onNote?.(tr("libs.cat_download_saved", "{lib} 已下载（已拷入项目 libs/）", { lib: e.artifact }));
+                  void refresh();
+                  return;
+                }
+              }
+            } catch {}
+            setCatBusy((m) => ({ ...m, [key]: "err:fallback" }));
+            onNote?.(tr("libs.cat_fallback", "{lib} 已下载到临时目录 {p}（项目 libs 写不了，请手动拷进去）", { lib: e.artifact, p: savedPath }));
+            return;
+          }
           setCatBusy((m) => ({ ...m, [key]: "done" }));
-          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载（{src}）", { lib: e.artifact, src: src.replace(/^https?:\/\//, "") }));
+          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载（{src}）", { lib: e.artifact, src: (parts[1] || "").replace(/^https?:\/\//, "") }));
           void refresh();
         } else {
-          setCatBusy((m) => ({ ...m, [key]: "err:" + ((r || "").startsWith("err:") ? r.slice(4) : "save failed") }));
-          onNote?.(tr("libs.cat_download_failed", "{lib} 下载失败：{err}（已试全部镜像）", { lib: e.artifact, err: (r || "").slice(4) || "?" }));
+          setCatBusy((m) => ({ ...m, [key]: "err:" + (r.slice(4) || "download failed") }));
+          onNote?.(tr("libs.cat_download_failed", "{lib} 下载失败：{err}", { lib: e.artifact, err: r.slice(4) || "?" }));
         }
         return;
       }

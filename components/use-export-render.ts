@@ -136,9 +136,21 @@ export function useExportRender(getDeps: () => ExportRenderDeps) {
     setExportNote(tt("正在收集布局引用的资源…"));
     void collectProjectRes(aiFileIo as never, openRel, base)
       .then((collected) => {
-        const stubNote = collected.stubbed?.length
-          ? tt("；{n} 个资源项目里没有，已用透明占位顶住", { n: collected.stubbed.length })
-          : "";
+        // M318c：缺资源不再静默“透明占位顶住”，而是明确列出缺哪些、提示用户去 res/values 补全。
+        //   占位仍然保留（让预览能渲染不崩），但文案改成「缺了 X，请补全」。
+        const stubbed = collected.stubbed || [];
+        const VALUES_STUB = /^(color|string|dimen|bool|integer|fraction|style|id|attr)\//;
+        const missingValues = stubbed.filter((k) => VALUES_STUB.test(k));
+        const missingFiles = stubbed.filter((k) => !VALUES_STUB.test(k)); // drawable/layout 等文件类
+        let stubNote = "";
+        if (missingValues.length > 0) {
+          const shown = missingValues.slice(0, 8).join("、");
+          const more = missingValues.length > 8 ? `（共 ${missingValues.length} 个）` : "";
+          stubNote += "\n⚠ " + tt("布局引用了 {n} 个未定义的 values 资源：{list}{more}。请在 res/values 里补全它们（colors.xml / strings.xml …），否则预览用的是占位值。", { n: missingValues.length, list: shown, more });
+        }
+        if (missingFiles.length > 0) {
+          stubNote += "；" + tt("另有 {n} 个文件资源（drawable 等）项目里没有，已用占位顶上。", { n: missingFiles.length });
+        }
         setExportNote(
           (collected.added
             ? tt("已补齐 {n} 个项目资源，正在用设备上的 aapt2 编译…", { n: collected.added })

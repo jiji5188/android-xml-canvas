@@ -2791,6 +2791,10 @@ export const SRC_EN: SrcDict = {
   "重命名当前文件": "Rename current file",
   "删除当前文件": "Delete current file",
   "已关闭「{name}」": "Closed “{name}”",
+  "布局引用了 {n} 个未定义的 values 资源：{list}{more}。请在 res/values 里补全它们（colors.xml / strings.xml …），否则预览用的是占位值。":
+    "Layout references {n} undefined values resources: {list}{more}. Define them in res/values (colors.xml / strings.xml …), otherwise the preview uses placeholder values.",
+  "另有 {n} 个文件资源（drawable 等）项目里没有，已用占位顶上。":
+    "Also {n} file resources (drawable, etc.) are missing from the project, filled with placeholders.",
 
 
 };

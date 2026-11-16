@@ -498,8 +498,10 @@ export async function collectProjectRes(
       continue;
     }
 
-    if (type === "color") stubValue(`<color name="${name}">#00000000</color>`, key);
-    else if (type === "string") stubValue(`<string name="${name}" />`, key);
+    // M318b：缺资源占位值要「可见」，别用透明/空——否则缺 @color 的按钮/分隔线渲染成全透明看不见，
+    //   用户会误以为「控件少了」（其实控件在，只是透明）。color 用可见中性灰，string 用资源名占位文本。
+    if (type === "color") stubValue(`<color name="${name}">#FFCCCCCC</color>`, key); // axv-stub 可见占位灰
+    else if (type === "string") stubValue(`<string name="${name}">${name}</string>`, key); // 占位文本=资源名，看得出是缺的
     else if (type === "dimen") stubValue(`<dimen name="${name}">0dp</dimen>`, key);
     else if (type === "bool") stubValue(`<bool name="${name}">false</bool>`, key);
     else if (type === "integer") stubValue(`<integer name="${name}">0</integer>`, key);
@@ -507,9 +509,9 @@ export async function collectProjectRes(
     else if (type === "style") stubValue(`<style name="${name}" parent="" />`, key);
     else if (type === "id") stubValue(`<item type="id" name="${name}" />`, key);
     else if (type === "array" || type === "string-array" || type === "integer-array")
-      stubValue(`<${type} name="${name}" />`, key);
+      stubValue(`<${type} name="${name}"><item>stub</item></${type}>`, key);
     else if (type === "plurals")
-      stubValue(`<plurals name="${name}"><item quantity="other">%s</item></plurals>`, key);
+      stubValue(`<plurals name="${name}"><item quantity="other">${name}</item></plurals>`, key);
   }
 
   if (stubValues.length > 0) {

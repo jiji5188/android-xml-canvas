@@ -126,6 +126,23 @@ public class ThemePreviewActivity extends Activity {
         if (hasPalette) { l1.setTextColor(cOnSurf); l2.setTextColor(cOnSurf); }
         status.addView(l1, topParams(16));
         status.addView(l2, topParams(4));
+
+        // M329：AppCompat / Material 主题 → 提示需自行加依赖（工具不内置资源库）
+        String parentClean = parent == null ? "" : parent;
+        boolean needsDep = false;
+        String depMaven = "";
+        if (parentClean.startsWith("Theme.AppCompat")) { needsDep = true; depMaven = "androidx.appcompat:appcompat"; }
+        else if (parentClean.startsWith("Theme.Material3") || parentClean.startsWith("Theme.MaterialComponents")) {
+            needsDep = true; depMaven = "com.google.android.material:material";
+        }
+        if (needsDep) {
+            TextView l3 = new TextView(this);
+            l3.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            l3.setText("⚠ 该主题需你在项目 gradle 添加 " + depMaven + " 依赖才是 1:1 观感；\n当前预览用系统等价主题 + 你选的配色近似。");
+            l3.setAlpha(0.8f);
+            if (hasPalette) l3.setTextColor(cOnSurf);
+            status.addView(l3, topParams(10));
+        }
         root.addView(status);
 
         sv.addView(root, new ViewGroup.LayoutParams(

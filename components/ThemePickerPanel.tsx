@@ -7,6 +7,7 @@ import {
   androidThemeGroups,
   argbToCss,
   inferPreviewFeatures,
+  needsThirdPartyDep,
   type AndroidThemePreset,
   type ThemeGroup,
 } from "@/lib/xml/android-theme-presets";
@@ -108,6 +109,9 @@ export function ThemePickerPanel({ tr, selectedId, onPick, onPreview, busy }: Pr
     <div className="axv-theme-panel">
       <div style={{ fontSize: 12, opacity: 0.7, margin: "2px 4px 10px", lineHeight: 1.5 }}>
         {tr("挑一个 Android 主题，写进项目的 themes.xml，预览与真机包都会用它。", "Pick an Android theme; it is written to your themes.xml and used by preview & on-device builds.")}
+        <div style={{ marginTop: 4, fontSize: 11, opacity: 0.6 }}>
+          {tr("系统主题开箱即用；Material / AppCompat 主题需你在 gradle 加对应依赖才 1:1。", "System themes work out of the box; Material / AppCompat themes need the matching dependency in your gradle for a 1:1 look.")}
+        </div>
       </div>
       {groups.map((g) => (
         <div key={g.group} style={{ marginBottom: 6 }}>
@@ -151,6 +155,28 @@ export function ThemePickerPanel({ tr, selectedId, onPick, onPreview, busy }: Pr
                             title={tr("对话框专用主题，不能套到整页 Activity", "Dialog-only theme; cannot be applied to a whole-Activity")}
                           >
                             {tr("对话框", "dialog")}
+                          </span>
+                        )}
+                        {needsThirdPartyDep(p.parent) && (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              fontSize: 10,
+                              color: "#a04000",
+                              background: "rgba(224,128,0,0.16)",
+                              border: "1px solid rgba(224,128,0,0.4)",
+                              borderRadius: 4,
+                              padding: "1px 5px",
+                              display: "inline-block",
+                              fontWeight: 500,
+                            }}
+                            title={tr(
+                              "该主题需你在项目里添加 {dep} 依赖才能 1:1 显示；工具不内置该资源库",
+                              "This theme requires adding {dep} to your project for a 1:1 look; the tool does not bundle its resources",
+                              { dep: needsThirdPartyDep(p.parent)!.maven },
+                            )}
+                          >
+                            {tr("需加依赖", "needs dep")} · {needsThirdPartyDep(p.parent)!.lib}
                           </span>
                         )}
                         {active && (

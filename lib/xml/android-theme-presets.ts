@@ -47,6 +47,18 @@ export function themeFamily(p: AndroidThemePreset): ThemeFamily {
   return /Holo/i.test(p.parent) ? "holo" : "device";
 }
 
+/** M329：该主题需要用户自己在项目里添加哪个第三方依赖才 1:1（工具不内置资源库）。
+ *  · `@android:style/*` 与 framework `Theme.Material` = 系统自带，返回 null
+ *  · `Theme.AppCompat*` → androidx.appcompat
+ *  · `Theme.Material3*` / `Theme.MaterialComponents*` → com.google.android.material
+ *  工具打包时不把这些库的 res 塞进用户 App，选了这些主题的用户需自行在 gradle 加对应依赖。 */
+export function needsThirdPartyDep(parent: string): { lib: string; maven: string } | null {
+  if (!parent || parent.startsWith("@android:")) return null;
+  if (/^Theme\.AppCompat/.test(parent)) return { lib: "androidx.appcompat", maven: "androidx.appcompat:appcompat" };
+  if (/^Theme\.(Material3|MaterialComponents)/.test(parent)) return { lib: "com.google.android.material", maven: "com.google.android.material:material" };
+  return null; // framework Theme.Material / Holo / DeviceDefault 等
+}
+
 export const THEME_GROUP_ORDER: ThemeGroup[] = [
   "appcompat",
   "material2",

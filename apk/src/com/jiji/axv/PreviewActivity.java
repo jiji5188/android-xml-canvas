@@ -46,10 +46,15 @@ public class PreviewActivity extends Activity {
     private String pkgName = RES_PKG;
     private String layoutName = "preview";
     private String apkPath = null;
+    /** M318：androidx/Material 控件的运行时 classloader（从 assets/androidx/androidx-preview.bin.gz 加载），
+     *  null = 没内置 androidx 或加载失败（退回平台控件 stub）。 */
+    private java.lang.ClassLoader androidxLoader = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // M318：先把 androidx 预览 dex 加载好（失败不影响预览，只退回 stub）
+        loadAndroidxLoader();
 
         // M154：外部传参优先；没传就是内置那个 demo 资源包（M151/M152 的老路径）
         if (getIntent() != null) {
@@ -228,8 +233,18 @@ public class PreviewActivity extends Activity {
         String[] prefixes = { "android.widget.", "android.view.", "android.webkit.", "android.app." };
         try {
             if (name.contains(".")) {
+                // M318：全限定名先试 app classloader（框架/项目自带类），再试 androidx 预览 classloader
                 Class<?> c = Class.forName(name);
                 return (View) c.getConstructor(Context.class, AttributeSet.class).newInstance(ctx, attrs);
+            }
+            // M318：androidx / Material 的常见短名（没写包名的）→ 用预览 classloader 试几个已知包
+            if (androidxLoader != null && isAndroidxShortName(name)) {
+                for (String cand : androidxShortCandidates(name)) {
+                    try {
+                        Class<?> c = androidxLoader.loadClass(cand);
+                        return (View) c.getConstructor(Context.class, AttributeSet.class).newInstance(ctx, attrs);
+                    } catch (Throwable ignore) { /* 下一个候选 */ }
+                }
             }
             for (String p : prefixes) {
                 try {
@@ -318,5 +333,74 @@ public class PreviewActivity extends Activity {
 
     private int dp(int v) {
         return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    /** M318：从 assets/androidx/androidx-preview.bin.gz 解出 dex，用 InMemoryDexClassLoader 加载。
+     *  失败/没内置就保持 androidxLoader = null（tryCreate 退回平台控件 stub，不崩预览）。 */
+    private void loadAndroidxLoader() {
+        try {
+            File dst = new File(getCacheDir(), "androidx-preview.dex");
+            byte[] gz = openAssetBytes("androidx/androidx-preview.bin.gz");
+            if (gz == null || gz.length == 0) { Log.i(TAG, "M318 未内置 androidx 预览 dex，退平台控件 stub"); return; }
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            java.util.zip.GZIPInputStream gin = new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(gz));
+            byte[] chunk = new byte[65536]; int n;
+            while ((n = gin.read(chunk)) > 0) bos.write(chunk, 0, n);
+            gin.close();
+            byte[] dexBytes = bos.toByteArray();
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                androidxLoader = new dalvik.system.InMemoryDexClassLoader(
+                        new java.nio.ByteBuffer[] { java.nio.ByteBuffer.wrap(dexBytes) },
+                        null, getClassLoader());
+            } else {
+                // API 24/25：InMemoryDexClassLoader 不可用 → 落文件 + DexClassLoader
+                File dexFile = new File(getCacheDir(), "androidx-preview-disk.dex");
+                FileOutputStream fos = new FileOutputStream(dexFile);
+                fos.write(dexBytes); fos.close();
+                androidxLoader = new dalvik.system.DexClassLoader(
+                        dexFile.getAbsolutePath(), getCacheDir().getAbsolutePath(),
+                        null, getClassLoader());
+            }
+            Log.i(TAG, "M318 androidx 预览 classloader 加载 OK（dex " + dexBytes.length + " 字节）");
+        } catch (Throwable t) {
+            androidxLoader = null;
+            Log.w(TAG, "M318 加载 androidx 预览 dex 失败，退平台控件 stub", t);
+        }
+    }
+
+    private byte[] openAssetBytes(String path) throws java.io.IOException {
+        try (InputStream is = getAssets().open(path)) {
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[65536]; int n;
+            while ((n = is.read(b)) > 0) bos.write(b, 0, n);
+            return bos.toByteArray();
+        }
+    }
+
+    /** 短名是否是「可能属于 androidx/Material」的控件（才去试预览 classloader） */
+    private boolean isAndroidxShortName(String name) {
+        return name.startsWith("Material") || name.startsWith("AppCompat")
+                || name.equals("TextInputEditText") || name.equals("Chip")
+                || name.equals("TabLayout") || name.equals("RecyclerView")
+                || name.equals("ConstraintLayout") || name.equals("CoordinatorLayout");
+    }
+
+    /** 短名 → 已知的 androidx/Material 全限定类候选 */
+    private java.util.List<String> androidxShortCandidates(String name) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        switch (name) {
+            case "MaterialButton": out.add("com.google.android.material.button.MaterialButton"); break;
+            case "MaterialCardView": out.add("com.google.android.material.card.MaterialCardView"); break;
+            case "TextInputEditText": out.add("com.google.android.material.textfield.TextInputEditText"); break;
+            case "Chip": out.add("com.google.android.material.chip.Chip"); break;
+            case "TabLayout": out.add("com.google.android.material.tabs.TabLayout"); break;
+            case "RecyclerView": out.add("androidx.recyclerview.widget.RecyclerView"); break;
+            case "ConstraintLayout": out.add("androidx.constraintlayout.widget.ConstraintLayout"); break;
+            case "CoordinatorLayout": out.add("androidx.coordinatorlayout.widget.CoordinatorLayout"); break;
+            default:
+                if (name.startsWith("Material")) out.add("com.google.android.material.widget." + name);
+                break;
+        }
+        return out;
     }
 }

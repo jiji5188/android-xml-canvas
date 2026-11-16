@@ -189,6 +189,62 @@ run(jbrExe("jar"), ["uf", "build/base.apk", "-C", "build/dex", "classes.dex"], a
   gz(path.join(apk, "build/signdex/classes.dex"), path.join(apk, "build/signer.bin.gz"));
 }
 
+// 6.4) M318：把 androidx 插件包（vendor/androidx/ 的 jar/aar）dex 成一个 androidx-preview.dex，
+//      gzip 后追加到 assets/androidx/。设备端 PreviewActivity 用 InMemoryDexClassLoader 加载，
+//      让 Material/androidx 控件在「编译真预览」里能真 inflate（否则退成空壳、"少了一些控件"）。
+{
+  const androidJar2 = path.join(SDK, "platforms", PLATFORM, "android.jar");
+  const vendorDir = path.join(apk, "vendor", "androidx");
+  const inputs = []; // 喂给 d8 的 class 来源（jar / 解出来的 classes.jar）
+  if (fs.existsSync(vendorDir)) {
+    const ext = path.join(apk, "build", "androidx-extract");
+    fs.rmSync(ext, { recursive: true, force: true });
+    fs.mkdirSync(ext, { recursive: true });
+    for (const f of fs.readdirSync(vendorDir)) {
+      const p = path.join(vendorDir, f);
+      if (f.endsWith(".jar")) { inputs.push(p); continue; }
+      if (!f.endsWith(".aar")) continue;
+      // aar 是 zip：用 jbr 的 jar.exe 解 classes.jar（比我手写 zip reader 可靠，支持 data descriptor）
+      const outDir = path.join(ext, f.replace(/\.aar$/, ""));
+      fs.mkdirSync(outDir, { recursive: true });
+      try {
+        execFileSync(jbrExe("jar"), ["xf", p, "classes.jar"], { cwd: outDir, stdio: "pipe" });
+        const cj = path.join(outDir, "classes.jar");
+        if (fs.existsSync(cj) && fs.statSync(cj).size > 0) inputs.push(cj);
+        else console.warn("aar 里没有 classes.jar：" + f);
+      } catch (e) {
+        console.warn("aar 解 classes.jar 失败 " + f + ": " + e.message);
+      }
+    }
+  }
+  const d8Ok = inputs.length > 0;
+  if (d8Ok) {
+    fs.mkdirSync(path.join(apk, "build", "androidxdex"), { recursive: true });
+    try {
+      run(jbrExe("java"), [
+        "-cp", btExe("lib/d8.jar"), "com.android.tools.r8.D8",
+        "--lib", androidJar2, "--min-api", "24",
+        "--output", "build/androidxdex",
+        ...inputs,
+      ], apk);
+    } catch (e) {
+      // androidx dex 失败不该阻断主包（真预览退回平台控件 stub，不影响安装/其它功能）
+      console.warn("⚠ androidx dex 失败，真预览将退化为平台控件 stub：" + e.message);
+      d8Ok = false;
+    }
+  }
+  if (d8Ok) {
+    fs.mkdirSync(path.join(apk, "build"), { recursive: true });
+    const gz2 = (src, dst) => fs.writeFileSync(dst, zlib.gzipSync(fs.readFileSync(src), { level: 9 }));
+    gz2(path.join(apk, "build", "androidxdex", "classes.dex"), path.join(apk, "build", "androidx-preview.bin.gz"));
+    console.log("androidx 预览 dex 已生成（gzip 后 " + (fs.statSync(path.join(apk, "build", "androidx-preview.bin.gz")).size / 1024).toFixed(0) + "KB）");
+  } else {
+    // 占位：让 append-assets 的 --add 路径一致（没有 dex 就塞个 0 字节，设备端会跳过）
+    fs.writeFileSync(path.join(apk, "build", "androidx-preview.bin.gz"), Buffer.alloc(0));
+    console.warn("androidx 预览 dex 未生成（无 vendor/androidx 或 d8 失败），真预览将用平台控件 stub");
+  }
+}
+
 // 6.5) assets 必须用正斜杠：aapt2 在 Windows 上会写成反斜杠（AssetManager 读不到，白屏），
 //      .NET ZipArchive 追加又会写 data descriptor（启动闪退）——用 append-assets.mjs 纯手写 STORE
 // M155：顺手把 framework 资源桩（只含 attr 的最小 android 包）也打进去，
@@ -213,7 +269,9 @@ run(process.execPath, [path.join(apk, "append-assets.mjs"), path.join(apk, "buil
   // M267：androidx 插件包（vendor/androidx/）→ 追加到 assets/androidx/（STORE，AssetManager 可读）
   ...(fs.existsSync(path.join(apk, "vendor", "androidx"))
     ? ["--add-dir", path.join(apk, "vendor", "androidx"), "assets/androidx"]
-    : [])], apk);
+    : []),
+  // M318：androidx 预览 dex（gzip）→ assets/androidx/androidx-preview.bin.gz，设备端 InMemoryDexClassLoader 加载
+  "--add", path.join(apk, "build", "androidx-preview.bin.gz"), "assets/androidx/androidx-preview.bin.gz"], apk);
 
 // 7) zipalign + 签名
 const keystore = path.join(apk, "debug.keystore");

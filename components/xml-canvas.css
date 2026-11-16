@@ -12028,3 +12028,48 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   gap: 8px;
   margin-top: 14px;
 }
+
+/* M316：主题选择页 */
+.axv-theme-panel {
+  padding: 4px 6px;
+  overflow: auto;
+  max-height: 100%;
+}
+.axv-theme-group {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 6px 4px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.axv-theme-group:hover {
+  background: rgba(0,0,0,0.05);
+}
+.axv-theme-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  width: 100%;
+  text-align: left;
+  background: rgba(0,0,0,0.03);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 8px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+}
+.axv-theme-row:hover {
+  background: rgba(0,0,0,0.06);
+}
+.axv-theme-row.on {
+  border-color: var(--axv-primary);
+  background: var(--axv-primary-soft, rgba(103,80,164,0.1));
+}

@@ -5,6 +5,7 @@ import {
   androidThemeById,
   writeThemeIntoValues,
   themeToItems,
+  argbToCss,
 } from "../lib/xml/android-theme-presets";
 
 describe("M316 Android 主题预设库", () => {
@@ -68,5 +69,13 @@ describe("M316 Android 主题预设库", () => {
   it("全屏主题多写 windowFullscreen", () => {
     const items = themeToItems(androidThemeById("material3-fullscreen"));
     expect(items.find((i) => i.item === "android:windowFullscreen")?.value).toBe("true");
+  });
+
+  it("argbToCss 把 Android #AARRGGBB 转成 CSS 颜色", () => {
+    // 关键回归：不转的话 #FF9E9E9E 会被浏览器当 #RRGGBBAA → 半透明淡红
+    expect(argbToCss("#FF9E9E9E")).toBe("rgb(158, 158, 158)");
+    expect(argbToCss("#FF000000")).toBe("rgb(0, 0, 0)");
+    expect(argbToCss("#80000000")).toBe("rgba(0, 0, 0, 0.502)");
+    expect(argbToCss("#6200EE")).toBe("#6200EE"); // 无 alpha 原样
   });
 });

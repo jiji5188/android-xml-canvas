@@ -67,6 +67,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
     parent: "Theme.AppCompat",
     note: "最基础的深色主题，旧 App 默认观感：方角按钮、经典 Material 1 控件",
     light: pal("#FF9E9E9E", "#FF000000", "#FF009688", "#FF303030", "#FFFFFFFF", "#FFB0BEC5"),
+    dark: pal("#FF9E9E9E", "#FF000000", "#FF009688", "#FF303030", "#FFFFFFFF", "#FFB0BEC5"),
   },
   {
     id: "appcompat-light",
@@ -83,6 +84,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
     parent: "Theme.AppCompat",
     note: "深色经典主题，深灰底浅字",
     light: pal("#FF9E9E9E", "#FF000000", "#FF009688", "#FF303030", "#FFFFFFFF", "#FFB0BEC5"),
+    dark: pal("#FF9E9E9E", "#FF000000", "#FF009688", "#FF303030", "#FFFFFFFF", "#FFB0BEC5"),
   },
   {
     id: "appcompat-light-noactionbar",
@@ -188,6 +190,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
     parent: "@android:style/Theme.Holo",
     note: "Android 4 时代经典 Holo 深色蓝，怀旧风 / 低版本兼容",
     light: pal("#FF33B5E5", "#FF000000", "#FF33B5E5", "#FF000000", "#FFFFFFFF", "#FF8E8E93"),
+    dark: pal("#FF33B5E5", "#FF000000", "#FF33B5E5", "#FF000000", "#FFFFFFFF", "#FF8E8E93"),
   },
   {
     id: "system-holo-light",
@@ -204,6 +207,7 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
     parent: "@android:style/Theme.Material",
     note: "原生 Material（无 AndroidX），API 21+ 系统主题",
     light: pal("#FF2196F3", "#FFFFFFFF", "#FF2196F3", "#FFFFFFFF", "#FF000000", "#FF757575"),
+    dark: pal("#FF80CBC4", "#FF000000", "#FF2196F3", "#FF212121", "#FFFFFFFF", "#FFB0BEC5"),
   },
 ];
 
@@ -218,6 +222,25 @@ export function androidThemeGroups(): { group: ThemeGroup; label: string; items:
 
 export function androidThemeById(id: string | undefined): AndroidThemePreset {
   return ANDROID_THEME_PRESETS.find((p) => p.id === id) ?? ANDROID_THEME_PRESETS[0];
+}
+
+/**
+ * Android ARGB 颜色（#AARRGGBB / #RRGGBB）→ CSS 可用颜色。
+ * 关键：调色板值是 Android 格式 #AARRGGBB，而浏览器把 8 位 hex 当 #RRGGBBAA 解析，
+ * 直接拿去当 CSS 会把 #FF9E9E9E 渲染成半透明浅红。这里统一转换。
+ */
+export function argbToCss(raw: string): string {
+  const s = (raw || "").trim();
+  const m = s.match(/^#([0-9a-fA-F]{8})$/);
+  if (m) {
+    const a = parseInt(m[1].slice(0, 2), 16);
+    const r = parseInt(m[1].slice(2, 4), 16);
+    const g = parseInt(m[1].slice(4, 6), 16);
+    const b = parseInt(m[1].slice(6, 8), 16);
+    if (a === 255) return `rgb(${r}, ${g}, ${b})`;
+    return `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
+  }
+  return s; // #RGB / #RRGGBB / rgb() / 名称 原样返回
 }
 
 /* ===== 写回 themes.xml ===== */

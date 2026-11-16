@@ -88,6 +88,8 @@ import { useBuildApk } from "./use-build-apk";
 import { installApk, shareApkFile, hasBuildApk, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
+import { ThemePickerPanel } from "./ThemePickerPanel";
+import { writeThemeIntoValues, type AndroidThemePreset } from "@/lib/xml/android-theme-presets";
 import { projectSaveRoot, projectFileExists, readProjectFile, readAppGradle, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
 import { parseAppIconConfig } from "@/lib/xml/app-icon";
 import { nativeBridge } from "@/lib/xml/native-save";
@@ -3082,6 +3084,39 @@ const findResolved = findResolvedNode;
   /** M36：当前打开项目的可写根（有则保存一律落进 <项目>/app/src/main/res/） */
   const projRoot = useMemo(() => projectSaveRoot(activeProject), [activeProject]);
 
+  /** M316：主题选择页——把选中预设写进 themes.xml（没有则新建），写完刷新资源索引 */
+  const [themeApplying, setThemeApplying] = useState(false);
+  const applyAndroidTheme = useCallback(
+    async (preset: AndroidThemePreset) => {
+      if (!projRoot) {
+        setExportNote(tr("没有打开的项目，先新建/打开一个项目", "Open a project first"));
+        window.setTimeout(() => setExportNote(" "), 3200);
+        return;
+      }
+      setThemeApplying(true);
+      const rel = "values/themes.xml";
+      try {
+        const cur = await readProjectFile(projRoot, rel);
+        const base = cur ?? "";
+        const next = writeThemeIntoValues(base, preset);
+        const r = await saveResFiles(projRoot, [{ path: rel, text: next }]);
+        setProjectRev((n) => n + 1);
+        setExportNote(
+          r.ok
+            ? tr("已应用主题 {name} → themes.xml", "Applied theme {name} to themes.xml", { name: preset.name })
+            : tr("主题写入失败（{n} 条）", "Theme write failed ({n})", { n: String(r.failed.length) }),
+        );
+        window.setTimeout(() => setExportNote(" "), 3200);
+      } catch {
+        setExportNote(tr("主题写入出错", "Failed to write theme"));
+        window.setTimeout(() => setExportNote(" "), 3200);
+      } finally {
+        setThemeApplying(false);
+      }
+    },
+    [projRoot, setProjectRev, setExportNote, tr],
+  );
+
   /** M174：「设为应用图标」面板初始值：
    *  1) localStorage 里上次的参数（生成过就写进去）
    *  2) 没有则从项目 res 读回（native 壳里读 mipmap-anydpi-v26 + drawable 背景色） */
@@ -4034,6 +4069,15 @@ const findResolved = findResolvedNode;
                 setExportNote(text);
                 window.setTimeout(() => setExportNote(" "), 3200);
               }}
+            />
+          )}
+
+          {/* M316：主题选择页 */}
+          {leftView === "theme" && (
+            <ThemePickerPanel
+              tr={tr}
+              onPick={(preset) => void applyAndroidTheme(preset)}
+              busy={themeApplying}
             />
           )}
 

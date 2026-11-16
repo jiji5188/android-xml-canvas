@@ -55,8 +55,8 @@ function menuItems(node: ReactNode): MenuIt[] {
     walk(p.children as ReactNode);
   };
   walk(node);
-  // 「更多」菜单特征：含 open 且不含 run-sim；「运行」菜单特征：含 run-sim
-  const moreMenu = found.find((arr) => arr.some((it) => it.key === "open") && !arr.some((it) => it.key === "run-sim"));
+  // 「更多」菜单特征：含 open 且不含 run-preview；「运行」菜单特征：含 run-preview
+  const moreMenu = found.find((arr) => arr.some((it) => it.key === "open") && !arr.some((it) => it.key === "run-preview"));
   out = moreMenu ?? found[0] ?? [];
   return out;
 }
@@ -84,7 +84,7 @@ function render(over: Partial<ToolbarProps> = {}) {
   const item = (label: string) => items.find((it) => it.label === label);
   // M290：运行菜单（key 以 run- 开头）
   const allItemArrays = collectAllItems(tree as unknown as ReactNode);
-  const runArr = allItemArrays.find((arr) => arr.some((it) => it.key === "run-sim")) ?? [];
+  const runArr = allItemArrays.find((arr) => arr.some((it) => it.key === "run-preview")) ?? [];
   const runItem = (label: string) => runArr.find((it) => it.label === label);
   return { p, tree, all, by, labels, items, item, runArr, runItem };
 }
@@ -190,10 +190,10 @@ describe("Toolbar — 主要动作接线", () => {
     // M173：打开 / 复制 移到了「更多」菜单
     item("打开 XML 文件")!.onClick();
     item("复制 XML")!.onClick();
-    // M290：运行按钮变成「运行 ▾」菜单，点击菜单第一项（模拟界面）触发 onRun
-    const runSim = runItem("模拟界面");
-    expect(runSim).toBeDefined();
-    runSim!.onClick();
+    // M316：运行菜单第一项（界面预览）——Web 端点选走 onRun（模拟界面）
+    const runPreview = runItem("界面预览");
+    expect(runPreview).toBeDefined();
+    runPreview!.onClick();
     expect(p.onSave).toHaveBeenCalledTimes(1);
     expect(p.onOpenFile).toHaveBeenCalledTimes(1);
     expect(p.onCopyXml).toHaveBeenCalledTimes(1);
@@ -247,26 +247,27 @@ describe("Toolbar — 主要动作接线", () => {
   });
 });
 
-describe("Toolbar — M290 运行 ▾ 菜单", () => {
-  it("四项齐全且顺序固定", () => {
+describe("Toolbar — M316 运行 ▾ 菜单（模拟+编译合并为「界面预览」）", () => {
+  it("三项齐全且顺序固定", () => {
     const { runArr } = render();
-    expect(runArr.map((i) => i.label)).toEqual(["模拟界面", "布局编译预览", "打包并运行", "签名打包发布"]);
+    expect(runArr.map((i) => i.label)).toEqual(["界面预览", "打包并运行", "签名打包发布"]);
   });
 
-  it("Web 端（无 realRenderAvailable / canBuildApk）三项禁用，模拟界面可用", () => {
-    const { runArr } = render({ realRenderAvailable: false, canBuildApk: false, canSign: false });
-    const sim = runArr.find((i) => i.key === "run-sim");
-    expect(sim?.disabled).toBeFalsy();
-    const compile = runArr.find((i) => i.key === "run-compile");
+  it("Web 端（无 realRenderAvailable）：界面预览可用（走模拟 onRun），打包/签名禁用", () => {
+    const { p, runArr } = render({ realRenderAvailable: false, canBuildApk: false, canSign: false });
+    const preview = runArr.find((i) => i.key === "run-preview");
+    expect(preview?.disabled).toBeFalsy();
+    preview!.onClick();
+    // Web 端 → 模拟界面 → onRun（onRealRender 未提供也不会误调）
+    expect(p.onRun).toHaveBeenCalledTimes(1);
     const build = runArr.find((i) => i.key === "run-build");
     const sign = runArr.find((i) => i.key === "run-sign");
-    expect(compile?.disabled).toBe(true);
     expect(build?.disabled).toBe(true);
     expect(sign?.disabled).toBe(true);
-    expect(compile?.disabledHint).toContain("APK");
+    expect(build?.disabledHint).toContain("APK");
   });
 
-  it("APK 端且有签名配置时四项均可用", () => {
+  it("APK 端：界面预览走真机编译 onRealRender；有签名配置时三项均可用", () => {
     const { p, runArr } = render({
       realRenderAvailable: true,
       onRealRender: vi.fn(),
@@ -276,12 +277,12 @@ describe("Toolbar — M290 运行 ▾ 菜单", () => {
       onSign: vi.fn(),
     });
     for (const it of runArr) expect(it.disabled, it.key).toBeFalsy();
-    runArr.find((i) => i.key === "run-sim")!.onClick();
-    runArr.find((i) => i.key === "run-compile")!.onClick();
+    runArr.find((i) => i.key === "run-preview")!.onClick();
     runArr.find((i) => i.key === "run-build")!.onClick();
     runArr.find((i) => i.key === "run-sign")!.onClick();
-    expect(p.onRun).toHaveBeenCalledTimes(1);
+    // APK 端 → 真机编译预览 → onRealRender（onRun 不应被误调）
     expect(p.onRealRender).toHaveBeenCalledTimes(1);
+    expect(p.onRun).toHaveBeenCalledTimes(0);
     expect(p.onBuildRun).toHaveBeenCalledTimes(1);
     expect(p.onSign).toHaveBeenCalledTimes(1);
   });

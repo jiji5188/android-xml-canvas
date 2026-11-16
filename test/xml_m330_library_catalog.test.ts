@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LIBRARY_CATALOG, libKey, libDownloadUrl, groupCatalog, mavenBase } from "../lib/xml/library-catalog";
+import { LIBRARY_CATALOG, libKey, libDownloadUrl, libDownloadUrls, groupCatalog, mavenBase } from "../lib/xml/library-catalog";
 
 describe("M330 library-catalog（内置库目录）", () => {
   it("目录非空且每个条目字段完整", () => {
@@ -27,6 +27,20 @@ describe("M330 library-catalog（内置库目录）", () => {
     expect(libDownloadUrl(gson)).toBe("https://repo1.maven.org/maven2/com/google/code/gson/gson/2.10.1/gson-2.10.1.jar");
     expect(mavenBase(gson)).toBe("https://repo1.maven.org/maven2");
     expect(mavenBase(mat)).toBe("https://dl.google.com/dl/android/maven2");
+  });
+
+  it("M331 候选镜像：国内镜像在前、官方源在后", () => {
+    const mat = LIBRARY_CATALOG.find((e) => e.artifact === "material")!;
+    const urls = libDownloadUrls(mat);
+    expect(urls.length).toBe(4);
+    expect(urls[0]).toContain("maven.aliyun.com/repository/google/");
+    expect(urls[2]).toContain("repo.huaweicloud.com");
+    expect(urls[3]).toContain("dl.google.com");
+    expect(urls[0]).toContain("material-1.12.0.aar");
+    const gson = LIBRARY_CATALOG.find((e) => e.artifact === "gson")!;
+    const gu = libDownloadUrls(gson);
+    expect(gu[0]).toContain("maven.aliyun.com/repository/central/");
+    expect(gu[3]).toContain("repo1.maven.org");
   });
 
   it("分组正确（material/androidx/thirdparty）", () => {

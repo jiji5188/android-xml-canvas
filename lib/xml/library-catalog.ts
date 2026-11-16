@@ -68,8 +68,24 @@ export function mavenBase(e: LibEntry): string {
   return isGoogle ? "https://dl.google.com/dl/android/maven2" : "https://repo1.maven.org/maven2";
 }
 
-/** 生成 aar/jar 的直连下载 URL */
+/** 生成 aar/jar 的直连下载 URL（官方源） */
 export function libDownloadUrl(e: LibEntry): string {
   const path = e.group.replace(/\./g, "/") + "/" + e.artifact + "/" + e.version + "/" + e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar");
   return mavenBase(e) + "/" + path;
+}
+
+/** M331：候选下载 URL 列表（国内镜像优先，最后官方源）——手机直连 dl.google.com 常被墙 */
+export function libDownloadUrls(e: LibEntry): string[] {
+  const path = e.group.replace(/\./g, "/") + "/" + e.artifact + "/" + e.version + "/" + e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar");
+  const isGoogle = e.group.startsWith("androidx.") || e.group.startsWith("com.google.android.");
+  const urls: string[] = [];
+  // 1) 阿里云镜像（google / central 分开）
+  urls.push("https://maven.aliyun.com/repository/" + (isGoogle ? "google" : "central") + "/" + path);
+  // 2) 腾讯云 maven-public（代理 google + central）
+  urls.push("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/" + path);
+  // 3) 华为云
+  urls.push("https://repo.huaweicloud.com/repository/maven/" + path);
+  // 4) 官方源
+  urls.push(mavenBase(e) + "/" + path);
+  return urls;
 }

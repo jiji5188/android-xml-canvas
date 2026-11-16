@@ -55,6 +55,9 @@ export interface AxvNativeBridge {
   saveBundle?(name: string, filesJson: string): void;
   /** M191：设备上生成 keystore（PKCS#12）；返回 "ok:<字节数>" / "err:<原因>" */
   makeKeystore?(path: string, alias: string, password: string, cn: string, org: string, years: number): string;
+  /** M331：原生下载（多镜像兜底）。urlsJson = JSON 数组的候选 URL；destAbs = 绝对路径。
+   *  逐个尝试直到成功；成功写文件并返回 "ok:<字节>@<url>"，全失败返回 "err:<最后错误>" */
+  downloadLib?(urlsJson: string, destAbs: string): string;
 }
 
 declare global {

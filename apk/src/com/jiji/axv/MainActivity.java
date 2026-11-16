@@ -696,6 +696,80 @@ public class MainActivity extends Activity {
             }
         }
 
+        /** M331：原生下载库文件（多镜像兜底）。urlsJson 是候选 URL 的 JSON 数组，逐个试，
+         *  成功写到 destAbs 并返回 "ok:<字节数>@<url>"；全失败返回 "err:<最后错误>"。
+         *  destAbs 必须在项目目录内（同 writeText 护栏）。同步执行（用户单点触发，超时受控）。 */
+        @JavascriptInterface
+        public String downloadLib(String urlsJson, String destAbs) {
+            try {
+                if (urlsJson == null || destAbs == null || destAbs.isEmpty()) return "err:参数空";
+                File f = new File(destAbs);
+                String base = defaultDir().getCanonicalPath();
+                String canon = f.getCanonicalPath();
+                if (!canon.startsWith(base)) return "err:只能写到项目目录内";
+                java.util.List<String> urls = jsonUrlList(urlsJson);
+                if (urls.isEmpty()) urls.add(urlsJson.trim());
+                f.getParentFile().mkdirs();
+                String lastErr = "";
+                for (String u : urls) {
+                    if (u == null || u.isEmpty()) continue;
+                    try {
+                        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(u).openConnection();
+                        conn.setConnectTimeout(10000);
+                        conn.setReadTimeout(30000);
+                        conn.setInstanceFollowRedirects(true);
+                        int code = conn.getResponseCode();
+                        if (code < 200 || code >= 300) {
+                            lastErr = u + " HTTP " + code;
+                            conn.disconnect();
+                            continue;
+                        }
+                        long n = 0;
+                        try (java.io.InputStream in = conn.getInputStream();
+                             java.io.OutputStream out = new java.io.BufferedOutputStream(new java.io.FileOutputStream(f))) {
+                            byte[] buf = new byte[8192];
+                            int r;
+                            while ((r = in.read(buf)) != -1) {
+                                out.write(buf, 0, r);
+                                n += r;
+                            }
+                        }
+                        conn.disconnect();
+                        if (n < 1024) {
+                            lastErr = u + " 内容过小(" + n + ")";
+                            continue;
+                        }
+                        return "ok:" + n + "@" + u;
+                    } catch (Throwable t) {
+                        lastErr = u + " " + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+                    }
+                }
+                return "err:" + lastErr;
+            } catch (Throwable t) {
+                String m = t.getMessage();
+                return "err:" + (m == null ? t.getClass().getSimpleName() : m);
+            }
+        }
+
+        /** 解析候选 URL 数组：容错（兼容直接给单串）。返回纯列表，不抛异常。 */
+        private static java.util.List<String> jsonUrlList(String urlsJson) {
+            java.util.List<String> out = new java.util.ArrayList<>();
+            if (urlsJson == null) return out;
+            String s = urlsJson.trim();
+            if (s.startsWith("[")) {
+                // 手动解析简单字符串数组（避免 JSONArray API 差异）
+                String inner = s.substring(1, s.lastIndexOf(']') > 0 ? s.lastIndexOf(']') : s.length());
+                for (String part : inner.split(",")) {
+                    String v = part.trim();
+                    if (v.length() >= 2 && v.startsWith("\"") && v.endsWith("\"")) v = v.substring(1, v.length() - 1);
+                    if (!v.isEmpty()) out.add(v);
+                }
+            } else {
+                out.add(s);
+            }
+            return out;
+        }
+
         @JavascriptInterface
         public String getWorkspace() {
             return workspaceLabel();

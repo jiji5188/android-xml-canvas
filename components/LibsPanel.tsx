@@ -8,7 +8,7 @@ import {
   LIBRARY_CATALOG,
   groupCatalog,
   libKey,
-  libDownloadUrl,
+  libDownloadUrls,
   type LibEntry,
 } from "@/lib/xml/library-catalog";
 
@@ -190,40 +190,57 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
 
   const currentList = tab === "local" ? localLibs : projectLibs;
 
-  /** M330：从内置目录一键下载某个库到项目 libs/（复用 fetchBase64 + native.writeText） */
+  /** M330：从内置目录一键下载某个库到项目 libs/（优先原生多镜像，浏览器回退 fetch） */
   const downloadCat = useCallback(
     async (e: LibEntry) => {
       const key = libKey(e);
       setCatBusy((m) => ({ ...m, [key]: "downloading" }));
-      onNote?.(tr("libs.cat_downloading", "正在下载 {lib}…", { lib: e.artifact }));
-      const r = await fetchBase64(libDownloadUrl(e));
-      if (!r.ok) {
-        setCatBusy((m) => ({ ...m, [key]: "err:" + (r.error || "download failed") }));
-        onNote?.(tr("libs.cat_download_failed", "{lib} 下载失败：{err}（网络不通或源 404）", { lib: e.artifact, err: r.error || "?" }));
-        return;
-      }
+      onNote?.(tr("libs.cat_downloading", "正在下载 {lib}…（多镜像）", { lib: e.artifact }));
       const fname = e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar");
       // 保存到项目 libs/（优先项目库，没有就本地库）
       let targetBase = null;
       if (nativeProjectRoot && native) targetBase = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
       if (!targetBase && localDir) targetBase = localDir;
-      if (targetBase && native) {
-        native.createEntry?.(targetBase, true);
-        const target = `${targetBase}/${fname}`;
-        const w = native.writeText?.(target, r.b64);
-        const ok = typeof w === "string" && w.startsWith("ok");
-        if (ok) {
+      const target = targetBase ? `${targetBase}/${fname}` : null;
+      if (target && native?.downloadLib) {
+        // 原生多镜像下载（APK）
+        const urlsJson = JSON.stringify(libDownloadUrls(e));
+        const r = native.downloadLib(urlsJson, target);
+        if (typeof r === "string" && r.startsWith("ok")) {
+          const src = r.split("@").pop() || "";
           setCatBusy((m) => ({ ...m, [key]: "done" }));
-          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载到 {path}（编译自动应用）", { lib: e.artifact, path: target }));
+          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载（{src}）", { lib: e.artifact, src: src.replace(/^https?:\/\//, "") }));
           void refresh();
         } else {
-          setCatBusy((m) => ({ ...m, [key]: "err:" + (w || "save failed") }));
-          onNote?.(tr("libs.cat_download_failed", "{lib} 保存失败：{err}", { lib: e.artifact, err: w || "?" }));
+          setCatBusy((m) => ({ ...m, [key]: "err:" + ((r || "").startsWith("err:") ? r.slice(4) : "save failed") }));
+          onNote?.(tr("libs.cat_download_failed", "{lib} 下载失败：{err}（已试全部镜像）", { lib: e.artifact, err: (r || "").slice(4) || "?" }));
         }
-      } else {
+        return;
+      }
+      // 浏览器回退：逐镜像 fetch
+      for (const url of libDownloadUrls(e)) {
+        const r = await fetchBase64(url);
+        if (!r.ok) continue;
+        if (targetBase && native) {
+          native.createEntry?.(targetBase, true);
+          const w = native.writeText?.(target!, r.b64);
+          const ok = typeof w === "string" && w.startsWith("ok");
+          if (ok) {
+            setCatBusy((m) => ({ ...m, [key]: "done" }));
+            onNote?.(tr("libs.cat_download_saved", "{lib} 已下载", { lib: e.artifact }));
+            void refresh();
+          } else {
+            setCatBusy((m) => ({ ...m, [key]: "err:" + (w || "save failed") }));
+            onNote?.(tr("libs.cat_download_failed", "{lib} 保存失败：{err}", { lib: e.artifact, err: w || "?" }));
+          }
+          return;
+        }
         setCatBusy((m) => ({ ...m, [key]: "err:" + tr("libs.cat_no_target", "没有可写的 libs 目录") }));
         onNote?.(tr("libs.cat_no_target", "没有可写的 libs 目录（需先打开项目）"));
+        return;
       }
+      setCatBusy((m) => ({ ...m, [key]: "err:" + tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") }));
+      onNote?.(tr("libs.cat_all_failed", "{lib} 下载失败：全部镜像都试过了（网络不通或源 404）", { lib: e.artifact }));
     },
     [native, nativeProjectRoot, localDir, onNote, tr, refresh],
   );
@@ -281,7 +298,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         {tab === "catalog" ? (
           <div>
             <div style={{ fontSize: 11, opacity: 0.6, margin: "4px 6px 8px", lineHeight: 1.5 }}>
-              {tr("libs.catalog_hint", "常用库目录：点「下载」即可存入项目 libs/，打包时自动进编译（无需改代码）。")}
+              {tr("libs.catalog_hint", "常用库目录：点「下载」从国内镜像自动存入项目 libs/，打包时自动进编译（无需改代码）。")}
             </div>
             {catGroups.map((g) => (
               <div key={g.kind} style={{ margin: "6px 4px" }}>

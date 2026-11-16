@@ -7,6 +7,8 @@
 //   - 改值 = 只替换值区间；改名 = 只替换 name 属性值；删 = 删整段；加 = 插到 </resources> 前
 // 原文件的注释、缩进风格、条目顺序全部原样保留。
 
+import { themeItemType } from "./theme-item-descs";
+
 export interface ValueItem {
   /** 元素名（string/color/dimen/…；<item type="color"> 也归成 color） */
   tag: string;
@@ -27,6 +29,12 @@ export interface ValueItem {
   nameTo: number;
   /** 行号（1 基，给界面显示/定位） */
   line: number;
+  /** M338：容器型条目（style/declare-styleable）的 parent 继承值 */
+  parent?: string;
+  /** M338：本条属于哪个容器（style 的 name），视图据此缩进 + 显示属性说明 */
+  inStyle?: string;
+  /** M338：层级（0=顶层/容器标题，1=容器内子项），视图缩进用 */
+  depth?: number;
 }
 
 export interface ValuesDoc {
@@ -169,7 +177,10 @@ export function parseValues(xml: string): ValuesDoc {
         const typeAttr = attrSpan(pending.attrs, pending.attrsStart, "type");
         // M315：容器型（style/declare-styleable/attr）展开嵌套 item 逐行，不再整块塞进 value（否则视图显示 &lt;item&gt; 乱码）
         if (isContainerTag(pending.tag)) {
-          emitContainerChildren(xml, pending.bodyFrom, xml.slice(pending.bodyFrom, at), items);
+          // M338：容器标题行先入列（样式节点 name + parent 在前，子项缩进在后），
+          // 视图才能呈现「样式 → 属性配置」的层级，而不是子项飘在标题上面。
+          const parentAttr = attrSpan(pending.attrs, pending.attrsStart, "parent");
+          const styleName = nameAttr ? nameAttr.value : "";
           if (nameAttr) {
             items.push({
               tag: pending.tag,
@@ -184,7 +195,22 @@ export function parseValues(xml: string): ValuesDoc {
               nameFrom: nameAttr.from,
               nameTo: nameAttr.to,
               line: lineAt(xml, pending.start),
+              parent: parentAttr?.value,
+              depth: 0,
             });
+          }
+          const before = items.length;
+          emitContainerChildren(xml, pending.bodyFrom, xml.slice(pending.bodyFrom, at), items);
+          for (let k = before; k < items.length; k++) {
+            const child = items[k];
+            child.inStyle = styleName;
+            child.depth = 1;
+            // M338：style 里的 <item name="colorPrimary"> 没写 type，
+            // 用属性说明表把类型补上（否则全部挤到「其他」，按类型筛就筛不出来）
+            if (!child.itemType && child.kind === "other") {
+              const ty = themeItemType(child.name);
+              if (ty !== "other" && ty !== "text") child.kind = ty;
+            }
           }
         } else if (nameAttr) {
           const raw = xml.slice(pending.bodyFrom, at);

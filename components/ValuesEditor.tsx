@@ -24,6 +24,7 @@ import {
   uniqueName,
   type ValueItem,
 } from "@/lib/xml/values-edit";
+import { themeItemDesc, type ThemeItemValueType } from "@/lib/xml/theme-item-descs";
 
 export interface ValuesEditorProps {
   xml: string;
@@ -33,6 +34,15 @@ export interface ValuesEditorProps {
 }
 
 const KINDS = ["all", "string", "color", "dimen", "integer", "bool", "other"] as const;
+
+/** M338：主题 style 里 item 的类型标签（按属性说明表推出来） */
+const TYPE_LABEL: Record<ThemeItemValueType, string> = {
+  color: "颜色", // i18n-ignore
+  dimen: "尺寸", // i18n-ignore
+  text: "文本", // i18n-ignore
+  bool: "开关", // i18n-ignore
+  other: "自定义", // i18n-ignore
+};
 
 /** 取色器回传的是 CSS 颜色串 → 转回 colors.xml 习惯的写法：
  *  alpha=1 写 #RRGGBB，带透明度写 #AARRGGBB（都是大写，与老行为一致） */
@@ -230,59 +240,90 @@ export function ValuesEditor({ xml, onChange, onNote, className }: ValuesEditorP
       ) : (
         <div className="axv-val-list" role="list">
           {rows.map((it) => {
-            const swatch = it.kind === "color" ? colorForPreview(it.value) : null;
+            const isHead = it.valueFrom < 0;
+            const desc = it.inStyle ? themeItemDesc(it.name) : undefined;
+            const swatch = !isHead && it.kind === "color" ? colorForPreview(it.value) : null;
+            const tagLabel = isHead
+              ? it.tag === "style"
+                ? tt("样式")
+                : tt("属性组")
+              : desc
+                ? TYPE_LABEL[desc.type]
+                : KIND_LABEL[it.kind] || it.kind;
+            const rowClass =
+              "axv-val-row" +
+              (isHead ? " is-style-head" : "") +
+              (desc ? " has-desc" : "") +
+              (it.inStyle ? " in-style" : "");
             return (
-              <div className="axv-val-row" role="listitem" key={`${it.tag}:${it.name}:${it.elemFrom}`}>
-                <span className={"axv-val-tag k-" + it.kind}>{KIND_LABEL[it.kind] || it.kind}</span>
-                <input
-                  className="axv-val-name"
-                  defaultValue={it.name}
-                  aria-label={tt("{name} 名称", { name: it.name })}
-                  spellCheck={false}
-                  onBlur={(e) => commitName(it, e.target.value, e.target)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                    if (e.key === "Escape") {
-                      (e.target as HTMLInputElement).value = it.name;
-                      (e.target as HTMLInputElement).blur();
-                    }
-                  }}
-                />
-                {swatch ? (
-                  <ColorField
-                    label={tt("{name} 取色", { name: it.name })}
-                    value={it.value}
-                    fallback={swatch}
-                    onChange={(next) =>
-                      onChange(setItemValue(xml, it, cssToAndroidColor(next)))
-                    }
+              <div
+                className={rowClass}
+                role="listitem"
+                key={`${it.tag}:${it.name}:${it.elemFrom}`}
+                style={it.depth ? { paddingLeft: 22 } : undefined}
+              >
+                <div className="axv-val-line">
+                  <span className={"axv-val-tag k-" + (isHead ? "style" : it.kind)}>{tagLabel}</span>
+                  <input
+                    className="axv-val-name"
+                    defaultValue={it.name}
+                    aria-label={tt("{name} 名称", { name: it.name })}
+                    spellCheck={false}
+                    onBlur={(e) => commitName(it, e.target.value, e.target)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      if (e.key === "Escape") {
+                        (e.target as HTMLInputElement).value = it.name;
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
                   />
-                ) : null}
-                <input
-                  className="axv-val-value"
-                  defaultValue={it.valueFrom < 0 ? "" : it.value}
-                  placeholder={it.valueFrom < 0 ? tt("容器条目，展开见下方子项") : undefined}
-                  disabled={it.valueFrom < 0}
-                  aria-label={tt("{name} 值", { name: it.name })}
-                  spellCheck={false}
-                  onBlur={(e) => commitValue(it, e.target.value, e.target)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                    if (e.key === "Escape") {
-                      (e.target as HTMLInputElement).value = it.value;
-                      (e.target as HTMLInputElement).blur();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="axv-val-del"
-                  title={tt("删除 {name}", { name: it.name })}
-                  aria-label={tt("删除 {name}", { name: it.name })}
-                  onClick={() => del(it)}
-                >
-                  <span className="msr" aria-hidden="true">delete</span>
-                </button>
+                  {isHead ? (
+                    <span
+                      className="axv-val-parent"
+                      title={it.parent ? tt("继承父样式 {p}", { p: it.parent }) : tt("未写 parent，默认继承系统默认主题")}
+                    >
+                      {it.parent ? `parent=\u0020${it.parent}` : tt("无 parent")}
+                    </span>
+                  ) : (
+                    <>
+                      {swatch ? (
+                        <ColorField
+                          label={tt("{name} 取色", { name: it.name })}
+                          value={it.value}
+                          fallback={swatch}
+                          onChange={(next) =>
+                            onChange(setItemValue(xml, it, cssToAndroidColor(next)))
+                          }
+                        />
+                      ) : null}
+                      <input
+                        className="axv-val-value"
+                        defaultValue={it.value}
+                        aria-label={tt("{name} 值", { name: it.name })}
+                        spellCheck={false}
+                        onBlur={(e) => commitValue(it, e.target.value, e.target)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                          if (e.key === "Escape") {
+                            (e.target as HTMLInputElement).value = it.value;
+                            (e.target as HTMLInputElement).blur();
+                          }
+                        }}
+                      />
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="axv-val-del"
+                    title={tt("删除 {name}", { name: it.name })}
+                    aria-label={tt("删除 {name}", { name: it.name })}
+                    onClick={() => del(it)}
+                  >
+                    <span className="msr" aria-hidden="true">delete</span>
+                  </button>
+                </div>
+                {desc ? <div className="axv-val-desc">{tt(desc.desc)}</div> : null}
               </div>
             );
           })}

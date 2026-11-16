@@ -12,6 +12,54 @@ export type SrcDict = Record<string, string>;
 /** 英文 —— 简体中文原文 → English */
 export const SRC_EN: SrcDict = {
   "跟随系统": "Follow system",
+  // M338：themes.xml 结构化视图（样式节点 + 属性配置说明）
+  "属性组": "Attribute group",
+  "继承父样式 {p}": "inherits {p}",
+  "未写 parent，默认继承系统默认主题": "No parent set, inherits the system default theme",
+  "无 parent": "no parent",
+  // M3 主色系
+  "M3 主色": "M3 primary color",
+  "主色上文字/图标色": "Text/icon color on primary",
+  "主容器色": "Primary container color",
+  "主容器上文字色": "Text color on primary container",
+  // M 次色系
+  "次要色": "Secondary color",
+  "次要色上文字色": "Text color on secondary",
+  "次要容器色": "Secondary container color",
+  "次要容器上文字色": "Text color on secondary container",
+  // M3 第三色系
+  "第三色": "Tertiary color",
+  "第三色上文字色": "Text color on tertiary",
+  "第三容器色": "Tertiary container color",
+  "第三容器上文字色": "Text color on tertiary container",
+  // 表面 / 轮廓
+  "表面底色": "Surface background color",
+  "表面文字色": "Text color on surface",
+  "表面变体色": "Surface variant color",
+  "表面变体文字色": "Text color on surface variant",
+  "轮廓线颜色": "Outline color",
+  "轮廓变体色": "Outline variant color",
+  // 错误色
+  "错误色": "Error color",
+  "错误色文字": "Text color on error",
+  "错误容器色": "Error container color",
+  "错误容器文字": "Text color on error container",
+  // 遮罩 / 形状 / 文字
+  "遮罩颜色": "Scrim color",
+  "小圆角尺寸": "Small corner radius",
+  "中等圆角尺寸": "Medium corner radius",
+  "大圆角尺寸": "Large corner radius",
+  "大号正文样式": "Large body text style",
+  "中号正文样式": "Medium body text style",
+  "小号正文样式": "Small body text style",
+  // 系统窗口 / 其他
+  "状态栏颜色": "Status bar color",
+  "导航栏颜色": "Navigation bar color",
+  "状态栏深色文字": "Dark status bar icons",
+  "关闭标题": "Hide title bar",
+  "是否显示 ActionBar": "Show ActionBar",
+  "波纹颜色": "Ripple color",
+
   "lib 库管理": "lib Library Management",
   "内置目录": "Built-in catalog",
   "lib 库下载": "lib Library Download",

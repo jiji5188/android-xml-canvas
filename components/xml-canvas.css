@@ -2857,6 +2857,54 @@ body.axv-lt-dragging .axv-lt-row {
 .axv-val-del .msr {
   font-size: 17px;
 }
+
+/* M338：themes.xml 结构化视图 —— 样式节点（name + parent）在前，属性配置缩进在后 + 中文说明 */
+.axv-val-row {
+  flex-wrap: wrap;
+}
+.axv-val-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 100%;
+  min-width: 0;
+}
+.axv-val-tag.k-style {
+  color: var(--axv-primary);
+  background: color-mix(in srgb, var(--axv-primary) 16%, transparent);
+  font-weight: 600;
+}
+.axv-val-row.is-style-head {
+  margin-top: 6px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  background: color-mix(in srgb, var(--axv-primary) 7%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--axv-primary) 55%, transparent);
+}
+.axv-val-row.is-style-head .axv-val-name {
+  font-weight: 650;
+  color: var(--axv-primary);
+}
+.axv-val-parent {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  line-height: 26px;
+  font-size: 11px;
+  color: var(--axv-on-surface-variant);
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.axv-val-desc {
+  flex: 1 1 100%;
+  padding: 0 0 2px 50px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--axv-on-surface-variant);
+  opacity: 0.8;
+}
 .axv-val-empty {
   flex: 1;
   display: flex;

@@ -1178,11 +1178,11 @@ export function buildRenderModel(
       style.color = style.color || ((attrs["textColor"] as string) || palette.onSurface);
       style.fontSize = style.fontSize || `${DP((attrs["textSize"] as number) || 14, scale)}px`;
       if (cls === "axv-switch") {
-        cs["--axv-ctl-w"] = `${DP(40, scale)}px`;
-        cs["--axv-ctl-h"] = `${DP(22, scale)}px`;
-        cs["--axv-ctl-r"] = `calc(${DP(22, scale)}px / 2)`;
-        // M11t：滑块尺寸与边框宽度也要跟 scale 走（原来 CSS 里硬写 4px / 2px，2 倍图下比例不对）
-        cs["--axv-ctl-thumb-d"] = `${DP(18, scale)}px`;
+        // M314：对齐 Android Material-2 Switch 默认几何（track 42×18dp / 滑块 20dp，开启时滑块外扩 22dp 并右移）
+        cs["--axv-ctl-w"] = `${DP(42, scale)}px`;
+        cs["--axv-ctl-h"] = `${DP(18, scale)}px`;
+        cs["--axv-ctl-r"] = `calc(${DP(18, scale)}px / 2)`;
+        cs["--axv-ctl-thumb-d"] = `${DP(on ? 22 : 20, scale)}px`;
         cs["--axv-ctl-bw"] = "0px";
         // M11t：trackTint（轨道色）/ thumbTint（滑块色）优先于默认主题色
         const tkOn = (attrs["trackTint"] as string) || NEUTRAL_ACCENT;
@@ -1191,8 +1191,9 @@ export function buildRenderModel(
         cs["--axv-ctl-ring"] = "transparent";
         cs["--axv-ctl-img"] = "none";
         cs["--axv-ctl-thumb"] = (attrs["thumbTint"] as string) || "#FFFFFF";
-        cs["--axv-ctl-thumb-x"] = on ? `${DP(20, scale)}px` : `${DP(2, scale)}px`;
+        cs["--axv-ctl-thumb-x"] = on ? `${DP(42 - 22 - 2, scale)}px` : `${DP(1, scale)}px`;
       } else {
+        // M314：CheckBox / RadioButton 对齐 Material-2（勾选框 20dp / 单选圆点 20dp）
         cs["--axv-ctl-w"] = `${DP(20, scale)}px`;
         cs["--axv-ctl-h"] = `${DP(20, scale)}px`;
         cs["--axv-ctl-r"] = cls === "axv-radio" ? "50%" : `${DP(3, scale)}px`;

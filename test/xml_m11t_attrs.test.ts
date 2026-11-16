@@ -51,8 +51,8 @@ describe("M11t 开关 / 勾选染色", () => {
     const st = n.style as Record<string, string>;
     expect(st["--axv-ctl-bg"]).toBe("#04409F");
     expect(st["--axv-ctl-thumb"]).toBe("#FFEE00");
-    expect(st["--axv-ctl-thumb-d"]).toBe("36px"); // 18dp × 2
-    expect(st["--axv-ctl-thumb-x"]).toBe("40px"); // 20dp × 2
+    expect(st["--axv-ctl-thumb-d"]).toBe("44px"); // M314：22dp×2（开启态滑块外扩）
+    expect(st["--axv-ctl-thumb-x"]).toBe("36px"); // 18dp×2（42-22-2）
   });
 
   it("CheckBox buttonTint 生效", () => {

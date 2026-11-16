@@ -3101,6 +3101,8 @@ const findResolved = findResolvedNode;
         const next = writeThemeIntoValues(base, preset);
         const r = await saveResFiles(projRoot, [{ path: rel, text: next }]);
         setProjectRev((n) => n + 1);
+        // M316：写进 themes.xml 后失效 res 全量索引缓存 → 重新收集 themeAttrs → 预览框调色板即时更新
+        bumpResCache();
         setExportNote(
           r.ok
             ? tr("已应用主题 {name} → themes.xml", "Applied theme {name} to themes.xml", { name: preset.name })
@@ -3114,7 +3116,7 @@ const findResolved = findResolvedNode;
         setThemeApplying(false);
       }
     },
-    [projRoot, setProjectRev, setExportNote, tr],
+    [projRoot, setProjectRev, setExportNote, tr, bumpResCache],
   );
 
   /** M174：「设为应用图标」面板初始值：

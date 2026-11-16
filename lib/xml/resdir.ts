@@ -363,7 +363,7 @@ interface RawStyle {
  * M92：从一批 style（含展开结果）里抽出「能当颜色/尺寸用」的主题属性。
  * expanded 传已展开的 style 表（夜间模式那边两者不同）；不传则用 raw 的 attrs。
  */
-function collectThemeAttrs(
+export function collectThemeAttrs(
   raw: Map<string, RawStyle>,
   expanded?: Record<string, { parent?: string; attrs: Record<string, string> }>,
 ): Record<string, string> {
@@ -386,7 +386,7 @@ function collectThemeAttrs(
   return out;
 }
 
-function parseStylesXml(xml: string, out: Map<string, RawStyle>) {  const styleRe = /<style\s+([^>]*)>([\s\S]*?)<\/style>/g;
+export function parseStylesXml(xml: string, out: Map<string, RawStyle>) {  const styleRe = /<style\s+([^>]*)>([\s\S]*?)<\/style>/g;
   let m: RegExpExecArray | null;
   while ((m = styleRe.exec(xml)) !== null) {
     const head = m[1];

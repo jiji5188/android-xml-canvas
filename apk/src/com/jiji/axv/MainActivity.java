@@ -1348,9 +1348,9 @@ public class MainActivity extends Activity {
                 return fileOp2Json((a, b) -> {
                     File f = new File(a), d = new File(b);
                     String base = defaultDir().getCanonicalPath();
-                    String ca = f.getCanonicalPath(), cb = d.getCanonicalPath();
+                    String cb = d.getCanonicalPath();
                     String chk = base + File.separator;
-                    if (!ca.equals(base) && !ca.startsWith(chk)) return "err:源超出工作目录";
+                    // M335：源允许在工作目录外（本地库 /AndroidUIIDE/libs 就在项目外），只围目标必须写在工作目录
                     if (!cb.equals(base) && !cb.startsWith(chk)) return "err:目标超出工作目录";
                     if (!f.exists()) return "err:源不存在";
                     if (d.exists()) return "err:目标同名已存在";

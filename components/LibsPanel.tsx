@@ -98,11 +98,17 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
 
   const native = nativeBridge();
 
-  // 本地库目录：优先 native 默认工作目录下的 libs，没有就 /storage/emulated/0/AndroidUIIDE/libs
+  // 本地库目录：默认工作目录（/sdcard/AndroidUIIDE/Project）的**上级** /libs
+  //  即 /sdcard/AndroidUIIDE/libs —— 所有下载的库都先存这里，再在本地库列表选择是否应用到项目
   const localDir = useMemo(() => {
     if (!native) return null;
     const def = native.getDefaultWorkspace?.();
-    if (def) return `${def.replace(/[\\/]+$/, "")}/libs`;
+    if (def) {
+      const clean = def.replace(/[\\/]+$/, "");
+      // /sdcard/AndroidUIIDE/Project → /sdcard/AndroidUIIDE/libs
+      const parent = clean.replace(/[\\/]Project$/i, "");
+      return parent !== clean ? `${parent}/libs` : `${clean}/libs`;
+    }
     return "/storage/emulated/0/AndroidUIIDE/libs";
   }, [native]);
 
@@ -197,10 +203,9 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       setCatBusy((m) => ({ ...m, [key]: "downloading" }));
       onNote?.(tr("libs.cat_downloading", "正在下载 {lib}…（多镜像）", { lib: e.artifact }));
       const fname = e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar");
-      // 保存到项目 libs/（优先项目库，没有就本地库）
-      let targetBase = null;
-      if (nativeProjectRoot && native) targetBase = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
-      if (!targetBase && localDir) targetBase = localDir;
+      // M335：一律先存到本地库 /AndroidUIIDE/libs，用户在本地库列表里选择是否应用到项目
+      let targetBase: string | null = null;
+      if (localDir) targetBase = localDir;
       const target = targetBase ? `${targetBase}/${fname}` : null;
       if (target && typeof native?.downloadLib === "function") {
         // 原生多镜像下载（APK）
@@ -230,7 +235,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
             return;
           }
           setCatBusy((m) => ({ ...m, [key]: "done" }));
-          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载（{src}）", { lib: e.artifact, src: (parts[1] || "").replace(/^https?:\/\//, "") }));
+          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载到本地库（去「本地库」点「应用到项目」加入项目）", { lib: e.artifact }));
           void refresh();
         } else {
           setCatBusy((m) => ({ ...m, [key]: "err:" + (r.slice(4) || "download failed") }));
@@ -266,12 +271,79 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     [native, nativeProjectRoot, localDir, onNote, tr, refresh],
   );
 
-  /** 已下载判定：项目/本地库列表里已有同名文件 */
+  /** 已下载判定：本地/项目库列表里已有同名文件 */
   const presentNames = useMemo(() => {
     const s = new Set<string>();
     for (const f of [...localLibs, ...projectLibs]) s.add(f.name);
     return s;
   }, [localLibs, projectLibs]);
+
+  /** M335：项目库已有的文件名（判断本地库是否已应用到项目） */
+  const projectNames = useMemo(() => new Set(projectLibs.map((f) => f.name)), [projectLibs]);
+  const [applyBusy, setApplyBusy] = useState<Record<string, string>>({}); // 本地库 name -> 'applying' | 'done' | 'err'
+  const canApply = !!(nativeProjectRoot && native?.copyEntry);
+
+  /** 应用到打开的项目：/AndroidUIIDE/libs/x → 项目/libs/x */
+  const applyToLocalProject = useCallback(
+    (f: LibFile) => {
+      if (!canApply || !nativeProjectRoot || !native) {
+        onNote?.(tr("libs.apply_need_project", "请先打开一个项目，才能应用库"));
+        return;
+      }
+      const dstBase = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
+      native.createEntry?.(dstBase, true);
+      const dst = `${dstBase}/${f.name}`;
+      setApplyBusy((m) => ({ ...m, [f.name]: "applying" }));
+      try {
+        const r = String(native.copyEntry?.(f.rel, dst, false) ?? "");
+        if (r.startsWith("err:")) {
+          setApplyBusy((m) => ({ ...m, [f.name]: "err:" + r.slice(4) }));
+          onNote?.(tr("libs.apply_fail", "{lib} 应用失败：{err}", { lib: f.name, err: r.slice(4) }));
+          return;
+        }
+        let p: { ok?: boolean } = {};
+        try { p = JSON.parse(r || "{}"); } catch { p = {}; }
+        if (p?.ok) {
+          setApplyBusy((m) => ({ ...m, [f.name]: "done" }));
+          onNote?.(tr("libs.apply_done", "{lib} 已应用到项目 libs/（打包时会带上）", { lib: f.name }));
+          void refresh();
+        } else {
+          setApplyBusy((m) => ({ ...m, [f.name]: "err:fail" }));
+          onNote?.(tr("libs.apply_fail", "{lib} 应用失败：{err}", { lib: f.name, err: "?" }));
+        }
+      } catch {
+        setApplyBusy((m) => ({ ...m, [f.name]: "err:copy failed" }));
+        onNote?.(tr("libs.apply_fail", "{lib} 应用失败：{err}", { lib: f.name, err: "copy" }));
+      }
+    },
+    [canApply, nativeProjectRoot, native, onNote, tr, refresh],
+  );
+
+  /** 从项目移除：删 项目/libs/x */
+  const removeFromProject = useCallback(
+    (name: string) => {
+      if (!nativeProjectRoot || !native) return;
+      const dst = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs/${name}`;
+      try {
+        const r = String(native.deleteEntry?.(dst, false) ?? "");
+        if (r.startsWith("err:")) {
+          onNote?.(tr("libs.remove_fail", "{lib} 移除失败：{err}", { lib: name, err: r.slice(4) }));
+          return;
+        }
+        let p: { ok?: boolean } = {};
+        try { p = JSON.parse(r || "{}"); } catch { p = {}; }
+        if (p?.ok) {
+          onNote?.(tr("libs.remove_done", "{lib} 已从项目移除", { lib: name }));
+          void refresh();
+        } else {
+          onNote?.(tr("libs.remove_fail", "{lib} 移除失败：{err}", { lib: name, err: "?" }));
+        }
+      } catch {
+        onNote?.(tr("libs.remove_fail", "{lib} 移除失败", { lib: name, err: "?" }));
+      }
+    },
+    [nativeProjectRoot, native, onNote, tr, refresh],
+  );
 
   const catGroups = useMemo(() => groupCatalog(), []);
 
@@ -316,10 +388,15 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       </div>
 
       <div className="axv-libs-list axv-rail-scroll">
+        {tab === "local" && (
+          <div style={{ fontSize: 10, opacity: 0.6, margin: "2px 6px 6px", lineHeight: 1.5, wordBreak: "break-all" }}>
+            {tr("libs.local_hint", "本地库目录：{path}", { path: localDir || "/AndroidUIIDE/libs" })}
+          </div>
+        )}
         {tab === "catalog" ? (
           <div>
             <div style={{ fontSize: 11, opacity: 0.6, margin: "4px 6px 8px", lineHeight: 1.5 }}>
-              {tr("libs.catalog_hint", "常用库目录：点「下载」从国内镜像自动存入项目 libs/，打包时自动进编译（无需改代码）。")}
+              {tr("libs.catalog_hint", "常用库目录：点「下载」自动存入本地库 /AndroidUIIDE/libs，再去「本地库」选择是否应用到项目；打包时项目 libs/ 的库自动进编译。")}
             </div>
             {catGroups.map((g) => (
               <div key={g.kind} style={{ margin: "6px 4px" }}>
@@ -370,15 +447,53 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
               : ""}
           </div>
         ) : (
-          currentList.map((f) => (
-            <div key={f.rel} className="axv-libs-item">
-              <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>archive</span>
-              <div className="axv-libs-item-text">
-                <div className="axv-libs-item-name">{f.name}</div>
-                <div className="axv-libs-item-rel">{f.rel}</div>
+          currentList.map((f) => {
+            const applied = projectNames.has(f.name);
+            const ab = applyBusy[f.name];
+            return (
+              <div key={f.rel} className="axv-libs-item">
+                <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>archive</span>
+                <div className="axv-libs-item-text">
+                  <div className="axv-libs-item-name">{f.name}</div>
+                  <div className="axv-libs-item-rel">{f.rel}</div>
+                </div>
+                {tab === "local" ? (
+                  applied ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontSize: 10, color: "#1a7f37" }}>{tr("libs.applied", "已应用")}</span>
+                      <button
+                        type="button"
+                        className="axv-libs-btn"
+                        style={{ fontSize: 10, padding: "1px 6px" }}
+                        onClick={() => removeFromProject(f.name)}
+                      >
+                        {tr("libs.remove", "移除")}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="axv-libs-btn"
+                      style={{ fontSize: 10, padding: "2px 8px", whiteSpace: "nowrap" }}
+                      disabled={!canApply || ab === "applying"}
+                      onClick={() => applyToLocalProject(f)}
+                    >
+                      {ab === "applying" ? tr("libs.applying", "应用中…") : tr("libs.apply", "应用到项目")}
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    className="axv-libs-btn"
+                    style={{ fontSize: 10, padding: "1px 6px" }}
+                    onClick={() => removeFromProject(f.name)}
+                  >
+                    {tr("libs.remove", "移除")}
+                  </button>
+                )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
         {busy && <div className="axv-libs-loading">{tr("loading", "加载中…")}</div>}
       </div>

@@ -1666,6 +1666,8 @@ export const SRC_EN: SrcDict = {
   "新资源值": "New resource value",
   "这个文件里还没有资源": "No resources in this file yet",
 "容器条目，展开见下方子项": "Container entry, see sub-items below",
+"界面预览": "UI Preview",
+"编译资源后渲染布局（真机路线）": "Compile resources then render layout (on-device path)",
   "没有匹配的条目": "No matching entries",
   "点右上角 + 新建一条。": "Tap + in the top right to create one.",
   "{name} 名称": "{name} name",

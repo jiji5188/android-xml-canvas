@@ -156,24 +156,19 @@ export function Toolbar(props: ToolbarProps) {
     });
   }
 
-  /* M290：运行 ▾ 的四个菜单项。不可用的能力灰显 + 说明，不隐藏（用户要能看懂差异） */
+  /* M290：运行 ▾ 菜单。M316：「模拟界面」与「布局编译预览」合并为「界面预览」——
+     APK 壳（realRenderAvailable）走真机编译预览，浏览器/桌面走前端模拟界面 */
   const apkOnlyHint = tt("仅 APK 端可用");
+  const isApkShell = !!realRenderAvailable;
   const runItems: RunMenuItem[] = [
     {
-      key: "run-sim",
-      icon: "smart_display",
-      label: tt("模拟界面"),
-      hint: tt("前端轻量预览，不调用 AAPT2 编译"),
-      onClick: onRun,
-    },
-    {
-      key: "run-compile",
-      icon: "android",
-      label: tt("布局编译预览"),
-      hint: tt("单独编译资源，渲染布局"),
-      disabled: !realRenderAvailable,
-      disabledHint: apkOnlyHint,
-      onClick: () => onRealRender?.(),
+      key: "run-preview",
+      icon: isApkShell ? "android" : "smart_display",
+      label: tt("界面预览"),
+      hint: isApkShell
+        ? tt("编译资源后渲染布局（真机路线）")
+        : tt("前端轻量预览，不调用 AAPT2 编译"),
+      onClick: () => (isApkShell ? onRealRender?.() : onRun()),
     },
     {
       key: "run-build",
@@ -258,7 +253,7 @@ export function Toolbar(props: ToolbarProps) {
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>image</span>
           </button>
-          {/* M290：运行按钮改成四选一菜单（模拟界面 / 布局编译预览 / 打包并运行 / 签名打包发布） */}
+          {/* M290：运行按钮菜单（M316：模拟+编译合并为「界面预览」，共三项） */}
           <ToolbarRunMenu busy={realRenderBusy || undefined} items={runItems} />
           <button
             className="axv-tb-btn"

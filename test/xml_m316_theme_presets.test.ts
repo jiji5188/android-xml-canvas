@@ -79,3 +79,56 @@ describe("M316 Android 主题预设库", () => {
     expect(argbToCss("#6200EE")).toBe("#6200EE"); // 无 alpha 原样
   });
 });
+
+import { findAppThemeStyle } from "../lib/xml/android-theme-presets";
+
+describe("M321 对话框主题区分", () => {
+  it("有独立的 dialog 分组，8 个对话框预设均标 kind=dialog", () => {
+    const groups = androidThemeGroups();
+    const dg = groups.find((g) => g.group === "dialog");
+    expect(dg).toBeTruthy();
+    expect(dg!.items.length).toBe(8);
+    for (const p of dg!.items) expect(p.kind).toBe("dialog");
+  });
+
+  it("非 dialog 预设 kind 缺省为 activity", () => {
+    const m3l = androidThemeById("material3-light");
+    expect(m3l.kind ?? "activity").toBe("activity");
+  });
+
+  it("dialog 主题的 themeToItems 不写 windowBackground/colorBackground（弹窗背景由系统 Dialog 自带）", () => {
+    const dl = androidThemeById("material2-light-dialog");
+    expect(dl.kind).toBe("dialog");
+    const items = themeToItems(dl);
+    expect(items.find((i) => i.item === "android:windowBackground")).toBeUndefined();
+    expect(items.find((i) => i.item === "android:colorBackground")).toBeUndefined();
+    // 但颜色项仍在
+    expect(items.find((i) => i.item === "colorPrimary")?.value).toBe(dl.light.primary);
+  });
+
+  it("activity 主题仍写 windowBackground", () => {
+    const m3l = androidThemeById("material3-light");
+    const items = themeToItems(m3l);
+    expect(items.find((i) => i.item === "android:windowBackground")?.value).toBe(m3l.light.surface);
+  });
+
+  it("dialog 主题写回默认用 styleName=Theme.MyDialog（不覆盖 app 的 Theme.MyApp）", () => {
+    const dl = androidThemeById("material3-light-dialog");
+    const out = writeThemeIntoValues("", dl);
+    expect(out).toContain('<style name="Theme.MyDialog" parent="Theme.Material3.Light.Dialog">');
+    expect(out).not.toContain('Theme.MyApp');
+  });
+
+  it("findAppThemeStyle 排除 dialog 主题（不把 Theme.MyDialog 当应用主题）", () => {
+    const xml = `<resources>
+      <style name="Theme.MyApp" parent="Theme.Material3.Light"><item name="colorPrimary">#FF6750A4</item></style>
+      <style name="Theme.MyDialog" parent="Theme.Material3.Light.Dialog"><item name="colorPrimary">#FF6750A4</item></style>
+    </resources>`;
+    expect(findAppThemeStyle([{ path: "values/themes.xml", text: xml }])).toBe("Theme.MyApp");
+    // 只有 dialog 主题时 → undefined（不拿它当 app 主题）
+    const onlyDialog = `<resources>
+      <style name="Theme.MyDialog" parent="Theme.Material3.Light.Dialog"><item name="colorPrimary">#FF6750A4</item></style>
+    </resources>`;
+    expect(findAppThemeStyle([{ path: "values/themes.xml", text: onlyDialog }])).toBeUndefined();
+  });
+});

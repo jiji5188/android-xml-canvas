@@ -47,12 +47,15 @@ public class ThemePreviewActivity extends Activity {
         // 1) 解析要应用的系统主题（在 setContentView 之前 setTheme 才生效）
         String parent = getIntent() != null ? getIntent().getStringExtra("parent") : null;
         String presetId = getIntent() != null ? getIntent().getStringExtra("presetId") : null;
+        String kind = getIntent() != null ? getIntent().getStringExtra("kind") : null;
+        final boolean isDialog = "dialog".equals(kind);
         applyPalette(getIntent());
         int themeId = resolveThemeStyle(parent);
-        if (themeId != 0) setTheme(themeId);
+        // 对话框主题不 setTheme 到 Activity（会变成透明/无装饰），只在外面垫遮罩；主题交给 Dialog
+        if (themeId != 0 && !isDialog) setTheme(themeId);
 
         ScrollView sv = new ScrollView(this);
-        sv.setBackgroundColor(cSurface);
+        if (!isDialog) sv.setBackgroundColor(cSurface);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         int pad = dp(16);
@@ -172,6 +175,17 @@ public class ThemePreviewActivity extends Activity {
         swatch.addView(colorBlock(cSurface, "底色"), new LinearLayout.LayoutParams(0, dp(40), 1));
         root.addView(swatch, topParams(16));
 
+        // M321：对话框主题 → 真弹一个 Dialog（用该主题），Activity 自己只当半透明遮罩
+        if (isDialog) {
+            getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x99000000));
+            android.app.Dialog dlg = new android.app.Dialog(this, themeId != 0 ? themeId : android.R.style.Theme_Material_Light_Dialog);
+            dlg.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+            dlg.setContentView(sv);
+            dlg.setCanceledOnTouchOutside(true);
+            dlg.show();
+            return;
+        }
+
         setContentView(sv);
     }
 
@@ -201,29 +215,36 @@ public class ThemePreviewActivity extends Activity {
         }
     }
 
-    /** parent 主题名 → 系统里一定存在的 framework style id。androidx 的映射到最近等价。 */
+    /** parent 主题名 → 系统里一定存在的 framework style id。androidx 的映射到最近等价；Dialog 主题映射到 *Dialog 变体。 */
     private int resolveThemeStyle(String parent) {
         if (parent == null || parent.isEmpty()) return 0;
-        // 先试 android 命名空间（Theme.Material / Theme.Holo / Theme.DeviceDefault…）
+        // 先试 android 命名空间（Theme.Material / Theme.Material.Dialog / Theme.Holo…）
         int id = getResources().getIdentifier(sanitize(parent), "style", "android");
         if (id != 0) return id;
         // androidx 系 → 映射到 framework 等价
         String p = parent.replace("Theme.", "");
+        boolean isDialog = p.contains("Dialog");
         if (p.contains("Material3") || p.contains("MaterialComponents") || p.equals("Material")) {
             boolean dark = p.contains("Dark") && !p.contains("DayNight");
+            if (isDialog) return dark ? android.R.style.Theme_Material_Dialog : android.R.style.Theme_Material_Light_Dialog;
             return dark ? android.R.style.Theme_Material : android.R.style.Theme_Material_Light;
         }
         if (p.contains("AppCompat")) {
             boolean light = p.contains("Light");
+            if (isDialog) return light ? android.R.style.Theme_Material_Light_Dialog : android.R.style.Theme_Material_Dialog;
             return light ? android.R.style.Theme_Material_Light : android.R.style.Theme_Material;
         }
         if (p.contains("Holo")) {
             boolean light = p.contains("Light");
+            if (isDialog) return light ? android.R.style.Theme_Holo_Light_Dialog : android.R.style.Theme_Holo_Dialog;
             return light ? android.R.style.Theme_Holo_Light : android.R.style.Theme_Holo;
         }
-        if (p.contains("DeviceDefault")) return android.R.style.Theme_DeviceDefault;
+        if (p.contains("DeviceDefault")) {
+            if (isDialog) return android.R.style.Theme_DeviceDefault_Dialog;
+            return android.R.style.Theme_DeviceDefault;
+        }
         // 兜底：Material 浅色
-        return android.R.style.Theme_Material_Light;
+        return isDialog ? android.R.style.Theme_Material_Light_Dialog : android.R.style.Theme_Material_Light;
     }
 
     private String sanitize(String parent) {

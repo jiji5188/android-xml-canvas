@@ -6,7 +6,10 @@
 //
 // 纯数据 + 纯函数，不碰 DOM，便于单测。
 
-export type ThemeGroup = "appcompat" | "material2" | "material3" | "system";
+export type ThemeGroup = "appcompat" | "material2" | "material3" | "system" | "dialog";
+
+/** 主题用途：activity = 整页主题（setTheme 到 Activity）；dialog = 对话框主题（只能挂在 Dialog 上，套到 Activity 会背景透明/窗口装饰异常） */
+export type ThemeKind = "activity" | "dialog";
 
 export interface AndroidThemePalette {
   primary: string;
@@ -26,6 +29,8 @@ export interface AndroidThemePreset {
   parent: string;
   /** 一句话说明（用户看的就是这个） */
   note: string;
+  /** M321：用途，缺省 = activity。dialog 组的主题只能用在对话框上 */
+  kind?: ThemeKind;
   /** 预览用调色板（浅） */
   light: AndroidThemePalette;
   /** 预览用调色板（深；没有就复用 light 的 onSurface 反转） */
@@ -37,6 +42,7 @@ export const THEME_GROUP_ORDER: ThemeGroup[] = [
   "material2",
   "material3",
   "system",
+  "dialog",
 ];
 
 export const THEME_GROUP_LABEL: Record<ThemeGroup, string> = {
@@ -44,6 +50,7 @@ export const THEME_GROUP_LABEL: Record<ThemeGroup, string> = {
   material2: "Material 2 变体",
   material3: "Material 3 变体",
   system: "系统内置主题",
+  dialog: "对话框主题（Dialog）",
 };
 
 /** 取色工具 */
@@ -209,6 +216,84 @@ export const ANDROID_THEME_PRESETS: AndroidThemePreset[] = [
     light: pal("#FF2196F3", "#FFFFFFFF", "#FF2196F3", "#FFFFFFFF", "#FF000000", "#FF757575"),
     dark: pal("#FF80CBC4", "#FF000000", "#FF2196F3", "#FF212121", "#FFFFFFFF", "#FFB0BEC5"),
   },
+
+  // ===== M321：对话框主题（Dialog）——只能挂在 Dialog 上，套到 Activity 会背景透明/窗口装饰异常 =====
+  {
+    id: "appcompat-dialog",
+    group: "dialog",
+    kind: "dialog",
+    name: "AppCompat · 对话框",
+    parent: "Theme.AppCompat.Dialog",
+    note: "对话框专用（深色），弹窗圆角卡片，适合确认/输入弹窗",
+    light: pal("#FF757575", "#FFFFFFFF", "#FF009688", "#FFFFFFFF", "#FF212121", "#FF616161"),
+    dark: pal("#FFB0BEC5", "#FF000000", "#FF009688", "#FF303030", "#FFFFFFFF", "#FFB0BEC5"),
+  },
+  {
+    id: "appcompat-light-dialog",
+    group: "dialog",
+    kind: "dialog",
+    name: "AppCompat · 对话框（浅色）",
+    parent: "Theme.AppCompat.Light.Dialog",
+    note: "对话框专用（浅色），白底弹窗，最常见",
+    light: pal("#FF757575", "#FFFFFFFF", "#FF009688", "#FFFFFFFF", "#FF212121", "#FF616161"),
+  },
+  {
+    id: "material2-dialog",
+    group: "dialog",
+    kind: "dialog",
+    name: "Material 2 · 对话框",
+    parent: "Theme.MaterialComponents.Dialog",
+    note: "对话框专用（Material2 深色），圆角 4dp 弹窗",
+    light: pal("#FF6200EE", "#FFFFFFFF", "#FF03DAC6", "#FFFFFFFF", "#FF1D1B20", "#FF49454F"),
+    dark: pal("#FFBB86FC", "#FF000000", "#FF03DAC6", "#FF1E1E1E", "#FFE6E1E5", "#FFCAC4D0"),
+  },
+  {
+    id: "material2-light-dialog",
+    group: "dialog",
+    kind: "dialog",
+    name: "Material 2 · 对话框（浅色）",
+    parent: "Theme.MaterialComponents.Light.Dialog",
+    note: "对话框专用（Material2 浅色），白底紫主色弹窗",
+    light: pal("#FF6200EE", "#FFFFFFFF", "#FF03DAC6", "#FFFFFFFF", "#FF1D1B20", "#FF49454F"),
+  },
+  {
+    id: "material3-dialog",
+    group: "dialog",
+    kind: "dialog",
+    name: "Material 3 · 对话框",
+    parent: "Theme.Material3.DayNight.Dialog",
+    note: "对话框专用（M3 跟随系统），圆角 28dp 大圆角弹窗",
+    light: pal("#FF6750A4", "#FFFFFFFF", "#FF625B71", "#FFFDF7FF", "#FF1D1B20", "#FF49454F"),
+    dark: pal("#FFD0BCFF", "#FF381E72", "#FFCCC2DC", "#FF1C1B1F", "#FFE6E1E5", "#FFCAC4D0"),
+  },
+  {
+    id: "material3-light-dialog",
+    group: "dialog",
+    kind: "dialog",
+    name: "Material 3 · 对话框（浅色）",
+    parent: "Theme.Material3.Light.Dialog",
+    note: "对话框专用（M3 浅色），白底大圆角弹窗",
+    light: pal("#FF6750A4", "#FFFFFFFF", "#FF625B71", "#FFFDF7FF", "#FF1D1B20", "#FF49454F"),
+  },
+  {
+    id: "system-material-dialog",
+    group: "dialog",
+    kind: "dialog",
+    name: "系统 · Material 对话框",
+    parent: "@android:style/Theme.Material.Dialog",
+    note: "系统 Material 对话框主题（无 AndroidX），API 21+",
+    light: pal("#FF2196F3", "#FFFFFFFF", "#FF2196F3", "#FFFFFFFF", "#FF000000", "#FF757575"),
+    dark: pal("#FF80CBC4", "#FF000000", "#FF2196F3", "#FF212121", "#FFFFFFFF", "#FFB0BEC5"),
+  },
+  {
+    id: "system-device-default-dialog",
+    group: "dialog",
+    kind: "dialog",
+    name: "系统 · 厂商默认对话框",
+    parent: "@android:style/Theme.DeviceDefault.Dialog",
+    note: "跟随厂商 ROM 的对话框外观，兼容性最好",
+    light: pal("#FF2196F3", "#FFFFFFFF", "#FF2196F3", "#FFFFFFFF", "#FF000000", "#FF757575"),
+  },
 ];
 
 /** 按分组折叠（UI 用） */
@@ -248,15 +333,19 @@ export function argbToCss(raw: string): string {
 /** 主题调色板 → 要写进 <style> 的 item 列表 */
 export function themeToItems(preset: AndroidThemePreset): { item: string; value: string }[] {
   const p = preset.light;
+  const isDialog = preset.kind === "dialog";
   const items: { item: string; value: string }[] = [
     { item: "colorPrimary", value: p.primary },
     { item: "colorOnPrimary", value: p.onPrimary },
     { item: "colorSecondary", value: p.secondary },
     { item: "colorOnSurface", value: p.onSurface },
     { item: "colorOnSurfaceVariant", value: p.onSurfaceVariant },
-    { item: "android:colorBackground", value: p.surface },
-    { item: "android:windowBackground", value: p.surface },
   ];
+  // 对话框主题：背景由系统 Dialog 自带（dialog 窗口背景），硬写 windowBackground 会把弹窗画成满屏方块
+  if (!isDialog) {
+    items.push({ item: "android:colorBackground", value: p.surface });
+    items.push({ item: "android:windowBackground", value: p.surface });
+  }
   if (preset.id === "material3-fullscreen" || preset.parent.includes(".Fullscreen")) {
     items.push({ item: "android:windowFullscreen", value: "true" });
   }
@@ -272,11 +361,13 @@ export function themeToItems(preset: AndroidThemePreset): { item: string; value:
 export function writeThemeIntoValues(
   themesXml: string,
   preset: AndroidThemePreset,
-  styleName = "Theme.MyApp",
+  styleName?: string,
 ): string {
+  // M321：对话框主题默认写 Theme.MyDialog（不覆盖 app 的 Theme.MyApp）
+  const name = styleName ?? (preset.kind === "dialog" ? "Theme.MyDialog" : "Theme.MyApp");
   const items = themeToItems(preset);
   const styleBlock = [
-    `    <style name="${styleName}" parent="${preset.parent}">`,
+    `    <style name="${name}" parent="${preset.parent}">`,
     ...items.map((i) => `        <item name="${i.item}">${i.value}</item>`),
     `    </style>`,
   ].join("\n");
@@ -289,7 +380,7 @@ export function writeThemeIntoValues(
   }
   // 2) 有同名 <style> 就替换整块
   const styleRe = new RegExp(
-    `<style\\s+[^>]*name\\s*=\\s*["']${escapeRegExp(styleName)}["'][^>]*>[\\s\\S]*?<\\/style>`,
+    `<style\\s+[^>]*name\\s*=\\s*["']${escapeRegExp(name)}["'][^>]*>[\\s\\S]*?<\\/style>`,
     "g",
   );
   if (styleRe.test(out)) {
@@ -327,9 +418,12 @@ export function findAppThemeStyle(
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) names.push(m[1]);
     if (names.length === 0) continue;
-    if (names.includes("Theme.MyApp")) return "Theme.MyApp";
-    const withTheme = names.find((n) => /(^|\.)theme/i.test(n));
-    return withTheme || names[0];
+    // M321：排除对话框主题 style（Theme.MyDialog / *Dialog*），它们不能当应用主题套到 Activity
+    const appNames = names.filter((n) => !/dialog/i.test(n));
+    if (appNames.length === 0) continue;
+    if (appNames.includes("Theme.MyApp")) return "Theme.MyApp";
+    const withTheme = appNames.find((n) => /(^|\.)theme/i.test(n));
+    return withTheme || appNames[0];
   }
   return undefined;
 }

@@ -147,6 +147,7 @@ export function ThemePickerPanel({ tr, selectedId, onPick, onPreview, busy }: Pr
     material2: true,
     material3: true,
     system: false,
+    dialog: false,
   });
   const groups = androidThemeGroups();
 
@@ -182,6 +183,23 @@ export function ThemePickerPanel({ tr, selectedId, onPick, onPreview, busy }: Pr
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 3 }}>
                         {tr(p.name, p.name)}
+                        {p.kind === "dialog" && (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              fontSize: 10,
+                              color: "#b26a00",
+                              background: "rgba(255,193,7,0.18)",
+                              borderRadius: 4,
+                              padding: "1px 5px",
+                              display: "inline-block",
+                              fontWeight: 500,
+                            }}
+                            title={tr("对话框专用主题，不能套到整页 Activity", "Dialog-only theme; cannot be applied to a whole-Activity")}
+                          >
+                            {tr("对话框", "dialog")}
+                          </span>
+                        )}
                         {active && (
                           <span style={{ marginLeft: 6, color: "var(--axv-primary)", fontSize: 11 }}>
                             ✓ {tr("当前", "current")}

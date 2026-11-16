@@ -5,7 +5,7 @@ import { axvNativeIf } from "@/lib/xml/native-bridge";
 import type { AndroidThemePreset } from "@/lib/xml/android-theme-presets";
 
 interface ThemePreviewBridge {
-  openThemePreview?: (presetId: string, parent: string, paletteJson: string) => void;
+  openThemePreview?: (presetId: string, parent: string, paletteJson: string, kind: string) => void;
 }
 
 /** 取预设的展示调色板（深色预设用 dark，否则 light）转成 {primary,onPrimary,secondary,surface,onSurface} */
@@ -25,7 +25,7 @@ export function openThemePreviewNative(p: AndroidThemePreset): boolean {
   const b = axvNativeIf<ThemePreviewBridge>((x) => typeof x.openThemePreview === "function");
   if (!b) return false;
   try {
-    b.openThemePreview?.(p.id, p.parent, presetPaletteJson(p));
+    b.openThemePreview?.(p.id, p.parent, presetPaletteJson(p), p.kind ?? "activity");
     return true;
   } catch {
     return false;

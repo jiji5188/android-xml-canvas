@@ -113,11 +113,6 @@ export function findValuesDefLine(text: string, type: ResType, name: string): nu
   return 0;
 }
 
-/** 媒体文件（drawable/mipmap）→ 该文件本身就是定义，行号固定 1 */
-export function fileDefLine(type: ResType): number {
-  return isValuesType(type) ? 0 : 1;
-}
-
 /** 给用户看的一行描述，如「@string/app_name → values/strings.xml:12」 */
 export function formatResRefHit(ref: ResRef, rel: string, line: number): string {
   return `${ref.raw} → ${rel}${line > 1 ? ":" + line : ""}`;

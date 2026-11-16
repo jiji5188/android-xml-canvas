@@ -280,13 +280,6 @@ export function isManifestPath(relOrName?: string | null): boolean {
 }
 
 /** 给界面用的人话说明 */
-export function manifestNotice(): { title: string; msg: string } {
-  return {
-    title: "AndroidManifest.xml · 视图编辑",
-    msg: "这是应用清单文件。视图里改基本字段、权限、组件；复杂 intent-filter 等直接切「代码」改。",
-  };
-}
-
 export const COMPONENT_LABEL: Record<string, string> = {
   activity: "Activity",
   service: "Service",

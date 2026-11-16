@@ -21,8 +21,6 @@ export function attrPrefixFor(name: string): "app" | "android" | "" {
 }
 
 export const APP_NS = "http://schemas.android.com/apk/res-auto";
-export const ANDROID_NS = "http://schemas.android.com/apk/res/android";
-
 const NAME_CH = /[\w:.\-]/;
 
 interface AttrToken {

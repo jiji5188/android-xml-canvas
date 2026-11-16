@@ -30,9 +30,3 @@ export function colOf(starts: number[], offset: number): number {
   const line = lineOf(starts, offset);
   return offset - starts[line - 1] + 1;
 }
-
-/** 偏移量 → { line, col }，两者都 1 基 */
-export function posOf(starts: number[], offset: number): { line: number; col: number } {
-  const line = lineOf(starts, offset);
-  return { line, col: offset - starts[line - 1] + 1 };
-}

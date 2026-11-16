@@ -38,21 +38,6 @@ export function fmtDp(v: number): string {
   return (Math.round(v * 100) / 100).toString();
 }
 
-/** 树中找指定 path 的节点（线性深度优先，画布树不会深到需要优化） */
-export function findNodeByPath(
-  root: InspectableNode | null,
-  path: string | null,
-): InspectableNode | null {
-  if (!root || !path) return null;
-  let out: InspectableNode | null = null;
-  const walk = (n: InspectableNode) => {
-    if (n.path === path) { out = n; return; }
-    for (const c of n.children) walk(c);
-  };
-  walk(root);
-  return out;
-}
-
 /**
  * 由 DOM 实测数据 + 树结构生成警告：
  * - overflow：子控件超出父控件边界（各方向 ≥ 1dp 才算，避免取整抖动）
@@ -143,7 +128,6 @@ export function collectMeasurements(
   return list;
 }
 
-/** 从 DOM 元素上取直接父级的 data-path（父元素没有 data-path 就继续往上找一层） */
 /** 取直接父控件的 path（调用方传的是 child.parentElement；再往上找一层是给画布外壳包装层留的余地） */
 function parentPathOf(parentEl: HTMLElement, _childPath: string, _els: Iterable<HTMLElement>): string | null {
   if (parentEl.dataset && parentEl.dataset.path) return parentEl.dataset.path;

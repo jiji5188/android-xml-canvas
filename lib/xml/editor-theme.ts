@@ -164,8 +164,6 @@ export const FONT_SIZE_MIN = 11;
 export const FONT_SIZE_MAX = 16;
 export const INDENT_MIN = 2;
 export const INDENT_MAX = 8;
-export const INDENT_PRESETS = [2, 3, 4, 6, 8];
-
 export function paletteOf(id: string): EditorPalette {
   return (HL_PRESETS.find((p) => p.id === id) || HL_PRESETS[0]).palette;
 }

@@ -317,8 +317,3 @@ function hexToRgbSafe(hex: string): { r: number; g: number; b: number } | null {
   if (!m) return null;
   return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) };
 }
-
-/** 供调用方在色块上显示当前颜色 */
-export function pickerSwatchColor(value: string): string {
-  return toAndroidHex(parseColorOr(value, "#3498db"));
-}

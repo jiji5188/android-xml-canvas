@@ -122,12 +122,6 @@ const STATE_ATTRS: string[] = [
   "state_above_anchor",
 ];
 
-export const STATE_ATTR_DEFS: AttrDef[] = STATE_ATTRS.map((name) => ({
-  name,
-  type: "boolean" as const,
-  label: name.replace(/^state_/, "").replace(/_/g, " "),
-}));
-
 export const OFFSET_ATTRS: AttrDef[] = [
   { name: "left", type: "dimension", label: "左偏移", note: "负值往外" },
   { name: "top", type: "dimension", label: "上偏移" },

@@ -124,15 +124,6 @@ export function deleteSnap(fileKey: string, id: string): Snap[] {
   return list;
 }
 
-export function clearSnaps(fileKey: string): void {
-  if (!hasStore()) return;
-  try {
-    localStorage.removeItem(snapKey(fileKey));
-  } catch {
-    // ignore
-  }
-}
-
 export interface DiffStat {
   added: number;
   removed: number;

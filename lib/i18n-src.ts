@@ -3013,10 +3013,6 @@ export function setI18nLang(lang: string): void {
   currentLang = lang;
 }
 
-export function getI18nLang(): string {
-  return currentLang;
-}
-
 /**
  * 取译文：与 tr(key, fallback) 的区别是不需要 key。
  * 用法：t("保存") → Save / 保存 / 保存（中文环境原样返回）
@@ -3032,9 +3028,4 @@ export function t(zh: string, vars?: Record<string, string | number>): string {
       : (SRC_DICTS[currentLang]?.[zh] ?? SRC_EN[zh] ?? zh);
   if (!vars) return raw;
   return raw.replace(/\{(\w+)\}/g, (_m, k: string) => String(vars[k] ?? ""));
-}
-
-/** 组件内可选用：拿到当前语言，便于把 lang 放进依赖里 */
-export function useLangValue(): string {
-  return currentLang;
 }

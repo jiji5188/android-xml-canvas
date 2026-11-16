@@ -118,15 +118,6 @@ export interface RippleNode extends WithTransform {
   mask?: DrawableNode;
 }
 
-export interface InsetNode {
-  t: "inset";
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-  node: DrawableNode;
-}
-
 /** 暂不支持的标签（animated-vector / level-list / bitmap …），保留占位不崩 */
 export interface UnsupportedNode extends WithTransform {
   t: "unsupported";
@@ -139,9 +130,6 @@ const ELEMENT = (n: XmlNode) => n.tag !== "#text" && n.tag !== "#comment";
 
 /** M127：包装类标签 —— 只包一个子节点、只改几何，解析时压成变换链，不当节点 */
 export const WRAPPER_TAGS: TransformKind[] = ["inset", "clip", "scale", "rotate", "animated-rotate"];
-
-export const isWrapperTag = (tag: string): tag is TransformKind =>
-  (WRAPPER_TAGS as string[]).includes(tag);
 
 function kids(node: XmlNode): XmlNode[] {
   return node.children.filter(ELEMENT);
@@ -650,9 +638,4 @@ export function countNodes(node: DrawableNode): number {
     default:
       return 1;
   }
-}
-
-/** 顶层是不是"纯一个形状"（决定 UI 显示简版还是图层面板） */
-export function isPlainShape(node: DrawableNode): boolean {
-  return node.t === "shape";
 }

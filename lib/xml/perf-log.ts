@@ -130,8 +130,3 @@ export function perfLogPath(): string {
     return "";
   }
 }
-
-/** 测试用：是否开启 */
-export function perfEnabled(): boolean {
-  return PERF_ON;
-}

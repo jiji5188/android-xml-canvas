@@ -361,12 +361,6 @@ function rootLabel(node: DrawableNode): string {
   }
 }
 
-/** 子节点在 UI 上的叫法（父容器决定语义，不出现 item 这个词） */
-export function childLabelOf(parent: DrawableNode, i: number): string {
-  const child = childAt(parent, i);
-  return child ? childLabel(parent, i, child) : `第 ${i + 1} 项`;
-}
-
 /** 只要「插槽名」——按下 / 第 1 层 / 内容，不带类型（结构树里类型由后面的节点名给） */
 export function slotLabelOf(parent: DrawableNode, i: number): string {
   if (parent.t === "layer") return `第 ${i + 1} 层`;

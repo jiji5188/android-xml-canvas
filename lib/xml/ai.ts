@@ -364,15 +364,3 @@ export const AI_QUICK_ACTIONS: QuickActionDef[] = [
     intent: "edit",
   },
 ];
-
-/** 把一轮对话拼成发给模型的消息数组 */
-export function buildMessages(history: AiMessage[], nextUser: string, ctx: AiContext | null): AiMessage[] {
-  const msgs: AiMessage[] = [{ role: "system", content: AI_SYSTEM_PROMPT }];
-  const first = ctx ? contextPreamble(ctx) : "";
-  // 只带最近 8 条，避免上下文无限膨胀
-  const recent = history.slice(-8);
-  if (first) msgs.push({ role: "user", content: first });
-  for (const m of recent) msgs.push({ role: m.role, content: m.content });
-  msgs.push({ role: "user", content: nextUser });
-  return msgs;
-}

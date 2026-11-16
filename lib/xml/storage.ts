@@ -2,13 +2,7 @@
 // 全部 try/catch：无 SSR、无痕模式、配额超限都不能把编辑器搞崩。
 
 export const LS_KEY_XML = "axv.autosave.xml";
-export const LS_KEY_HIST = "axv.autosave.history";
-export const LS_KEY_RES = "axv.autosave.resources";
 export const LS_KEY_ICONS = "axv.autosave.icons"; // M3g：图标选择器生成的矢量资源
-export const LS_KEY_DEVICE = "axv.device";
-export const LS_KEY_ZOOM = "axv.zoom";
-/** 多文件项目（文件列表 + 各自的 xml） */
-export const LS_KEY_PROJECT = "axv.project.v1";
 /** M144：上次打开的文件（项目名 + 目录路径 + rel），重开 App 直接定位，不用重新选 */
 export const LS_KEY_LAST_FILE = "axv.autosave.lastFile";
 /** M149：上次载入的示例项目 key —— 重启后恢复它自带的 values/drawable，否则 @string/@drawable 全裸显示 */

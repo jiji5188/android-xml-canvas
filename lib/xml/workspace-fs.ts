@@ -162,14 +162,6 @@ export async function restoreProjectDir(): Promise<DirHandle | null> {
   }
 }
 
-export async function forgetProjectDir(): Promise<void> {
-  try {
-    await idbDel(KEY_PROJECT);
-  } catch {
-    /* ignore */
-  }
-}
-
 /** 校验权限；granted 直接可用，prompt 需要用户手势再点一次 */
 export async function workspacePermission(dir: DirHandle): Promise<PermissionState> {
   try {
@@ -330,21 +322,4 @@ export async function pickMainLayout(dir: DirHandle): Promise<{ name: string; te
   candidates.sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
   const chosen = candidates[0];
   return { name: chosen.name, text: await (await chosen.getFile()).text() };
-}
-
-/** 把项目文件夹里的 xml 全列出来（用于展示「含 N 个布局」） */
-export async function listLayouts(dir: DirHandle): Promise<{ name: string; text: string }[]> {
-  const out: { name: string; text: string }[] = [];
-  const collect = async (d: DirHandle) => {
-    for await (const f of d.values()) {
-      if (f.kind === "file" && /\.xml$/i.test(f.name)) out.push({ name: f.name, text: await (await f.getFile()).text() });
-    }
-  };
-  try {
-    await collect(await dir.getDirectoryHandle(LAYOUT_DIR));
-  } catch {
-    await collect(dir);
-  }
-  out.sort((a, b) => a.name.localeCompare(b.name));
-  return out;
 }

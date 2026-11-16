@@ -23,18 +23,6 @@ export interface JavaResEnv {
   style: string[];
 }
 
-export const EMPTY_RES_ENV: JavaResEnv = {
-  ids: [],
-  idTag: {},
-  layout: [],
-  string: [],
-  drawable: [],
-  color: [],
-  dimen: [],
-  mipmap: [],
-  style: [],
-};
-
 function walk(node: XmlNode, fn: (n: XmlNode) => void): void {
   fn(node);
   for (const c of node.children) walk(c, fn);

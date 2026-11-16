@@ -14,8 +14,6 @@ import {
 import { restoreProjectFolder, type OpenedProject } from "@/lib/xml/project";
 import { yieldToUi } from "@/lib/xml/native-async";
 
-export type LeftViewLite = "parts" | "layers" | "ai" | "assets" | "res" | "libs" | "settings" | "about";
-
 export interface WorkspaceRefreshDeps {
   leftView: string;
   wsState: WsInfo | null;

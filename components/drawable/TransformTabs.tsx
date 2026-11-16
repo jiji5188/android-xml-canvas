@@ -282,5 +282,3 @@ export function TransformTabs({ node, onChange }: Props) {
     </div>
   );
 }
-
-export { KINDS as TRANSFORM_KINDS };

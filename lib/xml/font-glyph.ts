@@ -192,18 +192,3 @@ export async function getIconVectorWysiwyg(
  * 生成 PNG（data URL）：同一套画布渲染，按目标像素尺寸出图。
  * 用于「按列表原样式导出位图」——素材库 drawable-*dpi 用。
  */
-export async function renderIconPng(name: string, px: number, color = "#1D1B20"): Promise<string | null> {
-  if (!hasCanvas()) return null;
-  if (!(await ensureFont())) return null;
-  const c = document.createElement("canvas");
-  c.width = px;
-  c.height = px;
-  const g = c.getContext("2d") as Ctx2D | null;
-  if (!g) return null;
-  g.clearRect(0, 0, px, px);
-  g.fillStyle = color;
-  g.font = '400 ' + px + 'px "Material Symbols Rounded"';
-  g.textBaseline = "top";
-  g.fillText(name, 0, 0);
-  return c.toDataURL("image/png");
-}

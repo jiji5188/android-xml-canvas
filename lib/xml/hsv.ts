@@ -68,22 +68,7 @@ export function rgbToHsv(r: number, g: number, b: number): Hsv {
 }
 
 /** 灰色（含黑/白）没有色相，取值时保留原来的 H，避免拖到灰区时色相跳回 0 */
-export function rgbToHsvKeepHue(r: number, g: number, b: number, keepHue: number): Hsv {
-  const hsv = rgbToHsv(r, g, b);
-  return hsv.s === 0 ? { ...hsv, h: keepHue } : hsv;
-}
-
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return n < 0 ? 0 : n > 1 ? 1 : n;
-}
-
-/** 取色面板的纯 CSS 背景：底色 hsl(H,100%,50%) + 横白（S）+ 纵黑（V） */
-export function hsvPanelBackground(h: number): string {
-  const hue = Math.round(((h % 360) + 360) % 360);
-  return (
-    `linear-gradient(to top, #000, rgba(0,0,0,0)),` +
-    `linear-gradient(to right, #fff, rgba(255,255,255,0)),` +
-    `hsl(${hue} 100% 50%)`
-  );
 }

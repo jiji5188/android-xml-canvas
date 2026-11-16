@@ -179,10 +179,6 @@ export function groupMatrix(g: GroupSpec): Mat {
   };
 }
 
-export function applyMat(m: Mat, p: { x: number; y: number }): { x: number; y: number } {
-  return { x: m.a * p.x + m.c * p.y + m.e, y: m.b * p.x + m.d * p.y + m.f };
-}
-
 /** 父坐标 → 组局部坐标（矩阵不可逆时原样返回） */
 export function invertMat(m: Mat, p: { x: number; y: number }): { x: number; y: number } {
   const det = m.a * m.d - m.b * m.c;
@@ -1043,20 +1039,6 @@ export function smoothPath(pts: { x: number; y: number }[]): string {
   const last = pts[pts.length - 1];
   d += `L${nstr(last.x)},${nstr(last.y)}`;
   return d;
-}
-
-/** 旋转点 */
-export function rotatePoint(
-  p: { x: number; y: number },
-  c: { x: number; y: number },
-  deg: number,
-): { x: number; y: number } {
-  const a = (deg * Math.PI) / 180;
-  const cos = Math.cos(a);
-  const sin = Math.sin(a);
-  const dx = p.x - c.x;
-  const dy = p.y - c.y;
-  return { x: c.x + dx * cos - dy * sin, y: c.y + dx * sin + dy * cos };
 }
 
 /** pathData 缩放（围绕 (ox,oy) 做 sx/sy 缩放；支持绝对/相对命令与弧线近似） */

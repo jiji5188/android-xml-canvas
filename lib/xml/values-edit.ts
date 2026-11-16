@@ -7,8 +7,6 @@
 //   - 改值 = 只替换值区间；改名 = 只替换 name 属性值；删 = 删整段；加 = 插到 </resources> 前
 // 原文件的注释、缩进风格、条目顺序全部原样保留。
 
-export type ValueTag = "string" | "color" | "dimen" | "integer" | "bool" | "item";
-
 export interface ValueItem {
   /** 元素名（string/color/dimen/…；<item type="color"> 也归成 color） */
   tag: string;

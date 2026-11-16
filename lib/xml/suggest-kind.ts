@@ -35,10 +35,6 @@ export const KIND_NAME: Record<SuggestKind, string> = {
 
 const ALL: SuggestKind[] = ["decl", "class", "method", "var", "const", "ref", "prop", "plain"];
 
-export function isSuggestKind(v: unknown): v is SuggestKind {
-  return typeof v === "string" && (ALL as string[]).includes(v);
-}
-
 /* ===================== XML 侧 ===================== */
 
 /** 老的上下文类型（tag/attr/value/resource/plain）→ 新分类 */

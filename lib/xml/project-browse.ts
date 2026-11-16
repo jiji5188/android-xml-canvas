@@ -451,16 +451,6 @@ export const NATIVE_ICON_DIRS = [
   "res/drawable",
 ];
 
-export const NATIVE_ICON_NAMES = [
-  "ic_launcher.png",
-  "ic_launcher.webp",
-  "ic_launcher.jpg",
-  "ic_launcher_round.png",
-  "ic_launcher_round.webp",
-  "icon.png",
-  "app_icon.png",
-];
-
 const nativeMetaCache = new Map<string, ProjectMeta>();
 
 /** M33：从目录列表里挑最合适的图标文件名（纯函数，可单测）
@@ -602,12 +592,6 @@ export function resDirDescription(rel: string): string | null {
 }
 
 /** M43：这个目录是不是 res/ 的直接子目录（纯函数，可单测） */
-export function isResChildDirRel(rel: string): boolean {
-  const parts = rel.split("/").filter(Boolean);
-  if (parts.length < 2) return false;
-  return parts[parts.length - 2].toLowerCase() === "res";
-}
-
 // ── M144：文件行的描述文案 ──
 // 用户要求：副标题必须说清楚「这是什么」，不许一律兜底成「布局文件」。
 // 优先看目录语义（res/xxx），再看扩展名；完全认不出时返回 ""（宁可不显示也不乱猜）。

@@ -75,10 +75,6 @@ function wrapTransforms(node: DrawableNode, lines: string[], level: number): str
 }
 
 /** 不带 xmlns 的片段（嵌在 <item> 里时用），已按 level 缩进 */
-export function buildDrawableFragment(node: DrawableNode, level = 0): string[] {
-  return emit(node, level);
-}
-
 function emit(node: DrawableNode, level: number): string[] {
   switch (node.t) {
     case "shape": {
@@ -214,10 +210,4 @@ function round2(n: number): number {
 }
 
 /** 给「另存为 / 预览」用：把不支持的子树原文也带出来（调试用） */
-export function dumpUnsupported(node: DrawableNode, level = 0): string[] {
-  const pad = IND.repeat(level);
-  if (node.t === "unsupported" && node.raw) return [pad + node.raw.trim()];
-  return [];
-}
-
 export { serializeXmlNode };

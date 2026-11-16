@@ -109,13 +109,6 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(out);
 }
 
-export function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
 /** 按扩展名猜 MIME（原生写 MediaStore 时需要） */
 export function mimeOfName(name: string): string {
   const ext = (name.split(".").pop() || "").toLowerCase();
@@ -195,16 +188,6 @@ export function hapticNative(type: "long" | "toggle" | "none"): boolean {
 
 /** 触觉反馈统一入口：原生壳优先（精确时长），桌面浏览器回退 navigator.vibrate（能震就震）。
  *  ms=0 直接不震。 */
-export function vibrateSmart(ms: number, type?: "long" | "toggle" | "none"): void {
-  if (ms <= 0) return;
-  if (type && hapticNative(type)) return;
-  try {
-    navigator.vibrate?.(ms);
-  } catch {
-    /* Safari 直接抛，忽略 */
-  }
-}
-
 /** 原生保存 dataURL（PNG / SVG 导出都产出 dataURL） */
 export function saveDataUrlNative(name: string, dataUrl: string, mime?: string): boolean {
   if (!nativeAvailable()) return false;

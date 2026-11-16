@@ -1195,10 +1195,10 @@ export function buildRenderModel(
         cs["--axv-ctl-r"] = `calc(${DP(18, scale)}px / 2)`;
         cs["--axv-ctl-thumb-d"] = `${DP(on ? 22 : 20, scale)}px`;
         cs["--axv-ctl-bw"] = "0px";
-        // M11t：trackTint（轨道色）/ thumbTint（滑块色）优先于默认主题色
-        const tkOn = (attrs["trackTint"] as string) || NEUTRAL_ACCENT;
+        // M11t：trackTint（轨道色）/ thumbTint（滑块色）优先；否则跟项目主题主色，没主题→中性灰
+        const ctlAccent = (attrs["trackTint"] as string) || (palette.fromProject ? palette.primary : NEUTRAL_ACCENT);
         const tkOff = (attrs["trackTint"] as string) || NEUTRAL_TRACK;
-        cs["--axv-ctl-bg"] = on ? tkOn : tkOff;
+        cs["--axv-ctl-bg"] = on ? ctlAccent : tkOff;
         cs["--axv-ctl-ring"] = "transparent";
         cs["--axv-ctl-img"] = "none";
         cs["--axv-ctl-thumb"] = (attrs["thumbTint"] as string) || "#FFFFFF";
@@ -1209,8 +1209,8 @@ export function buildRenderModel(
         cs["--axv-ctl-h"] = `${DP(20, scale)}px`;
         cs["--axv-ctl-r"] = cls === "axv-radio" ? "50%" : `${DP(3, scale)}px`;
         cs["--axv-ctl-bw"] = `${DP(2, scale)}px`;
-        // M11t：buttonTint 同时作用于勾选态填充与边框色
-        const bt = (attrs["buttonTint"] as string) || NEUTRAL_ACCENT;
+        // M11t：buttonTint 同时作用于勾选态填充与边框色（默认跟随项目主题主色，没主题→中性灰）
+        const bt = (attrs["buttonTint"] as string) || (palette.fromProject ? palette.primary : NEUTRAL_ACCENT);
         cs["--axv-ctl-bg"] = cls === "axv-radio" ? "#FFFFFF" : on ? bt : "#FFFFFF";
         cs["--axv-ctl-ring"] = on ? bt : NEUTRAL_OUTLINE;
         cs["--axv-ctl-img"] = on
@@ -1256,10 +1256,12 @@ export function buildRenderModel(
       style["--axv-seek-pct"] = `${(ratio * 100).toFixed(2)}%`;
       style["--axv-seek-track-h"] = `${DP(4, scale)}px`;
       style["--axv-seek-thumb-d"] = `${DP(20, scale)}px`;
-      style["--axv-seek-color"] = (attrs["progressTint"] as string) || NEUTRAL_ACCENT;
+      // M314-S5：进度/滑块默认跟项目主题主色，没主题→中性灰
+      const seekAccent = (palette.fromProject ? palette.primary : NEUTRAL_ACCENT);
+      style["--axv-seek-color"] = (attrs["progressTint"] as string) || seekAccent;
       style["--axv-seek-track-bg"] = (attrs["trackTint"] as string) || NEUTRAL_TRACK;
-      // M11t：SeekBar 的滑块色（thumbTint，否则用主题色）
-      style["--axv-seek-thumb"] = (attrs["thumbTint"] as string) || NEUTRAL_ACCENT;
+      // M11t：SeekBar 的滑块色（thumbTint，否则跟随项目主题主色）
+      style["--axv-seek-thumb"] = (attrs["thumbTint"] as string) || seekAccent;
       // M11v：android:thumb 是图片（上传 res 后能解析成 data URL）就直接画图，颜色只做兜底
       const thumbImg = (attrs["thumb"] as string) || "";
       if (thumbImg.startsWith("data:")) {

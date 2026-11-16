@@ -1269,11 +1269,16 @@ export function buildRenderModel(
     }
 
     if (cls === "axv-spinner") {
-      style.minHeight = `${DP(40, scale)}px`;
-      style.border = "1px solid #79747E";
-      style.borderRadius = `${DP(8, scale)}px`;
-      style.backgroundColor = style.backgroundColor || "#FFFFFF";
+      // M314-S4：原生 Android Spinner（dropdown 模式）是「文本 + 下边线 + 右侧箭头」，不是整盒边框
+      style.minHeight = `${DP(48, scale)}px`;
+      style.border = "none";
+      style.borderBottom = `${DP(1, scale)}px solid #BDBDBD`;
+      style.borderRadius = `0px`;
+      style.backgroundColor = style.backgroundColor || "transparent";
+      style.paddingLeft = style.paddingLeft ?? `${DP(4, scale)}px`;
       style.paddingRight = `${DP(28, scale)}px`;
+      style.display = "flex";
+      style.alignItems = "center";
     }
 
     // ===== M2c：Guideline / Barrier 渲染为参考线（位置尺寸由 patchCL 求解写入） =====

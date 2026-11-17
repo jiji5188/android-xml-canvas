@@ -251,6 +251,7 @@ import { LeftRail, type LeftView } from "./LeftRail";
 import { LibsPanel } from "./LibsPanel";
 import { ProblemsDrawer } from "./ProblemsDrawer";
 import { useBuildLogs } from "./use-build-logs";
+import { usePanels } from "./use-panels";
 import {
   subscribeRuntimeLog,
   installRuntimeLogBridge,
@@ -495,50 +496,14 @@ export function XmlEditor() {
     | null
   >(null);
 
-  /** M140：历史版本快照面板 */
-  const [histPanelOpen, setHistPanelOpen] = useState(false);
-  const [snapCount, setSnapCount] = useState(0);
-  /** M25b：从项目目录打开的文件名（用于结构树里标「正在编辑」；应用内文件为空） */
-  const [wsActiveName, setWsActiveName] = useState("");
-  const [wsMsg, setWsMsg] = useState<string>("");
-  const [addModalOpen, setAddModalOpen] = useState(false);
-  /** M2s：导出前检查面板 */
-  const [exportOpen, setExportOpen] = useState(false);
-  // M165 并排对比：开/关 + 勾选的设备（localStorage 记住）
-  const [compareOpen, setCompareOpen] = useState(false);
-  const [compareIds, setCompareIds] = useState<string[]>(() => {
-    try {
-      const raw = window.localStorage.getItem("axv.compareIds");
-      if (raw) {
-        const arr = JSON.parse(raw) as string[];
-        if (Array.isArray(arr) && arr.length > 0) return arr;
-      }
-    } catch {
-      /* 静默 */
-    }
-    return COMPARE_DEFAULTS;
-  });
-  const toggleCompareDevice = (id: string, on: boolean) => {
-    setCompareIds((cur) => {
-      const next = on ? [...cur, id] : cur.filter((x) => x !== id);
-      const list = next.length > 0 ? next : COMPARE_DEFAULTS;
-      try {
-        window.localStorage.setItem("axv.compareIds", JSON.stringify(list));
-      } catch {
-        /* 静默 */
-      }
-      return list;
-    });
-  };
-  const [exportReport, setExportReport] = useState<ExportReport | null>(null);
-  /** M13：导出模式（localStorage 记住），compat = 纯平台控件、AIDE 可编译 */
-  const [exportMode, setExportMode] = useState<ExportMode>(() => {
-    try {
-      return window.localStorage.getItem("axv.exportMode") === "compat" ? "compat" : "modern";
-    } catch {
-      return "modern";
-    }
-  });
+  /** M366：弹窗/面板 UI state → components/use-panels.ts */
+  const {
+    histPanelOpen, setHistPanelOpen, snapCount, setSnapCount,
+    wsActiveName, setWsActiveName, wsMsg, setWsMsg,
+    addModalOpen, setAddModalOpen, exportOpen, setExportOpen,
+    compareOpen, setCompareOpen, compareIds, toggleCompareDevice,
+    exportReport, setExportReport, exportMode, setExportMode,
+  } = usePanels();
   /** M37：代码编辑器外观（光标/选区/高亮/字号，localStorage 记住）→ use-editor-theme */
   const {
     editorTheme, patchEditorTheme, resetEditorTheme, patchEditorColor,

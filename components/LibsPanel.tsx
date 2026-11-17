@@ -14,10 +14,19 @@ import {
 } from "@/lib/xml/library-catalog";
 import {
   parseGradleDepsDetailed,
+  parseGradleProperties,
+  parseSettingsModules,
+  parseSettingsRepos,
+  parseAppConfig,
+  parseBuildscriptClasspath,
   gradleDepDownloadUrls,
   gradleDepFname,
   type GradleDep,
   type GradleUnresolved,
+  type GradleProps,
+  type GradleRepo,
+  type AppConfig,
+  type ClasspathDep,
 } from "@/lib/xml/gradle-deps";
 
 interface LibsPanelProps {
@@ -107,6 +116,12 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   const [gradleBusy, setGradleBusy] = useState(false);
   const [gradleDeps, setGradleDeps] = useState<GradleDep[]>([]);
   const [gradleUnresolved, setGradleUnresolved] = useState<GradleUnresolved[]>([]);
+  const [gradleProps, setGradleProps] = useState<GradleProps | null>(null);
+  const [gradleModules, setGradleModules] = useState<string[]>([]);
+  const [gradleRootName, setGradleRootName] = useState<string | undefined>(undefined);
+  const [gradleRepos, setGradleRepos] = useState<GradleRepo[]>([]);
+  const [gradleAppConfig, setGradleAppConfig] = useState<AppConfig | null>(null);
+  const [gradleClasspath, setGradleClasspath] = useState<ClasspathDep[]>([]);
   const [gradleScanned, setGradleScanned] = useState(false);
   const [gradleBusyKey, setGradleBusyKey] = useState<Record<string, string>>({});
   const [gradleMsg, setGradleMsg] = useState<string | null>(null);
@@ -128,15 +143,15 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   }, [native]);
 
   /** M346：项目库标准目录 = 项目根/app/src/main/libs（标准安卓工程布局）。
-   *  同时兼容旧写法 app/libs 和 项目根/libs（collectProjectLibs 认所有含 /libs/ 段的路径，
-   *  所以三处都能被打包收编；新库统一写标准位置） */
+   *  M348：不再支持 项目根/libs/（非标准），只按标准安卓工程布局：
+   *  首选 app/src/main/libs（标准），其次 app/libs（模块级，仍可读）。
+   *  collectProjectLibs 认所有含 /libs/ 段的路径，所以这两处都能被打包收编 */
   const projectLibsBases = useMemo(() => {
     if (!nativeProjectRoot) return [] as string[];
     const root = nativeProjectRoot.replace(/[\\/]+$/, "");
     const primary = `${root}/app/src/main/libs`; // 标准位置（首选写入）
-    const legacy = [`${root}/app/libs`, `${root}/libs`]; // 旧位置（仍可读）
-    // 去重保序：primary 在前
-    return [primary, ...legacy.filter((p) => p !== primary)];
+    const alt = [`${root}/app/libs`]; // 模块级 libs（仍可读）
+    return [primary, ...alt.filter((p) => p !== primary)];
   }, [nativeProjectRoot]);
   /** 首选写入目录（应用到项目 / gradle 依赖下载都写这里） */
   const primaryLibBase = projectLibsBases[0] ?? null;
@@ -163,7 +178,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           }
           setProjectLibs(all);
         } else if (aiFileIo) {
-          const candidates = ["app/src/main/libs", "app/libs", "libs"];
+          const candidates = ["app/src/main/libs", "app/libs"];
           let all: LibFile[] = [];
           for (const c of candidates) {
             const items = await listDirViaIo(aiFileIo, c);
@@ -359,7 +374,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         onNote?.(tr("libs.apply_need_project", "请先打开一个项目，才能应用库"));
         return;
       }
-      const dstBase = primaryLibBase || `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
+      const dstBase = primaryLibBase || `${nativeProjectRoot.replace(/[\\/]+$/, "")}/app/src/main/libs`;
       native.createEntry?.(dstBase, true);
       const dst = `${dstBase}/${f.name}`;
       setApplyBusy((m) => ({ ...m, [f.name]: "applying" }));
@@ -422,44 +437,81 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
 
   const catGroups = useMemo(() => groupCatalog(), []);
 
-  /** M345：读项目根 build.gradle / build.gradle.kts + app 子目录，解析依赖 */
+  /** M345：读项目根 build.gradle / build.gradle.kts + app 子目录，解析依赖
+   *  M347：同时读 gradle.properties（编译标记）+ settings.gradle（模块）+ 根 build.gradle（buildscript classpath）
+   *  时序：settings.gradle → 根 build.gradle → app/build.gradle；gradle.properties 全局开关 */
   const scanGradleDeps = useCallback(async () => {
     setGradleBusy(true);
     setGradleMsg(null);
     setGradleScanned(false);
     setGradleDeps([]);
-    const texts: string[] = [];
-    const tryPaths = nativeProjectRoot
-      ? [
-          `${nativeProjectRoot}/build.gradle`,
-          `${nativeProjectRoot}/build.gradle.kts`,
-          `${nativeProjectRoot}/app/build.gradle`,
-          `${nativeProjectRoot}/app/build.gradle.kts`,
-        ]
-      : [];
-    for (const p of tryPaths) {
-      if (!native) break;
-      // 同步 readText（小文件安全）；读不到（err/空）就跳过
-      let t = "";
-      try { t = String(native.readText?.(p) ?? ""); } catch { t = ""; }
-      if (t.startsWith && t.startsWith("err:")) continue;
-      if (t) texts.push(t);
-    }
-    // 也尝试 aiFileIo（SAF 项目，readText 可能读不到 SAF 路径）
-    if (texts.length === 0 && aiFileIo) {
-      for (const rel of ["build.gradle", "build.gradle.kts", "app/build.gradle", "app/build.gradle.kts"]) {
+    setGradleUnresolved([]);
+    setGradleProps(null);
+    setGradleModules([]);
+    setGradleRootName(undefined);
+    setGradleRepos([]);
+    setGradleAppConfig(null);
+    setGradleClasspath([]);
+
+    // 读单个文件：native.readText 优先（SAF/外部路径），失败再 aiFileIo（相对项目根）
+    const readOne = async (abs: string, rel: string): Promise<string> => {
+      if (native) {
         try {
-          const r = await aiFileIo.read(rel);
-          if (r.ok && r.text) texts.push(r.text);
+          const t = String(native.readText?.(abs) ?? "");
+          if (t && !t.startsWith("err:")) return t;
         } catch {}
       }
+      if (aiFileIo) {
+        try {
+          const r = await aiFileIo.read(rel);
+          if (r.ok && r.text) return r.text;
+        } catch {}
+      }
+      return "";
+    };
+    const root = (nativeProjectRoot || "").replace(/[\\/]+$/, "");
+    const abs = (p: string) => (root ? root + "/" + p : p);
+
+    // 各文件（按用户给的时序）
+    const settings = await readOne(abs("settings.gradle"), "settings.gradle");
+    if (!settings) await readOne(abs("settings.gradle.kts"), "settings.gradle.kts");
+    const rootBuild = await readOne(abs("build.gradle"), "build.gradle");
+    if (!rootBuild) await readOne(abs("build.gradle.kts"), "build.gradle.kts");
+    const appBuild = await readOne(abs("app/build.gradle"), "app/build.gradle");
+    if (!appBuild) await readOne(abs("app/build.gradle.kts"), "app/build.gradle.kts");
+    const propsText = await readOne(abs("gradle.properties"), "gradle.properties");
+
+    // 模块 + 根名 + 仓库（settings.gradle）
+    if (settings) {
+      const sm = parseSettingsModules(settings);
+      setGradleModules(sm.modules);
+      setGradleRootName(sm.rootProjectName);
+      setGradleRepos(parseSettingsRepos(settings));
     }
-    if (texts.length === 0) {
-      setGradleMsg(tr("libs.gradle_notfound", "没找到 build.gradle / build.gradle.kts（需在项目根或 app/ 下）"));
+    // 编译标记（gradle.properties）
+    if (propsText) {
+      setGradleProps(parseGradleProperties(propsText));
+    }
+    // app 模块配置（包名 / sdk / 版本 / 签名）
+    if (appBuild) {
+      setGradleAppConfig(parseAppConfig(appBuild));
+    }
+    // buildscript classpath（根 build.gradle，构建期插件，只标记展示）
+    if (rootBuild) {
+      const cp = parseBuildscriptClasspath(rootBuild);
+      if (cp.length) setGradleClasspath(cp);
+    }
+
+    // 依赖（根 + app build.gradle 的 implementation 等）
+    const depTexts = [rootBuild, appBuild].filter(Boolean) as string[];
+    if (depTexts.length === 0) {
+      setGradleMsg(
+        tr("libs.gradle_notfound", "没找到 build.gradle / build.gradle.kts（需在项目根或 app/ 下）"),
+      );
       setGradleBusy(false);
       return;
     }
-    const all = texts.flatMap((t) => parseGradleDepsDetailed(t));
+    const all = depTexts.flatMap((t) => parseGradleDepsDetailed(t));
     // 去重（同一坐标在多个 gradle 文件出现）
     const seen = new Set<string>();
     const deps = all
@@ -726,6 +778,99 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         </div>
         {gradleMsg && (
           <div className="axv-libs-gradle-msg">{gradleMsg}</div>
+        )}
+        {gradleScanned && (
+          <div className="axv-libs-gradle-meta">
+            {(gradleModules.length > 0 || gradleRootName) && (
+              <div className="axv-libs-gradle-meta-row" title={tr("libs.gradle_meta_settings", "来自 settings.gradle")}>
+                <span className="axv-libs-gradle-meta-k">{tr("libs.gradle_modules", "模块")}</span>
+                <span className="axv-libs-gradle-meta-v">
+                  {gradleRootName ? tr("libs.gradle_rootname", "根工程 {name}", { name: gradleRootName }) : " "}{" "}
+                  {gradleModules.join(", ") || "—"}
+                </span>
+              </div>
+            )}
+            {gradleProps && (
+              <div className="axv-libs-gradle-meta-row" title={tr("libs.gradle_meta_props", "来自 gradle.properties（全局编译开关）")}>
+                <span className="axv-libs-gradle-meta-k">{tr("libs.gradle_flags", "编译标记")}</span>
+                <span className="axv-libs-gradle-meta-v">
+                  {gradleProps.flags.length === 0 &&
+                    [gradleProps.minSdk, gradleProps.targetSdk, gradleProps.compileSdk].filter(Boolean)
+                      .map((s) => s as string)
+                      .join(" · ")}
+                  {gradleProps.flags.map((f) => (
+                    <span key={f.key} className="axv-libs-flag" title={f.key}>
+                      {f.value === "true" ? f.key.replace(/^android\./, "") : `${f.key.replace(/^android\./, "")}=${f.value}`}
+                    </span>
+                  ))}
+                  {[gradleProps.minSdk, gradleProps.targetSdk, gradleProps.compileSdk]
+                    .filter(Boolean)
+                    .map((s, i) => (
+                      <span key={i} className="axv-libs-flag axv-libs-flag-sdk">
+                        {(["minSdk", "targetSdk", "compileSdk"] as const)[i]} = {s}
+                      </span>
+                    ))}
+                </span>
+              </div>
+            )}
+            {gradleRepos.length > 0 && (
+              <div className="axv-libs-gradle-meta-row" title={tr("libs.gradle_meta_repos", "来自 settings.gradle（依赖仓库）")}>
+                <span className="axv-libs-gradle-meta-k">{tr("libs.gradle_repos", "仓库")}</span>
+                <span className="axv-libs-gradle-meta-v" style={{ opacity: 0.85 }}>
+                  {gradleRepos.map((r) => (
+                    <span key={r.url || r.name} className="axv-libs-flag axv-libs-flag-repo" title={r.url || r.name}>
+                      {r.url ? r.url.replace(/^https?:\/\//, "").replace(/\/$/, "") : r.name}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            )}
+            {gradleAppConfig &&
+              (gradleAppConfig.namespace ||
+                gradleAppConfig.applicationId ||
+                gradleAppConfig.minSdk ||
+                gradleAppConfig.targetSdk ||
+                gradleAppConfig.compileSdk ||
+                gradleAppConfig.versionName) && (
+                <div className="axv-libs-gradle-meta-row" title={tr("libs.gradle_meta_app", "来自 app/build.gradle")}>
+                  <span className="axv-libs-gradle-meta-k">{tr("libs.gradle_app", "app")}</span>
+                  <span className="axv-libs-gradle-meta-v">
+                    {(gradleAppConfig.applicationId || gradleAppConfig.namespace) && (
+                      <span className="axv-libs-flag" title={tr("libs.gradle_pkg", "包名")}>
+                        {(gradleAppConfig.applicationId || gradleAppConfig.namespace) as string}
+                      </span>
+                    )}
+                    {([
+                      ["compileSdk", gradleAppConfig.compileSdk],
+                      ["minSdk", gradleAppConfig.minSdk],
+                      ["targetSdk", gradleAppConfig.targetSdk],
+                    ] as const)
+                      .filter(([, v]) => v)
+                      .map(([k, v]) => (
+                        <span key={k} className="axv-libs-flag axv-libs-flag-sdk">
+                          {k} = {v}
+                        </span>
+                      ))}
+                    {gradleAppConfig.versionName && (
+                      <span className="axv-libs-flag">v{gradleAppConfig.versionName}</span>
+                    )}
+                    {gradleAppConfig.hasSigning && (
+                      <span className="axv-libs-flag axv-libs-flag-sign" title={tr("libs.gradle_signing", "app/build.gradle 配了 signingConfigs")}>
+                        {tr("libs.gradle_signed", "已配签名")}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+            {gradleClasspath.length > 0 && (
+              <div className="axv-libs-gradle-meta-row" title={tr("libs.gradle_meta_classpath", "根 build.gradle buildscript（构建期插件，不进运行时）")}>
+                <span className="axv-libs-gradle-meta-k">{tr("libs.gradle_classpath", "构建插件")}</span>
+                <span className="axv-libs-gradle-meta-v" style={{ opacity: 0.7 }}>
+                  {gradleClasspath.map((c) => `${c.name}-${c.version}`).join(", ")}
+                </span>
+              </div>
+            )}
+          </div>
         )}
         {gradleScanned && gradleDeps.length === 0 && !gradleMsg && gradleUnresolved.length === 0 && (
           <div className="axv-libs-gradle-msg">{tr("libs.gradle_none", "没解析到 maven 依赖（fileTree / project 除外）")}</div>

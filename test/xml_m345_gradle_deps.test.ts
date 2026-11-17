@@ -3,6 +3,11 @@ import { describe, it, expect } from "vitest";
 import {
   parseGradleDeps,
   parseGradleDepsDetailed,
+  parseGradleProperties,
+  parseSettingsModules,
+  parseSettingsRepos,
+  parseAppConfig,
+  parseBuildscriptClasspath,
   collectGradleVars,
   gradleDepDownloadUrls,
   gradleDepFname,
@@ -183,3 +188,152 @@ describe("gradleDepDownloadUrls / gradleDepFname", () => {
     expect(urls.some((u) => u.includes("maven.aliyun.com/repository/central"))).toBe(true);
   });
 });
+
+describe("M347 gradle.properties 编译标记", () => {
+  it("提取 useAndroidX / enableJetifier 等开关", () => {
+    const p = parseGradleProperties(`
+# comment
+org.gradle.jvmargs=-Xmx2048m
+android.useAndroidX=true
+android.enableJetifier=true
+android.nonTransitiveRClass=true
+`);
+    const keys = p.flags.map((f) => f.key).sort();
+    expect(keys).toEqual([
+      "android.enableJetifier",
+      "android.nonTransitiveRClass",
+      "android.useAndroidX",
+      "org.gradle.jvmargs",
+    ]);
+    expect(p.flags.find((f) => f.key === "android.useAndroidX")?.value).toBe("true");
+  });
+
+  it("提取 SDK 号（支持变量拼接）", () => {
+    const p = parseGradleProperties(
+      [
+        "ext.minV = 24",
+        "android.minSdkVersion=\$ext.minV",
+        "targetSdkVersion=34",
+        "compileSdkVersion=34",
+      ].join("\n"),
+    );
+    expect(p.minSdk).toBe("24");
+    expect(p.targetSdk).toBe("34");
+    expect(p.compileSdk).toBe("34");
+  });
+
+  it("注释 / 空行 / 行内注释 都处理（# 和 ! 都是注释）", () => {
+    const p = parseGradleProperties([
+      "# android.useAndroidX=true（注释掉不算）",
+      "android.enableJetifier=true  # 行内注释",
+      "",
+      "!important=false（! 也是注释行，不算）",
+    ].join("\n"));
+    expect(p.raw["android.enableJetifier"]).toBe("true");
+    expect(p.raw["!important"]).toBeUndefined(); // ! 开头的行是注释
+    expect(p.raw["android.useAndroidX"]).toBeUndefined();
+  });
+});
+
+describe("M347 settings.gradle 模块", () => {
+  it("include ':a', ':b' 拆出模块名", () => {
+    const s = parseSettingsModules("rootProject.name = 'MyApp'\ninclude ':app', ':feature'");
+    expect(s.modules).toEqual(["app", "feature"]);
+    expect(s.rootProjectName).toBe("MyApp");
+  });
+
+  it("Kotlin include(\":a\", \"b\") 也认", () => {
+    const s = parseSettingsModules('include(":app", ":lib")');
+    expect(s.modules).toContain("app");
+    expect(s.modules).toContain("lib");
+  });
+});
+
+describe("M347 根 build.gradle buildscript classpath", () => {
+  it("抓 classpath 'g:a:v'", () => {
+    const r = parseBuildscriptClasspath(
+      [
+        "buildscript {",
+        "  dependencies {",
+        "    classpath 'com.android.tools.build:gradle:7.4.2'",
+        "    classpath 'com.google.gms:google-services:4.4.0'",
+        "  }",
+        "}",
+      ].join("\n"),
+    );
+    expect(r).toHaveLength(2);
+    expect(r[0]).toMatchObject({ group: "com.android.tools.build", name: "gradle", version: "7.4.2" });
+  });
+
+  it("map 写法 classpath group:.., name:.., version:..", () => {
+    const r = parseBuildscriptClasspath(
+      "classpath group: 'org.jetbrains.kotlin', name: 'kotlin-gradle-plugin', version: '1.9.0'",
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0].name).toBe("kotlin-gradle-plugin");
+  });
+});
+
+describe("M347b settings.gradle 仓库", () => {
+  it("内置简写 + 自定义 url，去重", () => {
+    const r = parseSettingsRepos([
+      "dependencyResolutionManagement {",
+      "  repositories {",
+      "    google()",
+      "    mavenCentral()",
+      "    maven { url 'https://jitpack.io' }",
+      "    maven { url 'https://jitpack.io' }",
+      "  }",
+      "}",
+    ].join("\n"));
+    const names = r.map((x) => x.name);
+    expect(names).toContain("google");
+    expect(names).toContain("mavenCentral");
+    // 两个 jitpack 去重成一个
+    const jit = r.filter((x) => x.url === "https://jitpack.io");
+    expect(jit).toHaveLength(1);
+  });
+
+  it("Kotlin uri() 写法", () => {
+    const r = parseSettingsRepos('maven { url = uri("https://maven.aliyun.com/repository/google") }');
+    expect(r).toHaveLength(1);
+    expect(r[0].url).toBe("https://maven.aliyun.com/repository/google");
+  });
+});
+
+describe("M347b app/build.gradle 模块配置", () => {
+  const g = [
+    "plugins { id 'com.android.application' }",
+    "android {",
+    "  namespace 'com.example.app'",
+    "  compileSdk 34",
+    "  defaultConfig {",
+    "    applicationId \"com.example.app\"",
+    "    minSdk 24",
+    "    targetSdk 34",
+    "    versionCode 1",
+    "    versionName \"1.0\"",
+    "  }",
+    "  signingConfigs { release { ... } }",
+    "}",
+  ].join("\n");
+
+  it("抓 namespace / applicationId / sdk / 版本 / 签名", () => {
+    const c = parseAppConfig(g);
+    expect(c.namespace).toBe("com.example.app");
+    expect(c.applicationId).toBe("com.example.app");
+    expect(c.minSdk).toBe("24");
+    expect(c.targetSdk).toBe("34");
+    expect(c.compileSdk).toBe("34");
+    expect(c.versionCode).toBe("1");
+    expect(c.versionName).toBe("1.0");
+    expect(c.hasSigning).toBe(true);
+  });
+
+  it("旧写法 xxxSdkVersion 也认", () => {
+    const c = parseAppConfig("compileSdkVersion 33\nminSdkVersion 21");
+    expect(c.compileSdk).toBe("33");
+    expect(c.minSdk).toBe("21");
+  });
+});
+

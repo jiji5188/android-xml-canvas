@@ -201,3 +201,266 @@ export function gradleDepDownloadUrls(d: GradleDep): string[] {
 export function gradleDepFname(d: GradleDep): string {
   return d.name + "-" + d.version + (d.isAar ? ".aar" : ".jar");
 }
+
+// ---------------------------------------------------------------------------
+// M347：gradle 全局编译标记 + 模块结构（用户 2026-11-17 要求）
+// 时序：settings.gradle → 根 build.gradle → app/build.gradle；
+// gradle.properties 是全局编译开关（AndroidX / Jetifier / minSdk 等）
+// ---------------------------------------------------------------------------
+
+/** 关心的 gradle.properties 键（显示用；不在表里的也照实收） */
+const PROPS_FLAG_KEYS = new Set([
+  "android.useAndroidX",
+  "android.enableJetifier",
+  "android.enableResourceOptimizations",
+  "android.nonTransitiveRClass",
+  "android.nonFinalResIds",
+  "org.gradle.jvmargs",
+  "org.gradle.parallel",
+  "org.gradle.caching",
+  "org.gradle.daemon",
+  "org.gradle.configureondemand",
+  "android.defaults.buildfeatures.buildconfig",
+  "android.suppressUnsupportedCompileSdk",
+]);
+
+export interface GradleProps {
+  /** 全量 key→value（已去注释/空行） */
+  raw: Record<string, string>;
+  /** 编译相关开关（布尔类 + 数值类），用于 UI 标记展示 */
+  flags: { key: string; value: string; known: boolean }[];
+  /** 便捷提取的 SDK 号（可能带变量，能解就解） */
+  minSdk?: string;
+  targetSdk?: string;
+  compileSdk?: string;
+}
+
+/**
+ * 解析 gradle.properties。格式：#注释 / 空行 跳过；key=value（key 可带 : 或 = 转义但这里只做最常用）。
+ * value 里的 $var / ${var} 用同一套 substitute 解（gradle.properties 支持跨文件变量，但只在文件内定义才解）。
+ */
+export function parseGradleProperties(text: string): GradleProps {
+  const raw: Record<string, string> = {};
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#") || line.startsWith("!")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue; // 必须 key=value
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    // 去掉行内注释（# 前有空格才算）
+    const h = value.search(/\s#/);
+    if (h >= 0) value = value.slice(0, h).trim();
+    if (key) raw[key] = value;
+  }
+
+  // 变量（gradle.properties 也允许 prop 引用其它 prop：${key} / $key；key 可带点/横线）
+  const vars = new Map<string, string>();
+  for (const [k, v] of Object.entries(raw)) vars.set(k, v);
+
+  // 专用替换：支持点号/横线的属性名（ext.minV / android.useAndroidX / joda-time）
+  const subProps = (v: string): string => {
+    let out = v;
+    for (let i = 0; i < 5; i++) {
+      if (!/\$[\{A-Za-z]/.test(out)) break;
+      out = out.replace(/\$\{([A-Za-z_.\\-]+)\}|\$([A-Za-z_.\\-]+)(?=[^\w.\\-]|$)/g, (w, braced, plain) => {
+        const key = braced || plain;
+        const val = vars.get(key);
+        return val === undefined ? w : val;
+      });
+    }
+    return out;
+  };
+
+  const pick = (k: string): string | undefined => {
+    const v = raw[k];
+    if (v === undefined) return undefined;
+    return subProps(v); // 变量没解掉就带 $ 返回，UI 能看出来
+  };
+
+  const flags: GradleProps["flags"] = [];
+  for (const [k, v] of Object.entries(raw)) {
+    if (!PROPS_FLAG_KEYS.has(k)) continue;
+    flags.push({ key: k, value: subProps(v), known: true });
+  }
+
+  return {
+    raw,
+    flags,
+    minSdk: pick("minSdkVersion") ?? pick("android.minSdkVersion") ?? pick("android.minSdk"),
+    targetSdk: pick("targetSdkVersion") ?? pick("android.targetSdkVersion") ?? pick("android.targetSdk"),
+    compileSdk: pick("compileSdkVersion") ?? pick("android.compileSdkVersion") ?? pick("android.compileSdk"),
+  };
+}
+
+export interface SettingsMeta {
+  /** include ':app', ':lib' 解出来的模块名 */
+  modules: string[];
+  rootProjectName?: string;
+}
+/**
+ * 解析 settings.gradle / settings.gradle.kts：
+ *   include ':app', ':feature'
+ *   include(":app", ":lib")
+ *   rootProject.name = "MyApp"
+ */
+export function parseSettingsModules(text: string): SettingsMeta {
+  const modules: string[] = [];
+  let rootProjectName: string | undefined;
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.replace(/\/\/.*$/, "").trim();
+    if (!line) continue;
+    // rootProject.name = 'X' / "X" / X
+    let m = line.match(/^rootProject\.name\s*=\s*(["'])([^"']+?)\1/);
+    if (m) {
+      rootProjectName = m[2];
+      continue;
+    }
+    m = line.match(/^rootProject\.name\s*=\s*([A-Za-z_]\w*)$/);
+    if (m) {
+      rootProjectName = m[1];
+      continue;
+    }
+    // include ':a', ':b'  或  include("a", "b")
+    m = line.match(/^include\s*(?:\(([^)]*)\)|(.+?))\s*$/);
+    if (m) {
+      const body = m[1] !== undefined ? m[1] : m[2] ?? "";
+      // 抓所有 :name / "name" / 'name'
+      const found = body.matchAll(/[:"']\s*:?([A-Za-z_][\w-]*)/g);
+      for (const f of found) {
+        const name = f[1];
+        if (!modules.includes(name)) modules.push(name);
+      }
+      // 也抓 include ':a' 里没引号但带冒号的（上面 [:"'] 已含冒号）
+    }
+  }
+  return { modules, rootProjectName };
+}
+
+/** 根 build.gradle 的 buildscript classpath 依赖（构建期插件，不进运行时 classpath，只标记展示） */
+export interface ClasspathDep {
+  group: string;
+  name: string;
+  version: string;
+  raw: string;
+}
+
+export function parseBuildscriptClasspath(text: string): ClasspathDep[] {
+  const out: ClasspathDep[] = [];
+  const vars = collectGradleVars(text);
+  const CLASSPATH =
+    /classpath\s+(?:["'])([\w$.{}-]+):([\w$.{}-]+):([\w.$+-]+)["']\s*$/m;
+  const CLASSPATH_MAP =
+    /classpath\s+group\s*:\s*["']([^"']+)["']\s*,\s*name\s*:\s*["']([^"']+)["']\s*,\s*version\s*:\s*["']([^"']+)["']/;
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!/^classpath\b/.test(line)) continue;
+    let g: string | undefined;
+    let n: string | undefined;
+    let v: string | undefined;
+    let m = line.match(CLASSPATH);
+    if (m) {
+      g = m[1];
+      n = m[2];
+      v = m[3];
+    } else {
+      m = line.match(CLASSPATH_MAP);
+      if (m) {
+        g = m[1];
+        n = m[2];
+        v = m[3];
+      }
+    }
+    if (!g || !n || !v) continue;
+    const gg = substitute(g, vars).value;
+    const nn = substitute(n, vars).value;
+    const vv = substitute(v, vars).value;
+    if (!isUsableVersion(vv)) continue;
+    out.push({ group: gg, name: nn, version: vv, raw: line });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// M347b：settings.gradle 的仓库（“仓库在哪”） + app/build.gradle 的模块配置
+// ---------------------------------------------------------------------------
+
+export interface GradleRepo {
+  /** 展示名：google / mavenCentral / gradlePluginPortal / 自定义 URL */
+  name: string;
+  /** 自定义 maven 仓库的 url（内置简写为空） */
+  url?: string;
+}
+
+/**
+ * 解析 settings.gradle 里的仓库声明：
+ *   google() / mavenCentral() / gradlePluginPortal() / mavenLocal()
+ *   maven { url 'https://jitpack.io' } / maven { url = uri("...") }
+ * 同时去重（pluginManagement 和 dependencyResolutionManagement 常常重复）。
+ */
+export function parseSettingsRepos(text: string): GradleRepo[] {
+  const out: GradleRepo[] = [];
+  const seen = new Set<string>();
+  const push = (r: GradleRepo) => {
+    const k = r.url || r.name;
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(r);
+  };
+  for (const rawLine of text.split(/\r?\n/)) {
+    // 只在 // 前是空白或行首时才当注释（避免把 https:// 里的 // 当注释）
+    const line = rawLine.replace(/(^\s*|\s)\/\/.*/g, (m, p1) => p1).trim();
+    if (!line) continue;
+    if (/^google\s*\(\s*\)/.test(line)) { push({ name: "google" }); continue; }
+    if (/^mavenCentral\s*\(\s*\)/.test(line)) { push({ name: "mavenCentral" }); continue; }
+    if (/^gradlePluginPortal\s*\(\s*\)/.test(line)) { push({ name: "gradlePluginPortal" }); continue; }
+    if (/^mavenLocal\s*\(\s*\)/.test(line)) { push({ name: "mavenLocal" }); continue; }
+    // maven { url '...' } 或 maven { url = uri('...') } （可能一行内写完）
+    if (/^maven\s*\{/.test(line)) {
+      const m =
+        line.match(/url\s*=?\s*["']([^"']+)["']/) ||
+        line.match(/uri\s*\(\s*["']([^"']+)["']\s*\)/);
+      if (m) push({ name: "maven", url: m[1] });
+    }
+  }
+  return out;
+}
+
+export interface AppConfig {
+  namespace?: string;
+  applicationId?: string;
+  minSdk?: string;
+  targetSdk?: string;
+  compileSdk?: string;
+  versionCode?: string;
+  versionName?: string;
+  /** 是否开了 signingConfigs（只标记，不解析密钥） */
+  hasSigning?: boolean;
+}
+
+/**
+ * 解析 app/build.gradle 模块专属配置：
+ *   namespace 'com.x.y' / applicationId 'com.x.y'
+ *   compileSdk 34 / minSdk 24 / targetSdk 34（也认 xxxSdkVersion 旧写法）
+ *   versionCode 1 / versionName "1.0"
+ *   signingConfigs { ... }
+ */
+export function parseAppConfig(text: string): AppConfig {
+  const cfg: AppConfig = {};
+  const vars = collectGradleVars(text);
+  const grab = (re: RegExp): string | undefined => {
+    const m = text.match(re);
+    if (!m) return undefined;
+    const v = substitute(m[1], vars).value;
+    return v.replace(/^["']|["']$/g, "").trim() || undefined;
+  };
+  cfg.namespace = grab(/\bnamespace\s*=?\s*(["'][^"']+["']|[\w.$]+)/);
+  cfg.applicationId = grab(/\bapplicationId\s*=?\s*(["'][^"']+["']|[\w.$]+)/);
+  cfg.compileSdk = grab(/\bcompileSdk(?:Version)?\s*=?\s*(\d+|[\w.$]+)/);
+  cfg.minSdk = grab(/\bminSdk(?:Version)?\s*=?\s*(\d+|[\w.$]+)/);
+  cfg.targetSdk = grab(/\btargetSdk(?:Version)?\s*=?\s*(\d+|[\w.$]+)/);
+  cfg.versionCode = grab(/\bversionCode\s*=?\s*(\d+|[\w.$]+)/);
+  cfg.versionName = grab(/\bversionName\s*=?\s*(["'][^"']+["']|[\w.$]+)/);
+  cfg.hasSigning = /\bsigningConfigs\s*\{/.test(text);
+  return cfg;
+}

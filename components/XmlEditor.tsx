@@ -118,12 +118,7 @@ import {
   type ThemeOverrides,
 } from "@/lib/xml/theme-presets";
 import {
-  wsInfo,
-  wsListTopProjects,
-  wsSubscribeTopProjects,
   wsOpenProject,
-  wsPickCustom,
-  wsUseDefault,
   wsRequestAllFiles,
   invalidateNativeProjectCache,
   type WsInfo,
@@ -200,7 +195,6 @@ import { useDiffHistory } from "./use-diff-history";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 import { SaveAsDialog, ConflictDialog } from "./SmallDialogs";
 import { useFileImport } from "./use-file-import";
-import { useWorkspaceRefresh } from "./use-workspace-refresh";
 import { useProjectCreate } from "./use-project-create";
 import { useProjectRename } from "./use-project-rename";
 import { useSaveDomain } from "./use-save-domain";
@@ -442,14 +436,24 @@ export function XmlEditor() {
   // M304：画布资产/设备/面板状态域（resIcon/resShape/resImage + device + 锁定 + 面板开合）→ components/use-canvas-assets.ts
   const { resIcon, setResIcon, resShape, setResShape, resImage, setResImage, deviceId, device, changeDevice, leftOpen, setLeftOpen, rightOpen, setRightOpen, leftView, setLeftView, lockedPaths, toggleLockPath, isPathLocked } = useCanvasAssets();
   /* ===== M16i：工作目录 ===== */
+  /** M366：弹窗/面板 UI state → components/use-panels.ts（前移：setWsMsg 要给 useXmlProjectState 用） */
+  const {
+    histPanelOpen, setHistPanelOpen, snapCount, setSnapCount,
+    wsActiveName, setWsActiveName, wsMsg, setWsMsg,
+    addModalOpen, setAddModalOpen, exportOpen, setExportOpen,
+    compareOpen, setCompareOpen, compareIds, toggleCompareDevice,
+    exportReport, setExportReport, exportMode, setExportMode,
+    imgExportOpen, setImgExportOpen, exportAction, setExportAction,
+    dropHint, setDropHint, runOpen, setRunOpen,
+  } = usePanels();
   /** M366：项目管理/工作区 state → components/use-xml-project.ts */
   const {
     projectTab, setProjectTab, wsState, setWsState, wsProjects, setWsProjects,
     activeProject, setActiveProject, projectRev, setProjectRev, projMeta, setProjMeta,
     newProjOpen, setNewProjOpen, newProjName, setNewProjName, newProjIcon, setNewProjIcon,
     newProjPkg, setNewProjPkg, newProjBusy, setNewProjBusy, saveOrigin, setSaveOrigin,
-    analyzeProjects,
-  } = useXmlProjectState();
+    analyzeProjects, wsBusy, setWsBusy, refreshWorkspace, pickCustomDir, useDefaultDir,
+  } = useXmlProjectState({ leftView, setWsMsg });
   /** M23：界面语言（默认跟随系统） */
   const [langPref, setLangPref] = useState<LangPref>(() => loadLangPref());
   const lang = useMemo(() => resolveLang(langPref), [langPref]);
@@ -467,7 +471,6 @@ export function XmlEditor() {
   /** M21：另存对话框（新建文件时先确认文件名） */
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState("activity_main.xml");
-  const [wsBusy, setWsBusy] = useState(false);
 
   /** M201：磁盘上的文件被外部改过 → 拦下这一次写入，让用户选
    *  （直接用旧内容盖掉别人在电脑上的改动是开发工具最不能犯的错） */
@@ -484,16 +487,7 @@ export function XmlEditor() {
     | null
   >(null);
 
-  /** M366：弹窗/面板 UI state → components/use-panels.ts */
-  const {
-    histPanelOpen, setHistPanelOpen, snapCount, setSnapCount,
-    wsActiveName, setWsActiveName, wsMsg, setWsMsg,
-    addModalOpen, setAddModalOpen, exportOpen, setExportOpen,
-    compareOpen, setCompareOpen, compareIds, toggleCompareDevice,
-    exportReport, setExportReport, exportMode, setExportMode,
-    imgExportOpen, setImgExportOpen, exportAction, setExportAction,
-    dropHint, setDropHint, runOpen, setRunOpen,
-  } = usePanels();
+  /** M366：弹窗/面板 UI state → usePanels 已在上方（M16i 区域）调用，此处不再重复 */
   /** M37：代码编辑器外观（光标/选区/高亮/字号，localStorage 记住）→ use-editor-theme */
   const {
     editorTheme, patchEditorTheme, resetEditorTheme, patchEditorColor,
@@ -614,35 +608,7 @@ export function XmlEditor() {
   useBackGuard(saveAsOpen, () => setSaveAsOpen(false), "save-as");
 
   // M25d/M31 项目分析（analyzeProjects + analyzed/analyzing refs）已下沉 → components/use-xml-project.ts
-  // M309：工作目录刷新 / 12s 轮询 / 恢复上次项目 → components/use-workspace-refresh.ts
-  const { refreshWorkspace } = useWorkspaceRefresh({
-    leftView,
-    wsState,
-    activeProject,
-    setActiveProject,
-    setWsBusy,
-    setWsMsg,
-    setWsState,
-    setWsProjects,
-    analyzeProjects,
-  });
-
-  const pickCustomDir = useCallback(async () => {
-    const ok = await wsPickCustom();
-    if (!ok) {
-      setWsMsg(wsState?.mode === "unsupported" ? tt("当前浏览器不支持，请用 Chrome / Edge 或 APK") : tt("已取消选择"));
-      return;
-    }
-    setWsMsg("");
-    // 原生选择器是异步回调，给系统一点时间落盘
-    window.setTimeout(() => void refreshWorkspace(), 600);
-  }, [refreshWorkspace, wsState?.mode]);
-
-  const useDefaultDir = useCallback(async () => {
-    await wsUseDefault();
-    setWsMsg(tt("已恢复默认工作目录"));
-    window.setTimeout(() => void refreshWorkspace(), 400);
-  }, [refreshWorkspace]);
+  // M309：工作目录刷新/12s 轮询/恢复上次项目 + 手选/默认目录 也已下沉 → components/use-xml-project.ts
 
   // M30b：默认落在「XML 代码」tab
   const [mobileTab, setMobileTab] = useState<"preview" | "xml" | "values">("xml");

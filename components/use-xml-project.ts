@@ -10,7 +10,18 @@ import type { WsInfo, WsProject } from "@/lib/xml/workspace";
 import type { ProjectMeta } from "@/lib/xml/project-browse";
 import type { ActiveProject } from "./XmlEditor";
 import { readProjectMeta, readProjectMetaNative } from "@/lib/xml/project-browse";
+import { wsPickCustom, wsUseDefault } from "@/lib/xml/workspace";
 import { yieldToUi } from "@/lib/xml/native-async";
+import { t as tt } from "@/lib/i18n-src";
+import { useWorkspaceRefresh } from "./use-workspace-refresh";
+
+/** M366：B 集群下沉时需要的壳外依赖（避免 B→C / B→Panels 硬耦合） */
+export interface XmlProjectDeps {
+  /** 当前左栏视图（res/settings/...），refreshWorkspace 的 effect 依赖它 */
+  leftView: string;
+  /** 工作区提示文案 setter（在 use-panels 里，壳传入） */
+  setWsMsg: (v: string) => void;
+}
 
 export interface XmlProjectState {
   /** M16i：工作目录面板 tab（projects = 项目列表 / current = 当前项目） */
@@ -49,9 +60,19 @@ export interface XmlProjectState {
   >;
   /** M25d/M31：后台分析项目名/图标（下沉自壳） */
   analyzeProjects: (list: WsProject[]) => Promise<void>;
+  /** M48：工作区刷新忙碌态（下沉自壳） */
+  wsBusy: boolean;
+  setWsBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  /** M309：工作目录刷新（来自 use-workspace-refresh） */
+  refreshWorkspace: (opts?: { quiet?: boolean }) => Promise<void>;
+  /** M16i：手选工作目录 */
+  pickCustomDir: () => Promise<void>;
+  /** M16i：恢复默认工作目录 */
+  useDefaultDir: () => Promise<void>;
 }
 
-export function useXmlProjectState(): XmlProjectState {
+export function useXmlProjectState(d: XmlProjectDeps): XmlProjectState {
+  const { leftView, setWsMsg } = d;
   const [projectTab, setProjectTab] = useState<"projects" | "current">("current");
   const [wsState, setWsState] = useState<WsInfo | null>(null);
   const [wsProjects, setWsProjects] = useState<WsProject[]>([]);
@@ -66,6 +87,8 @@ export function useXmlProjectState(): XmlProjectState {
   const [saveOrigin, setSaveOrigin] = useState<
     { kind: "native"; target: string; name: string } | { kind: "handle"; handle: unknown; name: string } | null
   >(null);
+  /** M48：工作区刷新忙碌态（原壳 470） */
+  const [wsBusy, setWsBusy] = useState(false);
 
   // M25d/M31 项目分析（原壳 616-673）：analyzed/analyzing refs + analyzeProjects 下沉
   /** M25d：已经分析过名称/图标的项目（rel），避免 4s 轮询重复读文件 */
@@ -127,11 +150,43 @@ export function useXmlProjectState(): XmlProjectState {
     [],
   );
 
+  // M309：工作目录刷新 / 12s 轮询 / 恢复上次项目 → use-workspace-refresh（下沉自壳 618-628）
+  const { refreshWorkspace } = useWorkspaceRefresh({
+    leftView,
+    wsState,
+    activeProject,
+    setActiveProject,
+    setWsBusy,
+    setWsMsg,
+    setWsState,
+    setWsProjects,
+    analyzeProjects,
+  });
+
+  // M16i：手选工作目录（原壳 630-639）
+  const pickCustomDir = useCallback(async () => {
+    const ok = await wsPickCustom();
+    if (!ok) {
+      setWsMsg(wsState?.mode === "unsupported" ? tt("当前浏览器不支持，请用 Chrome / Edge 或 APK") : tt("已取消选择"));
+      return;
+    }
+    setWsMsg("");
+    // 原生选择器是异步回调，给系统一点时间落盘
+    window.setTimeout(() => void refreshWorkspace(), 600);
+  }, [refreshWorkspace, wsState?.mode, setWsMsg]);
+
+  // M16i：恢复默认工作目录（原壳 641-646）
+  const useDefaultDir = useCallback(async () => {
+    await wsUseDefault();
+    setWsMsg(tt("已恢复默认工作目录"));
+    window.setTimeout(() => void refreshWorkspace(), 400);
+  }, [refreshWorkspace, setWsMsg]);
+
   return {
     projectTab, setProjectTab, wsState, setWsState, wsProjects, setWsProjects,
     activeProject, setActiveProject, projectRev, setProjectRev, projMeta, setProjMeta,
     newProjOpen, setNewProjOpen, newProjName, setNewProjName, newProjIcon, setNewProjIcon,
     newProjPkg, setNewProjPkg, newProjBusy, setNewProjBusy, saveOrigin, setSaveOrigin,
-    analyzeProjects,
+    analyzeProjects, wsBusy, setWsBusy, refreshWorkspace, pickCustomDir, useDefaultDir,
   };
 }

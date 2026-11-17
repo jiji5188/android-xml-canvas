@@ -1283,6 +1283,8 @@ export const SRC_EN: SrcDict = {
   "下载失败：{err}": "Download failed: {err}",
   "保存失败：{msg}": "Save failed: {msg}",
   "无法保存：当前没有可写的库目录": "Cannot save: no writable library directory",
+  "原生下载失败（{err}），改用浏览器下载": "Native download failed ({err}), falling back to browser",
+  "已保存到 {path}（本地库）": "Saved to {path} (local libs)",
   "暂无库文件": "No library files",
   "需先打开项目目录": "open a project folder first",
   "刷新": "Refresh",

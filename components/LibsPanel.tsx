@@ -161,25 +161,66 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     const name = dlName.trim() || url.split("/").pop() || "library.jar";
     setDlBusy(true);
     onNote?.(tr("libs.downloading", "正在下载…"));
+    // 保存目标：当前 tab 对应的 libs 目录
+    let targetBase = tab === "local" ? localDir : null;
+    if (!targetBase && nativeProjectRoot && native) {
+      targetBase = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
+    }
+    const target = targetBase ? `${targetBase}/${name}` : null;
+
+    // M344：优先原生 HttpURLConnection（多镜像 + 绕 CORS/WebView 限制），浏览器再回退 fetch
+    if (target && typeof native?.downloadLib === "function") {
+      native.createEntry?.(targetBase!, true);
+      // 用户输入的是完整 URL，直接传给原生下载器（只试这一个源）
+      const urlsJson = JSON.stringify([url]);
+      let r = "";
+      try { r = String(native.downloadLib(urlsJson, target) ?? ""); } catch (e2) { r = "throw:" + String(e2); }
+      if (r.startsWith("ok")) {
+        const parts = r.slice(3).split("@");
+        const savedPath = parts[2] || "";
+        const isFallback = parts[3] === "fallback";
+        if (isFallback && savedPath) {
+          // 项目 libs 写不了 → 存到应用私有目录，尝试拷回
+          try {
+            const b64 = native.readBase64?.(savedPath);
+            if (b64) {
+              const w = native.writeText?.(target, b64);
+              if (typeof w === "string" && w.startsWith("ok")) {
+                onNote?.(tr("libs.download_saved", "已保存到 {path}", { path: target }));
+                setDlOpen(false); setDlUrl(""); setDlName("");
+                void refresh(); setDlBusy(false); return;
+              }
+            }
+          } catch {}
+          setDlBusy(false);
+          onNote?.(tr("libs.cat_fallback", "{lib} 已下载到临时目录 {p}（项目 libs 写不了，请手动拷进去）", { lib: name, p: savedPath }));
+          return;
+        }
+        onNote?.(tr("libs.download_saved", "已保存到 {path}", { path: target }));
+        setDlOpen(false); setDlUrl(""); setDlName("");
+        void refresh();
+        setDlBusy(false);
+        return;
+      }
+      // 原生下载失败 → 走浏览器 fetch 回退
+      onNote?.(tr("libs.native_dl_failed", "原生下载失败（{err}），改用浏览器下载", { err: r.slice(4) || "?" }));
+    }
+
+    // 浏览器回退：fetch + base64
     const r = await fetchBase64(url);
     if (!r.ok) {
       onNote?.(tr("libs.download_failed", "下载失败：{err}", { err: r.error || "unknown" }));
       setDlBusy(false);
       return;
     }
-    // 保存目标：当前 tab 对应的 libs 目录
-    let targetBase = tab === "local" ? localDir : null;
-    if (!targetBase && nativeProjectRoot && native) {
-      targetBase = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
-    }
     if (targetBase && native) {
       native.createEntry?.(targetBase, true);
-      const target = `${targetBase}/${name}`;
-      const w = native.writeText?.(target, r.b64);
+      const tgt = `${targetBase}/${name}`;
+      const w = native.writeText?.(tgt, r.b64);
       const ok = typeof w === "string" && w.startsWith("ok");
       onNote?.(
         ok
-          ? tr("libs.download_saved", "已保存到 {path}", { path: target })
+          ? tr("libs.download_saved", "已保存到 {path}", { path: tgt })
           : tr("libs.download_save_failed", "保存失败：{msg}", { msg: w || "unknown" }),
       );
       if (ok) {

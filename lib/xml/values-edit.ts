@@ -249,6 +249,28 @@ export function parseValues(xml: string): ValuesDoc {
         const nameAttr = attrSpan(attrs, at + 1 + tag.length, "name");
         if (nameAttr) {
           const typeAttr = attrSpan(attrs, at + 1 + tag.length, "type");
+          // M342：自闭合的容器标签（<style name="X" />）也是容器，当作标题行（valueFrom=-1），
+          // 否则折叠分组/添加属性都拿不到它
+          if (isContainerTag(tag)) {
+            const parentAttr = attrSpan(attrs, at + 1 + tag.length, "parent");
+            items.push({
+              tag,
+              kind: kindOf(tag, typeAttr?.value),
+              name: nameAttr.value,
+              value: "",
+              valueFrom: -1,
+              valueTo: -1,
+              elemFrom: at,
+              elemEnd: at + whole.length,
+              itemType: typeAttr?.value,
+              nameFrom: nameAttr.from,
+              nameTo: nameAttr.to,
+              line: lineAt(xml, at),
+              parent: parentAttr?.value,
+              depth: 0,
+            });
+            continue;
+          }
           items.push({
             tag,
             kind: kindOf(tag, typeAttr?.value),
@@ -418,6 +440,94 @@ export function appendItem(
   }
   // 单行文件：<resources></resources>
   return xml.slice(0, insertAt) + nl + line + nl + xml.slice(insertAt);
+}
+
+/** M342：往指定 style 节点内插入一条属性（在 </style> 闭合标签前）
+ *  styleHead = 该 style 容器的 ValueItem（valueFrom < 0，即标题行）
+ *  返回修改后的 xml */
+export function insertIntoStyle(
+  xml: string,
+  styleHead: ValueItem,
+  entry: { tag: string; name: string; value: string; itemType?: string },
+  doc?: ValuesDoc,
+): string {
+  const d = doc || parseValues(xml);
+  const crlf = xml.includes("\r\n");
+  const nl = crlf ? "\r\n" : "\n";
+  const topIndent = detectIndent(xml, d);
+  // M342 修正：优先沿用该 style 现有子项的缩进（原文件子项可能比顶层多 4 格），没有子项再 顶层+2
+  const existingChild = d.items.find((i) => i.inStyle === styleHead.name && i.elemFrom >= 0 && i.elemFrom > styleHead.elemFrom);
+  let itemIndent: string;
+  if (existingChild) {
+    let cs = existingChild.elemFrom;
+    while (cs > 0 && (xml[cs - 1] === " " || xml[cs - 1] === "\t")) cs--;
+    itemIndent = xml.slice(cs, existingChild.elemFrom);
+  } else {
+    itemIndent = topIndent + (topIndent.includes("\t") ? "\t" : "  ");
+  }
+  const line = renderItem(entry.tag, entry.name, entry.value, {
+    itemType: entry.itemType,
+    indent: itemIndent,
+  });
+
+  const elemText = xml.slice(styleHead.elemFrom, styleHead.elemEnd);
+
+  // 1) 自闭合 <style ... /> → 改成 <style ...> + 子项 + </style>
+  const selfCloseAt = elemText.lastIndexOf("/>");
+  if (selfCloseAt >= 0) {
+    const slashAbs = styleHead.elemFrom + selfCloseAt;
+    // 该行行首缩进
+    let lineStart = styleHead.elemFrom;
+    while (lineStart > 0 && (xml[lineStart - 1] === " " || xml[lineStart - 1] === "\t")) lineStart--;
+    const headIndent = xml.slice(lineStart, styleHead.elemFrom);
+    return (
+      xml.slice(0, slashAbs) +
+      ">" +
+      nl +
+      line +
+      nl +
+      headIndent +
+      "</" + styleHead.tag + ">" +
+      xml.slice(styleHead.elemEnd)
+    );
+  }
+
+  // 2) 常规 <style ...>...</style>：elemEnd 指向闭合标签之后，找闭合标签起点
+  const closeTag = "</" + styleHead.tag + ">";
+  const closeAt = xml.lastIndexOf(closeTag, styleHead.elemEnd);
+  if (closeAt < styleHead.elemFrom) return xml;
+  // 吃掉闭合标签行首缩进
+  let insertAt = closeAt;
+  while (insertAt > 0 && (xml[insertAt - 1] === " " || xml[insertAt - 1] === "\t")) insertAt--;
+  if (insertAt > 0 && xml[insertAt - 1] === "\n") {
+    return xml.slice(0, insertAt) + line + nl + xml.slice(insertAt);
+  }
+  // 单行 style（<style ...></style> 无换行）
+  return xml.slice(0, insertAt) + nl + line + nl + xml.slice(insertAt);
+}
+
+export function appendStyle(
+  xml: string,
+  name: string,
+  parent?: string,
+  doc?: ValuesDoc,
+): string {
+  const d = doc || parseValues(xml);
+  if (d.closeAt < 0) return xml;
+  const crlf = xml.includes("\r\n");
+  const nl = crlf ? "\r\n" : "\n";
+  const indent = detectIndent(xml, d);
+  const parentAttr = parent ? ` parent="${parent}"` : "";
+  const open = `${indent}<style name="${name}"${parentAttr}>`;
+  const close = `${indent}</style>`;
+  const block = open + nl + close;
+  // 插在 </resources> 前（与 appendItem 同一套定位）
+  let insertAt = d.closeAt;
+  while (insertAt > 0 && (xml[insertAt - 1] === " " || xml[insertAt - 1] === "\t")) insertAt--;
+  if (insertAt > 0 && xml[insertAt - 1] === "\n") {
+    return xml.slice(0, insertAt) + block + nl + xml.slice(insertAt);
+  }
+  return xml.slice(0, insertAt) + nl + block + nl + xml.slice(insertAt);
 }
 
 /** name 是否已存在（查重用；M341：只看顶层资源名——style 内的 <item> 是属性引用，允许同名，不算资源名冲突） */

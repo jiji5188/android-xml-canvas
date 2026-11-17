@@ -2858,6 +2858,50 @@ body.axv-lt-dragging .axv-lt-row {
   font-size: 17px;
 }
 
+/* M342：style 节点内添加属性 */
+.axv-val-add-attr {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--axv-primary);
+  cursor: pointer;
+}
+.axv-val-add-attr:hover {
+  background: color-mix(in srgb, var(--axv-primary) 12%, transparent);
+}
+.axv-val-add-attr .msr {
+  font-size: 17px;
+}
+.axv-val-add-attr-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0 2px 22px;
+  flex-wrap: wrap;
+}
+.axv-val-add-attr-form input {
+  flex: 1 1 120px;
+  min-width: 80px;
+  max-width: 200px;
+  padding: 4px 8px;
+  border: 1px solid var(--axv-outline-variant, #ccc);
+  border-radius: 4px;
+  font-size: 12px;
+  background: transparent;
+  color: var(--axv-on-surface);
+}
+.axv-val-add-attr-form .axv-val-ok {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 /* M338：themes.xml 结构化视图 —— 样式节点（name + parent）在前，属性配置缩进在后 + 中文说明 */
 .axv-val-row {
   flex-wrap: wrap;

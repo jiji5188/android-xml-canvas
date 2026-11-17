@@ -15,8 +15,11 @@ import { parseColorOr, toArgbHex, toRgbHex } from "@/lib/xml/color-argb";
 import {
   KIND_LABEL,
   appendItem,
+  appendStyle,
   colorForPreview,
   groupByContainer,
+  hasName,
+  insertIntoStyle,
   isColorValue,
   parseValues,
   removeItem,
@@ -60,6 +63,7 @@ const NEW_TYPES: { tag: string; label: string; hint: string; sample: string }[] 
   { tag: "dimen", label: "尺寸", hint: "8dp / 12sp", sample: "8dp" }, // i18n-ignore
   { tag: "integer", label: "整数", hint: "纯数字", sample: "1" }, // i18n-ignore
   { tag: "bool", label: "布尔", hint: "true / false", sample: "true" }, // i18n-ignore
+  { tag: "style", label: "样式", hint: "parent 填值即可继承", sample: "Theme.MyApp" }, // i18n-ignore
 ];
 
 export function ValuesEditor({ xml, onChange, onNote, className, reservedNames }: ValuesEditorProps) {
@@ -79,6 +83,10 @@ export function ValuesEditor({ xml, onChange, onNote, className, reservedNames }
   /** M341：属性名过滤弹窗（哪个 style 内的 item 打开 + 过滤词） */
   const [attrFor, setAttrFor] = useState<string | null>(null);
   const [attrQ, setAttrQ] = useState("");
+  /** M342：往 style 节点内添加属性（哪个 style 打开 + 新属性名/值） */
+  const [addAttrFor, setAddAttrFor] = useState<string | null>(null);
+  const [newAttrName, setNewAttrName] = useState("");
+  const [newAttrValue, setNewAttrValue] = useState("");
 
   const note = (s: string) => {
     setMsg(s);
@@ -186,9 +194,46 @@ export function ValuesEditor({ xml, onChange, onNote, className, reservedNames }
     note(tt("已删除 {name}", { name: it.name }));
   };
 
+  /** M342：往指定 style 节点内添加一条属性 */
+  const addAttrToStyle = () => {
+    if (!addAttrFor) return;
+    const name = newAttrName.trim();
+    const value = newAttrValue.trim();
+    if (!name) {
+      note(tt("属性名不能为空"));
+      return;
+    }
+    // 找到目标 style 的 head item
+    const head = doc.items.find((i) => i.name === addAttrFor && i.valueFrom < 0 && i.tag === "style");
+    if (!head) {
+      note(tt("找不到样式 {name}", { name: addAttrFor }));
+      return;
+    }
+    onChange(insertIntoStyle(xml, head, { tag: "item", name, value, itemType: undefined }));
+    note(tt("已往 {style} 添加属性 {attr}", { style: addAttrFor, attr: name }));
+    setAddAttrFor(null);
+    setNewAttrName("");
+    setNewAttrValue("");
+  };
+
   const add = () => {
     const t = NEW_TYPES.find((x) => x.tag === newType) || NEW_TYPES[0];
-    const name = uniqueName(doc, newName.trim() || `${t.tag}_new`);
+    const rawName = newName.trim() || `${t.tag}_new`;
+    if (t.tag === "style") {
+      // M342：新建 style 节点（可带 parent）；资源名全局不能重名
+      const name = rawName;
+      if (hasName(doc, name) || reserved.has(name)) {
+        note(tt("资源名 {name} 已存在（全局不能重名）", { name }));
+        return;
+      }
+      onChange(appendStyle(xml, name, newValue.trim() || undefined, doc));
+      setNewName("");
+      setNewValue("");
+      setNewOpen(false);
+      note(tt("已新建样式 {name}", { name }));
+      return;
+    }
+    const name = uniqueName(doc, rawName);
     const value = newValue.trim() || t.sample;
     if (t.tag === "color" && !isColorValue(value)) {
       note(tt("颜色值要写 #RRGGBB / #AARRGGBB 或 @color/xxx"));
@@ -301,6 +346,17 @@ export function ValuesEditor({ xml, onChange, onNote, className, reservedNames }
               />
             </>
           )}
+          {isHead ? (
+            <button
+              type="button"
+              className="axv-val-add-attr"
+              title={tt("给 {name} 添加属性", { name: it.name })}
+              aria-label={tt("给 {name} 添加属性", { name: it.name })}
+              onClick={() => setAddAttrFor(addAttrFor === it.name ? null : it.name)}
+            >
+              <span className="msr" aria-hidden="true">add</span>
+            </button>
+          ) : null}
           <button
             type="button"
             className="axv-val-del"
@@ -312,6 +368,30 @@ export function ValuesEditor({ xml, onChange, onNote, className, reservedNames }
           </button>
         </div>
         {desc ? <div className="axv-val-desc">{tt(desc.desc)}</div> : null}
+        {isHead && addAttrFor === it.name ? (
+          <div className="axv-val-add-attr-form">
+            <input
+              value={newAttrName}
+              placeholder={tt("属性名（如 android:colorPrimary）")}
+              aria-label={tt("新属性名")}
+              spellCheck={false}
+              onChange={(e) => setNewAttrName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addAttrToStyle()}
+              list="axv-attr-dl"
+            />
+            <input
+              value={newAttrValue}
+              placeholder={tt("属性值")}
+              aria-label={tt("新属性值")}
+              spellCheck={false}
+              onChange={(e) => setNewAttrValue(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addAttrToStyle()}
+            />
+            <button type="button" className="axv-val-ok" onClick={addAttrToStyle}>
+              {tt("添加")}
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -405,8 +485,14 @@ export function ValuesEditor({ xml, onChange, onNote, className, reservedNames }
           ) : null}
           <input
             value={newValue}
-            placeholder={(NEW_TYPES.find((t) => t.tag === newType) || NEW_TYPES[0]).hint}
-            aria-label={tt("新资源值")}
+            placeholder={
+              newType === "style"
+                ? tt("parent（可选，如 Theme.Material3.Light）")
+                : (NEW_TYPES.find((t) => t.tag === newType) || NEW_TYPES[0]).hint
+            }
+            aria-label={newType === "style" ? tt("新样式 parent（可选）") : tt("新资源值")}
+            list={newType === "style" ? "axv-parent-dl" : undefined}
+            spellCheck={false}
             onChange={(e) => setNewValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
           />

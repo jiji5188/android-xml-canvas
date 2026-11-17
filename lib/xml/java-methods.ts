@@ -121,6 +121,35 @@ export const KNOWN_METHODS: string[] = [
   "getRunningServices", "isIgnoringBatteryOptimizations", "requestIgnoreBatteryOptimizations",
   "isDeviceIdleMode", "isPowerSaveMode", "registerComponentListener",
   "unregisterComponentListener", "getServicesForComponent", "startInstrumentation",
+  // M351：Activity / Fragment / View 常见 getter（getTitle 这类之前缺 → 被误判成 setTitle 的拼写错）
+  "getTitle", "getActionBar", "getSupportActionBar", "getLayoutInflater", "getOptionsMenu",
+  "getCallingPackage", "getComponentName", "getParentActivityIntent", "getParentActivityAction",
+  "getParentActivityName", "getParentClassName", "getTargetTheme", "getApplicationProvider", "getActivity",
+  "getArguments", "getUserVisibleHint", "getMenu", "getPreferences",
+  // View / ViewGroup 家族
+  "getContext", "getId", "getLayoutParam", "getWidth", "getHeight", "getLeft", "getTop", "getRight",
+  "getBottom", "getX", "getY", "getZ", "getScrollX", "getScrollY", "getMeasuredWidth",
+  "getMeasuredHeight", "getPadding", "getPaddingLeft", "getPaddingRight", "getPaddingTop", "getPaddingBottom",
+  "getPaddingStart", "getPaddingEnd", "getMinimumWidth", "getMinimumHeight", "getAlpha", "getRotation",
+  "getScaleX", "getScaleY", "getTranslationX", "getTranslationY", "getElevation", "getBackground",
+  "getAnimation", "getCurrentAnimation", "getFocusables", "getFocusableCount", "getDrawingCache",
+  "getImportantForAccessibility", "getContentDescription", "getAccessibilityNodeProvider", "getDrawingTime",
+  "getKeepScreenOn", "getKeyListener", "getSuggestionSpans", "getLongClickSloptime",
+  // TextView / EditText
+  "getText", "getHint", "getError", "getTextSize", "getPaint", "getColors", "getCurrentColors",
+  "getLinks", "getMovementMethod", "getSelectionStart", "getSelectionEnd", "getInputType", "getImeOptions",
+  "getCursorCapsMode", "getTextUtils", "getTransformationMethod", "getCompoundDrawables", "getCompoundDrawablesRelative",
+  "getTextLength", "getTextAt", "getLineCount", "getLineHeight", "getMaxLines", "getMinLines", "getMaxEms",
+  "getMinEms", "getLineSpacingExtra", "getLineSpacingMult", "getLetterSpacing", "getTextAlign", "getCompoundPaddingTop",
+  // 列表 / 适配器
+  "getItem", "getItemId", "getItemCount", "getView", "getChildCount", "getChildAt", "getFirstVisiblePosition",
+  "getLastVisiblePosition", "getCurrentItem", "getAdapterPosition", "getItemPosition", "getChildAdapterPosition",
+  "getRecycledViewPool", "getLayoutManager", "getSelectedItemAtPosition", "isCheckedItemPosition",
+  "getCheckedItemPosition", "getCheckedItemPositions", "getPrimaryItemId", "getItemViewType", "getItemViewTypeCount",
+  // 开关 / 进度 / 评分
+  "getSecondaryProgress", "getMaxProgress", "getRating", "getStars", "getNumberStars", "getIsIndicator",
+  "isIndeterminate", "getIndeterminateDrawable", "getIndeterminateDuration", "getIndeterminateTintMode",
+  "getProgressTint", "getProgressTintMode", "getSecondaryProgressTint", "getVertical", "isVertical",
 ];
 
 const KNOWN = new Set(KNOWN_METHODS);
@@ -180,15 +209,48 @@ export interface MethodTypo {
 }
 
 export interface FindMethodTyposOpts {
-  /** 跳过这些名字（本文件自己定义的方法） */
+  /** 跳过这些名字（本文件 / 项目其它文件里定义的方法） */
   declared?: Iterable<string>;
+}
+
+/** Java 关键字（在声明识别里当「类型 token」时要排除：return foo( / else if( 都不是声明） */
+const NOT_A_TYPE = new Set([
+  "if", "for", "while", "switch", "catch", "return", "new", "else", "do", "try", "throw",
+  "case", "assert", "synchronized", "instanceof", "super", "this", "yield", "default", "package",
+  "import", "class", "interface", "enum", "extends", "implements", "break", "continue", "finally",
+]);
+
+/** 行尾的「返回类型」 token：`String` / `List<Foo>` / `Map<String,Object>` / `int[]` */
+const TYPE_AT_END = /([A-Za-z_$][\w$]*(?:\s*<[^<>;{}]{0,160}>)?(?:\s*\[\s*\])*)\s*$/;
+
+/** M351：收集「方法声明」的名字（`public String getTitle(` / `void onCreate(` / `String name()`）。
+ *  只认「前面有返回类型且不是 `.` 调用」的形式；判错时宁可多收（少报拼写错）不可漏。
+ *  用途：① 本文件内的拼写检查豁免；② 把项目里其它文件的声明喂进 findMethodTypos，
+ *  否则 `SubmitData` 里实现好的 getTitle() 在别的文件里被调用时会被当成 setTitle() 的拼错。 */
+export function collectDeclaredMethods(code: string, into: Set<string> = new Set<string>()): Set<string> {
+  if (!code) return into;
+  for (const line of code.split("\n")) {
+    for (const m of line.matchAll(/([A-Za-z_$][\w$]*)\s*\(/g)) {
+      const name = m[1];
+      const at = m.index ?? 0;
+      const before = line.slice(0, at);
+      if (/\.\s*$/.test(before)) continue; // obj.name( → 调用
+      if (!/^[a-z_]/.test(name)) continue; // 构造器 / 类名不算方法
+      const tm = before.replace(/\s+$/, "").match(TYPE_AT_END);
+      if (!tm) continue;
+      const base = tm[1].replace(/<[\s\S]*$/, "").replace(/\[\s*\]/g, "").trim();
+      if (!base || NOT_A_TYPE.has(base)) continue;
+      into.add(name);
+    }
+  }
+  return into;
 }
 
 /** 在代码里找「调用名拼错」的地方 */
 export function findMethodTypos(code: string, opts: FindMethodTyposOpts = {}): MethodTypo[] {
   const declared = new Set<string>([...opts.declared ?? []]);
   // 本文件声明的方法（`void foo(` / `public String bar(`）不算拼错
-  for (const m of code.matchAll(/\b[A-Za-z_][\w<>[\]]*\s+([a-z_]\w*)\s*\(/g)) declared.add(m[1]);
+  collectDeclaredMethods(code, declared);
 
   const out: MethodTypo[] = [];
   const seen = new Set<string>();

@@ -71,6 +71,8 @@ export interface JavaLintOpts {
   idTag?: Record<string, string>;
   /** 允许「用了但不 import」的名字(同包类、内部类) */
   allowNames?: Iterable<string>;
+  /** M351：项目里其它文件声明过的方法名 —— 自己类里实现的 getTitle() 不该被当成 setTitle() 的拼错 */
+  knownMethods?: Iterable<string>;
 }
 
 /** 常见类的简单名 → 所在包。只列高频、几乎不会同名冲突的。 */
@@ -572,7 +574,7 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
 
   // 6) M178:方法名拼错(setTxt → setText)
   if (!opts.isKotlin) {
-    for (const t of findMethodTypos(masked.code)) {
+    for (const t of findMethodTypos(masked.code, { declared: opts.knownMethods })) {
       issues.push({
         line: t.line,
         col: t.col,

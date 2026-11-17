@@ -18,8 +18,10 @@ describe("M213 设备端真编译（源码级约定）", () => {
   });
 
   it("aapt2 link 带 --java + --custom-package（生成 R.java 才能编译）", () => {
-    expect(mainJava).toContain('"--java", genDir.getAbsolutePath()');
-    expect(mainJava).toContain('"--custom-package", pkg');
+    // M350：link 参数改成 List 拼装（要追加 aar overlay zip），不再是一行数组字面量 → 按“参数成对添加”校验
+    expect(mainJava).toMatch(/linkArgs\.add\("--java"\);\s*linkArgs\.add\(genDir\.getAbsolutePath\(\)\)/);
+    expect(mainJava).toMatch(/linkArgs\.add\("--custom-package"\);\s*linkArgs\.add\(pkg\)/);
+    expect(mainJava).toContain("linkArgs.toArray(new String[0])");
   });
 
   it("编译顺序：ECJ → 收集 .class → D8 → 注入 extraDex → 再 pack", () => {

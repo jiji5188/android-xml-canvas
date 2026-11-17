@@ -37,6 +37,7 @@ import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras, type ResTreeDir, type ResTreeFile } from "@/lib/xml/resdir";
 import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras, invalidateProjectRes } from "@/lib/xml/project-res";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";import { loadProjectJavaFiles } from "@/lib/xml/java-files";
+import { collectDeclaredMethods } from "@/lib/xml/java-methods";
 import { findLauncherActivity } from "@/lib/xml/find-launcher";
 import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
 import { writebackAttrs } from "@/lib/xml/writeback";
@@ -582,6 +583,8 @@ export function XmlEditor() {
   const [runOpen, setRunOpen] = useState(false);
   /** M199：运行调试时加载的 Java/Kotlin 源码（轻量逻辑仿真用） */
   const [runJavaFiles, setRunJavaFiles] = useState<{ rel: string; text: string }[]>([]);
+  /** M351：项目里所有文件声明过的方法名（含其它文件）—— 自己类里实现的 getTitle() 不应被当成 setTitle() 的拼写错 */
+  const [projMethods, setProjMethods] = useState<string[]>([]);
   /** M199：当前布局名（Java 仿真按它挑 Activity）；开的是代码文件时退回 activity_main */
   const entryLayoutName = useMemo(() => {
     const seg = (openRel || "").replace(/\\/g, "/").split("/").pop() || "";
@@ -1117,6 +1120,27 @@ const allDrawableNames = useMemo(() => {
 
   // M64b（B2）：AI 的文件通道跟着「当前项目」走，不再拼默认目录 + 项目名
   const aiFileIo = useMemo(() => ioForProject(activeProject), [activeProject]);
+  /** M351：编辑代码文件时把项目里其它文件的方法声明收集起来（拼写检查豁免用）。
+   *  只在看代码时扫、项目/保存变化才重扫，不会随着打字反复读盘。 */
+  const projRootKey = activeProject?.rootPath || activeProject?.dirPath || "";
+  useEffect(() => {
+    if (!isJavaFile) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const files = await loadProjectJavaFiles(aiFileIo, 12, { nativeRoot: projRootKey || null });
+        if (cancelled) return;
+        const names = new Set<string>();
+        for (const f of files) collectDeclaredMethods(f.text, names);
+        setProjMethods([...names]);
+      } catch {
+        if (!cancelled) setProjMethods([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isJavaFile, aiFileIo, projRootKey, projectRev]);
 
   // M159：打开文件就把它引用的项目资源读进来（values + @drawable 递归 → 再后台扫全套）
   // M194：Java/Kotlin 文件（codeOnly）也要扫 —— javaResEnv 靠它查 R.layout.X / R.string.X 是否真存在
@@ -1394,6 +1418,8 @@ const allDrawableNames = useMemo(() => {
             style: javaResEnv.style,
           },
           idTag: javaResEnv.idTag,
+          // M351：项目里其它文件声明过的方法名（getTitle 这种自己的方法不能被当成拼写错）
+          knownMethods: projMethods,
         }).map((j) => ({
           line: j.line,
           level: j.sev,
@@ -1428,7 +1454,7 @@ const allDrawableNames = useMemo(() => {
       console.error("[axv] 结构检查失败", e); // i18n-ignore
       return [] as LintIssue[];
     }
-  }, [lintSrc, codeOnly, isJavaFile, isKotlinLike, codeFileName, openRel, saveOrigin?.name, currentFile?.name, xmlResSig]);
+  }, [lintSrc, codeOnly, isJavaFile, isKotlinLike, codeFileName, openRel, saveOrigin?.name, currentFile?.name, xmlResSig, projMethods]);
   /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
   const lintErrCount = useMemo(() => {
     try {

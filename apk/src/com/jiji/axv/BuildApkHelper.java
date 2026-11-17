@@ -111,9 +111,10 @@ public class BuildApkHelper {
             }
             log.append("资源 ").append(written).append(" 个文件\n");
 
-            // M278/P1-1：aar 不只给 classpath，res/ 也要合并进 aapt2 资源目录
-            // （androidx aar 的 theme/drawable 等资源之前没进 aapt2，导致 R.style.* 等缺失）
-            mergeAarRes(libs, resDir, log);
+            // M278/P1-1：aar 的 res/ 也要进 aapt2（androidx aar 的 theme/drawable 等，缺了 R.style.* 全炸）
+            // M350：改成「一个 aar 一个独立 overlay」而不是合并进同一目录——
+            // 各 aar 的默认 values 文件名相同（values/values.xml），合并时“已存在不覆盖”会丢掉后面所有 aar 的默认值（本地化目录能进来）→ aapt2 link 报 “removing resource without required default value” + exit 1
+            java.util.List<File> aarResDirs = extractAarResDirs(libs, root, log);
 
             File man = new File(root, "AndroidManifest.xml");
             // M262：优先用项目里的 AndroidManifest.xml 原文（aapt2 link 会直接读它，不再合成只含 ShellActivity 的清单）。
@@ -196,17 +197,34 @@ public class BuildApkHelper {
                 dumpLayoutHeads(resDir, log);
                 return jsonFail("compile", log);
             }
+            // M350：每个 aar 的 res 单独 compile 成 overlay zip（不跟项目 res 混在同一目录里）
+            java.util.List<File> aarCompiled = new java.util.ArrayList<>();
+            for (int i = 0; i < aarResDirs.size(); i++) {
+                File ad = aarResDirs.get(i);
+                File az = new File(root, "compiled_aar" + i + ".zip");
+                int ca = runAapt2(bin, root, new String[] { "compile", "--dir", ad.getAbsolutePath(),
+                        "-o", az.getAbsolutePath() }, log);
+                if (ca != 0) {
+                    log.append("aar overlay 编译失败（第 ").append(i + 1).append(" 个，").append(ca).append("）：").append(ad.getName()).append("\n");
+                    return jsonFail("compile", log);
+                }
+                aarCompiled.add(az);
+            }
             logStage(log, "资源链接（aapt2 link）");
             File unsigned = new File(root, "unsigned.apk");
-            int c2 = runAapt2(bin, root, new String[] { "link", "-o", unsigned.getAbsolutePath(),
-                    "-I", fw.getAbsolutePath(),
-                    "--manifest", man.getAbsolutePath(),
-                    "--min-sdk-version", "24",
-                    "--target-sdk-version", "34",
-                    "--auto-add-overlay",
-                    "--java", genDir.getAbsolutePath(),
-                    "--custom-package", pkg,
-                    compiled.getAbsolutePath() }, log);
+            java.util.List<String> linkArgs = new java.util.ArrayList<>();
+            linkArgs.add("link");
+            linkArgs.add("-o"); linkArgs.add(unsigned.getAbsolutePath());
+            linkArgs.add("-I"); linkArgs.add(fw.getAbsolutePath());
+            linkArgs.add("--manifest"); linkArgs.add(man.getAbsolutePath());
+            linkArgs.add("--min-sdk-version"); linkArgs.add("24");
+            linkArgs.add("--target-sdk-version"); linkArgs.add("34");
+            linkArgs.add("--auto-add-overlay");
+            linkArgs.add("--java"); linkArgs.add(genDir.getAbsolutePath());
+            linkArgs.add("--custom-package"); linkArgs.add(pkg);
+            linkArgs.add(compiled.getAbsolutePath());
+            for (File z : aarCompiled) linkArgs.add(z.getAbsolutePath());
+            int c2 = runAapt2(bin, root, linkArgs.toArray(new String[0]), log);
             if (c2 != 0) return jsonFail("link", log);
             if (!unsigned.isFile()) return jsonFail("link", log);
 
@@ -1061,8 +1079,17 @@ public class BuildApkHelper {
     /** M278/P1-1：把 libs 里 aar 的 res/** 合并进 aapt2 资源目录（drawable/values 等）。
      *  同名资源：项目自己的优先（先写 aar，后写项目——这里在写完项目 res 之后调，
      *  所以 aar 的 res 不覆盖已有同名文件，只补缺的）。 */
-    private void mergeAarRes(JSONArray libs, File resDir, StringBuilder log) {
-        if (libs == null || libs.length() == 0) return;
+    /** M350：每个 aar 的 res/ 展开到独立目录（root/aarres/aarN），返回非空目录列表。
+     *  不做任何去重/覆盖逻辑——各 aar 完全隔离，aapt2 link 时用 --auto-add-overlay 按顺序叠加
+     *  （后面的 aar 覆盖前面的同名资源；同一 aar 内部无冲突）。
+     *  旧 mergeAarRes 合进同一目录 + “已存在不覆盖”会把后面 aar 的 values/values.xml（默认值）
+     *  整个丢掉（本地化 values-xx/values.xml 能进来）→ link 时 “removing resource without required default value” → exit 1。 */
+    private java.util.List<File> extractAarResDirs(JSONArray libs, File root, StringBuilder log) {
+        java.util.List<File> out = new java.util.ArrayList<>();
+        if (libs == null || libs.length() == 0) return out;
+        File base = new File(root, "aarres");
+        // 清掉上次构建残留，避免旧 aar 资源混进新包
+        deleteRec(base);
         int total = 0;
         for (int i = 0; i < libs.length(); i++) {
             JSONObject lj = libs.optJSONObject(i);
@@ -1073,18 +1100,18 @@ public class BuildApkHelper {
             try {
                 byte[] data = Base64.decode(b64, Base64.NO_WRAP);
                 if (data == null || data.length == 0) continue;
-                File aarTmp = new File(resDir, ".aar" + i + ".tmp");
+                File aarTmp = new File(root, ".aar" + i + ".tmp");
                 writeBytes(aarTmp, data);
                 int n = 0;
+                File dstDir = new File(base, "aar" + i);
                 try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(aarTmp)) {
                     java.util.Enumeration<? extends java.util.zip.ZipEntry> en = zf.entries();
                     while (en.hasMoreElements()) {
                         java.util.zip.ZipEntry ze = en.nextElement();
                         String name = ze.getName();
                         if (ze.isDirectory() || !name.startsWith("res/")) continue;
-                        String rel = name.substring(4); // 去 res/ 前缀 → 直接进 resDir
-                        File dst = new File(resDir, rel);
-                        if (dst.exists()) continue; // 项目自己的优先
+                        String rel = name.substring(4);
+                        File dst = new File(dstDir, rel);
                         dst.getParentFile().mkdirs();
                         try (InputStream is = zf.getInputStream(ze)) {
                             writeBytes(dst, readAll(is));
@@ -1094,11 +1121,25 @@ public class BuildApkHelper {
                 } finally {
                     aarTmp.delete();
                 }
-                total += n;
-                if (n > 0) log.append("aar res 合并：").append(libPath).append(" → ").append(n).append(" 个资源\n");
-            } catch (Throwable ignored) { }
+                if (n > 0) {
+                    out.add(dstDir);
+                    total += n;
+                    log.append("aar overlay：").append(libPath).append(" → ").append(n).append(" 个资源（独立目录，link 时叠加）\n");
+                }
+            } catch (Throwable ignored) {
+                log.append("aar overlay 展开失败（跳过）：").append(libPath).append("\n");
+            }
         }
-        if (total > 0) log.append("aar 资源共合并 ").append(total).append(" 个进 aapt2 目录\n");
+        if (total > 0) log.append("aar 资源共 ").append(total).append(" 个（").append(out.size()).append(" 个 overlay）\n");
+        return out;
+    }
+
+    /** 递归删目录（清 aarres 残留用，只删我们自己建的 cache 目录） */
+    private void deleteRec(File f) {
+        if (f == null || !f.exists()) return;
+        File[] kids = f.listFiles();
+        if (kids != null) for (File k : kids) deleteRec(k);
+        f.delete();
     }
 
     private File extractClassesJar(File aar, File outJar) {

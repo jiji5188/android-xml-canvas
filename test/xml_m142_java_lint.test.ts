@@ -16,7 +16,7 @@ describe("M142 Java 文件不再套 XML 校验", () => {
     expect(SRC).toContain('from "@/lib/xml/java-lint"');
     const i = SRC.indexOf("const lints = useMemo");
     expect(i).toBeGreaterThan(0);
-    const block = SRC.slice(i, i + 1600);
+    const block = SRC.slice(i, i + 2200);
     expect(block).toContain("if (isJavaFile)");
     expect(block).toContain("lintJava(lintSrc");
     // Java 分支必须在 codeOnly 之前，否则还是会被 XML 检查吃掉

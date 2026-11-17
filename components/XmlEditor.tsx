@@ -448,6 +448,7 @@ export function XmlEditor() {
     activeProject, setActiveProject, projectRev, setProjectRev, projMeta, setProjMeta,
     newProjOpen, setNewProjOpen, newProjName, setNewProjName, newProjIcon, setNewProjIcon,
     newProjPkg, setNewProjPkg, newProjBusy, setNewProjBusy, saveOrigin, setSaveOrigin,
+    analyzeProjects,
   } = useXmlProjectState();
   /** M23：界面语言（默认跟随系统） */
   const [langPref, setLangPref] = useState<LangPref>(() => loadLangPref());
@@ -612,66 +613,8 @@ export function XmlEditor() {
   useBackGuard(newProjOpen, () => setNewProjOpen(false), "new-project");
   useBackGuard(saveAsOpen, () => setSaveAsOpen(false), "save-as");
 
-  /** M25d：已经分析过名称/图标的项目（rel），避免 4s 轮询重复读文件 */
-  const analyzedRef = useRef<Set<string>>(new Set());
-  /** M48：分析链重入锁 */
-  const analyzingRef = useRef(false);
-
-  /** M25d/M31：后台分析项目名/图标（串行，读不到就跳过，不影响列表渲染）
-   *  web：有 DirHandle 走 readProjectMeta；APK：没有句柄，按项目绝对路径试读 strings.xml + ic_launcher */
-  const analyzeProjects = useCallback(
-    async (list: WsProject[]) => {
-      // M48：同一个项目列表只允许一条分析链在跑（轮询和重试可能撞车）
-      if (analyzingRef.current) return;
-      analyzingRef.current = true;
-      // M47：每轮最多分析 4 个，剩下的 200ms 后再来一轮，
-      // 避免一打开面板就一口气读十几个项目把主线程啃完（手机上最重的就是这里）
-      let count = 0;
-      let ok = 0;
-      const patch: Record<string, ProjectMeta> = {};
-      for (const it of list) {
-        if (count >= 4) break;
-        if (it.kind !== "dir") continue;
-        if (!it.handle && !it.dirPath) continue;
-        if (analyzedRef.current.has(it.rel)) continue;
-        try {
-          const meta = it.handle
-            ? await readProjectMeta(it.handle, it.name)
-            : await readProjectMetaNative(it.name, it.dirPath);
-          // M31d：成功才记账，失败（权限未授权/目录刚变）下一轮轮询再试
-          analyzedRef.current.add(it.rel);
-          patch[it.rel] = meta;
-          count++;
-          ok++;
-        } catch {
-          /* 分析失败就当没有，卡片回退到文件夹名 */
-          count++;
-        }
-        // M33：一个一个来，每个之间让出一帧，列表可以边读边显示（不再整页卡住）
-        await yieldToUi();
-      }
-      // 一次性合并，避免 N 次 setState 引发 N 轮重渲染
-      if (Object.keys(patch).length) setProjMeta((prev) => ({ ...prev, ...patch }));
-      analyzingRef.current = false;
-      // 还有没分析完的 → 200ms 后再来一轮（页面隐藏时不排）
-      // M48：一轮里一个都没成功（比如没权限）就不重试，否则会 200ms 一次死循环空转
-      const remaining =
-        ok > 0
-          ? list.filter(
-              (it) => it.kind === "dir" && (it.handle || it.dirPath) && !analyzedRef.current.has(it.rel),
-            )
-          : [];
-      if (remaining.length) {
-        window.setTimeout(() => {
-          if (typeof document !== "undefined" && document.hidden) return;
-          void analyzeProjects(list);
-        }, 200);
-      }
-    },
-    [],
-  );
-
-  /** M309：工作目录刷新 / 12s 轮询 / 恢复上次项目 → components/use-workspace-refresh.ts */
+  // M25d/M31 项目分析（analyzeProjects + analyzed/analyzing refs）已下沉 → components/use-xml-project.ts
+  // M309：工作目录刷新 / 12s 轮询 / 恢复上次项目 → components/use-workspace-refresh.ts
   const { refreshWorkspace } = useWorkspaceRefresh({
     leftView,
     wsState,

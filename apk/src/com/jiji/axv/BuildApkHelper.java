@@ -85,6 +85,25 @@ public class BuildApkHelper {
             File resDir = new File(root, "res");
             if (!resDir.mkdirs()) throw new IOException("mkdirs 失败: " + resDir);
 
+            // M354：appcompat / material aar 自带全套 attr/style（colorAccent/Theme.AppCompat…），
+            // 无条件生成的 axv_attrs.xml / axv_stub.xml 桩会与 aar overlay 撞名 → aapt2 link exit=1。
+            // 检测到这类 aar 就跳过这两个桩文件（允许 aapt2 出一批 without-required-default 警告，不阻断）。
+            boolean hasCompatLib = false;
+            if (libs != null) {
+                for (int k = 0; k < libs.length(); k++) {
+                    JSONObject lj = libs.optJSONObject(k);
+                    if (lj == null) continue;
+                    String lp = lj.optString("path", "").toLowerCase();
+                    if (lp.contains("appcompat") || lp.contains("material")) {
+                        hasCompatLib = true;
+                        break;
+                    }
+                }
+            }
+            if (hasCompatLib) {
+                log.append("检测到 AppCompat/Material aar → 跳过 axv_attrs.xml/axv_stub.xml 桩（避免与 aar 撞名，允许无默认值警告）\n");
+            }
+
             int written = 0;
             for (int i = 0; i < files.length(); i++) {
                 JSONObject f = files.getJSONObject(i);
@@ -93,6 +112,9 @@ public class BuildApkHelper {
                 String b64 = f.optString("base64", "");
                 if (path.isEmpty()) continue;
                 if (path.startsWith("/") || path.contains("..")) continue;
+                if (hasCompatLib && (path.equals("values/axv_attrs.xml") || path.equals("values/axv_stub.xml"))) {
+                    continue; // M354：有 appcompat 时不写这两个桩，让 aar 的权威定义生效
+                }
                 if (!b64.isEmpty()) {
                     byte[] data;
                     try {

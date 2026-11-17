@@ -252,6 +252,7 @@ import { LibsPanel } from "./LibsPanel";
 import { ProblemsDrawer } from "./ProblemsDrawer";
 import { useBuildLogs } from "./use-build-logs";
 import { usePanels } from "./use-panels";
+import { useXmlProjectState } from "./use-xml-project";
 import {
   subscribeRuntimeLog,
   installRuntimeLogBridge,
@@ -441,27 +442,13 @@ export function XmlEditor() {
   // M304：画布资产/设备/面板状态域（resIcon/resShape/resImage + device + 锁定 + 面板开合）→ components/use-canvas-assets.ts
   const { resIcon, setResIcon, resShape, setResShape, resImage, setResImage, deviceId, device, changeDevice, leftOpen, setLeftOpen, rightOpen, setRightOpen, leftView, setLeftView, lockedPaths, toggleLockPath, isPathLocked } = useCanvasAssets();
   /* ===== M16i：工作目录 ===== */
-  const [projectTab, setProjectTab] = useState<"projects" | "current">("current");
-  const [wsState, setWsState] = useState<WsInfo | null>(null);
-  const [wsProjects, setWsProjects] = useState<WsProject[]>([]);
-  /** M24：当前项目（项目名 + 懒加载浏览源）。M25d 起不再一次性深扫整棵树 */
-  const [activeProject, setActiveProject] = useState<ActiveProject | null>(null);
-  /** M25d：手动刷新项目结构时 +1，让面板丢掉懒加载缓存重新读根目录 */
-  const [projectRev, setProjectRev] = useState(0);
-  /** M25d：项目卡片分析结果（app_name / 图标），key = 项目 rel */
-  const [projMeta, setProjMeta] = useState<Record<string, ProjectMeta>>({});
-  /** M24：新建项目对话框 */
-  const [newProjOpen, setNewProjOpen] = useState(false);
-  const [newProjName, setNewProjName] = useState("MyApp");
-  /** M31i：新建项目可选图标（data URL 预览 + base64 落盘 + mime；null = 用默认自适应图标） */
-  const [newProjIcon, setNewProjIcon] = useState<{ dataUrl: string; base64: string; mime: string } | null>(null);
-  /** M176：新建项目时的包名（留空 = 按项目名自动 com.example.xxx） */
-  const [newProjPkg, setNewProjPkg] = useState("");
-  const [newProjBusy, setNewProjBusy] = useState(false);
-  /** M21：当前编辑内容的来源 —— 决定「保存」是写回原路还是弹选择器 */
-  const [saveOrigin, setSaveOrigin] = useState<
-    { kind: "native"; target: string; name: string } | { kind: "handle"; handle: unknown; name: string } | null
-  >(null);
+  /** M366：项目管理/工作区 state → components/use-xml-project.ts */
+  const {
+    projectTab, setProjectTab, wsState, setWsState, wsProjects, setWsProjects,
+    activeProject, setActiveProject, projectRev, setProjectRev, projMeta, setProjMeta,
+    newProjOpen, setNewProjOpen, newProjName, setNewProjName, newProjIcon, setNewProjIcon,
+    newProjPkg, setNewProjPkg, newProjBusy, setNewProjBusy, saveOrigin, setSaveOrigin,
+  } = useXmlProjectState();
   /** M23：界面语言（默认跟随系统） */
   const [langPref, setLangPref] = useState<LangPref>(() => loadLangPref());
   const lang = useMemo(() => resolveLang(langPref), [langPref]);

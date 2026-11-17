@@ -83,10 +83,25 @@ describe("多文件项目", () => {
     expect(normalizeFileName("   ")).toBe("layout.xml");
   });
 
+  it("M349：代码/脚本扩展名保留原扩展，不补 .xml", () => {
+    expect(normalizeFileName("SubmitData.java")).toBe("SubmitData.java");
+    expect(normalizeFileName("MyClass.kt")).toBe("MyClass.kt");
+    expect(normalizeFileName("build.gradle")).toBe("build.gradle");
+    expect(normalizeFileName("gradle.properties")).toBe("gradle.properties");
+    expect(normalizeFileName("ic_launcher.png")).toBe("ic_launcher.png");
+    expect(normalizeFileName("res/values/strings.xml")).toBe("strings.xml");
+  });
+
   it("uniqueFileName 支持排除自己（改名成自己原名不重复加号）", () => {
     const { project } = addFile(p0(), "b.xml", "<x/>");
     const b = project.files[1];
     expect(uniqueFileName("b.xml", project.files, b.id)).toBe("b.xml");
+  });
+
+  it("M349：uniqueFileName 保留原扩展名（.java 不补 .xml）", () => {
+    const { project } = addFile(p0(), "SubmitData.java", "class SubmitData {}");
+    const dup = uniqueFileName("SubmitData.java", project.files);
+    expect(dup).toBe("SubmitData_2.java");
   });
 
   it("guessFileName 按根标签命名", () => {

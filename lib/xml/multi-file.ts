@@ -37,24 +37,28 @@ export function nextFileId(files: ProjectFile[]): string {
   return `f${n}`;
 }
 
-/** 文件名规整：去路径、去非法字符、补 .xml */
+/** 文件名规整：去路径、去非法字符；已知代码/脚本扩展名保留原扩展，其余补 .xml */
 export function normalizeFileName(raw: string): string {
   const base = raw.trim().split(/[\\/]/).pop() ?? "";
   const cleaned = base.replace(/[<>:"|?*\x00-\x1f]/g, "").replace(/\s+/g, "_");
   if (!cleaned) return "layout.xml";
+  // 已知代码/脚本/资源扩展名保留原扩展，不补 .xml
+  if (/\.(java|kt|kts|gradle|properties|json|md|txt|png|jpg|jpeg|webp|gif|svg|webm|mp3|wav|ttf|otf|bin|so|aar|jar)$/i.test(cleaned)) return cleaned;
   return /\.xml$/i.test(cleaned) ? cleaned : `${cleaned}.xml`;
 }
 
-/** 同名时追加 _2 / _3 … */
+/** 同名时追加 _2 / _3 …（保留原扩展名） */
 export function uniqueFileName(name: string, files: ProjectFile[], exceptId?: string): string {
   const taken = new Set(
     files.filter((f) => f.id !== exceptId).map((f) => f.name.toLowerCase()),
   );
   if (!taken.has(name.toLowerCase())) return name;
-  const stem = name.replace(/\.xml$/i, "");
+  const m = name.match(/^(.*?)(\.[^.]+)?$/);
+  const stem = m?.[1] ?? name;
+  const ext = m?.[2] ?? ".xml";
   let n = 2;
-  while (taken.has(`${stem}_${n}.xml`.toLowerCase())) n += 1;
-  return `${stem}_${n}.xml`;
+  while (taken.has(`${stem}_${n}${ext}`.toLowerCase())) n += 1;
+  return `${stem}_${n}${ext}`;
 }
 
 /** 从一份 xml 猜文件名：RootTag + 语义化后缀 */

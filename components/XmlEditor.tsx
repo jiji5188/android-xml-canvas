@@ -38,6 +38,9 @@ import { buildResourceExtras, backfillDrawableXml, type ResourceExtras, type Res
 import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras, invalidateProjectRes } from "@/lib/xml/project-res";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { buildLexicon, type Lexicon } from "@/lib/xml/lexicon";
+import { loadSdkLexicon, mergeSdkLexicon } from "@/lib/xml/sdk-lexicon";
+import { collectProjectLibs } from "@/lib/xml/project-libs";
+import { indexLibsCached, mergeThirdLexicon } from "@/lib/xml/lib-index";
 import { collectDeclaredMethods } from "@/lib/xml/java-methods";
 import { findLauncherActivity } from "@/lib/xml/find-launcher";
 import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
@@ -588,6 +591,8 @@ export function XmlEditor() {
   const [projMethods, setProjMethods] = useState<string[]>([]);
   /** M352：项目词库（单一数据源）—— 建好塞进 CodeEditor 的 lexRef；空库 = 旧行为 */
   const lexRef = useRef<Lexicon | null>(null);
+  /** M2：词库就绪/更新计数（ref 变化不触发渲染，用它在 lint useMemo 依赖里重算） */
+  const [lexRev, setLexRev] = useState(0);
   /** M199：当前布局名（Java 仿真按它挑 Activity）；开的是代码文件时退回 activity_main */
   const entryLayoutName = useMemo(() => {
     const seg = (openRel || "").replace(/\\/g, "/").split("/").pop() || "";
@@ -1145,7 +1150,29 @@ const allDrawableNames = useMemo(() => {
             lang: (/\.kt$/i.test(f.rel) ? "kotlin" : "java") as "java" | "kotlin",
           }));
         const nextLex = buildLexicon(src);
-        lexRef.current = nextLex.allMethodNames.size > 0 ? nextLex : null;
+        // M2：合并 SDK 预消化词库（项目同名类优先，不污染）——SDK 方法/类名也能进候选
+        const sdkLex = await loadSdkLexicon();
+        if (cancelled) return;
+        const merged = sdkLex ? mergeSdkLexicon(nextLex, sdkLex) : nextLex;
+        lexRef.current = merged.allMethodNames.size > 0 ? merged : null;
+        setLexRev((v) => v + 1);
+        // M2b：第三方库索引（较慢，后台补上；同项目库不变就命中缓存）
+        if (!cancelled) {
+          try {
+            const libsRes = await collectProjectLibs(aiFileIo, projRootKey || null);
+            if (cancelled) return;
+            if (libsRes.libs.length) {
+              const third = await indexLibsCached(projRootKey || "-", libsRes.libs);
+              if (cancelled) return;
+              const base = lexRef.current ?? merged;
+              const withThird = mergeThirdLexicon(base, third.lex);
+              lexRef.current = withThird.allMethodNames.size > 0 ? withThird : lexRef.current;
+              setLexRev((v) => v + 1);
+            }
+          } catch {
+            /* 库索引失败不致命，词库保持 SDK+项目 */
+          }
+        }
       } catch {
         if (!cancelled) {
           setProjMethods([]);
@@ -1472,7 +1499,7 @@ const allDrawableNames = useMemo(() => {
       console.error("[axv] 结构检查失败", e); // i18n-ignore
       return [] as LintIssue[];
     }
-  }, [lintSrc, codeOnly, isJavaFile, isKotlinLike, codeFileName, openRel, saveOrigin?.name, currentFile?.name, xmlResSig, projMethods]);
+  }, [lintSrc, codeOnly, isJavaFile, isKotlinLike, codeFileName, openRel, saveOrigin?.name, currentFile?.name, xmlResSig, projMethods, lexRev]);
   /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
   const lintErrCount = useMemo(() => {
     try {

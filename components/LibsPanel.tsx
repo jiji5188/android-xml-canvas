@@ -1,7 +1,7 @@
 // components/LibsPanel.tsx — M295：库管理面板（本地库 / 项目库 + 下载）
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { nativeBridge } from "@/lib/xml/native-save";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
 import {
@@ -699,6 +699,29 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     }
   }, [gradleDeps, gradleBusyKey, downloadGradleDep]);
 
+  /** M360：打开项目时自动检查依赖 + 一键补齐。nativeProjectRoot 变化 → 自动 scanGradleDeps。
+   *  不静默自动下载（省流量/可控），只扫出缺失，banner 上「自动补齐」一键下。 */
+  const lastAutoScanRoot = useRef<string | null>(null);
+  useEffect(() => {
+    if (!nativeProjectRoot) { lastAutoScanRoot.current = null; return; }
+    if (lastAutoScanRoot.current === nativeProjectRoot) return; // 同项目不重扫
+    lastAutoScanRoot.current = nativeProjectRoot;
+    void scanGradleDeps();
+  }, [nativeProjectRoot, scanGradleDeps]);
+
+  /** M360：未补齐的依赖（gradleDeps 里尚未 done 且不在本地库的） */
+  const missingGradleDeps = useMemo(
+    () => gradleDeps.filter((d) => {
+      const k = d.group + ":" + d.name + ":" + d.version;
+      if (gradleBusyKey[k] === "done") return false;
+      // 本地库里已有同名文件（artifact-version.ext）则不算缺
+      const fname = (d.name + "-" + d.version + (d.isAar ? ".aar" : ".jar")).toLowerCase();
+      if (currentList.some((f) => f.name.toLowerCase().includes(fname.split("/").pop()!.replace(".aar", "").replace(".jar", "")) )) return false;
+      return true;
+    }),
+    [gradleDeps, gradleBusyKey, currentList],
+  );
+
   return (
     <div className="axv-libs-panel">
       <div className="axv-libs-tabs" role="tablist">
@@ -864,6 +887,27 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         )}
         {busy && <div className="axv-libs-loading">{tr("loading", "加载中…")}</div>}
       </div>
+
+      {/* M360：打开项目自动检查出的缺失依赖 → 一键补齐 */}
+      {missingGradleDeps.length > 0 && (
+        <div className="axv-libs-missing" style={{ margin: "6px 8px", padding: "8px 10px", border: "1px solid #f0c36d", borderRadius: 8, background: "#fff8e7", fontSize: 11 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span aria-hidden="true" style={{ fontSize: 14 }}>warning</span>
+            <span style={{ flex: 1, fontWeight: 600, color: "#8a5a00" }}>
+              {tr("libs.missing_deps", "缺 {n} 个依赖库：{list}", { n: missingGradleDeps.length, list: missingGradleDeps.slice(0, 3).map((d) => d.name + "-" + d.version).join("、") + (missingGradleDeps.length > 3 ? "…" : "") })}
+            </span>
+            <button
+              type="button"
+              className="axv-libs-btn primary"
+              style={{ fontSize: 11, padding: "2px 8px", whiteSpace: "nowrap" }}
+              disabled={gradleBusy}
+              onClick={() => void downloadAllGradleDeps()}
+            >
+              {gradleBusy ? tr("libs.downloading", "下载中…") : tr("libs.missing_fill", "自动补齐")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* M345：从 build.gradle 自动解析并下载依赖 */}
       <div className="axv-libs-gradle">

@@ -644,6 +644,13 @@ export function computeJavaSuggest(
       // JDK 类型 + 关键字兜底（词库没覆盖的基础类型）
       addAll(JAVA_KEYWORDS, "decl");
       addAll(JAVA_TYPES, "class");
+      // M355：词库分支也别把旧的宽池子丢了——M285 高频方法白名单 / 全量 JAVA_METHODS /
+      //   本文件引用符号 tok.refs，以前无词库时全进候选，现在项目文件都建了词库，
+      //   若不并回来，打字时 setText/findViewById 这些全局方法就看不到了（用户反馈丢功能）。
+      //   放在 ranked.ui 之后，词库打分的仍排前面，宽池子只做补充。
+      addAll(JAVA_METHODS, "method");
+      addAll(KNOWN_METHODS, "method");
+      addAll(tok.refs, "ref");
     } else {
       addAll(tok.vars, "var");
       addAll(tok.consts, "const");

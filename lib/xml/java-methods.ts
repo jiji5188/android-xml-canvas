@@ -144,6 +144,10 @@ export const KNOWN_METHODS: string[] = [
   // 列表 / 适配器
   "getItem", "getItemId", "getItemCount", "getView", "getChildCount", "getChildAt", "getFirstVisiblePosition",
   "getLastVisiblePosition", "getCurrentItem", "getAdapterPosition", "getItemPosition", "getChildAdapterPosition",
+  // ViewPager2 / TabLayout / 滑动器（set↔get 成对，补全避免 setCurrentItem 被当未知/拼错）
+  "setCurrentItem", "setOffscreenPageLimit", "getOffscreenPageLimit", "setCurrentTab", "getCurrentTab",
+  "addTab", "removeTab", "getTabAt", "setTabSelected", "setSelected", "registerOnPageChangeCallback",
+  "unregisterOnPageChangeCallback", "setUserInputEnabled", "isUserInputEnabled", "getRecyclerView",
   "getRecycledViewPool", "getLayoutManager", "getSelectedItemAtPosition", "isCheckedItemPosition",
   "getCheckedItemPosition", "getCheckedItemPositions", "getPrimaryItemId", "getItemViewType", "getItemViewTypeCount",
   // 开关 / 进度 / 评分
@@ -264,10 +268,14 @@ export function findMethodTypos(code: string, opts: FindMethodTyposOpts = {}): M
     let sug = suggestMethod(name, 2);
     if (!sug) {
       for (const cand of KNOWN_METHODS) {
-        if (lowerHint(name, cand) <= 1) {
-          sug = cand;
-          break;
-        }
+        if (lowerHint(name, cand) > 1) continue;
+        const cl = cand.toLowerCase();
+        const lo = name.toLowerCase();
+        // M353：归一化后只差开头动词（get↔set 等）且其余完全相同 → 是另一个方法，不报拼写错
+        //   （setCurrentItem 被 lowerHint 配成 getCurrentItem 就属于这种，以前 fallback 漏了 M208 的动词门槛）
+        if (lo.length >= 2 && cl.length >= 2 && lo[0] !== cl[0] && lo.slice(1) === cl.slice(1)) continue;
+        sug = cand;
+        break;
       }
     }
     if (!sug) return;

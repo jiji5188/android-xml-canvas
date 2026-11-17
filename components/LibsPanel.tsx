@@ -5,12 +5,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { nativeBridge } from "@/lib/xml/native-save";
 import type { AiFileIo } from "@/lib/xml/ai-tools";
 import {
-  LIBRARY_CATALOG,
   groupCatalog,
-  libKey,
   libDownloadUrls,
+  libKey,
+  LIBRARY_CATALOG,
+  LAN_LIBS_BASE,
   type LibEntry,
 } from "@/lib/xml/library-catalog";
+import { parseGradleDeps, gradleDepDownloadUrls, gradleDepFname, type GradleDep } from "@/lib/xml/gradle-deps";
 
 interface LibsPanelProps {
   /** 当前激活项目的 SAF 源（可 list/read）；没有则项目库列不出来 */
@@ -95,6 +97,12 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   const [dlUrl, setDlUrl] = useState("");
   const [dlName, setDlName] = useState("");
   const [dlBusy, setDlBusy] = useState(false);
+  // M345：从 build.gradle 解析依赖并自动下载
+  const [gradleBusy, setGradleBusy] = useState(false);
+  const [gradleDeps, setGradleDeps] = useState<GradleDep[]>([]);
+  const [gradleScanned, setGradleScanned] = useState(false);
+  const [gradleBusyKey, setGradleBusyKey] = useState<Record<string, string>>({});
+  const [gradleMsg, setGradleMsg] = useState<string | null>(null);
 
   const native = nativeBridge();
 
@@ -388,6 +396,113 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
 
   const catGroups = useMemo(() => groupCatalog(), []);
 
+  /** M345：读项目根 build.gradle / build.gradle.kts + app 子目录，解析依赖 */
+  const scanGradleDeps = useCallback(async () => {
+    setGradleBusy(true);
+    setGradleMsg(null);
+    setGradleScanned(false);
+    setGradleDeps([]);
+    const texts: string[] = [];
+    const tryPaths = nativeProjectRoot
+      ? [
+          `${nativeProjectRoot}/build.gradle`,
+          `${nativeProjectRoot}/build.gradle.kts`,
+          `${nativeProjectRoot}/app/build.gradle`,
+          `${nativeProjectRoot}/app/build.gradle.kts`,
+        ]
+      : [];
+    for (const p of tryPaths) {
+      if (!native) break;
+      // 同步 readText（小文件安全）；读不到（err/空）就跳过
+      let t = "";
+      try { t = String(native.readText?.(p) ?? ""); } catch { t = ""; }
+      if (t.startsWith && t.startsWith("err:")) continue;
+      if (t) texts.push(t);
+    }
+    // 也尝试 aiFileIo（SAF 项目，readText 可能读不到 SAF 路径）
+    if (texts.length === 0 && aiFileIo) {
+      for (const rel of ["build.gradle", "build.gradle.kts", "app/build.gradle", "app/build.gradle.kts"]) {
+        try {
+          const r = await aiFileIo.read(rel);
+          if (r.ok && r.text) texts.push(r.text);
+        } catch {}
+      }
+    }
+    if (texts.length === 0) {
+      setGradleMsg(tr("libs.gradle_notfound", "没找到 build.gradle / build.gradle.kts（需在项目根或 app/ 下）"));
+      setGradleBusy(false);
+      return;
+    }
+    const all = texts.flatMap((t) => parseGradleDeps(t));
+    // 去重（同一坐标在多个 gradle 文件出现）
+    const seen = new Set<string>();
+    const deps = all.filter((d) => {
+      const k = d.group + ":" + d.name + ":" + d.version;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    setGradleDeps(deps);
+    setGradleScanned(true);
+    setGradleBusy(false);
+    onNote?.(tr("libs.gradle_scanned", "解析到 {n} 条依赖", { n: deps.length }));
+  }, [nativeProjectRoot, native, aiFileIo, onNote, tr]);
+
+  /** M345：下载一条 gradle 依赖（优先原生多镜像，浏览器回退 fetch） */
+  const downloadGradleDep = useCallback(
+    async (d: GradleDep) => {
+      const key = d.group + ":" + d.name + ":" + d.version;
+      if (gradleBusyKey[key] === "downloading") return;
+      setGradleBusyKey((m) => ({ ...m, [key]: "downloading" }));
+      const fname = gradleDepFname(d);
+      let targetBase: string | null = null;
+      if (localDir) targetBase = localDir;
+      const target = targetBase ? `${targetBase}/${fname}` : null;
+      const urls = gradleDepDownloadUrls(d);
+      if (target && typeof native?.downloadLib === "function") {
+        native.createEntry?.(targetBase!, true);
+        let r = "";
+        try { r = String(native.downloadLib(JSON.stringify(urls), target) ?? ""); } catch (e2) { r = "throw:" + String(e2); }
+        if (r.startsWith("ok")) {
+          setGradleBusyKey((m) => ({ ...m, [key]: "done" }));
+          void refresh();
+          return;
+        }
+        setGradleBusyKey((m) => ({ ...m, [key]: "err:" + (r.slice(4) || "download failed") }));
+        onNote?.(tr("libs.gradle_dl_fail", "{lib} 下载失败：{err}", { lib: key, err: r.slice(4) || "?" }));
+        return;
+      }
+      // 浏览器回退
+      for (const url of urls) {
+        const r = await fetchBase64(url);
+        if (!r.ok) continue;
+        if (targetBase && native) {
+          native.createEntry?.(targetBase, true);
+          const w = native.writeText?.(target!, r.b64);
+          if (typeof w === "string" && w.startsWith("ok")) {
+            setGradleBusyKey((m) => ({ ...m, [key]: "done" }));
+            void refresh();
+            return;
+          }
+        }
+      }
+      setGradleBusyKey((m) => ({ ...m, [key]: "err:" + tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") }));
+      onNote?.(tr("libs.gradle_dl_fail", "{lib} 下载失败：全部镜像都试过了（网络不通或源 404）", { lib: key }));
+    },
+    [localDir, native, onNote, tr, refresh],
+  );
+
+  /** M345：全部下载（只下尚未下载的） */
+  const downloadAllGradleDeps = useCallback(async () => {
+    const missing = gradleDeps.filter((d) => {
+      const k = d.group + ":" + d.name + ":" + d.version;
+      return gradleBusyKey[k] !== "done";
+    });
+    for (const d of missing) {
+      await downloadGradleDep(d);
+    }
+  }, [gradleDeps, gradleBusyKey, downloadGradleDep]);
+
   return (
     <div className="axv-libs-panel">
       <div className="axv-libs-tabs" role="tablist">
@@ -537,6 +652,73 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           })
         )}
         {busy && <div className="axv-libs-loading">{tr("loading", "加载中…")}</div>}
+      </div>
+
+      {/* M345：从 build.gradle 自动解析并下载依赖 */}
+      <div className="axv-libs-gradle">
+        <div className="axv-libs-gradle-head">
+          <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>code</span>
+          <span style={{ flex: 1, fontSize: 12 }}>{tr("libs.gradle_title", "build.gradle 依赖")}</span>
+          <button
+            type="button"
+            className="axv-libs-btn"
+            style={{ fontSize: 11, padding: "2px 8px", whiteSpace: "nowrap" }}
+            disabled={gradleBusy}
+            onClick={() => void scanGradleDeps()}
+          >
+            {gradleBusy ? tr("libs.gradle_scanning", "解析中…") : tr("libs.gradle_scan", "解析 build.gradle")}
+          </button>
+          {gradleDeps.length > 0 && (
+            <button
+              type="button"
+              className="axv-libs-btn primary"
+              style={{ fontSize: 11, padding: "2px 8px", marginLeft: 6, whiteSpace: "nowrap" }}
+              onClick={() => void downloadAllGradleDeps()}
+            >
+              {tr("libs.gradle_download_all", "全部下载")}
+            </button>
+          )}
+        </div>
+        {gradleMsg && (
+          <div className="axv-libs-gradle-msg">{gradleMsg}</div>
+        )}
+        {gradleScanned && gradleDeps.length === 0 && !gradleMsg && (
+          <div className="axv-libs-gradle-msg">{tr("libs.gradle_none", "没解析到 maven 依赖（fileTree / project 除外）")}</div>
+        )}
+        {gradleDeps.map((d) => {
+          const key = d.group + ":" + d.name + ":" + d.version;
+          const st = gradleBusyKey[key] || "";
+          const present = presentNames.has(gradleDepFname(d));
+          return (
+            <div key={key} className="axv-libs-item" style={{ alignItems: "center" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
+                  {(present || st === "done") && <span style={{ color: "#1a7f37", marginRight: 4 }}>✓</span>}
+                  {d.name}
+                  <span style={{ opacity: 0.55, marginLeft: 6, fontSize: 11 }}>{d.version}</span>
+                  <span style={{ opacity: 0.4, marginLeft: 6, fontSize: 10 }}>{d.config}</span>
+                </div>
+                <div className="axv-libs-item-rel" style={{ fontSize: 10, opacity: 0.6 }} title={key}>
+                  {d.group}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="axv-libs-btn"
+                style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
+                disabled={st === "downloading" || present || st === "done"}
+                onClick={() => void downloadGradleDep(d)}
+              >
+                {st === "downloading" ? tr("libs.downloading", "下载中…") : present || st === "done" ? tr("libs.cat_present", "已下载") : tr("libs.cat_download", "下载")}
+              </button>
+              {st && st.startsWith("err:") && (
+                <span style={{ fontSize: 10, color: "#c62828", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={st.slice(4)}>
+                  ✗ {st.slice(4)}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {dlOpen && (

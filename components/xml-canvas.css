@@ -12105,6 +12105,23 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   font-size: 12px;
   color: rgba(0,0,0,0.5);
 }
+/* M345：build.gradle 依赖解析区块 */
+.axv-libs-gradle {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+.axv-libs-gradle-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+}
+.axv-libs-gradle-msg {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: rgba(0,0,0,0.55);
+}
 .axv-libs-dl-overlay {
   position: fixed;
   inset: 0;

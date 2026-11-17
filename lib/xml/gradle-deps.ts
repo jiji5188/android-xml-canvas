@@ -464,3 +464,62 @@ export function parseAppConfig(text: string): AppConfig {
   cfg.hasSigning = /\bsigningConfigs\s*\{/.test(text);
   return cfg;
 }
+
+/* ===== M359：应用到项目 = 写 maven 坐标（不拷文件，防源码膨胀）=====
+ *  把 maven 依赖写进 app/build.gradle（implementation 行）+ 把仓库 url 写进根 build.gradle 或 settings.gradle（repositories 块），
+ *  项目就能从 maven 拉到库，不用把物理库拷进项目。kts 用 (..) 括号写法，groovy 用单引号。 */
+
+export function mavenCoord(group: string, artifact: string, version: string): string {
+  return `${group}:${artifact}:${version}`;
+}
+
+/** 幂等地把一行 implementation 追加进 dependencies 块（没有就建块）。返回 [新文本, 是否已存在]。 */
+export function insertImplementation(
+  text: string,
+  coord: string,
+  kts: boolean,
+): [string, boolean] {
+  const depLine = kts ? `implementation("${coord}")` : `implementation '${coord}'`;
+  // 已存在（精确坐标匹配）→ 不动
+  if (new RegExp("implementation\\s*(?:\\()?[\"']?" + coord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\"']?").test(text)) {
+    return [text, true];
+  }
+  if (/\bdependencies\s*\{/.test(text)) {
+    // 有 dependencies 块 → 在其内首个 { 后插一行
+    const m = text.match(/\bdependencies\s*\{/);
+    if (m) {
+      const idx = m.index! + m[0].length;
+      return [text.slice(0, idx) + `\n        ${depLine}` + text.slice(idx), false];
+    }
+  }
+  // 没有 → 末尾追加一个块
+  const block = kts ? `\n\ndependencies {\n    ${depLine}\n}\n` : `\n\ndependencies {\n    ${depLine}\n}\n`;
+  return [text.replace(/\s*$/, "") + "\n" + block, false];
+}
+
+/** 把仓库 url 追加进 repositories 块（没有就建）。返回 [新文本, 是否已存在]。 */
+export function insertRepoUrl(
+  text: string,
+  repoUrl: string,
+  kts: boolean,
+): [string, boolean] {
+  if (text.includes(repoUrl)) return [text, true];
+  // 已知仓库用系统函数（google()/mavenCentral()），否则用 maven { url }
+  const repoLine =
+    repoUrl === "https://dl.google.com/dl/android/maven2" || repoUrl === "https://maven.google.com"
+      ? `google()`
+      : repoUrl === "https://repo.maven.apache.org/maven2"
+        ? `mavenCentral()`
+        : kts
+          ? `maven { url = uri("${repoUrl}") }`
+          : `maven { url '${repoUrl}' }`;
+  if (/\brepositories\s*\{/.test(text)) {
+    const m = text.match(/\brepositories\s*\{/);
+    if (m) {
+      const idx = m.index! + m[0].length;
+      return [text.slice(0, idx) + `\n    ${repoLine}` + text.slice(idx), false];
+    }
+  }
+  const block = `\n\nrepositories {\n    ${repoLine}\n}\n`;
+  return [text.replace(/\s*$/, "") + "\n" + block, false];
+}

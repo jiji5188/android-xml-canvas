@@ -21,6 +21,9 @@ import {
   parseBuildscriptClasspath,
   gradleDepDownloadUrls,
   gradleDepFname,
+  insertImplementation,
+  insertRepoUrl,
+  mavenCoord,
   type GradleDep,
   type GradleUnresolved,
   type GradleProps,
@@ -400,6 +403,85 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     [canApply, nativeProjectRoot, primaryLibBase, native, onNote, tr, refresh],
   );
 
+  /** M359：应用到项目 = 写 maven 坐标（不拷文件，防源码膨胀）。
+   *  把 group:artifact:version 写进 app/build.gradle（implementation）+ 仓库 url 写进 settings.gradle / 根 build.gradle（repositories）。
+   *  设备端打包时按 maven 坐标去共享库 /AndroidUIIDE/libs 找实体文件（M361 接）。 */
+  const applyMaven = useCallback(
+    async (coord: string, repoUrl: string, libName: string) => {
+      if (!nativeProjectRoot) {
+        onNote?.(tr("libs.apply_need_project", "请先打开一个项目，才能应用库"));
+        return;
+      }
+      const root = nativeProjectRoot.replace(/[\\/]+$/, "");
+      const writeOne = async (rel: string, abs: string, text: string): Promise<boolean> => {
+        if (native?.writeText) {
+          try {
+            const b64 = btoa(unescape(encodeURIComponent(text)));
+            const r = String(native.writeText?.(abs, b64) ?? "");
+            if (r && !r.startsWith("err:")) return true;
+          } catch {}
+        }
+        if (aiFileIo?.write) {
+          try {
+            const r = await aiFileIo.write(rel, text);
+            return r.ok;
+          } catch {}
+        }
+        return false;
+      };
+      const readOne = async (rel: string, abs: string): Promise<string> => {
+        if (native?.readText) {
+          try { const t = String(native.readText?.(abs) ?? ""); if (t && !t.startsWith("err:")) return t; } catch {}
+        }
+        if (aiFileIo?.read) {
+          try { const r = await aiFileIo.read(rel); if (r.ok && r.text) return r.text; } catch {}
+        }
+        return "";
+      };
+
+      setApplyBusy((m) => ({ ...m, [libName]: "maven" }));
+      try {
+        // 1) app/build.gradle（groovy 优先，kts 兑底）
+        let appRel = "app/build.gradle";
+        let appText = await readOne(appRel, root + "/" + appRel);
+        let kts = false;
+        if (!appText) {
+          appRel = "app/build.gradle.kts"; appText = await readOne(appRel, root + "/" + appRel);
+          kts = true;
+        }
+        if (appText) {
+          const [newApp, existed] = insertImplementation(appText, coord, kts);
+          const ok = await writeOne(appRel, root + "/" + appRel, newApp);
+          if (ok && !existed)
+            onNote?.(tr("libs.maven_written", "{lib} 已写入 maven 坐标 {coord}（不拷文件，防源码膨胀）", { lib: libName, coord }));
+        } else {
+          // 项目没 build.gradle → 建一个最小 app/build.gradle 带 implementation
+          appRel = "app/build.gradle"; kts = false;
+          const newApp = "plugins { id 'com.android.application' }\n\ndependencies {\n    implementation '${coord}'\n}\n";
+          await writeOne(appRel, root + "/" + appRel, newApp);
+        }
+        // 2) 仓库 url 写进 settings.gradle（现代）或根 build.gradle
+        if (repoUrl) {
+          let repoText = await readOne("settings.gradle", root + "/settings.gradle");
+          let repoRel = "settings.gradle"; let rkts = false;
+          if (!repoText) { repoText = await readOne("settings.gradle.kts", root + "/settings.gradle.kts"); repoRel = "settings.gradle.kts"; rkts = true; }
+          if (!repoText) { repoText = await readOne("build.gradle", root + "/build.gradle"); repoRel = "build.gradle"; }
+          if (repoText) {
+            const [newRepo] = insertRepoUrl(repoText, repoUrl, rkts);
+            await writeOne(repoRel, root + "/" + repoRel, newRepo);
+          }
+        }
+        setApplyBusy((m) => ({ ...m, [libName]: "done" }));
+        onNote?.(tr("libs.maven_done", "{lib} 已应用到项目（写 maven 配置，不拷文件）", { lib: libName }));
+        void refresh();
+      } catch {
+        setApplyBusy((m) => ({ ...m, [libName]: "err:写 maven 配置失败" }));
+        onNote?.(tr("libs.apply_fail", "{lib} 应用失败：{err}", { lib: libName, err: "写 maven 配置" }));
+      }
+    },
+    [nativeProjectRoot, native, aiFileIo, onNote, tr, refresh],
+  );
+
   /** 从项目移除：依次试 标准 + 旧 libs 目录，删到哪个算哪个（项目库可能来自三处任一个） */
   const removeFromProject = useCallback(
     (name: string) => {
@@ -433,6 +515,26 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   );
 
   const catGroups = useMemo(() => groupCatalog(), []);
+
+  /** M359：按库文件名找 maven 坐标（catalog + 项目 gradle deps）。找到返回 {coord,repoUrl}，找不到 null（用拷贝兑底）。 */
+  const findCoordForLib = useCallback(
+    (name: string): { coord: string; repoUrl: string } | null => {
+      // 文件名可能像 material-1.12.0.aar / jxl-2.9.3.jar。去掉版本号 + 扩展去匹配 artifact。
+      const base = name.replace(/\.(jar|aar)$/i, "");
+      const noVer = base.replace(/-\d.*$/, "");
+      const catHit = LIBRARY_CATALOG.find(
+        (e) => e.artifact.toLowerCase() === noVer.toLowerCase() ||
+          e.artifact.toLowerCase() === base.toLowerCase(),
+      );
+      if (catHit)
+        return { coord: mavenCoord(catHit.group, catHit.artifact, catHit.version), repoUrl: catHit.kind === "material" || catHit.kind === "androidx" ? "https://dl.google.com/dl/android/maven2" : "https://repo.maven.apache.org/maven2" };
+      // catalog 没中，看项目 gradle deps（同名 artifact）
+      const gHit = gradleDeps.find((d) => d.name.toLowerCase() === noVer.toLowerCase() || d.name.toLowerCase() === base.toLowerCase());
+      if (gHit) return { coord: mavenCoord(gHit.group, gHit.name, gHit.version), repoUrl: gHit.isAar ? "https://dl.google.com/dl/android/maven2" : "https://repo.maven.apache.org/maven2" };
+      return null;
+    },
+    [gradleDeps],
+  );
 
   /** M345：读项目根 build.gradle / build.gradle.kts + app 子目录，解析依赖
    *  M347：同时读 gradle.properties（编译标记）+ settings.gradle（模块）+ 根 build.gradle（buildscript classpath）
@@ -678,6 +780,16 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                       >
                         {st === "downloading" ? tr("libs.downloading", "下载中…") : present ? tr("libs.cat_present", "已下载") : tr("libs.cat_download", "下载")}
                       </button>
+                      {present && (
+                        <button
+                          type="button"
+                          className="axv-libs-btn"
+                          style={{ whiteSpace: "nowrap", fontSize: 10, padding: "2px 8px" }}
+                          onClick={() => void applyMaven(mavenCoord(e.group, e.artifact, e.version), e.kind === "material" || e.kind === "androidx" ? "https://dl.google.com/dl/android/maven2" : "https://repo.maven.apache.org/maven2", e.artifact)}
+                        >
+                          {tr("libs.apply_maven", "应用到项目（maven）")}
+                        </button>
+                      )}
                       {st && st.startsWith("err:") && (
                         <span style={{ fontSize: 10, color: "#c62828", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={st.slice(4)}>
                           ✗ {st.slice(4)}
@@ -725,10 +837,15 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                       type="button"
                       className="axv-libs-btn"
                       style={{ fontSize: 10, padding: "2px 8px", whiteSpace: "nowrap" }}
-                      disabled={!canApply || ab === "applying"}
-                      onClick={() => applyToLocalProject(f)}
+                      disabled={ab === "applying" || ab === "maven"}
+                      onClick={() => {
+                        // M359：有 maven 坐标 → 写配置不拷文件；无坐标（纯本地 jar）→ 拷贝兑底
+                        const c = findCoordForLib(f.name);
+                        if (c) void applyMaven(c.coord, c.repoUrl, f.name);
+                        else applyToLocalProject(f);
+                      }}
                     >
-                      {ab === "applying" ? tr("libs.applying", "应用中…") : tr("libs.apply", "应用到项目")}
+                      {ab === "applying" || ab === "maven" ? tr("libs.applying", "应用中…") : tr("libs.apply", "应用到项目")}
                     </button>
                   )
                 ) : (

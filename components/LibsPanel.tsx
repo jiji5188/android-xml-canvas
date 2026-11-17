@@ -637,17 +637,19 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     onNote?.(tr("libs.gradle_scanned", "解析到 {n} 条依赖", { n: deps.length }));
   }, [nativeProjectRoot, native, aiFileIo, onNote, tr]);
 
-  /** M345：下载一条 gradle 依赖（优先原生多镜像，浏览器回退 fetch） */
+  /** M345：下载一条 gradle 依赖（优先原生多镜像，浏览器回退 fetch）。
+   *  M358/M359：一律下到共享库 /AndroidUIIDE/libs（跨项目复用），不再按「是否打开项目」写到
+   *  app/src/main/libs。应用到项目=写 maven 坐标（M359），编译时从共享库取实体（M361），
+   *  不预拷进项目目录。 */
   const downloadGradleDep = useCallback(
     async (d: GradleDep) => {
       const key = d.group + ":" + d.name + ":" + d.version;
       if (gradleBusyKey[key] === "downloading") return;
       setGradleBusyKey((m) => ({ ...m, [key]: "downloading" }));
       const fname = gradleDepFname(d);
-      // M346：打开了项目就下到项目标准 libs 目录（app/src/main/libs），否则落本地库暂存目录
-      const targetBase: string | null = primaryLibBase || localDir || null;
+      // M358/M359：固定下到共享库 localDir（/AndroidUIIDE/libs），不看是否打开项目
+      const targetBase: string | null = localDir || null;
       const target = targetBase ? `${targetBase}/${fname}` : null;
-      const inProject = !!primaryLibBase;
       const urls = gradleDepDownloadUrls(d);
       if (target && typeof native?.downloadLib === "function") {
         native.createEntry?.(targetBase!, true);
@@ -655,9 +657,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         try { r = String(native.downloadLib(JSON.stringify(urls), target) ?? ""); } catch (e2) { r = "throw:" + String(e2); }
         if (r.startsWith("ok")) {
           setGradleBusyKey((m) => ({ ...m, [key]: "done" }));
-          onNote?.(inProject
-            ? tr("libs.gradle_dl_done_proj", "{lib} 已下载到项目 app/src/main/libs/（打包时自动进编译）", { lib: key })
-            : tr("libs.gradle_dl_done", "{lib} 已下载到本地库", { lib: key }));
+          onNote?.(tr("libs.gradle_dl_done_shared", "{lib} 已下载到共享库（跨项目复用）", { lib: key }));
           void refresh();
           return;
         }
@@ -665,7 +665,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         onNote?.(tr("libs.gradle_dl_fail", "{lib} 下载失败：{err}", { lib: key, err: r.slice(4) || "?" }));
         return;
       }
-      // 浏览器回退
+      // 浏览器回退（web 没有共享库概念，下到浏览器 Downloads；APK 不会走这里）
       for (const url of urls) {
         const r = await fetchBase64(url);
         if (!r.ok) continue;
@@ -674,9 +674,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           const w = native.writeText?.(target!, r.b64);
           if (typeof w === "string" && w.startsWith("ok")) {
             setGradleBusyKey((m) => ({ ...m, [key]: "done" }));
-            onNote?.(inProject
-              ? tr("libs.gradle_dl_done_proj", "{lib} 已下载到项目 app/src/main/libs/（打包时自动进编译）", { lib: key })
-              : tr("libs.gradle_dl_done", "{lib} 已下载到本地库", { lib: key }));
+            onNote?.(tr("libs.gradle_dl_done_shared", "{lib} 已下载到共享库（跨项目复用）", { lib: key }));
             void refresh();
             return;
           }
@@ -685,7 +683,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       setGradleBusyKey((m) => ({ ...m, [key]: "err:" + tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") }));
       onNote?.(tr("libs.gradle_dl_fail", "{lib} 下载失败：全部镜像都试过了（网络不通或源 404）", { lib: key }));
     },
-    [localDir, primaryLibBase, native, onNote, tr, refresh],
+    [localDir, native, onNote, tr, refresh],
   );
 
   /** M345：全部下载（只下尚未下载的） */

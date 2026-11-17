@@ -1712,6 +1712,39 @@ public class MainActivity extends Activity {
         return treeUri != null ? workspaceLabel() : "AndroidUIIDE/Project";
     }
 
+    /** M356：启动/回到前台时，缺 All-files-access（共享库 /AndroidUIIDE/libs 读写必需）就引导授权；
+     *  点「暂不」本会话不再反复弹（共享库相关操作时 LibsPanel 会再各自提示）。 */
+    private boolean permNagOff = false;
+
+    /** M356：启动/回前台检查读写权限（All-files-access + 安装未知应用），缺了引导获取。 */
+    private void maybeGuidePermissions() {
+        if (permNagOff) return;
+        if (hasAllFiles()) { permNagOff = false; return; } // 授权了就恢复不再弹
+        runOnUiThread(() -> {
+            try {
+                StringBuilder msg = new StringBuilder("下载/使用共享库（/AndroidUIIDE/libs）需要「所有文件访问」权限。未授权的话，库下载不到、共享库也用不了。\n\n是否现在去授权？");
+                boolean installOk = Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls();
+                if (!installOk) msg.append("\n\n另外「安装应用」权限未开，打包后点安装会被拦（需允许本应用安装未知应用）。");
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("需要读写权限")
+                        .setMessage(msg.toString())
+                        .setCancelable(false)
+                        .setPositiveButton("去授权", (d, w) -> {
+                            askAllFiles();
+                            if (!installOk) {
+                                try {
+                                    startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                            Uri.parse("package:" + getPackageName())));
+                                } catch (Throwable t) { /* 安装权限引导失败不阻断 */ }
+                            }
+                            d.dismiss();
+                        })
+                        .setNegativeButton("暂不", (d, w) -> { permNagOff = true; d.dismiss(); })
+                        .show();
+            } catch (Throwable t) { Log.e(TAG, "guide permissions", t); }
+        });
+    }
+
     private boolean hasAllFiles() {
         if (Build.VERSION.SDK_INT >= 30) {
             try {
@@ -3853,6 +3886,8 @@ public class MainActivity extends Activity {
         } catch (Throwable t) {
             Log.e(TAG, "re-inject bridge", t);
         }
+        // M356：启动/回前台时检查读写权限（All-files-access），缺了引导获取（maybeGuidePermissions 是 MainActivity 顶层方法，裸调）
+        maybeGuidePermissions();
     }
 
     @Override

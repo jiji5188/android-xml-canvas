@@ -89,6 +89,7 @@ import { hasRealRender, renderReal, prepareFiles } from "@/lib/xml/native-render
 import { readStoredSigning, writeStoredSigning, clearStoredSigning } from "@/lib/xml/sign-store";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
+import { useEditorState } from "./editor-state";
 import { useBuildApk } from "./use-build-apk";
 import { installApk, shareApkFile, hasBuildApk, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
@@ -297,37 +298,17 @@ export function XmlEditor() {
       };
     }
   }
-  const [xml, setXml] = useState<string>(() => bootRef.current!.xml);
+  /** M366（路线 2）：共享核心 state 下沉到 useEditorState，壳/各组都读 E */
+  const E = useEditorState(bootRef.current!);
+  const { xml, setXml, project, setProject, resExtras, setResExtras, resCacheRev, bumpResCache, docRef, liveXmlRef, xmlSyncTimer, setXmlAndTrackRef, currentXml, flushXml } = E;
 
   /* ===== M57：编辑器 → React 的同步改成「常驻 ref + 防抖落状态」 =====
    * 旧行为：每个按键都 setXml(整份文档) → 这个 3000+ 行的组件整棵树重渲染
    * （ProjectPanel / AttrPanel / LayerTree / Toolbar 全跟着渲染）→ 大文件必然卡。
    * 新：最新文本先进 liveXmlRef（同步、零成本），setXml 防抖 250ms；
    * 保存/格式化/切 tab/撤销前先 flushXml()，保证拿到的是最新内容。
-   * 这也是 VS Code（Monaco）/ CM6 官方 React 包的做法：文档真相在编辑器里，React 只拿快照。 */
-  const docRef = useRef(xml);
-  const liveXmlRef = useRef<string | null>(null);
-  /** M202：doFixOne 在 setXmlAndTrack 声明之前就需要引用它，用 ref 包一层 */
-  const setXmlAndTrackRef = useRef<((next: string, mergeKey?: string) => void) | null>(null);
-  const xmlSyncTimer = useRef<number | null>(null);
-  /** 当前真实文本（优先编辑中的最新值） */
-  const currentXml = useCallback(() => liveXmlRef.current ?? docRef.current, []);
-  const flushXml = useCallback(() => {
-    if (xmlSyncTimer.current !== null) {
-      window.clearTimeout(xmlSyncTimer.current);
-      xmlSyncTimer.current = null;
-    }
-    const v = liveXmlRef.current;
-    if (v === null) return;
-    setXml(v);
-  }, []);
-  useEffect(() => {
-    docRef.current = xml;
-    // 状态追平后清掉 live（留着会让 currentXml 永远走旧分支）
-    if (liveXmlRef.current === xml) liveXmlRef.current = null;
-  }, [xml]);
-  /** 多文件项目：文件列表 + 当前激活文件（内容以 xml 为准，切换时回写） */
-  const [project, setProject] = useState<Project>(() => bootRef.current!.project);
+   * 这也是 VS Code（Monaco）/ CM6 官方 React 包的做法：文档真相在编辑器里，React 只拿快照。
+   * （M366：state/refs 已下沉到 useEditorState，见上方 E） */
 
   const currentFile = activeFile(project);
   /** M290：多文件 tab 面板 —— 每个项目文件一个 tab，名字就是文件名；点 tab 切换当前文件。
@@ -402,12 +383,8 @@ export function XmlEditor() {
   }
   /** 示例项目自带的 values（@color/@string）——单独存，不抢用户自己贴的片段；用户片段优先 */
   const [sampleValues, setSampleValues] = useState(sampleBoot.current.values);
-  /** 上传 res/ 目录解析出的附加资源（drawable/vector/styles/values 原文） */
-  const [resExtras, setResExtras] = useState<ResourceExtras | null>(null);
-  /** M210c：资源索引缓存世代。存了 res 文件（新建布局/values/drawable）后 +1，
-   *   让下一次「全量资源索引」先 invalidate 再扫，否则 20s 缓存里还是旧的（新建的 id 查不到 → 误报）。 */
-  const [resCacheRev, setResCacheRev] = useState(0);
-  const bumpResCache = useCallback(() => setResCacheRev((v) => v + 1), []);
+  /** 上传 res/ 目录解析出的附加资源（drawable/vector/styles/values 原文）—— M366：已下沉到 useEditorState，见上方 E */
+  /** M210c：资源索引缓存世代—— M366：已下沉到 useEditorState */
   /** M3g/M3h：本工具生成的 drawable 资源：资源名 → xml 原文（图标 vector + 自定义 shape/ripple 共用） */
   const [generatedDrawables, setGeneratedDrawables] = useState<Record<string, string>>(sampleBoot.current.drawables);
   /** M171：应用图标生成的额外资源（mipmap-anydpi-v26/ic_launcher.xml 等，路径相对 res/） */

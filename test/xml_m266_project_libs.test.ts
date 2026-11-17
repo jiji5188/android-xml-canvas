@@ -29,21 +29,23 @@ function fakeIo(
 type FakeTree = Record<string, { kind: "dir" | "file"; name?: string }[]>;
 
 describe("collectProjectLibs (M266)", () => {
-  it("扫出 app/libs 下的 jar/aar", async () => {
+  it("M358：0 容忍——扫出 app/src/main/libs 下的 jar/aar（不再收 app/libs）", async () => {
     const tree: FakeTree = {
       "": [{ kind: "dir", name: "app" }],
       app: [{ kind: "dir", name: "libs" }, { kind: "dir", name: "src" }],
-      "app/libs": [{ kind: "file", name: "jxl.jar" }, { kind: "file", name: "androidx-core.aar" }],
-      "app/src": [{ kind: "file", name: "Main.java" }],
+      "app/libs": [{ kind: "file", name: "should-ignore.jar" }],
+      "app/src": [{ kind: "dir", name: "main" }],
+      "app/src/main": [{ kind: "dir", name: "libs" }],
+      "app/src/main/libs": [{ kind: "file", name: "jxl.jar" }, { kind: "file", name: "androidx-core.aar" }],
     };
     const r = await collectProjectLibs(
       fakeIo(tree, {
-        "app/libs/jxl.jar": "YWJjZA==",
-        "app/libs/androidx-core.aar": "ZXhmaQ==",
+        "app/src/main/libs/jxl.jar": "YWJjZA==",
+        "app/src/main/libs/androidx-core.aar": "ZXhmaQ==",
       }),
       null,
     );
-    expect(r.libs.map((l) => l.rel).sort()).toEqual(["app/libs/androidx-core.aar", "app/libs/jxl.jar"]);
+    expect(r.libs.map((l) => l.rel).sort()).toEqual(["app/src/main/libs/androidx-core.aar", "app/src/main/libs/jxl.jar"]);
     expect(r.failed).toEqual([]);
   });
 
@@ -56,11 +58,14 @@ describe("collectProjectLibs (M266)", () => {
     expect(r.libs).toEqual([]);
   });
 
-  it("总量超 40MB 截断", async () => {
+  it("M358：总量超 40MB 截断（app/src/main/libs）", async () => {
     const big = "A".repeat(16 * 1024 * 1024); // base64 4/3 后 ~12MB
     const tree: FakeTree = {
-      "": [{ kind: "dir", name: "libs" }],
-      libs: [
+      "": [{ kind: "dir", name: "app" }],
+      app: [{ kind: "dir", name: "src" }],
+      "app/src": [{ kind: "dir", name: "main" }],
+      "app/src/main": [{ kind: "dir", name: "libs" }],
+      "app/src/main/libs": [
         { kind: "file", name: "a.jar" },
         { kind: "file", name: "b.jar" },
         { kind: "file", name: "c.jar" },
@@ -68,9 +73,9 @@ describe("collectProjectLibs (M266)", () => {
     };
     const r = await collectProjectLibs(
       fakeIo(tree, {
-        "libs/a.jar": big,
-        "libs/b.jar": big,
-        "libs/c.jar": big,
+        "app/src/main/libs/a.jar": big,
+        "app/src/main/libs/b.jar": big,
+        "app/src/main/libs/c.jar": big,
       }),
       null,
     );

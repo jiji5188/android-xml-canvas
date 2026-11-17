@@ -142,16 +142,13 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     return "/storage/emulated/0/AndroidUIIDE/libs";
   }, [native]);
 
-  /** M346：项目库标准目录 = 项目根/app/src/main/libs（标准安卓工程布局）。
-   *  M348：不再支持 项目根/libs/（非标准），只按标准安卓工程布局：
-   *  首选 app/src/main/libs（标准），其次 app/libs（模块级，仍可读）。
-   *  collectProjectLibs 认所有含 /libs/ 段的路径，所以这两处都能被打包收编 */
+  /** M346/M358：项目库标准目录 = 项目根/app/src/main/libs（标准安卓工程布局）。
+   *  M358：彻底移除 /app/libs 适配，只认标准位置 app/src/main/libs。
+   *  共享库 /AndroidUIIDE/libs 是另一回事（跨项目复用，在「共享库」tab 里）。 */
   const projectLibsBases = useMemo(() => {
     if (!nativeProjectRoot) return [] as string[];
     const root = nativeProjectRoot.replace(/[\\/]+$/, "");
-    const primary = `${root}/app/src/main/libs`; // 标准位置（首选写入）
-    const alt = [`${root}/app/libs`]; // 模块级 libs（仍可读）
-    return [primary, ...alt.filter((p) => p !== primary)];
+    return [`${root}/app/src/main/libs`];
   }, [nativeProjectRoot]);
   /** 首选写入目录（应用到项目 / gradle 依赖下载都写这里） */
   const primaryLibBase = projectLibsBases[0] ?? null;
@@ -178,7 +175,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           }
           setProjectLibs(all);
         } else if (aiFileIo) {
-          const candidates = ["app/src/main/libs", "app/libs"];
+          const candidates = ["app/src/main/libs"];
           let all: LibFile[] = [];
           for (const c of candidates) {
             const items = await listDirViaIo(aiFileIo, c);
@@ -319,7 +316,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
             return;
           }
           setCatBusy((m) => ({ ...m, [key]: "done" }));
-          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载到本地库（去「本地库」点「应用到项目」加入项目）", { lib: e.artifact }));
+          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载到共享库（去「共享库」点「应用到项目」加入项目）", { lib: e.artifact }));
           void refresh();
         } else {
           setCatBusy((m) => ({ ...m, [key]: "err:" + (r.slice(4) || "download failed") }));
@@ -609,7 +606,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           className={tab === "local" ? "on" : ""}
           onClick={() => setTab("local")}
         >
-          {tr("libs.local", "本地库")}
+          {tr("libs.local", "共享库")}
         </button>
         <button
           role="tab"
@@ -643,13 +640,13 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       <div className="axv-libs-list axv-rail-scroll">
         {tab === "local" && (
           <div style={{ fontSize: 10, opacity: 0.6, margin: "2px 6px 6px", lineHeight: 1.5, wordBreak: "break-all" }}>
-            {tr("libs.local_hint", "本地库目录：{path}", { path: localDir || "/AndroidUIIDE/libs" })}
+            {tr("libs.local_hint", "共享库目录：{path}", { path: localDir || "/AndroidUIIDE/libs" })}
           </div>
         )}
         {tab === "catalog" ? (
           <div>
             <div style={{ fontSize: 11, opacity: 0.6, margin: "4px 6px 8px", lineHeight: 1.5 }}>
-              {tr("libs.catalog_hint", "常用库目录：点「下载」自动存入本地库 /AndroidUIIDE/libs，再去「本地库」选择是否应用到项目；打包时项目 libs/ 的库自动进编译。")}
+              {tr("libs.catalog_hint", "常用库目录：点「下载」自动存入共享库 /AndroidUIIDE/libs，再去「共享库」选择是否应用到项目；打包时项目 libs/ 的库自动进编译。")}
             </div>
             {catGroups.map((g) => (
               <div key={g.kind} style={{ margin: "6px 4px" }}>
@@ -952,7 +949,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
               />
             </label>
             <div className="axv-libs-hint">
-              {tr("libs.save_to", "保存到 {tab}", { tab: tab === "local" ? tr("libs.local", "本地库") : tr("libs.project", "项目库") })}
+              {tr("libs.save_to", "保存到 {tab}", { tab: tab === "local" ? tr("libs.local", "共享库") : tr("libs.project", "项目库") })}
             </div>
             <div className="axv-libs-dl-actions">
               <button type="button" className="axv-libs-btn" onClick={() => setDlOpen(false)}>

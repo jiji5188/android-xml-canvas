@@ -1,18 +1,19 @@
 // lib/xml/project-libs.ts — M266：把项目里的依赖库（libs/*.jar、*.aar）读成 base64，
 // 打包时传给设备端 ECJ/D8 当 classpath，解决 androidx / jxl 等第三方引用。
+// M358：编译扫描 0 容忍——只认标准位置 app/src/main/libs（不再全树 /libs/ 兜底，不认 /app/libs）。
+// 共享库 /AndroidUIIDE/libs（跨项目复用）由 M361 单独收集进 classpath，不在本函数里。
 //
 // 规则：
-//   - 只认路径里含 /libs/ 段的文件（app/libs、libs 根目录都算）
-//   - 后缀 .jar / .aar（.so 不碰——那是运行期 native 库，编译用不上）
+//   - 只收 app/src/main/libs 下的 .jar / .aar（.so 不碰——那是运行期 native 库，编译用不上）
 //   - 单文件 ≤ 15MB，总量 ≤ 40MB（防 Gradle 缓存误扫进几百 MB）
 //   - 超了就在返回里标 truncated，调用方 toast 提示
 
 import type { AiFileIo } from "./ai-tools";
-import { hasAsyncIo, listDirQueued, readBase64Queued } from "./native-async";
+import { hasAsyncIo, listDirQueued } from "./native-async";
 import { nativeBridge } from "./native-save";
 
 export interface ProjectLib {
-  /** 相对项目根，如 app/libs/jxl.jar */
+  /** 相对项目根，如 app/src/main/libs/jxl.jar */
   rel: string;
   base64: string;
 }
@@ -27,11 +28,10 @@ export interface CollectLibsResult {
 
 const MAX_FILE = 15 * 1024 * 1024;
 const MAX_TOTAL = 40 * 1024 * 1024;
-const MAX_DEPTH = 4;
 
-const isLib = (rel: string) =>
-  /(^|\/)libs\/[^\/]+$/i.test(rel.replace(/\\/g, "/")) &&
-  /\.(jar|aar)$/i.test(rel);
+/** M358：只收标准位置的库文件。 */
+export const LIBS_BASE = "app/src/main/libs";
+const isLibFile = (name: string) => /\.(jar|aar)$/i.test(name);
 
 /** 原生通道列目录（绝对路径，同步） */
 function nativeListDir(abs: string): { ok: boolean; items?: { name: string; kind: string; path?: string }[] } {
@@ -69,75 +69,50 @@ export async function collectProjectLibs(
   const failed: string[] = [];
   let total = 0;
 
-  const tryAdd = async (rel: string): Promise<void> => {
-    // io.readBase64
-    if (io?.readBase64) {
-      const r = await io.readBase64(rel);
-      if (r.ok && r.base64) {
-        // base64 长度 ≈ 原始字节 × 4/3；粗略判大小
-        const bytes = Math.floor(r.base64.length * 0.75);
-        if (bytes > MAX_FILE || total + bytes > MAX_TOTAL) {
-          skipped.push(rel);
-          return;
-        }
-        total += bytes;
-        libs.push({ rel, base64: r.base64 });
-        return;
-      }
-      if (!r.ok) failed.push(rel);
-    }
+  const addBase64 = (rel: string, b64: string) => {
+    const bytes = Math.floor(b64.length * 0.75);
+    if (bytes > MAX_FILE || total + bytes > MAX_TOTAL) { skipped.push(rel); return; }
+    total += bytes;
+    libs.push({ rel, base64: b64 });
   };
 
-  // 1) io 通道（SAF）：全量递归（深度限制），只收 libs 下的 jar/aar
-  if (io) {
-    const walk = async (rel: string, depth: number): Promise<void> => {
-      if (depth > MAX_DEPTH) return;
-      const r = await io.list(rel);
-      if (!r.ok || !r.items) return;
+  // M358：0 容忍——只直接列 app/src/main/libs，不再全树递归、不认 /app/libs 与任意 /libs/
+  // 1) io 通道（SAF）：直接列标准目录
+  if (io?.list) {
+    const dir = LIBS_BASE;
+    const r = await io.list(dir);
+    if (r.ok && r.items) {
       for (const it of r.items) {
-        const childRel = rel ? `${rel}/${it.name}` : it.name;
-        if (it.kind === "dir") {
-          await walk(childRel, depth + 1);
-        } else if (isLib(childRel)) {
-          await tryAdd(childRel);
-        }
+        if (it.kind === "dir" || !isLibFile(it.name)) continue;
+        const rel = `${dir}/${it.name}`;
+        const rb = io.readBase64 ? await io.readBase64(rel) : { ok: false as const };
+        if (rb.ok && rb.base64) addBase64(rel, rb.base64);
+        else if (!rb.ok) failed.push(rel);
       }
-    };
-    await walk("", 0);
+    }
   }
 
-  // 2) 原生通道兜底（nativeRoot）：找 libs 目录全量递归
+  // 2) 原生通道兜底（nativeRoot）：直接列标准目录
   if (nativeRoot && libs.length === 0) {
-    const walkN = async (abs: string, rel: string, depth: number): Promise<void> => {
-      if (depth > MAX_DEPTH) return;
-      let json: string | null = null;
-      try {
-        json = hasAsyncIo() ? await listDirQueued(abs) : nativeListDir(abs).ok ? JSON.stringify(nativeListDir(abs)) : null;
-      } catch {
-        return;
-      }
-      if (!json) return;
+    const abs = `${nativeRoot.replace(/[\\/]+$/, "")}/${LIBS_BASE}`;
+    let json: string | null = null;
+    try {
+      json = hasAsyncIo() ? await listDirQueued(abs) : nativeListDir(abs).ok ? JSON.stringify(nativeListDir(abs)) : null;
+    } catch { json = null; }
+    if (json) {
       let parsed: { ok?: boolean; items?: { name: string; kind: string; path?: string }[] };
-      try { parsed = JSON.parse(json); } catch { return; }
-      if (!parsed?.ok || !Array.isArray(parsed.items)) return;
-      for (const it of parsed.items) {
-        const childRel = rel ? rel + "/" + it.name : it.name;
-        if (it.kind === "dir") {
-          await walkN(it.path || abs + "/" + it.name, childRel, depth + 1);
-        } else if (isLib(childRel)) {
-          const absPath = it.path || abs + "/" + it.name;
+      try { parsed = JSON.parse(json); } catch { parsed = { ok: false }; }
+      if (parsed?.ok && Array.isArray(parsed.items)) {
+        for (const it of parsed.items) {
+          if (it.kind === "dir" || !isLibFile(it.name)) continue;
+          const rel = `${LIBS_BASE}/${it.name}`;
+          const absPath = it.path || `${abs}/${it.name}`;
           const b64 = nativeReadBase64(absPath);
-          if (b64) {
-            const bytes = Math.floor(b64.length * 0.75);
-            if (bytes > MAX_FILE || total + bytes > MAX_TOTAL) skipped.push(childRel);
-            else { total += bytes; libs.push({ rel: childRel, base64: b64 }); }
-          } else {
-            failed.push(childRel);
-          }
+          if (b64) addBase64(rel, b64);
+          else failed.push(rel);
         }
       }
-    };
-    await walkN(nativeRoot, "", 0);
+    }
   }
 
   return { libs, skipped, failed };

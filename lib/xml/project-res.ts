@@ -108,23 +108,25 @@ export function mergeProjectExtras(a: ResourceExtras | null, b: ResourceExtras |
   return {
     ...a,
     ...b,
-    drawables: { ...a.drawables, ...b.drawables },
-    drawableXml: { ...a.drawableXml, ...b.drawableXml },
+    drawables: { ...(a.drawables || {}), ...(b.drawables || {}) },
+    drawableXml: { ...(a.drawableXml || {}), ...(b.drawableXml || {}) },
     // M210：layouts 也合并（a 是快速通道里当前文档引用的，b 是全量扫描；缺一边都会少 id）
     layouts: { ...(a.layouts || {}), ...(b.layouts || {}) },
     // M256：全项目 @+id 也合并（menu/navigation 里的 id）
     ids: [...new Set([...(a.ids || []), ...(b.ids || [])])],
-    styles: { ...a.styles, ...b.styles },
-    vectorNames: [...new Set([...a.vectorNames, ...b.vectorNames])],
+    styles: { ...(a.styles || {}), ...(b.styles || {}) },
+    // M367 修复：vectorNames/sourceFiles 旧缓存/快速通道可能缺字段，展开 undefined 报
+    // "a is not iterable"（minify 后）。统一加 || [] 守卫（与 ids 一致）。
+    vectorNames: [...new Set([...(a.vectorNames || []), ...(b.vectorNames || [])])],
     valuesXml,
-    sourceFiles: [...new Set([...a.sourceFiles, ...b.sourceFiles])],
+    sourceFiles: [...new Set([...(a.sourceFiles || []), ...(b.sourceFiles || [])])],
     counts: {
-      images: Object.keys({ ...a.drawables, ...b.drawables }).length,
-      vectors: new Set([...a.vectorNames, ...b.vectorNames]).size,
+      images: Object.keys({ ...(a.drawables || {}), ...(b.drawables || {}) }).length,
+      vectors: new Set([...(a.vectorNames || []), ...(b.vectorNames || [])]).size,
       // 数真去重后的键数，不再把两边的计数盲加（旧版会越加越大）
       values: valuesKeys(valuesXml).size,
-      styles: Object.keys({ ...a.styles, ...b.styles }).length,
-      shapes: Math.max(a.counts.shapes, b.counts.shapes),
+      styles: Object.keys({ ...(a.styles || {}), ...(b.styles || {}) }).length,
+      shapes: Math.max(a.counts?.shapes ?? 0, b.counts?.shapes ?? 0),
     },
     themeAttrs: { ...(a.themeAttrs || {}), ...(b.themeAttrs || {}) },
     themeAttrsNight: { ...(a.themeAttrsNight || {}), ...(b.themeAttrsNight || {}) },

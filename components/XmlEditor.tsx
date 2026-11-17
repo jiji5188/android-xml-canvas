@@ -250,6 +250,7 @@ import { readSigningFromGradle } from "@/lib/xml/signing";
 import { LeftRail, type LeftView } from "./LeftRail";
 import { LibsPanel } from "./LibsPanel";
 import { ProblemsDrawer } from "./ProblemsDrawer";
+import { useBuildLogs } from "./use-build-logs";
 import {
   subscribeRuntimeLog,
   installRuntimeLogBridge,
@@ -2600,42 +2601,12 @@ const findResolved = findResolvedNode;
     setBuildLogs,
   }));
 
-  /** M188b：构建日志（真机渲染 pipeline，新在前），给底部抽屉「构建日志」tab */
-  const [buildLogs, setBuildLogs] = useState<
-    {
-      id: string;
-      ok: boolean;
-      stage?: string;
-      ms?: number;
-      log?: string;
-      logFile?: string;
-      files?: number;
-      bytes?: number;
-    }[]
-  >([]);
-  // M252：打包（APK）完成后，把日志推进抽屉并自动打开到「构建日志」tab（不再只塞在签名弹窗）
-  const [apkForceView, setApkForceView] = useState<{ open: boolean; tab: "problems" | "build-log" | "runtime" } | null>(null);
-  // M288：运行日志（被打出来的 App 通过广播发到编辑器的），给抽屉「运行日志」tab
-  const [runtimeLogs, setRuntimeLogs] = useState<RuntimeLogEntry[]>([]);
-  useEffect(() => {
-    installRuntimeLogBridge();
-    const unsub = subscribeRuntimeLog((entries) => setRuntimeLogs([...entries].reverse()));
-    return () => {
-      unsub();
-    };
-  }, []);
-  const clearRuntimeLogsCb = useCallback(() => {
-    clearRuntimeLog();
-  }, []);
-  // M256：抽屉展开状态（手机端代码区要腾出高度，别被遮）
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const pushApkBuildLog = useCallback(
-    (entry: { id: string; ok: boolean; stage: string; ms?: number; log?: string; files?: number; bytes?: number }) => {
-      setBuildLogs((prev) => [entry, ...prev].slice(0, 20));
-      setApkForceView({ open: true, tab: "build-log" });
-    },
-    [],
-  );
+  /** M366：构建/运行日志 + 抽屉状态 → components/use-build-logs.ts */
+  const {
+    buildLogs, setBuildLogs, apkForceView, setApkForceView,
+    runtimeLogs, setRuntimeLogs, drawerOpen, setDrawerOpen,
+    clearRuntimeLogsCb, pushApkBuildLog,
+  } = useBuildLogs();
 
   const clearRes = () => {
     setResExtras(null);

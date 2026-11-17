@@ -199,6 +199,27 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     void refresh();
   }, [refresh]);
 
+  /** M365：系统下载器优先（后台 + 系统通知 + 进度弹窗）；全失败则回退 HttpURLConnection
+   *  downloadLib（保证文件仍下到共享库，只是没系统通知）。返回 { ok, error?, via }。 */
+  const dlWithFallback = useCallback(
+    async (urls: string[], fname: string, destDir: string): Promise<{ ok: boolean; error?: string; via?: "system" | "direct" }> => {
+      const res = await systemDownload(urls, fname, destDir, { showNativeProgress: true });
+      if (res.missingPermission) return { ok: false, error: tr("libs.cat_no_perm", "缺 All-files-access 权限，下载不到") };
+      if (res.ok) return { ok: true, via: "system" };
+      // 系统下载器全失败 → 回退原生 HttpURLConnection（同步、能下到共享库）
+      if (native?.downloadLib) {
+        native.createEntry?.(destDir, true);
+        const target = `${destDir}/${fname}`;
+        let r = "";
+        try { r = String(native.downloadLib(JSON.stringify(urls), target) ?? ""); } catch (e2) { r = "throw:" + String(e2); }
+        if (r.startsWith("ok")) return { ok: true, via: "direct" };
+        return { ok: false, error: r.slice(4) || tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") };
+      }
+      return { ok: false, error: res.error || tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") };
+    },
+    [native, tr],
+  );
+
   const doDownload = useCallback(async () => {
     const url = dlUrl.trim();
     if (!url) return;
@@ -210,16 +231,11 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     const target = targetBase ? `${targetBase}/${name}` : null;
 
     if (targetBase) {
-      // M357：走系统 DownloadManager（后台跑 + 系统通知 + 进度弹窗 + 切页不中断）
-      const res = await systemDownload([url], name, targetBase, { showNativeProgress: true });
-      if (res.missingPermission) {
-        onNote?.(tr("libs.cat_no_perm", "缺 All-files-access 权限，下载不到"));
-        setDlBusy(false);
-        return;
-      }
+      // M357/M365：系统 DownloadManager（后台 + 通知 + 弹窗）；失败回退 HttpURLConnection
+      const res = await dlWithFallback([url], name, targetBase);
       if (res.ok) {
         setDlOpen(false); setDlUrl(""); setDlName("");
-        onNote?.(tr("libs.download_saved", "已保存到 {path}", { path: `${targetBase}/${name}` }));
+        onNote?.(tr("libs.download_saved", "已保存到 {path}" + (res.via === "direct" ? "（直连下载，无系统通知）" : ""), { path: `${targetBase}/${name}` }));
         void refresh();
       } else {
         onNote?.(tr("libs.download_failed", "下载失败：{err}", { err: res.error || "unknown" }));
@@ -237,7 +253,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     }
     onNote?.(tr("libs.download_no_target", "当前没有可写的共享库目录（浏览器已下到 Downloads）"));
     setDlBusy(false);
-  }, [dlUrl, dlName, localDir, onNote, tr, refresh, setDlOpen, setDlUrl, setDlName, setDlBusy]);
+  }, [dlUrl, dlName, localDir, onNote, tr, refresh, setDlOpen, setDlUrl, setDlName, setDlBusy, dlWithFallback]);
 
   const currentList = tab === "local" ? localLibs : projectLibs;
 
@@ -253,13 +269,8 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       if (localDir) targetBase = localDir;
       const target = targetBase ? `${targetBase}/${fname}` : null;
       if (targetBase) {
-        // M357/M364：走系统 DownloadManager（后台跑 + 系统通知 + 进度弹窗 + 切页不中断）
-        const res = await systemDownload(libDownloadUrls(e), fname, targetBase, { showNativeProgress: true });
-        if (res.missingPermission) {
-          setCatBusy((m) => ({ ...m, [key]: "err:perm" }));
-          onNote?.(tr("libs.cat_no_perm", "缺 All-files-access 权限，下载不到"));
-          return;
-        }
+        // M357/M365：系统 DownloadManager（后台 + 通知 + 弹窗）；失败回退 HttpURLConnection
+        const res = await dlWithFallback(libDownloadUrls(e), fname, targetBase);
         if (res.ok) {
           setCatBusy((m) => ({ ...m, [key]: "done" }));
           onNote?.(tr("libs.cat_download_saved", "{lib} 已下载到共享库（去「共享库」点「应用到项目」加入项目）", { lib: e.artifact }));
@@ -331,7 +342,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       setCatBusy((m) => ({ ...m, [key]: "err:" + tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") }));
       onNote?.(tr("libs.cat_all_failed", "{lib} 下载失败：全部镜像都试过了（网络不通或源 404）", { lib: e.artifact }));
     },
-    [native, nativeProjectRoot, localDir, onNote, tr, refresh],
+    [native, nativeProjectRoot, localDir, onNote, tr, refresh, dlWithFallback],
   );
 
   /** 已下载判定：本地/项目库列表里已有同名文件 */
@@ -631,13 +642,8 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       const target = targetBase ? `${targetBase}/${fname}` : null;
       const urls = gradleDepDownloadUrls(d);
       if (targetBase) {
-        // M357/M364：走系统 DownloadManager（后台 + 系统通知 + 进度弹窗）
-        const res = await systemDownload(urls, fname, targetBase, { showNativeProgress: true });
-        if (res.missingPermission) {
-          setGradleBusyKey((m) => ({ ...m, [key]: "err:perm" }));
-          onNote?.(tr("libs.cat_no_perm", "缺 All-files-access 权限，下载不到"));
-          return;
-        }
+        // M357/M365：系统 DownloadManager（后台 + 通知 + 弹窗）；失败回退 HttpURLConnection
+        const res = await dlWithFallback(urls, fname, targetBase);
         if (res.ok) {
           setGradleBusyKey((m) => ({ ...m, [key]: "done" }));
           onNote?.(tr("libs.gradle_dl_done_shared", "{lib} 已下载到共享库（跨项目复用）", { lib: key }));
@@ -680,7 +686,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       setGradleBusyKey((m) => ({ ...m, [key]: "err:" + tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") }));
       onNote?.(tr("libs.gradle_dl_fail", "{lib} 下载失败：全部镜像都试过了（网络不通或源 404）", { lib: key }));
     },
-    [localDir, native, onNote, tr, refresh],
+    [localDir, native, onNote, tr, refresh, dlWithFallback],
   );
 
   /** M345：全部下载（只下尚未下载的） */

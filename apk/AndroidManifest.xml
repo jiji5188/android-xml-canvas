@@ -7,6 +7,8 @@
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+<uses-permission android:name="android.permission.ACCESS_DOWNLOAD_MANAGER" android:maxSdkVersion="28" />
     <!-- M16i锛氶粯璁ゅ伐浣滅洰褰曞湪瀛樺偍鏍逛笅 /AndroidUIIDE/Project锛孉ndroid 11+ 闇€瑕併€屾墍鏈夋枃浠惰闂€?-->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" xmlns:tools="http://schemas.android.com/tools" />

@@ -1326,6 +1326,7 @@ export const SRC_EN: SrcDict = {
   "{lib} 已下载到共享库（跨项目复用）": "{lib} downloaded into shared libs (reused across projects)",
   "缺 All-files-access 权限，下载不到": "Missing All-files-access permission; cannot download",
   "当前没有可写的共享库目录（浏览器已下到 Downloads）": "No writable shared-lib dir (browser downloaded to Downloads)",
+  "（直连下载，无系统通知）": "(direct download, no system notification)",
   "模块": "Modules",
   "根工程 {name}": "root project {name}",
   "编译标记": "Build flags",

@@ -6,6 +6,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IntentFilter;
 import android.app.AlertDialog;
+import android.app.DownloadManager;
+import android.app.ProgressDialog;
+import android.database.Cursor;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -773,6 +776,129 @@ public class MainActivity extends Activity {
                 String m = t.getMessage();
                 return "err:" + (m == null ? t.getClass().getSimpleName() : m);
             }
+        }
+
+        /* ===== M357：系统下载器（DownloadManager，后台/切页不中断/系统通知）+ 原生 ProgressDialog ===== */
+
+        /** M357：交给系统 DownloadManager 下载。urlsJson=候选镜像数组（换源由 JS 逐个重试）；name=目标文件名；
+         *  destDir=目标目录（绝对路径，共享库 /AndroidUIIDE/libs）。快返回 jobId，下载在后台跑。
+         *  返回 "ok:<jobId>" / "err:no-permission" / "err:<原因>"。
+         *  注意：本方法只在 Android native 桥上有；浏览器模式 JS 自己走 a[download]，不会调到这里。 */
+        public String systemDownload(String urlsJson, String name, String destDir) {
+            try {
+                if (name == null || name.isEmpty() || destDir == null || destDir.isEmpty()) return "err:参数空";
+                if (!hasAllFiles()) return "err:no-permission";
+                java.util.List<String> urls = jsonUrlList(urlsJson);
+                if (urls.isEmpty()) return "err:无候选 URL";
+                File target = new File(new File(destDir), name);
+                try { target.getParentFile().mkdirs(); } catch (Throwable ignore) {}
+                android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(android.app.DownloadManager.class);
+                if (dm == null) return "err:DownloadManager 不可用";
+                android.app.DownloadManager.Request req =
+                        new android.app.DownloadManager.Request(android.net.Uri.parse(urls.get(0)));
+                req.setDestinationUri(android.net.Uri.fromFile(target));
+                req.setTitle(name);
+                req.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE);
+                req.setAllowedNetworkTypes(android.app.DownloadManager.Request.NETWORK_WIFI | android.app.DownloadManager.Request.NETWORK_MOBILE);
+                long id = dm.enqueue(req);
+                if (id < 0) return "err:enqueue 失败";
+                return "ok:" + id;
+            } catch (Throwable t) {
+                return "err:" + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+            }
+        }
+
+        /** M357：查 DownloadManager 下载进度。jobId → JSON {state,cur,total,done,failed}。
+         *  state: 0=成功 1=排队 2=运行 3=失败 4=暂停 5=已取消 */
+        public String downloadProgress(String jobId) {
+            JSONObject out = new JSONObject();
+            try {
+                if (jobId == null || jobId.isEmpty()) { out.put("browser", true); return out.toString(); }
+                android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(android.app.DownloadManager.class);
+                if (dm == null) { out.put("error", "DownloadManager 不可用"); return out.toString(); }
+                android.app.DownloadManager.Query q = new android.app.DownloadManager.Query();
+                q.setFilterById(Long.parseLong(jobId.trim()));
+                Cursor c = dm.query(q);
+                if (c == null || c.getCount() == 0) { out.put("gone", true); return out.toString(); }
+                c.moveToFirst();
+                int st = c.getInt(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS));
+                long cur = 0, total = -1;
+                int ci = c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR);
+                int ti = c.getColumnIndex(android.app.DownloadManager.COLUMN_TOTAL_SIZE_BYTES);
+                if (ci >= 0) cur = c.getLong(ci);
+                if (ti >= 0) total = c.getLong(ti);
+                c.close();
+                out.put("state", st);
+                out.put("cur", cur);
+                out.put("total", total);
+                out.put("done", st == android.app.DownloadManager.STATUS_SUCCESSFUL);
+                out.put("failed", st == android.app.DownloadManager.STATUS_FAILED || st == android.app.DownloadManager.STATUS_PAUSED);
+                return out.toString();
+            } catch (Throwable t) {
+                try { out.put("error", t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage()); } catch (Throwable ignore) {}
+                return out.toString();
+            }
+        }
+
+        /** M357：取消某个 DownloadManager 下载（可选，给「取消下载」按钮用；关 dialog 不取消，下载继续）。 */
+        public String cancelDownload(String jobId) {
+            try {
+                if (jobId == null || jobId.isEmpty()) return "ok:none";
+                android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(android.app.DownloadManager.class);
+                if (dm == null) return "err:no-dm";
+                long[] ids = { Long.parseLong(jobId.trim()) };
+                int n = dm.remove(ids);
+                return "ok:" + n;
+            } catch (Throwable t) { return "err:" + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage()); }
+        }
+
+        /* ===== M357：原生 ProgressDialog（打包编译=不可关·成败自动关；下载=可关·后台继续）=====
+         *  opKey 区分多个并发操作（构建 / 下载）。showOpProgress 建一个带进度条的 AlertDialog，
+         *  setOpProgress 更新文案/百分比，closeOpProgress 关掉。构建类 cancelable=false；下载类 cancelable=true（
+         *  关掉只是藏 dialog，DownloadManager 后台照跑 + 系统通知不断）。 */
+        private final java.util.Map<String, ProgressDialog> opDialogs = new java.util.concurrent.ConcurrentHashMap<>();
+
+        public void showOpProgress(final String opKey, final String title, final String msg, final boolean cancelable) {
+            final MainActivity act = MainActivity.this;
+            runOnUiThread(() -> {
+                try {
+                    ProgressDialog old = opDialogs.get(opKey);
+                    if (old != null) old.dismiss();
+                    ProgressDialog d = new ProgressDialog(act);
+                    d.setTitle(title);
+                    d.setMessage(msg == null || msg.isEmpty() ? "正在处理…" : msg);
+                    d.setCancelable(cancelable);
+                    d.setOnCancelListener(null); // cancelable 时用户点掉也不打断后台任务，JS 会 closeOpProgress
+                    opDialogs.put(opKey, d);
+                    d.show();
+                } catch (Throwable t) { Log.e(TAG, "showOpProgress " + opKey, t); }
+            });
+        }
+
+        public void setOpProgress(final String opKey, final int percent, final String msg) {
+            final MainActivity act = MainActivity.this;
+            runOnUiThread(() -> {
+                try {
+                    ProgressDialog d = opDialogs.get(opKey);
+                    if (d == null) return;
+                    if (percent >= 0 && percent <= 100) {
+                        d.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+                        d.setMax(100);
+                        d.setProgress(percent);
+                    }
+                    if (msg != null && !msg.isEmpty()) d.setMessage(msg);
+                } catch (Throwable t) { /* 进度更新失败不阻断任务 */ }
+            });
+        }
+
+        public void closeOpProgress(final String opKey) {
+            final MainActivity act = MainActivity.this;
+            runOnUiThread(() -> {
+                try {
+                    ProgressDialog d = opDialogs.remove(opKey);
+                    if (d != null) d.dismiss();
+                } catch (Throwable t) { Log.e(TAG, "closeOpProgress " + opKey, t); }
+            });
         }
 
         /** 能建父目录就返回目标；建不了返回 null（让调用方走 fallback）。 */

@@ -58,6 +58,18 @@ export interface AxvNativeBridge {
   /** M331：原生下载（多镜像兜底）。urlsJson = JSON 数组的候选 URL；destAbs = 绝对路径。
    *  逐个尝试直到成功；成功写文件并返回 "ok:<字节>@<url>"，全失败返回 "err:<最后错误>" */
   downloadLib?(urlsJson: string, destAbs: string): string;
+  /** M357：系统下载器（Android=DownloadManager 后台/系统通知；浏览器 JS 自行 a[download]，不会调这里）。
+   *  urlsJson=候选镜像数组，name=目标文件名，destDir=目标目录（共享库绝对路径）。
+   *  返回 "ok:<jobId>" / "err:no-permission" / "err:<原因>" */
+  systemDownload?(urlsJson: string, name: string, destDir: string): string;
+  /** M357：查 DownloadManager 下载进度。jobId → JSON {state,cur,total,done,failed,gone?} */
+  downloadProgress?(jobId: string): string;
+  /** M357：取消某个下载（可选）。jobId → "ok:<n>" */
+  cancelDownload?(jobId: string): string;
+  /** M357：原生 ProgressDialog（打包编译=cancelable false·成败自动关；下载=cancelable true·后台继续） */
+  showOpProgress?(opKey: string, title: string, msg: string, cancelable: boolean): void;
+  setOpProgress?(opKey: string, percent: number, msg: string): void;
+  closeOpProgress?(opKey: string): void;
 }
 
 declare global {

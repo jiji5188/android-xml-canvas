@@ -60,6 +60,7 @@ import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
 import { computeSuggest } from "@/lib/xml/keyword-suggest";
 import { computeJavaSuggest, JAVA_SYMBOLS, importForType, buildImportInsertMany } from "@/lib/xml/java-vocab";
+import { getLexStore, type Lexicon } from "@/lib/xml/lexicon";
 import { KIND_LABEL, KIND_NAME, type SuggestKind } from "@/lib/xml/suggest-kind";
 import { estimateSuggestSize, placeSuggest, type Placement } from "@/lib/xml/suggest-position";
 import { tokenAt } from "@/lib/xml/ref-token";
@@ -86,6 +87,8 @@ export interface CodeEditorProps {
   resNames?: string[];
   /** M101:Ctrl/Cmd + 点击资源引用时回调(raw 如 `@string/app_name` / `R.id.btn`) */
   onRefClick?: (raw: string) => void;
+  /** M352：项目词库 ref（XmlEditor 建好塞进来；没有就走 getLexStore / 旧行为） */
+  lexRef?: React.MutableRefObject<Lexicon | null>;
   /** M209:悬停提示——父层把光标下的 token（如 R.id.btn / @drawable/ic / 变量名）解析成提示文本，非 null 就弹 tooltip */
   hoverTip?: (raw: string) => string | null;
 }
@@ -482,6 +485,7 @@ export function CodeEditor({
   indent = 4,
   resNames,
   onRefClick,
+  lexRef,
   hoverTip,
 }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -636,9 +640,11 @@ export function CodeEditor({
     const head = sel.head;
     const line = v.state.doc.lineAt(head);
     const col = head - line.from + 1;
+    // M352：项目词库（有内容才用；空库走旧行为）
+    const lex = lexRef?.current ?? getLexStore().current;
     const ctx =
       langRef.current === "java"
-        ? computeJavaSuggest(v.state.doc.toString(), { line: line.number, col })
+        ? computeJavaSuggest(v.state.doc.toString(), { line: line.number, col }, lex && lex.allMethodNames.size > 0 ? lex : undefined)
         : computeSuggest(v.state.doc.toString(), { line: line.number, col }, resNamesRef.current);
     if (!ctx) {
       setSugBoth(null);

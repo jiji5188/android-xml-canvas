@@ -31,6 +31,8 @@ export interface XmlCodeViewProps {
   onRefClick?: (raw: string) => void;
   /** M209：悬停提示——把光标下 token 解析成提示文本 */
   hoverTip?: (raw: string) => string | null;
+  /** M352：项目词库 ref */
+  lexRef?: React.MutableRefObject<import("@/lib/xml/lexicon").Lexicon | null>;
 
   /** 格式化（重排缩进，保留注释） */
   onFormat: () => void;
@@ -106,6 +108,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           onCursorLine={props.onCursorLine}
           onFormat={props.onFormat}
           onRefClick={props.onRefClick}
+          lexRef={props.lexRef}
           hoverTip={props.hoverTip}
           lang={props.lang}
           indent={props.indent}

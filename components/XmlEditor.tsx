@@ -37,6 +37,7 @@ import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras, type ResTreeDir, type ResTreeFile } from "@/lib/xml/resdir";
 import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras, invalidateProjectRes } from "@/lib/xml/project-res";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";import { loadProjectJavaFiles } from "@/lib/xml/java-files";
+import { buildLexicon, type Lexicon } from "@/lib/xml/lexicon";
 import { collectDeclaredMethods } from "@/lib/xml/java-methods";
 import { findLauncherActivity } from "@/lib/xml/find-launcher";
 import type { ResolvedNode, ResourceTable, XmlNode, XmlIssue, RenderModel } from "@/lib/xml/types";
@@ -585,6 +586,8 @@ export function XmlEditor() {
   const [runJavaFiles, setRunJavaFiles] = useState<{ rel: string; text: string }[]>([]);
   /** M351：项目里所有文件声明过的方法名（含其它文件）—— 自己类里实现的 getTitle() 不应被当成 setTitle() 的拼写错 */
   const [projMethods, setProjMethods] = useState<string[]>([]);
+  /** M352：项目词库（单一数据源）—— 建好塞进 CodeEditor 的 lexRef；空库 = 旧行为 */
+  const lexRef = useRef<Lexicon | null>(null);
   /** M199：当前布局名（Java 仿真按它挑 Activity）；开的是代码文件时退回 activity_main */
   const entryLayoutName = useMemo(() => {
     const seg = (openRel || "").replace(/\\/g, "/").split("/").pop() || "";
@@ -1133,8 +1136,21 @@ const allDrawableNames = useMemo(() => {
         const names = new Set<string>();
         for (const f of files) collectDeclaredMethods(f.text, names);
         setProjMethods([...names]);
+        // M352：同一份文件建项目词库（单一数据源）
+        const src = files
+          .filter((f) => /\.(java|kt)$/i.test(f.rel))
+          .map((f) => ({
+            rel: f.rel,
+            text: f.text,
+            lang: (/\.kt$/i.test(f.rel) ? "kotlin" : "java") as "java" | "kotlin",
+          }));
+        const nextLex = buildLexicon(src);
+        lexRef.current = nextLex.allMethodNames.size > 0 ? nextLex : null;
       } catch {
-        if (!cancelled) setProjMethods([]);
+        if (!cancelled) {
+          setProjMethods([]);
+          lexRef.current = null;
+        }
       }
     })();
     return () => {
@@ -1420,6 +1436,8 @@ const allDrawableNames = useMemo(() => {
           idTag: javaResEnv.idTag,
           // M351：项目里其它文件声明过的方法名（getTitle 这种自己的方法不能被当成拼写错）
           knownMethods: projMethods,
+          // M352：项目词库里的类名（同包类/项目类）—— 用了但不 import 不该报「缺 import」/「未知符号」
+          allowNames: (lexRef.current ? [...lexRef.current.classes.values()].map((c) => c.name) : []),
         }).map((j) => ({
           line: j.line,
           level: j.sev,
@@ -3704,6 +3722,7 @@ const findResolved = findResolvedNode;
         onFixAll={doFixAll}
         onFixOne={doFixOne}
         onRefClick={onGotoRef}
+        lexRef={lexRef}
         hoverTip={hoverTip}
         lang={editorLang}
         indent={editorTheme.indent}

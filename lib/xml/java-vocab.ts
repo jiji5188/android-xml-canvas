@@ -8,6 +8,9 @@
 // 纯数据 + 纯函数，方便单测；不做语义分析，只按前缀过滤 + 去重。
 
 import { extractJavaTokens, type SuggestKind } from "./suggest-kind";
+import { getLexStore } from "./lexicon";
+import { rankCandidates } from "./lexicon-rank";
+import type { Lexicon } from "./lexicon";
 import { KNOWN_METHODS } from "./java-methods";
 
 export interface JavaSymbol {
@@ -587,6 +590,7 @@ const MAX_ITEMS = 24; // M98：从 12 提到 24，配合弹窗滚动（320px 高
 export function computeJavaSuggest(
   doc: string,
   cursor: { line: number; col: number },
+  lex?: Lexicon, // M352：项目词库（传了就走打分排序；没传保留旧行为）
 ): { line: number; col: number; prefix: string; kind: SuggestKind; items: string[]; kinds: SuggestKind[] } | null {
   const lines = doc.split("\n");
   const li = Math.max(0, Math.min(cursor.line - 1, lines.length - 1));
@@ -626,21 +630,37 @@ export function computeJavaSuggest(
   if (isAt) {
     addAll(["Override", "Test", "NonNull", "Nullable", "SuppressWarnings", "Deprecated"].map((a) => "@" + a), "ref");
   } else {
-    addAll(tok.vars, "var");
-    addAll(tok.consts, "const");
-    addAll(tok.methods, "method");
-    addAll(tok.refs, "ref");
-    addAll(tok.types, "class");
-    addAll(JAVA_KEYWORDS, "decl");
-    addAll(JAVA_TYPES, "class");
-    addAll(JAVA_METHODS, "method");
-    addAll(KNOWN_METHODS, "method"); // M285：高频白名单全量进候选（以前只有 JAVA_METHODS 里那几十条）
-    // M285：有接收者且能认出类型 → 该类的高频成员方法排在最前（比全局表更准）
-    if (receiverType && receiver !== "this") {
-      const recv = methodsForType(receiverType);
-      // 逆序 unshift，保持原数组顺序（setText 在数组前 → 排在前）
-      for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method" });
-      pool.unshift({ text: receiverType, kind: "class" });
+    // M352：有项目词库 → 候选池以词库（打分排序）为主，再并 JDK 类型/关键字兜底
+    if (lex && lex.allMethodNames.size > 0) {
+      const ranked = rankCandidates(body, {
+        lex,
+        currentFile: { methods: tok.methods, classes: tok.types, fields: tok.consts, vars: tok.vars },
+        receiverType,
+        receiver,
+      });
+      for (const it of ranked.ui) {
+        pool.push({ text: it.text, kind: it.kind === "const" ? "const" : it.kind });
+      }
+      // JDK 类型 + 关键字兜底（词库没覆盖的基础类型）
+      addAll(JAVA_KEYWORDS, "decl");
+      addAll(JAVA_TYPES, "class");
+    } else {
+      addAll(tok.vars, "var");
+      addAll(tok.consts, "const");
+      addAll(tok.methods, "method");
+      addAll(tok.refs, "ref");
+      addAll(tok.types, "class");
+      addAll(JAVA_KEYWORDS, "decl");
+      addAll(JAVA_TYPES, "class");
+      addAll(JAVA_METHODS, "method");
+      addAll(KNOWN_METHODS, "method"); // M285：高频白名单全量进候选（以前只有 JAVA_METHODS 里那几十条）
+      // M285：有接收者且能认出类型 → 该类的高频成员方法排在最前（比全局表更准）
+      if (receiverType && receiver !== "this") {
+        const recv = methodsForType(receiverType);
+        // 逆序 unshift，保持原数组顺序（setText 在数组前 → 排在前）
+        for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method" });
+        pool.unshift({ text: receiverType, kind: "class" });
+      }
     }
   }
 

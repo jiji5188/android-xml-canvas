@@ -600,6 +600,8 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
         knownTypes.add(fq.slice(fq.lastIndexOf(".") + 1));
       }
       for (const simple of Object.keys(COMMON_IMPORTS)) knownTypes.add(simple);
+      // M352：项目词库类名（同包类/项目类，allowNames 已喂进来）也是已知类型，不算未知符号
+      for (const n of allow) knownTypes.add(n);
       // 泛型/基本类型名（int/String/List/... 出现在声明里的）
       for (const m of masked.code.matchAll(/\b([A-Z]\w*)\s+(?:[a-z_]\w*)\s*[=;:)]/g)) knownTypes.add(m[1]);
       const starts2 = starts; // 复用上面算的

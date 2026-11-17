@@ -117,3 +117,32 @@ export async function collectProjectLibs(
 
   return { libs, skipped, failed };
 }
+
+/**
+ * M361：从共享库 /AndroidUIIDE/libs（跨项目复用）读 jar/aar，进打包 classpath。
+ *  maven 坐标引用的库实体就存在共享库；项目 build.gradle 写了坐标、实体在共享库，
+ *  打包时把共享库也进 classpath 才能编译过。
+ *  用 native 通道（listDir + readBytesBase64）——共享库在 SAF 外部存储，io（SAF 项目树）不覆盖。
+ *  返回的 rel 用 shared/ 前缀，打包端据此区分（不写进项目树）。
+ */
+export async function collectSharedLibs(): Promise<ProjectLib[]> {
+  const n = nativeBridge();
+  if (!n?.listDir || !n?.readBase64) return [];
+  const base = "/AndroidUIIDE/libs";
+  let names: string[] = [];
+  try { names = JSON.parse(n.listDir(base) || "[]"); } catch { return []; }
+  const out: ProjectLib[] = [];
+  let total = 0;
+  for (const raw of names) {
+    const n1 = String(raw);
+    if (!isLibFile(n1)) continue;
+    const abs = `${base}/${n1}`;
+    const b64 = n.readBase64?.(abs) || "";
+    if (!b64) continue;
+    const bytes = Math.floor(b64.length * 0.75);
+    if (bytes > MAX_FILE || total + bytes > MAX_TOTAL) continue; // 守 40MB 帽
+    total += bytes;
+    out.push({ rel: `shared/${n1}`, base64: b64 });
+  }
+  return out;
+}

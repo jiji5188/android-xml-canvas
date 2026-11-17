@@ -39,7 +39,7 @@ import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras, in
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { buildLexicon, type Lexicon } from "@/lib/xml/lexicon";
 import { loadSdkLexicon, mergeSdkLexicon } from "@/lib/xml/sdk-lexicon";
-import { collectProjectLibs } from "@/lib/xml/project-libs";
+import { collectProjectLibs, collectSharedLibs } from "@/lib/xml/project-libs";
 import { indexLibsCached, mergeThirdLexicon } from "@/lib/xml/lib-index";
 import { collectDeclaredMethods } from "@/lib/xml/java-methods";
 import { findLauncherActivity } from "@/lib/xml/find-launcher";
@@ -1161,8 +1161,11 @@ const allDrawableNames = useMemo(() => {
           try {
             const libsRes = await collectProjectLibs(aiFileIo, projRootKey || null);
             if (cancelled) return;
-            if (libsRes.libs.length) {
-              const third = await indexLibsCached(projRootKey || "-", libsRes.libs);
+            // M362：共享库 /AndroidUIIDE/libs 也进候选词库（跨项目复用的库符号）
+            const sharedLibs = await collectSharedLibs();
+            const allLibs = [...libsRes.libs, ...sharedLibs];
+            if (allLibs.length) {
+              const third = await indexLibsCached(projRootKey || "-", allLibs);
               if (cancelled) return;
               const base = lexRef.current ?? merged;
               const withThird = mergeThirdLexicon(base, third.lex);

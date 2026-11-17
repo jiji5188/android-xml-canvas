@@ -117,6 +117,16 @@ export const SRC_EN: SrcDict = {
   "libs.missing_fill": "Auto-fill",
   "缺 {n} 个依赖库：{list}": "Missing {n} dependencies: {list}",
   "自动补齐": "Auto-fill",
+  // M362：共享库 + 项目库 进候选词库
+  "词库": "Lexicon",
+  "libs.sharedlibs_missing": "Shared-lib dir unavailable ({path}); shared-lib symbols not in lexicon",
+  "libs.lex_shared_libs": "Merged {n} shared-lib symbols into lexicon",
+  "libs.lex_lib_indexed": "Indexed {n} lib symbols into lexicon",
+  // M361：打包 ProgressDialog 文案
+  "正在打包": "Building…",
+  "收集资源…": "Collecting resources…",
+  "发现 {n} 个依赖库（项目 {a} + 共享 {b}），一起加进 classpath": "Found {n} dependency libs (project {a} + shared {b}), added to classpath",
+  "编译资源并签名…": "Compiling resources & signing…",
   "常用库目录：点「下载」自动存入共享库 /AndroidUIIDE/libs，再去「共享库」选择是否应用到项目；打包时项目 libs/ 的库自动进编译。": "Common libraries: tap Download to save into shared libs /AndroidUIIDE/libs, then in Shared choose to apply to the project; project libs auto-compile on build.",
   "libs.local_hint": "Shared libs: {path}",
   "libs.apply": "Apply to project",

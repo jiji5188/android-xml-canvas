@@ -22,7 +22,8 @@ import type { RenderFile } from "@/lib/xml/native-render";
 import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, rPackagesFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
 import { axvRuntimeSources, injectAxvLogProvider } from "@/lib/xml/axv-runtime";
 import { autofixJavaSources } from "@/lib/xml/java-autofix";
-import { collectProjectLibs } from "@/lib/xml/project-libs";
+import { collectProjectLibs, collectSharedLibs } from "@/lib/xml/project-libs";
+import { showNativeProgress, setNativeProgress, closeNativeDialog } from "@/lib/xml/system-download";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
 import { t as tt } from "@/lib/i18n-src";
@@ -170,6 +171,8 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
       const input = buildSaveInput();
       setApkBusy(true);
       setExportNote(tt("正在收集资源…"));
+      // M361：打包 ProgressDialog（不可关闭，成功/失败自动关）
+      showNativeProgress(tt("正在打包"), tt("收集资源…"), false, "build");
       try {
         const openRelNorm = (openRel || input.name || "").replace(/\\/g, "/");
         const relLayout = openRelNorm.match(/(?:^|\/)layout(?:-[^/]+)?\/(.+)\.xml$/i);
@@ -233,8 +236,11 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         // M266：项目依赖库（libs/*.jar|aar）→ 设备端 ECJ classpath
         setExportNote(tt("正在收集依赖库…"));
         const libsRes = await collectProjectLibs(aiFileIo, activeProject?.rootPath || activeProject?.dirPath || null);
-        if (libsRes.libs.length) {
-          setExportNote(tt("发现 {n} 个依赖库，一起加进 classpath", { n: String(libsRes.libs.length) }));
+        // M361：共享库 /AndroidUIIDE/libs 也进 classpath（maven 坐标引用的库实体存这里）
+        const sharedLibs = await collectSharedLibs();
+        const allBuildLibs = [...libsRes.libs, ...sharedLibs];
+        if (allBuildLibs.length) {
+          setExportNote(tt("发现 {n} 个依赖库（项目 {a} + 共享 {b}），一起加进 classpath", { n: String(allBuildLibs.length), a: String(libsRes.libs.length), b: String(sharedLibs.length) }));
         }
         // M258：清单里找不到 MAIN/LAUNCHER 时，从源码推入口（extends Activity 的那个类）——
         //  否则 ShellActivity 拿不到 axv.launcher，永远停在壳上，用户代码跑不起来。
@@ -262,6 +268,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           setExportNote(tt("{f} 还没保存，这次打包用的是编辑器里的最新内容", { f: (relNow.split("/").pop() || relNow) }));
         }
         setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
+        setNativeProgress("build", tt("编译资源并签名…"), -1);
         const prep = prepareFiles(layout, files);
         if (prep.blocked) {
           setApkResult({ ok: false, step: "compile", log: prep.blocked });
@@ -363,7 +370,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           launchActivity: manifest || "",
           manifestText: manifestTextForBuild || "",
           axvLog: axvLogOn,
-          libs: libsRes.libs.length ? libsRes.libs.map((l) => ({ path: l.rel, base64: l.base64 })) : undefined,
+          libs: allBuildLibs.length ? allBuildLibs.map((l) => ({ path: l.rel, base64: l.base64 })) : undefined,
           rPackages: rPackagesFromSources(javaSources),
         });
         setApkResult(r);
@@ -422,6 +429,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         return bad;
       } finally {
         setApkBusy(false);
+        closeNativeDialog("build");
       }
     },
     [apkBusy, activeProject, gradleForSign, signAppName, aiFileIo, openRel, docKind, xml, buildSaveInput, noteTimed, setExportNote, onBuildLog],

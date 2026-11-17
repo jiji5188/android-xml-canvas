@@ -153,3 +153,9 @@ export function closeNativeDialog(opKey: string) {
   const b = nativeBridge();
   if (b?.closeOpProgress) b.closeOpProgress(opKey);
 }
+
+/** M361：更新原生 ProgressDialog 的进度文案（打包分节回传用）。 */
+export function setNativeProgress(opKey: string, msg: string, percent = -1) {
+  const b = nativeBridge();
+  if (b?.setOpProgress) b.setOpProgress(opKey, percent, msg);
+}

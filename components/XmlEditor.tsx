@@ -248,6 +248,7 @@ import { useBuildLogs } from "./use-build-logs";
 import { usePanels } from "./use-panels";
 import { useXmlProjectState } from "./use-xml-project";
 import { useXmlProjectFns } from "./use-xml-project-fns";
+import { useIconShapeActions } from "./use-icon-shape-actions";
 import {
   subscribeRuntimeLog,
   installRuntimeLogBridge,
@@ -778,67 +779,15 @@ export function XmlEditor() {
     }
   }, []);
 
-  /** M3g：选中图标 → 存矢量原文 + 把属性写成 @drawable/资源名 */
-  const onPickIcon = useCallback(
-    (attrName: string, resourceName: string, vectorXml: string) => {
-      // M4f：资源名必须是 aapt 合法的 a-z0-9_，否则会落成 #00c853.xml 之类编译不过的文件
-      const safe = sanitizeResName(resourceName, "ic");
-      setGeneratedDrawables((m) => ({ ...m, [safe]: vectorXml }));
-      if (selectedPath) {
-        // 通过 commitAttr 把属性改成 @drawable/<资源名>
-        commitAttrRef.current(attrName, `@drawable/${safe}`);
-      }
-      const file = safe + ".xml";
-      const root = projectSaveRoot(activeProject);
-      // M172：有打开的项目就直接写进 res/drawable，不只存内存
-      if (root) {
-        void saveResFiles(root, [{ path: `drawable/${file}`, text: vectorXml }]).then((r) => {
-          setExportNote(
-            r.ok
-              ? tt("已写入 res/drawable/{file}，属性指向它", { file })
-              : tt("已生成 drawable/{file}（内存），但写入项目失败：{reason}", { file, reason: r.failed[0] || tt("目录不可写") }),
-          );
-          window.setTimeout(() => setExportNote(""), 4200);
-        });
-        return;
-      }
-      setExportNote(tt("已生成 res/drawable/{file}，属性指向它（导出 res 包时会自动包含）", { file }));
-      window.setTimeout(() => setExportNote(""), 3600);
-    },
-    [selectedPath, activeProject],
-  );
-
-  /** M3h：形状 → 存 xml + 把属性写成 @drawable/资源名（与图标同一存储） */
-  const onSaveShape = useCallback(
-    (attrName: string, resourceName: string, shapeXml: string) => {
-      const safe = sanitizeResName(resourceName, "bg");
-      setGeneratedDrawables((m) => ({ ...m, [safe]: shapeXml }));
-      if (selectedPath) commitAttrRef.current(attrName, `@drawable/${safe}`);
-      const file = safe + ".xml";
-      const root = projectSaveRoot(activeProject);
-      // M172：有打开的项目就直接写进 res/drawable，不只存内存
-      if (root) {
-        void saveResFiles(root, [{ path: `drawable/${file}`, text: shapeXml }]).then((r) => {
-          setExportNote(
-            r.ok
-              ? tt("已写入 res/drawable/{file}，属性指向它（水波纹？{yn}）", {
-                  file,
-                  yn: shapeXml.includes("<ripple") ? tt("是") : tt("否"),
-                })
-              : tt("已生成 drawable/{file}（内存），但写入项目失败：{reason}", {
-                  file,
-                  reason: r.failed[0] || tt("目录不可写"),
-                }),
-          );
-          window.setTimeout(() => setExportNote(""), 4200);
-        });
-        return;
-      }
-      setExportNote(tt("已生成 res/drawable/{file}（含水波纹？{yn}），属性指向它", { file, yn: shapeXml.includes("<ripple") ? tt("是") : tt("否") }));
-      window.setTimeout(() => setExportNote(""), 3600);
-    },
-    [selectedPath, activeProject],
-  );
+  /** M3g/M3h/M366：图标/形状资源动作（onPickIcon/onSaveShape/onFillIconAttr）→ components/use-icon-shape-actions.ts（延迟 Proxy 避开 commitAttrRef/flashNote TDZ） */
+  const { onPickIcon, onSaveShape, onFillIconAttr } = useIconShapeActions(() => ({
+    setGeneratedDrawables,
+    selectedPath,
+    commitAttrRef,
+    activeProject,
+    setExportNote,
+    flashNote,
+  }));
 
   const resources: ResourceTable = useMemo(() => {
     // 顺序：内置默认 → 上传 res/ 里的 values（真实 color/dimen/string）→ 用户手贴片段（最高优先）
@@ -2958,21 +2907,6 @@ const findResolved = findResolvedNode;
       };
     },
     [aiFileIo, xml],
-  );
-
-  /** M180：项目树里选中的图标 → 直接写进当前选中控件的属性（attr 由调用方给，通常 src） */
-  const onFillIconAttr = useCallback(
-    (attr: string, resourceName: string, vectorXml: string) => {
-      if (!selectedPath) {
-        flashNote(tt("先在画布上选一个控件（比如 ImageView），再点「填入选中控件」"));
-        return;
-      }
-      const safe = sanitizeResName(resourceName, "ic");
-      if (vectorXml) setGeneratedDrawables((m) => ({ ...m, [safe]: vectorXml }));
-      commitAttrRef.current(attr, `@drawable/${safe}`);
-      flashNote(tt("已填入 {attr} = @drawable/{name}", { attr, name: safe }));
-    },
-    [selectedPath, flashNote],
   );
 
   return (

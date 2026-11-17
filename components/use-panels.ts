@@ -35,6 +35,17 @@ export interface PanelsState {
   /** M13：导出模式，compat = 纯平台控件、AIDE 可编译 */
   exportMode: ExportMode;
   setExportMode: React.Dispatch<React.SetStateAction<ExportMode>>;
+  /** M6a：导出预览图（PNG / SVG）弹窗 */
+  imgExportOpen: boolean;
+  setImgExportOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  /** 导出预览图：download / copy */
+  exportAction: "download" | "copy";
+  setExportAction: React.Dispatch<React.SetStateAction<"download" | "copy">>;
+  dropHint: string | null;
+  setDropHint: React.Dispatch<React.SetStateAction<string | null>>;
+  /** 运行调试页开合 */
+  runOpen: boolean;
+  setRunOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export function usePanels(): PanelsState {
@@ -78,11 +89,19 @@ export function usePanels(): PanelsState {
     }
   });
 
+  /** M6a：导出预览图（PNG / SVG）弹窗 */
+  const [imgExportOpen, setImgExportOpen] = useState(false);
+  const [exportAction, setExportAction] = useState<"download" | "copy">("download");
+  const [dropHint, setDropHint] = useState<string | null>(null);
+  const [runOpen, setRunOpen] = useState(false);
+
   return {
     histPanelOpen, setHistPanelOpen, snapCount, setSnapCount,
     wsActiveName, setWsActiveName, wsMsg, setWsMsg,
     addModalOpen, setAddModalOpen, exportOpen, setExportOpen,
     compareOpen, setCompareOpen, compareIds, toggleCompareDevice,
     exportReport, setExportReport, exportMode, setExportMode,
+    imgExportOpen, setImgExportOpen, exportAction, setExportAction,
+    dropHint, setDropHint, runOpen, setRunOpen,
   };
 }

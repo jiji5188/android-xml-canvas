@@ -503,6 +503,8 @@ export function XmlEditor() {
     addModalOpen, setAddModalOpen, exportOpen, setExportOpen,
     compareOpen, setCompareOpen, compareIds, toggleCompareDevice,
     exportReport, setExportReport, exportMode, setExportMode,
+    imgExportOpen, setImgExportOpen, exportAction, setExportAction,
+    dropHint, setDropHint, runOpen, setRunOpen,
   } = usePanels();
   /** M37：代码编辑器外观（光标/选区/高亮/字号，localStorage 记住）→ use-editor-theme */
   const {
@@ -522,12 +524,9 @@ export function XmlEditor() {
   /** 兼容模式的转换摘要（选 compat 时重算） */
   const [compatNotes, setCompatNotes] = useState<string[]>([]);
   /** M6a：导出预览图（PNG / SVG）弹窗 */
-  const [imgExportOpen, setImgExportOpen] = useState(false);
+  /** M366：imgExportOpen/exportAction/dropHint/runOpen 已下沉到 usePanels，见下方解构 */
   /** 手机壳 DOM（导出图片要拿它做 DOM → SVG/PNG） */
   const phoneRef = useRef<HTMLDivElement | null>(null);
-  const [exportAction, setExportAction] = useState<"download" | "copy">("download");
-  const [dropHint, setDropHint] = useState<string | null>(null);
-  const [runOpen, setRunOpen] = useState(false);
   /** M199：运行调试时加载的 Java/Kotlin 源码（轻量逻辑仿真用） */
   const [runJavaFiles, setRunJavaFiles] = useState<{ rel: string; text: string }[]>([]);
   /** M351：项目里所有文件声明过的方法名（含其它文件）—— 自己类里实现的 getTitle() 不应被当成 setTitle() 的拼写错 */

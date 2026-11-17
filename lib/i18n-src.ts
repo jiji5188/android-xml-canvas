@@ -1324,6 +1324,8 @@ export const SRC_EN: SrcDict = {
   "{lib} 已下载到项目 app/src/main/libs/（打包时自动进编译）": "{lib} downloaded into project app/src/main/libs/ (auto-included on build)",
   "{lib} 已下载到本地库": "{lib} downloaded to local libs",
   "{lib} 已下载到共享库（跨项目复用）": "{lib} downloaded into shared libs (reused across projects)",
+  "缺 All-files-access 权限，下载不到": "Missing All-files-access permission; cannot download",
+  "当前没有可写的共享库目录（浏览器已下到 Downloads）": "No writable shared-lib dir (browser downloaded to Downloads)",
   "模块": "Modules",
   "根工程 {name}": "root project {name}",
   "编译标记": "Build flags",

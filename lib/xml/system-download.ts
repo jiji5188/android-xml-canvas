@@ -73,7 +73,7 @@ export function cancelSystemDownload(jobId: string): boolean {
  * @param name 目标文件名（含扩展，如 jxl-2.9.3.jar）
  * @param destDir 目标目录（绝对路径；APK 传共享库 /AndroidUIIDE/libs；浏览器忽略）
  */
-export function systemDownload(urls: string[], name: string, destDir: string, opts: SysDownloadOpts = {}): SysDownloadResult {
+export async function systemDownload(urls: string[], name: string, destDir: string, opts: SysDownloadOpts = {}): Promise<SysDownloadResult> {
   const b = nativeBridge();
   const clean = (urls || []).map((u) => (u || "").trim()).filter((u) => u && u.length > 4);
   if (clean.length === 0) return { ok: false, error: "无候选 URL", attemptedSources: 0 };
@@ -115,7 +115,7 @@ export function systemDownload(urls: string[], name: string, destDir: string, op
       const pct = p.total > 0 ? Math.floor((p.cur / p.total) * 100) : -1;
       if (opts.onProgress) opts.onProgress(name, p.cur, p.total, i);
       if (pct !== lastSent) { lastSent = pct; sendNativeProgress(opts, name, pct); }
-      void sleep(pollMs);
+      await sleep(pollMs);
     }
     // 到这说明这个镜像没成（超时/失败），取消它再换源
     cancelSystemDownload(jobId);

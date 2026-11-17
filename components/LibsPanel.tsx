@@ -31,6 +31,7 @@ import {
   type AppConfig,
   type ClasspathDep,
 } from "@/lib/xml/gradle-deps";
+import { systemDownload } from "@/lib/xml/system-download";
 
 interface LibsPanelProps {
   /** 当前激活项目的 SAF 源（可 list/read）；没有则项目库列不出来 */
@@ -204,79 +205,39 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     const name = dlName.trim() || url.split("/").pop() || "library.jar";
     setDlBusy(true);
     onNote?.(tr("libs.downloading", "正在下载…"));
-    // 保存目标：当前 tab 对应的 libs 目录
-    let targetBase = tab === "local" ? localDir : null;
-    if (!targetBase && nativeProjectRoot && native) {
-      targetBase = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
-    }
+    // M357/M358：下载目标 = 共享库 /AndroidUIIDE/libs（跨项目复用，不再按 tab/项目写到 src/main/libs）
+    const targetBase = localDir || null;
     const target = targetBase ? `${targetBase}/${name}` : null;
 
-    // M344：优先原生 HttpURLConnection（多镜像 + 绕 CORS/WebView 限制），浏览器再回退 fetch
-    if (target && typeof native?.downloadLib === "function") {
-      native.createEntry?.(targetBase!, true);
-      // 用户输入的是完整 URL，直接传给原生下载器（只试这一个源）
-      const urlsJson = JSON.stringify([url]);
-      let r = "";
-      try { r = String(native.downloadLib(urlsJson, target) ?? ""); } catch (e2) { r = "throw:" + String(e2); }
-      if (r.startsWith("ok")) {
-        const parts = r.slice(3).split("@");
-        const savedPath = parts[2] || "";
-        const isFallback = parts[3] === "fallback";
-        if (isFallback && savedPath) {
-          // 项目 libs 写不了 → 存到应用私有目录，尝试拷回
-          try {
-            const b64 = native.readBase64?.(savedPath);
-            if (b64) {
-              const w = native.writeText?.(target, b64);
-              if (typeof w === "string" && w.startsWith("ok")) {
-                onNote?.(tr("libs.download_saved", "已保存到 {path}", { path: target }));
-                setDlOpen(false); setDlUrl(""); setDlName("");
-                void refresh(); setDlBusy(false); return;
-              }
-            }
-          } catch {}
-          setDlBusy(false);
-          onNote?.(tr("libs.cat_fallback", "{lib} 已下载到临时目录 {p}（项目 libs 写不了，请手动拷进去）", { lib: name, p: savedPath }));
-          return;
-        }
-        onNote?.(tr("libs.download_saved", "已保存到 {path}", { path: target }));
-        setDlOpen(false); setDlUrl(""); setDlName("");
-        void refresh();
+    if (targetBase) {
+      // M357：走系统 DownloadManager（后台跑 + 系统通知 + 进度弹窗 + 切页不中断）
+      const res = await systemDownload([url], name, targetBase, { showNativeProgress: true });
+      if (res.missingPermission) {
+        onNote?.(tr("libs.cat_no_perm", "缺 All-files-access 权限，下载不到"));
         setDlBusy(false);
         return;
       }
-      // 原生下载失败 → 走浏览器 fetch 回退
-      onNote?.(tr("libs.native_dl_failed", "原生下载失败（{err}），改用浏览器下载", { err: r.slice(4) || "?" }));
+      if (res.ok) {
+        setDlOpen(false); setDlUrl(""); setDlName("");
+        onNote?.(tr("libs.download_saved", "已保存到 {path}", { path: `${targetBase}/${name}` }));
+        void refresh();
+      } else {
+        onNote?.(tr("libs.download_failed", "下载失败：{err}", { err: res.error || "unknown" }));
+      }
+      setDlBusy(false);
+      return;
     }
 
-    // 浏览器回退：fetch + base64
+    // 无共享库目录（浏览器 / 权限没给）→ 浏览器原生下载
     const r = await fetchBase64(url);
     if (!r.ok) {
       onNote?.(tr("libs.download_failed", "下载失败：{err}", { err: r.error || "unknown" }));
       setDlBusy(false);
       return;
     }
-    if (targetBase && native) {
-      native.createEntry?.(targetBase, true);
-      const tgt = `${targetBase}/${name}`;
-      const w = native.writeText?.(tgt, r.b64);
-      const ok = typeof w === "string" && w.startsWith("ok");
-      onNote?.(
-        ok
-          ? tr("libs.download_saved", "已保存到 {path}", { path: tgt })
-          : tr("libs.download_save_failed", "保存失败：{msg}", { msg: w || "unknown" }),
-      );
-      if (ok) {
-        setDlOpen(false);
-        setDlUrl("");
-        setDlName("");
-        void refresh();
-      }
-    } else {
-      onNote?.(tr("libs.download_no_target", "无法保存：当前没有可写的库目录"));
-    }
+    onNote?.(tr("libs.download_no_target", "当前没有可写的共享库目录（浏览器已下到 Downloads）"));
     setDlBusy(false);
-  }, [dlUrl, dlName, tab, localDir, nativeProjectRoot, native, onNote, tr, refresh]);
+  }, [dlUrl, dlName, localDir, onNote, tr, refresh, setDlOpen, setDlUrl, setDlName, setDlBusy]);
 
   const currentList = tab === "local" ? localLibs : projectLibs;
 
@@ -291,6 +252,24 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       let targetBase: string | null = null;
       if (localDir) targetBase = localDir;
       const target = targetBase ? `${targetBase}/${fname}` : null;
+      if (targetBase) {
+        // M357/M364：走系统 DownloadManager（后台跑 + 系统通知 + 进度弹窗 + 切页不中断）
+        const res = await systemDownload(libDownloadUrls(e), fname, targetBase, { showNativeProgress: true });
+        if (res.missingPermission) {
+          setCatBusy((m) => ({ ...m, [key]: "err:perm" }));
+          onNote?.(tr("libs.cat_no_perm", "缺 All-files-access 权限，下载不到"));
+          return;
+        }
+        if (res.ok) {
+          setCatBusy((m) => ({ ...m, [key]: "done" }));
+          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载到共享库（去「共享库」点「应用到项目」加入项目）", { lib: e.artifact }));
+          void refresh();
+        } else {
+          setCatBusy((m) => ({ ...m, [key]: "err:" + (res.error || "download failed") }));
+          onNote?.(tr("libs.cat_download_failed", "{lib} 下载失败：{err}", { lib: e.artifact, err: res.error || "?" }));
+        }
+        return;
+      }
       if (target && typeof native?.downloadLib === "function") {
         // 原生多镜像下载（APK）
         const urlsJson = JSON.stringify(libDownloadUrls(e));
@@ -651,6 +630,24 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       const targetBase: string | null = localDir || null;
       const target = targetBase ? `${targetBase}/${fname}` : null;
       const urls = gradleDepDownloadUrls(d);
+      if (targetBase) {
+        // M357/M364：走系统 DownloadManager（后台 + 系统通知 + 进度弹窗）
+        const res = await systemDownload(urls, fname, targetBase, { showNativeProgress: true });
+        if (res.missingPermission) {
+          setGradleBusyKey((m) => ({ ...m, [key]: "err:perm" }));
+          onNote?.(tr("libs.cat_no_perm", "缺 All-files-access 权限，下载不到"));
+          return;
+        }
+        if (res.ok) {
+          setGradleBusyKey((m) => ({ ...m, [key]: "done" }));
+          onNote?.(tr("libs.gradle_dl_done_shared", "{lib} 已下载到共享库（跨项目复用）", { lib: key }));
+          void refresh();
+        } else {
+          setGradleBusyKey((m) => ({ ...m, [key]: "err:" + (res.error || "download failed") }));
+          onNote?.(tr("libs.gradle_dl_fail", "{lib} 下载失败：{err}", { lib: key, err: res.error || "?" }));
+        }
+        return;
+      }
       if (target && typeof native?.downloadLib === "function") {
         native.createEntry?.(targetBase!, true);
         let r = "";

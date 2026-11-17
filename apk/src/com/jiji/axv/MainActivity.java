@@ -784,6 +784,7 @@ public class MainActivity extends Activity {
          *  destDir=目标目录（绝对路径，共享库 /AndroidUIIDE/libs）。快返回 jobId，下载在后台跑。
          *  返回 "ok:<jobId>" / "err:no-permission" / "err:<原因>"。
          *  注意：本方法只在 Android native 桥上有；浏览器模式 JS 自己走 a[download]，不会调到这里。 */
+        @JavascriptInterface
         public String systemDownload(String urlsJson, String name, String destDir) {
             try {
                 if (name == null || name.isEmpty() || destDir == null || destDir.isEmpty()) return "err:参数空";
@@ -810,6 +811,7 @@ public class MainActivity extends Activity {
 
         /** M357：查 DownloadManager 下载进度。jobId → JSON {state,cur,total,done,failed}。
          *  state: 0=成功 1=排队 2=运行 3=失败 4=暂停 5=已取消 */
+        @JavascriptInterface
         public String downloadProgress(String jobId) {
             JSONObject out = new JSONObject();
             try {
@@ -841,6 +843,7 @@ public class MainActivity extends Activity {
         }
 
         /** M357：取消某个 DownloadManager 下载（可选，给「取消下载」按钮用；关 dialog 不取消，下载继续）。 */
+        @JavascriptInterface
         public String cancelDownload(String jobId) {
             try {
                 if (jobId == null || jobId.isEmpty()) return "ok:none";
@@ -858,6 +861,7 @@ public class MainActivity extends Activity {
          *  关掉只是藏 dialog，DownloadManager 后台照跑 + 系统通知不断）。 */
         private final java.util.Map<String, ProgressDialog> opDialogs = new java.util.concurrent.ConcurrentHashMap<>();
 
+        @JavascriptInterface
         public void showOpProgress(final String opKey, final String title, final String msg, final boolean cancelable) {
             final MainActivity act = MainActivity.this;
             runOnUiThread(() -> {
@@ -875,6 +879,7 @@ public class MainActivity extends Activity {
             });
         }
 
+        @JavascriptInterface
         public void setOpProgress(final String opKey, final int percent, final String msg) {
             final MainActivity act = MainActivity.this;
             runOnUiThread(() -> {
@@ -891,6 +896,7 @@ public class MainActivity extends Activity {
             });
         }
 
+        @JavascriptInterface
         public void closeOpProgress(final String opKey) {
             final MainActivity act = MainActivity.this;
             runOnUiThread(() -> {

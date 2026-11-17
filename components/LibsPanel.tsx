@@ -12,7 +12,13 @@ import {
   LAN_LIBS_BASE,
   type LibEntry,
 } from "@/lib/xml/library-catalog";
-import { parseGradleDeps, gradleDepDownloadUrls, gradleDepFname, type GradleDep } from "@/lib/xml/gradle-deps";
+import {
+  parseGradleDepsDetailed,
+  gradleDepDownloadUrls,
+  gradleDepFname,
+  type GradleDep,
+  type GradleUnresolved,
+} from "@/lib/xml/gradle-deps";
 
 interface LibsPanelProps {
   /** 当前激活项目的 SAF 源（可 list/read）；没有则项目库列不出来 */
@@ -100,6 +106,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   // M345：从 build.gradle 解析依赖并自动下载
   const [gradleBusy, setGradleBusy] = useState(false);
   const [gradleDeps, setGradleDeps] = useState<GradleDep[]>([]);
+  const [gradleUnresolved, setGradleUnresolved] = useState<GradleUnresolved[]>([]);
   const [gradleScanned, setGradleScanned] = useState(false);
   const [gradleBusyKey, setGradleBusyKey] = useState<Record<string, string>>({});
   const [gradleMsg, setGradleMsg] = useState<string | null>(null);
@@ -120,6 +127,20 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     return "/storage/emulated/0/AndroidUIIDE/libs";
   }, [native]);
 
+  /** M346：项目库标准目录 = 项目根/app/src/main/libs（标准安卓工程布局）。
+   *  同时兼容旧写法 app/libs 和 项目根/libs（collectProjectLibs 认所有含 /libs/ 段的路径，
+   *  所以三处都能被打包收编；新库统一写标准位置） */
+  const projectLibsBases = useMemo(() => {
+    if (!nativeProjectRoot) return [] as string[];
+    const root = nativeProjectRoot.replace(/[\\/]+$/, "");
+    const primary = `${root}/app/src/main/libs`; // 标准位置（首选写入）
+    const legacy = [`${root}/app/libs`, `${root}/libs`]; // 旧位置（仍可读）
+    // 去重保序：primary 在前
+    return [primary, ...legacy.filter((p) => p !== primary)];
+  }, [nativeProjectRoot]);
+  /** 首选写入目录（应用到项目 / gradle 依赖下载都写这里） */
+  const primaryLibBase = projectLibsBases[0] ?? null;
+
   const refresh = useCallback(async () => {
     setBusy(true);
     try {
@@ -132,18 +153,17 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           setLocalLibs(listDirViaNative(localDir));
         }
       } else {
-        // 项目库：优先 native 项目根下的 libs / app/libs
+        // 项目库：native 项目根下标准 + 旧 libs 目录（见 projectLibsBases）
         if (nativeProjectRoot && native) {
-          const bases = [`${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`, `${nativeProjectRoot.replace(/[\\/]+$/, "")}/app/libs`];
           let all: LibFile[] = [];
-          for (const base of bases) {
+          for (const base of projectLibsBases) {
             native.createEntry?.(base, true);
             const items = listDirViaNative(base);
             all = all.concat(items);
           }
           setProjectLibs(all);
         } else if (aiFileIo) {
-          const candidates = ["libs", "app/libs"];
+          const candidates = ["app/src/main/libs", "app/libs", "libs"];
           let all: LibFile[] = [];
           for (const c of candidates) {
             const items = await listDirViaIo(aiFileIo, c);
@@ -157,7 +177,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     } finally {
       setBusy(false);
     }
-  }, [tab, localDir, nativeProjectRoot, aiFileIo, native, refreshKey]);
+  }, [tab, localDir, nativeProjectRoot, aiFileIo, native, refreshKey, projectLibsBases]);
 
   useEffect(() => {
     void refresh();
@@ -332,14 +352,14 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   const [applyBusy, setApplyBusy] = useState<Record<string, string>>({}); // 本地库 name -> 'applying' | 'done' | 'err'
   const canApply = !!(nativeProjectRoot && native?.copyEntry);
 
-  /** 应用到打开的项目：/AndroidUIIDE/libs/x → 项目/libs/x */
+  /** 应用到打开的项目：/AndroidUIIDE/libs/x → 项目/app/src/main/libs/x（标准位置） */
   const applyToLocalProject = useCallback(
     (f: LibFile) => {
       if (!canApply || !nativeProjectRoot || !native) {
         onNote?.(tr("libs.apply_need_project", "请先打开一个项目，才能应用库"));
         return;
       }
-      const dstBase = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
+      const dstBase = primaryLibBase || `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`;
       native.createEntry?.(dstBase, true);
       const dst = `${dstBase}/${f.name}`;
       setApplyBusy((m) => ({ ...m, [f.name]: "applying" }));
@@ -354,7 +374,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         try { p = JSON.parse(r || "{}"); } catch { p = {}; }
         if (p?.ok) {
           setApplyBusy((m) => ({ ...m, [f.name]: "done" }));
-          onNote?.(tr("libs.apply_done", "{lib} 已应用到项目 libs/（打包时会带上）", { lib: f.name }));
+          onNote?.(tr("libs.apply_done", "{lib} 已应用到项目 app/src/main/libs/（打包时会带上）", { lib: f.name }));
           void refresh();
         } else {
           setApplyBusy((m) => ({ ...m, [f.name]: "err:fail" }));
@@ -365,33 +385,39 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         onNote?.(tr("libs.apply_fail", "{lib} 应用失败：{err}", { lib: f.name, err: "copy" }));
       }
     },
-    [canApply, nativeProjectRoot, native, onNote, tr, refresh],
+    [canApply, nativeProjectRoot, primaryLibBase, native, onNote, tr, refresh],
   );
 
-  /** 从项目移除：删 项目/libs/x */
+  /** 从项目移除：依次试 标准 + 旧 libs 目录，删到哪个算哪个（项目库可能来自三处任一个） */
   const removeFromProject = useCallback(
     (name: string) => {
       if (!nativeProjectRoot || !native) return;
-      const dst = `${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs/${name}`;
-      try {
-        const r = String(native.deleteEntry?.(dst, false) ?? "");
-        if (r.startsWith("err:")) {
-          onNote?.(tr("libs.remove_fail", "{lib} 移除失败：{err}", { lib: name, err: r.slice(4) }));
-          return;
-        }
-        let p: { ok?: boolean } = {};
-        try { p = JSON.parse(r || "{}"); } catch { p = {}; }
-        if (p?.ok) {
-          onNote?.(tr("libs.remove_done", "{lib} 已从项目移除", { lib: name }));
-          void refresh();
-        } else {
-          onNote?.(tr("libs.remove_fail", "{lib} 移除失败：{err}", { lib: name, err: "?" }));
-        }
-      } catch {
-        onNote?.(tr("libs.remove_fail", "{lib} 移除失败", { lib: name, err: "?" }));
+      const bases = projectLibsBases.length
+        ? projectLibsBases
+        : [`${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`];
+      let ok = false;
+      let lastErr = "?";
+      for (const base of bases) {
+        const dst = `${base}/${name}`;
+        try {
+          const r = String(native.deleteEntry?.(dst, false) ?? "");
+          if (r.startsWith("err:")) {
+            lastErr = r.slice(4);
+            continue;
+          }
+          let p: { ok?: boolean } = {};
+          try { p = JSON.parse(r || "{}"); } catch { p = {}; }
+          if (p?.ok) { ok = true; break; }
+        } catch {}
+      }
+      if (ok) {
+        onNote?.(tr("libs.remove_done", "{lib} 已从项目移除", { lib: name }));
+        void refresh();
+      } else {
+        onNote?.(tr("libs.remove_fail", "{lib} 移除失败：{err}", { lib: name, err: lastErr }));
       }
     },
-    [nativeProjectRoot, native, onNote, tr, refresh],
+    [nativeProjectRoot, native, projectLibsBases, onNote, tr, refresh],
   );
 
   const catGroups = useMemo(() => groupCatalog(), []);
@@ -433,16 +459,28 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       setGradleBusy(false);
       return;
     }
-    const all = texts.flatMap((t) => parseGradleDeps(t));
+    const all = texts.flatMap((t) => parseGradleDepsDetailed(t));
     // 去重（同一坐标在多个 gradle 文件出现）
     const seen = new Set<string>();
-    const deps = all.filter((d) => {
-      const k = d.group + ":" + d.name + ":" + d.version;
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
+    const deps = all
+      .flatMap((r) => r.deps)
+      .filter((d) => {
+        const k = d.group + ":" + d.name + ":" + d.version;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    // 未解析变量：同一坐标去重
+    const unSeen = new Set<string>();
+    const unresolved = all
+      .flatMap((r) => r.unresolved)
+      .filter((u) => {
+        if (unSeen.has(u.coord)) return false;
+        unSeen.add(u.coord);
+        return true;
+      });
     setGradleDeps(deps);
+    setGradleUnresolved(unresolved);
     setGradleScanned(true);
     setGradleBusy(false);
     onNote?.(tr("libs.gradle_scanned", "解析到 {n} 条依赖", { n: deps.length }));
@@ -455,9 +493,10 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       if (gradleBusyKey[key] === "downloading") return;
       setGradleBusyKey((m) => ({ ...m, [key]: "downloading" }));
       const fname = gradleDepFname(d);
-      let targetBase: string | null = null;
-      if (localDir) targetBase = localDir;
+      // M346：打开了项目就下到项目标准 libs 目录（app/src/main/libs），否则落本地库暂存目录
+      const targetBase: string | null = primaryLibBase || localDir || null;
       const target = targetBase ? `${targetBase}/${fname}` : null;
+      const inProject = !!primaryLibBase;
       const urls = gradleDepDownloadUrls(d);
       if (target && typeof native?.downloadLib === "function") {
         native.createEntry?.(targetBase!, true);
@@ -465,6 +504,9 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         try { r = String(native.downloadLib(JSON.stringify(urls), target) ?? ""); } catch (e2) { r = "throw:" + String(e2); }
         if (r.startsWith("ok")) {
           setGradleBusyKey((m) => ({ ...m, [key]: "done" }));
+          onNote?.(inProject
+            ? tr("libs.gradle_dl_done_proj", "{lib} 已下载到项目 app/src/main/libs/（打包时自动进编译）", { lib: key })
+            : tr("libs.gradle_dl_done", "{lib} 已下载到本地库", { lib: key }));
           void refresh();
           return;
         }
@@ -481,6 +523,9 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           const w = native.writeText?.(target!, r.b64);
           if (typeof w === "string" && w.startsWith("ok")) {
             setGradleBusyKey((m) => ({ ...m, [key]: "done" }));
+            onNote?.(inProject
+              ? tr("libs.gradle_dl_done_proj", "{lib} 已下载到项目 app/src/main/libs/（打包时自动进编译）", { lib: key })
+              : tr("libs.gradle_dl_done", "{lib} 已下载到本地库", { lib: key }));
             void refresh();
             return;
           }
@@ -489,7 +534,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       setGradleBusyKey((m) => ({ ...m, [key]: "err:" + tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") }));
       onNote?.(tr("libs.gradle_dl_fail", "{lib} 下载失败：全部镜像都试过了（网络不通或源 404）", { lib: key }));
     },
-    [localDir, native, onNote, tr, refresh],
+    [localDir, primaryLibBase, native, onNote, tr, refresh],
   );
 
   /** M345：全部下载（只下尚未下载的） */
@@ -682,9 +727,29 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         {gradleMsg && (
           <div className="axv-libs-gradle-msg">{gradleMsg}</div>
         )}
-        {gradleScanned && gradleDeps.length === 0 && !gradleMsg && (
+        {gradleScanned && gradleDeps.length === 0 && !gradleMsg && gradleUnresolved.length === 0 && (
           <div className="axv-libs-gradle-msg">{tr("libs.gradle_none", "没解析到 maven 依赖（fileTree / project 除外）")}</div>
         )}
+        {gradleUnresolved.length > 0 && (
+          <div className="axv-libs-gradle-msg" title={gradleUnresolved.map((u) => u.raw).join("\n")}>
+            {tr("libs.gradle_unresolved", "{n} 条依赖的版本是变量且本文件未定义，已跳过（在 build.gradle 里给变量赋值后可重新解析）", {
+              n: gradleUnresolved.length,
+            })}
+          </div>
+        )}
+        {gradleUnresolved.map((u) => (
+          <div key={u.coord} className="axv-libs-item" style={{ alignItems: "center", opacity: 0.6 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
+                {u.coord.split(":")[1] || u.coord}
+                <span style={{ marginLeft: 6, fontSize: 10 }}>{u.config}</span>
+              </div>
+              <div className="axv-libs-item-rel" style={{ fontSize: 10 }} title={u.raw}>
+                {tr("libs.gradle_unresolved_vars", "未定义变量：{vars}", { vars: u.vars.join(", ") || "?" })}
+              </div>
+            </div>
+          </div>
+        ))}
         {gradleDeps.map((d) => {
           const key = d.group + ":" + d.name + ":" + d.version;
           const st = gradleBusyKey[key] || "";

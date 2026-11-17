@@ -1,6 +1,12 @@
 // test/xml_m345_gradle_deps.test.ts — M345：解析 build.gradle 依赖
 import { describe, it, expect } from "vitest";
-import { parseGradleDeps, gradleDepDownloadUrls, gradleDepFname } from "@/lib/xml/gradle-deps";
+import {
+  parseGradleDeps,
+  parseGradleDepsDetailed,
+  collectGradleVars,
+  gradleDepDownloadUrls,
+  gradleDepFname,
+} from "@/lib/xml/gradle-deps";
 
 describe("parseGradleDeps", () => {
   it("提取 implementation 单引号写法", () => {
@@ -88,6 +94,70 @@ api 'com.x:y:1.0'
 `;
     const deps = parseGradleDeps(g);
     expect(deps).toHaveLength(1);
+  });
+});
+
+describe("变量版本解析（M345b）", () => {
+  it("collectGradleVars 收集 def / ext. / rootProject.ext. / 裸赋值", () => {
+    const vars = collectGradleVars(`
+def materialVersion = '1.11.0'
+ext.coreKtx = "1.13.1"
+rootProject.ext.junitV = '4.13.2'
+retrofitV = "3.0.0"
+`);
+    expect(vars.get("materialVersion")).toBe("1.11.0");
+    expect(vars.get("coreKtx")).toBe("1.13.1");
+    expect(vars.get("junitV")).toBe("4.13.2");
+    expect(vars.get("retrofitV")).toBe("3.0.0");
+  });
+
+  it("$var 与 ${var} 两种引用都能解出版本", () => {
+    const g = `
+def materialVersion = '1.11.0'
+def okhttp = "4.12.0"
+dependencies {
+    implementation "com.google.android.material:material:$materialVersion"
+    implementation(\"com.squareup.okhttp3:okhttp:\${okhttp}\")
+}
+`;
+    const { deps, unresolved } = parseGradleDepsDetailed(g);
+    expect(unresolved).toHaveLength(0);
+    expect(deps).toHaveLength(2);
+    expect(deps[0]).toMatchObject({ group: "com.google.android.material", name: "material", version: "1.11.0", isAar: true });
+    expect(deps[1]).toMatchObject({ group: "com.squareup.okhttp3", name: "okhttp", version: "4.12.0", isAar: false });
+  });
+
+  it("版本变量没在本文件定义 → 进 unresolved，不当字面版本去下载", () => {
+    const g = `dependencies {
+    implementation "androidx.core:core-ktx:$kotlinVersion"
+    implementation 'junit:junit:4.13.2'
+}`;
+    const { deps, unresolved } = parseGradleDepsDetailed(g);
+    expect(deps).toHaveLength(1);
+    expect(deps[0].name).toBe("junit");
+    expect(unresolved).toHaveLength(1);
+    expect(unresolved[0].vars).toEqual(["kotlinVersion"]);
+    expect(unresolved[0].coord).toContain("$kotlinVersion");
+  });
+
+  it("变量套变量也能解（最多 5 轮）", () => {
+    const g = `
+def major = '1'
+def minor = '13'
+def coreV = "$major.$minor.1"
+dependencies {
+    implementation "androidx.core:core-ktx:$coreV"
+}`;
+    const { deps } = parseGradleDepsDetailed(g);
+    expect(deps).toHaveLength(1);
+    expect(deps[0].version).toBe("1.13.1");
+  });
+
+  it("解析前的注释里的变量声明不算（否则会误命中）", () => {
+    const g = `// def junk = '9.9.9'
+implementation 'com.x:y:1.0'
+`;
+    expect(collectGradleVars(g).size).toBe(0);
   });
 });
 

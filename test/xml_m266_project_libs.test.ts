@@ -77,4 +77,22 @@ describe("collectProjectLibs (M266)", () => {
     // 单文件 ~12MB，3 个 36MB < 40MB 都能进；换成 4 个就截断
     expect(r.libs.length).toBe(3);
   });
+
+  it("M346：标准安卓工程位置 app/src/main/libs/ 也能被收进编译（depth 4 不超 MAX_DEPTH）", async () => {
+    const tree: FakeTree = {
+      "": [{ kind: "dir", name: "app" }],
+      app: [{ kind: "dir", name: "src" }],
+      "app/src": [{ kind: "dir", name: "main" }],
+      "app/src/main": [{ kind: "dir", name: "libs" }, { kind: "dir", name: "res" }],
+      "app/src/main/libs": [{ kind: "file", name: "okhttp-4.12.0.jar" }],
+      "app/src/main/res": [{ kind: "dir", name: "layout" }],
+      "app/src/main/res/layout": [{ kind: "file", name: "a.xml" }],
+    };
+    const r = await collectProjectLibs(
+      fakeIo(tree, { "app/src/main/libs/okhttp-4.12.0.jar": "YWJjZA==" }),
+      null,
+    );
+    expect(r.libs.map((l) => l.rel)).toEqual(["app/src/main/libs/okhttp-4.12.0.jar"]);
+    expect(r.failed).toEqual([]);
+  });
 });

@@ -247,6 +247,7 @@ import { ProblemsDrawer } from "./ProblemsDrawer";
 import { useBuildLogs } from "./use-build-logs";
 import { usePanels } from "./use-panels";
 import { useXmlProjectState } from "./use-xml-project";
+import { useXmlProjectFns } from "./use-xml-project-fns";
 import {
   subscribeRuntimeLog,
   installRuntimeLogBridge,
@@ -1646,80 +1647,33 @@ const allDrawableNames = useMemo(() => {
   );
   setXmlAndTrackRef.current = setXmlAndTrack;
 
-  /** M25d：把一个条目载入画布（记住来源，保存时写回原文件） */
-  /** M293：从左侧项目树打开文件 —— 统一走「文件 tab」：已开过的切 tab，没开过的加 tab */
-  const loadEntry = useCallback(
-    async (source: ProjectSource, entry: BrowseEntry) => {
-      try {
-        const extMeta = { rel: entry.rel, target: entry.target, handle: entry.handle, sourceId: source.name };
-        const cur = projectRef.current;
-        const existing = cur.files.find(
-          (f) => (entry.rel && f.ext?.rel === entry.rel) || (entry.target && f.ext?.target === entry.target),
-        );
-        if (existing) {
-          flushTextTimer();
-          setProject((p) => switchFile(updateFileXml(p, p.activeId, xmlRef.current), existing.id));
-          setXml(existing.xml);
-          histRef.current = diffHistoryInit(existing.xml);
-          syncHist();
-          setSelectedPath(null);
-          saveBaseline(existing.ext?.rel || existing.ext?.target || existing.name, existing.xml);
-          setWsActiveName(existing.name);
-          setOpenRel(existing.ext?.rel ?? null);
-          if (existing.ext?.target) setSaveOrigin({ kind: "native", target: existing.ext.target, name: existing.name });
-          else if (existing.ext?.handle) setSaveOrigin({ kind: "handle", handle: existing.ext.handle as any, name: existing.name });
-          else setSaveOrigin(null);
-          setWsMsg(tt("已打开 {name}", { name: existing.name }));
-          setWsActiveName(existing.name);
-          return;
-        }
-        const text = await source.readText(entry.rel);
-        if (text === null) {
-          setWsMsg(tt("打不开《{name}》：文件已不存在或目录权限被收回", { name: entry.name }));
-          return;
-        }
-        flushTextTimer();
-        setProject((p) => {
-          const { project: next, id } = addFile(p, entry.name, text);
-          if (!id) return p;
-          return {
-            ...next,
-            files: next.files.map((f) => (f.id === id ? { ...f, ext: extMeta } : f)),
-          };
-        });
-        setXml(text);
-        histRef.current = diffHistoryInit(text);
-        syncHist();
-        setSelectedPath(null);
-        saveBaseline(entry.rel || entry.target || entry.name, text);
-        setWsActiveName(entry.name);
-        setOpenRel(entry.rel || null);
-        if (entry.target) setSaveOrigin({ kind: "native", target: entry.target, name: entry.name });
-        else if (entry.handle) setSaveOrigin({ kind: "handle", handle: entry.handle, name: entry.name });
-        else setSaveOrigin(null);
-        setWsMsg(tt("已打开 {name}", { name: entry.name }));
-        setWsActiveName(entry.name);
-      } catch (e) {
-        setWsMsg(tt("打开失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }));
-      }
-      try {
-        const cur = activeProjectRef.current;
-        if (cur?.source && entry.rel) {
-          lsSetJson(LS_KEY_LAST_FILE, {
-            dirPath: cur.dirPath ?? null,
-            rootPath: cur.rootPath ?? null,
-            project: cur.name,
-            rel: entry.rel,
-            name: entry.name,
-          });
-          writeLastRel(cur.dirPath || cur.name, entry.rel);
-        }
-      } catch {
-        /* 静默 */
-      }
-    },
-    [flushTextTimer],
-  );
+    /** M293/M366：项目操作 B 集群函数（loadEntry/openProjectEntry/handlePkgSynced/activateProject/
+   *  openWsProject/openProjectDir/refreshActiveProject/applySample/Blank/selectFile/rename/delete/close）
+   *  → components/use-xml-project-fns.ts（deps-getter 模式，函数体运行时解引用壳内晚声明 ref） */
+  const {
+    loadEntry,
+    openProjectEntry,
+    handlePkgSynced,
+    activateProject,
+    openWsProject,
+    openProjectDir,
+    refreshActiveProject,
+    applySampleProject,
+    applyBlankTemplate,
+    selectFile,
+    renameActiveFile,
+    deleteActiveFile,
+    closeActiveFile,
+  } = useXmlProjectFns(() => ({
+    xml, setXml, project, setProject,
+    histRef, syncHist, flushTextTimer,
+    setSelectedPath, setExportNote, setOpenRel, setXmlAndTrack, applyExternalState,
+    openRelRef, xmlRef, projectRef,
+    setGeneratedDrawables, setSampleValues,
+    setWsActiveName, setWsMsg,
+    activeProjectRef, setSaveOrigin, setActiveProject, setProjectRev, setProjectTab, projMeta,
+    refreshWorkspace, setWsBusy, wsState,
+  }));
 
   /** 当前项目的浏览源（用 ref 拿，避免面板回调闭包里拿到旧值） */
   const activeProjectRef = useRef<ActiveProject | null>(null);
@@ -1727,113 +1681,7 @@ const allDrawableNames = useMemo(() => {
     activeProjectRef.current = activeProject;
   }, [activeProject]);
 
-  /** 结构树里点一个 xml */
-  const openProjectEntry = useCallback(
-    (entry: BrowseEntry) => {
-      const src = activeProjectRef.current?.source;
-      if (src) void loadEntry(src, entry);
-    },
-    [loadEntry],
-  );
-
-  /** M219c：包名同步后，把“当前打开文件”的路径重映射到新包目录（如果它在旧包目录里）。
-   *  否则编辑器 buffer 指向旧路径，Ctrl+S 会把旧包目录 + 旧 package 声明重新写回来。
-   *  嵌套改名（com.a → com.a.b）不重映射（目录没动），也不动 buffer。 */
-  const handlePkgSynced = useCallback(
-    (oldPkg: string, newPkg: string) => {
-      const cur = openRelRef.current;
-      const src = activeProjectRef.current?.source;
-      if (!cur || !src) return;
-      if (!newPkg || !oldPkg || newPkg === oldPkg) return;
-      const oldDir = oldPkg.replace(/\./g, "/");
-      const newDir = newPkg.replace(/\./g, "/");
-      // 嵌套改名不能自动挪（M219b 已 guard），不重映射
-      if (newDir.startsWith(oldDir + "/") || newDir === oldDir) return;
-      // 通用匹配：<任何源码根>/(java|kotlin)/<旧包路径>/...（不限 app/ 与 main）
-      const m = cur.match(/^(.*\/(?:java|kotlin))\/(.+)$/);
-      if (!m) return; // 不在 java/kotlin 源树里（如 manifest/strings）→ 路径没变，不动
-      const root = m[1];
-      const rest = m[2];
-      if (!(rest === oldDir || rest.startsWith(oldDir + "/"))) return; // 不在旧包目录下
-      {
-        const tail = rest.slice(oldDir.length).replace(/^\//, "");
-        const newRel = tail ? `${root}/${newDir}/${tail}` : `${root}/${newDir}`;
-        // 重读盘上内容（同步后已是新 package 声明）并接管为当前文件
-        void (async () => {
-          const text = await src.readText(newRel).catch(() => null);
-          if (text === null) {
-            setWsMsg(tt("包名已改，当前文件《{name}》没找到新路径，请手动重新打开", { name: cur.split("/").pop() || "" }));
-            setOpenRel(null);
-            return;
-          }
-          setXmlAndTrack(text);
-          saveBaseline(newRel, text);
-          setWsActiveName(cur.split("/").pop() || "");
-          setOpenRel(newRel);
-          try {
-            const ap = activeProjectRef.current;
-            if (ap?.source) {
-              lsSetJson(LS_KEY_LAST_FILE, {
-                dirPath: ap.dirPath ?? null,
-                rootPath: ap.rootPath ?? null,
-                project: ap.name,
-                rel: newRel,
-                name: newRel.split("/").pop() || "",
-              });
-              writeLastRel(ap.dirPath || ap.name, newRel);
-            }
-          } catch {
-            /* 静默 */
-          }
-          setWsMsg(tt("包名已改，《{name}》已切换到新路径 {rel}", { name: newRel.split("/").pop() || "", rel: newRel }));
-        })();
-      }
-    },
-    [openRelRef, setXmlAndTrack, setWsMsg, setWsActiveName, setOpenRel],
-  );
-
-  /** 激活一个已打开的项目：切到「当前项目」tab，并自动载入主布局（找不到就只显示结构树） */
-  const activateProject = useCallback(
-    async (opened: OpenedProject, preferRel?: string | null) => {
-      // M31：标题显示 app 名称（读 res/values/strings.xml 的 app_name），并取 ic_launcher 做图标
-      let name = opened.name;
-      let iconUrl: string | null = null;
-      try {
-        const meta = await readProjectMetaFromSource(opened.source, opened.name);
-        name = meta.name;
-        iconUrl = meta.iconUrl ?? null;
-        // M31：APK 里扁平列表只含 xml，图标读不到 → 按项目绝对路径直试 ic_launcher*
-        if (!iconUrl && opened.dirPath) {
-          const nm = await readProjectMetaNative(opened.name, opened.dirPath);
-          if (nm.name && nm.name !== opened.name) name = nm.name;
-          iconUrl = nm.iconUrl ?? null;
-        }
-      } catch {
-        /* 读不到就用目录名 */
-      }
-      setActiveProject({ ...opened, name, iconUrl });
-      setProjectRev((n) => n + 1);
-      setProjectTab("current");
-      setWsActiveName("");
-      // M144：优先恢复「上次打开的文件」，读不到才退回主布局
-      const prefer = preferRel ?? readLastRel(opened.dirPath || opened.name);
-      let restored = false;
-      if (prefer) {
-        const text = await opened.source.readText(prefer).catch(() => null);
-        if (text !== null) {
-          const bn = prefer.split("/").pop() || prefer;
-          await loadEntry(opened.source, { kind: "file", name: bn, rel: prefer });
-          restored = true;
-        }
-      }
-      const main = restored ? null : await findMainLayout(opened.source);
-      if (main) await loadEntry(opened.source, main);
-      else if (!restored) setWsMsg(tt("已打开《{name}》，但里面没找到 layout xml", { name }));
-    },
-    [loadEntry],
-  );
-
-  /* M144：启动时恢复上次打开的项目+文件（仅 native：有绝对路径才能不经用户手势直读）。
+    /* M144：启动时恢复上次打开的项目+文件（仅 native：有绝对路径才能不经用户手势直读）。
    * 网页端目录句柄拿不到，只能让用户重新选项目，这里静默跳过。 */
   const lastFileRestored = useRef(false);
   useEffect(() => {
@@ -1849,60 +1697,6 @@ const allDrawableNames = useMemo(() => {
       rec.rel,
     );
   }, [activateProject]);
-
-  /** M25d：项目列表里点一项 —— 打开这个项目（网页端也能直接读工作目录里的文件夹） */
-  const openWsProject = useCallback(
-    async (item: WsProject) => {
-      setWsBusy(true);
-      try {
-        if (item.kind === "file") {
-          const r = await wsOpenProject(item);
-          if (!r) {
-            setWsMsg(tt("打不开《{name}》：文件已不存在或目录权限被收回", { name: item.name }));
-            return;
-          }
-          setXmlAndTrack(r.text);
-          setWsActiveName(item.name);
-          if (item.target) setSaveOrigin({ kind: "native", target: item.target, name: item.name });
-          else if (item.handle) setSaveOrigin({ kind: "handle", handle: item.handle, name: item.name });
-          else setSaveOrigin(null);
-          setWsMsg(tt("已打开 {name}", { name: item.name }));
-          return;
-        }
-        const opened = await openProjectFromItem(item);
-        if (!opened) {
-          setWsMsg(tt("打不开《{name}》：目录权限可能已失效，请重新选目录", { name: item.name }));
-          return;
-        }
-        const shownName = projMeta[item.rel]?.name || item.name;
-        await activateProject({ ...opened, name: shownName });
-      } catch (e) {
-        setWsMsg(tt("打开失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }));
-      } finally {
-        setWsBusy(false);
-      }
-    },
-    [activateProject, projMeta, setXmlAndTrack],
-  );
-
-  /** M24：打开一个项目目录（弹系统选择器），成功后切到「当前项目」 */
-  const openProjectDir = useCallback(async () => {
-    setWsBusy(true);
-    setWsMsg(tt("正在等你选项目文件夹…"));
-    try {
-      const proj = await openProjectFolder();
-      if (!proj) {
-        setWsMsg(wsState?.mode === "unsupported" ? tt("当前环境不支持选目录，请用 Chrome / Edge 或 APK") : tt("已取消打开"));
-        return;
-      }
-      await activateProject(proj);
-      window.setTimeout(() => void refreshWorkspace({ quiet: true }), 600);
-    } catch (e) {
-      setWsMsg(tt("打开项目失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }));
-    } finally {
-      setWsBusy(false);
-    }
-  }, [activateProject, refreshWorkspace, wsState?.mode]);
 
   /** M24/M31i：新建项目 —— 应用内建一个带 activity_main.xml 的项目，
    *  并在工作目录里直接落盘完整 Android 工程结构：项目名/app/src/main/...
@@ -1931,152 +1725,12 @@ const allDrawableNames = useMemo(() => {
     setProject,
   });
 
-  /** M24：重读当前项目结构（手动刷新）——M25d：只重置懒加载缓存，不深扫 */
-  const refreshActiveProject = useCallback(async () => {
-    if (activeProjectRef.current?.source) {
-      setProjectRev((n) => n + 1);
-      setWsMsg(tt("已刷新项目结构"));
-      return;
-    }
-    try {
-      const p = await restoreProjectFolder();
-      if (p) {
-        // M31：刷新时重读 app_name / 图标
-        let name = p.name;
-        let iconUrl: string | null = null;
-        try {
-          const meta = await readProjectMetaFromSource(p.source, p.name);
-          name = meta.name;
-          iconUrl = meta.iconUrl ?? null;
-          if (!iconUrl && p.dirPath) {
-            const nm = await readProjectMetaNative(p.name, p.dirPath);
-            if (nm.name && nm.name !== p.name) name = nm.name;
-            iconUrl = nm.iconUrl ?? null;
-          }
-        } catch {
-          /* 用目录名 */
-        }
-        setActiveProject({ ...p, name, iconUrl });
-        setProjectRev((n) => n + 1);
-        setWsMsg(tt("已刷新《{name}》", { name }));
-      } else {
-        setWsMsg(tt("刷新失败：项目目录权限可能已失效，请重新「打开」"));
-      }
-    } catch (e) {
-      setWsMsg(e instanceof Error ? e.message : String(e));
-    }
-  }, []);
-
-
-
-  /** 载入完整示例项目：布局 + 自带 drawable + values 一起换（合并语义：用户已有资源不会被覆盖） */
-  const applySampleProject = useCallback(
-    (key: string) => {
-      const p = sampleProjectByKey(key);
-      if (!p) return;
-      setXmlAndTrack(p.layout);
-      setGeneratedDrawables((m) => ({ ...p.drawables, ...m }));
-      setSampleValues(p.values ?? "");
-      // M149：记住示例项目，重启后恢复它的 values/drawable（不记 key 就全裸显示 @string/@drawable）
-      lsSet(LS_KEY_SAMPLE, key);
-      setSelectedPath(null);
-      setExportNote(
-        tt("已载入示例项目「{name}」· {lib}，自带 {n} 个 drawable", { name: p.name, lib: p.library, n: Object.keys(p.drawables).length }),
-      );
-      window.setTimeout(() => setExportNote(""), 4600);
-    },
-    [setXmlAndTrack],
-  );
-
-  const applyBlankTemplate = useCallback(
-    (key: string) => {
-      const b = SAMPLE_BLANKS.find((t) => t.key === key);
-      if (!b) return;
-      setXmlAndTrack(b.layout);
-      setSelectedPath(null);
-    },
-    [setXmlAndTrack],
-  );
-
-  /** M9：多文件切换 —— 先把当前编辑内容回写到项目，再切到目标文件，撤销栈跟着文件走 */
-  const selectFile = useCallback(
-    (id: string) => {
-      flushTextTimer();
-      setProject((p) => {
-        const withSaved = updateFileXml(p, p.activeId, xml);
-        const next = switchFile(withSaved, id);
-        const target = activeFile(next);
-        if (target && target.id !== p.activeId) {
-          setXml(target.xml);
-          histRef.current = diffHistoryInit(target.xml);
-          syncHist();
-          setSelectedPath(null);
-          applyExternalState(target);
-        }
-        return next;
-      });
-    },
-    [flushTextTimer, xml],
-  );
-
   /** M294/M336b：新建文件对话框 → 抽出到 components/use-new-file-dialog.tsx */
   const newFileDlg = useNewFileDialog({
     tt, project, setProject, xml, flushTextTimer,
     applyExternalState, setXml, histRef, syncHist, setSelectedPath, setExportNote,
   });
   const { openNewFileMenu, newFile, dialogJsx: newFileDialog } = newFileDlg;
-
-  const renameActiveFile = useCallback(() => {
-    const cur = activeFile(project);
-    if (!cur) return;
-    const input = window.prompt(tt("重命名「{name}」", { name: cur.name }), cur.name);
-    if (!input || input === cur.name) return;
-    setProject((p) => renameFile(p, cur.id, input));
-  }, [project]);
-
-  const deleteActiveFile = useCallback(() => {
-    const cur = activeFile(project);
-    if (!cur || project.files.length <= 1) {
-      setExportNote(tt("项目里只剩最后一个文件，删不了（先新建一个）"));
-      window.setTimeout(() => setExportNote(""), 3600);
-      return;
-    }
-    if (!window.confirm(tt("删除「{name}」？该文件内容会丢失。", { name: cur.name }))) return;
-    flushTextTimer();
-    setProject((p) => {
-      const withSaved = updateFileXml(p, p.activeId, xml);
-      const next = removeFile(withSaved, cur.id);
-      const target = activeFile(next)!;
-      setXml(target.xml);
-      histRef.current = diffHistoryInit(target.xml);
-      syncHist();
-      setSelectedPath(null);
-      applyExternalState(target);
-      return next;
-    });
-    setExportNote(tt("已删除「{name}」", { name: cur.name }));
-    window.setTimeout(() => setExportNote(""), 2400);
-  }, [flushTextTimer, project, xml]);
-
-  /** M291：关闭当前文件 tab（不确认、不删盘，仅从项目里摘掉；剩最后一个时不动） */
-  const closeActiveFile = useCallback(() => {
-    const cur = activeFile(project);
-    if (!cur || project.files.length <= 1) return;
-    flushTextTimer();
-    setProject((p) => {
-      const withSaved = updateFileXml(p, p.activeId, xml);
-      const next = removeFile(withSaved, cur.id);
-      const target = activeFile(next)!;
-      setXml(target.xml);
-      histRef.current = diffHistoryInit(target.xml);
-      syncHist();
-      setSelectedPath(null);
-      applyExternalState(target);
-      return next;
-    });
-    setExportNote(tt("已关闭「{name}」", { name: cur.name }));
-    window.setTimeout(() => setExportNote(""), 2400);
-  }, [flushTextTimer, project, xml]);
 
   /** 手敲代码：最新文本先进 ref（不阻塞输入），状态防抖 250ms 落一次，历史 500ms 合并 */
   const onChangeXmlText = useCallback(

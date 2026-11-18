@@ -611,17 +611,18 @@ export function lintJava(src: string, opts: JavaLintOpts = {}): JavaLintIssue[] 
         if (reported.has(u.name)) continue; // 同名只报一次（最高频来源）
         reported.add(u.name);
         const sug = nearestName(u.name, Array.from(sy.declared).filter((d) => d[0] === d[0].toLowerCase()));
-        // M207 置信度分级：
-        //  - 能猜到近似声明（拼写错）→ error（高置信度，几乎必错）
-        //  - 猜不到 → warn（我们的符号提取有盲区：反射注入字段、注解处理器生成代码等）
-        //   宁可降级也不拿"可能是我漏识别"冒充编译错
+        // M352 M3：外部库未索引不报未知符号——已由 findUnknownSymbols 内部保证：
+        //   ① 首字母大写的类型（外部库类）直接跳过（M203b）
+        //   ② 后面跟 ( 或 . 的方法调用/属性访问跳过（外部库方法）
+        //   所以这里剩下的都是裸小写标识符（变量/常量）；此类几乎都是拼错或垃圾代码，仍报。
+        //   能猜到近似本地声明 → error（拼写错，高置信）；猜不到 → warn（可能是漏声明/盲区）。
         issues.push({
           line: u.line,
           col: u.col,
           len: u.len,
           sev: sug ? "error" : "warn",
           code: "sym",
-          msg: `用了 ${u.name} 但本类没声明（不是字段/参数/局部变量/方法，也不是已 import 的类）${sug ? `（是不是想写 ${sug}）` : "（打错字？还是忘声明？）"}`,
+          msg: `用了 ${u.name} 但本类没声明（不是字段/参数/局部变量/方法，也不是已 import 的类）${sug ? `（是不是想写 ${sug}）` : "（打错字？还是忘声明？外部库的类型/方法不会报这个）"}`,
         });
       }
     }

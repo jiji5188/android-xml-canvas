@@ -99,7 +99,11 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
       // 同名多个来源：取最高分那条，但合并来源标注（这里简单取高）
       if (score > existing.score) {
         existing.score = score;
-        pool.set(text, { ...existing, ...extra, score } as RankItem);
+        const merged = { ...existing, ...extra, score } as RankItem;
+        // M352 M3：新条目没带签名时，别把已有的第二行签名抹掉
+        if (!extra?.signature) merged.signature = existing.signature;
+        if (!extra?.originClass) merged.originClass = existing.originClass;
+        pool.set(text, merged);
       }
     } else {
       pool.set(text, {
@@ -123,11 +127,20 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
 
   // 2) 项目（继承/接口合并后的方法；receiverType 能认出就按该类过滤）
   const lex = ctx.lex;
-  // 方法名 → 是否废弃（从 methods 里扫一遍，用于「无 receiver 走全项目方法名」时带上废弃标记）
-  const depByName = new Map<string, { alt?: string; sig?: string }>();
+  // 方法名 → 废弃标记 + 签名（从 methods 里扫一遍，用于「无 receiver 走全项目方法名」时带第二行/废弃标记）
+  const depByName = new Map<string, { alt?: string; sig?: string; dep?: boolean }>();
   for (const arr of lex.methods.values()) {
     for (const m of arr) {
-      if (m.isDeprecated && !depByName.has(m.name)) depByName.set(m.name, { alt: m.alt, sig: m.signature });
+      const cur = depByName.get(m.name);
+      // 保留首个签名（非空优先），废弃标记任意一个为真即可
+      if (!cur) depByName.set(m.name, { alt: m.alt, sig: m.signature, dep: m.isDeprecated });
+      else {
+        if (!cur.sig && m.signature) cur.sig = m.signature;
+        if (m.isDeprecated) {
+          cur.dep = true;
+          if (!cur.alt) cur.alt = m.alt;
+        }
+      }
     }
   }
   if (ctx.receiverType) {
@@ -142,10 +155,10 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
       });
     }
   } else {
-    // 没 receiver：全项目方法名（去重），带上废弃标记
+    // 没 receiver：全项目方法名（去重），带签名（第二行）+ 废弃标记
     for (const name of lex.allMethodNames) {
       const d = depByName.get(name);
-      add(name, "method", "project", { isDeprecated: !!d, alt: d?.alt, signature: d?.sig });
+      add(name, "method", "project", { isDeprecated: !!d?.dep, alt: d?.alt, signature: d?.sig });
     }
     // 项目类名
     for (const c of lex.classes.values()) add(c.name, "class", "project", { isDeprecated: c.isDeprecated });

@@ -591,7 +591,8 @@ export function computeJavaSuggest(
   doc: string,
   cursor: { line: number; col: number },
   lex?: Lexicon, // M352：项目词库（传了就走打分排序；没传保留旧行为）
-): { line: number; col: number; prefix: string; kind: SuggestKind; items: string[]; kinds: SuggestKind[] } | null {
+  recency?: Map<string, number>, // M352 M3：使用记忆（近期选中过的高分）
+): { line: number; col: number; prefix: string; kind: SuggestKind; items: string[]; kinds: SuggestKind[]; subs?: (string | undefined)[] } | null {
   const lines = doc.split("\n");
   const li = Math.max(0, Math.min(cursor.line - 1, lines.length - 1));
   const lineText = lines[li] ?? "";
@@ -623,7 +624,8 @@ export function computeJavaSuggest(
   // M99：本文件已有的变量/常量/方法/类型/引用排在词表前面
   //        ——写 `user` 时最想看到的是这个文件里的 userName，而不是 JDK 的 UserManager
   const tok = extractJavaTokens(doc);
-  const pool: { text: string; kind: SuggestKind }[] = [];
+  // M352 M3：候选条目带归属签名（第二行）
+  const pool: { text: string; kind: SuggestKind; signature?: string }[] = [];
   const addAll = (words: string[], kind: SuggestKind) => {
     for (const w of words) pool.push({ text: w, kind });
   };
@@ -637,9 +639,9 @@ export function computeJavaSuggest(
         currentFile: { methods: tok.methods, classes: tok.types, fields: tok.consts, vars: tok.vars },
         receiverType,
         receiver,
-      });
+      }, { recency });
       for (const it of ranked.ui) {
-        pool.push({ text: it.text, kind: it.kind === "const" ? "const" : it.kind });
+        pool.push({ text: it.text, kind: it.kind === "const" ? "const" : it.kind, signature: it.signature });
       }
       // JDK 类型 + 关键字兜底（词库没覆盖的基础类型）
       addAll(JAVA_KEYWORDS, "decl");
@@ -673,8 +675,8 @@ export function computeJavaSuggest(
 
   const lower = body.toLowerCase();
   const seen = new Set<string>();
-  const picked: { text: string; kind: SuggestKind }[] = [];
-  const push = (it: { text: string; kind: SuggestKind }) => {
+  const picked: { text: string; kind: SuggestKind; signature?: string }[] = [];
+  const push = (it: { text: string; kind: SuggestKind; signature?: string }) => {
     const key = isAt ? it.text : it.text;
     // M99：自己不要当候选（文档 token 会把刚打的半个词也扫进来）
     if (it.text === prefix || it.text === body) return;
@@ -694,5 +696,7 @@ export function computeJavaSuggest(
   if (picked.length === 0) return null;
   const items = picked.map((p) => p.text);
   const kinds = picked.map((p) => p.kind);
-  return { line: cursor.line, col, prefix, kind: kinds[0] ?? "plain", items, kinds };
+  // M352 M3：第二行签名统一包成 (参数)（空参数显示 "()"，一眼看出是方法且无参）
+  const subs = picked.map((p) => (p.signature !== undefined ? "(" + p.signature + ")" : undefined));
+  return { line: cursor.line, col, prefix, kind: kinds[0] ?? "plain", items, kinds, subs };
 }

@@ -60,6 +60,7 @@ import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
 import { computeSuggest } from "@/lib/xml/keyword-suggest";
 import { computeJavaSuggest, JAVA_SYMBOLS, importForType, buildImportInsertMany } from "@/lib/xml/java-vocab";
+import { loadRecency, recordUsage } from "@/lib/xml/lex-recency";
 import { getLexStore, type Lexicon } from "@/lib/xml/lexicon";
 import { KIND_LABEL, KIND_NAME, type SuggestKind } from "@/lib/xml/suggest-kind";
 import { estimateSuggestSize, placeSuggest, type Placement } from "@/lib/xml/suggest-position";
@@ -116,6 +117,8 @@ interface SugState {
   kind: SuggestKind;
   /** M99:与 items 对应的分类(逐条不同) */
   kinds?: SuggestKind[];
+  /** M352 M3:与 items 对应的第二行（方法签名/重载/归属类） */
+  subs?: (string | undefined)[];
   prefix: string;
   placement: Placement;
   width: number;
@@ -644,7 +647,7 @@ export function CodeEditor({
     const lex = lexRef?.current ?? getLexStore().current;
     const ctx =
       langRef.current === "java"
-        ? computeJavaSuggest(v.state.doc.toString(), { line: line.number, col }, lex && lex.allMethodNames.size > 0 ? lex : undefined)
+        ? computeJavaSuggest(v.state.doc.toString(), { line: line.number, col }, lex && lex.allMethodNames.size > 0 ? lex : undefined, loadRecency())
         : computeSuggest(v.state.doc.toString(), { line: line.number, col }, resNamesRef.current);
     if (!ctx) {
       setSugBoth(null);
@@ -679,6 +682,7 @@ export function CodeEditor({
       sel: 0,
       kind: ctx.kind,
       kinds: ctx.kinds,
+      subs: "subs" in ctx ? (ctx as { subs?: (string | undefined)[] }).subs : undefined,
       prefix: ctx.prefix,
       placement,
       width: size.width,
@@ -702,6 +706,8 @@ export function CodeEditor({
       if (!v || !s) return;
       const item = s.items[idx];
       if (item === undefined) return;
+      // M352 M3：使用记忆落盘（下次同前缀排更前）
+      if (langRef.current === "java") recordUsage(item);
       const head = v.state.selection.main.head;
       const from = Math.max(0, head - s.prefix.length);
       lastAcceptRef.current = Date.now();
@@ -1247,8 +1253,15 @@ export function CodeEditor({
                   }
                 }}
               >
-                <span className="axv-sug-text">{it}</span>
-                <span className={"axv-sug-kind is-" + k} title={KIND_NAME[k]}>
+                <span className="axv-sug-text">
+                  {it}
+                  {sug.subs?.[i] ? (
+                    <span className="axv-sug-sub" title={sug.subs[i] as string}>
+                      {sug.subs[i] as string}
+                    </span>
+                  ) : null}
+                </span>
+                <span className={("axv-sug-kind is-" + k)} title={KIND_NAME[k]}>
                   {KIND_LABEL[k]}
                 </span>
               </div>

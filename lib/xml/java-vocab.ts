@@ -401,6 +401,9 @@ export const JAVA_IMPORTS: Record<string, string> = {
  *  只收最常见的那些类，避免表太大；每个类 10~30 个高频方法。
  *  未列出的类回退到全局 JAVA_METHODS + KNOWN_METHODS。 */
 export const JAVA_TYPE_METHODS: Record<string, string[]> = {
+  // M393：Object —— 所有类的默认基类（不写字面类型/import/var 时 receiver 多半解析到它）
+  //   obj. 弹这些：toString/equals/hashCode/getClass/notify/notifyAll/wait/clone
+  Object: ["toString", "hashCode", "equals", "getClass", "notify", "notifyAll", "wait", "clone"],
   TextView: [
     "setText", "getText", "setTextColor", "setTextSize", "setTextStyle", "setGravity", "setHint",
     "setSingleLine", "setMaxLines", "setLines", "setEllipsize", "setTypeface", "setMovementMethod",

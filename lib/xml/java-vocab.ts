@@ -709,14 +709,20 @@ export function computeJavaSuggest(
   const push = (it: { text: string; kind: SuggestKind; signature?: string }) => {
     const key = isAt ? it.text : it.text;
     // M99：自己不要当候选（文档 token 会把刚打的半个词也扫进来）
-    if (it.text === prefix || it.text === body) return;
+    // M390：关键词豁免 —— 关键词来自静态表（不是从文档扫的），不会被半截词污染；
+    //   不豁免的话 `if`/`do` 这种 2 字符关键词永远弹不出来（打 1 字符不够最短，打满 2 字符=完整词被跳过）
+    if ((it.text === prefix || it.text === body) && it.kind !== "decl") return;
     if (seen.has(key) || picked.length >= MAX_ITEMS) return;
     seen.add(key);
     picked.push(it);
   };
   // 第一轮只留「前缀开头」的（最常见的匹配），不够 6 条再补「包含」的
+  // M390：完全相等的先收（打满 int 应 int 在 interface 前；动态词会被 push 的自检跳过，实际只有关键词受惠）
   for (const it of pool) {
-    if (it.text.toLowerCase().startsWith(lower)) push(it);
+    if (it.text.toLowerCase() === lower) push(it);
+  }
+  for (const it of pool) {
+    if (it.text.toLowerCase() !== lower && it.text.toLowerCase().startsWith(lower)) push(it);
   }
   if (picked.length < 6) {
     for (const it of pool) {

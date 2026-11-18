@@ -192,8 +192,35 @@ export async function detectPkgState(
  *  只留父包——前缀替换后子包层次自然保留（com.a.b → new.b），
  *  否则两个都改会把 com.a.b 拍平成 new，子包结构全丢。 */
 export function suggestOldPkgs(state: PkgState, target: string): string[] {
-  const cands = state.all.filter((p) => p !== target);
-  return cands.filter((p) => !cands.some((q) => q !== p && p.startsWith(q + ".")));
+  return planPkgRename(state, target).roots;
+}
+
+/** M402：改名计划（把「要改哪些包」的判定集中到一处，弹窗与 unify 共用）
+ *
+ *  规则：
+ *   1. 目标包自己的子包（target.data）**不是**旧包名——它们本来就对，前缀替换根包时
+ *      会自动变成 new.data，层次保留。若把它们列进来，反而会被拍平成 new。
+ *   2. 目标包的祖先包（target = com.a.b.c，而 com.a.b 存在）无法安全前缀替换
+ *      （com.a.b → com.a.b.c 会把 com.a.b.c 自身变成 com.a.b.c.c），只告警让人工确认。
+ *   3. 剩下的候选折叠成「最上层根包」，靠前缀替换覆盖全部子包。
+ */
+export interface PkgRenamePlan {
+  /** 需要前缀替换的根包（子包层次自动保留） */
+  roots: string[];
+  /** 目标包的祖先包（不会自动改，需人工确认） */
+  ancestors: string[];
+}
+
+export function planPkgRename(state: PkgState, target: string): PkgRenamePlan {
+  const tgt = (target || "").trim();
+  if (!tgt) return { roots: [], ancestors: [] };
+  const all = Array.from(new Set(state.all.filter(Boolean)));
+  const ancestors = all.filter((p) => p !== tgt && tgt.startsWith(p + "."));
+  const cands = all.filter(
+    (p) => p !== tgt && !p.startsWith(tgt + ".") && !ancestors.includes(p),
+  );
+  const roots = cands.filter((p) => !cands.some((q) => q !== p && p.startsWith(q + ".")));
+  return { roots, ancestors };
 }
 
 export interface UnifyResult {
@@ -376,10 +403,20 @@ export async function unifyPackageTo(
   }
   const map: Record<string, string> = {};
   const raw = Array.from(new Set(olds.map((o) => (o || "").trim()))).filter((p) => p && p !== tgt);
-  // 防御：调用方若把子包也传进来，只留最上层那个（否则 com.a.b 会被拍平）
-  for (const p of raw) {
-    if (raw.some((q) => q !== p && p.startsWith(q + "."))) continue;
+  // M402 三重守卫（都是为了防止「统一成一棵拍平的树 / 套两层」）：
+  //  ① 目标包的子包 → 不能用「包名 → 目标」的整串替换，否则 Com.a.data 变 Com.a（层次丢失）；
+  //     它们应靠根包前缀替换自然得到 target.data。
+  //  ② 目标包的祖先包 → 前缀替换会把 target 自身再套一层（target.xxx → target.xxx.xxx），不自动改。
+  //  ③ 其余候选折叠成最上层根包（父包优先，子包靠前缀覆盖）。
+  const noSub = raw.filter((p) => !p.startsWith(tgt + "."));
+  const safe = noSub.filter((p) => !tgt.startsWith(p + "."));
+  const skippedAncestors = noSub.filter((p) => tgt.startsWith(p + "."));
+  for (const p of safe) {
+    if (safe.some((q) => q !== p && p.startsWith(q + "."))) continue;
     map[p] = tgt;
+  }
+  if (skippedAncestors.length) {
+    res.warnings.push(`pkg-ancestor-skipped:${skippedAncestors.join(",")}`);
   }
   // M282：以前 map 空就直接 return，导致「源码已是新包名、只差 gradle」的情况下 gradle 也不改。
   // 现在：map 空时源码/manifest 各段自然是 no-op（rewritePkgMap 空 map 返回 unchanged），

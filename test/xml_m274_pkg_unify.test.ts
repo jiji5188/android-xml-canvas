@@ -20,6 +20,7 @@ import {
   rewritePkgMap,
   detectPkgState,
   suggestOldPkgs,
+  planPkgRename,
   unifyPackageTo,
 } from "../lib/xml/pkg-rename";
 
@@ -170,6 +171,72 @@ describe("detectPkgState", () => {
     expect(olds).toContain("com.momo.ReturnSystem");
     expect(olds).not.toContain("com.momo.ReturnSystem3");
     expect(olds).not.toContain("com.momo.ReturnSystem2.util");
+  });
+
+  it("M402 目标就是父包时：子包不是残留，roots 为空（不再误报/拍平）", async () => {
+    const files: Record<string, string> = {
+      "app/build.gradle": `android {\n    namespace 'com.momo.ReturnSystem'\n    defaultConfig { applicationId "com.momo.ReturnSystem" }\n}`,
+      "app/src/main/java/com/momo/ReturnSystem/MainActivity.java": "package com.momo.ReturnSystem;\nclass Main{}",
+      "app/src/main/java/com/momo/ReturnSystem/data/Repo.java": "package com.momo.ReturnSystem.data;\nclass Repo{}",
+      "app/src/main/java/com/momo/ReturnSystem/Utlis/Str.java": "package com.momo.ReturnSystem.Utlis;\nclass Str{}",
+    };
+    const st = await detectPkgState(fakeSource(files));
+    const plan = planPkgRename(st, "com.momo.ReturnSystem");
+    expect(plan.roots).toEqual([]);
+    expect(plan.ancestors).toEqual([]);
+    expect(suggestOldPkgs(st, "com.momo.ReturnSystem")).toEqual([]);
+  });
+
+  it("M402 真改根包名时只映射根包，子包层次保留（old.data → new.data）", async () => {
+    const files: Record<string, string> = {
+      "app/build.gradle": GRADLE,
+      "app/src/main/java/com/momo/ReturnSystem/Main.java": "package com.momo.ReturnSystem;\nclass Main{}",
+      "app/src/main/java/com/momo/ReturnSystem/data/Repo.java":
+        "package com.momo.ReturnSystem.data;\nimport com.momo.ReturnSystem.R;\nclass Repo{}",
+    };
+    const src = fakeSource(files);
+    const st = await detectPkgState(src);
+    const olds = suggestOldPkgs(st, "com.new.App");
+    // 根包折叠：ReturnSystem2.util 被父包 ReturnSystem2 覆盖；.data 被根包 ReturnSystem 覆盖
+    expect(olds).toEqual(["com.momo.ReturnSystem", "com.momo.ReturnSystem2"]);
+    const res = await unifyPackageTo(src, { kind: "native", base: "/tmp/x" }, null, "com.new.App", olds);
+    expect(res.ok).toBe(true);
+    const repo = writes.get("app/src/main/java/com/momo/ReturnSystem/data/Repo.java")!;
+    expect(repo).toContain("package com.new.App.data;");
+    expect(repo).toContain("import com.new.App.R;");
+    expect(repo).not.toContain("package com.new.App;");
+  });
+
+  it("M402 目标是现有包的子包：祖先不自动改，告警 pkg-ancestor-skipped", async () => {
+    const files: Record<string, string> = {
+      "app/src/main/java/com/momo/ReturnSystem/Main.java": "package com.momo.ReturnSystem;\nclass Main{}",
+    };
+    const src = fakeSource(files);
+    const st = await detectPkgState(src);
+    const plan = planPkgRename(st, "com.momo.ReturnSystem.data");
+    expect(plan.roots).toEqual([]);
+    expect(plan.ancestors).toEqual(["com.momo.ReturnSystem"]);
+    // 直接传给 unify（调用方失误场景）也不得套两层
+    const res = await unifyPackageTo(
+      src, { kind: "native", base: "/tmp/x" }, null, "com.momo.ReturnSystem.data",
+      ["com.momo.ReturnSystem", "com.momo.ReturnSystem.data"],
+    );
+    expect(res.warnings.some((w) => w.startsWith("pkg-ancestor-skipped:"))).toBe(true);
+    expect(writes.size).toBe(0);
+  });
+
+  it("M402 unify 内部再守卫：调用方误传目标子包也不拍平", async () => {
+    const files: Record<string, string> = {
+      "app/src/main/java/com/momo/Old/Main.java": "package com.momo.Old;\nclass Main{}",
+      "app/src/main/java/com/momo/Old/data/Repo.java": "package com.momo.Old.data;\nclass Repo{}",
+    };
+    const src = fakeSource(files);
+    const res = await unifyPackageTo(
+      src, { kind: "native", base: "/tmp/x" }, null, "com.momo.Old",
+      ["com.momo.Old", "com.momo.Old.data"], // 调用方误把子包也传进来
+    );
+    expect(res.files).toEqual([]);
+    expect(writes.size).toBe(0);
   });
 });
 

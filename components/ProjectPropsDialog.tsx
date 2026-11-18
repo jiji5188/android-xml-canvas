@@ -27,7 +27,7 @@ import {
 } from "@/lib/xml/gradle-deps";
 import { saveProjectFile, type ProjectSaveRoot } from "@/lib/xml/project-save";
 import type { FileOpsCtx } from "@/lib/xml/file-ops";
-import { detectPkgState, suggestOldPkgs, unifyPackageTo } from "@/lib/xml/pkg-rename";
+import { detectPkgState, planPkgRename, unifyPackageTo } from "@/lib/xml/pkg-rename";
 import { Overlay } from "@/components/TreeFileMenu";
 import { useEditorGuard } from "@/components/useEditorGuard";
 
@@ -180,16 +180,35 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
         setGradleForm(form);
         setOrigin({ dir: p.item.name, appName: an, pkg: pkgVal, gradle: form });
         if (!g && !s) setLoadMsg(tt("没找到 build.gradle / strings.xml，只能改项目名。"));
-        // M274：打开时探测全项目包名，若有残留多个包名就给提示（保存时会自动统一）
-        if (g) {
+        // M274：打开时探测全项目包名；M402 重写判定：
+        //  ① 目标包自己的子包（target.data/.util）是正常工程结构，不算残留旧包名；
+        //  ② 只有「既不是 target、也不是 target 子包」的残留包才提示统一；
+        //  ③ manifest/gradle 与 target 不一致也算待同步。
+        //  数字与清单一致：{n} = 残留包个数，清单只列残留包（不再混进目标包）。
+        if (g && pkgVal) {
           const st = await detectPkgState(p.source, g.text).catch(() => null);
-          if (alive && st && !st.consistent) {
-            const olds = suggestOldPkgs(st, pkgVal);
-            const parts = st.sourcePkgs.slice(0, 4).map((x) => `${x.pkg}(${x.count})`).join("、");
-            setPkgWarn(
-              tt("检测到 {n} 个不同包名：{l}。保存时会把 {o} 全部统一为新包名。",
-                { n: olds.length, l: parts, o: olds.slice(0, 3).join("、") }),
-            );
+          if (alive && st) {
+            const plan = planPkgRename(st, pkgVal);
+            const cnt = new Map(st.sourcePkgs.map((x) => [x.pkg, x.count] as const));
+            const strayParts = plan.roots
+              .slice(0, 4)
+              .map((p) => (cnt.get(p) ? `${p}(${cnt.get(p)})` : p))
+              .join("、");
+            if (plan.roots.length) {
+              setPkgWarn(
+                tt("检测到 {n} 个残留包名：{l}。保存时会把 {o} 统一到 {t}，子包层次保留（工程共 {m} 个包）。",
+                  { n: plan.roots.length, l: strayParts, o: plan.roots.slice(0, 3).join("、"), t: pkgVal, m: st.sourcePkgs.length }),
+              );
+            } else if (
+              (st.manifestPkg && st.manifestPkg !== pkgVal && !st.manifestPkg.startsWith(pkgVal + ".")) ||
+              (st.gradlePkg && st.gradlePkg !== pkgVal)
+            ) {
+              setPkgWarn(
+                tt("AndroidManifest / build.gradle 的包名与 {t} 不一致，保存时会同步为 {t}。", { t: pkgVal }),
+              );
+            } else {
+              setPkgWarn("");
+            }
           }
         }
       } finally {
@@ -285,19 +304,34 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
       // 改：用局部变量 gradleTextToSave 记新文本，第 4 步写它。
       let gradleTextToSave: string | null = gradle ? gradle.text : null;
         let pkgDetail: string | null = null; // M289：第 3 步的包名同步详情（非空就展示它，否则展示「已保存」）
-      if (gradle && pkg && pkg !== origin.pkg) {
-        const r = setGradlePackage(gradle.text, pkg);
-        if (!r.ok) {
-          setMsg(r.msg || tt("包名写入失败"));
-          return;
+      // M402：只要检测到残留包名/manifest与gradle不一致就统一，
+      // 不再要求「包名字段被改过」——残留旧包不管你是改没改名，保存时都应清掉（不能漏改）。
+      let unifyState: Awaited<ReturnType<typeof detectPkgState>> | null = null;
+      let olds: string[] = [];
+      if (gradle && pkg) {
+        unifyState = await detectPkgState(p.source, gradle.text).catch(() => null);
+        const plan = unifyState ? planPkgRename(unifyState, pkg) : null;
+        olds = plan
+          ? plan.roots
+          : pkg !== origin.pkg
+            ? [origin.pkg].filter(Boolean)
+            : [];
+        const manMismatch = !!unifyState?.manifestPkg && unifyState.manifestPkg !== pkg && !unifyState.manifestPkg.startsWith(pkg + ".");
+        const gradMismatch = !!unifyState?.gradlePkg && unifyState.gradlePkg !== pkg;
+        const needUnify = olds.length > 0 || manMismatch || gradMismatch;
+        if (pkg !== origin.pkg) {
+          const r = setGradlePackage(gradle.text, pkg);
+          if (!r.ok) {
+            setMsg(r.msg || tt("包名写入失败"));
+            return;
+          }
+          gradleTextToSave = r.text;
+          setGradle({ ...gradle, text: r.text });
         }
-        gradleTextToSave = r.text;
-        setGradle({ ...gradle, text: r.text });
-        // M274：一次把所有「残留包名」（不止 gradle 那一个）统一到新包名，
-        //  源码 / manifest / gradle / 源码目录全改，ReturnSystem/2/3 共存这种后遗症一并清掉
-        if (p.saveRoot) {
-          const state = await detectPkgState(p.source, gradle.text).catch(() => null);
-          const olds = state ? suggestOldPkgs(state, pkg) : [origin.pkg].filter(Boolean);
+        // M274/M402：一次把所有「残留包名」（不止 gradle 那一个）统一到目标包名，
+        //  源码 / manifest / gradle / 源码目录全改，ReturnSystem/2/3 共存这种后遗症一并清掉；
+        //  目标包自己的子包不进映射，靠根包前缀替换保留层次
+        if (p.saveRoot && needUnify) {
           const unify = await unifyPackageTo(
             p.source,
             p.saveRoot,
@@ -326,8 +360,8 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
                 : "";
             if (mvText) parts.push(mvText);
             let base = tt("包名已统一：{s}", { s: parts.join("，") });
-            if (state && !state.consistent) {
-              base += tt("（检测到 {n} 个旧包名 {l}", { n: olds.length, l: olds.join("、") }) + "）";
+            if (olds.length) {
+              base += tt("（旧包名 {l} → {t}，子包层次保留）", { l: olds.slice(0, 4).join("、"), t: pkg });
             }
             if (unify.conflicts.length) {
               base += tt("\n冲突 {n} 处：{l}", { n: unify.conflicts.length, l: unify.conflicts.slice(0, 4).join("、") });
@@ -336,12 +370,28 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
               base += tt("\n⚠ assets 里 {n} 个文件疑似硬编码旧包名（未自动改，请自查）：{l}",
                 { n: unify.assetsHints.length, l: unify.assetsHints.slice(0, 4).join("、") });
             }
+            const anc = unify.warnings.find((w) => w.startsWith("pkg-ancestor-skipped:"));
+            if (anc) {
+              base += tt("\n⚠ {l} 是新包名的父包，未自动改（会套两层后缀），请人工确认", {
+                l: anc.slice("pkg-ancestor-skipped:".length),
+              });
+            }
             const gw = unify.warnings.find((w) => w.startsWith("gradle-"));
             if (gw) {
               base += tt("\n⚠ build.gradle 未同步：{m}（请手动改 namespace/applicationId）", {
                 m: gw === "gradle-not-found" ? tt("没找到 build.gradle") : gw.replace(/^gradle-\w+:/, ""),
               });
             }
+            // M402：保存后复检，防止漏改（真机读的是写盘后的内容；测试内存源不含新写入）
+            try {
+              const after = await detectPkgState(p.source, null).catch(() => null);
+              const left = after ? planPkgRename(after, pkg).roots : [];
+              if (left.length) {
+                base += tt("\n⚠ 复检仍有 {n} 个包名未统一：{l}（可能写入失败或目录冲突）", {
+                  n: left.length, l: left.slice(0, 4).join("、"),
+                });
+              }
+            } catch { /* 复检失败不影响保存 */ }
             setMsg(base);
           pkgDetail = base;
             for (const o of olds) p.onPkgSynced?.(o, pkg);

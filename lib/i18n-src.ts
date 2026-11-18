@@ -1519,6 +1519,15 @@ export const SRC_EN: SrcDict = {
   "需手动改目录名": "rename the source folder manually",
   "检测到 {n} 个不同包名：{l}。保存时会把 {o} 全部统一为新包名。":
     "Found {n} different package names: {l}. On save, {o} will all be unified to the new package.",
+  "检测到 {n} 个残留包名：{l}。保存时会把 {o} 统一到 {t}，子包层次保留（工程共 {m} 个包）。":
+    "Found {n} leftover package(s): {l}. On save they will be unified to {t} (sub-package hierarchy preserved; {m} packages total).",
+  "AndroidManifest / build.gradle 的包名与 {t} 不一致，保存时会同步为 {t}。":
+    "AndroidManifest / build.gradle package differs from {t}; it will be synced to {t} on save.",
+  "（旧包名 {l} → {t}，子包层次保留）": "(old {l} → {t}, sub-package hierarchy kept)",
+  "\n⚠ {l} 是新包名的父包，未自动改（会套两层后缀），请人工确认":
+    "\n⚠ {l} is a parent of the new package; not auto-renamed (would double the suffix) — please check manually",
+  "\n⚠ 复检仍有 {n} 个包名未统一：{l}（可能写入失败或目录冲突）":
+    "\n⚠ Re-check: {n} package name(s) still not unified: {l} (write may have failed or dir conflict)",
   "Java 源码收集": "Java source collection",
   "资源预检查（不阻断，仅提示）": "Resource pre-check (non-blocking, info only)",
   "资源预检查（已自动补占位）": "Resource pre-check (stubs auto-added)",

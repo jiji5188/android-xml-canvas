@@ -167,7 +167,7 @@ export function rewritePkgTokens(text: string, oldPkg: string, newPkg: string): 
   return { text: out, changed: out !== text };
 }
 
-/** 递归列出某个目录下所有文本源文件（.java/.kt + 所有 .xml，供包名全量同步用）。相对项目根。 */
+/** 递归列出某个目录下所有文本源文件（.java/.kt/.aidl + 所有 .xml，供包名全量同步用）。相对项目根。 */
 export async function listAllTextFiles(source: ProjectSource, startRel: string): Promise<string[]> {
   const out: string[] = [];
   let depth = 0;
@@ -189,7 +189,7 @@ export async function listAllTextFiles(source: ProjectSource, startRel: string):
       const full = rel ? `${rel}/${e.name}` : e.name;
       if (e.kind === "dir") {
         await walk(full);
-      } else if (isJavaSrcName(e.name) || /\.xml$/i.test(e.name)) {
+      } else if (isJavaSrcName(e.name) || /\.xml$/i.test(e.name) || /\.aidl$/i.test(e.name)) {
         out.push(full);
       }
     }

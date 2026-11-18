@@ -51,6 +51,35 @@ function isJarAar(name: string) {
   return /\.(jar|aar)$/i.test(name);
 }
 
+/** fileTree include 过滤：*.jar / *.aar 后缀匹配；空/通配全过 */
+function matchFileTreeInclude(name: string, includes: string[]): boolean {
+  if (!includes.length) return true;
+  const lower = name.toLowerCase();
+  return includes.some((inc) => {
+    const p = (inc || "").trim().replace(/^\*\*\//, "").toLowerCase();
+    if (!p || p === "*" || p === "*.*") return true;
+    if (p.startsWith("*.")) return lower.endsWith(p.slice(1));
+    return lower === p || lower.endsWith("/" + p);
+  });
+}
+
+/** fileTree 目录规范化（去 ./ 前缀、尾部斜杠、反斜杠转正斜杠） */
+function normFtDir(dir: string): string {
+  return (dir || "")
+    .trim()
+    .replace(/^\.\//, "")
+    .replace(/^\/+/, "")
+    .replace(/[\\/]+$/, "")
+    .replace(/\\/g, "/");
+}
+
+/** 项目库候选目录：标准 app/src/main/libs + 每个 fileTree 的 dir（带各自的 include 过滤） */
+interface ProjectLibCandidate {
+  rel: string;
+  abs: string | null;
+  includes: string[];
+}
+
 async function fetchBase64(url: string): Promise<{ b64: string; ok: boolean; error?: string; size?: number }> {
   try {
     const r = await fetch(url, { mode: "cors" });
@@ -175,6 +204,26 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     return projectLibsBases[0] ?? null;
   }, [nativeProjectRoot, gradleFileTrees, projectLibsBases]);
 
+  /** M372：项目库候选目录（rel + abs + 各自 include 过滤）。
+   *  native 和 SAF（aiFileIo）两路都用 fileTree 指向的目录，不再只扫标准 libs。 */
+  const projectLibCandidates = useMemo(() => {
+    const out: ProjectLibCandidate[] = [
+      { rel: "app/src/main/libs", abs: null, includes: [] },
+    ];
+    const root = (nativeProjectRoot || "").replace(/[\\/]+$/, "");
+    for (const ft of gradleFileTrees) {
+      const d = normFtDir(ft.dir);
+      if (!d) continue;
+      const rels = /^app(\/|$)/.test(d) ? [d] : [`app/${d}`, d];
+      for (const rel of rels) {
+        if (out.some((c) => c.rel === rel)) continue;
+        out.push({ rel, abs: root ? `${root}/${rel}` : null, includes: ft.includes });
+      }
+    }
+    if (root) out[0].abs = `${root}/app/src/main/libs`;
+    return out;
+  }, [nativeProjectRoot, gradleFileTrees]);
+
   const refresh = useCallback(async () => {
     setBusy(true);
     try {
@@ -187,21 +236,21 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           setLocalLibs(listDirViaNative(localDir));
         }
       } else {
-        // 项目库：native 项目根下标准 + 旧 libs 目录（见 projectLibsBases）
+        // 项目库：标准 libs + build.gradle fileTree 指向的目录（按 include 过滤）
         if (nativeProjectRoot && native) {
           let all: LibFile[] = [];
-          for (const base of projectLibsBases) {
-            native.createEntry?.(base, true);
-            const items = listDirViaNative(base);
+          for (const c of projectLibCandidates) {
+            if (!c.abs) continue;
+            native.createEntry?.(c.abs, true);
+            const items = listDirViaNative(c.abs).filter((f) => matchFileTreeInclude(f.name, c.includes));
             all = all.concat(items);
           }
           setProjectLibs(all);
         } else if (aiFileIo) {
-          const candidates = ["app/src/main/libs"];
           let all: LibFile[] = [];
-          for (const c of candidates) {
-            const items = await listDirViaIo(aiFileIo, c);
-            all = all.concat(items.map((f) => ({ ...f, rel: f.rel })));
+          for (const c of projectLibCandidates) {
+            const items = await listDirViaIo(aiFileIo, c.rel);
+            all = all.concat(items.filter((f) => matchFileTreeInclude(f.name, c.includes)));
           }
           setProjectLibs(all);
         } else {
@@ -211,7 +260,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     } finally {
       setBusy(false);
     }
-  }, [tab, localDir, nativeProjectRoot, aiFileIo, native, refreshKey, projectLibsBases]);
+  }, [tab, localDir, nativeProjectRoot, aiFileIo, native, refreshKey, projectLibCandidates]);
 
   useEffect(() => {
     void refresh();
@@ -734,16 +783,18 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     [localDir, native, onNote, tr, refresh, dlWithFallback],
   );
 
-  /** M345：全部下载（只下尚未下载的） */
+  /** M345：一键下载（只下尚未下载、且不在本地库的） */
   const downloadAllGradleDeps = useCallback(async () => {
     const missing = gradleDeps.filter((d) => {
       const k = d.group + ":" + d.name + ":" + d.version;
-      return gradleBusyKey[k] !== "done";
+      if (gradleBusyKey[k] === "done") return false;
+      if (presentNames.has(gradleDepFname(d))) return false;
+      return true;
     });
     for (const d of missing) {
       await downloadGradleDep(d);
     }
-  }, [gradleDeps, gradleBusyKey, downloadGradleDep]);
+  }, [gradleDeps, gradleBusyKey, presentNames, downloadGradleDep]);
 
   /** M360：打开项目时自动检查依赖 + 一键补齐。
    *  M372：native 项目或有 SAF 源（aiFileIo）都自动扫一次，不再需要手动按钮。
@@ -756,19 +807,6 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     lastAutoScanRoot.current = scanKey;
     void scanGradleDeps();
   }, [scanKey, scanGradleDeps]);
-
-  /** M360：未补齐的依赖（gradleDeps 里尚未 done 且不在本地库的） */
-  const missingGradleDeps = useMemo(
-    () => gradleDeps.filter((d) => {
-      const k = d.group + ":" + d.name + ":" + d.version;
-      if (gradleBusyKey[k] === "done") return false;
-      // 本地库里已有同名文件（artifact-version.ext）则不算缺
-      const fname = (d.name + "-" + d.version + (d.isAar ? ".aar" : ".jar")).toLowerCase();
-      if (currentList.some((f) => f.name.toLowerCase().includes(fname.split("/").pop()!.replace(".aar", "").replace(".jar", "")) )) return false;
-      return true;
-    }),
-    [gradleDeps, gradleBusyKey, currentList],
-  );
 
   return (
     <div className="axv-libs-panel">
@@ -795,7 +833,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           className={tab === "catalog" ? "on" : ""}
           onClick={() => setTab("catalog")}
         >
-          {tr("libs.catalog", "lib 库下载")}
+          {tr("libs.catalog", "常用库")}
         </button>
       </div>
 
@@ -817,6 +855,22 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           {tr("refresh", "刷新")}
         </button>
       </div>
+
+      {/* M373：列表上方一键下载（缺的依赖在列表里直接看得到，不再弹警告条） */}
+      {tab === "project" && gradleDeps.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", margin: "0 8px 6px" }}>
+          <button
+            type="button"
+            className="axv-libs-btn primary"
+            style={{ fontSize: 11, padding: "2px 10px", whiteSpace: "nowrap" }}
+            disabled={gradleBusy}
+            onClick={() => void downloadAllGradleDeps()}
+          >
+            <span className="msr" aria-hidden="true" style={{ fontSize: 15, verticalAlign: "middle", marginRight: 3 }}>cloud_download</span>
+            {gradleBusy ? tr("libs.downloading", "下载中…") : tr("libs.download_all", "一键下载")}
+          </button>
+        </div>
+      )}
 
       <div className="axv-libs-list axv-rail-scroll">
         {tab === "local" && (
@@ -869,25 +923,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                 </div>
               </div>
             ))}
-            {/* fileTree 本地库声明（dir + include），目录已并入项目库扫描 */}
-            {gradleScanned && gradleFileTrees.map((ft) => (
-              <div
-                key={"ft:" + ft.dir + ":" + ft.includes.join(",")}
-                className="axv-libs-item"
-                style={{ alignItems: "center", opacity: 0.75 }}
-                title={ft.raw}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
-                    {ft.dir}
-                    <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.6 }}>{ft.config || "fileTree"}</span>
-                  </div>
-                  <div className="axv-libs-item-rel" style={{ fontSize: 10 }}>
-                    include: {ft.includes.length > 0 ? ft.includes.join(", ") : "*"}
-                  </div>
-                </div>
-              </div>
-            ))}
+            {/* M372：fileTree 不再显示声明行 —— dir 并入候选目录、按 include 过滤后直接列库文件 */}
             {gradleDeps.filter((d) => matchGradleDep(d, libQuery)).map((d) => {
               const key = d.group + ":" + d.name + ":" + d.version;
               const st = gradleBusyKey[key] || "";
@@ -1078,27 +1114,6 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         )}
         {busy && <div className="axv-libs-loading">{tr("loading", "加载中…")}</div>}
       </div>
-
-      {/* M360：打开项目自动检查出的缺失依赖 → 一键补齐 */}
-      {missingGradleDeps.length > 0 && (
-        <div className="axv-libs-missing" style={{ margin: "6px 8px", padding: "8px 10px", border: "1px solid #f0c36d", borderRadius: 8, background: "#fff8e7", fontSize: 11 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span aria-hidden="true" style={{ fontSize: 14 }}>warning</span>
-            <span style={{ flex: 1, fontWeight: 600, color: "#8a5a00" }}>
-              {tr("libs.missing_deps", "缺 {n} 个依赖库：{list}", { n: missingGradleDeps.length, list: missingGradleDeps.slice(0, 3).map((d) => d.name + "-" + d.version).join("、") + (missingGradleDeps.length > 3 ? "…" : "") })}
-            </span>
-            <button
-              type="button"
-              className="axv-libs-btn primary"
-              style={{ fontSize: 11, padding: "2px 8px", whiteSpace: "nowrap" }}
-              disabled={gradleBusy}
-              onClick={() => void downloadAllGradleDeps()}
-            >
-              {gradleBusy ? tr("libs.downloading", "下载中…") : tr("libs.missing_fill", "自动补齐")}
-            </button>
-          </div>
-        </div>
-      )}
 
       {dlOpen && (
         <div className="axv-libs-dl-overlay" onClick={() => setDlOpen(false)}>

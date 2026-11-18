@@ -103,6 +103,8 @@ export const SRC_EN: SrcDict = {
   "lib 库管理": "lib Library Management",
   "内置目录": "Built-in catalog",
   "lib 库下载": "lib Library Download",
+  "常用库": "Common Libraries",
+  "一键下载": "Download all",
   "libs.local": "Shared libraries",
   "共享库": "Shared libraries",
   "libs.maven_written": "{lib} maven 坐标已写入 build.gradle {coord}（不拷文件，防源码膨胀）",

@@ -48,7 +48,7 @@ const TITLES: Record<LeftView, { key: string; fallback: string }> = {
   code: { key: "rail.code", fallback: "XML 代码" }, // i18n-ignore
   res: { key: "rail.res", fallback: "项目管理" }, // i18n-ignore
   assets: { key: "rail.resources", fallback: "资源" }, // i18n-ignore
-  libs: { key: "rail.libs", fallback: "库管理" }, // i18n-ignore
+  libs: { key: "rail.libs", fallback: "lib 库管理" }, // i18n-ignore
   theme: { key: "rail.theme", fallback: "主题" }, // i18n-ignore
   settings: { key: "rail.settings", fallback: "设置" }, // i18n-ignore
   about: { key: "rail.about", fallback: "关于" }, // i18n-ignore

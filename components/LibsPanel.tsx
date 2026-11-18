@@ -745,15 +745,17 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     }
   }, [gradleDeps, gradleBusyKey, downloadGradleDep]);
 
-  /** M360：打开项目时自动检查依赖 + 一键补齐。nativeProjectRoot 变化 → 自动 scanGradleDeps。
+  /** M360：打开项目时自动检查依赖 + 一键补齐。
+   *  M372：native 项目或有 SAF 源（aiFileIo）都自动扫一次，不再需要手动按钮。
    *  不静默自动下载（省流量/可控），只扫出缺失，banner 上「自动补齐」一键下。 */
   const lastAutoScanRoot = useRef<string | null>(null);
+  const scanKey = nativeProjectRoot || (aiFileIo ? "io" : null);
   useEffect(() => {
-    if (!nativeProjectRoot) { lastAutoScanRoot.current = null; return; }
-    if (lastAutoScanRoot.current === nativeProjectRoot) return; // 同项目不重扫
-    lastAutoScanRoot.current = nativeProjectRoot;
+    if (!scanKey) { lastAutoScanRoot.current = null; return; }
+    if (lastAutoScanRoot.current === scanKey) return; // 同项目不重扫
+    lastAutoScanRoot.current = scanKey;
     void scanGradleDeps();
-  }, [nativeProjectRoot, scanGradleDeps]);
+  }, [scanKey, scanGradleDeps]);
 
   /** M360：未补齐的依赖（gradleDeps 里尚未 done 且不在本地库的） */
   const missingGradleDeps = useMemo(
@@ -832,6 +834,100 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
             })}
           </div>
         )}
+        {/* M372：build.gradle 解析出的引用库直接进列表（打开项目自动解析，无需按钮） */}
+        {tab === "project" && (
+          <>
+            {gradleMsg && (
+              <div className="axv-libs-empty" style={{ padding: "4px 8px", fontSize: 11 }}>{gradleMsg}</div>
+            )}
+            {gradleScanned && gradleDeps.length === 0 && !gradleMsg && gradleUnresolved.length === 0 && gradleFileTrees.length === 0 && (
+              <div className="axv-libs-empty" style={{ padding: "4px 8px", fontSize: 11 }}>
+                {tr("libs.gradle_none", "没解析到 maven 依赖（fileTree / project 除外）")}
+              </div>
+            )}
+            {gradleUnresolved.length > 0 && (
+              <div
+                className="axv-libs-empty"
+                style={{ padding: "4px 8px", fontSize: 11 }}
+                title={gradleUnresolved.map((u) => u.raw).join("\n")}
+              >
+                {tr("libs.gradle_unresolved", "{n} 条依赖的版本是变量且本文件未定义，已跳过（在 build.gradle 里给变量赋值后可重新解析）", {
+                  n: gradleUnresolved.length,
+                })}
+              </div>
+            )}
+            {gradleUnresolved.map((u) => (
+              <div key={u.coord} className="axv-libs-item" style={{ alignItems: "center", opacity: 0.6 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
+                    {u.coord.split(":")[1] || u.coord}
+                    <span style={{ marginLeft: 6, fontSize: 10 }}>{u.config}</span>
+                  </div>
+                  <div className="axv-libs-item-rel" style={{ fontSize: 10 }} title={u.raw}>
+                    {tr("libs.gradle_unresolved_vars", "未定义变量：{vars}", { vars: u.vars.join(", ") || "?" })}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {/* fileTree 本地库声明（dir + include），目录已并入项目库扫描 */}
+            {gradleScanned && gradleFileTrees.map((ft) => (
+              <div
+                key={"ft:" + ft.dir + ":" + ft.includes.join(",")}
+                className="axv-libs-item"
+                style={{ alignItems: "center", opacity: 0.75 }}
+                title={ft.raw}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
+                    {ft.dir}
+                    <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.6 }}>{ft.config || "fileTree"}</span>
+                  </div>
+                  <div className="axv-libs-item-rel" style={{ fontSize: 10 }}>
+                    include: {ft.includes.length > 0 ? ft.includes.join(", ") : "*"}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {gradleDeps.filter((d) => matchGradleDep(d, libQuery)).map((d) => {
+              const key = d.group + ":" + d.name + ":" + d.version;
+              const st = gradleBusyKey[key] || "";
+              const present = presentNames.has(gradleDepFname(d));
+              return (
+                <div key={key} className="axv-libs-item" style={{ alignItems: "center" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
+                      {(present || st === "done") && <span style={{ color: "#1a7f37", marginRight: 4 }}>✓</span>}
+                      {d.name}
+                      <span style={{ opacity: 0.55, marginLeft: 6, fontSize: 11 }}>{d.version}</span>
+                      <span style={{ opacity: 0.4, marginLeft: 6, fontSize: 10 }}>{d.config}</span>
+                    </div>
+                    <div className="axv-libs-item-rel" style={{ fontSize: 10, opacity: 0.6 }} title={key}>
+                      {d.group}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="axv-libs-btn"
+                    style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
+                    disabled={st === "downloading" || present || st === "done"}
+                    onClick={() => void downloadGradleDep(d)}
+                  >
+                    {st === "downloading"
+                      ? tr("libs.downloading", "下载中…")
+                      : present || st === "done"
+                        ? tr("libs.cat_present", "已下载")
+                        : tr("libs.cat_download", "下载")}
+                  </button>
+                  {st && st.startsWith("err:") && (
+                    <span style={{ fontSize: 10, color: "#c62828", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={st.slice(4)}>
+                      ✗ {st.slice(4)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
         {tab === "catalog" ? (
           <div>
             <div style={{ fontSize: 11, opacity: 0.6, margin: "4px 6px 8px", lineHeight: 1.5 }}>
@@ -888,7 +984,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
               </div>
             ))}
           </div>
-        ) : visibleList.length === 0 ? (
+        ) : visibleList.length === 0 && !(tab === "project" && (gradleDeps.length > 0 || gradleFileTrees.length > 0 || gradleUnresolved.length > 0)) ? (
           <div className="axv-libs-empty">
             {libQuery.trim()
               ? tr("libs.search_empty", "没匹配「{q}」的库", { q: libQuery.trim() })
@@ -1003,113 +1099,6 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           </div>
         </div>
       )}
-
-      {/* M345：从 build.gradle 自动解析并下载依赖 */}
-      <div className="axv-libs-gradle">
-        <div className="axv-libs-gradle-head">
-          <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>code</span>
-          <span style={{ flex: 1, fontSize: 12 }}>{tr("libs.gradle_title", "build.gradle 依赖")}</span>
-          <button
-            type="button"
-            className="axv-libs-btn"
-            style={{ fontSize: 11, padding: "2px 8px", whiteSpace: "nowrap" }}
-            disabled={gradleBusy}
-            onClick={() => void scanGradleDeps()}
-          >
-            {gradleBusy ? tr("libs.gradle_scanning", "解析中…") : tr("libs.gradle_scan", "解析 build.gradle")}
-          </button>
-          {gradleDeps.length > 0 && (
-            <button
-              type="button"
-              className="axv-libs-btn primary"
-              style={{ fontSize: 11, padding: "2px 8px", marginLeft: 6, whiteSpace: "nowrap" }}
-              onClick={() => void downloadAllGradleDeps()}
-            >
-              {tr("libs.gradle_download_all", "全部下载")}
-            </button>
-          )}
-        </div>
-        {gradleMsg && (
-          <div className="axv-libs-gradle-msg">{gradleMsg}</div>
-        )}
-        {/* M371：模块/编译标记/app 配置/构建插件等元信息已移到「项目属性」弹窗（ProjectPropsDialog） */}
-        {gradleScanned && gradleDeps.length === 0 && !gradleMsg && gradleUnresolved.length === 0 && (
-          <div className="axv-libs-gradle-msg">{tr("libs.gradle_none", "没解析到 maven 依赖（fileTree / project 除外）")}</div>
-        )}
-        {gradleUnresolved.length > 0 && (
-          <div className="axv-libs-gradle-msg" title={gradleUnresolved.map((u) => u.raw).join("\n")}>
-            {tr("libs.gradle_unresolved", "{n} 条依赖的版本是变量且本文件未定义，已跳过（在 build.gradle 里给变量赋值后可重新解析）", {
-              n: gradleUnresolved.length,
-            })}
-          </div>
-        )}
-        {gradleUnresolved.map((u) => (
-          <div key={u.coord} className="axv-libs-item" style={{ alignItems: "center", opacity: 0.6 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
-                {u.coord.split(":")[1] || u.coord}
-                <span style={{ marginLeft: 6, fontSize: 10 }}>{u.config}</span>
-              </div>
-              <div className="axv-libs-item-rel" style={{ fontSize: 10 }} title={u.raw}>
-                {tr("libs.gradle_unresolved_vars", "未定义变量：{vars}", { vars: u.vars.join(", ") || "?" })}
-              </div>
-            </div>
-          </div>
-        ))}
-        {/* M370：fileTree 本地库声明（dir + include），无坐标不能下，但目录已并入项目库列表 */}
-        {gradleScanned && gradleFileTrees.length > 0 && gradleFileTrees.map((ft) => (
-          <div
-            key={"ft:" + ft.dir + ":" + ft.includes.join(",")}
-            className="axv-libs-item"
-            style={{ alignItems: "center", opacity: 0.75 }}
-            title={ft.raw}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
-                {ft.dir}
-                <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.6 }}>{ft.config || "fileTree"}</span>
-              </div>
-              <div className="axv-libs-item-rel" style={{ fontSize: 10 }}>
-                include: {ft.includes.length > 0 ? ft.includes.join(", ") : "*"}
-              </div>
-            </div>
-          </div>
-        ))}
-        {gradleDeps.filter((d) => matchGradleDep(d, libQuery)).map((d) => {
-          const key = d.group + ":" + d.name + ":" + d.version;
-          const st = gradleBusyKey[key] || "";
-          const present = presentNames.has(gradleDepFname(d));
-          return (
-            <div key={key} className="axv-libs-item" style={{ alignItems: "center" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
-                  {(present || st === "done") && <span style={{ color: "#1a7f37", marginRight: 4 }}>✓</span>}
-                  {d.name}
-                  <span style={{ opacity: 0.55, marginLeft: 6, fontSize: 11 }}>{d.version}</span>
-                  <span style={{ opacity: 0.4, marginLeft: 6, fontSize: 10 }}>{d.config}</span>
-                </div>
-                <div className="axv-libs-item-rel" style={{ fontSize: 10, opacity: 0.6 }} title={key}>
-                  {d.group}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="axv-libs-btn"
-                style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
-                disabled={st === "downloading" || present || st === "done"}
-                onClick={() => void downloadGradleDep(d)}
-              >
-                {st === "downloading" ? tr("libs.downloading", "下载中…") : present || st === "done" ? tr("libs.cat_present", "已下载") : tr("libs.cat_download", "下载")}
-              </button>
-              {st && st.startsWith("err:") && (
-                <span style={{ fontSize: 10, color: "#c62828", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={st.slice(4)}>
-                  ✗ {st.slice(4)}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
 
       {dlOpen && (
         <div className="axv-libs-dl-overlay" onClick={() => setDlOpen(false)}>

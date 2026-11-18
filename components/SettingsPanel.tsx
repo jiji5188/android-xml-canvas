@@ -568,15 +568,22 @@ export function SettingsPanel(p: SettingsPanelProps) {
             </b>
             <span className="axv-plugin-id">{p.compilerInfo.id} v{p.compilerInfo.version}</span>
           </div>
-          <button
-            type="button"
-            className="axv-set-btn axv-set-btn-mini"
-            disabled={p.compilerBusy}
-            onClick={p.onCheckCompilerUpdate}
-          >
-            {p.compilerBusy ? tt("检查中…") : tt("检查更新")}
-          </button>
-          {p.compilerNote ? <div className="axv-set-hint">{p.compilerNote}</div> : null}
+          <div style={{ display: "flex", flexWrap: "nowrap", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <button
+              type="button"
+              className="axv-set-btn axv-set-btn-mini"
+              style={{ maxWidth: 100 }}
+              disabled={p.compilerBusy}
+              onClick={p.onCheckCompilerUpdate}
+            >
+              {p.compilerBusy ? tt("检查中…") : tt("检查更新")}
+            </button>
+            {p.compilerNote ? (
+              <div className="axv-set-hint" style={{ margin: 0, flex: 1, minWidth: 0 }}>
+                {p.compilerNote}
+              </div>
+            ) : null}
+          </div>
         </div>
         {/* M234：安装第三方插件（弹窗，不占面板空间） */}
         <button

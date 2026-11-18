@@ -476,6 +476,61 @@ export function methodsForType(type: string): string[] {
   return arr ? [...arr] : [];
 }
 
+/** M391：按「接收者类型」给的公开常量/字段表（`fn.VISIBLE` / `ll.VERTICAL` 之类）。
+ *  只收高频的几个；每个类几个到十几个，避免表爆炸。
+ *  这些是 static 常量，作为字段（var 类）进候选，kind 仍按 const。 */
+export const JAVA_TYPE_CONSTANTS: Record<string, string[]> = {
+  View: ["VISIBLE", "INVISIBLE", "GONE", "FOCUSABLE", "FOCUSABLES_TOUCH_MODE"],
+  LinearLayout: ["HORIZONTAL", "VERTICAL"],
+  ScrollView: ["FOCUSABLE", "GONE"],
+  Gravity: ["TOP", "BOTTOM", "LEFT", "RIGHT", "CENTER", "CENTER_VERTICAL", "CENTER_HORIZONTAL", "CENTER_IN_PARENT", "START", "END"],
+  LayoutParams: ["MATCH_PARENT", "WRAP_CONTENT"],
+  Integer: ["MAX_VALUE", "MIN_VALUE", "SIZE"],
+  Long: ["MAX_VALUE", "MIN_VALUE"],
+  Double: ["NaN", "POSITIVE_INFINITY", "NEGATIVE_INFINITY"],
+  Math: ["PI", "E"],
+  ViewF: ["VISIBLE", "INVISIBLE", "GONE"],
+};
+
+/** 某类型的公开常量（继承：TextView/EditText 也认 View 的 VISIBLE/GONE） */
+export function constantsForType(type: string): string[] {
+  const out = new Set<string>();
+  const direct = JAVA_TYPE_CONSTANTS[type];
+  if (direct) for (const c of direct) out.add(c);
+  // 常见继承链：View 的子类共享 VISIBLE/GONE/INVISIBLE
+  if (["TextView", "EditText", "Button", "ImageView", "ViewGroup", "LinearLayout", "ScrollView", "RecyclerView", "ListView"].includes(type)) {
+    for (const c of JAVA_TYPE_CONSTANTS.View ?? []) out.add(c);
+  }
+  return [...out];
+}
+
+/** 项目词库里某类型的成员方法（含继承/接口），返回 {name, signature, isDeprecated}。SDK 类不在词库 → 空 */
+export function resolveTypeMethodsFromLex(
+  lex: Lexicon | null | undefined,
+  type: string,
+): { name: string; signature?: string; isDeprecated: boolean }[] {
+  if (!lex || !type) return [];
+  const out: { name: string; signature?: string; isDeprecated: boolean }[] = [];
+  const seen = new Set<string>();
+  const walk = (c: string, depth: number): void => {
+    if (depth > 8 || seen.has(c)) return;
+    seen.add(c);
+    const ms = lex.methods.get(c);
+    if (ms) for (const m of ms) out.push({ name: m.name, signature: m.signature, isDeprecated: !!m.isDeprecated });
+    const cls = lex.classes.get(c);
+    if (cls) for (const p of [...cls.parents, ...cls.interfaces]) walk(p, depth + 1);
+  };
+  walk(type, 0);
+  // 去重（同名同签名）
+  const dedup = new Set<string>();
+  return out.filter((m) => {
+    const k = m.name + "|" + (m.signature ?? "");
+    if (dedup.has(k)) return false;
+    dedup.add(k);
+    return true;
+  });
+}
+
 /** 简单类名 → 该 import 的完整路径；不需 import（java.lang / 未知类）返回 null */
 export function importForType(name: string): string | null {
   return JAVA_IMPORTS[name] || null;
@@ -638,7 +693,36 @@ export function computeJavaSuggest(
   }
   const isAt = prefix.startsWith("@");
   const body = isAt ? prefix.slice(1) : prefix;
-  if (body.length < 2 && !isAt) return null;
+  // M391：能认出 receiver 类型时，允许空前缀（刚点完点号）直接列该类成员，不再要求 ≥2 字符
+  const memberMode = !isAt && !!receiverType && body.length < 2;
+  if (body.length < 2 && !isAt && !memberMode) return null;
+
+  // M391：成员列表模式 —— `fn.` 刚打完点号（body 为空）或打了 1 个字母，
+  //   直接按 receiver 类型列「公开方法 + 公开常量/字段」，不掺入全局/当前文件的泛用池，
+  //   避免一上来弹一堆无关项目方法。1 字符时按前缀过滤，空时全列（限 24）。
+  if (memberMode && receiverType) {
+    const items: { text: string; kind: SuggestKind; signature?: string }[] = [];
+    const p = body.toLowerCase();
+    const want = (t: string) => !p || t.toLowerCase().startsWith(p);
+    for (const m of methodsForType(receiverType)) if (want(m)) items.push({ text: m, kind: "method", signature: "" });
+    for (const c of constantsForType(receiverType)) if (want(c)) items.push({ text: c, kind: "const" });
+    // 项目词库里该类的方法（继承/接口）也并进来，排在 JDK 表后面
+    for (const m of resolveTypeMethodsFromLex(lex, receiverType)) {
+      if (want(m.name) && !items.some((x) => x.text === m.name))
+        items.push({ text: m.name, kind: "method", signature: (m.isDeprecated ? "@Deprecated " : "") + (m.signature ?? "") });
+    }
+    if (items.length === 0) return null;
+    const picked = items.slice(0, MAX_ITEMS);
+    return {
+      line: cursor.line,
+      col,
+      prefix,
+      kind: picked[0].kind,
+      items: picked.map((x) => x.text),
+      kinds: picked.map((x) => x.kind),
+      subs: picked.map((x) => (x.kind === "method" ? "(" + (x.signature ?? "") + ")" : undefined)),
+    };
+  }
 
   // M99：本文件已有的变量/常量/方法/类型/引用排在词表前面
   //        ——写 `user` 时最想看到的是这个文件里的 userName，而不是 JDK 的 UserManager

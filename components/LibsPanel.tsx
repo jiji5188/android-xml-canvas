@@ -502,6 +502,19 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     [canApply, nativeProjectRoot, primaryLibBase, native, onNote, tr, refresh],
   );
 
+  /** M375：把已下载到共享库的文件拷到项目 fileTree 目录（「存 libs」按钮）。
+   *  不看 tab 当前缓存，直接用 localDir + 文件名构造源路径。 */
+  const saveSharedToLibs = useCallback(
+    (fname: string) => {
+      if (!localDir) {
+        onNote?.(tr("libs.apply_need_project", "请先打开一个项目，才能应用库"));
+        return;
+      }
+      applyToLocalProject({ name: fname, rel: `${localDir}/${fname}` });
+    },
+    [localDir, applyToLocalProject, onNote, tr],
+  );
+
   /** M359：应用到项目 = 写 maven 坐标（不拷文件，防源码膨胀）。
    *  把 group:artifact:version 写进 app/build.gradle（implementation）+ 仓库 url 写进 settings.gradle / 根 build.gradle（repositories）。
    *  设备端打包时按 maven 坐标去共享库 /AndroidUIIDE/libs 找实体文件（M361 接）。 */
@@ -941,19 +954,26 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                       {d.group}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="axv-libs-btn"
-                    style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
-                    disabled={st === "downloading" || present || st === "done"}
-                    onClick={() => void downloadGradleDep(d)}
-                  >
-                    {st === "downloading"
-                      ? tr("libs.downloading", "下载中…")
-                      : present || st === "done"
-                        ? tr("libs.cat_present", "已下载")
-                        : tr("libs.cat_download", "下载")}
-                  </button>
+                  {present || st === "done" ? (
+                    <button
+                      type="button"
+                      className="axv-libs-btn"
+                      style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
+                      onClick={() => saveSharedToLibs(gradleDepFname(d))}
+                    >
+                      {tr("libs.save_libs", "存 libs")}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="axv-libs-btn"
+                      style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
+                      disabled={st === "downloading"}
+                      onClick={() => void downloadGradleDep(d)}
+                    >
+                      {st === "downloading" ? tr("libs.downloading", "下载中…") : tr("libs.cat_download", "下载")}
+                    </button>
+                  )}
                   {st && st.startsWith("err:") && (
                     <span style={{ fontSize: 10, color: "#c62828", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={st.slice(4)}>
                       ✗ {st.slice(4)}
@@ -1000,14 +1020,24 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                         {st === "downloading" ? tr("libs.downloading", "下载中…") : present ? tr("libs.cat_present", "已下载") : tr("libs.cat_download", "下载")}
                       </button>
                       {present && (
-                        <button
-                          type="button"
-                          className="axv-libs-btn"
-                          style={{ whiteSpace: "nowrap", fontSize: 10, padding: "2px 8px" }}
-                          onClick={() => void applyMaven(mavenCoord(e.group, e.artifact, e.version), e.kind === "material" || e.kind === "androidx" ? "https://dl.google.com/dl/android/maven2" : "https://repo.maven.apache.org/maven2", e.artifact)}
-                        >
-                          {tr("libs.apply_maven", "应用到项目（maven）")}
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            className="axv-libs-btn"
+                            style={{ whiteSpace: "nowrap", fontSize: 10, padding: "2px 8px", marginRight: 6 }}
+                            onClick={() => saveSharedToLibs(e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar"))}
+                          >
+                            {tr("libs.save_libs", "存 libs")}
+                          </button>
+                          <button
+                            type="button"
+                            className="axv-libs-btn"
+                            style={{ whiteSpace: "nowrap", fontSize: 10, padding: "2px 8px" }}
+                            onClick={() => void applyMaven(mavenCoord(e.group, e.artifact, e.version), e.kind === "material" || e.kind === "androidx" ? "https://dl.google.com/dl/android/maven2" : "https://repo.maven.apache.org/maven2", e.artifact)}
+                          >
+                            {tr("libs.apply_maven", "应用到项目（maven）")}
+                          </button>
+                        </>
                       )}
                       {st && st.startsWith("err:") && (
                         <span style={{ fontSize: 10, color: "#c62828", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={st.slice(4)}>
@@ -1074,15 +1104,10 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                         type="button"
                         className="axv-libs-btn"
                         style={{ fontSize: 10, padding: "2px 8px", whiteSpace: "nowrap" }}
-                        disabled={ab === "applying" || ab === "maven"}
-                        onClick={() => {
-                          // M359：有 maven 坐标 → 写配置不拷文件；无坐标（纯本地 jar）→ 拷贝兑底
-                          const c = findCoordForLib(f.name);
-                          if (c) void applyMaven(c.coord, c.repoUrl, f.name);
-                          else applyToLocalProject(f);
-                        }}
+                        disabled={ab === "applying"}
+                        onClick={() => applyToLocalProject(f)}
                       >
-                        {ab === "applying" || ab === "maven" ? tr("libs.applying", "应用中…") : tr("libs.apply", "应用到项目")}
+                        {ab === "applying" ? tr("libs.applying", "应用中…") : tr("libs.save_libs", "存 libs")}
                       </button>
                       {native?.deleteEntry && (
                         <button

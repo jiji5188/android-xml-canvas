@@ -695,6 +695,31 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     [gradleDeps],
   );
 
+  /** M400：共享库行「应用」——把 maven 坐标写进项目 build.gradle（implementation）+ 仓库 url 写进 settings.gradle（maven 下载地址）。
+   *  与「存 libs」（拷物理文件到 app/src/main/libs）不同：本项不拷文件，走 maven 声明。
+   *  没 maven 坐标（不在内置目录/项目依赖）→ 提示改用「存 libs」。 */
+  const applyLocalMaven = useCallback(
+    async (name: string) => {
+      if (!nativeProjectRoot) {
+        onNote?.(tr("libs.apply_need_project", "请先打开一个项目，才能应用库"));
+        return;
+      }
+      const c = findCoordForLib(name);
+      if (!c) {
+        onNote?.(
+          tr(
+            "libs.apply_no_maven",
+            "{lib} 没有 maven 坐标（不在内置目录/项目依赖里），请改用「存 libs」把文件拷进项目",
+            { lib: name },
+          ),
+        );
+        return;
+      }
+      await applyMaven(c.coord, c.repoUrl, name);
+    },
+    [nativeProjectRoot, findCoordForLib, applyMaven, onNote, tr],
+  );
+
   /** M345：读项目根 build.gradle / build.gradle.kts + app 子目录，解析依赖
    *  M370：同时解析 fileTree(dir/include) —— 本地库声明，指向真实目录
    *  M371：模块/编译标记/app 配置/构建插件等元信息改到「项目属性」弹窗展示（ProjectPropsDialog），
@@ -1127,6 +1152,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
             const menuItems: LibsMenuItem[] =
               tab === "local"
                 ? [
+                    { key: "apply", label: tr("libs.apply_dep", "应用"), disabled: ab === "maven" || ab === "applying", onClick: () => void applyLocalMaven(f.name) },
                     ...(applied
                       ? [
                           { key: "remove", label: tr("libs.remove", "移除"), danger: true, onClick: () => void removeFromProject(f.name) },

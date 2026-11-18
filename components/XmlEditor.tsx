@@ -257,6 +257,7 @@ import { usePlugins } from "./use-plugins";
 import { useExportActions } from "./use-export-actions";
 import { useCodeNav } from "./use-code-nav";
 import { UsagesPanel } from "./UsagesPanel";
+import { useThemeApp } from "./use-theme-app";
 import { useSaveExport } from "./use-save-export";
 import {
   subscribeRuntimeLog,
@@ -1425,72 +1426,11 @@ const allDrawableNames = useMemo(() => {
   /** M36：当前打开项目的可写根（有则保存一律落进 <项目>/app/src/main/res/） */
   const projRoot = useMemo(() => projectSaveRoot(activeProject), [activeProject]);
 
-  /** M316：主题选择页——把选中预设写进 themes.xml（没有则新建），写完刷新资源索引 */
-  const [themeApplying, setThemeApplying] = useState(false);
-  const applyAndroidTheme = useCallback(
-    async (preset: AndroidThemePreset) => {
-      if (!projRoot) {
-        setExportNote(tr("没有打开的项目，先新建/打开一个项目", "Open a project first"));
-        window.setTimeout(() => setExportNote(" "), 3200);
-        return;
-      }
-      setThemeApplying(true);
-      const rel = "values/themes.xml";
-      try {
-        const cur = await readProjectFile(projRoot, rel);
-        const base = cur ?? "";
-        const next = writeThemeIntoValues(base, preset);
-        const r = await saveResFiles(projRoot, [{ path: rel, text: next }]);
-        setProjectRev((n) => n + 1);
-        // M316：写进 themes.xml 后失效 res 全量索引缓存 → 重新收集 themeAttrs → 预览框调色板即时更新
-        bumpResCache();
-        setExportNote(
-          r.ok
-            ? tr("已应用主题 {name} → themes.xml", "Applied theme {name} to themes.xml", { name: preset.name })
-            : tr("主题写入失败（{n} 条）", "Theme write failed ({n})", { n: String(r.failed.length) }),
-        );
-        window.setTimeout(() => setExportNote(" "), 3200);
-      } catch {
-        setExportNote(tr("主题写入出错", "Failed to write theme"));
-        window.setTimeout(() => setExportNote(" "), 3200);
-      } finally {
-        setThemeApplying(false);
-      }
-    },
-    [projRoot, setProjectRev, setExportNote, tr, bumpResCache],
-  );
-
-  /** M174：「设为应用图标」面板初始值：
-   *  1) localStorage 里上次的参数（生成过就写进去）
-   *  2) 没有则从项目 res 读回（native 壳里读 mipmap-anydpi-v26 + drawable 背景色） */
-  const appIconInit = useMemo(() => {
-    try {
-      const saved = lsGetJson<{ bgColor?: string; contentDp?: number }>(LS_KEY_APP_ICON);
-      if (saved?.bgColor) {
-        return { bgColor: saved.bgColor, contentDp: saved.contentDp ?? 72 };
-      }
-      if (projRoot?.kind === "native") {
-        const b = nativeBridge();
-        if (b?.readText) {
-          const collect: Record<string, string> = {};
-          for (const rel of [
-            "mipmap-anydpi-v26/ic_launcher.xml",
-            "mipmap-anydpi-v26/ic_launcher_round.xml",
-            "drawable/ic_launcher_background.xml",
-            "drawable/ic_launcher_foreground.xml",
-          ]) {
-            try {
-              const t = b.readText(resAbs(projRoot.base, rel));
-              if (t) collect[rel] = t;
-            } catch { /* 读不到就跳过 */ }
-          }
-          const cfg = parseAppIconConfig(collect);
-          if (cfg) return cfg;
-        }
-      }
-    } catch { /* 回落到默认值 */ }
-    return null;
-  }, [projRoot]);
+  /** M366 step22：主题应用 + 应用图标初始值域（themeApplying/applyAndroidTheme/appIconInit）
+   *  → components/use-theme-app.ts */
+  const { themeApplying, applyAndroidTheme, appIconInit } = useThemeApp(projRoot, () => ({
+    setExportNote, tr, setProjectRev, bumpResCache,
+  }));
 
   /** 把当前内容整包写进当前项目的 res 目录（layout + 依赖 drawable/values） */
   /** M312：保存域（saveIntoProject / saveBack / saveAsTo / saveRawFile / doSave / M201 外部改动拦截）→ components/use-save-domain.ts */

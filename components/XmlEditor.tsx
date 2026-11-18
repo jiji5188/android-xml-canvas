@@ -254,6 +254,7 @@ import { useLints } from "./use-lints";
 import { useCanvasOps } from "./use-canvas-ops";
 import { useCanvasRender } from "./use-canvas-render";
 import { useInspector } from "./use-inspector";
+import { useFormatFix } from "./use-format-fix";
 import { useSaveExport } from "./use-save-export";
 import {
   subscribeRuntimeLog,
@@ -1198,48 +1199,10 @@ const allDrawableNames = useMemo(() => {
     setExportNote,
   }));
 
-  /** 一键格式化：重排缩进，保留注释，可撤销 */
-  const doFormat = () => {
-    flushXml();
-    const cur = currentXml();
-    let next: string;
-    if (isJavaLikePath(openRel || "")) {
-      next = formatJava(cur, { indent: editorTheme.indent || 4 });
-    } else {
-      next = formatXml(cur, 2);
-    }
-    if (next !== cur) setXmlAndTrack(next);
-  };
-
-  /** M179：一键修复：把 lints 里所有能修的（资源引用拼错/方法名拼错）就地替换。
-   *  - 同一行可能有多处：逐条改，每改一次就把结果写回 lines
-   *  - 用 applyFixToLine 做「整词」替换：@drawable/ic_hom 不能把 @drawable/ic_home 改坏
-   *  - 修完重新跑检查自然收敛（lintSrc 会跟着 xml 重新 debounce） */
-  const doFixAll = () => {
-    flushXml();
-    const cur = currentXml();
-    const lines = cur.split("\n");
-    const done = new Set<string>();
-    let fixed = 0;
-    for (const iss of lints) {
-      const fx = iss.fix;
-      if (!fx) continue;
-      const key = `${iss.line}|${fx.from}|${fx.to}`;
-      if (done.has(key)) continue;
-      done.add(key);
-      const idx = Math.max(0, Math.min(iss.line - 1, lines.length - 1));
-      const L = lines[idx];
-      if (L === undefined) continue;
-      const r = applyFixToLine(L, fx.from, fx.to);
-      if (!r.count) continue;
-      lines[idx] = r.text;
-      fixed += r.count;
-    }
-    if (!fixed) return;
-    setXmlAndTrack(lines.join("\n"));
-    setExportNote(tt("已修复 {n} 处（可撤销）", { n: fixed }));
-    window.setTimeout(() => setExportNote(""), 2400);
-  };
+  /** M366 step16：一键格式化 / 一键修复域（doFormat/doFixAll）→ components/use-format-fix.ts */
+  const { doFormat, doFixAll } = useFormatFix(() => ({
+    flushXml, currentXml, openRel, editorTheme, setXmlAndTrack, lints, setExportNote,
+  }));
 
   /* ===== ConstraintLayout 约束编辑（一期：表单 + 自动推断） ===== */
   const [autoNotes, setAutoNotes] = useState<string[]>([]);

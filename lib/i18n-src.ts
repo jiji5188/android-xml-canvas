@@ -2015,6 +2015,7 @@ export const SRC_EN: SrcDict = {
   "已撤销图标修复": "Icon fix reverted",
   "只改 application 上的 android:icon / android:roundIcon 这两行，注释和顺序保持原样。": "Only android:icon / android:roundIcon on <application> are changed; comments and order stay untouched.",
   "图标": "Icon",
+  "圆形图标": "Round icon",
   "主题": "Theme",
   "未设置": "Not set",
   "没有 <application> 节点，上面这些字段不可编辑。": "No <application> node — the fields above cannot be edited.",

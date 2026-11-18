@@ -78,6 +78,15 @@ describe("M43 XmlCodeView 接线", () => {
     expect(html).toContain("android.permission.INTERNET");
   });
 
+  it("M385：Application 里能编辑 android:roundIcon", () => {
+    const withRound = MANIFEST.replace(
+      '<application android:allowBackup="true" android:icon="@mipmap/ic_launcher">',
+      '<application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round">',
+    );
+    const html = renderToStaticMarkup(<XmlCodeView {...props({ value: withRound })} />);
+    expect(html).toContain('value="@mipmap/ic_launcher_round"');
+  });
+
   it("view=values 还是走 ValuesEditor（互不串）", () => {
     const p = props({ view: "values", value: '<resources><string name="a">x</string></resources>', fileKey: "res/values/strings.xml" });
     const tree = XmlCodeView(p) as unknown as El;

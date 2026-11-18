@@ -346,6 +346,17 @@ export function ManifestEditor({ xml, onChange, onNote, className }: ManifestEdi
                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
               }}
             />
+            <span className="axv-mf-label">{tt("圆形图标")}</span>
+            <input
+              className="axv-mf-input mono"
+              defaultValue={read(doc.application, "android:roundIcon")}
+              placeholder="@mipmap/ic_launcher_round"
+              spellCheck={false}
+              onBlur={(e) => commitAppAttr("android:roundIcon", e.target.value, e.target)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              }}
+            />
             {/* M174 B：图标声明不规范时的提示 + 一键修复（外科手术式改，保留注释/顺序） */}
             {iconIssues.length ? (
               <div className="axv-mf-fix">

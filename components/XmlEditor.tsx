@@ -185,9 +185,6 @@ import { CanvasStage } from "./CanvasStage";
 import { APP_VERSION } from "@/lib/version";
 import { AboutPanel } from "@/components/AboutPanel";
 import { SettingsPanel } from "@/components/SettingsPanel";
-import { loadPluginEnabled, togglePluginEnabled, type PluginEnabledMap } from "@/lib/plugin/store";
-import { installPlugin, loadInstalledPlugins, type InstalledPlugin } from "@/lib/plugin/installer";
-import { BUILTIN_COMPILER } from "@/lib/plugin/compiler";
 import { useEditorTheme } from "./use-editor-theme";
 import { useCanvasZoom } from "./use-canvas-zoom";
 import { useCanvasAssets } from "./use-canvas-assets";
@@ -256,6 +253,7 @@ import { useCanvasRender } from "./use-canvas-render";
 import { useInspector } from "./use-inspector";
 import { useFormatFix } from "./use-format-fix";
 import { useConstraint } from "./use-constraint";
+import { usePlugins } from "./use-plugins";
 import { useSaveExport } from "./use-save-export";
 import {
   subscribeRuntimeLog,
@@ -543,69 +541,12 @@ export function XmlEditor() {
 
   const [showIssues, setShowIssues] = useState(true);
 
-  // M233：内置编辑器插件的启用状态（drawable / icon）。关掉后资源树点对应类型回退代码编辑。
-  const [pluginEnabled, setPluginEnabled] = useState<PluginEnabledMap>(loadPluginEnabled);
-  const onTogglePlugin = (id: string, on: boolean) =>
-    setPluginEnabled((cur) => togglePluginEnabled(id, on, cur));
-
-  // M234：第三方插件安装
-  const [installedPlugins, setInstalledPlugins] = useState<InstalledPlugin[]>([]);
-  const [installBusy, setInstallBusy] = useState(false);
-  const [installNote, setInstallNote] = useState("");
-  // 启动时把 IndexedDB 里已装的插件重新加载 + 注册
-  useEffect(() => {
-    let alive = true;
-    loadInstalledPlugins().then((list) => {
-      if (alive) setInstalledPlugins(list);
-    });
-    
-
-  return () => {
-      alive = false;
-    };
-  }, []);
-
-  // M235：编译器插件（内置）
-  const [compilerInfo, setCompilerInfo] = useState({ id: BUILTIN_COMPILER.id, name: BUILTIN_COMPILER.name, language: BUILTIN_COMPILER.language, version: BUILTIN_COMPILER.version, source: BUILTIN_COMPILER.source });
-  const [compilerBusy, setCompilerBusy] = useState(false);
-  const [compilerNote, setCompilerNote] = useState("");
-  const onCheckCompilerUpdate = () => {
-    setCompilerBusy(true);
-    setCompilerNote("");
-    import("@/lib/plugin/compiler").then(({ fetchCompilerInfo }) => {
-      fetchCompilerInfo()
-        .then((info) => {
-          if (info) {
-            setCompilerInfo({ ...info, source: info.version !== "3.33.0" ? "remote" : "builtin" });
-            setCompilerNote(
-              info.version === "3.33.0"
-                ? tt("已是最新版本 v{v}", { v: info.version })
-                : tt("发现新版本 v{v}（APK 端下载后重启生效）", { v: info.version })
-            );
-          } else {
-            setCompilerNote(tt("拉取 manifest 失败，检查网络"));
-          }
-        })
-        .catch(() => setCompilerNote(tt("拉取 manifest 失败")))
-        .finally(() => setCompilerBusy(false));
-    }).catch(() => setCompilerBusy(false));
-  };
-  const onInstallPlugin = (manifestUrl: string): Promise<void> => {
-    setInstallBusy(true);
-    setInstallNote("");
-    return installPlugin(manifestUrl)
-      .then((p) => {
-        setInstalledPlugins((cur) => (cur.some((x) => x.id === p.id) ? cur.map((x) => (x.id === p.id ? p : x)) : [...cur, p]));
-        setInstallNote(tt("已安装：{name}", { name: p.name }));
-        setPluginEnabled((cur) => ({ ...cur, [p.id]: true }));
-      })
-      .catch((e: unknown) => {
-        const msg = String((e as Error)?.message || e);
-        setInstallNote(msg);
-        throw new Error(msg); // 让弹窗也能 catch
-      })
-      .finally(() => setInstallBusy(false));
-  };
+  /** M366 step18：插件域（内置开关/第三方安装/编译器更新）→ components/use-plugins.ts */
+  const {
+    pluginEnabled, setPluginEnabled, onTogglePlugin,
+    installedPlugins, setInstalledPlugins, installBusy, installNote,
+    compilerInfo, compilerBusy, compilerNote, onCheckCompilerUpdate, onInstallPlugin,
+  } = usePlugins(tt);
 
   /* ===== M100：安卓返回键 =====
    * 注册顺序 = 层级从下到上：先左栅面板，再子页面，最后弹窗。

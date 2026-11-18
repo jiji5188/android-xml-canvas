@@ -29,9 +29,12 @@ describe("M233 设置面板插件分组", () => {
   });
 
   it("XmlEditor 持有插件状态并传给设置面板 + 编辑器挂载", () => {
+    // M366 step18：插件 state/逻辑已下沉 → components/use-plugins.ts
+    const h = rd("components/use-plugins.ts");
+    expect(h).toContain("loadPluginEnabled");
+    expect(h).toContain("togglePluginEnabled");
     const s = rd("components/XmlEditor.tsx");
-    expect(s).toContain("loadPluginEnabled");
-    expect(s).toContain("togglePluginEnabled");
+    expect(s).toContain("usePlugins");
     expect(s).toContain("pluginsEnabled={pluginEnabled}");
     expect(s).toContain("onTogglePlugin={onTogglePlugin}");
     expect(s).toContain("enabled={pluginEnabled}");

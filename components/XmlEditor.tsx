@@ -254,6 +254,7 @@ import { useInspector } from "./use-inspector";
 import { useFormatFix } from "./use-format-fix";
 import { useConstraint } from "./use-constraint";
 import { usePlugins } from "./use-plugins";
+import { useExportActions } from "./use-export-actions";
 import { useSaveExport } from "./use-save-export";
 import {
   subscribeRuntimeLog,
@@ -1550,76 +1551,13 @@ const allDrawableNames = useMemo(() => {
     };
   }, [fileTabMenu, closeFileTabMenu]);
 
-  const confirmSaveAs = async () => {
-    const raw = saveAsName.trim() || "activity_main.xml";
-    const name = /\.xml$/i.test(raw) ? raw : `${raw}.xml`;
-    setSaveAsOpen(false);
-    await saveAsTo(name);
-  };
-
-  const buildReport = (mode: ExportMode = exportMode): ExportReport => {
-    // M13：报告基于「真正要导出的内容」算——兼容模式下 CL 约束/库属性都已消失，
-    // 拿原始 xml 算会把已不存在的项报成错误
-    const body = exportLayoutXml(xml, { mode });
-    const check = exportChecks(body);
-    const lint = lintXml(body);
-    if (mode === "compat") {
-      const compat = toCompatXml(fixNamespacePrefixes(xml));
-      setCompatNotes(compat.notes);
-    }
-    return {
-      errors: lint.filter((i) => i.level === "error"),
-      notes: check.notes,
-    };
-  };
-
-  /** M13：切换导出模式（面板里点选）——立即重算报告，用户能看到模式带来的差异 */
-  const applyExportMode = (m: ExportMode) => {
-    setExportMode(m);
-    try {
-      window.localStorage.setItem("axv.exportMode", m);
-    } catch {
-      /* ignore */
-    }
-    setExportReport(buildReport(m));
-  };
-
-  const saveProject = () => {
-    flushXml(); // M57：先把打字中的最新文本落状态，保存读到的才是当前内容
-    if (codeOnly) {
-      flashNote(tt("当前文件不是布局，不能走「导出检查」；直接「保存」写回原文件即可"), 4600);
-      return;
-    }
-    setExportAction("download");
-    setExportReport(buildReport());
-    setExportOpen(true);
-  };
-
-  /** M3：复制生成的 XML 到剪贴板（与下载同一份内容） */
-  const doCopy = async () => {
-    const body = exportLayoutXml(xml, { mode: exportMode });
-    // 原生壳里先走 ClipboardManager（WebView 的 navigator.clipboard 不可靠）
-    if (copyTextNative(body)) {
-      setExportNote(tt("已复制到剪贴板"));
-      window.setTimeout(() => setExportNote(""), 2600);
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(body);
-      setExportNote(tt("已复制到剪贴板"));
-    } catch {
-      // 剪贴板 API 不可用（非 https / 旧浏览器）时退化成保存
-      doDownload();
-      setExportNote(tt("剪贴板不可用，已改为保存文件"));
-    }
-    window.setTimeout(() => setExportNote(""), 2600);
-  };
-
-  const copyExportedXml = () => {
-    setExportAction("copy");
-    setExportReport(buildReport());
-    setExportOpen(true);
-  };
+  /** M366 step19：导出/保存动作域（confirmSaveAs/buildReport/applyExportMode/saveProject/doCopy/copyExportedXml）
+   *  → components/use-export-actions.ts */
+  const { confirmSaveAs, buildReport, applyExportMode, saveProject, doCopy, copyExportedXml } =
+    useExportActions(() => ({
+      saveAsName, setSaveAsOpen, saveAsTo, exportMode, setExportMode, xml, setCompatNotes, flashNote, tt,
+      codeOnly, setExportAction, setExportReport, setExportOpen, setExportNote, copyTextNative, doDownload, flushXml,
+    }));
 
   /** M27：保存基线（用于状态条「未保存」提示） */
   const xmlRef = useRef(xml);

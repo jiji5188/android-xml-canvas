@@ -46,3 +46,50 @@ export function matchGradleDep(d: { name: string; group: string }, query: string
   const hay = `${d.name}\n${d.group}`.toLowerCase();
   return q.split(/\s+/).every((w) => hay.includes(w));
 }
+
+/** fileTree include 过滤：*.jar / *.aar 后缀匹配；空/通配全过 */
+export function matchFileTreeInclude(name: string, includes: string[]): boolean {
+  if (!includes.length) return true;
+  const lower = name.toLowerCase();
+  return includes.some((inc) => {
+    const p = (inc || "").trim().replace(/^\*\*\//, "").toLowerCase();
+    if (!p || p === "*" || p === "*.*") return true;
+    if (p.startsWith("*.")) return lower.endsWith(p.slice(1));
+    return lower === p || lower.endsWith("/" + p);
+  });
+}
+
+/** fileTree 目录规范化（去 ./ 前缀、尾部斜杠、反斜杠转正斜杠） */
+export function normFtDir(dir: string): string {
+  return (dir || "")
+    .trim()
+    .replace(/^\.\//, "")
+    .replace(/^\/+/, "")
+    .replace(/[\\/]+$/, "")
+    .replace(/\\/g, "/");
+}
+
+/** fileTree 目录 → 项目根相对路径（libs → app/libs；../libs → libs）
+ *  gradleRel 是 build.gradle 的项目相对路径（app/build.gradle → 基准目录 app/）。
+ *  绝对路径 / 无法解析的写法返回空串（不猜）。 */
+export function ftDirToProjectRel(dir: string, gradleRel: string): string {
+  const raw = (dir || "").trim().replace(/\\/g, "/");
+  // 绝对路径（/sdcard/libs、C:/libs）不猜——gradle 里这种写法本来就不可移植
+  if (!raw || raw.startsWith("/") || /^[a-zA-Z]:/.test(raw)) return "";
+  const d = normFtDir(raw);
+  if (!d) return "";
+  const gRel = (gradleRel || "build.gradle").replace(/\\/g, "/");
+  const baseParts = gRel.split("/").slice(0, -1).filter(Boolean);
+  const parts = [...baseParts];
+  for (const seg of d.split("/")) {
+    if (!seg || seg === ".") continue;
+    if (seg === "..") {
+      if (!parts.length) return ""; // 跑出项目根了，不猜
+      parts.pop();
+      continue;
+    }
+    parts.push(seg);
+  }
+  return parts.join("/");
+}
+

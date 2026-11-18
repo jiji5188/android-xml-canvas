@@ -121,6 +121,9 @@ export async function collectProjectRes(
   docRel: string | null,
   input: RenderFile[],
   budget = 160,
+  /** M380：额外参与“引用扫描”的文本（如 AndroidManifest.xml）
+   *  —— manifest 里的 @mipmap/app、@drawable/... 也是资源引用，不扫就会 aapt2 link 报 not found。 */
+  extraTexts: string[] = [],
 ): Promise<CollectResult> {
   const files = input.map((f) => ({ ...f }));
   if (!io) return { files, missing: [], added: 0 };
@@ -265,7 +268,10 @@ export async function collectProjectRes(
     return null;
   };
 
-  let queue = files.flatMap((f) => refsIn(f.text));
+  let queue = [
+    ...files.flatMap((f) => refsIn(f.text)),
+    ...extraTexts.flatMap((t) => refsIn(t || "")),
+  ];
   const seenRef = new Set<string>();
 
   while (queue.length > 0 && added < budget) {

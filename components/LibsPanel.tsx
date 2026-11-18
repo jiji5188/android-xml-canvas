@@ -25,7 +25,7 @@ import {
   type GradleFileTree,
 } from "@/lib/xml/gradle-deps";
 import { systemDownload } from "@/lib/xml/system-download";
-import { formatBytes, matchLibQuery, matchGradleDep, sortLibFiles } from "@/lib/xml/libs-utils";
+import { formatBytes, matchLibQuery, matchGradleDep, sortLibFiles, matchFileTreeInclude, normFtDir } from "@/lib/xml/libs-utils";
 
 interface LibsPanelProps {
   /** 当前激活项目的 SAF 源（可 list/read）；没有则项目库列不出来 */
@@ -51,27 +51,7 @@ function isJarAar(name: string) {
   return /\.(jar|aar)$/i.test(name);
 }
 
-/** fileTree include 过滤：*.jar / *.aar 后缀匹配；空/通配全过 */
-function matchFileTreeInclude(name: string, includes: string[]): boolean {
-  if (!includes.length) return true;
-  const lower = name.toLowerCase();
-  return includes.some((inc) => {
-    const p = (inc || "").trim().replace(/^\*\*\//, "").toLowerCase();
-    if (!p || p === "*" || p === "*.*") return true;
-    if (p.startsWith("*.")) return lower.endsWith(p.slice(1));
-    return lower === p || lower.endsWith("/" + p);
-  });
-}
-
-/** fileTree 目录规范化（去 ./ 前缀、尾部斜杠、反斜杠转正斜杠） */
-function normFtDir(dir: string): string {
-  return (dir || "")
-    .trim()
-    .replace(/^\.\//, "")
-    .replace(/^\/+/, "")
-    .replace(/[\\/]+$/, "")
-    .replace(/\\/g, "/");
-}
+/** fileTree include 过滤 / 目录规范化统一在 libs-utils（M380：打包侧 collectProjectLibs 共用同一套规则） */
 
 /** 项目库候选目录：标准 app/src/main/libs + 每个 fileTree 的 dir（带各自的 include 过滤） */
 interface ProjectLibCandidate {

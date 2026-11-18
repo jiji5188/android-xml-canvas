@@ -1,6 +1,8 @@
 // lib/xml/project-libs.ts — M266：把项目里的依赖库（libs/*.jar、*.aar）读成 base64，
 // 打包时传给设备端 ECJ/D8 当 classpath，解决 androidx / jxl 等第三方引用。
-// M358：编译扫描 0 容忍——只认标准位置 app/src/main/libs（不再全树 /libs/ 兜底，不认 /app/libs）。
+// M358：编译扫描 0 容忍——以前全树 /libs/ 兜底会误扫。
+// M380：现在只认两个来源：标准位置 app/src/main/libs + build.gradle 里 fileTree(dir:) 显式声明的目录
+// （用户库放在 ../libs 之类自定义目录时，以前只扫标准位置 → 明明声明了却找不到）。
 // 共享库 /AndroidUIIDE/libs（跨项目复用）由 M361 单独收集进 classpath，不在本函数里。
 //
 // 规则：
@@ -11,6 +13,8 @@
 import type { AiFileIo } from "./ai-tools";
 import { hasAsyncIo, listDirQueued } from "./native-async";
 import { nativeBridge } from "./native-save";
+import { parseFileTrees } from "./gradle-deps";
+import { ftDirToProjectRel, matchFileTreeInclude } from "./libs-utils";
 
 export interface ProjectLib {
   /** 相对项目根，如 app/src/main/libs/jxl.jar */
@@ -63,6 +67,10 @@ function nativeReadBase64(abs: string): string | null {
 export async function collectProjectLibs(
   io: AiFileIo | null | undefined,
   nativeRoot?: string | null,
+  /** M380：build.gradle 原文 —— 里面 fileTree(dir:..) 声明的目录也要扫 */
+  gradleText?: string | null,
+  /** build.gradle 的项目相对路径（决定 fileTree dir 的基准目录：app/build.gradle → app/） */
+  gradleRel?: string | null,
 ): Promise<CollectLibsResult> {
   const libs: ProjectLib[] = [];
   const skipped: string[] = [];
@@ -76,41 +84,64 @@ export async function collectProjectLibs(
     libs.push({ rel, base64: b64 });
   };
 
-  // M358：0 容忍——只直接列 app/src/main/libs，不再全树递归、不认 /app/libs 与任意 /libs/
-  // 1) io 通道（SAF）：直接列标准目录
+  // M380：候选目录 = 标准位置 app/src/main/libs + 每个 fileTree 声明目录（各自 include 过滤）
+  //  背景：用户的库不在 app/src/main/libs，而在 build.gradle 的 fileTree(dir: '../libs') 里，
+  //  只扫标准目录会让 libs 明明声明了却“不存在”（aapt2/ECJ 都找不到）。
+  const candidates: { rel: string; includes: string[] }[] = [{ rel: LIBS_BASE, includes: [] }];
+  const seenDir = new Set<string>([LIBS_BASE]);
+  if (gradleText) {
+    for (const ft of parseFileTrees(gradleText)) {
+      const rel = ftDirToProjectRel(ft.dir, gradleRel || "build.gradle");
+      if (!rel || seenDir.has(rel)) continue;
+      seenDir.add(rel);
+      candidates.push({ rel, includes: ft.includes });
+    }
+  }
+  /** 目录里的文件名是否算库：fileTree 声明了 include 就按 include 走，否则只认 jar/aar */
+  const acceptName = (name: string, includes: string[]) =>
+    includes.length ? matchFileTreeInclude(name, includes) && isLibFile(name) : isLibFile(name);
+  const seenName = new Set<string>();
+  const ioHandled = new Set<string>();
+
+  // 1) io 通道（SAF）：逐个候选目录直接列
   if (io?.list) {
-    const dir = LIBS_BASE;
-    const r = await io.list(dir);
-    if (r.ok && r.items) {
+    for (const cand of candidates) {
+      const r = await io.list(cand.rel);
+      if (!r.ok || !r.items) continue;
+      ioHandled.add(cand.rel);
       for (const it of r.items) {
-        if (it.kind === "dir" || !isLibFile(it.name)) continue;
-        const rel = `${dir}/${it.name}`;
+        if (it.kind === "dir" || !acceptName(it.name, cand.includes)) continue;
+        if (seenName.has(it.name)) continue; // 同名库已在更早的目录里取过
+        const rel = `${cand.rel}/${it.name}`;
         const rb = io.readBase64 ? await io.readBase64(rel) : { ok: false as const };
-        if (rb.ok && rb.base64) addBase64(rel, rb.base64);
+        if (rb.ok && rb.base64) { seenName.add(it.name); addBase64(rel, rb.base64); }
         else if (!rb.ok) failed.push(rel);
       }
     }
   }
 
-  // 2) 原生通道兜底（nativeRoot）：直接列标准目录
-  if (nativeRoot && libs.length === 0) {
-    const abs = `${nativeRoot.replace(/[\\/]+$/, "")}/${LIBS_BASE}`;
-    let json: string | null = null;
-    try {
-      json = hasAsyncIo() ? await listDirQueued(abs) : nativeListDir(abs).ok ? JSON.stringify(nativeListDir(abs)) : null;
-    } catch { json = null; }
-    if (json) {
+  // 2) 原生通道（nativeRoot）：io 看不到的目录（SAF 树外，如 ../libs）靠这里补
+  if (nativeRoot) {
+    const root = nativeRoot.replace(/[\\/]+$/, "");
+    for (const cand of candidates) {
+      if (ioHandled.has(cand.rel)) continue; // io 已经列过且列到了
+      const abs = `${root}/${cand.rel}`;
+      let json: string | null = null;
+      try {
+        json = hasAsyncIo() ? await listDirQueued(abs) : nativeListDir(abs).ok ? JSON.stringify(nativeListDir(abs)) : null;
+      } catch { json = null; }
+      if (!json) continue;
       let parsed: { ok?: boolean; items?: { name: string; kind: string; path?: string }[] };
       try { parsed = JSON.parse(json); } catch { parsed = { ok: false }; }
-      if (parsed?.ok && Array.isArray(parsed.items)) {
-        for (const it of parsed.items) {
-          if (it.kind === "dir" || !isLibFile(it.name)) continue;
-          const rel = `${LIBS_BASE}/${it.name}`;
-          const absPath = it.path || `${abs}/${it.name}`;
-          const b64 = nativeReadBase64(absPath);
-          if (b64) addBase64(rel, b64);
-          else failed.push(rel);
-        }
+      if (!parsed?.ok || !Array.isArray(parsed.items)) continue;
+      for (const it of parsed.items) {
+        if (it.kind === "dir" || !acceptName(it.name, cand.includes)) continue;
+        if (seenName.has(it.name)) continue;
+        const rel = `${cand.rel}/${it.name}`;
+        const absPath = it.path || `${abs}/${it.name}`;
+        const b64 = nativeReadBase64(absPath);
+        if (b64) { seenName.add(it.name); addBase64(rel, b64); }
+        else failed.push(rel);
       }
     }
   }

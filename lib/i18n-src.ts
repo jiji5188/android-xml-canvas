@@ -2929,6 +2929,8 @@ export const SRC_EN: SrcDict = {
   "打包失败（env）": "Build failed (env)",
   "打包失败（keystore）": "Build failed (keystore)",
   "打包失败（compile）": "Build failed (compile)",
+  "已注入默认图标": "Default icon injected",
+  "manifest 引用的图标在项目 res 里不存在，已自动补默认图标：{l}": "Icons referenced by the manifest are missing from the project res; injected default icons: {l}",
   "清单里没找到 launcher，已从源码推断入口：{n}": "No launcher in the manifest; entry inferred from sources: {n}",
   "依赖预检查（不阻断，仅提示）": "Dependency pre-check (non-blocking, informational)",
   "编译前自动修复（{n} 个文件）": "Auto-fixed before compile ({n} file(s))",

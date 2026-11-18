@@ -13,6 +13,7 @@ import { projectSaveRoot, readAppGradle } from "@/lib/xml/project-save";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { packageOf } from "@/lib/xml/new-project";
 import { collectProjectRes } from "@/lib/xml/res-collect";
+import { injectMissingManifestIcons } from "@/lib/xml/icon-fallback";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { buildResNameIndex, missingResourceRefs, collectExternalImports, missingLibPackages, stubMissingRefs } from "@/lib/xml/resource-refs";
@@ -159,9 +160,10 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
       const clean = (o.storeFile || "").replace(/\\/g, "/").replace(/^\/+/, "");
       const keystore = clean ? `${base}/${clean}` : "";
       let gradlePkg = gradleForSign;
+      let gradleRel = "app/build.gradle";
       if (root) {
         const fresh = await readAppGradle(root);
-        if (fresh?.text) gradlePkg = fresh.text;
+        if (fresh?.text) { gradlePkg = fresh.text; gradleRel = fresh.rel; }
       }
       let pkg = activeProject?.name ? packageOf(activeProject.name) : "com.axv.app";
       if (gradlePkg) {
@@ -196,9 +198,35 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           layout = picked.name;
           baseInput = { ...input, name: picked.rel, xml: picked.text };
         }
-        const collected = await collectProjectRes(aiFileIo, openRel, buildRealRenderFiles(baseInput));
+        // M380：manifest 里的 @mipmap/app、@drawable/ic_... 也是资源引用。
+        //  以前 collectProjectRes 只扫布局文件的引用，manifest 引用的图标不进包 →
+        //  aapt2 link 报 “resource mipmap/app not found / failed processing manifest”。
+        //  必须在收集资源前读出来，作为额外引用源传进去。
+        const manifestInfo = await readProjectManifest(aiFileIo, pkg);
+        const collected = await collectProjectRes(
+          aiFileIo,
+          openRel,
+          buildRealRenderFiles(baseInput),
+          160,
+          manifestInfo.text ? [manifestInfo.text] : [],
+        );
         const relNow = (openRel || input.name || "").replace(/\\/g, "/");
-        const files = /\.xml$/i.test(relNow) ? withCurrentXml(collected.files, relNow, xml) : collected.files;
+        const withCurrent = /\.xml$/i.test(relNow) ? withCurrentXml(collected.files, relNow, xml) : collected.files;
+        // M380：manifest 引用的图标（@mipmap/app / @mipmap/app_round）项目里确实没有时，
+        //  补一张默认矢量图标——否则 aapt2 link 必报 resource not found，整个打包卡死。
+        const iconFix = injectMissingManifestIcons(withCurrent, manifestInfo.text);
+        if (iconFix.injected.length) {
+          pushBuildLog(
+            true,
+            tt("已注入默认图标"),
+            tt("manifest 引用的图标在项目 res 里不存在，已自动补默认图标：{l}", { l: iconFix.injected.join("、") }),
+            undefined,
+            undefined,
+            undefined,
+            "info",
+          );
+        }
+        const files = iconFix.files;
         const dexGot = await collectProjectDex(aiFileIo);
         const dexFiles = numberDexFiles(dexGot).map((d) => ({ name: d.name, base64: d.base64 }));
         if (dexGot.length) {
@@ -234,8 +262,14 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           pkg = domPkg;
         }
         // M266：项目依赖库（libs/*.jar|aar）→ 设备端 ECJ classpath
+        // M380：除标准位置 app/src/main/libs，还扫 build.gradle 里 fileTree(dir:) 声明的目录
         setExportNote(tt("正在收集依赖库…"));
-        const libsRes = await collectProjectLibs(aiFileIo, activeProject?.rootPath || activeProject?.dirPath || null);
+        const libsRes = await collectProjectLibs(
+          aiFileIo,
+          activeProject?.rootPath || activeProject?.dirPath || null,
+          gradlePkg,
+          gradleRel,
+        );
         // M361：共享库 /AndroidUIIDE/libs 也进 classpath（maven 坐标引用的库实体存这里）
         // M379：Array.isArray 守卫——上游任何异常形状都不能再抛 "is not iterable"（M367/M379 两次事故）
         const sharedLibs = await collectSharedLibs();
@@ -247,8 +281,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         }
         // M258：清单里找不到 MAIN/LAUNCHER 时，从源码推入口（extends Activity 的那个类）——
         //  否则 ShellActivity 拿不到 axv.launcher，永远停在壳上，用户代码跑不起来。
-        // M262：同时把项目 manifest 原文读出来给 BuildApkHelper 用（aapt2 link 不再合成清单）
-        const manifestInfo = await readProjectManifest(aiFileIo, pkg);
+        // M262：项目 manifest 原文（M380 起上面已提前读过，这里直接用）
         let manifest = manifestInfo.launcher || "";
         // M268：把 manifest 里的 package 强制对齐到权威 pkg（Java 源码多数包名）
         let manifestTextForBuild = manifestInfo.text;

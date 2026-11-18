@@ -1313,11 +1313,12 @@ const allDrawableNames = useMemo(() => {
   });
   const { openNewFileMenu, openNewFilePreset, newFile, dialogJsx: newFileDialog } = newFileDlg;
 
-  /** M404：工具栏「＋」新建菜单 → 新建 Activity 页面 / Java 类 / XML 布局（复用新建文件对话框，预选分类直达二级） */
+  /** M404：工具栏「＋」新建菜单 → 新建 Activity 页面 / Java 类 / 调试入口 / XML 布局（复用新建文件对话框，预选分类直达二级） */
   const handleNewItem = useCallback(
-    (kind: "activity" | "java" | "layout") => {
+    (kind: "activity" | "java" | "layout" | "debug") => {
       if (kind === "activity") openNewFilePreset("java", "java-activity");
       else if (kind === "java") openNewFilePreset("java", "java-class");
+      else if (kind === "debug") openNewFilePreset("java", "java-debug"); // M405：带 main/debug，新建后直接可「▶ 调试」
       else openNewFilePreset("layout", "layout-cl");
     },
     [openNewFilePreset],

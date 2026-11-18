@@ -169,11 +169,12 @@ public class DebugRunHelper {
             try {
                 Object result;
                 if (target.getParameterTypes().length == 1 && target.getParameterTypes()[0] == String[].class) {
-                    result = target.invoke(null, new String[]{ argList.toArray(new String[0]) });
+                    // main(String[] args)：把参数数组作为单个 Object 传进去（varargs 再包一层 Object[]）
+                    result = target.invoke(null, new Object[]{ argList.toArray(new String[0]) });
                 } else if (target.getParameterTypes().length == 0) {
                     result = target.invoke(null);
                 } else {
-                    // 参数不匹配的 static 方法：尽量按 args 转（string 透传）
+                    // 其他 static 方法：按 args 透传（string）
                     result = target.invoke(null, argList.toArray());
                 }
                 returnValue = result == null ? "null" : String.valueOf(result);
@@ -205,9 +206,13 @@ public class DebugRunHelper {
             }
             return out.toString();
         } catch (Throwable t) {
-            out.put("ok", false);
-            out.put("step", step);
-            out.put("log", (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage()) + "\n" + log);
+            try {
+                out.put("ok", false);
+                out.put("step", step);
+                out.put("log", (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage()) + "\n" + log);
+            } catch (Throwable ignored) {
+                // put 也失败（理论上不会）→ 兜底返回
+            }
             return out.toString();
         }
     }

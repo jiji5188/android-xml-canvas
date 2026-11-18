@@ -3212,6 +3212,9 @@ export const SRC_EN: SrcDict = {
   "调试运行{step}：{e}": "Debug run {step}: {e}",
   "调试运行失败：{m}": "Debug run failed: {m}",
   "运行调试（设备端编译+动态执行，结果看下方调试日志）": "Debug run (on-device build + dynamic dex; results in the log below)",
+  "新建调试入口类": "New debug entry class",
+  "带 main/debug，可直接调试运行": "With main/debug; ready to debug-run",
+  "新建：Activity / Java / 调试入口 / XML 布局": "New: Activity / Java / debug entry / XML layout",
 
 };
 

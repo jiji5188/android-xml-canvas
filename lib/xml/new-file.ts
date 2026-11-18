@@ -81,6 +81,29 @@ public class {name} {
 }
 `;
 
+// M405：带 debug/main 入口的 Java 类——新建后直接可点「▶ 调试」（设备端编译 + 动态执行）
+//  用户把要验证的纯逻辑写进 debug() 或 main()；只能跑算法/工具类，起不了 Activity/用不了系统 Context
+const JAVA_DEBUG = `package com.example.app;
+
+/**
+ * M405 调试入口类：点「▶ 调试」会自动找这里的 main / debug。
+ * 写要验证的纯逻辑（算法/工具类）进去，结果出在下方「调试日志」。
+ */
+public class {name} {
+
+    /** 默认入口（调试运行优先调它） */
+    public static void debug() {
+        System.out.println("hello from {name}.debug");
+        System.out.println("改这里的代码，再点「▶ 调试」看输出");
+    }
+
+    /** 备用入口（也可以点「▶ 调试」时指定 main） */
+    public static void main(String[] args) {
+        debug();
+    }
+}
+`;
+
 const KOTLIN_ACTIVITY = `package com.example.app
 
 import android.app.Activity
@@ -210,6 +233,8 @@ export const NEW_FILE_CATEGORIES: NewFileCategory[] = [
       { key: "java-fragment", label: "Fragment", ext: ".java", body: JAVA_FRAGMENT, companion: true },
       { key: "java-service", label: "Service", ext: ".java", body: JAVA_SERVICE },
       { key: "java-class", label: "普通类", ext: ".java", body: JAVA_CLASS },
+      // M405：带 main/debug 入口，新建后直接可「▶ 调试」
+      { key: "java-debug", label: "调试入口类", ext: ".java", body: JAVA_DEBUG },
       { key: "java-blank", label: "空文件", ext: ".java", body: "" },
     ],
   },

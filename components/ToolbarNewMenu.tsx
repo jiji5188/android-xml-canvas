@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { t as tt } from "@/lib/i18n-src";
 
-export type NewItemKind = "activity" | "java" | "layout";
+export type NewItemKind = "activity" | "java" | "layout" | "debug";
 
 export interface NewMenuItem {
   key: NewItemKind;
@@ -26,6 +26,8 @@ const MENU_MAX_W = 232;
 export const DEFAULT_NEW_ITEMS = (onNewItem: (kind: NewItemKind) => void): NewMenuItem[] => [
   { key: "activity", icon: "note_add", label: tt("新建 Activity 页面"), hint: tt("Java 类 + 配套布局"), onClick: () => onNewItem("activity") },
   { key: "java", icon: "description", label: tt("新建 Java 类"), hint: tt("只建 .java 源文件"), onClick: () => onNewItem("java") },
+  // M405：带 main/debug 入口的 Java 类，新建后直接可点「▶ 调试」
+  { key: "debug", icon: "bug_report", label: tt("新建调试入口类"), hint: tt("带 main/debug，可直接调试运行"), onClick: () => onNewItem("debug") },
   { key: "layout", icon: "dashboard_customize", label: tt("新建 XML 布局"), hint: tt("res/layout 下新建布局"), onClick: () => onNewItem("layout") },
 ];
 
@@ -120,7 +122,7 @@ export function ToolbarNewMenu({ items }: { items: NewMenuItem[] }) {
       <button
         ref={btnRef}
         className="axv-tb-btn"
-        title={tt("新建：Activity 页面 / Java 类 / XML 布局")}
+        title={tt("新建：Activity / Java / 调试入口 / XML 布局")}
         aria-label={tt("新建")}
         aria-haspopup="menu"
         aria-expanded={open}

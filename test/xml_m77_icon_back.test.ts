@@ -9,7 +9,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const css = readFileSync(resolve(process.cwd(), "components/xml-canvas.css"), "utf8");
+import { readCssSource } from "./css-source";
+const css = readCssSource();
 const cvEditor = readFileSync(resolve(process.cwd(), "components/IconCanvasEditor.tsx"), "utf8");
 
 /** 抓一条规则体（按选择器精确匹配，取到第一个 } 为止） */

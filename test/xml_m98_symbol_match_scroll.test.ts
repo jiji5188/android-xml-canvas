@@ -58,9 +58,11 @@ describe("M98 符号匹配不再误报", () => {
   });
 });
 
+import { readCssSource } from "./css-source";
+
 describe("M98 候选弹窗：可滚动 + 按下不算点击", () => {
   const src = fs.readFileSync("components/CodeEditor.tsx", "utf8");
-  const css = fs.readFileSync("components/xml-canvas.css", "utf8");
+  const css = readCssSource();
 
   it("pointerdown 只记录，不再直接确认", () => {
     expect(src).toContain("onSugDown");

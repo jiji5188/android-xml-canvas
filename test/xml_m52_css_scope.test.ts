@@ -2,12 +2,13 @@
 // 否则复用 .axv-set-group 的「编辑图标」「关于」两个子页面内容会被整块隐藏（已出过事故）。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { readCssSource } from "./css-source";
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
 describe("M52 折叠规则作用域", () => {
   it("display:none 的折叠规则只作用于 .axv-settings 内部", () => {
-    const css = read("components/xml-canvas.css");
+    const css = readCssSource();
     const hits = css
       .split("\n")
       .filter((l) => l.includes(":not(.open) > *:not(.axv-set-label)"))

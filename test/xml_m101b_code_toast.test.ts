@@ -6,10 +6,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readCssSource } from "./css-source";
 
 const root = path.resolve(__dirname, "..");
 const editor = fs.readFileSync(path.join(root, "components/XmlEditor.tsx"), "utf8");
-const css = fs.readFileSync(path.join(root, "components/xml-canvas.css"), "utf8");
+const css = readCssSource();
 
 describe("M101b 代码面板 toast", () => {
   it("CSS 里有 .axv-code-toast（fixed 定位，不依赖画布）", () => {

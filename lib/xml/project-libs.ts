@@ -129,13 +129,22 @@ export async function collectSharedLibs(): Promise<ProjectLib[]> {
   const n = nativeBridge();
   if (!n?.listDir || !n?.readBase64) return [];
   const base = "/AndroidUIIDE/libs";
-  let names: string[] = [];
-  try { names = JSON.parse(n.listDir(base) || "[]"); } catch { return []; }
+  // M379：native listDir 返回的是 {ok, items:[{name,kind,path,size}]}（MainActivity.listDirJson），
+  // 不是字符串数组！之前直接 for...of parse 结果 → "a is not iterable"（目录不存在时 {"ok":false} 也是对象，必炸）。
+  // M367 只修了 mergeProjectExtras，漏了这里；这是设备端打包必炸的真根因。
+  let items: { name?: string; kind?: string }[] = [];
+  try {
+    const parsed = JSON.parse(n.listDir(base) || "{}") as {
+      ok?: boolean;
+      items?: { name?: string; kind?: string }[];
+    };
+    if (parsed?.ok && Array.isArray(parsed.items)) items = parsed.items;
+  } catch { return []; }
   const out: ProjectLib[] = [];
   let total = 0;
-  for (const raw of names) {
-    const n1 = String(raw);
-    if (!isLibFile(n1)) continue;
+  for (const it of items) {
+    const n1 = String(it?.name || "");
+    if (!n1 || it.kind === "dir" || !isLibFile(n1)) continue;
     const abs = `${base}/${n1}`;
     const b64 = n.readBase64?.(abs) || "";
     if (!b64) continue;

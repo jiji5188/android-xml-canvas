@@ -237,10 +237,13 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         setExportNote(tt("正在收集依赖库…"));
         const libsRes = await collectProjectLibs(aiFileIo, activeProject?.rootPath || activeProject?.dirPath || null);
         // M361：共享库 /AndroidUIIDE/libs 也进 classpath（maven 坐标引用的库实体存这里）
+        // M379：Array.isArray 守卫——上游任何异常形状都不能再抛 "is not iterable"（M367/M379 两次事故）
         const sharedLibs = await collectSharedLibs();
-        const allBuildLibs = [...libsRes.libs, ...sharedLibs];
+        const projectLibsArr = Array.isArray(libsRes?.libs) ? libsRes.libs : [];
+        const sharedLibsArr = Array.isArray(sharedLibs) ? sharedLibs : [];
+        const allBuildLibs = [...projectLibsArr, ...sharedLibsArr];
         if (allBuildLibs.length) {
-          setExportNote(tt("发现 {n} 个依赖库（项目 {a} + 共享 {b}），一起加进 classpath", { n: String(allBuildLibs.length), a: String(libsRes.libs.length), b: String(sharedLibs.length) }));
+          setExportNote(tt("发现 {n} 个依赖库（项目 {a} + 共享 {b}），一起加进 classpath", { n: String(allBuildLibs.length), a: String(projectLibsArr.length), b: String(sharedLibsArr.length) }));
         }
         // M258：清单里找不到 MAIN/LAUNCHER 时，从源码推入口（extends Activity 的那个类）——
         //  否则 ShellActivity 拿不到 axv.launcher，永远停在壳上，用户代码跑不起来。

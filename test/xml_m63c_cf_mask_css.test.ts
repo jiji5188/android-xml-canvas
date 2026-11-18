@@ -3,7 +3,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-const css = readFileSync("components/xml-canvas.css", "utf8");
+import { readCssSource } from "./css-source";
+const css = readCssSource();
 const src = readFileSync("components/ColorField.tsx", "utf8");
 
 describe("颜色取色器：全屏蒙版 + 居中弹窗", () => {

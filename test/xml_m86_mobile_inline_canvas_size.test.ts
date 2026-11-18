@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import { test, expect, describe, it } from "vitest";
+import { readCssSource } from "./css-source";
 
 const read = (p: string) => fs.readFileSync(`D:/android-xml-canvas/repo/${p}`, "utf8");
 
 describe("M86 移动端右栏不做抽屉（M88c 改为右悬浮滑面板）", () => {
   const src = read("components/IconCanvasEditor.tsx");
-  const css = read("components/xml-canvas.css");
+  const css = readCssSource();
 
   it("移动端右栏为靠右浮层，不整块隐藏", () => {
     expect(src).not.toContain("resOpen");
@@ -42,7 +43,7 @@ describe("M86 画布面板加入画布尺寸", () => {
 
 describe("M86 图层面板移植原页面功能", () => {
   const src = read("components/IconCanvasEditor.tsx");
-  const css = read("components/xml-canvas.css");
+  const css = readCssSource();
 
   it("图层行有 上移/下移 按钮与拖拽手柄", () => {
     expect(src).toContain('title={tt("上移一层")}');

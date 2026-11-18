@@ -3,13 +3,14 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { readCssSource } from "./css-source";
 
 const root = process.cwd();
 const read = (p: string) => fs.readFileSync(path.join(root, p), "utf8");
 
 describe("M84 移动端资源面板（M86 起改为常规流式，不做抽屉）", () => {
   const src = read("components/IconCanvasEditor.tsx");
-  const css = read("components/xml-canvas.css");
+  const css = readCssSource();
 
   it("不再有抽屉开关 / 遮罩 / 标题栏按钮", () => {
     expect(src).not.toContain("resOpen");

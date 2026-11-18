@@ -64,7 +64,7 @@ import { HistoryPanel } from "@/components/HistoryPanel";
 import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
 import { hasIcon } from "@/lib/xml/icon-vectors";
-import { workspaceLabel, chooseWorkspace, nativeAvailable, copyTextNative, writeTextNative } from "@/lib/xml/native-save";
+import { workspaceLabel, copyTextNative, writeTextNative } from "@/lib/xml/native-save";
 import { yieldToUi } from "@/lib/xml/native-async";
 import { perfMark, perfTimer, heapMB, perfLogPath } from "@/lib/xml/perf-log";
 import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
@@ -179,7 +179,6 @@ import { exportLayoutXml, exportChecks } from "@/lib/xml/export";
 import { toCompatXml } from "@/lib/xml/compat";
 import { fixNamespacePrefixes } from "@/lib/xml/namespace";
 import { ExportCheckModal, type ExportReport, type ExportMode } from "./ExportCheckModal";
-import { ExportImageModal } from "./ExportImageModal";
 import type { ExportTarget } from "@/lib/xml/export-image";
 import { CanvasStage } from "./CanvasStage";
 import { APP_VERSION } from "@/lib/version";
@@ -462,7 +461,7 @@ export function XmlEditor() {
     addModalOpen, setAddModalOpen, exportOpen, setExportOpen,
     compareOpen, setCompareOpen, compareIds, toggleCompareDevice,
     exportReport, setExportReport, exportMode, setExportMode,
-    imgExportOpen, setImgExportOpen, exportAction, setExportAction,
+    exportAction, setExportAction,
     dropHint, setDropHint, runOpen, setRunOpen,
   } = usePanels();
   /** M366：项目管理/工作区 state → components/use-xml-project.ts */
@@ -525,7 +524,7 @@ export function XmlEditor() {
   /** 兼容模式的转换摘要（选 compat 时重算） */
   const [compatNotes, setCompatNotes] = useState<string[]>([]);
   /** M6a：导出预览图（PNG / SVG）弹窗 */
-  /** M366：imgExportOpen/exportAction/dropHint/runOpen 已下沉到 usePanels，见下方解构 */
+  /** M366：exportAction/dropHint/runOpen 已下沉到 usePanels，见下方解构 */
   /** 手机壳 DOM（导出图片要拿它做 DOM → SVG/PNG） */
   const phoneRef = useRef<HTMLDivElement | null>(null);
   /** M199：运行调试时加载的 Java/Kotlin 源码（轻量逻辑仿真用） */
@@ -565,7 +564,6 @@ export function XmlEditor() {
   useBackGuard(editingTheme !== null, () => setEditingTheme(null), "theme-dialog");
   useBackGuard(exportOpen, () => setExportOpen(false), "export-dialog");
   useBackGuard(addModalOpen, () => setAddModalOpen(false), "add-attr");
-  useBackGuard(imgExportOpen, () => setImgExportOpen(false), "img-export");
   useBackGuard(newProjOpen, () => setNewProjOpen(false), "new-project");
   useBackGuard(saveAsOpen, () => setSaveAsOpen(false), "save-as");
 
@@ -1311,7 +1309,17 @@ const allDrawableNames = useMemo(() => {
     tt, project, setProject, xml, flushTextTimer,
     applyExternalState, setXml, histRef, syncHist, setSelectedPath, setExportNote,
   });
-  const { openNewFileMenu, newFile, dialogJsx: newFileDialog } = newFileDlg;
+  const { openNewFileMenu, openNewFilePreset, newFile, dialogJsx: newFileDialog } = newFileDlg;
+
+  /** M404：工具栏「＋」新建菜单 → 新建 Activity 页面 / Java 类 / XML 布局（复用新建文件对话框，预选分类直达二级） */
+  const handleNewItem = useCallback(
+    (kind: "activity" | "java" | "layout") => {
+      if (kind === "activity") openNewFilePreset("java", "java-activity");
+      else if (kind === "java") openNewFilePreset("java", "java-class");
+      else openNewFilePreset("layout", "layout-cl");
+    },
+    [openNewFilePreset],
+  );
 
   /** M366 step12：画布编辑操作域（onChangeXmlText + 控件增删改 + 层级 + 属性回写 + 几何）
    *  → components/use-canvas-ops.ts（延迟 Proxy 避开 liveXmlRef/xmlSyncTimer/textTimer 等晚声明 TDZ） */
@@ -1343,17 +1351,16 @@ const allDrawableNames = useMemo(() => {
   }));
 
   /** 打开 .xml 文件（弹系统文件选择器）；M141：有未保存改动先问一句 */
-    /** M366 step13：打开文件/保存/导出域（openProject/openProjectFile/clearRes/doDownload/currentSaveInput）
+    /** M366 step13：打开文件/保存/导出域（openProject/openProjectFile/doDownload/currentSaveInput）
    *  → components/use-save-export.ts（延迟 Proxy；currentSaveInput 供 useExportRender/useBuildApk 复用） */
   const {
-    openProject, openProjectFile, clearRes, doDownload, currentSaveInput,
+    openProject, openProjectFile, doDownload, currentSaveInput,
   } = useSaveExport(() => ({
     leaveGuard, dirty, pickXmlFile, loadXmlFile, setSaveOrigin,
-    setResExtras, setResourceFragment, setSampleValues, resDirRef,
     setExportNote, flashNote,
     codeOnly, downloadLayout, workspaceLabel,
     currentXml, exportMode, saveOrigin, project, generatedDrawables,
-    resExtrasAll, appIconRes, LS_KEY_SAMPLE, LS_KEY_RES,
+    resExtrasAll, appIconRes,
   }));
 
   /** 清掉已上传的资源，回到内置默认 */
@@ -1496,7 +1503,7 @@ const allDrawableNames = useMemo(() => {
 
   /** M366 step19：导出/保存动作域（confirmSaveAs/buildReport/applyExportMode/saveProject/doCopy/copyExportedXml）
    *  → components/use-export-actions.ts */
-  const { confirmSaveAs, buildReport, applyExportMode, saveProject, doCopy, copyExportedXml } =
+  const { confirmSaveAs, buildReport, applyExportMode, saveProject, doCopy } =
     useExportActions(() => ({
       saveAsName, setSaveAsOpen, saveAsTo, exportMode, setExportMode, xml, setCompatNotes, flashNote, tt,
       codeOnly, setExportAction, setExportReport, setExportOpen, setExportNote, copyTextNative, doDownload, flushXml,
@@ -2195,23 +2202,12 @@ const allDrawableNames = useMemo(() => {
         onUndo={undo}
         onRedo={redo}
         onSave={() => void doSave()}
-        onOpenFile={openProject}
-        onCopyXml={copyExportedXml}
+        // M404：删掉打开 XML / 复制 XML / 导出预览图 / 清除 res / 更换保存位置的 props
         showResZip={Boolean(resExtras) || Object.keys(generatedDrawables).length > 0}
         onExportRes={doDownloadResZip}
         canExportProject={!!aiFileIo}
         onExportProject={() => void doExportProject()}
-        onExportImage={() => setImgExportOpen(true)}
-        hasRes={Boolean(resExtras)}
-        onClearRes={clearRes}
-        nativeAvailable={nativeAvailable()}
-        workspaceLabel={workspaceLabel()}
-        onChangeWorkspace={() => {
-          if (chooseWorkspace()) {
-            setExportNote(tt("已更换保存位置（下次保存生效）"));
-            window.setTimeout(() => setExportNote(""), 2400);
-          }
-        }}
+        onNewItem={(kind) => void handleNewItem(kind)}
         onRun={() => setRunOpen(true)}
         realRenderAvailable={realRenderAvailable}
         canBuildApk={hasBuildApk()}
@@ -2303,26 +2299,6 @@ const allDrawableNames = useMemo(() => {
           window.setTimeout(() => setExportNote(" "), 3000);
         }}
       />
-
-      {imgExportOpen ? (
-        <ExportImageModal
-          getTarget={(): ExportTarget | null =>
-            phoneRef.current
-              ? {
-                  el: phoneRef.current,
-                  width: outerW,
-                  height: outerH,
-                  background: phoneBg,
-                }
-              : null
-          }
-          deviceLabel={device.label}
-          width={outerW}
-          height={outerH}
-          onClose={() => setImgExportOpen(false)}
-          onToast={assetsNote}
-        />
-      ) : null}
 
       {/* M90：配色方案编辑子页（改界面 token + 代码编辑器 4 个颜色） */}
       {signDialogOpen && (

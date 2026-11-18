@@ -19,7 +19,6 @@ describe("M100 返回键接线", () => {
       "setLeftOpen(false)",
       "setSaveAsOpen(false)",
       "setNewProjOpen(false)",
-      "setImgExportOpen(false)",
       "setAddModalOpen(false)",
       "setExportOpen(false)",
       "setEditingTheme(null)",
@@ -29,9 +28,9 @@ describe("M100 返回键接线", () => {
     for (const t of targets) {
       expect(xmlEditor, `缺少 ${t} 的返回处理`).toContain(t);
     }
-    // 至少 9 个浮层挂了钩子；新加浮层忘了挂会被这里提醒
+    // 至少 8 个浮层挂了钩子；新加浮层忘了挂会被这里提醒
     const n = (xmlEditor.match(/useBackGuard\(/g) || []).length;
-    expect(n).toBeGreaterThanOrEqual(9);
+    expect(n).toBeGreaterThanOrEqual(8);
   });
 
   it("XmlEditor 挂载时安装 JS 桥，卸载时清栈", () => {

@@ -35,9 +35,6 @@ export interface PanelsState {
   /** M13：导出模式，compat = 纯平台控件、AIDE 可编译 */
   exportMode: ExportMode;
   setExportMode: React.Dispatch<React.SetStateAction<ExportMode>>;
-  /** M6a：导出预览图（PNG / SVG）弹窗 */
-  imgExportOpen: boolean;
-  setImgExportOpen: React.Dispatch<React.SetStateAction<boolean>>;
   /** 导出预览图：download / copy */
   exportAction: "download" | "copy";
   setExportAction: React.Dispatch<React.SetStateAction<"download" | "copy">>;
@@ -89,8 +86,6 @@ export function usePanels(): PanelsState {
     }
   });
 
-  /** M6a：导出预览图（PNG / SVG）弹窗 */
-  const [imgExportOpen, setImgExportOpen] = useState(false);
   const [exportAction, setExportAction] = useState<"download" | "copy">("download");
   const [dropHint, setDropHint] = useState<string | null>(null);
   const [runOpen, setRunOpen] = useState(false);
@@ -101,7 +96,7 @@ export function usePanels(): PanelsState {
     addModalOpen, setAddModalOpen, exportOpen, setExportOpen,
     compareOpen, setCompareOpen, compareIds, toggleCompareDevice,
     exportReport, setExportReport, exportMode, setExportMode,
-    imgExportOpen, setImgExportOpen, exportAction, setExportAction,
+    exportAction, setExportAction,
     dropHint, setDropHint, runOpen, setRunOpen,
   };
 }

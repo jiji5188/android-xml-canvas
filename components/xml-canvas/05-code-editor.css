@@ -15,6 +15,81 @@
   min-height: 0;
   position: relative;
 }
+
+/* M404：代码编辑器长按/右键弹出菜单（复制/粘贴/剪切/全选/查找/查看文档） */
+.axv-code-ctx {
+  position: absolute;
+  z-index: 40;
+  min-width: 172px;
+  max-width: 240px;
+  background: var(--axv-surface, #fff);
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.axv-code-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--axv-on-surface);
+  font-size: 12.5px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.axv-code-ctx-item:active {
+  background: color-mix(in srgb, var(--axv-primary) 14%, transparent);
+}
+/* M404：查看文档浮层 */
+.axv-code-ctxdoc {
+  position: absolute;
+  inset: 8px auto auto 8px;
+  z-index: 45;
+  max-width: 420px;
+  max-height: 80%;
+  background: var(--axv-surface, #fff);
+  border: 1px solid var(--axv-outline);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  padding: 10px 12px;
+  overflow: auto;
+}
+.axv-code-ctxdoc-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--axv-on-surface-variant);
+  margin-bottom: 6px;
+}
+.axv-code-ctxdoc-close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 6px;
+}
+.axv-code-ctxdoc-close:active {
+  background: color-mix(in srgb, var(--axv-on-surface) 10%, transparent);
+}
+.axv-code-ctxdoc-body {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--axv-on-surface);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 /* 琛屽彿鏍?*/
 .axv-gutter {
   flex: 0 0 52px;

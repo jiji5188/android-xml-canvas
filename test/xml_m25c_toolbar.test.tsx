@@ -23,16 +23,8 @@ function props(over: Partial<ToolbarProps> = {}): ToolbarProps {
     onUndo: vi.fn(),
     onRedo: vi.fn(),
     onSave: vi.fn(),
-    onOpenFile: vi.fn(),
-    onCopyXml: vi.fn(),
     showResZip: false,
     onExportRes: vi.fn(),
-    onExportImage: vi.fn(),
-    hasRes: false,
-    onClearRes: vi.fn(),
-    nativeAvailable: false,
-    workspaceLabel: "",
-    onChangeWorkspace: vi.fn(),
     onRun: vi.fn(),
     onFormat: vi.fn(),
     ...over,
@@ -55,9 +47,10 @@ function menuItems(node: ReactNode): MenuIt[] {
     walk(p.children as ReactNode);
   };
   walk(node);
-  // 「更多」菜单特征：含 open 且不含 run-preview；「运行」菜单特征：含 run-preview
-  const moreMenu = found.find((arr) => arr.some((it) => it.key === "open") && !arr.some((it) => it.key === "run-preview"));
-  out = moreMenu ?? found[0] ?? [];
+  // 「更多」菜单特征：M404 后「更多」的 items 只剩 reszip / exportproj（可能为空数组）；
+  // 不再靠 open 项识别，改为找不含 run-preview 也不含 activity/java/layout 的那组
+  const moreMenu = found.find((arr) => !arr.some((it) => it.key === "run-preview") && !arr.some((it) => it.key === "activity"));
+  out = moreMenu ?? [];
   return out;
 }
 
@@ -137,67 +130,68 @@ describe("Toolbar — 侧栏按钮", () => {
   });
 });
 
-describe("Toolbar — res / 原生容器相关按钮的显隐（M173 起在「更多」菜单里）", () => {
-  it("无 res 资源时既没有导出 res 包也没有清除 res", () => {
-    const { item, items } = render({ showResZip: false, hasRes: false });
+describe("Toolbar — 更多菜单 / 新建菜单的显隐（M404：删掉打开/复制/清除 res/更换保存位置）", () => {
+  it("无 res 资源时更多菜单为空（只剩导出可编译项目也不传时）", () => {
+    const { item, items } = render({ showResZip: false });
     expect(item("导出 res 包")).toBeUndefined();
+    // M404：这些项已删除
+    expect(item("打开 XML 文件")).toBeUndefined();
+    expect(item("复制 XML")).toBeUndefined();
     expect(item("清除 res")).toBeUndefined();
-    // 「更多」菜单始终存在（ToolbarMoreMenu 的 items 还会带上打开 / 复制）
-    expect(items.map((it) => it.label)).toEqual(["打开 XML 文件", "复制 XML"]);
-  });
-
-  it("有 res 资源时两个菜单项都出现，点击各自回调", () => {
-    const { item, p } = render({ showResZip: true, hasRes: true });
-    item("导出 res 包")!.onClick();
-    item("清除 res")!.onClick();
-    expect(p.onExportRes).toHaveBeenCalledTimes(1);
-    expect(p.onClearRes).toHaveBeenCalledTimes(1);
-  });
-
-  it("只有生成 drawable（showResZip=true 但 hasRes=false）时只有导出项", () => {
-    const { item } = render({ showResZip: true, hasRes: false });
-    expect(item("导出 res 包")).toBeDefined();
-    expect(item("清除 res")).toBeUndefined();
-  });
-
-  it("Web 端（非原生容器）不显示「更换保存位置」", () => {
-    const { item } = render({ nativeAvailable: false });
     expect(item("更换保存位置")).toBeUndefined();
+    expect(items).toEqual([]);
   });
 
-  it("原生容器显示「更换保存位置」，title 里带当前目录名，点击触发 onChangeWorkspace", () => {
-    const { item, p } = render({ nativeAvailable: true, workspaceLabel: "Download/AXV" });
-    const it0 = item("更换保存位置")!;
-    expect(String(it0.title)).toContain("Download/AXV");
-    it0.onClick();
-    expect(p.onChangeWorkspace).toHaveBeenCalledTimes(1);
+  it("有 res 资源时只有导出 res 包，点击回调 onExportRes", () => {
+    const { item, p } = render({ showResZip: true });
+    item("导出 res 包")!.onClick();
+    expect(p.onExportRes).toHaveBeenCalledTimes(1);
+    expect(item("清除 res")).toBeUndefined();
   });
 
-  it("原生容器未设置目录时 title 回落到「默认目录」", () => {
-    const { item } = render({ nativeAvailable: true, workspaceLabel: "" });
-    expect(String(item("更换保存位置")!.title)).toContain("默认目录");
+  it("传 canExportProject 时显示导出可编译项目", () => {
+    const { item, p } = render({ showResZip: false, canExportProject: true, onExportProject: vi.fn() });
+    item("导出可编译项目")!.onClick();
+    expect(p.onExportProject).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Toolbar — ＋新建菜单（M404）", () => {
+  it("不传 onNewItem 时不显示＋菜单", () => {
+    const p = props({});
+    const tree = Toolbar(p) as unknown as El;
+    const arrs = collectAllItems(tree as unknown as ReactNode);
+    expect(arrs.find((a) => a.some((it) => it.key === "activity"))).toBeUndefined();
+  });
+
+  it("传 onNewItem 时菜单含三个新建项并各自回调", () => {
+    const p = props({ onNewItem: vi.fn() });
+    const tree = Toolbar(p) as unknown as El;
+    const arrs = collectAllItems(tree as unknown as ReactNode);
+    const newArr = arrs.find((a) => a.some((it) => it.key === "activity")) ?? [];
+    expect(newArr.map((it) => it.label)).toEqual(["新建 Activity 页面", "新建 Java 类", "新建 XML 布局"]);
+    newArr.find((it) => it.key === "activity")!.onClick();
+    newArr.find((it) => it.key === "java")!.onClick();
+    newArr.find((it) => it.key === "layout")!.onClick();
+    const fn = p.onNewItem as ReturnType<typeof vi.fn>;
+    expect(fn.mock.calls).toEqual([["activity"], ["java"], ["layout"]]);
   });
 });
 
 describe("Toolbar — 主要动作接线", () => {
-  it("保存 / 打开 / 复制 / 导出预览图 / 运行 / 格式化 各自触发对应回调", () => {
-    const { by, item, p, runItem } = render();
-    for (const label of ["保存", "导出预览图", "格式化"]) {
+  it("保存 / 运行 / 格式化 各自触发对应回调（M404：导出预览图按钮已删）", () => {
+    const { by, p, runItem } = render();
+    for (const label of ["保存", "格式化"]) {
       const b = by(label);
       expect(b, label).toBeDefined();
       (b!.props.onClick as () => void)();
     }
-    // M173：打开 / 复制 移到了「更多」菜单
-    item("打开 XML 文件")!.onClick();
-    item("复制 XML")!.onClick();
+    expect(by("导出预览图")).toBeUndefined();
     // M316：运行菜单第一项（界面预览）——Web 端点选走 onRun（模拟界面）
     const runPreview = runItem("界面预览");
     expect(runPreview).toBeDefined();
     runPreview!.onClick();
     expect(p.onSave).toHaveBeenCalledTimes(1);
-    expect(p.onOpenFile).toHaveBeenCalledTimes(1);
-    expect(p.onCopyXml).toHaveBeenCalledTimes(1);
-    expect(p.onExportImage).toHaveBeenCalledTimes(1);
     expect(p.onRun).toHaveBeenCalledTimes(1);
     expect(p.onFormat).toHaveBeenCalledTimes(1);
   });

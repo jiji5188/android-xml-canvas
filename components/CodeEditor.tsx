@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { diagRanges as calcDiagRanges, type DiagInfo } from "@/lib/xml/diag-deco";
+import { symbolDoc } from "@/lib/xml/java-doc";
 import { codeHint } from "@/lib/xml/diag-hints";
 import { Compartment, EditorState, Prec, Range, RangeSet, SelectionRange, StateEffect, StateField } from "@codemirror/state";
 import {
@@ -622,6 +623,228 @@ export function CodeEditor({
 
   /** M76:输入法是否在组合中(此时按键/候选一律让路) */
   const composing = useCallback(() => !!viewRef.current?.composing, []);
+
+  /* ===== M404:长按弹出菜单（复制 / 粘贴 / 剪切 / 全选 / 查找 / 文档）=====
+   * 触屏长按 450ms（或鼠标右键）在按压点弹菜单；有选区才出「剪切」；
+   * 选中的 token 能被 hoverTip 解析出文档时多出「文档」项。
+   * 位置限制在 .axv-code-body 里（相对定位）。 */
+  const [ctxMenu, setCtxMenu] = useState<{
+    x: number;
+    y: number;
+    items: { key: string; icon: string; label: string; run: () => void }[];
+  } | null>(null);
+  /** M404:文档浮层（选中类/方法的 Javadoc/KDoc + 签名，或资源引用说明），非 null 时渲染 */
+  const [ctxDocShow, setCtxDocShow] = useState<{ title: string; body: string } | null>(null);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressPos = useRef<{ x: number; y: number } | null>(null);
+  const longPressMoved = useRef(false);
+
+  const closeCtxMenu = useCallback(() => {
+    setCtxMenu(null);
+    setCtxDocShow(null);
+  }, []);
+
+  /** 当前选区文本（长按时捕获，避免菜单打开后选区变化） */
+  const selectionText = useCallback((): string => {
+    const v = viewRef.current;
+    if (!v) return "";
+    const sel = v.state.selection.main;
+    return sel.empty ? "" : v.state.sliceDoc(sel.from, sel.head);
+  }, []);
+
+  /** 光标下的 token（无选区时查文档项用）：取光标所在行当前列起的单词 */
+  const cursorToken = useCallback((): string => {
+    const v = viewRef.current;
+    if (!v) return "";
+    const sel = v.state.selection.main;
+    if (!sel.empty) {
+      const t = v.state.sliceDoc(sel.from, sel.head).trim();
+      // 只认单词（类名/方法名），多行/带空白不查文档
+      if (t && /^[A-Za-z0-9_]+$/.test(t)) return t;
+      return "";
+    }
+    const line = v.state.doc.lineAt(sel.head);
+    const rest = line.text.slice(sel.head - line.from);
+    const m = rest.match(/^[A-Za-z_][A-Za-z0-9_]*/);
+    return m ? m[0] : "";
+  }, []);
+
+  const ctxCopy = useCallback(async () => {
+    const text = selectionText();
+    if (!text) {
+      closeCtxMenu();
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /* 剪贴板不可用时静默（非 https / 旧 WebView） */
+    }
+    closeCtxMenu();
+  }, [selectionText, closeCtxMenu]);
+
+  const ctxCut = useCallback(async () => {
+    const text = selectionText();
+    const v = viewRef.current;
+    if (!text || !v) {
+      closeCtxMenu();
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /* ignore */
+    }
+    const sel = v.state.selection.main;
+    v.dispatch({ changes: { from: sel.from, to: sel.head } });
+    closeCtxMenu();
+  }, [selectionText, closeCtxMenu]);
+
+  const ctxPaste = useCallback(async () => {
+    const v = viewRef.current;
+    if (!v) {
+      closeCtxMenu();
+      return;
+    }
+    let text = "";
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      closeCtxMenu();
+      return;
+    }
+    if (!text) {
+      closeCtxMenu();
+      return;
+    }
+    const sel = v.state.selection.main;
+    v.dispatch({ changes: { from: sel.from, to: sel.head, insert: text } });
+    closeCtxMenu();
+    v.focus();
+  }, [closeCtxMenu]);
+
+  const ctxSelectAll = useCallback(() => {
+    const v = viewRef.current;
+    if (!v) {
+      closeCtxMenu();
+      return;
+    }
+    const len = v.state.doc.length;
+    v.dispatch({ selection: { anchor: 0, head: len }, effects: EditorView.scrollIntoView(0) });
+    closeCtxMenu();
+    v.focus();
+  }, [closeCtxMenu]);
+
+  const ctxFind = useCallback(() => {
+    setFindOpen(true);
+    setReplaceOpen(false);
+    closeCtxMenu();
+    // 用选区内容预填查找框
+    const sel = selectionText();
+    if (sel && /^[\w@./-]{1,120}$/.test(sel)) setQuery(sel);
+    window.setTimeout(() => findRef.current?.focus(), 30);
+  }, [closeCtxMenu, selectionText]);
+
+  /** M404:长按/右键 触发点：构建菜单项 */
+  const openCtxMenu = useCallback(
+    (clientX: number, clientY: number) => {
+      const body = bodyRef.current;
+      if (!body) return;
+      const selText = selectionText();
+      const hasSel = !!selText;
+      const items: { key: string; icon: string; label: string; run: () => void }[] = [];
+      if (hasSel) items.push({ key: "copy", icon: "content_copy", label: tt("复制"), run: ctxCopy });
+      if (hasSel) items.push({ key: "cut", icon: "content_cut", label: tt("剪切"), run: ctxCut });
+      items.push({ key: "paste", icon: "content_paste", label: tt("粘贴"), run: ctxPaste });
+      items.push({ key: "selectall", icon: "select_all", label: tt("全选"), run: ctxSelectAll });
+      items.push({ key: "find", icon: "find", label: tt("查找"), run: ctxFind });
+      // 文档项：选中类/方法时，用 symbolDoc 取 Javadoc/KDoc；资源引用走 hoverTip
+      const token = selText.trim() || cursorToken();
+      let doc: { title: string; body: string } | null = null;
+      let resourceDoc: string | null = null;
+      if (token) {
+        // Java/Kotlin 文件：查当前文件的类/方法文档
+        if (langRef.current === "java") {
+          const isKt = /\bfun\b/.test(value) || /\bval\s/.test(value) || /\.kts?$/.test(value);
+          doc = symbolDoc(value, isKt, token);
+        }
+        // 资源引用（R.id / @drawable 等）走 hoverTip
+        if (!doc && hoverTipRef.current) {
+          resourceDoc = hoverTipRef.current(token);
+        }
+      }
+      if (doc || resourceDoc) {
+        const docContent = doc ? doc.body : (resourceDoc as string);
+        const docTitle = doc ? doc.title : token;
+        items.push({
+          key: "doc", icon: "article", label: tt("查看文档"),
+          run: () => {
+            setCtxDocShow({ title: docTitle, body: docContent });
+            setCtxMenu(null);
+          },
+        });
+      }
+      // 转相对 .axv-code-body 坐标
+      const br = body.getBoundingClientRect();
+      const x = Math.max(4, Math.min(clientX - br.left, br.width - 176));
+      const y = Math.max(4, Math.min(clientY - br.top, br.height - 40));
+      setCtxMenu({ x, y, items });
+    },
+    [selectionText, cursorToken, ctxCopy, ctxCut, ctxPaste, ctxSelectAll, ctxFind, value, langRef, tt],
+  );
+
+  /* M404:长按监听（.axv-cm 上的 pointerdown 起 450ms 计时，移动/抬起取消；右键直接弹） */
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const cancel = () => {
+      if (longPressTimer.current !== null) {
+        window.clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+      longPressMoved.current = false;
+      longPressPos.current = null;
+    };
+    const onDown = (e: PointerEvent) => {
+      if (e.button === 2) return; // 右键走 onContextMenu
+      longPressPos.current = { x: e.clientX, y: e.clientY };
+      longPressMoved.current = false;
+      if (longPressTimer.current !== null) window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = window.setTimeout(() => {
+        if (longPressMoved.current || !longPressPos.current) return;
+        const p = longPressPos.current;
+        longPressTimer.current = null;
+        e.preventDefault();
+        openCtxMenu(p.x, p.y);
+      }, 450);
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!longPressPos.current) return;
+      const dx = Math.abs(e.clientX - longPressPos.current.x);
+      const dy = Math.abs(e.clientY - longPressPos.current.y);
+      if (dx > 12 || dy > 12) {
+        longPressMoved.current = true;
+        cancel();
+      }
+    };
+    const onCtx = (e: MouseEvent) => {
+      e.preventDefault();
+      openCtxMenu(e.clientX, e.clientY);
+    };
+    host.addEventListener("pointerdown", onDown);
+    host.addEventListener("pointermove", onMove);
+    host.addEventListener("pointerup", cancel);
+    host.addEventListener("pointercancel", cancel);
+    host.addEventListener("contextmenu", onCtx);
+    return () => {
+      host.removeEventListener("pointerdown", onDown);
+      host.removeEventListener("pointermove", onMove);
+      host.removeEventListener("pointerup", cancel);
+      host.removeEventListener("pointercancel", cancel);
+      host.removeEventListener("contextmenu", onCtx);
+      cancel();
+    };
+  }, [openCtxMenu]);
 
   /* ===== M45:算候选 + 算光标坐标 → 定位弹窗 ===== */
   const refreshSuggest = useCallback(() => {
@@ -1410,6 +1633,48 @@ export function CodeEditor({
             >
               {tt("全部")}
             </button>
+          </div>
+        ) : null}
+
+        {/* M404：长按/右键弹出菜单（复制/粘贴/剪切/全选/查找/查看文档） */}
+        {ctxMenu ? (
+          <div
+            className="axv-code-ctx"
+            role="menu"
+            style={{ left: ctxMenu.x, top: ctxMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {ctxMenu.items.map((it) => (
+              <button
+                key={it.key}
+                type="button"
+                className="axv-code-ctx-item"
+                role="menuitem"
+                aria-label={it.label}
+                onClick={() => it.run()}
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>{it.icon}</span>
+                {it.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {ctxDocShow ? (
+          <div
+            className="axv-code-ctxdoc"
+            role="dialog"
+            aria-label={tt("文档")}
+            onClick={closeCtxMenu}
+          >
+            <div className="axv-code-ctxdoc-head">
+              <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>article</span>
+              {ctxDocShow.title}
+              <button type="button" className="axv-code-ctxdoc-close" aria-label={tt("关闭")} onClick={(e) => { e.stopPropagation(); closeCtxMenu(); }}>
+                <span className="msr" aria-hidden="true" style={{ fontSize: 15 }}>close</span>
+              </button>
+            </div>
+            <div className="axv-code-ctxdoc-body">{ctxDocShow.body}</div>
           </div>
         ) : null}
       </div>

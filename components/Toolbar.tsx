@@ -11,6 +11,7 @@
 import { ViewSettingsMenu } from "./ViewSettingsMenu";
 import { ToolbarMoreMenu, type MoreItem } from "./ToolbarMoreMenu";
 import { ToolbarRunMenu, type RunMenuItem } from "./ToolbarRunMenu";
+import { ToolbarNewMenu, DEFAULT_NEW_ITEMS, type NewItemKind } from "./ToolbarNewMenu";
 import { t as tt } from "@/lib/i18n-src";
 
 export type ToolbarProps = {
@@ -33,21 +34,13 @@ export type ToolbarProps = {
   onUndo: () => void;
   onRedo: () => void;
 
+  /** M404：撤销按钮前的「＋」新建菜单（新建 Activity 页面 / Java 类 / XML 布局） */
+  onNewItem?: (kind: NewItemKind) => void;
+
   onSave: () => void;
-  onOpenFile: () => void;
-  onCopyXml: () => void;
   /** 有 res 资源或生成的 drawable 时才显示「导出 res 包」 */
   showResZip: boolean;
   onExportRes: () => void;
-  onExportImage: () => void;
-  /** 有 res 资源时才显示「清除 res」 */
-  hasRes: boolean;
-  onClearRes: () => void;
-
-  /** 原生容器（APK）才有「更换保存位置」 */
-  nativeAvailable: boolean;
-  workspaceLabel: string;
-  onChangeWorkspace: () => void;
 
   onRun: () => void;
   /** M154：设备端 aapt2 真渲染（只有 APK 里桥在才有） */
@@ -87,17 +80,10 @@ export function Toolbar(props: ToolbarProps) {
     canRedo,
     onUndo,
     onRedo,
+    onNewItem,
     onSave,
-    onOpenFile,
-    onCopyXml,
     showResZip,
     onExportRes,
-    onExportImage,
-    hasRes,
-    onClearRes,
-    nativeAvailable,
-    workspaceLabel,
-    onChangeWorkspace,
     onRun,
     realRenderAvailable,
     realRenderBusy,
@@ -113,17 +99,8 @@ export function Toolbar(props: ToolbarProps) {
     snapCount,
   } = props;
 
-  /* M173：低频操作收进「更多」弹出菜单（渲染在 ToolbarMoreMenu 里，portal 到 .axv-main，避免被工具栏裁剪） */
-  const moreItems: MoreItem[] = [
-    {
-      key: "open",
-      icon: "file_open",
-      label: tt("打开 XML 文件"),
-      hint: tt("也可直接把文件拖进来"),
-      onClick: onOpenFile,
-    },
-    { key: "copy", icon: "content_copy", label: tt("复制 XML"), onClick: onCopyXml },
-  ];
+  /* M173：低频操作收进「更多」弹出菜单（M404：删掉「打开 XML / 复制 XML / 清除 res / 更换保存位置」，只留导出 res 包 + 导出可编译项目） */
+  const moreItems: MoreItem[] = [];
   if (showResZip) {
     moreItems.push({
       key: "reszip",
@@ -133,9 +110,6 @@ export function Toolbar(props: ToolbarProps) {
       onClick: onExportRes,
     });
   }
-  if (hasRes) {
-    moreItems.push({ key: "clearres", icon: "hide_image", label: tt("清除 res"), onClick: onClearRes });
-  }
   if (canExportProject) {
     moreItems.push({
       key: "exportproj",
@@ -143,16 +117,6 @@ export function Toolbar(props: ToolbarProps) {
       label: tt("导出可编译项目"),
       hint: tt("整个项目打成 zip，拷到电脑出 release 包"),
       onClick: () => onExportProject?.(),
-    });
-  }
-  if (nativeAvailable) {
-    moreItems.push({
-      key: "workspace",
-      icon: "save_location",
-      label: tt("更换保存位置"),
-      hint: workspaceLabel || tt("默认目录"),
-      title: tt("保存位置：{path}（点击更换）", { path: workspaceLabel || tt("默认目录") }),
-      onClick: onChangeWorkspace,
     });
   }
 
@@ -220,6 +184,8 @@ export function Toolbar(props: ToolbarProps) {
         <div className="axv-tb-group">
           {/* M6c/M10：设备 + 缩放收进这个按钮，并与其它工具同处一个工具组 */}
           <ViewSettingsMenu deviceId={deviceId} onDevice={onChangeDevice} scale={scale} onScale={onScale} onCompare={onCompare} />
+          {/* M404：＋新建菜单（撤销按钮前） */}
+          {onNewItem ? <ToolbarNewMenu items={DEFAULT_NEW_ITEMS(onNewItem)} /> : null}
           <button className="axv-tb-btn" title={tt("撤销")} aria-label={tt("撤销")} disabled={!canUndo} onClick={onUndo}>
             <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>undo</span>
           </button>
@@ -245,14 +211,7 @@ export function Toolbar(props: ToolbarProps) {
               {snapCount ? <span className="axv-tb-badge">{snapCount}</span> : null}
             </button>
           ) : null}
-          <button
-            className="axv-tb-btn"
-            title={tt("导出预览图（PNG / SVG）")}
-            aria-label={tt("导出预览图")}
-            onClick={onExportImage}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>image</span>
-          </button>
+          {/* M404：导出预览图按钮已删除 */}
           {/* M290：运行按钮菜单（M316：模拟+编译合并为「界面预览」，共三项） */}
           <ToolbarRunMenu busy={realRenderBusy || undefined} items={runItems} />
           <button

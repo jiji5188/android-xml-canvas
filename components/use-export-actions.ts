@@ -39,7 +39,6 @@ export interface ExportActionsResult {
   applyExportMode: (m: ExportMode) => void;
   saveProject: () => void;
   doCopy: () => Promise<void>;
-  copyExportedXml: () => void;
 }
 
 export function useExportActions(getDeps: () => ExportActionsDeps): ExportActionsResult {
@@ -124,11 +123,5 @@ export function useExportActions(getDeps: () => ExportActionsDeps): ExportAction
     window.setTimeout(() => D.setExportNote(""), 2600);
   };
 
-  const copyExportedXml = () => {
-    D.setExportAction("copy");
-    D.setExportReport(buildReport());
-    D.setExportOpen(true);
-  };
-
-  return { confirmSaveAs, buildReport, applyExportMode, saveProject, doCopy, copyExportedXml };
+  return { confirmSaveAs, buildReport, applyExportMode, saveProject, doCopy };
 }

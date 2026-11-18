@@ -1,7 +1,7 @@
 // components/use-save-export.ts — M366 step13（路线 2 拆解）：打开文件 / 保存 / 导出域
 //
 // 从 XmlEditor.tsx 抽出（原 ~1626-1734 区域）：
-//   openProject / openProjectFile（打开 .xml）/ clearRes（清上传资源）/
+//   openProject / openProjectFile（打开 .xml）/
 //   doDownload（导出布局 XML）/ currentSaveInput（四条保存路径共用的落盘输入）
 //
 // deps-getter + 延迟 Proxy（与 use-canvas-ops.ts 同款）。纯 lib 直接 import。
@@ -9,7 +9,6 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { t as tt } from "@/lib/i18n-src";
-import { lsSet } from "@/lib/xml/storage";
 import { activeFile, type Project } from "@/lib/xml/multi-file";
 import { downloadLayout, type SaveInput } from "@/lib/xml/save-flow";
 import type { ResourceExtras } from "@/lib/xml/resdir";
@@ -28,11 +27,6 @@ export interface SaveExportDeps {
   pickXmlFile: () => Promise<{ text: string; name: string; handle: unknown } | null>;
   loadXmlFile: (f: File) => void;
   setSaveOrigin: React.Dispatch<React.SetStateAction<SaveOriginT>>;
-  // 清资源
-  setResExtras: (v: ResourceExtras | null) => void;
-  setResourceFragment: (v: string) => void;
-  setSampleValues: (v: string) => void;
-  resDirRef: React.MutableRefObject<HTMLInputElement | null>;
   // 提示
   setExportNote: (v: string) => void;
   flashNote: (msg: string, ms?: number) => void;
@@ -48,14 +42,11 @@ export interface SaveExportDeps {
   generatedDrawables: Record<string, string>;
   resExtrasAll: ResourceExtras | null;
   appIconRes: Record<string, string>;
-  LS_KEY_SAMPLE: string;
-  LS_KEY_RES: string;
 }
 
 export interface SaveExportResult {
   openProject: () => void;
   openProjectFile: () => void;
-  clearRes: () => void;
   doDownload: () => void;
   currentSaveInput: (name?: string) => SaveInput;
 }
@@ -113,22 +104,6 @@ export function useSaveExport(getDeps: () => SaveExportDeps): SaveExportResult {
 
   const openProject = () => D.leaveGuard.gate(D.dirty, () => openProjectFile());
 
-  const clearRes = () => {
-    D.setResExtras(null);
-    D.setResourceFragment("");
-    // M149：连示例项目自带的 values/drawable 一起清掉，否则清完还是一堆“幽灵资源”
-    D.setSampleValues("");
-    lsSet(D.LS_KEY_SAMPLE, "");
-    try {
-      window.localStorage.removeItem(D.LS_KEY_RES);
-    } catch {
-      /* ignore */
-    }
-    if (D.resDirRef.current) D.resDirRef.current.value = "";
-    D.setExportNote(tt("已清除上传的 res 资源"));
-    window.setTimeout(() => D.setExportNote(""), 2400);
-  };
-
   /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续
    *  M2s：改成可视化检查面板（不再用 alert/confirm） */
   const doDownload = () => {
@@ -143,5 +118,5 @@ export function useSaveExport(getDeps: () => SaveExportDeps): SaveExportResult {
     window.setTimeout(() => D.setExportNote(""), 2400);
   };
 
-  return { openProject, openProjectFile, clearRes, doDownload, currentSaveInput };
+  return { openProject, openProjectFile, doDownload, currentSaveInput };
 }

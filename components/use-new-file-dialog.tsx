@@ -59,6 +59,20 @@ export function useNewFileDialog(deps: NewFileDialogDeps) {
     setNewStep(1);
   }, []);
 
+  /** M404：工具栏「＋」菜单直达：预选分类+模板，跳过一级分类菜单直接进二级对话框 */
+  const openNewFilePreset = useCallback((catKey: string, tplKey?: string) => {
+    const cat = findCategory(catKey);
+    if (!cat) return;
+    const tpl = (tplKey ? cat.templates.find((x) => x.key === tplKey) : undefined) ?? cat.templates[0];
+    setNewCat(cat.key);
+    setNewTpl(tpl?.key ?? "");
+    setNewPath(cat.defaultPath);
+    setNewName(tpl ? guessDefaultFileName(cat.key, tpl.ext) : "");
+    setNewCompanion(false);
+    setNewFileOpen(true);
+    setNewStep(2);
+  }, []);
+
   const closeNewFile = useCallback(() => {
     setNewFileOpen(false);
   }, []);
@@ -231,5 +245,5 @@ export function useNewFileDialog(deps: NewFileDialogDeps) {
     </div>
   ) : null;
 
-  return { openNewFileMenu, newFile, dialogJsx, newFileOpen, closeNewFile };
+  return { openNewFileMenu, openNewFilePreset, newFile, dialogJsx, newFileOpen, closeNewFile };
 }

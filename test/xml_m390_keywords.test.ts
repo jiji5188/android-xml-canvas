@@ -28,6 +28,20 @@ describe("M390 关键词完整词可达", () => {
       expect(r?.items?.[0]).toBe(w);
     }
   });
+  it("M392：普通词 1 字母就弹（之前要 2 字母）", () => {
+    const r1 = probe("p");
+    expect(r1).not.toBeNull();
+    expect(r1?.items?.length).toBeGreaterThan(0);
+    const rA = probe("a");
+    expect(rA).not.toBeNull();
+    // 类名/变量/方法里有 a 开头的才会出现
+  });
+  it("M392：receiver 点号后空前缀仍列成员（fn.）", () => {
+    const d = "public class A {\n    void f() {\n        TextView fn = findViewById(R.id.tv);\n        fn.";
+    const lines = d.split("\n");
+    const r = computeJavaSuggest(d, { line: 4, col: 12 }, undefined);
+    expect(r?.items?.includes("setText")).toBe(true);
+  });
   it("变量/方法的自我跳过规则不变（半截词不弹自己）", () => {
     // 打了半截 titleVi：文档扫描会把 titleVi 当 var 扫进来，但弹窗里不能有 titleVi 这个半截词
     const doc = "class A {\n    TextView titleView;\n    void f() {\n        titleVi";

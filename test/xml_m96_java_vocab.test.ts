@@ -100,9 +100,12 @@ describe("M96 Java 候选计算", () => {
     expect(suggest('String s = "public cl')).toBeNull();
   });
 
-  it("前缀太短 / 无匹配返回 null", () => {
-    expect(suggest("p")).toBeNull();
-    expect(suggest("zzzzqqq")).toBeNull();
+  it("前缀无匹配返回 null；1 字母也弹（M392）", () => {
+    // M392：普通词放开到 1 字母就弹（词库+作用域已收窄，弹窗有最大高度，不会满屏）
+    const p = suggest("p");
+    expect(p).not.toBeNull();
+    expect(p!.items.length).toBeGreaterThan(0); // public / put…
+    expect(suggest("zzzzqqq")).toBeNull(); // 完全无匹配仍 null
   });
 
   it("候选数量有上限", () => {

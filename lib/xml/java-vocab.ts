@@ -693,9 +693,12 @@ export function computeJavaSuggest(
   }
   const isAt = prefix.startsWith("@");
   const body = isAt ? prefix.slice(1) : prefix;
-  // M391：能认出 receiver 类型时，允许空前缀（刚点完点号）直接列该类成员，不再要求 ≥2 字符
+  // M392：普通词放开成 1 字母就弹（之前是 ≥2）。
+  //   依据：候选池已按「词库 + 作用域」收窄过（类名只弹 import/项目里出现过的，变量只弹本方法+本类，方法没有类前提就不弹类里方法），
+  //   且弹窗本身有最大高度（超了内部滚动，不会满屏）——所以 1 字母弹 10~20 条完全可接受，少打一个字更顺。
+  //   memberMode（receiver 点号后）仍允许空前缀直接列成员。
   const memberMode = !isAt && !!receiverType && body.length < 2;
-  if (body.length < 2 && !isAt && !memberMode) return null;
+  if (body.length < 1 && !isAt && !memberMode) return null;
 
   // M391：成员列表模式 —— `fn.` 刚打完点号（body 为空）或打了 1 个字母，
   //   直接按 receiver 类型列「公开方法 + 公开常量/字段」，不掺入全局/当前文件的泛用池，

@@ -643,6 +643,28 @@ public class MainActivity extends Activity {
             }).start();
         }
 
+        /** M405：debug 运行·编译步（异步）→ window.__axvDebugCompile(id, resultJson) */
+        @JavascriptInterface
+        public void debugCompileToDexAsync(final String id, final String payloadJson) {
+            new Thread(() -> {
+                final String res = MainActivity.this.debugCompileToDex(payloadJson);
+                final String js = "window.__axvDebugCompile && window.__axvDebugCompile(" + JSONObject.quote(id) + ","
+                        + JSONObject.quote(res) + ");";
+                MainActivity.this.evalJsOnUi(js);
+            }).start();
+        }
+
+        /** M405：debug 运行·执行步（异步）→ window.__axvDebugRun(id, resultJson) */
+        @JavascriptInterface
+        public void debugRunAsync(final String id, final String payloadJson) {
+            new Thread(() -> {
+                final String res = MainActivity.this.debugRun(payloadJson);
+                final String js = "window.__axvDebugRun && window.__axvDebugRun(" + JSONObject.quote(id) + ","
+                        + JSONObject.quote(res) + ");";
+                MainActivity.this.evalJsOnUi(js);
+            }).start();
+        }
+
         /** M192：调系统安装器装刚打出来的包 */
         @JavascriptInterface
         public void installApk(String path) {
@@ -3428,6 +3450,16 @@ public class MainActivity extends Activity {
     private String buildInstallApk(String payloadJson) {
         // M239：打包逻辑全抽到 BuildApkHelper（工具类，传 context）
         return new BuildApkHelper(this).build(payloadJson);
+    }
+
+    /** M405：debug 运行·编译步 —— 把项目 Java 编成 dex 字节（不打包/不签名/不装包）。返回 JSON */
+    private String debugCompileToDex(String payloadJson) {
+        return new BuildApkHelper(this).compileToDex(payloadJson);
+    }
+
+    /** M405：debug 运行·执行步 —— 动态加载 dex 并跑 main/debug，捕获 System.out/err/异常。返回 JSON */
+    private String debugRun(String payloadJson) {
+        return new DebugRunHelper(this).run(payloadJson);
     }
 
     private static String jsonFail(String step, StringBuilder log) {

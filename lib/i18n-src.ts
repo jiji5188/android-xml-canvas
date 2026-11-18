@@ -3189,6 +3189,29 @@ export const SRC_EN: SrcDict = {
   "Holo 浅色版，老式白底蓝主色": "Holo light version, old-style white background with blue primary",
   "原生 Material（无 AndroidX），API 21+ 系统主题": "Native Material (no AndroidX), system theme for API 21+",
 
+  // M405：调试运行（AIDE 同款不装包）—— 与 SRC_EN 里已有的重名键（调试日志/失败/没有可写的项目目录/正在收集 Java 源码…/正在收集依赖库…）不重复登记
+  "调试": "Debug",
+  "运行中…": "Running…",
+  "再跑一次": "Run again",
+  "（无输出）": "(no output)",
+  "输出": "Output",
+  "返回值": "Return",
+  "报错": "Errors",
+  "点「运行」执行 main/debug，结果会显示在这里。": "Hit “Run” to execute main/debug; results appear here.",
+  "正在设备端编译 + 动态加载执行…": "Compiling on-device + loading dex dynamically…",
+  "没有异常": "No exceptions",
+  "编译日志": "Build log",
+  "void / null": "void / null",
+  "成功": "OK",
+  "当前环境不支持调试运行（网页版没有 ECJ/D8），请在手机上操作": "Debug run needs the on-device compiler (no ECJ/D8 in web) — please use the phone app",
+  "项目里没有 Java 源码，没法调试运行": "No Java sources in this project; can't debug-run",
+  "正在设备端编译（ECJ+D8）…": "Compiling on-device (ECJ+D8)…",
+  "编译失败：{log}": "Build failed:\n{log}",
+  "正在执行（动态加载 dex）…": "Executing (loading dex)…",
+  "调试运行成功（{ms}ms）": "Debug run OK ({ms}ms)",
+  "调试运行{step}：{e}": "Debug run {step}: {e}",
+  "调试运行失败：{m}": "Debug run failed: {m}",
+  "运行调试（设备端编译+动态执行，结果看下方调试日志）": "Debug run (on-device build + dynamic dex; results in the log below)",
 
 };
 

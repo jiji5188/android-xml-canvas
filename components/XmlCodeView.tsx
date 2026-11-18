@@ -55,6 +55,13 @@ export interface XmlCodeViewProps {
   onNote?: (msg: string) => void;
   /** M341：其它 values 文件已用的顶层资源名（全局重名校验用，不含当前文件） */
   reservedNames?: string[];
+
+  /** M405：编辑器下方插槽（调试日志面板），仅 Java 代码页显示 */
+  codeSlot?: React.ReactNode;
+  /** M405：运行调试回调（Java 页快捷条里的「▶ 调试」按钮） */
+  onDebugRun?: () => void;
+  /** M405：是否显示调试按钮（仅 Java 且有设备端编译能力时） */
+  showDebugRun?: boolean;
 }
 
 export function XmlCodeView(props: XmlCodeViewProps) {
@@ -113,8 +120,11 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           lang={props.lang}
           indent={props.indent}
           resNames={props.resNames}
+          onDebugRun={props.showDebugRun ? props.onDebugRun : undefined}
         />
       )}
+      {/* M405：调试日志面板（编辑器下方，仅代码页） */}
+      {props.codeSlot}
     </div>
   );
 }

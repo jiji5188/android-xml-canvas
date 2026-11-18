@@ -94,6 +94,8 @@ export interface CodeEditorProps {
   lexRef?: React.MutableRefObject<Lexicon | null>;
   /** M209:悬停提示——父层把光标下的 token（如 R.id.btn / @drawable/ic / 变量名）解析成提示文本，非 null 就弹 tooltip */
   hoverTip?: (raw: string) => string | null;
+  /** M405:运行调试（Java 页）—— 设备端 ECJ+D8 编 dex 动态执行 main/debug，结果打到编辑器下方调试日志 */
+  onDebugRun?: () => void;
 }
 
 /** M76:在一份文本里找全部匹配(大小写不敏感,上限 500 条,空 query 返回空) */
@@ -492,6 +494,7 @@ export function CodeEditor({
   onRefClick,
   lexRef,
   hoverTip,
+  onDebugRun,
 }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -1836,6 +1839,18 @@ export function CodeEditor({
             onClick={onFormat}
           >
             <span className="msr" aria-hidden="true">format_align_left</span>
+          </button>
+        ) : null}
+        {lang === "java" && onDebugRun ? (
+          <button
+            type="button"
+            className="axv-sym-btn axv-sym-action"
+            title={tt("运行调试（设备端编译+动态执行，结果看下方调试日志）")}
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.preventDefault()}
+            onClick={onDebugRun}
+          >
+            ▶ {tt("调试")}
           </button>
         ) : null}
         {(lang === "java" ? JAVA_SYMBOLS : SYMBOLS).map((s) => (

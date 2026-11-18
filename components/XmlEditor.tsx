@@ -91,6 +91,8 @@ import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { useEditorState } from "./editor-state";
 import { useBuildApk } from "./use-build-apk";
+import { useDebugRun } from "./use-debug-run";
+import { DebugRunPanel } from "./DebugRunPanel";
 import { installApk, shareApkFile, hasBuildApk, type BuildApkResult } from "@/lib/xml/native-apk";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
@@ -1425,6 +1427,30 @@ const allDrawableNames = useMemo(() => {
     onBuildLog: pushApkBuildLog,
   });
 
+  // M405：调试运行（AIDE 同款不装包：设备端 ECJ+D8 编 dex → 动态加载执行 main/debug → 捕获输出）
+  const { debugBusy, debugResult, doDebugRun, canDebug } = useDebugRun({
+    activeProject,
+    aiFileIo,
+    openRel,
+    xml,
+    resources,
+    noteTimed,
+    setExportNote,
+  });
+  const [debugPanelOpen, setDebugPanelOpen] = useState(false);
+  const [debugEntry, setDebugEntry] = useState<{ cls: string; method: string } | null>(null);
+  const triggerDebugRun = useCallback(
+    async (opt?: { entryClass?: string; entryMethod?: string }) => {
+      setDebugPanelOpen(true);
+      if (opt) setDebugEntry({ cls: opt.entryClass || "", method: opt.entryMethod || "" });
+      await doDebugRun({
+        entryClass: opt?.entryClass,
+        entryMethod: opt?.entryMethod,
+      });
+    },
+    [doDebugRun],
+  );
+
   /** M290：工具栏「打包并运行」—— 默认签名一键打包；doBuildApk 成功后会自动调安装/分享 */
   const doBuildAndRun = useCallback(async () => {
     await doBuildApk({ storeFile: "", storePass: "", alias: "", keyPass: "" });
@@ -1885,6 +1911,26 @@ const allDrawableNames = useMemo(() => {
         view={mobileTab === "values" ? viewKind ?? "code" : "code"}
         fileKey={openRel || saveOrigin?.name || ""}
         onNote={flashNote}
+        codeSlot={
+          debugPanelOpen && editorLang === "java" ? (
+            <DebugRunPanel
+              result={debugResult}
+              busy={debugBusy}
+              canDebug={canDebug}
+              onRerun={() => {
+                void triggerDebugRun({
+                  entryClass: debugEntry?.cls || undefined,
+                  entryMethod: debugEntry?.method || undefined,
+                });
+              }}
+              onClose={() => setDebugPanelOpen(false)}
+            />
+          ) : null
+        }
+        showDebugRun={editorLang === "java" && canDebug}
+        onDebugRun={() => {
+          void triggerDebugRun();
+        }}
       />
 
       {/* M101：代码 tab 也能看到操作反馈（exportNote 原本只在画布里的状态条） */}

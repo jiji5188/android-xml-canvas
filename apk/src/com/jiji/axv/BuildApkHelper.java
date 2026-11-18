@@ -444,6 +444,60 @@ public class BuildApkHelper {
 
     // ===== 编译 =====
 
+    /** M405：debug 运行 —— 把项目 Java 编译成 dex 字节（不打包/不签名/不装包）。
+     *  payload 与 buildInstallApk 同构（javaSources / libs / rPackages / pkg），但只走到「dex 字节」。
+     *  返回 { ok, dex: [base64…], classes, log }；供 DebugRunHelper 动态加载后反射跑 main/debug。
+     *  R.java 由调用方（JS）生成好塞进 javaSources（path 以 R.java 结尾），这里不再跑 aapt2。
+     */
+    public String compileToDex(String payloadJson) {
+        StringBuilder log = new StringBuilder();
+        String step = "init";
+        try {
+            JSONObject p = new JSONObject(payloadJson);
+            String pkg = p.optString("pkg", "com.axv.app");
+            JSONArray javaSources = p.optJSONArray("javaSources");
+            JSONArray libs = p.optJSONArray("libs");
+            if (javaSources == null || javaSources.length() == 0) {
+                return "{\"ok\":false,\"step\":\"sources\",\"log\":\"没有 Java 源码可编译\"}";
+            }
+            step = "compile";
+            File root = new File(ctx.getCacheDir(), "debugrun");
+            deleteTree(root);
+            if (!root.mkdirs()) throw new IOException("建不了 debugrun 目录");
+            // 同 build 的 androidx 插件包（assets/androidx/ → cache，拼 ECJ classpath）
+            List<String> androidxJars = ensureAndroidx(root, log);
+            log.append("debugrun: androidx 插件包 ").append(androidxJars.size()).append(" 个\n");
+            java.util.List<byte[]> extraDex = new java.util.ArrayList<>();
+            String cm = compileProjectJava(javaSources, root, null, log, extraDex, null, libs, androidxJars, pkg);
+            if (!cm.startsWith("java:")) {
+                return "{\"ok\":false,\"step\":\"compile\",\"log\":" + quote(cm) + "}";
+            }
+            // 把 dex 字节拼成一个 JSON（base64 数组）回给 JS，避免大 payload 走 JNI 同步返回超限
+            JSONArray arr = new JSONArray();
+            int total = 0;
+            for (int i = 0; i < extraDex.size(); i++) {
+                byte[] d = extraDex.get(i);
+                if (d == null || d.length == 0) continue;
+                arr.put(android.util.Base64.encodeToString(d, android.util.Base64.NO_WRAP));
+                total += d.length;
+            }
+            if (arr.length() == 0) {
+                return "{\"ok\":false,\"step\":\"dex\",\"log\":\"编译未产出 dex（" + log + "）\"}";
+            }
+            JSONObject out = new JSONObject();
+            out.put("ok", true);
+            out.put("step", "done");
+            out.put("dex", arr);
+            out.put("bytes", total);
+            out.put("log", log.toString());
+            return out.toString();
+        } catch (Throwable t) {
+            String m = t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
+            Log.e(TAG, "compileToDex fail", t);
+            return "{\"ok\":false,\"step\":" + quote(step) + ",\"log\":" + quote(m + "\n" + log) + "}";
+        }
+    }
+
     private String compileProjectJava(JSONArray javaSources, File root, File genDir,
                                       StringBuilder log, java.util.List<byte[]> extraDex, JSONArray resFiles,
                                       JSONArray libs, List<String> androidxJars, String appPkg) throws Exception {

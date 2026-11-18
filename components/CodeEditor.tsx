@@ -60,6 +60,7 @@ import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
 import { computeSuggest } from "@/lib/xml/keyword-suggest";
 import { computeJavaSuggest, JAVA_SYMBOLS, importForType, buildImportInsertMany } from "@/lib/xml/java-vocab";
+import { buildJavaAcceptTemplate } from "@/lib/xml/java-templates";
 import { loadRecency, recordUsage } from "@/lib/xml/lex-recency";
 import { getLexStore, type Lexicon } from "@/lib/xml/lexicon";
 import { KIND_LABEL, KIND_NAME, type SuggestKind } from "@/lib/xml/suggest-kind";
@@ -714,7 +715,20 @@ export function CodeEditor({
       setSugBoth(null);
       const docStr = v.state.doc.toString();
       const changes: { from: number; to?: number; insert: string }[] = [];
-      let anchor = from + item.length;
+      // M397：语句块关键字 / 事件回调方法 → 插入整个代码块（光标落到该填的位置）
+      //   只在「前面不是点号」时生效：`x.onClick` 是调用，不该展开方法体
+      let insertText = item;
+      let cursorOffset = item.length;
+      if (langRef.current === "java" && !(from > 0 && docStr[from - 1] === ".")) {
+        const line = v.state.doc.lineAt(from);
+        const indent = (line.text.match(/^[ \t]*/) ?? [""])[0];
+        const tpl = buildJavaAcceptTemplate(item, s.kinds?.[idx] ?? "plain", indent);
+        if (tpl) {
+          insertText = tpl.text;
+          cursorOffset = tpl.cursor;
+        }
+      }
+      let anchor = from + cursorOffset;
       // M273：选中一个类（如 TextView）且文件没 import → 自动补 import 声明
       if (langRef.current === "java") {
         const fqn = importForType(item);
@@ -726,7 +740,7 @@ export function CodeEditor({
           }
         }
       }
-      changes.push({ from, to: head, insert: item });
+      changes.push({ from, to: head, insert: insertText });
       v.dispatch({
         changes,
         selection: { anchor },

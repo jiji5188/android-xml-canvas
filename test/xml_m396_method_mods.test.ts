@@ -21,7 +21,7 @@ const PROJECT = {
     "    public static String buildName(String s) { return s; }\n" +
     "    abstract void run();\n" +
     "}\n",
-  lang: "java",
+  lang: "java" as const,
 };
 const lex = buildLexicon([PROJECT]);
 

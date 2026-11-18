@@ -255,6 +255,7 @@ import { useFormatFix } from "./use-format-fix";
 import { useConstraint } from "./use-constraint";
 import { usePlugins } from "./use-plugins";
 import { useExportActions } from "./use-export-actions";
+import { useCodeNav } from "./use-code-nav";
 import { useSaveExport } from "./use-save-export";
 import {
   subscribeRuntimeLog,
@@ -1637,40 +1638,16 @@ const allDrawableNames = useMemo(() => {
   /** M2s：跳转到代码视图并让代码编辑器滚动/选中到指定行
    *  M187 修复：代码视图早就搬到主区 tab（mobileTab === "xml"）了，这里还在 setLeftView("code")
    *  → 点抽屉里的问题只弹出左侧滑面板、代码根本没动。改成切主区 tab + 关面板 + 下一帧跳行。 */
-  const [focusLine, setFocusLine] = useState(0);
-  const [focusTick, setFocusTick] = useState(0);
-  const gotoLine = useCallback((line: number) => {
-    setMobileTab("xml");
-    setLeftOpen(false);
-    setRightOpen(false);
-    requestAnimationFrame(() => {
-      setFocusLine(line);
-      setFocusTick((t) => t + 1);
-    });
-  }, []);
-
-  /** M61：函数列表 → 跳行（手机上先切到「代码」页，等一帧编辑器挂载后再跳） */
-  const jumpToCodeLine = useCallback(
-    (line: number) => {
-      if (isMobile && mobileTab !== "xml") setMobileTab("xml");
-      // M63j：手机端跳完就收起右侧面板，把屏幕让给代码（桌面端保持面板不关）
-      if (isMobile) setRightOpen(false);
-      requestAnimationFrame(() => {
-        setFocusLine(line);
-        setFocusTick((t) => t + 1);
-      });
-    },
-    [isMobile, mobileTab],
-  );
-
-  /** M68（C3）：「引用」浮层（查这个资源在项目里被哪些地方用到） */
-  const [usesPanel, setUsesPanel] = useState<{
-    title: string;
-    hits: UsageHit[];
-    files: number;
-    truncated: boolean;
-    loading: boolean;
-  } | null>(null);
+  /** M366 step20：代码导航域（focusLine/focusTick/gotoLine/jumpToCodeLine/usesPanel/
+   *  openUsages/openResRef/checkDeleteImpact/onGotoRef/hoverTip/onRenameResource）
+   *  → components/use-code-nav.ts */
+  const {
+    focusLine, focusTick, setFocusLine, setFocusTick, usesPanel, setUsesPanel,
+    gotoLine, jumpToCodeLine, openUsages, openResRef, checkDeleteImpact, onGotoRef, hoverTip, onRenameResource,
+  } = useCodeNav(() => ({
+    setMobileTab, setLeftOpen, setRightOpen, isMobile, mobileTab, aiFileIo, openRel, tt, flashNote,
+    loadEntry, activeProjectRef, xml, setWsMsg, setXmlAndTrack, resExtras, generatedDrawables,
+  }));
   /* M146：右滑面板 + 运行预览 + 历史面板 + 引用列表 —— 返回键先关浮层再谈退出 */
   useBackGuard(isMobile && rightOpen, () => setRightOpen(false), "right-panel");
   useBackGuard(runOpen, () => setRunOpen(false), "run-preview");
@@ -1678,246 +1655,6 @@ const allDrawableNames = useMemo(() => {
   useBackGuard(usesPanel !== null, () => setUsesPanel(null), "usages-panel");
 
 
-  const openUsages = useCallback(
-    async (value: string) => {
-      if (!aiFileIo) {
-        setWsMsg(tt("先打开一个项目目录，才能查引用（当前是单个文件）"));
-        return;
-      }
-      const dir = openRel ? openRel.split("/").slice(0, -1).join("/") : undefined;
-      setUsesPanel({ title: value, hits: [], files: 0, truncated: false, loading: true });
-      try {
-        const res = await findUsages(aiFileIo, value, undefined, { firstDir: dir });
-        setUsesPanel({
-          title: value,
-          hits: res.hits,
-          files: res.files,
-          truncated: res.truncated,
-          loading: false,
-        });
-      } catch (e) {
-        setUsesPanel(null);
-        setWsMsg(tt("查引用失败：{msg}", { msg: e instanceof Error ? e.message : String(e) }));
-      }
-    },
-    [aiFileIo, openRel],
-  );
-
-  /**
-   * M65：属性值是 `@string/app_name` 这类资源引用时 → 找定义文件并跳到那一行。
-   * 已经打开的就是这个文件时只跳行，不重新读盘。
-   */
-  const openResRef = useCallback(
-    async (value: string) => {
-      const resolver = createResResolver(aiFileIo, openRel ?? null);
-      if (!resolver) {
-        // M101：改成底部 toast —— wsMsg 只在项目面板里看得到，代码面板上点了“没反应”很难受
-        flashNote(tt("先打开一个项目目录，才能跳到资源定义（当前是单个文件）"));
-        return;
-      }
-      const hit = await resolver.resolve(value);
-      if (!hit) {
-        flashNote(tt("项目里没找到 {value}（可能只在别的模块/依赖库里）", { value }));
-        return;
-      }
-      const going = formatResRefHit(hit.ref, hit.rel, hit.line);
-      if (openRel && openRel === hit.rel) {
-        jumpToCodeLine(hit.line);
-        flashNote(going);
-        return;
-      }
-      const src = activeProjectRef.current?.source;
-      if (!src) {
-        flashNote(tt("找到了：{target}，但当前没有可切换的项目源", { target: going }));
-        return;
-      }
-      const name = hit.rel.split("/").pop() || hit.rel;
-      await loadEntry(src, { kind: "file", name, rel: hit.rel });
-      jumpToCodeLine(hit.line);
-      flashNote(going);
-    },
-    [aiFileIo, flashNote, jumpToCodeLine, loadEntry, openRel],
-  );
-
-  /**
-   * M101：删除资源前的影响面 —— 复用已有的 findUsages（带预算扫描，手机上也安全）。
-   * 入参是 `drawable/bg_card` 这种符号，内部拼成 `@drawable/bg_card` 去扫。
-   */
-  const checkDeleteImpact = useCallback(
-    async (symbol: string) => {
-      if (!aiFileIo) return null;
-      const res = await findUsages(aiFileIo, `@${symbol}`, undefined, { maxHits: 40 });
-      return {
-        count: res.hits.length,
-        samples: res.hits.slice(0, 3).map((h) => ({ rel: h.rel, line: h.line })),
-      };
-    },
-    [aiFileIo],
-  );
-
-  /**
-   * M101：代码面板里 Ctrl/Cmd + 点击资源引用 → 按写法分流。
-   *  - @+id/x / @id/x / R.id.x → 打开「查引用」浮层（id 没有独立定义文件）
-   *  - 其余（@string/x、R.string.x、@drawable/x…）→ 跳定义
-   *  - @android:x → 提示「框架内置，跳不了」
-   */
-  const onGotoRef = useCallback(
-    (raw: string) => {
-      const t = parseRefToken(raw);
-      if (!t) {
-        // M209：不是资源引用 → 当「本文件内符号」处理：Ctrl+点击跳到声明行
-        if (isJavaLikePath(openRel || "")) {
-          const name = raw.replace(/^\.+|\.+$/g, "").split(".").pop() || "";
-          const isKt = /\.kts?$/i.test(openRel || "");
-          const outline = parseOutline(xml, isKt);
-          const hit = outline.find((s) => s.name === name);
-          if (hit) {
-            jumpToCodeLine(hit.line);
-            return;
-          }
-        }
-        flashNote(tt("这里没有可跳转的定义"));
-        return;
-      }
-      const a = refAction(t);
-      if (a.kind === "none") {
-        flashNote(
-          a.reason === "framework" ? tt("@android: 内置资源，没有可跳的定义") : tt("这里没有可跳转的引用"),
-        );
-        return;
-      }
-      // 没打开项目目录时，静默失败让人其妙（wsMsg 在不看项目面板时看不到）→ 用底部 toast 提示
-      if (!aiFileIo) {
-        flashNote(tt("先打开一个项目目录，才能跳转 / 查引用（当前是单个文件）"));
-        return;
-      }
-      if (a.kind === "usages") {
-        void openUsages(a.refValue);
-        return;
-      }
-      void openResRef(a.refValue);
-    },
-    [aiFileIo, flashNote, openResRef, openUsages, openRel, xml, jumpToCodeLine],
-  );
-
-  /**
-   * M209：代码编辑器悬停提示——光标落在资源引用 / 已知方法·变量上时，给一行说明。
-   * 数据源：resExtras（项目 res）+ generatedDrawables（本工具生成）+ 当前文件的 Java/Kotlin 大纲。
-   */
-  const hoverTip = useCallback(
-    (raw: string): string | null => {
-      // R.id.X / R.drawable.X / @drawable/X / @string/X
-      const rType = raw.match(/^R\.(\w+)\.(\w+)$/);
-      const atType = raw.match(/^@(\w+)\s*\/\s*(\w+)$/);
-      if (rType || atType) {
-        const kind = rType ? rType[1] : atType ? atType[1] : null;
-        const name = (rType ? rType[2] : atType ? atType[2] : null) || "";
-        if (kind === "id") {
-          const found = xml.search(new RegExp(`<[^>]*android:id="@\\+?id/"?${name}"?`, "g"));
-          if (found >= 0) {
-            const ln = xml.slice(0, found).split("\n").length;
-            return `R.id.${name} · layout L${ln}`;
-          }
-        }
-        // drawable / string 等资源
-        if (resExtras || generatedDrawables[name]) {
-          const where = kind === "drawable" || kind === "mipmap" ? "res/drawable" : `res/values/${kind}s`;
-          return tt("资源 {name}（{where}）", { name, where });
-        }
-        return `R.${kind}.${name}`;
-      }
-      // 裸标识符：查当前文件的 Java/Kotlin 大纲（类 / 方法）
-      if (isJavaLikePath(openRel || "")) {
-        const isKt = /\.kts?$/i.test(openRel || "");
-        const outline = parseOutline(xml, isKt);
-        const hit = outline.find((s) => s.name === raw);
-        if (hit) {
-          return tt("{kind} {name} · L{line}", {
-            kind: hit.kind === "class" ? tt("类") : tt("方法"),
-            name: hit.name,
-            line: hit.line,
-          });
-        }
-      }
-      return null;
-    },
-    [xml, resExtras, generatedDrawables, openRel],
-  );
-
-  /**
-   * M180：重命名资源文件 → 同步改全项目对它的 @type/name 引用（布局/values/drawable 互引/Java）。
-   * 改名本身由调用方（项目树）完成，这里只负责文本替换 + 写回。
-   */
-  const onRenameResource = useCallback(
-    async (oldRel: string, newName: string) => {
-      if (!aiFileIo || !aiFileIo.canWrite) {
-        return { ok: false, msg: tt("当前环境不能写文件，只改了文件名，引用没同步") };
-      }
-      const m = /^(.*)\/res\/(\S+)\/.+/i.exec(oldRel);
-      if (!m) {
-        return { ok: false, msg: tt("这个名字不在 res/ 下，没敢自动改引用") };
-      }
-      const subDir = m[2].toLowerCase();
-      const kind: "ref" | "values" = subDir.startsWith("values") ? "values" : "ref";
-      const resType =
-        kind === "values"
-          ? singularResType(
-              (oldRel.split("/").pop() || "strings.xml").replace(/\.xml$/, "").replace(/-.*$/, ""),
-            )
-          : subDir.split("-")[0];
-      const oldName = oldRel.split("/").pop()!.replace(/\.[^.]+$/, "");
-      let files = 0;
-      let refs = 0;
-      let budget = 260;
-      // 扫项目里的 xml + java/kt（预算 260 个文件，超出停止）
-      const scanDir = async (dir: string, depth: number): Promise<void> => {
-        if (depth > 8 || budget <= 0) return;
-        let items: AiFileEntry[] = [];
-        try {
-          const r = await aiFileIo.list(dir);
-          items = r.ok && r.items ? r.items : [];
-        } catch {
-          return;
-        }
-        for (const it of items) {
-          if (budget <= 0) return;
-          const p = `${dir}/${it.name}`;
-          if (it.kind === "dir") {
-            await scanDir(p, depth + 1);
-            continue;
-          }
-          if (!/\.(xml|java|kt)$/i.test(it.name)) continue;
-          const rd = await aiFileIo.read(p);
-          if (!rd.ok || typeof rd.text !== "string" || !rd.text) continue;
-          const inValues = /\/res\/values/.test(p);
-          const r2 = renameResRef(rd.text, inValues ? "values" : "ref", resType, oldName, newName);
-          if (r2.n > 0) {
-            const w = await aiFileIo.write(p, r2.text);
-            if (w.ok) {
-              files++;
-              refs += r2.n;
-            }
-          }
-          budget--;
-        }
-      };
-      await scanDir("", 0);
-      // 当前编辑器里打开的布局如果也引用了 → 一并改（未保存内容）
-      if (kind === "ref" && xml.includes(`@${resType}/${oldName}`)) {
-        const esc = oldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const fixed = xml.replace(new RegExp(`@${resType}/${esc}(?![A-Za-z0-9_])`, "g"), `@${resType}/${newName}`);
-        if (fixed !== xml) setXmlAndTrack(fixed);
-      }
-      return {
-        ok: true,
-        msg:
-          refs > 0
-            ? tt("已同步 {n} 处引用（{f} 个文件）", { n: refs, f: files })
-            : tt("项目里没找到对「{name}」的引用", { name: oldName }),
-      };
-    },
-    [aiFileIo, xml],
-  );
 
   return (
     <div

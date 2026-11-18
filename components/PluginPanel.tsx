@@ -91,23 +91,25 @@ export function PluginPanel({ enabled, onToggle }: Props) {
                 </span>
               ) : null}
             </div>
-            <button
-              type="button"
-              className="axv-plugin-check"
-              disabled={!!checks[p.id]?.busy}
-              onClick={() => void runCheck(p.id)}
-            >
-              {checks[p.id]?.busy ? tt("检查中…") : tt("检查更新")}
-            </button>
-            <label className="axv-plugin-toggle">
-              <input
-                type="checkbox"
-                checked={on}
-                onChange={(e) => onToggle(p.id, e.target.checked)}
-                aria-label={tt("启用") + " " + p.label}
-              />
-              <span>{on ? tt("已启用") : tt("已禁用")}</span>
-            </label>
+            <div className="axv-plugin-actions">
+              <button
+                type="button"
+                className="axv-plugin-check"
+                disabled={!!checks[p.id]?.busy}
+                onClick={() => void runCheck(p.id)}
+              >
+                {checks[p.id]?.busy ? tt("检查中…") : tt("检查更新")}
+              </button>
+              <label className="axv-plugin-toggle">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={(e) => onToggle(p.id, e.target.checked)}
+                  aria-label={tt("启用") + " " + p.label}
+                />
+                <span>{on ? tt("已启用") : tt("已禁用")}</span>
+              </label>
+            </div>
           </div>
         );
       })}

@@ -91,14 +91,16 @@ function InstalledPluginRow({
           {note}
         </span>
       ) : null}
-      <button type="button" className="axv-plugin-check" disabled={busy} onClick={() => void check()}>
-        {busy ? tt("检查中…") : tt("检查更新")}
-      </button>
-      {canUpdate ? (
-        <button type="button" className="axv-plugin-check" disabled={busy} onClick={() => void doUpdate()}>
-          {tt("更新")}
+      <div className="axv-plugin-actions">
+        <button type="button" className="axv-plugin-check" disabled={busy} onClick={() => void check()}>
+          {busy ? tt("检查中…") : tt("检查更新")}
         </button>
-      ) : null}
+        {canUpdate ? (
+          <button type="button" className="axv-plugin-check" disabled={busy} onClick={() => void doUpdate()}>
+            {tt("更新")}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

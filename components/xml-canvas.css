@@ -4949,13 +4949,20 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-plugin-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--axv-outline);
   border-radius: 10px;
   background: var(--axv-surface);
+}
+/* M376：检查更新按钮 + 启用开关 横排 */
+.axv-plugin-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
 }
 .axv-plugin-meta {
   display: flex;
@@ -5061,9 +5068,9 @@ body.axv-lt-dragging .axv-lt-row {
 }
 .axv-installed-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   padding: 6px 8px;
   border: 1px solid var(--axv-outline);
   border-radius: 8px;

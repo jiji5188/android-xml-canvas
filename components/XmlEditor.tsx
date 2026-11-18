@@ -256,6 +256,7 @@ import { useConstraint } from "./use-constraint";
 import { usePlugins } from "./use-plugins";
 import { useExportActions } from "./use-export-actions";
 import { useCodeNav } from "./use-code-nav";
+import { UsagesPanel } from "./UsagesPanel";
 import { useSaveExport } from "./use-save-export";
 import {
   subscribeRuntimeLog,
@@ -2314,65 +2315,17 @@ const allDrawableNames = useMemo(() => {
         />
       ) : null}
 
-      {/* M68（C3）：资源引用列表 */}
-      {usesPanel ? (
-        <div
-          className="axv-uses-mask"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setUsesPanel(null);
-          }}
-        >
-          <div className="axv-uses-card">
-            <div className="axv-uses-head">
-              <span className="axv-uses-title">{tt("{title} 的引用", { title: usesPanel.title })}</span>
-              <span className="axv-uses-count">
-                {usesPanel.loading
-                  ? tt("扫描中…")
-                  : tt("{n} 处 · 扫了 {files} 个文件{mode}", { n: usesPanel.hits.length, files: usesPanel.files, mode: usesPanel.truncated ? tt("（已截断）") : "" })}
-              </span>
-              <span style={{ flex: 1 }} />
-              <button className="axv-uses-x" aria-label={tt("关闭")} onClick={() => setUsesPanel(null)}>
-                ✕
-              </button>
-            </div>
-            <div className="axv-uses-list">
-              {!usesPanel.loading && usesPanel.hits.length === 0 ? (
-                <div className="axv-uses-empty">{tt("没找到引用（可能只在别的模块或依赖库里）")}</div>
-              ) : null}
-              {usesPanel.hits.map((h) => (
-                <button
-                  key={`${h.rel}:${h.line}`}
-                  className="axv-uses-row"
-                  title={`${h.rel}:${h.line}`}
-                  onClick={() => {
-                    setUsesPanel(null);
-                    const src = activeProjectRef.current?.source;
-                    if (!src) {
-                      setWsMsg(`${h.rel}:${h.line}`);
-                      return;
-                    }
-                    if (openRel === h.rel) {
-                      jumpToCodeLine(h.line);
-                      return;
-                    }
-                    void loadEntry(src, {
-                      kind: "file",
-                      name: h.rel.split("/").pop() || h.rel,
-                      rel: h.rel,
-                    }).then(() => jumpToCodeLine(h.line));
-                  }}
-                >
-                  <span className="axv-uses-file">{h.rel}</span>
-                  <span className="axv-uses-line">L{h.line}</span>
-                  <span className="axv-uses-snip">{h.text}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {/* M68（C3）：资源引用列表 → components/UsagesPanel.tsx（M366 step21） */}
+      <UsagesPanel
+        usesPanel={usesPanel}
+        setUsesPanel={setUsesPanel}
+        tt={tt}
+        activeProjectRef={activeProjectRef}
+        setWsMsg={setWsMsg}
+        openRel={openRel}
+        jumpToCodeLine={jumpToCodeLine}
+        loadEntry={loadEntry}
+      />
 
       {/* M6a：导出预览图（PNG / SVG） */}
       {/* M21/M307：新建文件保存对话框 → components/SmallDialogs.tsx */}

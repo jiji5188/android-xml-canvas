@@ -9,7 +9,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { lintJava } from "@/lib/xml/java-lint";
 
-const SRC = fs.readFileSync(path.resolve(__dirname, "../components/XmlEditor.tsx"), "utf8");
+// M366 step11：lints 块已下沉到 components/use-lints.ts（shell 不再含 `const lints = useMemo`）
+const SRC = fs.readFileSync(
+  path.resolve(__dirname, "../components/use-lints.ts"),
+  "utf8",
+);
 
 describe("M142 Java 文件不再套 XML 校验", () => {
   it("XmlEditor 里 Java 分支走 lintJava，而不是 lintCodeDoc / lintXml", () => {
@@ -17,12 +21,12 @@ describe("M142 Java 文件不再套 XML 校验", () => {
     const i = SRC.indexOf("const lints = useMemo");
     expect(i).toBeGreaterThan(0);
     const block = SRC.slice(i, i + 2200);
-    expect(block).toContain("if (isJavaFile)");
+    expect(block).toContain("if (D.isJavaFile)");
     expect(block).toContain("lintJava(lintSrc");
     // Java 分支必须在 codeOnly 之前，否则还是会被 XML 检查吃掉
-    expect(block.indexOf("if (isJavaFile)")).toBeLessThan(block.indexOf("else if (codeOnly)"));
+    expect(block.indexOf("if (D.isJavaFile)")).toBeLessThan(block.indexOf("else if (D.codeOnly)"));
     // 依赖数组里要有 isJavaFile，否则切文件不重算
-    expect(block).toContain("isJavaFile");
+    expect(block).toContain("D.isJavaFile");
   });
 
   it("用户那段登录校验代码本身没有结构错误（<1 不该被判成标签）", () => {

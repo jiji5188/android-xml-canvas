@@ -250,6 +250,7 @@ import { useXmlProjectState } from "./use-xml-project";
 import { useXmlProjectFns } from "./use-xml-project-fns";
 import { useIconShapeActions } from "./use-icon-shape-actions";
 import { useSelectionOps } from "./use-selection-ops";
+import { useLints } from "./use-lints";
 import {
   subscribeRuntimeLog,
   installRuntimeLogBridge,
@@ -897,6 +898,8 @@ const allDrawableNames = useMemo(() => {
   );
   /** 代码编辑器光标行（函数列表里高亮「你在这儿」） */
   const [codeCursor, setCodeCursor] = useState(0);
+  /** M2y：光标行 → 画布反跳时置 true，避免画布选中再反拖编辑器（M366：上移到 useLints 调用点之前，避 Proxy 渲染期 evaluate 撞 TDZ） */
+  const fromCodeRef = useRef(false);
   /** M39：values 资源文件 → 代码视图默认走表格（路径优先，其次看内容根节点是不是 <resources>） */
   const isValuesFile = useMemo(
     () =>
@@ -1171,149 +1174,18 @@ const allDrawableNames = useMemo(() => {
 
   /** M57：lint 改「停手后跑」——代码 tab 仍能标错，但打字期间不跑（lintXml 之前是 O(n²) 已修，
    *  这里再加一道闸：400ms 内不再输入才计算） */
-  const [lintSrc, setLintSrc] = useState("");
-  useEffect(() => {
-    // M138：非布局文件也跑校验（lint-doc 按文件类型叠领域规则），只是规则不同
-    const t = window.setTimeout(() => setLintSrc(parsedXml), 400);
-    return () => window.clearTimeout(t);
-  }, [parsedXml]);
-
-  /** M177：把工程里的布局/values/图片汇总成资源清单，供 Java 代码检查 */
-  const javaResEnv = useMemo(() => {
-    const layouts: Record<string, string> = { ...(resExtras?.layouts ?? {}) };
-    const drawables = [
-      ...Object.keys(resExtras?.drawables ?? {}),
-      ...Object.keys(resExtras?.drawableXml ?? {}),
-      ...(resExtras?.vectorNames ?? []),
-      ...Object.keys(generatedDrawables ?? {}),
-    ];
-    // M179：示例项目/资源片段的 values 也参与渲染，检查时同源带上，否则 string/color 引用查不到真名
-    const valuesText = [resExtras?.valuesXml ?? "", sampleValues].filter((x) => x.trim()).join("\n");
-    return collectResEnv({
-      layouts,
-      currentLayoutXml: docKind === "layout" ? xml : null,
-      valuesFiles: valuesText.trim() ? { "values.xml": valuesText } : undefined,
-      drawables,
-      // M256：全项目（含 menu/navigation）扫到的 @+id 并入，防 R.id.nav_home 误报
-      extraIds: resExtras?.ids,
-    });
-  }, [resExtras, generatedDrawables, docKind, xml, sampleValues]);
-
-  /** M179：XML 资源引用检查用的清单（名字集合；某类为空时不检查该类） */
-  const xmlResEnv = useMemo(
-    () => ({
-      layout: javaResEnv.layout,
-      drawable: javaResEnv.drawable,
-      mipmap: javaResEnv.mipmap,
-      string: javaResEnv.string,
-      color: javaResEnv.color,
-      dimen: javaResEnv.dimen,
-      style: javaResEnv.style,
-      id: javaResEnv.ids,
-    }),
-    [javaResEnv],
-  );
-  /** 资源清单的指纹：只有名字真变了才重跑 lint（打字时不变，保住 M57 的 debounce） */
-  const xmlResSig = useMemo(
-    () =>
-      [
-        xmlResEnv.layout,
-        xmlResEnv.drawable,
-        xmlResEnv.mipmap,
-        xmlResEnv.string,
-        xmlResEnv.color,
-        xmlResEnv.dimen,
-        xmlResEnv.style,
-        xmlResEnv.id,
-      ]
-        .map((xs) => (xs ?? []).join(","))
-        .join("|"),
-    [xmlResEnv],
-  );
-
-  /** 代码视图的结构检查（带行号，标红用） */
-  const lints = useMemo(() => {
-    try {
-      if (lintSrc === "") return [] as LintIssue[];
-      const t = perfTimer("xml.lint", "len=" + lintSrc.length);
-      // M142：.java / .kt 是 Java 语法，不能拿 XML 规则跑（`if (a<1) {` 里的 `<1` 会被当成标签 → 误报「未闭合」）
-      let out: LintIssue[];
-      if (isJavaFile) {
-        out = lintJava(lintSrc, {
-          isKotlin: isKotlinLike,
-          // M177：把项目里真实存在的资源喂进去，R.id / R.layout / findViewById 类型才能真校验
-          ids: javaResEnv.ids,
-          res: {
-            layout: javaResEnv.layout,
-            string: javaResEnv.string,
-            drawable: javaResEnv.drawable,
-            color: javaResEnv.color,
-            dimen: javaResEnv.dimen,
-            mipmap: javaResEnv.mipmap,
-            style: javaResEnv.style,
-          },
-          idTag: javaResEnv.idTag,
-          // M351：项目里其它文件声明过的方法名（getTitle 这种自己的方法不能被当成拼写错）
-          knownMethods: projMethods,
-          // M352：项目词库里的类名（同包类/项目类）—— 用了但不 import 不该报「缺 import」/「未知符号」
-          allowNames: (lexRef.current ? [...lexRef.current.classes.values()].map((c) => c.name) : []),
-        }).map((j) => ({
-          line: j.line,
-          level: j.sev,
-          message: j.msg,
-          // M202：带列号/长度，编辑器能画精确范围的波浪下划线（像 AIDE 那样圈住出问题的这一段）
-          ...(j.col !== undefined ? { col: j.col } : {}),
-          ...(j.len !== undefined ? { len: j.len } : {}),
-          // M179：能自动修复的带上 from/to，编辑器给「一键修复」
-          ...(j.fix ? { fix: { from: j.fix.from, to: j.fix.to, label: `${j.fix.from} → ${j.fix.to}` } } : {}),
-          // M207：带上机器可读 code，问题卡片能显示「为什么报 / 怎么改」
-          code: j.code,
-        }));
-        // M178：控件方法名拼写错误（setTxt → setText），只报编辑距离 1 的
-        for (const a of checkApiTypos(lintSrc)) {
-          out.push({ line: a.line, level: "warn", message: formatApiIssue(a), code: "method" });
-        }
-      } else if (codeOnly) {
-        // M138：非布局文件走 lint-doc（结构 + 清单/values/drawable 等类型规则）
-        out = lintCodeDoc(lintSrc, openRel || saveOrigin?.name || currentFile?.name || "");
-        // M179：drawable / menu / values / 清单 里也会引用资源，名字拼错一样给提示
-        out.push(...checkXmlResRefs(lintSrc, xmlResEnv));
-      } else {
-        out = lintXml(lintSrc);
-        // M179：布局里的 @drawable/ @string/ @color/ … 引用，拼错且能猜出来 → 带 fix
-        out.push(...checkXmlResRefs(lintSrc, xmlResEnv));
-      }
-      // M179：资源引用的问题按行号排进去（排序稳定，错误条取第一条才合理）
-      out.sort((a, b) => a.line - b.line);
-      t.end("issues=" + out.length);
-      return out;
-    } catch (e) {
-      console.error("[axv] 结构检查失败", e); // i18n-ignore
-      return [] as LintIssue[];
-    }
-  }, [lintSrc, codeOnly, isJavaFile, isKotlinLike, codeFileName, openRel, saveOrigin?.name, currentFile?.name, xmlResSig, projMethods, lexRev]);
-  /** M22：能渲染但有结构错误时，画布上给一条可跳转的提示（不阻断预览） */
-  const lintErrCount = useMemo(() => {
-    try {
-      return lints.filter((l) => l.level === "error").length;
-    } catch {
-      return 0;
-    }
-  }, [lints]);
-
-  /** M2y：代码编辑器光标行 → 选中对应画布节点（反跳，和画布 → 行号正跳对称） */
-  const onCodeCursorLine = useCallback(
-    (line: number) => {
-      if (line > 0) setCodeCursor(line);
-      if (!treeRoot || line < 1) return;
-      const n = nodeAtLine(treeRoot, line);
-      if (n && n.path !== selectedPath) {
-        fromCodeRef.current = true; // 这次选中是代码触发的，不要再反向拖动编辑器
-        setSelectedPath(n.path);
-      }
-    },
-    [treeRoot, selectedPath],
-  );
+    /** M138/M177/M202/M366：代码视图结构检查域（lintSrc + resEnv + lints + lintErrCount +
+   *  onCodeCursorLine + doFixOne）→ components/use-lints.ts（延迟 Proxy 避开 fromCodeRef TDZ） */
+  const {
+    lintSrc, setLintSrc, lints, lintErrCount, onCodeCursorLine, doFixOne,
+  } = useLints(() => ({
+    xml, resExtras, parsedXml, flushXml, currentXml, setXmlAndTrackRef,
+    generatedDrawables, sampleValues,
+    docKind, codeOnly, isJavaFile, isKotlinLike, codeFileName,
+    openRel, saveOrigin, currentFile, projMethods, lexRef, lexRev,
+    setCodeCursor, treeRoot, selectedPath, setSelectedPath, fromCodeRef,
+    setExportNote,
+  }));
 
   /** 一键格式化：重排缩进，保留注释，可撤销 */
   const doFormat = () => {
@@ -1357,27 +1229,6 @@ const allDrawableNames = useMemo(() => {
     setExportNote(tt("已修复 {n} 处（可撤销）", { n: fixed }));
     window.setTimeout(() => setExportNote(""), 2400);
   };
-
-  /** M202：点某条问题卡片的「应用此修复」—— 只修这一条（其余等用户再点） */
-  const doFixOne = useCallback(
-    (iss: LintIssue) => {
-      const fx = iss.fix;
-      if (!fx) return;
-      flushXml();
-      const cur = currentXml();
-      const lines = cur.split("\n");
-      const idx = Math.max(0, Math.min((iss.line ?? 1) - 1, lines.length - 1));
-      const L = lines[idx];
-      if (L === undefined) return;
-      const r = applyFixToLine(L, fx.from, fx.to);
-      if (!r.count) return;
-      lines[idx] = r.text;
-      setXmlAndTrackRef.current?.(lines.join("\n"));
-      setExportNote(tt("已修复 {n} 处（可撤销）", { n: r.count }));
-      window.setTimeout(() => setExportNote(""), 2400);
-    },
-    [flushXml, currentXml],
-  );
 
   /* ===== ConstraintLayout 约束编辑（一期：表单 + 自动推断） ===== */
   const [autoNotes, setAutoNotes] = useState<string[]>([]);
@@ -2419,7 +2270,6 @@ const findResolved = findResolvedNode;
   /** M26：画布选中 → 代码视图滚到并高亮对应行（反方向由 onCodeCursorLine 负责） */
   const selectedLine = useMemo(() => lineOfPath(treeRoot, selectedPath), [treeRoot, selectedPath]);
   const lastLineSyncRef = useRef("");
-  const fromCodeRef = useRef(false);
   useEffect(() => {
     // 切到代码视图时重置，保证每次都重新定位到当前选中块
     if (mobileTab === "xml") lastLineSyncRef.current = "";

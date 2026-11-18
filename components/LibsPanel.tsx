@@ -27,6 +27,7 @@ import {
 import { systemDownload } from "@/lib/xml/system-download";
 import { orderBySecurity, verifyDownloadedLib, type VerifyResult } from "@/lib/xml/lib-integrity";
 import { formatBytes, matchLibQuery, matchGradleDep, sortLibFiles, matchFileTreeInclude, normFtDir } from "@/lib/xml/libs-utils";
+import { LibsItemMenu, useLongPress, type LibsItemMenuState, type LibsMenuItem } from "@/components/LibsItemMenu";
 
 interface LibsPanelProps {
   /** 当前激活项目的 SAF 源（可 list/read）；没有则项目库列不出来 */
@@ -129,6 +130,11 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   const [gradleFileTrees, setGradleFileTrees] = useState<GradleFileTree[]>([]);
   const [gradleBusyKey, setGradleBusyKey] = useState<Record<string, string>>({});
   const [gradleMsg, setGradleMsg] = useState<string | null>(null);
+  // M388：表项次要动作（存 libs/删除/移除/应用到项目）走长按弹菜单，不再挂内联按钮
+  const [libMenu, setLibMenu] = useState<LibsItemMenuState | null>(null);
+  const closeLibMenu = useCallback(() => setLibMenu(null), []);
+  // M388：行级长按/右键 → 弹菜单（同一时刻只有一行在被按，单例 ref）
+  const bindLongPress = useLongPress<LibsMenuItem[]>((x, y, items) => setLibMenu({ x, y, items }));
 
   const native = nativeBridge();
 
@@ -983,7 +989,17 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
               const st = gradleBusyKey[key] || "";
               const present = presentNames.has(gradleDepFname(d));
               return (
-                <div key={key} className="axv-libs-item" style={{ alignItems: "center" }}>
+                <div
+                  key={key}
+                  className="axv-libs-item"
+                  style={{ alignItems: "center" }}
+                  {...((present || st === "done")
+                    ? bindLongPress([
+                        { key: "save", label: tr("libs.save_libs", "存 libs"), onClick: () => saveSharedToLibs(gradleDepFname(d)) },
+                        { key: "remove", label: tr("libs.remove", "移除"), danger: true, onClick: () => void removeFromProject(gradleDepFname(d)) },
+                      ])
+                    : {})}
+                >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
                       {(present || st === "done") && <span style={{ color: "#1a7f37", marginRight: 4 }}>✓</span>}
@@ -996,14 +1012,9 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                     </div>
                   </div>
                   {present || st === "done" ? (
-                    <button
-                      type="button"
-                      className="axv-libs-btn"
-                      style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
-                      onClick={() => saveSharedToLibs(gradleDepFname(d))}
-                    >
-                      {tr("libs.save_libs", "存 libs")}
-                    </button>
+                    <span style={{ fontSize: 11, color: "#1a7f37", whiteSpace: "nowrap", marginRight: 6 }}>
+                      {tr("libs.cat_present", "已下载")}
+                    </span>
                   ) : (
                     <button
                       type="button"
@@ -1040,7 +1051,28 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                   const st = catBusy[key];
                   const present = presentNames.has(e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar")) || st === "done";
                   return (
-                    <div key={key} className="axv-libs-item" style={{ alignItems: "center" }}>
+                    <div
+                      key={key}
+                      className="axv-libs-item"
+                      style={{ alignItems: "center" }}
+                      {...(present
+                        ? bindLongPress([
+                            { key: "save", label: tr("libs.save_libs", "存 libs"), onClick: () => saveSharedToLibs(e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar")) },
+                            {
+                              key: "maven",
+                              label: tr("libs.apply_maven", "应用到项目（maven）"),
+                              onClick: () =>
+                                void applyMaven(
+                                  mavenCoord(e.group, e.artifact, e.version),
+                                  e.kind === "material" || e.kind === "androidx"
+                                    ? "https://dl.google.com/dl/android/maven2"
+                                    : "https://repo.maven.apache.org/maven2",
+                                  e.artifact,
+                                ),
+                            },
+                          ])
+                        : {})}
+                    >
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
                           {present && <span style={{ color: "#1a7f37", marginRight: 4 }}>✓</span>}
@@ -1051,34 +1083,20 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                           {e.note}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        className="axv-libs-btn"
-                        style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
-                        disabled={st === "downloading" || present}
-                        onClick={() => void downloadCat(e)}
-                      >
-                        {st === "downloading" ? tr("libs.downloading", "下载中…") : present ? tr("libs.cat_present", "已下载") : tr("libs.cat_download", "下载")}
-                      </button>
-                      {present && (
-                        <>
-                          <button
-                            type="button"
-                            className="axv-libs-btn"
-                            style={{ whiteSpace: "nowrap", fontSize: 10, padding: "2px 8px", marginRight: 6 }}
-                            onClick={() => saveSharedToLibs(e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar"))}
-                          >
-                            {tr("libs.save_libs", "存 libs")}
-                          </button>
-                          <button
-                            type="button"
-                            className="axv-libs-btn"
-                            style={{ whiteSpace: "nowrap", fontSize: 10, padding: "2px 8px" }}
-                            onClick={() => void applyMaven(mavenCoord(e.group, e.artifact, e.version), e.kind === "material" || e.kind === "androidx" ? "https://dl.google.com/dl/android/maven2" : "https://repo.maven.apache.org/maven2", e.artifact)}
-                          >
-                            {tr("libs.apply_maven", "应用到项目（maven）")}
-                          </button>
-                        </>
+                      {present ? (
+                        <span style={{ fontSize: 11, color: "#1a7f37", whiteSpace: "nowrap", marginRight: 6 }}>
+                          {tr("libs.cat_present", "已下载")}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="axv-libs-btn"
+                          style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
+                          disabled={st === "downloading"}
+                          onClick={() => void downloadCat(e)}
+                        >
+                          {st === "downloading" ? tr("libs.downloading", "下载中…") : tr("libs.cat_download", "下载")}
+                        </button>
                       )}
                       {st && st.startsWith("err:") && (
                         <span style={{ fontSize: 10, color: "#c62828", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={st.slice(4)}>
@@ -1104,8 +1122,29 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           visibleList.map((f) => {
             const applied = projectNames.has(f.name);
             const ab = applyBusy[f.name];
+            // M388：本地库行 —— 删除/存 libs/移除 全走长按；行内只留状态（已应用）
+            // 项目库行 —— 文件已在项目里，只需长按「移除」
+            const menuItems: LibsMenuItem[] =
+              tab === "local"
+                ? [
+                    ...(applied
+                      ? [
+                          { key: "remove", label: tr("libs.remove", "移除"), danger: true, onClick: () => void removeFromProject(f.name) },
+                        ]
+                      : [
+                          { key: "save", label: tr("libs.save_libs", "存 libs"), disabled: ab === "applying", onClick: () => void applyToLocalProject(f) },
+                        ]),
+                    ...(native?.deleteEntry
+                      ? [
+                          { key: "delete", label: tr("libs.delete", "删除"), danger: true, disabled: deleteBusy === f.rel, onClick: () => void deleteLocalLib(f) },
+                        ]
+                      : []),
+                  ]
+                : [
+                    { key: "remove", label: tr("libs.remove", "移除"), danger: true, onClick: () => void removeFromProject(f.name) },
+                  ];
             return (
-              <div key={f.rel} className="axv-libs-item">
+              <div key={f.rel} className="axv-libs-item" {...bindLongPress(menuItems)}>
                 <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>archive</span>
                 <div className="axv-libs-item-text">
                   <div className="axv-libs-item-name">
@@ -1114,66 +1153,15 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                   </div>
                   <div className="axv-libs-item-rel">{f.rel}</div>
                 </div>
-                {tab === "local" ? (
-                  applied ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <span style={{ fontSize: 10, color: "#1a7f37" }}>{tr("libs.applied", "已应用")}</span>
-                      <button
-                        type="button"
-                        className="axv-libs-btn"
-                        style={{ fontSize: 10, padding: "1px 6px" }}
-                        onClick={() => removeFromProject(f.name)}
-                      >
-                        {tr("libs.remove", "移除")}
-                      </button>
-                      {native?.deleteEntry && (
-                        <button
-                          type="button"
-                          className="axv-libs-btn"
-                          style={{ fontSize: 10, padding: "1px 6px", color: "#c62828" }}
-                          disabled={deleteBusy === f.rel}
-                          title={tr("libs.delete_title", "从共享库删除文件")}
-                          onClick={() => deleteLocalLib(f)}
-                        >
-                          {deleteBusy === f.rel ? tr("libs.deleting", "…") : tr("libs.delete", "删除")}
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <button
-                        type="button"
-                        className="axv-libs-btn"
-                        style={{ fontSize: 10, padding: "2px 8px", whiteSpace: "nowrap" }}
-                        disabled={ab === "applying"}
-                        onClick={() => applyToLocalProject(f)}
-                      >
-                        {ab === "applying" ? tr("libs.applying", "应用中…") : tr("libs.save_libs", "存 libs")}
-                      </button>
-                      {native?.deleteEntry && (
-                        <button
-                          type="button"
-                          className="axv-libs-btn"
-                          style={{ fontSize: 10, padding: "1px 6px", color: "#c62828" }}
-                          disabled={deleteBusy === f.rel}
-                          title={tr("libs.delete_title", "从共享库删除文件")}
-                          onClick={() => deleteLocalLib(f)}
-                        >
-                          {deleteBusy === f.rel ? tr("libs.deleting", "…") : tr("libs.delete", "删除")}
-                        </button>
-                      )}
-                    </div>
-                  )
-                ) : (
-                  <button
-                    type="button"
-                    className="axv-libs-btn"
-                    style={{ fontSize: 10, padding: "1px 6px" }}
-                    onClick={() => removeFromProject(f.name)}
-                  >
-                    {tr("libs.remove", "移除")}
-                  </button>
-                )}
+                {tab === "local" && applied ? (
+                  <span style={{ fontSize: 10, color: "#1a7f37", flex: "0 0 auto" }}>{tr("libs.applied", "已应用")}</span>
+                ) : null}
+                {ab === "applying" ? (
+                  <span style={{ fontSize: 10, opacity: 0.6, flex: "0 0 auto" }}>{tr("libs.applying", "应用中…")}</span>
+                ) : null}
+                {deleteBusy === f.rel ? (
+                  <span style={{ fontSize: 10, opacity: 0.6, flex: "0 0 auto" }}>{tr("libs.deleting", "…")}</span>
+                ) : null}
               </div>
             );
           })
@@ -1220,6 +1208,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           </div>
         </div>
       )}
+      {libMenu ? <LibsItemMenu state={libMenu} onClose={closeLibMenu} /> : null}
     </div>
   );
 }

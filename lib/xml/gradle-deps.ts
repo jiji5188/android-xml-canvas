@@ -184,6 +184,85 @@ export function parseGradleDeps(text: string): GradleDep[] {
   return parseGradleDepsDetailed(text).deps;
 }
 
+/* ===== M370：fileTree 解析（本地库目录） =====
+ *
+ * 真实项目常用 `implementation fileTree(dir: 'libs', include: ['*.jar'])` 引入本地库。
+ * 这类声明没有 maven 坐标（不能下载），但**必须知道它指向哪个目录**：
+ *   ① 项目库列表要把那个目录里的 jar/aar 列出来（否则用户以为项目没依赖）
+ *   ② 「应用到项目」必须写到那个目录（写 app/src/main/libs 编译不生效）
+ */
+export interface GradleFileTree {
+  /** 原始声明（含 config），用于展示 */
+  raw: string;
+  /** implementation / api / compileOnly ...（取不到为空串） */
+  config: string;
+  /** dir 原样值，如 "libs"、"../libs"、"app/libs" */
+  dir: string;
+  /** include 模式数组，如 ["*.jar", "*.aar"]；空数组 = 全选 */
+  includes: string[];
+}
+
+/** 提取 name(...) 调用（括号配对 + 跳过字符串与注释；不依赖正则贪婪匹配） */
+function extractCalls(text: string, name: string): { raw: string; args: string; index: number }[] {
+  const out: { raw: string; args: string; index: number }[] = [];
+  const re = new RegExp(`\\b${name}\\s*\\(`, "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const start = m.index;
+    let i = start + m[0].length;
+    let depth = 1;
+    let quote = "";
+    for (; i < text.length && depth > 0; i++) {
+      const ch = text[i];
+      if (quote) {
+        if (ch === "\\") { i++; continue; }
+        if (ch === quote) quote = "";
+        continue;
+      }
+      if (ch === "'" || ch === '"') { quote = ch; continue; }
+      if (ch === "/" && text[i + 1] === "/") {
+        const nl = text.indexOf("\n", i);
+        if (nl < 0) break;
+        i = nl;
+        continue;
+      }
+      if (ch === "(") depth++;
+      else if (ch === ")") depth--;
+    }
+    const raw = text.slice(start, i).trim();
+    out.push({ raw, args: text.slice(start + m[0].length, i - 1), index: start });
+    re.lastIndex = i;
+  }
+  return out;
+}
+
+const CONFIG_WORD = /\b(implementation|api|compileOnly|runtimeOnly|debugImplementation|releaseImplementation|testImplementation|androidTestImplementation|compile)\b/;
+
+/** 解析 build.gradle / build.gradle.kts 里所有 fileTree(...) 声明 */
+export function parseFileTrees(text: string): GradleFileTree[] {
+  const out: GradleFileTree[] = [];
+  const seen = new Set<string>();
+  for (const call of extractCalls(text, "fileTree")) {
+    const dirM = call.args.match(/dir\s*:\s*(?:file\s*\(\s*)?['"]([^'"]+)['"]/);
+    const incM = call.args.match(/include\s*:\s*(\[[\s\S]*?\]|['"][^'"]+['"])/);
+    const dir = dirM ? dirM[1].trim() : "";
+    const includes = incM
+      ? (incM[1].match(/['"]([^'"]+)['"]/g) || []).map((s) => s.slice(1, -1))
+      : [];
+    if (!dir && includes.length === 0) continue; // 完全认不出的写法，不猜
+    // config 从声明所在行取
+    const lineStart = text.lastIndexOf("\n", call.index) + 1;
+    const lineEnd = text.indexOf("\n", call.index);
+    const line = text.slice(lineStart, lineEnd < 0 ? text.length : lineEnd);
+    const config = line.match(CONFIG_WORD)?.[1] ?? "";
+    const key = dir + "|" + includes.join(",");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ raw: call.raw.replace(/\s+/g, " "), config, dir, includes });
+  }
+  return out;
+}
+
 /** 候选下载 URL */
 export function gradleDepDownloadUrls(d: GradleDep): string[] {
   const e: LibEntry = {

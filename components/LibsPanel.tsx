@@ -19,6 +19,7 @@ import {
   parseSettingsRepos,
   parseAppConfig,
   parseBuildscriptClasspath,
+  parseFileTrees,
   gradleDepDownloadUrls,
   gradleDepFname,
   insertImplementation,
@@ -30,6 +31,7 @@ import {
   type GradleRepo,
   type AppConfig,
   type ClasspathDep,
+  type GradleFileTree,
 } from "@/lib/xml/gradle-deps";
 import { systemDownload } from "@/lib/xml/system-download";
 import { formatBytes, matchLibQuery, matchGradleDep, sortLibFiles } from "@/lib/xml/libs-utils";
@@ -129,6 +131,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   const [gradleAppConfig, setGradleAppConfig] = useState<AppConfig | null>(null);
   const [gradleClasspath, setGradleClasspath] = useState<ClasspathDep[]>([]);
   const [gradleScanned, setGradleScanned] = useState(false);
+  const [gradleFileTrees, setGradleFileTrees] = useState<GradleFileTree[]>([]);
   const [gradleBusyKey, setGradleBusyKey] = useState<Record<string, string>>({});
   const [gradleMsg, setGradleMsg] = useState<string | null>(null);
 
@@ -149,15 +152,43 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   }, [native]);
 
   /** M346/M358：项目库标准目录 = 项目根/app/src/main/libs（标准安卓工程布局）。
-   *  M358：彻底移除 /app/libs 适配，只认标准位置 app/src/main/libs。
-   *  共享库 /AndroidUIIDE/libs 是另一回事（跨项目复用，在「共享库」tab 里）。 */
+   *  M370：+ build.gradle 里 fileTree(dir: 'libs') 指定的目录（真实老项目常见 app/libs），
+   *  否则这些 jar 在项目库列表里永远看不到，且「应用到项目」会写错地方。 */
   const projectLibsBases = useMemo(() => {
     if (!nativeProjectRoot) return [] as string[];
     const root = nativeProjectRoot.replace(/[\\/]+$/, "");
-    return [`${root}/app/src/main/libs`];
-  }, [nativeProjectRoot]);
-  /** 首选写入目录（应用到项目 / gradle 依赖下载都写这里） */
-  const primaryLibBase = projectLibsBases[0] ?? null;
+    const bases = [`${root}/app/src/main/libs`];
+    for (const ft of gradleFileTrees) {
+      const d = (ft.dir || "")
+        .trim()
+        .replace(/^\.\//, "")
+        .replace(/^\/+/, "")
+        .replace(/[\\/]+$/, "");
+      if (!d) continue;
+      // dir 相对模块目录（app/）；写全路径（app/...）时按项目根解
+      for (const cand of [`${root}/app/${d}`, `${root}/${d}`]) {
+        if (!bases.includes(cand)) bases.push(cand);
+      }
+    }
+    return bases;
+  }, [nativeProjectRoot, gradleFileTrees]);
+  /** 首选写入目录（应用到项目 / gradle 依赖下载都写这里）。
+   *  M370：build.gradle 配了 fileTree → 写 fileTree 目录（写 app/src/main/libs 编译不生效）；
+   *  否则仍用标准位置 app/src/main/libs。 */
+  const primaryLibBase = useMemo(() => {
+    if (!nativeProjectRoot) return null;
+    const root = nativeProjectRoot.replace(/[\\/]+$/, "");
+    for (const ft of gradleFileTrees) {
+      const d = (ft.dir || "")
+        .trim()
+        .replace(/^\.\//, "")
+        .replace(/^\/+/, "")
+        .replace(/[\\/]+$/, "");
+      if (!d) continue;
+      return /^app([\\/]|$)/.test(d) ? `${root}/${d}` : `${root}/app/${d}`;
+    }
+    return projectLibsBases[0] ?? null;
+  }, [nativeProjectRoot, gradleFileTrees, projectLibsBases]);
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -418,7 +449,12 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         try { p = JSON.parse(r || "{}"); } catch { p = {}; }
         if (p?.ok) {
           setApplyBusy((m) => ({ ...m, [f.name]: "done" }));
-          onNote?.(tr("libs.apply_done", "{lib} 已应用到项目 app/src/main/libs/（打包时会带上）", { lib: f.name }));
+          onNote?.(
+            tr("libs.apply_done", "{lib} 已应用到 {path}（打包时会带上）", {
+              lib: f.name,
+              path: dstBase.replace(nativeProjectRoot.replace(/[\\/]+$/, "") + "/", "") || dstBase,
+            }),
+          );
           void refresh();
         } else {
           setApplyBusy((m) => ({ ...m, [f.name]: "err:fail" }));
@@ -631,11 +667,13 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     }
 
     // 依赖（根 + app build.gradle 的 implementation 等）
+    // M370：fileTree(dir/include) 一并解析 —— 本地库声明，无坐标但指向真实目录
     const depTexts = [rootBuild, appBuild].filter(Boolean) as string[];
     if (depTexts.length === 0) {
       setGradleMsg(
         tr("libs.gradle_notfound", "没找到 build.gradle / build.gradle.kts（需在项目根或 app/ 下）"),
       );
+      setGradleFileTrees([]);
       setGradleBusy(false);
       return;
     }
@@ -661,6 +699,17 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       });
     setGradleDeps(deps);
     setGradleUnresolved(unresolved);
+    // M370：fileTree 去重（dir+include 相同算同一条）
+    const ftSeen = new Set<string>();
+    const fts = depTexts
+      .flatMap((t) => parseFileTrees(t))
+      .filter((ft) => {
+        const k = ft.dir + "|" + ft.includes.join(",");
+        if (ftSeen.has(k)) return false;
+        ftSeen.add(k);
+        return true;
+      });
+    setGradleFileTrees(fts);
     setGradleScanned(true);
     setGradleBusy(false);
     onNote?.(tr("libs.gradle_scanned", "解析到 {n} 条依赖", { n: deps.length }));
@@ -814,6 +863,16 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         {tab === "local" && (
           <div style={{ fontSize: 10, opacity: 0.6, margin: "2px 6px 6px", lineHeight: 1.5, wordBreak: "break-all" }}>
             {tr("libs.local_hint", "共享库目录：{path}", { path: localDir || "/AndroidUIIDE/libs" })}
+          </div>
+        )}
+        {tab === "project" && gradleScanned && (gradleDeps.length > 0 || gradleFileTrees.length > 0) && (
+          <div style={{ fontSize: 10, opacity: 0.6, margin: "2px 6px 6px", lineHeight: 1.5, wordBreak: "break-all" }}>
+            {tr("libs.project_hint", "build.gradle：maven {n} 条（下方可下）；本地目录 {dirs}", {
+              n: gradleDeps.length,
+              dirs: gradleFileTrees.length
+                ? gradleFileTrees.map((f) => f.dir).join(", ")
+                : tr("libs.none", "无"),
+            })}
           </div>
         )}
         {tab === "catalog" ? (
@@ -1128,6 +1187,25 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
               </div>
               <div className="axv-libs-item-rel" style={{ fontSize: 10 }} title={u.raw}>
                 {tr("libs.gradle_unresolved_vars", "未定义变量：{vars}", { vars: u.vars.join(", ") || "?" })}
+              </div>
+            </div>
+          </div>
+        ))}
+        {/* M370：fileTree 本地库声明（dir + include），无坐标不能下，但目录已并入项目库列表 */}
+        {gradleScanned && gradleFileTrees.length > 0 && gradleFileTrees.map((ft) => (
+          <div
+            key={"ft:" + ft.dir + ":" + ft.includes.join(",")}
+            className="axv-libs-item"
+            style={{ alignItems: "center", opacity: 0.75 }}
+            title={ft.raw}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
+                {ft.dir}
+                <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.6 }}>{ft.config || "fileTree"}</span>
+              </div>
+              <div className="axv-libs-item-rel" style={{ fontSize: 10 }}>
+                include: {ft.includes.length > 0 ? ft.includes.join(", ") : "*"}
               </div>
             </div>
           </div>

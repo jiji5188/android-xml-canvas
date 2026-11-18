@@ -11059,7 +11059,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 12px;
+  padding: 0 16px;
   /* M193：把手条高 26px（M193c 从 20 回调） */
   height: 26px;
   min-height: 26px;
@@ -11070,7 +11070,7 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   overflow: hidden;
 }
 .axv-drawer-chevron {
-  font-size: 14px;
+  font-size: 18px;
   color: var(--axv-on-surface, #333);
   margin-right: 2px;
   flex: 0 0 auto;
@@ -11149,8 +11149,8 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 }
 @media (max-width: 840px) {
   .axv-drawer {
-    margin-left: 4px;
-    margin-right: 4px;
+    margin-left: 0px;
+    margin-right: 0px;
   }
   .axv-drawer-body {
     height: 42vh;

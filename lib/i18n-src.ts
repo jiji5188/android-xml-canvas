@@ -134,11 +134,15 @@ export const SRC_EN: SrcDict = {
   "libs.applied": "Applied",
   "libs.remove": "Remove",
   "libs.apply_need_project": "Open a project first to apply libraries",
-  "libs.apply_done": "{lib} applied to project libs/ (will be included on build)",
+  "libs.apply_done": "{lib} applied to {path} (will be included on build)",
+  "{lib} 已应用到 {path}（打包时会带上）": "{lib} applied to {path} (will be included on build)",
   "libs.apply_fail": "{lib} apply failed: {err}",
   "libs.remove_done": "{lib} removed from project",
   "libs.remove_fail": "{lib} remove failed: {err}",
   // M368：库管理面板优化（搜索/删除）
+  // M370：项目库 tab 提示（build.gradle 配置摘要）
+  "libs.project_hint": "build.gradle: {n} maven deps (download below); local dirs {dirs}",
+  "build.gradle：maven {n} 条（下方可下）；本地目录 {dirs}": "build.gradle: {n} maven deps (download below); local dirs {dirs}",
   "libs.search": "Search libraries",
   "搜索库": "Search libraries",
   "libs.search_hint": "Search lib name / package…",

@@ -32,6 +32,7 @@ import {
   type ClasspathDep,
 } from "@/lib/xml/gradle-deps";
 import { systemDownload } from "@/lib/xml/system-download";
+import { formatBytes, matchLibQuery, matchGradleDep, sortLibFiles } from "@/lib/xml/libs-utils";
 
 interface LibsPanelProps {
   /** 当前激活项目的 SAF 源（可 list/read）；没有则项目库列不出来 */
@@ -85,9 +86,10 @@ function listDirViaNative(abs: string): LibFile[] {
     if (!p?.ok || !Array.isArray(p.items)) return [];
     return p.items
       .filter((it: { kind: string; name: string }) => it.kind === "file" && isJarAar(it.name))
-      .map((it: { name: string; path?: string }) => ({
+      .map((it: { name: string; path?: string; size?: number }) => ({
         name: it.name,
         rel: it.path || `${abs}/${it.name}`,
+        size: typeof it.size === "number" ? it.size : undefined,
       }));
   } catch {
     return [];
@@ -256,6 +258,43 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   }, [dlUrl, dlName, localDir, onNote, tr, refresh, setDlOpen, setDlUrl, setDlName, setDlBusy, dlWithFallback]);
 
   const currentList = tab === "local" ? localLibs : projectLibs;
+
+  // M368：搜索过滤（四个列表共用一个框）+ 名称排序
+  const [libQuery, setLibQuery] = useState("");
+  const visibleList = useMemo(
+    () => sortLibFiles(currentList.filter((f) => matchLibQuery(f.name, f.rel, libQuery))),
+    [currentList, libQuery],
+  );
+  // 删除共享库文件（deleteEntry + 确认；项目库不提供删，避免误删工程内文件）
+  const [deleteBusy, setDeleteBusy] = useState<string | null>(null);
+  const deleteLocalLib = useCallback(
+    (f: LibFile) => {
+      if (!native?.deleteEntry) return;
+      // eslint-disable-next-line no-alert
+      if (!window.confirm(tr("libs.delete_confirm", "删除 {name}？（共享库里的文件，删了别的项目也用不了）", { name: f.name }))) return;
+      setDeleteBusy(f.rel);
+      try {
+        const r = native.deleteEntry(f.rel, false);
+        let ok = false;
+        try {
+          ok = !!JSON.parse(r || "").ok;
+        } catch {
+          ok = false;
+        }
+        if (ok) {
+          onNote?.(tr("libs.deleted", "已删除 {name}", { name: f.name }));
+          setLocalLibs((m) => m.filter((x) => x.rel !== f.rel));
+        } else {
+          onNote?.(tr("libs.delete_failed", "删除失败：{r}", { r: r || "unknown" }));
+        }
+      } catch (e: unknown) {
+        onNote?.(tr("libs.delete_failed", "删除失败：{r}", { r: String(e) }));
+      }
+      setDeleteBusy(null);
+      void refresh();
+    },
+    [native, onNote, tr, refresh],
+  );
 
   /** M330：从内置目录一键下载某个库到项目 libs/（优先原生多镜像，浏览器回退 fetch） */
   const downloadCat = useCallback(
@@ -732,7 +771,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           className={tab === "local" ? "on" : ""}
           onClick={() => setTab("local")}
         >
-          {tr("libs.local", "共享库")}
+          {tr("libs.local", "共享库")}{localLibs.length > 0 ? ` (${localLibs.length})` : ""}
         </button>
         <button
           role="tab"
@@ -740,7 +779,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           className={tab === "project" ? "on" : ""}
           onClick={() => setTab("project")}
         >
-          {tr("libs.project", "项目库")}
+          {tr("libs.project", "项目库")}{projectLibs.length > 0 ? ` (${projectLibs.length})` : ""}
         </button>
         <button
           role="tab"
@@ -753,6 +792,14 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       </div>
 
       <div className="axv-libs-actions">
+        <input
+          type="search"
+          className="axv-libs-search"
+          value={libQuery}
+          onChange={(e) => setLibQuery(e.target.value)}
+          placeholder={tr("libs.search_hint", "搜库名 / 包名…")}
+          aria-label={tr("libs.search", "搜索库")}
+        />
         <button type="button" className="axv-libs-btn" onClick={() => setDlOpen(true)}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>download</span>
           {tr("libs.download", "下载库文件")}
@@ -774,12 +821,12 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
             <div style={{ fontSize: 11, opacity: 0.6, margin: "4px 6px 8px", lineHeight: 1.5 }}>
               {tr("libs.catalog_hint", "常用库目录：点「下载」自动存入共享库 /AndroidUIIDE/libs，再去「共享库」选择是否应用到项目；打包时项目 libs/ 的库自动进编译。")}
             </div>
-            {catGroups.map((g) => (
+            {catGroups.filter((g) => !libQuery.trim() || g.libs.some((e) => matchGradleDep({ name: e.artifact, group: e.group }, libQuery))).map((g) => (
               <div key={g.kind} style={{ margin: "6px 4px" }}>
                 <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.7, margin: "2px 6px 6px" }}>
                   {g.label}（{g.libs.length}）
                 </div>
-                {g.libs.map((e) => {
+                {g.libs.filter((e) => matchGradleDep({ name: e.artifact, group: e.group }, libQuery)).map((e) => {
                   const key = libKey(e);
                   const st = catBusy[key];
                   const present = presentNames.has(e.artifact + "-" + e.version + (e.isAar ? ".aar" : ".jar")) || st === "done";
@@ -825,22 +872,27 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
               </div>
             ))}
           </div>
-        ) : currentList.length === 0 ? (
+        ) : visibleList.length === 0 ? (
           <div className="axv-libs-empty">
-            {tr("libs.empty", "暂无库文件")}
+            {libQuery.trim()
+              ? tr("libs.search_empty", "没匹配「{q}」的库", { q: libQuery.trim() })
+              : tr("libs.empty", "暂无库文件")}
             {tab === "project" && !aiFileIo && !nativeProjectRoot
               ? ` (${tr("libs.empty_hint", "需先打开项目目录")})`
               : ""}
           </div>
         ) : (
-          currentList.map((f) => {
+          visibleList.map((f) => {
             const applied = projectNames.has(f.name);
             const ab = applyBusy[f.name];
             return (
               <div key={f.rel} className="axv-libs-item">
                 <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>archive</span>
                 <div className="axv-libs-item-text">
-                  <div className="axv-libs-item-name">{f.name}</div>
+                  <div className="axv-libs-item-name">
+                    {f.name}
+                    <span style={{ opacity: 0.5, marginLeft: 6, fontSize: 10 }}>{formatBytes(f.size) || ""}</span>
+                  </div>
                   <div className="axv-libs-item-rel">{f.rel}</div>
                 </div>
                 {tab === "local" ? (
@@ -855,22 +907,48 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                       >
                         {tr("libs.remove", "移除")}
                       </button>
+                      {native?.deleteEntry && (
+                        <button
+                          type="button"
+                          className="axv-libs-btn"
+                          style={{ fontSize: 10, padding: "1px 6px", color: "#c62828" }}
+                          disabled={deleteBusy === f.rel}
+                          title={tr("libs.delete_title", "从共享库删除文件")}
+                          onClick={() => deleteLocalLib(f)}
+                        >
+                          {deleteBusy === f.rel ? tr("libs.deleting", "…") : tr("libs.delete", "删除")}
+                        </button>
+                      )}
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      className="axv-libs-btn"
-                      style={{ fontSize: 10, padding: "2px 8px", whiteSpace: "nowrap" }}
-                      disabled={ab === "applying" || ab === "maven"}
-                      onClick={() => {
-                        // M359：有 maven 坐标 → 写配置不拷文件；无坐标（纯本地 jar）→ 拷贝兑底
-                        const c = findCoordForLib(f.name);
-                        if (c) void applyMaven(c.coord, c.repoUrl, f.name);
-                        else applyToLocalProject(f);
-                      }}
-                    >
-                      {ab === "applying" || ab === "maven" ? tr("libs.applying", "应用中…") : tr("libs.apply", "应用到项目")}
-                    </button>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <button
+                        type="button"
+                        className="axv-libs-btn"
+                        style={{ fontSize: 10, padding: "2px 8px", whiteSpace: "nowrap" }}
+                        disabled={ab === "applying" || ab === "maven"}
+                        onClick={() => {
+                          // M359：有 maven 坐标 → 写配置不拷文件；无坐标（纯本地 jar）→ 拷贝兑底
+                          const c = findCoordForLib(f.name);
+                          if (c) void applyMaven(c.coord, c.repoUrl, f.name);
+                          else applyToLocalProject(f);
+                        }}
+                      >
+                        {ab === "applying" || ab === "maven" ? tr("libs.applying", "应用中…") : tr("libs.apply", "应用到项目")}
+                      </button>
+                      {native?.deleteEntry && (
+                        <button
+                          type="button"
+                          className="axv-libs-btn"
+                          style={{ fontSize: 10, padding: "1px 6px", color: "#c62828" }}
+                          disabled={deleteBusy === f.rel}
+                          title={tr("libs.delete_title", "从共享库删除文件")}
+                          onClick={() => deleteLocalLib(f)}
+                        >
+                          {deleteBusy === f.rel ? tr("libs.deleting", "…") : tr("libs.delete", "删除")}
+                        </button>
+                      )}
+                    </div>
                   )
                 ) : (
                   <button
@@ -1054,7 +1132,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
             </div>
           </div>
         ))}
-        {gradleDeps.map((d) => {
+        {gradleDeps.filter((d) => matchGradleDep(d, libQuery)).map((d) => {
           const key = d.group + ":" + d.name + ":" + d.version;
           const st = gradleBusyKey[key] || "";
           const present = presentNames.has(gradleDepFname(d));

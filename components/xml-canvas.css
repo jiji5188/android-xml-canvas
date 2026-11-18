@@ -12056,6 +12056,22 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
   display: flex;
   gap: 6px;
   padding: 8px;
+  flex-wrap: wrap;
+}
+/* M368：搜索框（共享库/项目库/库目录/gradle 依赖共用） */
+.axv-libs-search {
+  flex: 1 1 120px;
+  min-width: 100px;
+  padding: 5px 9px;
+  border: 1px solid var(--axv-outline, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  background: var(--axv-surface, #fff);
+  color: var(--axv-on-surface, inherit);
+  font-size: 12px;
+}
+.axv-libs-search:focus {
+  outline: 1px solid var(--axv-primary, #04409f);
+  border-color: var(--axv-primary, #04409f);
 }
 .axv-libs-btn {
   display: inline-flex;

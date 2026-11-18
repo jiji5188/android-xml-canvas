@@ -2640,6 +2640,8 @@ public class MainActivity extends Activity {
                 it.put("name", f.getName());
                 it.put("kind", f.isDirectory() ? "dir" : "file");
                 it.put("path", f.getAbsolutePath());
+                // M368：带文件大小（库管理面板显示 MB/KB；老 JS 不读此字段也兼容）
+                it.put("size", f.length());
                 items.put(it);
             }
         }

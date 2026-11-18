@@ -138,7 +138,7 @@ export const SRC_EN: SrcDict = {
   // M361：打包 ProgressDialog 文案
   "正在打包": "Building…",
   "收集资源…": "Collecting resources…",
-  "发现 {n} 个依赖库（项目 {a} + 共享 {b}），一起加进 classpath": "Found {n} dependency libs (project {a} + shared {b}), added to classpath",
+  "发现 {n} 个依赖库（共享 {b} + 项目 {a}），共享库优先加进 classpath": "Found {n} dependency libs (shared {b} + project {a}), shared libs first on classpath",
   "编译资源并签名…": "Compiling resources & signing…",
   "常用库目录：点「下载」自动存入共享库 /AndroidUIIDE/libs，再去「共享库」选择是否应用到项目；打包时项目 libs/ 的库自动进编译。": "Common libraries: tap Download to save into shared libs /AndroidUIIDE/libs, then in Shared choose to apply to the project; project libs auto-compile on build.",
   "libs.local_hint": "Shared libs: {path}",
@@ -1487,7 +1487,7 @@ export const SRC_EN: SrcDict = {
   "⚠ build.gradle 未同步：{m}（请手动改 namespace/applicationId）": "⚠ build.gradle not synced: {m} (edit namespace/applicationId manually)",
   "没找到 build.gradle": "build.gradle not found",
   "代码 import 了这些第三方包，但 libs/ 里没找到对应 jar/aar：{l}{more}": "Code imports these third-party packages but no matching jar/aar found in libs/: {l}{more}",
-  "请把这些依赖的 jar 放进项目 libs/ 目录再打包。": "Put these dependencies' jars into the project libs/ directory, then build again.",
+  "请把这些依赖的 jar 放进项目 libs/ 目录或共享库 /AndroidUIIDE/libs 再打包。": "Put these dependencies' jars into the project libs/ directory or the shared libs /AndroidUIIDE/libs, then build again.",
   "包名已统一：{s}": "Package unified: {s}",
   "{n} 个源码文件": "{n} source file(s)",
   "{n} 个 AndroidManifest": "{n} AndroidManifest file(s)",

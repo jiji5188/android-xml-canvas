@@ -278,7 +278,8 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         const sharedLibs = await collectSharedLibs(libNotes);
         const projectLibsArr = Array.isArray(libsRes?.libs) ? libsRes.libs : [];
         const sharedLibsArr = Array.isArray(sharedLibs) ? sharedLibs : [];
-        const allBuildLibs = [...projectLibsArr, ...sharedLibsArr];
+        // M398：共享库在前 —— 同名 jar 共享库赢（BuildApkHelper 的 ECJ classpath / R8 M283 去重都保首个）
+        const allBuildLibs = [...sharedLibsArr, ...projectLibsArr];
         // M383：依赖库收集明细——一眼看出“为什么 classpath 是 0 个库”（上次真实事故）
         pushBuildLog(
           true,
@@ -292,7 +293,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           "info",
         );
         if (allBuildLibs.length) {
-          setExportNote(tt("发现 {n} 个依赖库（项目 {a} + 共享 {b}），一起加进 classpath", { n: String(allBuildLibs.length), a: String(projectLibsArr.length), b: String(sharedLibsArr.length) }));
+          setExportNote(tt("发现 {n} 个依赖库（共享 {b} + 项目 {a}），共享库优先加进 classpath", { n: String(allBuildLibs.length), a: String(projectLibsArr.length), b: String(sharedLibsArr.length) }));
         }
         // M258：清单里找不到 MAIN/LAUNCHER 时，从源码推入口（extends Activity 的那个类）——
         //  否则 ShellActivity 拿不到 axv.launcher，永远停在壳上，用户代码跑不起来。
@@ -357,7 +358,8 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           }
           // P2：第三方依赖预检查——import 的顶层包在 libs 里对不上就提示
           const extImports = collectExternalImports(javaSources.map((j) => j.code), [pkg]);
-          const libPaths = libsRes.libs.map((l) => l.rel);
+          // M398：预检查也要算共享库——以前只传项目库，库在共享目录里会被误报「libs/ 里没找到」
+          const libPaths = allBuildLibs.map((l) => l.rel);
           const missLibs = missingLibPackages(extImports, libPaths);
           if (missLibs.length) {
             const top = missLibs.slice(0, 10).join("、");
@@ -365,7 +367,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
               tt("代码 import 了这些第三方包，但 libs/ 里没找到对应 jar/aar：{l}{more}",
                 { l: top, more: missLibs.length > 10 ? `（还有 ${missLibs.length - 10} 个）` : "" }) +
                 "\n" +
-                tt("请把这些依赖的 jar 放进项目 libs/ 目录再打包。", {}),
+                tt("请把这些依赖的 jar 放进项目 libs/ 目录或共享库 /AndroidUIIDE/libs 再打包。", {}),
               undefined, undefined, undefined, "info");
           }
           // M382：编译前检查①——按引用补齐后仍缺的资源（aapt2 必报 not found 的那些）。

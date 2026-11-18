@@ -164,45 +164,80 @@ export async function collectProjectLibs(
 }
 
 /**
- * M361：从共享库 /AndroidUIIDE/libs（跨项目复用）读 jar/aar，进打包 classpath。
+ * M398：共享库候选目录（顺序 = 查找优先级）。
+ *  坑（真机根因）：collectSharedLibs 以前用 "/AndroidUIIDE/libs" —— Android 里这是**相对路径**
+ *  （new File(path) 相对进程 cwd "/" 解析），canon 后目录不存在 → {ok:false} → 共享库永远是 0 个。
+ *  而 LibsPanel 下载/列表用的是绝对路径 /storage/emulated/0/AndroidUIIDE/libs，所以面板能看到库、
+ *  编译却收不到 → 用户报「只加载了 app/src/main/libs 的库」。
+ *  目录优先级：共享库（下载默认落点）→ 旧相对路径兑底 → 应用私有回退目录（M333 下载回退落点）。
+ *  同名文件先到先得（前面目录赢）。
+ */
+export const SHARED_LIB_DIRS = [
+  "/storage/emulated/0/AndroidUIIDE/libs",
+  "/AndroidUIIDE/libs",
+  "/storage/emulated/0/Android/data/com.jiji.axv/files/axv-libs",
+];
+
+/**
+ * M361：从共享库目录（跨项目复用）读 jar/aar，进打包 classpath。
  *  maven 坐标引用的库实体就存在共享库；项目 build.gradle 写了坐标、实体在共享库，
  *  打包时把共享库也进 classpath 才能编译过。
- *  用 native 通道（listDir + readBytesBase64）——共享库在 SAF 外部存储，io（SAF 项目树）不覆盖。
+ *  用 native 通道（listDir + readBase64）——共享库在 SAF 外部存储，io（SAF 项目树）不覆盖。
  *  返回的 rel 用 shared/ 前缀，打包端据此区分（不写进项目树）。
  */
 export async function collectSharedLibs(notes?: string[]): Promise<ProjectLib[]> {
   const n = nativeBridge();
   if (!n?.listDir || !n?.readBase64) { notes?.push("共享库：原生桥不可用（listDir/readBase64 缺失）"); return []; }
-  const base = "/AndroidUIIDE/libs";
   // M379：native listDir 返回的是 {ok, items:[{name,kind,path,size}]}（MainActivity.listDirJson），
   // 不是字符串数组！之前直接 for...of parse 结果 → "a is not iterable"（目录不存在时 {"ok":false} 也是对象，必炸）。
   // M367 只修了 mergeProjectExtras，漏了这里；这是设备端打包必炸的真根因。
-  let items: { name?: string; kind?: string }[] = [];
-  try {
-    const parsed = JSON.parse(n.listDir(base) || "{}") as {
-      ok?: boolean;
-      items?: { name?: string; kind?: string }[];
-    };
-    if (parsed?.ok && Array.isArray(parsed.items)) items = parsed.items;
-    else notes?.push(`共享库 ${base}: listDir 返回异常（${JSON.stringify(parsed).slice(0, 60)}）`);
-  } catch { notes?.push(`共享库 ${base}: listDir 返回非 JSON`); return []; }
+  const seen = new Set<string>(); // M398：同名去重，先到先得（目录顺序 = 优先级）
   const out: ProjectLib[] = [];
   let total = 0;
   let readFail = 0;
   let overCap = 0;
-  for (const it of items) {
-    const n1 = String(it?.name || "");
-    if (!n1 || it.kind === "dir" || !isLibFile(n1)) continue;
-    const abs = `${base}/${n1}`;
-    const b64 = n.readBase64?.(abs) || "";
-    if (!b64) { readFail++; continue; }
-    const bytes = Math.floor(b64.length * 0.75);
-    if (bytes > MAX_FILE || total + bytes > MAX_TOTAL) { overCap++; continue; } // 守 40MB 帽
-    total += bytes;
-    out.push({ rel: `shared/${n1}`, base64: b64 });
+  for (const dir of SHARED_LIB_DIRS) {
+    let items: { name?: string; kind?: string }[] = [];
+    let ok = false;
+    try {
+      const parsed = JSON.parse(n.listDir(dir) || "{}") as {
+        ok?: boolean;
+        items?: { name?: string; kind?: string }[];
+      };
+      if (parsed?.ok && Array.isArray(parsed.items)) { items = parsed.items; ok = true; }
+    } catch { notes?.push(`共享库 ${dir}: listDir 返回非 JSON`); continue; }
+    if (!ok) {
+      notes?.push(`共享库 ${dir}: 不可读（目录不存在或无「所有文件访问」权限）`);
+      continue;
+    }
+    let added = 0;
+    let dirFail = 0;
+    let dirOver = 0;
+    for (const it of items) {
+      const n1 = String(it?.name || "");
+      if (!n1 || it.kind === "dir" || !isLibFile(n1)) continue;
+      const key = n1.toLowerCase();
+      if (seen.has(key)) continue; // 同名：优先级高的目录已收
+      const abs = `${dir}/${n1}`;
+      const b64 = n.readBase64?.(abs) || "";
+      if (!b64) { dirFail++; continue; }
+      const bytes = Math.floor(b64.length * 0.75);
+      if (bytes > MAX_FILE || total + bytes > MAX_TOTAL) { dirOver++; continue; } // 守 40MB 帽
+      total += bytes;
+      seen.add(key);
+      out.push({ rel: `shared/${n1}`, base64: b64 });
+      added++;
+    }
+    readFail += dirFail;
+    overCap += dirOver;
+    notes?.push(
+      `共享库 ${dir}: 列 ${items.length} 项 → 收 ${added} 个` +
+        (dirFail ? `，读失败 ${dirFail}` : "") +
+        (dirOver ? `，超限跳过 ${dirOver}` : ""),
+    );
   }
   notes?.push(
-    `共享库 ${base}: 列 ${items.length} 项 → 收 ${out.length} 个` +
+    `共享库合计 ${out.length} 个` +
       (readFail ? `，读失败 ${readFail}` : "") +
       (overCap ? `，超限跳过 ${overCap}` : ""),
   );

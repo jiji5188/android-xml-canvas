@@ -913,7 +913,8 @@ const allDrawableNames = useMemo(() => {
             if (cancelled) return;
             // M362：共享库 /AndroidUIIDE/libs 也进候选词库（跨项目复用的库符号）
             const sharedLibs = await collectSharedLibs();
-            const allLibs = [...libsRes.libs, ...sharedLibs];
+            // M398：共享库在前（同名符号优先共享库的，跟打包 classpath 顺序一致）
+            const allLibs = [...sharedLibs, ...libsRes.libs];
             if (allLibs.length) {
               const third = await indexLibsCached(projRootKey || "-", allLibs);
               if (cancelled) return;

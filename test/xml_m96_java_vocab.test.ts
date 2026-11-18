@@ -80,10 +80,15 @@ describe("M96 Java 候选计算", () => {
     expect(s!.items[0]).toBe("String");
   });
 
-  it("方法：toSt → toString", () => {
-    const s = suggest("obj.toSt");
+  it("方法：toSt → toString（不带 receiver）", () => {
+    const s = suggest("toSt");
     expect(s!.items[0]).toBe("toString");
     expect(s!.prefix).toBe("toSt");
+  });
+
+  it("M395：未声明的 receiver 不再泄漏本类/全局方法（obj.toSt → null）", () => {
+    // obj 没声明、也没传词库 → 解析不到类型 → 不弹（之前会退回通用池弹 toString）
+    expect(suggest("obj.toSt")).toBeNull();
   });
 
   it("注解：@Ov → @Override", () => {

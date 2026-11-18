@@ -7,7 +7,7 @@
 //
 // 纯数据 + 纯函数，方便单测；不做语义分析，只按前缀过滤 + 去重。
 
-import { extractJavaTokens, extractScopedSymbols, KIND_PRIORITY, type SuggestKind } from "./suggest-kind";
+import { extractJavaTokens, extractScopedSymbols, KIND_PRIORITY, RECEIVER_KIND_PRIORITY, type SuggestKind } from "./suggest-kind";
 import { getLexStore } from "./lexicon";
 import { rankCandidates } from "./lexicon-rank";
 import type { Lexicon } from "./lexicon";
@@ -404,6 +404,8 @@ export const JAVA_TYPE_METHODS: Record<string, string[]> = {
   // M393：Object —— 所有类的默认基类（不写字面类型/import/var 时 receiver 多半解析到它）
   //   obj. 弹这些：toString/equals/hashCode/getClass/notify/notifyAll/wait/clone
   Object: ["toString", "hashCode", "equals", "getClass", "notify", "notifyAll", "wait", "clone"],
+  // M395：Toast 常用的静态方法（Toast.makeText / show）
+  Toast: ["makeText", "show", "cancel", "setGravity", "setDuration", "setView", "getView", "setText"],
   TextView: [
     "setText", "getText", "setTextColor", "setTextSize", "setTextStyle", "setGravity", "setHint",
     "setSingleLine", "setMaxLines", "setLines", "setEllipsize", "setTypeface", "setMovementMethod",
@@ -622,6 +624,21 @@ function rawSimpleType(t: string): string {
   return dot >= 0 ? s.slice(dot + 1) : s;
 }
 
+/**
+ * M395：receiver 是否更像「类名」（静态成员访问，如 Toast./String./Integer.）。
+ * 是的话按静态访问处理（列该类成员），而不是当未知变量。
+ */
+function isKnownClassRef(name: string, lex?: Lexicon | null): boolean {
+  if (JAVA_TYPE_METHODS[name] || JAVA_TYPE_CONSTANTS[name]) return true;
+  if (JAVA_TYPES.includes(name)) return true;
+  if (lex) {
+    if (lex.classes.has(name)) return true;
+    for (const c of lex.classes.values()) if (c.name === name) return true;
+  }
+  // Java 命名惯例：类型名大写开头，变量/字段小写开头
+  return /^[A-Z]/.test(name);
+}
+
 /** 光标左边正在输入的词 */
 function wordBefore(doc: string, offset: number): { prefix: string; start: number } {
   let start = offset;
@@ -673,15 +690,20 @@ export function computeJavaSuggest(
   let receiver: string | null = null;
   let receiverType: string | null = null;
   const { prefix, start: prefixStart } = wordBefore(doc, offset);
-  if (prefixStart > 0 && doc[prefixStart - 1] === ".") {
+  const afterDot = prefixStart > 0 && doc[prefixStart - 1] === ".";
+  if (afterDot) {
     // 当前词紧跟在 . 后面 → 取 . 左边的标识符
     let rs = prefixStart - 1;
     while (rs > 0 && /[A-Za-z0-9_]/.test(doc[rs - 1])) rs--;
     receiver = doc.slice(rs, prefixStart - 1);
-    if (receiver && receiver !== "this" && /^[A-Za-z_]\w*$/.test(receiver)) {
+    if (receiver && receiver !== "this" && receiver !== "super" && /^[A-Za-z_]\w*$/.test(receiver)) {
       // 在文件里找 `X receiver` 声明拿到 X（跳过 receiver 自身那行，找类型）
       // M389：receiver 类型解析（之前只认 `Type x =`，漏了字段声明 `Type x;`）+ 词库字段表兜底
-      const declRe = new RegExp("\\b([A-Za-z_][\\w.]*)\\s+" + receiver + "\\b\\s*[=;:]");
+      // M395：终止符扩到 `[=;:,)]`（漏了方法参数 `Type x,` / `Type x)`、增强 for `Type x :`）；
+      //   类型捕获允许泛型 `List<String>`
+      const declRe = new RegExp(
+        "\\b([A-Za-z_][\\w.]*(?:<[^<>]*>)?)\\s+" + receiver + "\\b\\s*[=;:,)]",
+      );
       const dm = declRe.exec(doc);
       if (dm) receiverType = rawSimpleType(dm[1]);
       if (!receiverType && lex) {
@@ -692,10 +714,15 @@ export function computeJavaSuggest(
           }
         }
       }
+      // M395：receiver 本身是已知类名（大写开头 / 词库里有的类 / 有方法表）→ 静态访问 Toast./String.
+      if (!receiverType && isKnownClassRef(receiver, lex)) receiverType = receiver;
     }
   }
   const isAt = prefix.startsWith("@");
   const body = isAt ? prefix.slice(1) : prefix;
+  // M395：receiver 解析不到类型、又不是 this/super → 不弹候选。
+  //   否则会退回通用池，把「本类方法」当成 j 的成员弹出来（用户实测：j 未声明时打 j.my 弹出 myMethod）。
+  if (afterDot && receiver && receiver !== "this" && receiver !== "super" && !receiverType) return null;
   // M392：普通词放开成 1 字母就弹（之前是 ≥2）。
   //   依据：候选池已按「词库 + 作用域」收窄过（类名只弹 import/项目里出现过的，变量只弹本方法+本类，方法没有类前提就不弹类里方法），
   //   且弹窗本身有最大高度（超了内部滚动，不会满屏）——所以 1 字母弹 10~20 条完全可接受，少打一个字更顺。
@@ -831,7 +858,13 @@ export function computeJavaSuggest(
   //   有 receiver（fn./obj.）时是「某类的成员」语义，必须维持方法优先（receiver 方法已被 unshift 到池最前），
   //   否则打 fn.se 会先弹关键词 sealed、打 obj.to 会先弹类 Toast（实测回归）。
   if (receiverType) {
-    cand.sort((a, b) => a.tier - b.tier || a.idx - b.idx);
+    // receiver 上下文：方法优先（成员语义），但仍按档位分
+    cand.sort(
+      (a, b) =>
+        a.tier - b.tier ||
+        (RECEIVER_KIND_PRIORITY[a.kind] ?? 6) - (RECEIVER_KIND_PRIORITY[b.kind] ?? 6) ||
+        a.idx - b.idx,
+    );
   } else {
     cand.sort(
       (a, b) =>

@@ -251,3 +251,18 @@ export const KIND_PRIORITY: Record<SuggestKind, number> = {
   prop: 5,
   plain: 6,
 };
+
+/**
+ * M395：receiver 上下文（`x.` / `Obj.`）的类型排序 —— 方法优先。
+ * 与通用词库相反：点号后是在选「某类/某对象的成员」，方法最应该排前，类名不该抢位。
+ */
+export const RECEIVER_KIND_PRIORITY: Record<SuggestKind, number> = {
+  method: 0,
+  const: 1,
+  var: 2,
+  class: 3,
+  decl: 4,
+  ref: 5,
+  prop: 5,
+  plain: 6,
+};

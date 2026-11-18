@@ -19,6 +19,35 @@ export const MAX_DEPTH = 30;
 
 const isCode = (rel: string) => /\.(java|kt|kts)$/i.test(rel);
 
+/**
+ * M381：源码身份 = 包名 + 文件名。
+ * io（SAF）和 native 两条通道扫同一个文件时 rel 前缀可能不一样
+ * （SAF 树根可能是 app/，native 相对项目根），按 rel 去重会漏 →
+ * 同一个类被喂给 ECJ 两份，报一片 "The type X is already defined"。
+ * 按包声明+文件名去重后，同一物理文件无论从哪条通道进来都只算一份。
+ */
+export function javaIdentity(rel: string, text: string): string {
+  const base = (rel.split("/").pop() || rel).toLowerCase();
+  const pkg = (text.match(/\bpackage\s+([\w.]+)\s*;/) || [])[1] || "";
+  return `${pkg}/${base}`;
+}
+
+export function dedupeJavaSources(list: { rel: string; text: string }[]): {
+  out: { rel: string; text: string }[];
+  dups: string[];
+} {
+  const seen = new Set<string>();
+  const out: { rel: string; text: string }[] = [];
+  const dups: string[] = [];
+  for (const f of list) {
+    const id = javaIdentity(f.rel, f.text || "");
+    if (seen.has(id)) { dups.push(f.rel); continue; }
+    seen.add(id);
+    out.push(f);
+  }
+  return { out, dups };
+}
+
 // M236：Native 全量递归（绕过 listChildren 的 UI 过滤），
 // 当 aiFileIo 扫不到任何 .java 时 fallback 到这里。
 async function nativeWalk(
@@ -154,6 +183,12 @@ export async function loadProjectJavaFiles(
     if (nb.remaining <= 0) truncated = true;
   }
 
-  onReport?.({ collected: out.length, skipped, truncated, maxDepth, maxFiles: MAX_FILES, maxText: MAX_TEXT, nativeWalkUsed });
-  return out;
+  // M381：按「包名+文件名」去重——io 和 native 双通道扫同一文件时 rel 前缀不同，
+  //  按 rel 去重拦不住，ECJ 会报一片 "The type X is already defined"。
+  const dd = dedupeJavaSources(out);
+  const finalOut = dd.out;
+  for (const d of dd.dups) skipped.push({ rel: d, reason: "重复（双通道扫到同一文件，已保留一份）" });
+
+  onReport?.({ collected: finalOut.length, skipped, truncated, maxDepth, maxFiles: MAX_FILES, maxText: MAX_TEXT, nativeWalkUsed });
+  return finalOut;
 }

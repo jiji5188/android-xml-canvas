@@ -141,6 +141,8 @@ export const SRC_EN: SrcDict = {
   "libs.remove_fail": "{lib} remove failed: {err}",
   // M368：库管理面板优化（搜索/删除）
   // M370：项目库 tab 提示（build.gradle 配置摘要）
+  // M371：项目属性弹窗 Gradle 配置区块
+  "Gradle 配置": "Gradle config",
   "libs.project_hint": "build.gradle: {n} maven deps (download below); local dirs {dirs}",
   "build.gradle：maven {n} 条（下方可下）；本地目录 {dirs}": "build.gradle: {n} maven deps (download below); local dirs {dirs}",
   "libs.search": "Search libraries",

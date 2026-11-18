@@ -14,11 +14,6 @@ import {
 } from "@/lib/xml/library-catalog";
 import {
   parseGradleDepsDetailed,
-  parseGradleProperties,
-  parseSettingsModules,
-  parseSettingsRepos,
-  parseAppConfig,
-  parseBuildscriptClasspath,
   parseFileTrees,
   gradleDepDownloadUrls,
   gradleDepFname,
@@ -27,10 +22,6 @@ import {
   mavenCoord,
   type GradleDep,
   type GradleUnresolved,
-  type GradleProps,
-  type GradleRepo,
-  type AppConfig,
-  type ClasspathDep,
   type GradleFileTree,
 } from "@/lib/xml/gradle-deps";
 import { systemDownload } from "@/lib/xml/system-download";
@@ -124,12 +115,6 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   const [gradleBusy, setGradleBusy] = useState(false);
   const [gradleDeps, setGradleDeps] = useState<GradleDep[]>([]);
   const [gradleUnresolved, setGradleUnresolved] = useState<GradleUnresolved[]>([]);
-  const [gradleProps, setGradleProps] = useState<GradleProps | null>(null);
-  const [gradleModules, setGradleModules] = useState<string[]>([]);
-  const [gradleRootName, setGradleRootName] = useState<string | undefined>(undefined);
-  const [gradleRepos, setGradleRepos] = useState<GradleRepo[]>([]);
-  const [gradleAppConfig, setGradleAppConfig] = useState<AppConfig | null>(null);
-  const [gradleClasspath, setGradleClasspath] = useState<ClasspathDep[]>([]);
   const [gradleScanned, setGradleScanned] = useState(false);
   const [gradleFileTrees, setGradleFileTrees] = useState<GradleFileTree[]>([]);
   const [gradleBusyKey, setGradleBusyKey] = useState<Record<string, string>>({});
@@ -602,20 +587,16 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   );
 
   /** M345：读项目根 build.gradle / build.gradle.kts + app 子目录，解析依赖
-   *  M347：同时读 gradle.properties（编译标记）+ settings.gradle（模块）+ 根 build.gradle（buildscript classpath）
-   *  时序：settings.gradle → 根 build.gradle → app/build.gradle；gradle.properties 全局开关 */
+   *  M370：同时解析 fileTree(dir/include) —— 本地库声明，指向真实目录
+   *  M371：模块/编译标记/app 配置/构建插件等元信息改到「项目属性」弹窗展示（ProjectPropsDialog），
+   *  这里只解析「当前项目被引用的库」。 */
   const scanGradleDeps = useCallback(async () => {
     setGradleBusy(true);
     setGradleMsg(null);
     setGradleScanned(false);
     setGradleDeps([]);
     setGradleUnresolved([]);
-    setGradleProps(null);
-    setGradleModules([]);
-    setGradleRootName(undefined);
-    setGradleRepos([]);
-    setGradleAppConfig(null);
-    setGradleClasspath([]);
+    setGradleFileTrees([]);
 
     // 读单个文件：native.readText 优先（SAF/外部路径），失败再 aiFileIo（相对项目根）
     const readOne = async (abs: string, rel: string): Promise<string> => {
@@ -636,35 +617,11 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     const root = (nativeProjectRoot || "").replace(/[\\/]+$/, "");
     const abs = (p: string) => (root ? root + "/" + p : p);
 
-    // 各文件（按用户给的时序）
-    const settings = await readOne(abs("settings.gradle"), "settings.gradle");
-    if (!settings) await readOne(abs("settings.gradle.kts"), "settings.gradle.kts");
+    // 各文件：根 build.gradle + app/build.gradle（依赖与 fileTree 都在这里）
     const rootBuild = await readOne(abs("build.gradle"), "build.gradle");
     if (!rootBuild) await readOne(abs("build.gradle.kts"), "build.gradle.kts");
     const appBuild = await readOne(abs("app/build.gradle"), "app/build.gradle");
     if (!appBuild) await readOne(abs("app/build.gradle.kts"), "app/build.gradle.kts");
-    const propsText = await readOne(abs("gradle.properties"), "gradle.properties");
-
-    // 模块 + 根名 + 仓库（settings.gradle）
-    if (settings) {
-      const sm = parseSettingsModules(settings);
-      setGradleModules(sm.modules);
-      setGradleRootName(sm.rootProjectName);
-      setGradleRepos(parseSettingsRepos(settings));
-    }
-    // 编译标记（gradle.properties）
-    if (propsText) {
-      setGradleProps(parseGradleProperties(propsText));
-    }
-    // app 模块配置（包名 / sdk / 版本 / 签名）
-    if (appBuild) {
-      setGradleAppConfig(parseAppConfig(appBuild));
-    }
-    // buildscript classpath（根 build.gradle，构建期插件，只标记展示）
-    if (rootBuild) {
-      const cp = parseBuildscriptClasspath(rootBuild);
-      if (cp.length) setGradleClasspath(cp);
-    }
 
     // 依赖（根 + app build.gradle 的 implementation 等）
     // M370：fileTree(dir/include) 一并解析 —— 本地库声明，无坐标但指向真实目录
@@ -1075,99 +1032,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         {gradleMsg && (
           <div className="axv-libs-gradle-msg">{gradleMsg}</div>
         )}
-        {gradleScanned && (
-          <div className="axv-libs-gradle-meta">
-            {(gradleModules.length > 0 || gradleRootName) && (
-              <div className="axv-libs-gradle-meta-row" title={tr("libs.gradle_meta_settings", "来自 settings.gradle")}>
-                <span className="axv-libs-gradle-meta-k">{tr("libs.gradle_modules", "模块")}</span>
-                <span className="axv-libs-gradle-meta-v">
-                  {gradleRootName ? tr("libs.gradle_rootname", "根工程 {name}", { name: gradleRootName }) : " "}{" "}
-                  {gradleModules.join(", ") || "—"}
-                </span>
-              </div>
-            )}
-            {gradleProps && (
-              <div className="axv-libs-gradle-meta-row" title={tr("libs.gradle_meta_props", "来自 gradle.properties（全局编译开关）")}>
-                <span className="axv-libs-gradle-meta-k">{tr("libs.gradle_flags", "编译标记")}</span>
-                <span className="axv-libs-gradle-meta-v">
-                  {gradleProps.flags.length === 0 &&
-                    [gradleProps.minSdk, gradleProps.targetSdk, gradleProps.compileSdk].filter(Boolean)
-                      .map((s) => s as string)
-                      .join(" · ")}
-                  {gradleProps.flags.map((f) => (
-                    <span key={f.key} className="axv-libs-flag" title={f.key}>
-                      {f.value === "true" ? f.key.replace(/^android\./, "") : `${f.key.replace(/^android\./, "")}=${f.value}`}
-                    </span>
-                  ))}
-                  {[gradleProps.minSdk, gradleProps.targetSdk, gradleProps.compileSdk]
-                    .filter(Boolean)
-                    .map((s, i) => (
-                      <span key={i} className="axv-libs-flag axv-libs-flag-sdk">
-                        {(["minSdk", "targetSdk", "compileSdk"] as const)[i]} = {s}
-                      </span>
-                    ))}
-                </span>
-              </div>
-            )}
-            {gradleRepos.length > 0 && (
-              <div className="axv-libs-gradle-meta-row" title={tr("libs.gradle_meta_repos", "来自 settings.gradle（依赖仓库）")}>
-                <span className="axv-libs-gradle-meta-k">{tr("libs.gradle_repos", "仓库")}</span>
-                <span className="axv-libs-gradle-meta-v" style={{ opacity: 0.85 }}>
-                  {gradleRepos.map((r) => (
-                    <span key={r.url || r.name} className="axv-libs-flag axv-libs-flag-repo" title={r.url || r.name}>
-                      {r.url ? r.url.replace(/^https?:\/\//, "").replace(/\/$/, "") : r.name}
-                    </span>
-                  ))}
-                </span>
-              </div>
-            )}
-            {gradleAppConfig &&
-              (gradleAppConfig.namespace ||
-                gradleAppConfig.applicationId ||
-                gradleAppConfig.minSdk ||
-                gradleAppConfig.targetSdk ||
-                gradleAppConfig.compileSdk ||
-                gradleAppConfig.versionName) && (
-                <div className="axv-libs-gradle-meta-row" title={tr("libs.gradle_meta_app", "来自 app/build.gradle")}>
-                  <span className="axv-libs-gradle-meta-k">{tr("libs.gradle_app", "app")}</span>
-                  <span className="axv-libs-gradle-meta-v">
-                    {(gradleAppConfig.applicationId || gradleAppConfig.namespace) && (
-                      <span className="axv-libs-flag" title={tr("libs.gradle_pkg", "包名")}>
-                        {(gradleAppConfig.applicationId || gradleAppConfig.namespace) as string}
-                      </span>
-                    )}
-                    {([
-                      ["compileSdk", gradleAppConfig.compileSdk],
-                      ["minSdk", gradleAppConfig.minSdk],
-                      ["targetSdk", gradleAppConfig.targetSdk],
-                    ] as const)
-                      .filter(([, v]) => v)
-                      .map(([k, v]) => (
-                        <span key={k} className="axv-libs-flag axv-libs-flag-sdk">
-                          {k} = {v}
-                        </span>
-                      ))}
-                    {gradleAppConfig.versionName && (
-                      <span className="axv-libs-flag">v{gradleAppConfig.versionName}</span>
-                    )}
-                    {gradleAppConfig.hasSigning && (
-                      <span className="axv-libs-flag axv-libs-flag-sign" title={tr("libs.gradle_signing", "app/build.gradle 配了 signingConfigs")}>
-                        {tr("libs.gradle_signed", "已配签名")}
-                      </span>
-                    )}
-                  </span>
-                </div>
-              )}
-            {gradleClasspath.length > 0 && (
-              <div className="axv-libs-gradle-meta-row" title={tr("libs.gradle_meta_classpath", "根 build.gradle buildscript（构建期插件，不进运行时）")}>
-                <span className="axv-libs-gradle-meta-k">{tr("libs.gradle_classpath", "构建插件")}</span>
-                <span className="axv-libs-gradle-meta-v" style={{ opacity: 0.7 }}>
-                  {gradleClasspath.map((c) => `${c.name}-${c.version}`).join(", ")}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+        {/* M371：模块/编译标记/app 配置/构建插件等元信息已移到「项目属性」弹窗（ProjectPropsDialog） */}
         {gradleScanned && gradleDeps.length === 0 && !gradleMsg && gradleUnresolved.length === 0 && (
           <div className="axv-libs-gradle-msg">{tr("libs.gradle_none", "没解析到 maven 依赖（fileTree / project 除外）")}</div>
         )}

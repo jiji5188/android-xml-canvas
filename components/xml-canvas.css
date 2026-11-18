@@ -10712,6 +10712,12 @@ input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="color
 .axv-prop-icon-hint { font-size: 11px; color: var(--axv-on-surface-variant); line-height: 1.4; }
 .axv-prop-sec-title { font-size: 11.5px; font-weight: 600; letter-spacing: .04em; color: var(--axv-on-surface-variant); text-transform: uppercase; margin: 12px 0 6px; }
 .axv-prop-deps { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow: auto; border: 1px solid var(--axv-outline-variant); border-radius: 8px; padding: 6px; margin-bottom: 8px; }
+/* M371：项目属性弹窗的 Gradle 配置摘要（从 LibsPanel 搬来） */
+.axv-prop-meta { display: flex; flex-direction: column; gap: 4px; font-size: 11px; border: 1px solid var(--axv-outline-variant); border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+.axv-prop-meta-row { display: flex; align-items: baseline; gap: 8px; line-height: 1.6; }
+.axv-prop-meta-k { flex: 0 0 auto; font-weight: 600; opacity: 0.65; }
+.axv-prop-meta-v { flex: 1 1 auto; min-width: 0; word-break: break-all; }
+.axv-prop-meta-tag { display: inline-block; padding: 0 6px; margin: 1px 3px 1px 0; border: 1px solid var(--axv-outline-variant); border-radius: 6px; background: color-mix(in srgb, var(--axv-on-surface) 5%, transparent); }
 .axv-prop-dep { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 4px; border-radius: 6px; }
 .axv-prop-dep:active { background: color-mix(in srgb, var(--axv-primary) 12%, transparent); }
 .axv-prop-dep-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; }

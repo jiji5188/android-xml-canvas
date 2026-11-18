@@ -14,6 +14,17 @@ import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
 import type { WsProject } from "@/lib/xml/workspace";
 import { readAppName, setAppName } from "@/lib/xml/project-rename";
 import { addGradleDep, listGradleDeps, parseGradlePackage, removeGradleDep, setGradlePackage } from "@/lib/xml/project-info";
+import {
+  parseSettingsModules,
+  parseGradleProperties,
+  parseSettingsRepos,
+  parseAppConfig,
+  parseBuildscriptClasspath,
+  type GradleProps,
+  type ClasspathDep,
+  type GradleRepo,
+  type AppConfig,
+} from "@/lib/xml/gradle-deps";
 import { saveProjectFile, type ProjectSaveRoot } from "@/lib/xml/project-save";
 import type { FileOpsCtx } from "@/lib/xml/file-ops";
 import { detectPkgState, suggestOldPkgs, unifyPackageTo } from "@/lib/xml/pkg-rename";
@@ -40,6 +51,16 @@ interface GradleFile {
   text: string;
 }
 
+/** M371：Gradle 配置摘要（从 LibsPanel 搬过来的：模块/编译标记/app/构建插件/仓库） */
+interface GradleMeta {
+  rootName?: string;
+  modules: string[];
+  props: GradleProps | null;
+  app: AppConfig | null;
+  classpath: ClasspathDep[];
+  repos: GradleRepo[];
+}
+
 const STRINGS_REL = "app/src/main/res/values/strings.xml";
 
 export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
@@ -49,6 +70,7 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
   const [gradle, setGradle] = useState<GradleFile | null>(null);
   const [strings, setStrings] = useState<{ rel: string; text: string } | null>(null);
   const [jars, setJars] = useState<BrowseEntry[]>([]);
+  const [gradleMeta, setGradleMeta] = useState<GradleMeta | null>(null);
 
   const [dir, setDir] = useState(p.item.name);
   const [appName, setAppNameInput] = useState("");
@@ -101,10 +123,38 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
         const libsRel = base ? `${base}/libs` : "libs";
         const libs = await p.source.listChildren(libsRel).catch(() => [] as BrowseEntry[]);
 
+        // M371：Gradle 配置摘要（模块/编译标记/app/构建插件/仓库）—— 从 LibsPanel 搬过来
+        const readFirst = async (rels: string[]): Promise<string> => {
+          for (const rel of rels) {
+            const t = await p.source.readText(rel).catch(() => null);
+            if (t) return t;
+          }
+          return "";
+        };
+        const settingsText = await readFirst(["settings.gradle", "settings.gradle.kts"]);
+        const propsText = await readFirst(["gradle.properties"]);
+        // base="app" 时根 build.gradle 是另一份文件；否则 g 就是根
+        const rootBuildText = base === "app" ? await readFirst(["build.gradle", "build.gradle.kts"]) : g?.text ?? "";
+
         if (!alive) return;
         setGradle(g);
         setStrings(s);
         setJars(libs.filter((e) => e.kind === "file" && /\.(jar|aar)$/i.test(e.name)));
+        {
+          const sm = settingsText ? parseSettingsModules(settingsText) : null;
+          const gpParsed = propsText ? parseGradleProperties(propsText) : null;
+          const repos = settingsText ? parseSettingsRepos(settingsText) : [];
+          const cp = rootBuildText ? parseBuildscriptClasspath(rootBuildText) : [];
+          const ac = g ? parseAppConfig(g.text) : null;
+          setGradleMeta({
+            rootName: sm?.rootProjectName,
+            modules: sm?.modules ?? [],
+            props: gpParsed,
+            app: ac,
+            classpath: cp,
+            repos,
+          });
+        }
         const gp = g ? parseGradlePackage(g.text) : { namespace: null, applicationId: null };
         const an = s ? readAppName(s.text) || "" : "";
         const pkgVal = gp.applicationId || gp.namespace || "";
@@ -344,6 +394,99 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
                 />
                 {pkgWarn ? <div className="axv-saveas-hint axv-pkg-warn">{pkgWarn}</div> : null}
               </label>
+
+              {/* M371：Gradle 配置摘要（从 LibsPanel 搬来：模块/编译标记/app/构建插件/仓库） */}
+              {gradleMeta &&
+              (gradleMeta.rootName ||
+                gradleMeta.modules.length > 0 ||
+                gradleMeta.props ||
+                gradleMeta.app ||
+                gradleMeta.classpath.length > 0 ||
+                gradleMeta.repos.length > 0) ? (
+                <>
+                  <div className="axv-prop-sec-title">{tt("Gradle 配置")}</div>
+                  <div className="axv-prop-meta">
+                    {(gradleMeta.rootName || gradleMeta.modules.length > 0) && (
+                      <div className="axv-prop-meta-row">
+                        <span className="axv-prop-meta-k">{tt("模块")}</span>
+                        <span className="axv-prop-meta-v">
+                          {gradleMeta.rootName ? tt("根工程 {name}", { name: gradleMeta.rootName }) + " " : ""}
+                          {gradleMeta.modules.join(", ") || "—"}
+                        </span>
+                      </div>
+                    )}
+                    {gradleMeta.props && (gradleMeta.props.flags.length > 0 || gradleMeta.props.minSdk || gradleMeta.props.targetSdk || gradleMeta.props.compileSdk) && (
+                      <div className="axv-prop-meta-row">
+                        <span className="axv-prop-meta-k">{tt("编译标记")}</span>
+                        <span className="axv-prop-meta-v">
+                          {gradleMeta.props.flags.length === 0 &&
+                            [gradleMeta.props.minSdk, gradleMeta.props.targetSdk, gradleMeta.props.compileSdk]
+                              .filter(Boolean)
+                              .map((v) => v as string)
+                              .join(" · ")}
+                          {gradleMeta.props.flags.map((f) => (
+                            <span key={f.key} className="axv-prop-meta-tag" title={f.key}>
+                              {f.value === "true" ? f.key.replace(/^android\./, "") : `${f.key.replace(/^android\./, "")}=${f.value}`}
+                            </span>
+                          ))}
+                        </span>
+                      </div>
+                    )}
+                    {gradleMeta.app &&
+                    (gradleMeta.app.namespace || gradleMeta.app.applicationId || gradleMeta.app.minSdk || gradleMeta.app.targetSdk || gradleMeta.app.compileSdk || gradleMeta.app.versionName) ? (
+                      <div className="axv-prop-meta-row">
+                        <span className="axv-prop-meta-k">app</span>
+                        <span className="axv-prop-meta-v">
+                          {(gradleMeta.app.applicationId || gradleMeta.app.namespace) && (
+                            <span className="axv-prop-meta-tag" title={tt("包名")}>
+                              {String(gradleMeta.app.applicationId || gradleMeta.app.namespace)}
+                            </span>
+                          )}
+                          {([
+                            ["compileSdk", gradleMeta.app.compileSdk],
+                            ["minSdk", gradleMeta.app.minSdk],
+                            ["targetSdk", gradleMeta.app.targetSdk],
+                          ] as const)
+                            .filter(([, v]) => v)
+                            .map(([k, v]) => (
+                              <span key={k} className="axv-prop-meta-tag">
+                                {k} = {String(v)}
+                              </span>
+                            ))}
+                          {gradleMeta.app.versionName && (
+                            <span className="axv-prop-meta-tag">v{gradleMeta.app.versionName}</span>
+                          )}
+                          {gradleMeta.app.hasSigning && (
+                            <span className="axv-prop-meta-tag" title={tt("app/build.gradle 配了 signingConfigs")}>
+                              {tt("已配签名")}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    ) : null}
+                    {gradleMeta.classpath.length > 0 && (
+                      <div className="axv-prop-meta-row" title={tt("根 build.gradle buildscript（构建期插件，不进运行时）")}>
+                        <span className="axv-prop-meta-k">{tt("构建插件")}</span>
+                        <span className="axv-prop-meta-v" style={{ opacity: 0.7 }}>
+                          {gradleMeta.classpath.map((c) => `${c.name}-${c.version}`).join(", ")}
+                        </span>
+                      </div>
+                    )}
+                    {gradleMeta.repos.length > 0 && (
+                      <div className="axv-prop-meta-row" title={tt("来自 settings.gradle（依赖仓库）")}>
+                        <span className="axv-prop-meta-k">{tt("仓库")}</span>
+                        <span className="axv-prop-meta-v" style={{ opacity: 0.85 }}>
+                          {gradleMeta.repos.map((r) => (
+                            <span key={r.url || r.name} className="axv-prop-meta-tag" title={r.url || r.name}>
+                              {r.url ? r.url.replace(/^https?:\/\//, "").replace(/\/$/, "") : r.name}
+                            </span>
+                          ))}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : null}
 
               {/* 依赖列表 */}
               <div className="axv-prop-sec-title">{tt("依赖库（{n}）", { n: deps.length + jars.length })}</div>

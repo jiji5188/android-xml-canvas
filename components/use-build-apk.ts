@@ -265,18 +265,32 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         // M266：项目依赖库（libs/*.jar|aar）→ 设备端 ECJ classpath
         // M380：除标准位置 app/src/main/libs，还扫 build.gradle 里 fileTree(dir:) 声明的目录
         setExportNote(tt("正在收集依赖库…"));
+        const libNotes: string[] = [];
         const libsRes = await collectProjectLibs(
           aiFileIo,
           activeProject?.rootPath || activeProject?.dirPath || null,
           gradlePkg,
           gradleRel,
         );
+        libNotes.push(...(libsRes.notes || []));
         // M361：共享库 /AndroidUIIDE/libs 也进 classpath（maven 坐标引用的库实体存这里）
         // M379：Array.isArray 守卫——上游任何异常形状都不能再抛 "is not iterable"（M367/M379 两次事故）
-        const sharedLibs = await collectSharedLibs();
+        const sharedLibs = await collectSharedLibs(libNotes);
         const projectLibsArr = Array.isArray(libsRes?.libs) ? libsRes.libs : [];
         const sharedLibsArr = Array.isArray(sharedLibs) ? sharedLibs : [];
         const allBuildLibs = [...projectLibsArr, ...sharedLibsArr];
+        // M383：依赖库收集明细——一眼看出“为什么 classpath 是 0 个库”（上次真实事故）
+        pushBuildLog(
+          true,
+          tt("依赖库收集明细"),
+          libNotes.join("\n") +
+            (libsRes.failed?.length ? `\n读失败：${libsRes.failed.slice(0, 8).join("、")}` : "") +
+            (libsRes.skipped?.length ? `\n超限跳过：${libsRes.skipped.slice(0, 8).join("、")}` : ""),
+          undefined,
+          undefined,
+          undefined,
+          "info",
+        );
         if (allBuildLibs.length) {
           setExportNote(tt("发现 {n} 个依赖库（项目 {a} + 共享 {b}），一起加进 classpath", { n: String(allBuildLibs.length), a: String(projectLibsArr.length), b: String(sharedLibsArr.length) }));
         }

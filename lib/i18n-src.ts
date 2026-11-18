@@ -2934,6 +2934,7 @@ export const SRC_EN: SrcDict = {
   "编译前检查：缺失资源": "Pre-build check: missing resources",
   "这些资源被引用但项目里收集不到（打包会报 not found；若实际来自依赖库可忽略）：{l}{more}": "These resources are referenced but not found in the project (build will report not found; ignore if they come from library AARs): {l}{more}",
   "编译前检查：依赖缺实体": "Pre-build check: dependencies without local artifacts",
+  "依赖库收集明细": "Library collection details",
   "build.gradle 声明了这些依赖，但项目 libs/共享库里没有对应的 jar/aar：{l}{more}": "These dependencies are declared in build.gradle but have no matching jar/aar in project libs or the shared lib dir: {l}{more}",
   "缺实体的包编译时会报 package does not exist；去「lib 库管理 → 一键下载」补齐后再打包。": "Packages without local artifacts will fail with 'package does not exist'; download them via Lib management → Download all before building.",
   "清单里没找到 launcher，已从源码推断入口：{n}": "No launcher in the manifest; entry inferred from sources: {n}",

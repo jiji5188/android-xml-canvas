@@ -82,7 +82,10 @@ describe("M141 全局离开拦截（切文件 / 关窗口）", () => {
   const s = rd("components/XmlEditor.tsx");
 
   it("打开新文件前先过 gate", () => {
-    expect(s).toContain("const openProject = () => leaveGuard.gate(dirty, () => openProjectFile());");
+    // M366 step13：openProject 下沉到 use-save-export.ts，gate 模式不变
+    const se = rd("components/use-save-export.ts");
+    expect(se).toContain("D.leaveGuard.gate(D.dirty, () => openProjectFile())");
+    expect(se).toContain("openProjectFile = ()");
   });
 
   it("关窗口时挂 beforeunload（脏了才拦）", () => {

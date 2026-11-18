@@ -252,6 +252,7 @@ import { useIconShapeActions } from "./use-icon-shape-actions";
 import { useSelectionOps } from "./use-selection-ops";
 import { useLints } from "./use-lints";
 import { useCanvasOps } from "./use-canvas-ops";
+import { useSaveExport } from "./use-save-export";
 import {
   subscribeRuntimeLog,
   installRuntimeLogBridge,
@@ -1623,30 +1624,18 @@ const findResolved = findResolvedNode;
   }));
 
   /** 打开 .xml 文件（弹系统文件选择器）；M141：有未保存改动先问一句 */
-  const openProject = () => leaveGuard.gate(dirty, () => openProjectFile());
-  const openProjectFile = () => {
-    // M21：浏览器支持 File System Access 时带句柄打开 → 之后「保存」能写回原路径
-    void (async () => {
-      const picked = await pickXmlFile();
-      if (picked) {
-        const fake = new File([picked.text], picked.name, { type: "text/xml" });
-        loadXmlFile(fake);
-        setSaveOrigin({ kind: "handle", handle: picked.handle, name: picked.name });
-        return;
-      }
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = ".xml";
-      input.onchange = () => {
-        const f = input.files?.[0];
-        if (f) {
-          setSaveOrigin(null); // 普通 <input> 拿不到写句柄
-          loadXmlFile(f);
-        }
-      };
-      input.click();
-    })();
-  };
+    /** M366 step13：打开文件/保存/导出域（openProject/openProjectFile/clearRes/doDownload/currentSaveInput）
+   *  → components/use-save-export.ts（延迟 Proxy；currentSaveInput 供 useExportRender/useBuildApk 复用） */
+  const {
+    openProject, openProjectFile, clearRes, doDownload, currentSaveInput,
+  } = useSaveExport(() => ({
+    leaveGuard, dirty, pickXmlFile, loadXmlFile, setSaveOrigin,
+    setResExtras, setResourceFragment, setSampleValues, resDirRef,
+    setExportNote, flashNote,
+    codeOnly, downloadLayout, workspaceLabel,
+    currentXml, exportMode, saveOrigin, project, generatedDrawables,
+    resExtrasAll, appIconRes, LS_KEY_SAMPLE, LS_KEY_RES,
+  }));
 
   /** 清掉已上传的资源，回到内置默认 */
   /** M3g：导出 res 包（zip）：布局 + 图标矢量 + 上传的 shape/values 一起带走，
@@ -1676,36 +1665,8 @@ const findResolved = findResolvedNode;
     clearRuntimeLogsCb, pushApkBuildLog,
   } = useBuildLogs();
 
-  const clearRes = () => {
-    setResExtras(null);
-    setResourceFragment("");
-    // M149：连示例项目自带的 values/drawable 一起清掉，否则清完还是一堆“幽灵资源”
-    setSampleValues("");
-    lsSet(LS_KEY_SAMPLE, "");
-    try {
-      window.localStorage.removeItem(LS_KEY_RES);
-    } catch {
-      /* ignore */
-    }
-    if (resDirRef.current) resDirRef.current.value = "";
-    setExportNote(tt("已清除上传的 res 资源"));
-    window.setTimeout(() => setExportNote(""), 2400);
-  };
-
-  /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续
+    /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续
    *  M2s：改成可视化检查面板（不再用 alert/confirm） */
-  const doDownload = () => {
-    if (codeOnly) {
-      flashNote(tt("当前文件不是布局，不能导出为布局 XML；直接「保存」就行"), 4600);
-      return;
-    }
-    const r = downloadLayout(currentSaveInput("activity_main.xml"));
-    setExportNote(
-      r.native ? tt("已保存 {name}（{dir}）", { name: r.name, dir: workspaceLabel() || tt("工作目录") }) : tt("已导出 {name}", { name: r.name }),
-    );
-    window.setTimeout(() => setExportNote(""), 2400);
-  };
-
   /* ===== M115：画布多选 / 复制 / 粘贴 / 成组 / 解组 ===== */
   /** 当前实际多选集合（主选在前，附加在后；按 path 字典序排序方便成组判定） */
   /** M115/M366：画布多选/剪贴板操作域（selPaths + select/copy/paste/dup/group/ungroup/delete）
@@ -1723,14 +1684,6 @@ const findResolved = findResolvedNode;
     if (selectedPath === null && selExtra.length) setSelExtra([]);
   }, [selectedPath, selExtra.length]);
 
-  /** 当前 xml → 落盘输入（四条保存路径共用） */
-  const currentSaveInput = (name?: string): SaveInput => ({    xml: currentXml(),
-    mode: exportMode,
-    name: name || saveOrigin?.name || activeFile(project)?.name || "activity_main.xml",
-    generatedDrawables,
-    extras: resExtrasAll,
-    extraRes: appIconRes,
-  });
   // M238：打包 hook（放在 currentSaveInput 之后，闭包能拿到 buildSaveInput）
   const { apkBusy, apkResult, doBuildApk } = useBuildApk({
     activeProject,

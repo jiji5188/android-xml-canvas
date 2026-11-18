@@ -252,6 +252,7 @@ import { useIconShapeActions } from "./use-icon-shape-actions";
 import { useSelectionOps } from "./use-selection-ops";
 import { useLints } from "./use-lints";
 import { useCanvasOps } from "./use-canvas-ops";
+import { useCanvasRender } from "./use-canvas-render";
 import { useSaveExport } from "./use-save-export";
 import {
   subscribeRuntimeLog,
@@ -1253,6 +1254,17 @@ const allDrawableNames = useMemo(() => {
     return findNode(treeRoot, "#" + segs.slice(0, -1).join("/"));
   }, [selectedPath, treeRoot]);
 
+  /** M366 step14：画布渲染几何计算域（selectedNode/widthPx/…/fitRatio/shortTag/findResolved）
+   *  → components/use-canvas-render.ts（纯计算 + resize；无跨集群纠缠，直接搬）
+   *  调用点上移到此（shortTag 在 1257 行 isChildOfCL 被用，早于原 1567 位置） */
+  const {
+    selectedNode, widthPx, heightPx, PHONE_BORDER, outerW, outerH,
+    STATUS_BAR_H, NAV_BAR_H, phoneTheme, phoneBg, phoneFg, vw, fitRatio,
+    shortTag, findResolved,
+  } = useCanvasRender({
+    selectedPath, model, device, isMobile, leftOpen, rightOpen, scale, SCALE, DPX,
+  });
+
   const isChildOfCL = !!selectedParent && shortTag(selectedParent.tag) === "ConstraintLayout";
 
   const clSiblings: SibOption[] = useMemo(() => {
@@ -1557,58 +1569,6 @@ const allDrawableNames = useMemo(() => {
     setExportNote, setDropHint,
   }));
 
-  const selectedNode: ResolvedNode | null = useMemo(() => {
-    if (!selectedPath || !model) return null;
-    return findResolvedNode(model.root, selectedPath);
-  }, [selectedPath, model]);
-
-  // M187：外壳布局 px 固定（不乘 scale），缩放靠 transform
-  const widthPx = Math.round(device.w * SCALE);
-  const heightPx = Math.round(device.h * SCALE);
-  /** 屏 dp → px（含用户缩放） */
-  /** 手机外壳边框宽（px）；内容区保持 412x892dp 不被边框吃掉
-   *  M12：必须和 xml-canvas.css 里 `.axv-phone` 的 `border: 8px` 一致。
-   *  之前这里是 2，CSS 是 8 → border-box 下内容区比模型假设窄 12px，
-   *  导致 CL/RL 的 match_parent 子项比内容区宽 12px，肉眼看到「右边偏窄/贴边」。 */
-  const PHONE_BORDER = 8;
-  const outerW = widthPx + PHONE_BORDER * 2;
-  const outerH = heightPx + PHONE_BORDER * 2;
-  /** 状态栏 24dp（Android 默认高度） */
-  const STATUS_BAR_H = Math.round(24 * DPX);
-  /** 三键导航栏 48dp */
-  const NAV_BAR_H = Math.round(48 * DPX);
-  /** 按根布局背景色推导状态栏/导航栏文字颜色（深底浅字 / 浅底深字） */
-  const phoneTheme = readableOn(
-    String(model?.root?.style?.backgroundColor ?? model?.root?.style?.background ?? ""),
-  );
-  const phoneBg = phoneTheme.bg;
-  const phoneFg = phoneTheme.fg;
-
-  /** 窄屏：把 824px 的机屏等比缩到可视宽度内（保留 dp→px 内部尺寸不变） */
-  const [vw, setVw] = useState(0);
-  useEffect(() => {
-    const onResize = () => setVw(window.innerWidth);
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-  const fitRatio = (() => {
-    if (!vw) return 1;
-    const panels = isMobile ? 0 : (leftOpen ? 320 : 0) + (rightOpen ? 320 : 0);
-    const avail = vw - panels - (isMobile ? 28 : 48);
-    // M20i：用户要求复原为之前的实现（基准装入比 × 用户缩放）
-    const baseW = device.w * SCALE + PHONE_BORDER * 2;
-    const fitBase = Math.min(1, avail / Math.max(1, baseW));
-    // M187：不再钳 1 —— 钳了以后放大档等于没放大（外壳变大 + transform 缩回，内容却没变）
-    return fitBase * scale;
-  })();
-
-  function shortTag(t: string): string {
-  return t.includes(".") ? t.slice(t.lastIndexOf(".") + 1) : t;
-}
-
-/** 在渲染模型里按 path 找节点（findResolvedNode 的别名，历史命名保留） */
-const findResolved = findResolvedNode;
   /** M308：载入 .xml / 上传 res 目录 → components/use-file-import.ts */
   const { loadXmlFile, onPickRes } = useFileImport(() => ({
     setExportNote,

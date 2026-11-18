@@ -42,9 +42,21 @@ export function readRootProjectName(src: string): string | null {
 }
 
 export function setRootProjectName(src: string, name: string): string {
-  const re = /(rootProject\.name\s*=\s*['"])[^'"]*(['"])/;
-  if (!re.test(src)) return src;
-  return src.replace(re, (_m, a: string, b: string) => `${a}${name}${b}`);
+  // M403：有现成 rootProject.name = 行 → 原地替换（保留原引号风格）；没有 → 插入
+  const exact = /(rootProject\.name\s*=\s*)(['"])([^'"]*)\2/;
+  if (exact.test(src)) {
+    return src.replace(exact, (_m, a: string, q: string) => `${a}${q}${name}${q}`);
+  }
+  const quoted = name.replace(/'/g, "\\'");
+  const line = `rootProject.name = '${quoted}'`;
+  const incM = src.match(/^\s*include\b/m);
+  if (incM) return src.slice(0, incM.index!) + line + "\n" + src.slice(incM.index!);
+  const blockM = src.match(/\b(pluginManagement|dependencyResolutionManagement)\s*\{[\s\S]*?\n\}/);
+  if (blockM) {
+    const at = blockM.index! + blockM[0].length;
+    return src.slice(0, at) + "\n\n" + line + "\n" + src.slice(at);
+  }
+  return src.replace(/\s*$/, "") + "\n" + line + "\n";
 }
 
 /* ---------------- 主题名 Theme.XXX ---------------- */

@@ -7,7 +7,7 @@
 //   · 依赖 —— 列 gradle 依赖 + app/libs 下的 jar，支持增删 gradle 坐标（jar 只读展示）
 // 图标只读展示（改图标要走图标编辑器生成 adaptive-icon 文件，不是一行文本能表达的）。
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import type { BrowseEntry, ProjectSource } from "@/lib/xml/project-browse";
 import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
@@ -25,6 +25,17 @@ import {
   type GradleRepo,
   type AppConfig,
 } from "@/lib/xml/gradle-deps";
+import {
+  parseRepoScope,
+  addRepoUrl,
+  removeRepoUrl,
+  readGradleProp,
+  setGradleProp,
+  listGradleProps,
+  parseBuildFeatures,
+  setBuildFeature,
+  type RepoScope,
+} from "@/lib/xml/gradle-edit";
 import { saveProjectFile, type ProjectSaveRoot } from "@/lib/xml/project-save";
 import type { FileOpsCtx } from "@/lib/xml/file-ops";
 import { detectPkgState, planPkgRename, unifyPackageTo } from "@/lib/xml/pkg-rename";
@@ -83,6 +94,42 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
 
   // M387：Gradle 可编辑表单（SDK/版本）；namespace/applicationId 走已有的 pkg 字段（同步改两个）
   const [gradleForm, setGradleForm] = useState<Record<string, string>>({});
+  // M403：按文件折叠分组的可编辑区
+  const [propsText, setPropsText] = useState("");
+  const [propsKey, setPropsKey] = useState("");
+  const [propsVal, setPropsVal] = useState("");
+  const [propsOrigin, setPropsOrigin] = useState("");
+  //  仓库（区分 buildscript / allprojects 两 scope，可增删；保存时统一写回）
+  const [repoUrl, setRepoUrl] = useState("");
+  const [repoOps, setRepoOps] = useState<
+    { kind: "add" | "remove"; scope: RepoScope; url: string; id?: number }[]
+  >([]);
+  const repoOpsRef = useRef(0);
+  //  加载到的各文件原文（保存仓库操作时的基础）
+  const [settingsText, setSettingsText] = useState("");
+  const [rootBuildText, setRootBuildText] = useState("");
+  const [settingsRel, setSettingsRel] = useState("");
+  const [rootBuildRel, setRootBuildRel] = useState("");
+  //  app/build.gradle 的 buildFeatures 开关
+  const [bf, setBf] = useState<Record<string, boolean>>({});
+  const [bfOrigin, setBfOrigin] = useState<Record<string, boolean>>({});
+  const addRepo = (scope: RepoScope) => {
+    const u = repoUrl.trim();
+    if (!u) return;
+    setRepoOps((o) => [...o, { kind: "add", scope, url: u, id: repoOpsRef.current++ }]);
+    setRepoUrl("");
+  };
+  const removeRepo = (scope: RepoScope, id: number, url: string) => {
+    setRepoOps((o) => {
+      const addIdx = o.findIndex((x) => x.kind === "add" && x.url === url && x.scope === scope);
+      if (addIdx >= 0) {
+        const c = o.slice();
+        c.splice(addIdx, 1);
+        return c;
+      }
+      return [...o, { kind: "remove" as const, scope, url, id }];
+    });
+  };
 
   // 原始值（判断哪些字段真改了）
   const [origin, setOrigin] = useState({
@@ -143,6 +190,16 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
         const propsText = await readFirst(["gradle.properties"]);
         // base="app" 时根 build.gradle 是另一份文件；否则 g 就是根
         const rootBuildText = base === "app" ? await readFirst(["build.gradle", "build.gradle.kts"]) : g?.text ?? "";
+        // M403：记录命中的 rel（仓库操作写回时按文件定位）
+        const readFirstRel = async (rels: string[]): Promise<string> => {
+          for (const rel of rels) {
+            const t = await p.source.readText(rel).catch(() => null);
+            if (t) return rel;
+          }
+          return "";
+        };
+        const settingsRelFound = await readFirstRel(["settings.gradle", "settings.gradle.kts"]);
+        const rootBuildRelFound = base === "app" ? await readFirstRel(["build.gradle", "build.gradle.kts"]) : g?.rel ?? "";
 
         if (!alive) return;
         setGradle(g);
@@ -162,6 +219,22 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
             classpath: cp,
             repos,
           });
+        }
+        // M403：仓库/props/buildFeatures 初值（可编辑折叠区）
+        if (alive) {
+          setSettingsText(settingsText);
+          setRootBuildText(rootBuildText);
+          setSettingsRel(settingsRelFound);
+          setRootBuildRel(rootBuildRelFound);
+          setPropsOrigin(propsText);
+          setPropsText(propsText);
+          if (g) {
+            const bfParsed = parseBuildFeatures(g.text);
+            const bfInit: Record<string, boolean> = {};
+            for (const k of bfParsed.keys) bfInit[k] = (bfParsed as unknown as Record<string, boolean | undefined>)[k] ?? false;
+            setBf(bfInit);
+            setBfOrigin(bfInit);
+          }
         }
         const gp = g ? parseGradlePackage(g.text) : { namespace: null, applicationId: null };
         const an = s ? readAppName(s.text) || "" : "";
@@ -230,7 +303,11 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
     appName !== origin.appName ||
     pkg !== origin.pkg ||
     (!!gradle && gradle.text !== originalGradleText.current) ||
-    Object.keys(gradleForm).some((k) => (gradleForm[k] || "") !== (origin.gradle[k] || ""));
+    Object.keys(gradleForm).some((k) => (gradleForm[k] || "") !== (origin.gradle[k] || "")) ||
+    // M403：编译标记 / 仓库 / buildFeatures 的改动也算脏
+    (!!propsText && propsText !== propsOrigin) ||
+    repoOps.length > 0 ||
+    Object.keys(bf).some((k) => bf[k] !== (bfOrigin[k] ?? false));
 
   // M387：子页面未保存守卫 + 系统返回键（DrawableEditor 同款）
   const guard = useEditorGuard({
@@ -417,6 +494,80 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
         }
         setGradle({ ...gradle, text: gradleTextToSave });
       }
+      // 3.6) M403：buildFeatures 开关（写 app/build.gradle）
+      if (gradle && gradleTextToSave !== null) {
+        const kts = gradle.rel.endsWith(".kts");
+        for (const [k, v] of Object.entries(bf)) {
+          if (v === undefined) continue;
+          const r = setBuildFeature(gradleTextToSave, k, v, kts);
+          if (!r.ok) {
+            setMsg(tt("buildFeatures 改 {k} 失败：{m}", { k, m: r.msg || "" }));
+            return;
+          }
+          gradleTextToSave = r.text;
+        }
+      }
+      // 3.7) M403：gradle.properties 编译标记（写 gradle.properties）
+      if (propsText && p.saveRoot) {
+        // 编辑过的 key=value（propsText 是当前编辑文本，与 propsOrigin 比对）
+        const nextProps = propsText;
+        if (nextProps !== propsOrigin) {
+          const ok = await saveRel(p, "gradle.properties", nextProps);
+          if (!ok) {
+            setMsg(tt("gradle.properties 写入失败。"));
+            return;
+          }
+        }
+      }
+      // 3.8) M403：仓库增删（按 scope 写对应文件）
+      //  注意：目标文件若是 gradle 自己（base≠app 时根 build.gradle = gradle.rel），
+      //  必须改在 gradleTextToSave 上，否则第 4 步会用旧文本覆盖掉仓库改动。
+      if (p.saveRoot) {
+        for (const op of repoOps) {
+          const targetFile =
+            op.scope === "settings" ? settingsRel : rootBuildRel;
+          if (!targetFile) {
+            setMsg(tt("仓库 {s} 找不到对应文件", { s: op.scope }));
+            return;
+          }
+          const sameAsGradle = !!gradle && targetFile === gradle.rel;
+          let src: string;
+          if (sameAsGradle) {
+            src = gradleTextToSave ?? gradle.text;
+          } else if (targetFile === settingsRel) {
+            src = settingsText || "";
+          } else {
+            src = rootBuildText || "";
+          }
+          const kts = targetFile.endsWith(".kts");
+          let next = src;
+          if (op.kind === "add") {
+            const r = addRepoUrl(next, op.scope, op.url!, kts);
+            if (!r.ok) {
+              setMsg(tt("加仓库失败：{m}", { m: r.msg || "" }));
+              return;
+            }
+            next = r.text;
+          } else {
+            const r = removeRepoUrl(next, op.scope, op.url!);
+            if (!r.ok) {
+              setMsg(tt("删仓库失败：{m}", { m: r.msg || "" }));
+              return;
+            }
+            next = r.text;
+          }
+          if (sameAsGradle) {
+            gradleTextToSave = next;
+            setGradle({ ...gradle, text: next });
+          } else {
+            const ok = await saveRel(p, targetFile, next);
+            if (!ok) {
+              setMsg(tt("{f} 写入失败", { f: targetFile }));
+              return;
+            }
+          }
+        }
+      }
       // 4) 依赖（gradle 正文已在内存里改过）
       // M282：必须写 gradleTextToSave（含包名新值），不能写闭包里的 gradle.text（旧值）
       if (gradle && gradleTextToSave !== null) {
@@ -427,6 +578,10 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
         }
       }
       setOrigin({ dir: dir.trim() || origin.dir, appName, pkg, gradle: { ...gradleForm } });
+      // M403：重置折叠区的脏状态（保存成功后回到「未改动」）
+      setPropsOrigin(propsText);
+      setBfOrigin({ ...bf });
+      setRepoOps([]);
       p.onSaved();
       // 保留第 3 步的包名同步详情（「已保存」会把具体结果冲掉）：
       // 有同步结果就展示它，没有就展示「已保存」
@@ -497,54 +652,153 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
               {gradle ? (
                 <>
                   <div className="axv-prop-sec-title">{tt("Gradle 配置")}</div>
-                  <div className="axv-prop-form">
-                    <label className="axv-saveas-field">
-                      <span>compileSdk</span>
-                      <input
-                        className="axv-saveas-input"
-                        value={gradleForm.compileSdk || ""}
-                        inputMode="numeric"
-                        placeholder={tt("没读到，可填 34")}
+                {/* M403：按文件折叠分组（gradle.properties / settings.gradle / build.gradle / app/build.gradle） */}
+                <details className="axv-prop-file" open={!!propsText}>
+                  <summary>{tt("gradle.properties（编译标记）")}</summary>
+                  {propsText ? (
+                    <div className="axv-prop-props">
+                      <textarea
+                        className="axv-saveas-input axv-prop-props-ta"
+                        value={propsText}
                         spellCheck={false}
-                        onChange={(e) => setGradleForm((m) => ({ ...m, compileSdk: e.target.value }))}
+                        rows={Math.min(10, Math.max(3, propsText.split("\n").length))}
+                        onChange={(e) => setPropsText(e.target.value)}
                       />
-                    </label>
-                    <div className="axv-prop-form-2col">
-                      <label className="axv-saveas-field">
-                        <span>minSdk</span>
+                      <div className="axv-prop-props-add">
                         <input
                           className="axv-saveas-input"
-                          value={gradleForm.minSdk || ""}
-                          inputMode="numeric"
-                          placeholder={tt("没读到，可填 24")}
+                          value={propsKey}
                           spellCheck={false}
-                          onChange={(e) => setGradleForm((m) => ({ ...m, minSdk: e.target.value }))}
+                          placeholder={tt("键，如 android.useAndroidX")}
+                          onChange={(e) => setPropsKey(e.target.value)}
                         />
-                      </label>
-                      <label className="axv-saveas-field">
-                        <span>targetSdk</span>
                         <input
                           className="axv-saveas-input"
-                          value={gradleForm.targetSdk || ""}
-                          inputMode="numeric"
-                          placeholder={tt("没读到，可填 34")}
+                          value={propsVal}
                           spellCheck={false}
-                          onChange={(e) => setGradleForm((m) => ({ ...m, targetSdk: e.target.value }))}
+                          placeholder={tt("值，如 true")}
+                          onChange={(e) => setPropsVal(e.target.value)}
                         />
-                      </label>
+                        <button
+                          type="button"
+                          className="axv-set-btn"
+                          disabled={!propsKey.trim()}
+                          onClick={() => {
+                            const r = setGradleProp(propsText, propsKey.trim(), propsVal.trim());
+                            setPropsText(r.text);
+                            setPropsKey("");
+                            setPropsVal("");
+                          }}
+                        >
+                          {tt("添加")}
+                        </button>
+                      </div>
                     </div>
-                    <div className="axv-prop-form-2col">
-                      <label className="axv-saveas-field">
-                        <span>versionCode</span>
-                        <input
-                          className="axv-saveas-input"
-                          value={gradleForm.versionCode || ""}
-                          inputMode="numeric"
-                          placeholder={tt("没读到，请手动加")}
-                          spellCheck={false}
-                          onChange={(e) => setGradleForm((m) => ({ ...m, versionCode: e.target.value }))}
-                        />
-                      </label>
+                  ) : (
+                    <div className="axv-saveas-hint">{tt("没找到 gradle.properties")}</div>
+                  )}
+                </details>
+
+                <details className="axv-prop-file">
+                  <summary>{tt("settings.gradle（仓库·模块）")}</summary>
+                  {(gradleMeta?.rootName || (gradleMeta?.modules.length ?? 0) > 0) && (
+                    <div className="axv-prop-meta-row">
+                      <span className="axv-prop-meta-k">{tt("模块")}</span>
+                      <span className="axv-prop-meta-v">
+                        {gradleMeta?.rootName ? tt("根工程 {name}", { name: gradleMeta.rootName }) + " " : ""}
+                        {gradleMeta?.modules.join(", ") || "—"}
+                      </span>
+                    </div>
+                  )}
+                </details>
+
+                <details className="axv-prop-file" open>
+                  <summary>{tt("build.gradle（根·仓库）")}</summary>
+                  {gradleMeta && gradleMeta.classpath.length > 0 && (
+                    <div className="axv-prop-meta-row" title={tt("根 build.gradle buildscript（构建期插件，不进运行时）")}>
+                      <span className="axv-prop-meta-k">{tt("构建插件")}</span>
+                      <span className="axv-prop-meta-v" style={{ opacity: 0.7 }}>
+                        {gradleMeta.classpath.map((c) => `${c.name}-${c.version}`).join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  {/* M403：仓库按 scope（buildscript / allprojects）分列表，可增删 */}
+                  <RepoPanel
+                    label={tt("仓库（buildscript）")}
+                    items={parseRepoScope(rootBuildText, "buildscript")}
+                    scope="buildscript"
+                    addUrl={repoUrl}
+                    setAddUrl={setRepoUrl}
+                    onAddClick={addRepo}
+                    onRemove={removeRepo}
+                    repoOps={repoOps}
+                    tt={tt}
+                  />
+                  <RepoPanel
+                    label={tt("仓库（allprojects）")}
+                    items={parseRepoScope(rootBuildText, "allprojects")}
+                    scope="allprojects"
+                    addUrl={repoUrl}
+                    setAddUrl={setRepoUrl}
+                    onAddClick={addRepo}
+                    onRemove={removeRepo}
+                    repoOps={repoOps}
+                    tt={tt}
+                  />
+                </details>
+
+                <details className="axv-prop-file" open={!!gradle}>
+                  <summary>{tt("app/build.gradle（SDK·版本·特性）")}</summary>
+                  {gradle ? (
+                    <div className="axv-prop-form">
+                      <div className="axv-prop-form-2col">
+                        <label className="axv-saveas-field">
+                          <span>compileSdk</span>
+                          <input
+                            className="axv-saveas-input"
+                            value={gradleForm.compileSdk || ""}
+                            inputMode="numeric"
+                            placeholder={tt("没读到，可填 34")}
+                            spellCheck={false}
+                            onChange={(e) => setGradleForm((m) => ({ ...m, compileSdk: e.target.value }))}
+                          />
+                        </label>
+                        <label className="axv-saveas-field">
+                          <span>minSdk</span>
+                          <input
+                            className="axv-saveas-input"
+                            value={gradleForm.minSdk || ""}
+                            inputMode="numeric"
+                            placeholder={tt("没读到，可填 24")}
+                            spellCheck={false}
+                            onChange={(e) => setGradleForm((m) => ({ ...m, minSdk: e.target.value }))}
+                          />
+                        </label>
+                      </div>
+                      <div className="axv-prop-form-2col">
+                        <label className="axv-saveas-field">
+                          <span>targetSdk</span>
+                          <input
+                            className="axv-saveas-input"
+                            value={gradleForm.targetSdk || ""}
+                            inputMode="numeric"
+                            placeholder={tt("没读到，可填 34")}
+                            spellCheck={false}
+                            onChange={(e) => setGradleForm((m) => ({ ...m, targetSdk: e.target.value }))}
+                          />
+                        </label>
+                        <label className="axv-saveas-field">
+                          <span>versionCode</span>
+                          <input
+                            className="axv-saveas-input"
+                            value={gradleForm.versionCode || ""}
+                            inputMode="numeric"
+                            placeholder={tt("没读到，请手动加")}
+                            spellCheck={false}
+                            onChange={(e) => setGradleForm((m) => ({ ...m, versionCode: e.target.value }))}
+                          />
+                        </label>
+                      </div>
                       <label className="axv-saveas-field">
                         <span>versionName</span>
                         <input
@@ -555,56 +809,30 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
                           onChange={(e) => setGradleForm((m) => ({ ...m, versionName: e.target.value }))}
                         />
                       </label>
+                      {/* M403：buildFeatures 开关 */}
+                      <div className="axv-prop-form">
+                        <span className="axv-prop-meta-k">{tt("buildFeatures")}</span>
+                        <div className="axv-prop-bf">
+                          {(parseBuildFeatures(gradle.text).keys.length
+                            ? parseBuildFeatures(gradle.text).keys
+                            : ["buildConfig", "viewBinding", "compose"]
+                          ).map((k) => (
+                            <label key={k} className="axv-prop-bf-item">
+                              <input
+                                type="checkbox"
+                                checked={bf[k] === true}
+                                onChange={(e) => setBf((m) => ({ ...m, [k]: e.target.checked }))}
+                              />
+                              <span>{k}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="axv-prop-meta">
-                    {(gradleMeta?.rootName || (gradleMeta?.modules.length ?? 0) > 0) && (
-                      <div className="axv-prop-meta-row">
-                        <span className="axv-prop-meta-k">{tt("模块")}</span>
-                        <span className="axv-prop-meta-v">
-                          {gradleMeta?.rootName ? tt("根工程 {name}", { name: gradleMeta.rootName }) + " " : ""}
-                          {gradleMeta?.modules.join(", ") || "—"}
-                        </span>
-                      </div>
-                    )}
-                    {gradleMeta?.props && (gradleMeta.props.flags.length > 0 || gradleMeta.props.minSdk || gradleMeta.props.targetSdk || gradleMeta.props.compileSdk) && (
-                      <div className="axv-prop-meta-row">
-                        <span className="axv-prop-meta-k">{tt("编译标记")}</span>
-                        <span className="axv-prop-meta-v">
-                          {gradleMeta.props.flags.length === 0 &&
-                            [gradleMeta.props.minSdk, gradleMeta.props.targetSdk, gradleMeta.props.compileSdk]
-                              .filter(Boolean)
-                              .map((v) => v as string)
-                              .join(" · ")}
-                          {gradleMeta.props.flags.map((f) => (
-                            <span key={f.key} className="axv-prop-meta-tag" title={f.key}>
-                              {f.value === "true" ? f.key.replace(/^android\./, "") : `${f.key.replace(/^android\./, "")}=${f.value}`}
-                            </span>
-                          ))}
-                        </span>
-                      </div>
-                    )}
-                    {gradleMeta && gradleMeta.classpath.length > 0 && (
-                      <div className="axv-prop-meta-row" title={tt("根 build.gradle buildscript（构建期插件，不进运行时）")}>
-                        <span className="axv-prop-meta-k">{tt("构建插件")}</span>
-                        <span className="axv-prop-meta-v" style={{ opacity: 0.7 }}>
-                          {gradleMeta.classpath.map((c) => `${c.name}-${c.version}`).join(", ")}
-                        </span>
-                      </div>
-                    )}
-                    {gradleMeta && gradleMeta.repos.length > 0 && (
-                      <div className="axv-prop-meta-row" title={tt("来自 settings.gradle（依赖仓库）")}>
-                        <span className="axv-prop-meta-k">{tt("仓库")}</span>
-                        <span className="axv-prop-meta-v" style={{ opacity: 0.85 }}>
-                          {gradleMeta.repos.map((r) => (
-                            <span key={r.url || r.name} className="axv-prop-meta-tag" title={r.url || r.name}>
-                              {r.url ? r.url.replace(/^https?:\/\//, "").replace(/\/$/, "") : r.name}
-                            </span>
-                          ))}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <div className="axv-saveas-hint">{tt("没找到 app/build.gradle")}</div>
+                  )}
+                </details>
                 </>
               ) : null}
               {/* 依赖列表 */}
@@ -683,4 +911,70 @@ function useOriginalText(g: GradleFile | null): { current: string } {
 async function saveRel(p: ProjectPropsDialogProps, rel: string, text: string): Promise<boolean> {
   if (!p.saveRoot) return false;
   return saveProjectFile(p.saveRoot, rel, text);
+}
+
+/** M403：单个 scope（buildscript / allprojects）的仓库列表 + 增删 */
+function RepoPanel(props: {
+  label: string;
+  items: import("@/lib/xml/gradle-edit").RepoEntry[];
+  scope: import("@/lib/xml/gradle-edit").RepoScope;
+  addUrl: string;
+  setAddUrl: (s: string) => void;
+  onAddClick: (scope: import("@/lib/xml/gradle-edit").RepoScope) => void;
+  onRemove: (scope: import("@/lib/xml/gradle-edit").RepoScope, id: number, url: string) => void;
+  repoOps: { kind: "add" | "remove"; scope: import("@/lib/xml/gradle-edit").RepoScope; url: string; id?: number }[];
+  tt: (s: string, p?: Record<string, string | number>) => string;
+}) {
+  const { label, items, scope, addUrl, setAddUrl, onAddClick, onRemove, repoOps, tt } = props;
+  // 本 scope 待加的 url（还没保存的）
+  const pendingAdd = repoOps.filter((o) => o.kind === "add" && o.scope === scope).map((o) => o.url);
+  const pendingRemove = new Set(repoOps.filter((o) => o.kind === "remove" && o.scope === scope).map((o) => o.url));
+  const all = [...items, ...pendingAdd.map((u) => ({ name: "maven", url: u, raw: u, scope } as import("@/lib/xml/gradle-edit").RepoEntry))];
+  return (
+    <div className="axv-prop-repo">
+      <div className="axv-prop-meta-row">
+        <span className="axv-prop-meta-k">{label}</span>
+      </div>
+      {all.length === 0 && <div className="axv-saveas-hint">{tt("无")}</div>}
+      {all.map((r, i) => {
+        const ident = r.url || r.name;
+        const removed = pendingRemove.has(ident);
+        const pending = pendingAdd.includes(ident) && !r.raw;
+        return (
+          <div key={`${ident}-${i}`} className="axv-prop-repo-item" style={{ opacity: removed ? 0.4 : 1, textDecoration: removed ? "line-through" : "none" }}>
+            <span className="axv-prop-repo-name" title={r.url || r.name}>
+              {r.url ? r.url.replace(/^https?:\/\//, "").replace(/\/$/, "") : r.name}
+            </span>
+            {pending ? <span className="axv-prop-repo-tag">{tt("待加")}</span> : null}
+            <button
+              type="button"
+              className="axv-ws-mini"
+              title={tt("删除这条仓库")}
+              aria-label={tt("删除这条仓库")}
+              onClick={() => onRemove(scope, i, ident)}
+            >
+              <span className="msr" aria-hidden="true" style={{ fontSize: 14 }}>delete</span>
+            </button>
+          </div>
+        );
+      })}
+      <div className="axv-prop-repo-add">
+        <input
+          className="axv-saveas-input"
+          value={addUrl}
+          spellCheck={false}
+          placeholder={tt("仓库 URL，如 https://maven.aliyun.com/repository/public")}
+          onChange={(e) => setAddUrl(e.target.value)}
+        />
+        <button
+          type="button"
+          className="axv-set-btn"
+          disabled={!addUrl.trim()}
+          onClick={() => onAddClick(scope)}
+        >
+          {tt("加到 {s}", { s: scope })}
+        </button>
+      </div>
+    </div>
+  );
 }

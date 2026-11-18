@@ -1524,6 +1524,27 @@ export const SRC_EN: SrcDict = {
   "AndroidManifest / build.gradle 的包名与 {t} 不一致，保存时会同步为 {t}。":
     "AndroidManifest / build.gradle package differs from {t}; it will be synced to {t} on save.",
   "（旧包名 {l} → {t}，子包层次保留）": "(old {l} → {t}, sub-package hierarchy kept)",
+  // M403：项目属性页折叠分组（gradle.properties / 仓库 / buildFeatures）
+  "gradle.properties（编译标记）": "gradle.properties (build flags)",
+  "键，如 android.useAndroidX": "key, e.g. android.useAndroidX",
+  "值，如 true": "value, e.g. true",
+  "没找到 gradle.properties": "gradle.properties not found",
+  "settings.gradle（仓库·模块）": "settings.gradle (repos · modules)",
+  "build.gradle（根·仓库）": "build.gradle (root · repos)",
+  "仓库（buildscript）": "Repositories (buildscript)",
+  "仓库（allprojects）": "Repositories (allprojects)",
+  "app/build.gradle（SDK·版本·特性）": "app/build.gradle (SDK · version · features)",
+  "没找到 app/build.gradle": "app/build.gradle not found",
+  "待加": "pending",
+  "删除这条仓库": "Remove this repository",
+  "仓库 URL，如 https://maven.aliyun.com/repository/public": "Repo URL, e.g. https://maven.aliyun.com/repository/public",
+  "加到 {s}": "Add to {s}",
+  "buildFeatures 改 {k} 失败：{m}": "Failed to set buildFeatures {k}: {m}",
+  "gradle.properties 写入失败。": "Failed to write gradle.properties.",
+  "仓库 {s} 找不到对应文件": "No target file found for repo scope {s}",
+  "加仓库失败：{m}": "Failed to add repository: {m}",
+  "删仓库失败：{m}": "Failed to remove repository: {m}",
+  "{f} 写入失败": "Failed to write {f}",
   "\n⚠ {l} 是新包名的父包，未自动改（会套两层后缀），请人工确认":
     "\n⚠ {l} is a parent of the new package; not auto-renamed (would double the suffix) — please check manually",
   "\n⚠ 复检仍有 {n} 个包名未统一：{l}（可能写入失败或目录冲突）":

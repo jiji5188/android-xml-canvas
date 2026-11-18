@@ -73,9 +73,15 @@ describe("M176 settings.gradle rootProject.name", () => {
     expect(t).toBe('rootProject.name = "B"');
   });
 
-  it("没有该语句不报错", () => {
+  it("没有该语句 → 插入到 include 行前（M403 老工程漏改修复）", () => {
     const t = setRootProjectName("include ':app'", "X");
-    expect(t).toBe("include ':app'");
+    expect(t).toContain("rootProject.name = 'X'");
+    expect(t).toContain("include ':app'");
+  });
+
+  it("没有 include 也没仓库块 → 插到文件尾", () => {
+    const t = setRootProjectName("task clean(type: Delete) { delete rootProject.buildDir }", "Z");
+    expect(t).toContain("rootProject.name = 'Z'");
   });
 });
 

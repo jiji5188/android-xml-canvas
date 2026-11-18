@@ -399,6 +399,41 @@
 .axv-prop-add { display: flex; gap: 6px; margin-bottom: 10px; }
 .axv-prop-add .axv-saveas-input { flex: 1; }
 
+/* M403：项目属性页按文件折叠分组（gradle.properties / settings / build.gradle / buildFeatures / 仓库） */
+.axv-prop-file { border: 1px solid var(--axv-outline-variant); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+.axv-prop-file > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 9px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--axv-on-surface);
+  background: color-mix(in srgb, var(--axv-on-surface) 4%, transparent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+.axv-prop-file > summary::-webkit-details-marker { display: none; }
+.axv-prop-file > summary::after { content: "\u25B8"; margin-left: auto; opacity: 0.5; font-size: 10px; transition: transform 0.15s; }
+.axv-prop-file[open] > summary::after { transform: rotate(90deg); }
+.axv-prop-file > *:not(summary) { padding: 0 10px 8px; }
+.axv-prop-props { display: flex; flex-direction: column; gap: 6px; }
+.axv-prop-props-ta { font-family: ui-monospace, Consolas, monospace; font-size: 11px; line-height: 1.5; resize: vertical; white-space: pre; }
+.axv-prop-props-add { display: flex; gap: 6px; }
+.axv-prop-props-add input:first-child { flex: 2 1 0; min-width: 0; }
+.axv-prop-props-add input:nth-child(2) { flex: 1 1 0; min-width: 0; }
+.axv-prop-props-add .axv-set-btn { flex: 0 0 auto; }
+.axv-prop-repo { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.axv-prop-repo-item { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 4px; border-radius: 6px; }
+.axv-prop-repo-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Consolas, monospace; }
+.axv-prop-repo-tag { flex: 0 0 auto; font-size: 10px; color: var(--axv-primary); border: 1px solid color-mix(in srgb, var(--axv-primary) 40%, transparent); border-radius: 6px; padding: 0 5px; }
+.axv-prop-repo-add { display: flex; gap: 6px; margin-top: 4px; }
+.axv-prop-repo-add .axv-saveas-input { flex: 1; min-width: 0; }
+.axv-prop-repo-add .axv-set-btn { flex: 0 0 auto; }
+.axv-prop-bf { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; }
+.axv-prop-bf-item { display: flex; align-items: center; gap: 5px; font-size: 12px; font-family: ui-monospace, Consolas, monospace; }
+
 /* M182: project segmented view (layout/resource/code/all) */
 /* M182：项目分段视图（布局 / 资源 / 代码 / 全部） */
 .axv-pb-scopes {

@@ -45,6 +45,59 @@ export function setGradlePackage(text: string, pkg: string): { ok: boolean; text
   return { ok: true, text: next };
 }
 
+/** M387：可编辑的 app/build.gradle 字段 */
+export type AppConfigField =
+  | "namespace"
+  | "applicationId"
+  | "compileSdk"
+  | "minSdk"
+  | "targetSdk"
+  | "versionCode"
+  | "versionName";
+
+const QUOTED_FIELDS = new Set<string>(["namespace", "applicationId", "versionName"]);
+
+/**
+ * M387：改 app/build.gradle 里的单个配置字段（项目属性子页表单用）。
+ * 认三种写法：key value / key = value / keyVersion value（SDK 旧写法）。
+ * 字段不存在时的策略（宁缺毋滥，不猜工程结构）：
+ *   - compileSdk/minSdk/targetSdk 缺 → 插到 android { 顶层的合法位置
+ *   - versionCode/versionName/namespace/applicationId 缺 → 报错（这些该在 defaultConfig 里，乱插会出坏 gradle）
+ */
+export function setAppConfigField(
+  text: string,
+  field: AppConfigField,
+  value: string,
+  kts = false,
+): { ok: boolean; text: string; msg?: string } {
+  const v = value.trim();
+  if (!v) return { ok: false, text, msg: "值不能为空" };
+  if (field.endsWith("Sdk") && !/^\d+$/.test(v)) return { ok: false, text, msg: "SDK 值必须是数字" };
+  if (field === "versionCode" && !/^\d+$/.test(v)) return { ok: false, text, msg: "versionCode 必须是数字" };
+  const quoted = QUOTED_FIELDS.has(field);
+  // SDK 字段同时认旧写法 compileSdkVersion / minSdkVersion / targetSdkVersion
+  // 长 key（*SdkVersion）必须优先：否则 minSdk 的前缀正则会撞进 minSdkVersion，值部分把 "Version" 当数字吞掉
+  const keys = field.endsWith("Sdk") ? [field.replace(/Sdk$/, "SdkVersion"), field] : [field];
+  for (const key of keys) {
+    const re = new RegExp(`((?<![\\w.$])${key}[ \\t]*=?[ \\t]*)(?:"[^"]*"|'[^']*'|[\\w.]+)`);
+    if (re.test(text)) {
+      const rep = quoted ? `$1"${v}"` : `$1${v}`;
+      return { ok: true, text: text.replace(re, rep) };
+    }
+  }
+  // 字段缺失：SDK 类可插 android { 顶层；其余报错
+  const m = /(^|\n)([ \t]*)android\s*\{/.exec(text);
+  if (!m) return { ok: false, text, msg: "build.gradle 里没找到 android { } 块" };
+  if (!field.endsWith("Sdk")) {
+    return { ok: false, text, msg: `build.gradle 里没有 ${field}（它在 defaultConfig 里，请手动加）` };
+  }
+  const lineEnd = text.indexOf("\n", m.index);
+  if (lineEnd < 0) return { ok: false, text, msg: "android { 块格式异常" };
+  const indent = m[2] + "    ";
+  const line = kts ? `${indent}${field} = ${v}` : `${indent}${field} ${v}`;
+  return { ok: true, text: text.slice(0, lineEnd + 1) + line + "\n" + text.slice(lineEnd + 1) };
+}
+
 /** 列出 dependencies { } 里所有依赖坐标（implementation / api / compileOnly / ...） */
 export function listGradleDeps(text: string): string[] {
   const m = /(^|\n)dependencies\s*\{([\s\S]*?)\n\}/.exec(text);

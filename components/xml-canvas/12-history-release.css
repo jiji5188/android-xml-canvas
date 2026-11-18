@@ -1073,3 +1073,12 @@
 }
 
 
+
+/* M387：项目属性弹窗 → 全屏子页（配置表单化） */
+.axv-prop-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 14px 16px 20px; display: flex; flex-direction: column; background: #ffffff14; }
+.axv-prop-rel { flex: 1 1 auto; min-width: 0; margin-left: 8px; text-align: right; font-size: 11px; color: var(--axv-on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.axv-prop-form { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--axv-outline-variant); border-radius: 10px; padding: 4px 10px 10px; background: color-mix(in srgb, var(--axv-on-surface) 4%, transparent); margin-bottom: 8px; }
+.axv-prop-form .axv-prop-sec-title { margin: 6px 0 2px; }
+.axv-prop-form .axv-saveas-field { margin-top: 8px; }
+.axv-prop-form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.axv-prop-form-2col .axv-saveas-field { margin-top: 8px; }

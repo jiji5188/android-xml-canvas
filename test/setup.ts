@@ -1,3 +1,9 @@
+// M388：主机 shell 可能带 NODE_ENV=production（react/react-dom 会走 prod 构建，
+// 没有 React.act → RTL 报错）；vitest 一律按 test 跑
+if (process.env.NODE_ENV !== "test") {
+  (process.env as Record<string, string | undefined>).NODE_ENV = "test";
+}
+
 // test/setup.ts — M144：jsdom 里补一个 localStorage
 //
 // 背景：Node 24 自带 `localStorage` 全局（不带 --experimental-webstorage 时访问就返回 undefined），

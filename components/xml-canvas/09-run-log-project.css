@@ -1,0 +1,975 @@
+/* ===== M148锛氳皟璇曟棩蹇楅潰鏉匡紙宸ュ叿璋冪敤/妯″瀷鍘熷杈撳嚭/鎶ラ敊閮藉湪杩欓噷锛屼笉杩涜亰澶╂锛?===== */
+.axv-ai-log { flex: 0 0 auto; border-top: 1px solid var(--axv-outline); background: var(--axv-surface-head); }
+.axv-ai-log-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 8px 0 10px;
+  border-bottom: 1px solid var(--axv-outline);
+}
+.axv-ai-log-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-ai-log-toggle b { font-size: 12px; font-weight: 700; }
+.axv-ai-log-count {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--axv-on-surface-variant);
+  background: var(--axv-surface);
+  border: 1px solid var(--axv-outline);
+  border-radius: 999px;
+  padding: 0 7px;
+  min-width: 20px;
+  text-align: center;
+}
+.axv-ai-log-head .axv-ai-spacer { flex: 1; }
+.axv-ai-log-body {
+  height: 160px;
+  overflow: auto;
+  padding: 8px 10px;
+  background: var(--axv-surface);
+  font-size: 10.5px;
+  line-height: 1.5;
+  display: grid;
+  gap: 6px;
+}
+.axv-ai-log-empty { color: var(--axv-on-surface-variant); padding: 4px 2px; }
+.axv-ai-log-row { display: grid; grid-template-columns: 52px 64px 1fr; gap: 8px; padding: 5px 8px; border-left: 3px solid var(--axv-outline); background: var(--axv-surface-head); border-radius: 6px; }
+.axv-ai-log-time { color: var(--axv-on-surface-variant); font-variant-numeric: tabular-nums; }
+.axv-ai-log-kind { font-weight: 700; }
+.axv-ai-log-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--axv-on-surface);
+  font-family: var(--axv-font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  max-height: 120px;
+  overflow: auto;
+}
+/* 鍒嗙被棰滆壊锛堥渶姹傦細鏃ュ織甯﹀垎绫婚鑹诧級 */
+.axv-ai-log-row.k-system { border-left-color: var(--axv-primary, #5b9dff); }
+.axv-ai-log-row.k-system .axv-ai-log-kind { color: var(--axv-primary, #5b9dff); }
+.axv-ai-log-row.k-tool_call { border-left-color: #ff9d3c; }
+.axv-ai-log-row.k-tool_call .axv-ai-log-kind { color: #ff9d3c; }
+.axv-ai-log-row.k-tool_result { border-left-color: #3fbf6f; }
+.axv-ai-log-row.k-tool_result .axv-ai-log-kind { color: #3fbf6f; }
+.axv-ai-log-row.k-model_raw { border-left-color: #e0b341; }
+.axv-ai-log-row.k-model_raw .axv-ai-log-kind { color: #e0b341; }
+.axv-ai-log-row.k-error { border-left-color: #ff6b6b; }
+.axv-ai-log-row.k-error .axv-ai-log-kind { color: #ff6b6b; }
+.axv-ai-log-row.k-error .axv-ai-log-text { color: #ff6b6b; }
+.axv-ai-log-row.k-info { border-left-color: var(--axv-on-surface-variant); }
+.axv-ai-log-row.k-info .axv-ai-log-kind { color: var(--axv-on-surface-variant); }
+.axv-ai-continue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  font-size: 12px;
+  color: #ff9d3c;
+}
+.axv-ai-continue-txt { flex: 1; }
+
+.axv-ai-input { padding: 8px 12px 12px; display: grid; gap: 8px; }
+.axv-ai-input textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 72px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font-size: 12.5px;
+  font-family: inherit;
+  line-height: 1.5;
+  outline: none;
+}
+.axv-ai-input textarea:focus { border-color: var(--axv-primary); }
+.axv-ai-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.axv-ai-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+}
+.axv-ai-check input { accent-color: var(--axv-primary); }
+.axv-ai-keys {
+  margin-left: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--axv-on-surface-variant);
+  opacity: 0.8;
+}
+@media (max-width: 1400px) {
+  /* 绐勪簡灏辨妸蹇嵎閿彁绀鸿棌鎺夛紝鍒妸涓や釜寮€鍏虫尋鎴愮珫鎺?*/
+  .axv-ai-keys { display: none; }
+  .axv-ai-send { margin-left: auto; }
+}
+.axv-ai-send { min-width: 72px; display: inline-flex; align-items: center; gap: 4px; justify-content: center; }
+.axv-ai-send:disabled { opacity: 0.5; cursor: default; }
+
+/* ===== M18锛氳繍琛岃皟璇曠殑鍙氦浜掓ā鎷?=====
+   鈿?鐢诲竷 SCALE = 2锛?dp = 2px锛夛細杩欓噷鎵€鏈夐暱搴﹂兘鎸?2 鍊嶅啓銆?   渚嬪 Android 鐨?56dp 鍒楄〃琛?鈫?112px锛?4sp 姝ｆ枃 鈫?28px銆?*/
+.axv-run-body { position: relative; overflow: hidden; }
+.axv-run-screen { position: relative; height: 100%; }
+
+.axv-run-pressed { filter: brightness(0.94); }
+/* M20k锛氭稛婕敼鎴愪吉鍏冪礌锛屽ぉ鐒惰鎺т欢鑷繁鐨?overflow:hidden 瑁佹帀锛?   涓嶅啀寰€ DOM 鎻?span锛堟棫鍋氭硶鍗婂緞 max(w,h)*2锛屽叏瀹芥寜閽細鐩栦綇鏁村睆锛?   鐪嬭捣鏉ュ儚鈥滄墍鏈夋帶浠堕兘琚寜涓嬧€濓級銆?*/
+.axv-run-rippleable {
+  position: relative;
+  overflow: hidden;
+}
+.axv-run-rippleable::after {
+  content: "";
+  position: absolute;
+  left: var(--axv-rip-x, 50%);
+  top: var(--axv-rip-y, 50%);
+  width: var(--axv-rip-r, 0px);
+  height: var(--axv-rip-r, 0px);
+  margin-left: calc(var(--axv-rip-r, 0px) / -2);
+  margin-top: calc(var(--axv-rip-r, 0px) / -2);
+  border-radius: 50%;
+  background: var(--axv-rip-c, rgba(0, 0, 0, 0.18));
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+.axv-run-rippleable.axv-run-rippling::after {
+  opacity: 0.9;
+  animation: axv-run-ripple 0.45s ease-out forwards;
+}
+.axv-run-ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 6;
+  animation: axv-run-ripple 0.45s ease-out forwards;
+}
+@keyframes axv-run-ripple {
+  to { transform: scale(1); opacity: 0; }
+}
+.axv-run-body [data-tag="Button"],
+.axv-run-body [data-tag$="Button"],
+.axv-run-body [data-tag="Chip"],
+.axv-run-body [data-tag="Spinner"] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.axv-run-body [data-tag="Button"] { transition: filter 0.12s ease; }
+
+/* 杈撳叆妗?*/
+.axv-run-input {
+  cursor: text;
+  outline: none !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+  caret-color: #1d1b20;
+}
+.axv-run-input.axv-run-focused { box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.45); }
+.axv-run-input.axv-run-input-empty::before {
+  content: attr(data-run-hint);
+  color: #9aa0a6;
+  pointer-events: none;
+}
+.axv-run-input[data-single="1"] { white-space: nowrap; overflow: hidden; }
+
+/* 鍒楄〃 / 缃戞牸锛氭紨绀鸿锛?6dp = 112px锛?*/
+.axv-run-list { display: block; overflow: auto; }
+.axv-run-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 16px;
+  align-content: start;
+  overflow: auto;
+}
+.axv-run-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 112px;
+  padding: 12px 32px;
+  box-sizing: border-box;
+  border-bottom: 2px solid var(--axv-outline);
+  background: #ffffff;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.12s ease;
+}
+.axv-run-grid .axv-run-row {
+  border: 2px solid var(--axv-outline);
+  border-radius: 16px;
+  align-items: center;
+  padding: 24px 16px;
+  min-height: 128px;
+}
+.axv-run-row:hover { background: rgba(0, 0, 0, 0.04); }
+.axv-run-row.on { background: rgba(0, 0, 0, 0.08); }
+.axv-run-row-title { font-size: 28px; line-height: 1.3; color: #1d1b20; }
+.axv-run-row-sub { font-size: 23px; line-height: 1.3; color: #79747e; }
+.axv-run-row-static { cursor: pointer; }
+.axv-run-row-static.on { background: rgba(0, 0, 0, 0.08); }
+
+/* 涓嬫媺鍊欓€夎彍鍗曪紙Android Spinner 寮圭獥锛?*/
+.axv-run-popup {
+  position: absolute;
+  z-index: 30;
+  max-height: 264px;
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22), 0 0 0 2px rgba(0, 0, 0, 0.06);
+  padding: 8px 0;
+  animation: axv-run-pop-in 0.12s ease-out;
+}
+@keyframes axv-run-pop-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+.axv-run-popup-item {
+  padding: 18px 28px;
+  font-size: 27px;
+  line-height: 1.3;
+  color: #1d1b20;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-run-popup-item:hover { background: rgba(0, 0, 0, 0.05); }
+.axv-run-popup-item.on {
+  color: #1d1b20;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Android 椋庢牸 Toast */
+.axv-run-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 144px;
+  transform: translateX(-50%);
+  max-width: 82%;
+  padding: 18px 32px;
+  border-radius: 999px;
+  background: rgba(32, 26, 38, 0.92);
+  color: #ffffff;
+  font-size: 25px;
+  line-height: 1.4;
+  text-align: center;
+  pointer-events: none;
+  z-index: 40;
+  animation: axv-run-toast-in 0.18s ease-out;
+}
+@keyframes axv-run-toast-in {
+  from { opacity: 0; transform: translate(-50%, 16px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+/* M18-END */
+
+/* ===== M21锛氬彟瀛樺璇濇锛堟枃浠跺悕 + 閫夋枃浠跺す锛?===== */
+.axv-saveas-mask {
+  position: fixed; inset: 0;
+  background: var(--axv-scrim);
+  z-index: 120;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.axv-saveas-card {
+  width: min(430px, 94vw);
+  background: var(--axv-surface);
+  border: 1px solid var(--axv-outline);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.28);
+  padding: 18px 18px 14px;
+}
+.axv-saveas-title { font-size: 15px; font-weight: 700; color: var(--axv-title); }
+.axv-saveas-hint { margin-top: 8px; font-size: 12px; line-height: 1.6; color: var(--axv-desc); }
+.axv-saveas-hint code { background: var(--axv-surface-sunken); border-radius: 4px; padding: 0 4px; }
+/* M274：包名残留提示（检测到多个不同包名时） */
+.axv-pkg-warn { color: var(--axv-warn, #d97706); font-weight: 500; }
+/* M201：外部改动冲突弹窗里的文件路径 */
+.axv-conflict-path {
+  display: block;
+  margin-top: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--axv-on-surface-variant);
+  background: var(--axv-surface-sunken);
+  border-radius: 6px;
+  padding: 6px 8px;
+  word-break: break-all;
+}
+.axv-saveas-field { margin-top: 12px; display: flex; flex-direction: column; gap: 5px; }
+.axv-saveas-field > span { font-size: 12px; color: var(--axv-on-surface-variant); }
+.axv-saveas-subhint { font-size: 11px; color: var(--axv-on-surface-variant); opacity: .8; }
+.axv-saveas-input {
+  border: 1px solid var(--axv-outline);
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  outline: none;
+}
+.axv-saveas-input:focus { border-color: var(--axv-primary); }
+.axv-saveas-btns { margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px; }
+.axv-saveas-btns .axv-set-btn { padding: 7px 14px; font-size: 12.5px; }
+.axv-saveas-ok { background: var(--axv-primary); color: var(--axv-on-primary); border-color: var(--axv-primary); }
+
+/* M22锛氱粨鏋勯棶棰樻彁绀烘潯锛堣兘娓叉煋浣嗘湁閿欙紝鍙竴閿烦浠ｇ爜闈㈡澘锛?*/
+.axv-struct-warn {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 8px 0;
+  padding: 7px 10px;
+  max-width: min(520px, 92%);
+  border-radius: 9px;
+  border: 1px solid #f0d9a8;
+  background: #fff8e6;
+  color: var(--axv-warn);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.axv-struct-warn-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+  border: 1px solid #d9b45a;
+  background: var(--axv-surface);
+  color: var(--axv-warn);
+  border-radius: 7px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+html[data-axv-theme="dark"] .axv-struct-warn {
+  background: #3a3115;
+  border-color: #5a4a1d;
+  color: #f2d789;
+}
+
+/* ===== M22锛氳В鏋?娓叉煋澶辫触鍗＄墖锛堜笉鐧藉睆锛岀洿鎺ュ紩鍒颁唬鐮侀潰鏉匡級 ===== */
+.axv-parse-fail {
+  margin: 14px 10px;
+  padding: 16px 14px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  max-width: 340px;
+}
+.axv-parse-fail-icon { font-size: 30px; color: var(--axv-danger); }
+/* M37b锛氶潪甯冨眬鏂囦欢鎻愮ず鍗★紙钃濊壊璋冿紝涓嶆槸閿欒锛?*/
+.axv-codeonly-card .axv-parse-fail-icon { color: var(--axv-primary); }
+.axv-codeonly-card { border-style: dashed; }
+.axv-parse-fail-title { font-size: 13.5px; font-weight: 700; color: var(--axv-title); }
+.axv-parse-fail-msg {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--axv-danger);
+  word-break: break-word;
+  max-height: 108px;
+  overflow: auto;
+}
+.axv-parse-fail-hint { font-size: 11.5px; line-height: 1.6; color: var(--axv-desc); }
+.axv-parse-fail-btns { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; justify-content: center; }
+.axv-parse-fail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--axv-primary);
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-parse-fail-btn.ghost {
+  background: var(--axv-surface);
+  color: var(--axv-primary);
+}
+.axv-parse-fail-btn:hover { filter: brightness(1.06); }
+
+/* M23锛氳缃噷鐨勮瑷€涓嬫媺 */
+.axv-lang-select {
+  width: 100%;
+  height: auto;
+  margin-top: 2px;
+  padding: 6px 16px 6px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+}
+
+/* ===== M24锛氬綋鍓嶉」鐩潰鏉匡紙椤圭洰缁撴瀯鏍戯級 ===== */
+.axv-proj-now {
+  margin: 8px 10px 4px;
+  border: 1px solid var(--axv-outline-variant, #0000001f);
+  border-radius: 10px;
+  background: var(--axv-surface-2, #ffffff0f);
+  overflow: hidden;
+  /* M31i锛氬師鏉ラ潬瀛愬垪琛?max-height:42vh 闄愬埗锛岀獥鍙ｄ竴鍙橀珮灏辩┖涓€澶у潡锛涙敼鎴愭拺婊″墿浣欓珮搴?*/
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.axv-proj-now-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--axv-outline-variant, #00000014);
+}
+.axv-proj-now-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  max-width: 52%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* M31锛氶」鐩浘鏍囷紙ic_launcher 鍥剧墖锛?*/
+.axv-proj-now-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+.axv-proj-now-sub {
+  font-size: 11px;
+  opacity: 0.62;
+  margin-left: auto;
+}
+.axv-proj-now .axv-ws-list {
+  /* M31i锛氫笉鍐嶅浐瀹?42vh锛屾敼鎴愬崰婊?axv-proj-now 閲屽墿涓嬬殑楂樺害 */
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+.axv-proj-now-foot {
+  display: flex;
+  gap: 12px;
+  padding: 6px 9px 0px;
+  border-top: 1px solid var(--axv-outline-variant, #00000010);
+}
+.axv-ws-item-static {
+  cursor: default;
+}
+.axv-newproj-input {
+  text-transform: none;
+}
+
+/* M25d: 椤圭洰鍒楄〃鍗＄墖锛堟墎骞筹紝涓€灞傦級 */
+.axv-proj-card {
+  border: 1px solid var(--axv-outline-variant, #00000014);
+  border-radius: 12px;
+  background: var(--axv-surface-2, #ffffff0a);
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+}
+.axv-proj-card-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+/* M176锛氬崱鐗囧彸渚х殑銆屾敼鍚嶃€嶇瑪褰㈡寜閽?*/
+.axv-proj-card-edit {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  border: none;
+  border-left: 1px solid var(--axv-outline-variant, #00000014);
+  background: transparent;
+  color: var(--axv-desc);
+  cursor: pointer;
+}
+.axv-proj-card-edit:hover { background: var(--axv-hover); color: var(--axv-on-surface); }
+.axv-proj-card-btn:hover { background: var(--axv-hover); }
+.axv-proj-card-ico {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--axv-primary-container, #6750a41f);
+  color: var(--axv-primary);
+  overflow: hidden;
+}
+.axv-proj-card-ico img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.axv-proj-card-ico .msr { font-size: 20px; }
+.axv-proj-card-btn .axv-ws-item-main { flex: 1 1 auto; }
+.axv-proj-card-go { flex: 0 0 auto; font-size: 18px; color: var(--axv-desc); opacity: 0.6; }
+
+/* M25d: 鎳掑姞杞界粨鏋勬爲 */
+.axv-proj-tree { max-height: 46vh; overflow: auto; margin-top: 6px; }
+/* M46: 妯悜婊氬姩 鈥斺€?娣辩洰褰曞悕涓嶆埅鏂紝瓒呭嚭鏃跺彲宸﹀彸婊?*/
+.axv-ws-row { min-width: max-content; }
+.axv-ws-item-main { min-width: 0; }
+.axv-ws-item-name { white-space: nowrap; }
+.axv-ws-row { user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+
+/* M46: 闀挎寜鎿嶄綔鑿滃崟 */
+.axv-tfm-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  background: rgba(0, 0, 0, 0.25);
+}
+.axv-tfm {
+  position: fixed;
+  min-width: 168px;
+  background: var(--axv-surface, #fff);
+  border: 1px solid var(--axv-outline-variant, #d0d0d0);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 131;
+}
+.axv-tfm-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: none;
+  background: none;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--axv-on-surface, #222);
+}
+.axv-tfm-item:hover:not(:disabled) { background: var(--axv-primary-soft, #e3f2fd); }
+.axv-tfm-item:disabled { opacity: 0.4; cursor: not-allowed; }
+.axv-tfm-item.danger:not(:disabled) { color: #d33; }
+.axv-tfm-item.danger:hover:not(:disabled) { background: #ffecec; }
+.axv-tfm-label { font-weight: 600; }
+.axv-tfm-hint { font-size: 11px; color: var(--axv-desc, #888); font-weight: 400; }
+
+/* M46: 寮圭獥锛堟柊寤?閲嶅懡鍚?鍒犻櫎/娑堟伅锛?*/
+.axv-dlg {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 132;
+  background: var(--axv-surface, #fff);
+  border: 1px solid var(--axv-outline-variant, #d0d0d0);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  min-width: 280px;
+  max-width: min(92vw, 420px);
+  padding: 16px;
+}
+.axv-dlg-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--axv-on-surface, #222);
+}
+.axv-dlg-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.axv-dlg-label { font-size: 12px; color: var(--axv-desc, var(--axv-desc)); }
+.axv-dlg-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--axv-outline-variant, #c0c0c0);
+  border-radius: 8px;
+  font-size: 14px;
+  background: transparent;
+  color: inherit;
+  outline: none;
+}
+.axv-dlg-input:focus { border-color: var(--axv-primary, #1976d2); }
+.axv-dlg-check { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.axv-dlg-sub { margin-top: 8px; }
+.axv-dlg-radio-group { display: flex; gap: 14px; font-size: 13px; }
+.axv-dlg-radio { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.axv-dlg-hint { font-size: 12px; color: var(--axv-desc, var(--axv-desc)); margin-bottom: 10px; min-height: 14px; }
+.axv-dlg-multiline { white-space: pre-wrap; line-height: 1.6; }
+.axv-dlg-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.axv-btn-danger { background: var(--axv-danger); color: var(--axv-on-primary); }
+.axv-btn-danger:hover { background: #c22; }
+
+/* M46b: 绉诲姩妯″紡宸ュ叿鏉?+ 鎷栨嫿鎵嬫焺 + 钀界偣楂樹寒 */
+.axv-move-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  background: var(--axv-primary-soft, #e3f2fd);
+  border: 1px dashed var(--axv-primary, #1976d2);
+  border-radius: 8px;
+}
+.axv-move-tip {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.axv-move-bar .axv-btn { flex: 0 0 auto; padding: 2px 10px; font-size: 12px; height: 26px; }
+.axv-move-handle {
+  flex: 0 0 auto;
+  width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--axv-primary, #1976d2);
+  cursor: grab;
+  touch-action: none;
+  margin-left: auto;
+  padding-left: 4px;
+}
+.axv-move-handle:active { cursor: grabbing; }
+.axv-ws-row.axv-move-src { opacity: 0.45; }
+.axv-ws-row.axv-drop { outline: 2px solid var(--axv-primary, #1976d2); outline-offset: -2px; border-radius: 6px; }
+.axv-ws-row-loading { display: flex; align-items: center; gap: 6px; padding: 5px 6px; }
+.axv-ws-spin {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--axv-outline, #8883);
+  border-top-color: var(--axv-primary);
+  animation: axv-spin 0.7s linear infinite;
+}
+@keyframes axv-spin { to { transform: rotate(360deg); } }
+
+/* ===== M27锛氬簳閮ㄧ姸鎬佹潯 ===== */
+.axv-appstatus {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  z-index: 7;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--axv-on-surface);
+  background: color-mix(in srgb, var(--axv-on-surface) 6%, var(--axv-surface));
+  backdrop-filter: blur(8px);
+  border-top: 1px solid color-mix(in srgb, var(--axv-on-surface) 14%, transparent);
+  user-select: none;
+}
+.axv-sb-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 45%;
+}
+.axv-sb-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.axv-sb-src {
+  opacity: 0.55;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+.axv-sb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 35%, transparent);
+  flex: 0 0 auto;
+}
+.axv-sb-dot.on {
+  background: #ffb300;
+  border-color: #ffb300;
+  box-shadow: 0 0 0 3px #ffb30021;
+}
+.axv-sb-gap {
+  flex: 1 1 auto;
+}
+.axv-sb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  opacity: 0.82;
+}
+button.axv-sb-item {
+  cursor: pointer;
+}
+button.axv-sb-item:hover {
+  background: color-mix(in srgb, var(--axv-on-surface) 10%, transparent);
+  opacity: 1;
+}
+.axv-sb-item:focus-visible {
+  outline: 2px solid var(--axv-primary);
+  outline-offset: 1px;
+}
+.axv-sb-issue {
+  color: var(--axv-danger);
+  opacity: 1;
+}
+.axv-sb-issue .msr,
+.axv-sb-ok .msr {
+  font-size: 15px;
+}
+.axv-sb-ok {
+  color: color-mix(in srgb, var(--axv-ok) 80%, var(--axv-on-surface));
+}
+.axv-sb-dim {
+  opacity: 0.55;
+  margin-left: 4px;
+}
+.axv-sb-saved {
+  opacity: 0.5;
+}
+.axv-appstatus[data-dirty="1"] .axv-sb-saved {
+  display: none;
+}
+@media (max-width: 900px) {
+  .axv-appstatus {
+    height: 24px;
+    font-size: 11px;
+    gap: 6px;
+  }
+  .axv-sb-dim,
+  .axv-sb-saved {
+    display: none;
+  }
+  .axv-sb-file {
+    max-width: 55%;
+  }
+}
+/* M28锛氬睘鎬ч潰鏉挎悳绱?+ 鍙湅宸蹭慨鏀?*/
+.axv-attr-filter {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 12px 2px;
+  flex: 0 0 auto;
+}
+.axv-attr-filter-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 18%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--axv-on-surface) 5%, transparent);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  outline: none;
+}
+.axv-attr-filter-input:focus {
+  border-color: var(--axv-primary);
+}
+.axv-attr-filter-toggle {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 18%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: color-mix(in srgb, var(--axv-on-surface) 72%, transparent);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-attr-filter-toggle:hover {
+  color: var(--axv-on-surface);
+}
+.axv-attr-filter-toggle.is-on {
+  background: var(--axv-primary);
+  border-color: var(--axv-primary);
+  color: var(--axv-on-primary, #fff);
+}
+.axv-attr-filter-toggle:focus-visible {
+  outline: 2px solid var(--axv-primary);
+  outline-offset: 1px;
+}
+.axv-attr-filter-clear {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--axv-on-surface) 8%, transparent);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  cursor: pointer;
+}
+/* M29锛氬浘灞傛爲鎼滅储 */
+.axv-lt-search {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  flex: 0 0 auto;
+}
+.axv-lt-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 18%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--axv-on-surface) 5%, transparent);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  outline: none;
+}
+.axv-lt-search-input:focus {
+  border-color: var(--axv-primary);
+}
+.axv-lt-search-clear {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--axv-on-surface) 8%, transparent);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  cursor: pointer;
+}
+.axv-lt-row.hit {
+  box-shadow: inset 2px 0 0 var(--axv-primary);
+  background: color-mix(in srgb, var(--axv-primary) 9%, transparent);
+}
+.axv-lt-row.hit .axv-lt-tag {
+  color: var(--axv-primary);
+  font-weight: 700;
+}
+/* M30锛氬父鐢ㄧ鍙峰揩鎹锋潯 + 宸ュ叿鎸夐挳鏀剁煯 */
+.axv-sym-bar {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid color-mix(in srgb, var(--axv-on-surface) 10%, transparent);
+  background: var(--axv-surface-head);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.axv-sym-bar::-webkit-scrollbar {
+  display: none;
+}
+.axv-sym-btn {
+  flex: 0 0 auto;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--axv-on-surface) 14%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--axv-on-surface) 5%, transparent);
+  color: var(--axv-on-surface);
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.axv-sym-btn:active {
+  background: var(--axv-primary);
+  border-color: var(--axv-primary);
+  color: var(--axv-on-primary);
+}
+/* M30b锛氱鍙锋潯鏈€鍓嶉潰鐨勩€屾牸寮忓寲銆嶅姩浣滄寜閽紙闈炵鍙凤紝鐢ㄦ鏂囧瓧浣擄級 */
+.axv-sym-btn.axv-sym-action {
+  font-family: inherit;
+  font-weight: 600;
+  padding: 0 10px;
+  margin-right: 4px;
+}
+@media (hover: hover) {
+  .axv-sym-btn:hover {
+    border-color: var(--axv-primary);
+    color: var(--axv-primary);
+  }
+}
+
+/* ===== M60c锛氶」鐩鐞嗗垪琛ㄨ嚜宸辨粴锛堥」鐩鏃惰秴鍑哄睆骞曠湅涓嶅埌鍚庨潰锛?===== */
+.axv-ws-panel > .axv-ws-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 10px;
+}
+

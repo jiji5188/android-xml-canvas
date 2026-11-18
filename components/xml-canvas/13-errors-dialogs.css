@@ -1,0 +1,910 @@
+/* M188a 签名与发布弹层 */
+.axv-sign-card {
+  width: min(420px, 94vw);
+  background: var(--axv-surface);
+  border: 1px solid var(--axv-outline);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0,0,0,.28);
+  padding: 18px;
+}
+.axv-sign-row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.axv-sign-row > label {
+  font-size: 12px;
+  color: var(--axv-text-2);
+}
+.axv-sign-row input,
+.axv-sign-row select {
+  width: 100%;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: var(--axv-field-bg, transparent);
+  color: var(--axv-text);
+}
+.axv-sign-row button {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--axv-text-2);
+  cursor: pointer;
+}
+.axv-sign-row button.axv-sign-on {
+  background: var(--axv-primary, #4f8cff);
+  border-color: transparent;
+  color: #fff;
+}
+.axv-sign-err {
+  font-size: 12px;
+  color: var(--axv-danger, #ff5b5b);
+  margin-top: 8px;
+}
+.axv-sign-hint {
+  font-size: 11px;
+  color: var(--axv-text-3, var(--axv-text-2));
+  margin-top: 8px;
+}
+.axv-sign-primary {
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-primary, #4f8cff);
+  background: var(--axv-primary, #4f8cff);
+  color: #fff;
+  cursor: pointer;
+}
+
+
+/* M188b 构建日志抽屉条目 */
+.axv-drawer-logwrap {
+  max-height: 100%;
+  overflow: auto;
+  padding: 4px 10px 8px;
+}
+.axv-drawer-logcard {
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  margin: 4px 0;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--axv-surface) 80%, transparent);
+}
+.axv-drawer-logcard-err {
+  border-color: color-mix(in srgb, var(--axv-danger, #ff5b5b) 55%, transparent);
+}
+/* M297：普通提示（注入日志/预检查/自动修复）既不是成功也不是失败，用中性色 */
+.axv-drawer-logcard-info {
+  border-color: color-mix(in srgb, var(--axv-accent, #4f8cff) 35%, transparent);
+}
+.axv-drawer-logcard summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--axv-text-2);
+  user-select: none;
+}
+.axv-drawer-logcard summary::marker {
+  color: var(--axv-text-3, #888);
+}
+.axv-drawer-logcard pre.axv-drawer-log {
+  margin: 6px 0 2px;
+  padding: 8px;
+  font: 11px/1.5 ui-monospace, Consolas, monospace;
+  color: var(--axv-text);
+  background: color-mix(in srgb, var(--axv-bg, #111) 45%, transparent);
+  border-radius: 8px;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.axv-drawer-badge-log {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  background: var(--axv-accent, #4f8cff);
+  display: inline-block;
+}
+
+/* M260：最新一条构建日志默认展开，给个左侧强调条让人一眼看到「这次的输出」 */
+.axv-drawer-logcard-latest {
+  box-shadow: inset 3px 0 0 var(--axv-primary, #4f8cff);
+}
+.axv-drawer-logcard-latest.axv-drawer-logcard-err {
+  box-shadow: inset 3px 0 0 var(--axv-danger, #ff5b5b);
+}
+.axv-drawer-logcard-latest.axv-drawer-logcard-info {
+  box-shadow: inset 3px 0 0 var(--axv-accent, #4f8cff);
+}
+/* M297：红色日志底只在「真的失败」时出现；以前所有最新一条都染红，成功也像报错 */
+.axv-drawer-logcard-latest.axv-drawer-logcard-err pre.axv-drawer-log {
+  max-height: 40vh;
+  background: color-mix(in srgb, #f9a7a7 45%, transparent);
+}
+.axv-drawer-logcard-latest pre.axv-drawer-log {
+  max-height: 40vh;
+}
+/* M276：构建日志卡片 summary 里的「复制」按钮 */
+.axv-drawer-logcopy {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--axv-primary, #4f8cff);
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--axv-primary, #4f8cff) 40%, transparent);
+  border-radius: 5px;
+  background: transparent;
+  flex: none;
+  margin-left: 8px;
+}
+.axv-drawer-logcopy:hover { background: color-mix(in srgb, var(--axv-primary, #4f8cff) 12%, transparent); }
+.axv-drawer-logcopy.axv-drawer-logcopy-ok { color: var(--axv-success, #2ea043); border-color: color-mix(in srgb, var(--axv-success, #2ea043) 40%, transparent); }
+
+
+/* M189 版本信息 + 发布前检查 */
+.axv-sign-sep {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--axv-text-2, #999);
+  border-top: 1px solid var(--axv-outline, #333);
+  padding-top: 10px;
+}
+.axv-sign-meta {
+  font-size: 11px;
+  color: var(--axv-text-2, #999);
+  margin: 4px 0 8px;
+  word-break: break-all;
+}
+.axv-sign-issues {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.axv-sign-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+.axv-sign-issue .msr { font-size: 14px; margin-top: 1px; }
+.axv-sign-issue-error {
+  color: color-mix(in srgb, var(--axv-danger, #ff5b5b) 85%, white);
+  background: color-mix(in srgb, var(--axv-danger, #ff5b5b) 12%, transparent);
+}
+.axv-sign-issue-warn {
+  color: color-mix(in srgb, var(--axv-warn, #ffb020) 85%, white);
+  background: color-mix(in srgb, var(--axv-warn, #ffb020) 12%, transparent);
+}
+.axv-sign-issue-info {
+  color: var(--axv-text-2, #999);
+  background: color-mix(in srgb, var(--axv-surface-2, #222) 55%, transparent);
+}
+.axv-sign-ok {
+  font-size: 12px;
+  color: var(--axv-accent, #4f8cff);
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--axv-accent, #4f8cff) 10%, transparent);
+  margin: 4px 0 0;
+}
+
+
+/* M189+ 发布前检查的「修」按钮 */
+.axv-sign-fix {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  opacity: 0.85;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-sign-fix:hover { opacity: 1; }
+.axv-sign-pkgfix {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.axv-sign-pkgfix input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.axv-sign-pkgfix button { font-size: 12px; padding: 2px 10px; }
+
+/* ===== M202：AIDE 式错误引导（上/下一条 + 问题卡片） ===== */
+.axv-diagbar-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.axv-diag-nav {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+}
+.axv-diag-navbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 11px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.axv-diag-navbtn:hover { opacity: 1; background: rgba(0, 0, 0, 0.06); }
+.axv-diag-navbtn .msr { font-size: 16px; }
+.axv-diag-count {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+  min-width: 30px;
+  text-align: center;
+}
+
+/* 问题卡片：贴在错误条上方 */
+.axv-diagcard {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% + 6px);
+  z-index: 40;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--axv-surface, #fff);
+  color: var(--axv-on-surface, #1f2328);
+  border: 1px solid var(--axv-outline-variant, rgba(0, 0, 0, 0.12));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  font-size: 12px;
+  line-height: 1.55;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px 8px;
+}
+.axv-diagcard-head {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 22px;
+}
+.axv-diagcard-sev {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #fff;
+}
+.axv-diagcard-sev-err { background: #dc2626; }
+.axv-diagcard-sev-warn { background: #d97706; }
+.axv-diagcard-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.axv-diagcard-actions { flex: 0 0 auto; }
+.axv-diagcard-fix {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--axv-primary, #0b5fa5);
+  background: color-mix(in srgb, var(--axv-primary, #0b5fa5) 10%, transparent);
+  color: var(--axv-primary, #0b5fa5);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.axv-diagcard-fix .msr { font-size: 14px; }
+.axv-diagcard-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--axv-on-surface-variant, #6e7781);
+  cursor: pointer;
+}
+.axv-diagcard-close:hover { background: rgba(0, 0, 0, 0.06); }
+.axv-diagcard-close .msr { font-size: 15px; }
+/* M207：卡片「为什么/怎么改」两栏 */
+.axv-diagcard-why {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+  border-top: 1px solid color-mix(in srgb, var(--axv-outline-variant, #000) 14%, transparent);
+}
+.axv-diagcard-whyrow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.axv-diagcard-label {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--axv-on-surface-variant, #6e7781);
+  padding-top: 2px;
+  min-width: 44px;
+}
+.axv-diagcard-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--axv-on-surface, #1f2933);
+  overflow-wrap: anywhere;
+}
+/* M207：错误条「只看错误」切换 */
+.axv-errbar-only {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  margin-left: 6px;
+  border: 1px solid color-mix(in srgb, var(--axv-outline, #94a3b8) 40%, transparent);
+  border-radius: 9px;
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--axv-on-surface-variant, #6e7781);
+}
+.axv-errbar-only-on {
+  background: color-mix(in srgb, var(--axv-primary, #0b5fa5) 12%, transparent);
+  border-color: var(--axv-primary, #0b5fa5);
+  color: var(--axv-primary, #0b5fa5);
+  font-weight: 600;
+}
+
+/* M209：行号槽「可修复」灯泡列 */
+.cm-fix-gutter {
+  background: transparent;
+}
+.cm-fix-slot {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 21px;
+}
+.cm-fix-bulb {
+  cursor: help;
+  filter: saturate(0.9);
+}
+
+/* M209：代码编辑器悬停提示 */
+.axv-hover-tip {
+  background: var(--axv-surface-head, #f7f8fa);
+  border: 1px solid var(--axv-outline, #d8dce3);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  padding: 5px 9px;
+  font-size: 11px;
+  max-width: 420px;
+  color: var(--axv-on-surface, #1d1b20);
+}
+.axv-hover-tip-body {
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+
+/* M212c 导入 APK 换图重签弹窗（之前误用不存在的 axv-saveas，弹窗没底没边距） */
+.axv-repack-card {
+  width: min(720px, 94vw);
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--axv-surface, #fff);
+  border: 1px solid var(--axv-outline, #d8dce3);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  padding: 18px 18px 14px;
+}
+.axv-repack-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.axv-repack-title { font-size: 15px; font-weight: 700; color: var(--axv-title, var(--axv-on-surface, #1d1b20)); }
+.axv-repack-x {
+  flex: 0 0 auto; width: 26px; height: 26px; line-height: 1; border-radius: 8px;
+  border: 1px solid transparent; background: transparent; cursor: pointer;
+  color: var(--axv-text-2, #5f6368); font-size: 13px;
+}
+.axv-repack-x:hover { background: var(--axv-surface-sunken, #f2f3f5); }
+.axv-repack-sub { margin-top: 6px; font-size: 11.5px; line-height: 1.65; color: var(--axv-desc, var(--axv-text-2, #5f6368)); }
+.axv-repack-warn { display: block; margin: 8px 0 0; }
+.axv-repack-bar { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.axv-repack-file { font-size: 12px; color: var(--axv-text-2, #5f6368); word-break: break-all; min-width: 0; }
+.axv-repack-ghost {
+  font-size: 12px; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--axv-outline, #d8dce3);
+  background: var(--axv-surface, #fff); color: var(--axv-on-surface, #1d1b20); cursor: pointer;
+}
+.axv-repack-ghost:disabled { opacity: 0.5; cursor: default; }
+.axv-repack-search {
+  margin-top: 10px; width: 100%; box-sizing: border-box;
+  font-size: 12px; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid var(--axv-outline, #d8dce3);
+  background: var(--axv-surface-sunken, #f7f8fa); color: var(--axv-on-surface, #1d1b20);
+}
+.axv-repack-search:focus { outline: 2px solid var(--axv-primary, #4f8cff); outline-offset: -1px; }
+.axv-repack-list {
+  margin-top: 8px; flex: 1 1 auto; min-height: 150px; max-height: 46vh; overflow: auto;
+  border: 1px solid var(--axv-outline, #d8dce3); border-radius: 10px;
+  background: var(--axv-surface-sunken, #fafbfc);
+}
+.axv-repack-row { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 12px; border-bottom: 1px solid rgba(0,0,0,.05); }
+.axv-repack-row:last-child { border-bottom: 0; }
+.axv-repack-row:hover { background: color-mix(in srgb, var(--axv-primary, #4f8cff) 7%, transparent); }
+.axv-repack-row.is-fixed { opacity: 0.5; }
+.axv-repack-name {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px;
+  color: var(--axv-on-surface, #1d1b20);
+}
+.axv-repack-size { flex: 0 0 auto; color: var(--axv-text-3, var(--axv-text-2, #8a8f98)); font-variant-numeric: tabular-nums; font-size: 11px; }
+.axv-repack-picked { flex: 0 0 auto; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0a8f5f; font-size: 11px; }
+.axv-repack-btn {
+  flex: 0 0 auto; font-size: 11px; padding: 3px 10px; border-radius: 6px;
+  border: 1px solid var(--axv-outline, #d8dce3); background: var(--axv-surface, #fff);
+  color: var(--axv-on-surface, #1d1b20); cursor: pointer;
+}
+.axv-repack-btn:hover:not(:disabled) { border-color: var(--axv-primary, #4f8cff); color: var(--axv-primary, #4f8cff); }
+.axv-repack-btn:disabled { opacity: 0.4; cursor: default; }
+.axv-repack-empty { padding: 14px; font-size: 12px; color: var(--axv-text-3, #8a8f98); }
+.axv-repack-more { margin-top: 4px; font-size: 11px; color: var(--axv-text-3, #8a8f98); }
+.axv-repack-err { display: block; margin-top: 8px; }
+.axv-repack-ok { margin-top: 8px; }
+.axv-repack-okpath { font-size: 11px; word-break: break-all; }
+.axv-repack-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.axv-repack-go { min-width: 132px; }
+@media (max-width: 640px) {
+  .axv-repack-card { width: 96vw; padding: 14px 12px 10px; max-height: 88vh; }
+  .axv-repack-row { padding: 6px 8px; }
+  .axv-repack-size { display: none; }
+  .axv-repack-list { max-height: 42vh; }
+  .axv-repack-picked { max-width: 84px; }
+}
+/* M212e 底部状态行 + 常驻文件输入 + 处理中提示 */
+.axv-repack-state {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--axv-text-3, #8a8f98);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-repack-state.is-blocked { color: var(--axv-warn, #b26a00); }
+.axv-repack-fileinput { display: none; }
+.axv-repack-busy { margin-top: 8px; }
+.axv-repack-go[aria-disabled='true'] { opacity: 0.5; }
+
+/* M256锛氭娊灞夊睍寮€鏃?绉诲姑绔?浠ｇ爜鍖哄簳杈?inset 鍔ㄦ€佷笂绉伙紝娑堥櫎閬╃洊锛堥粯璁?12px锛屾娊灞夊睍寮€鍚庣敱 inline 瑕嗙洊鎴?calc(12px+42vh)锛?*/
+.axv-mob-xml { transition: bottom 0.22s ease; }
+
+
+/* M294：新建文件两步对话框 */
+.axv-newfile-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 16px;
+}
+.axv-newfile-panel {
+  width: 100%;
+  max-width: 340px;
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--axv-panel-bg, #fff);
+  color: var(--axv-text, #111827);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  padding: 14px;
+  box-sizing: border-box;
+}
+.axv-newfile-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.axv-newfile-back {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  color: inherit;
+  padding: 4px;
+}
+.axv-newfile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.axv-newfile-cat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+}
+.axv-newfile-cat:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.axv-newfile-field {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+}
+.axv-newfile-field input,
+.axv-newfile-field select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.axv-newfile-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.axv-newfile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.axv-newfile-btn {
+  padding: 8px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+}
+.axv-newfile-btn.primary {
+  background: var(--axv-primary, #04409f);
+  color: var(--axv-on-primary, #fff);
+  border-color: transparent;
+}
+
+/* M295：库管理面板 */
+.axv-libs-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.axv-libs-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.axv-libs-tabs button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.axv-libs-tabs button.on {
+  background: rgba(0,0,0,0.06);
+  font-weight: 600;
+}
+.axv-libs-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  flex-wrap: wrap;
+}
+/* M368：搜索框（共享库/项目库/库目录/gradle 依赖共用） */
+.axv-libs-search {
+  flex: 1 1 120px;
+  min-width: 100px;
+  padding: 5px 9px;
+  border: 1px solid var(--axv-outline, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  background: var(--axv-surface, #fff);
+  color: var(--axv-on-surface, inherit);
+  font-size: 12px;
+}
+.axv-libs-search:focus {
+  outline: 1px solid var(--axv-primary, #04409f);
+  border-color: var(--axv-primary, #04409f);
+}
+.axv-libs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+.axv-libs-btn.primary {
+  background: var(--axv-primary, #04409f);
+  color: var(--axv-on-primary, #fff);
+  border-color: transparent;
+}
+.axv-libs-list {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 8px 12px;
+}
+.axv-libs-empty {
+  padding: 16px 8px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(0,0,0,0.5);
+}
+.axv-libs-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+}
+.axv-libs-item:hover {
+  background: rgba(0,0,0,0.04);
+}
+.axv-libs-item-text {
+  min-width: 0;
+  flex: 1;
+}
+.axv-libs-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-libs-item-rel {
+  font-size: 11px;
+  color: rgba(0,0,0,0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-libs-loading {
+  padding: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(0,0,0,0.5);
+}
+/* M345：build.gradle 依赖解析区块 */
+.axv-libs-gradle {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+.axv-libs-gradle-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+}
+.axv-libs-gradle-msg {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: rgba(0,0,0,0.55);
+}
+.axv-libs-gradle-meta {
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.axv-libs-gradle-meta-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  line-height: 1.5;
+}
+.axv-libs-gradle-meta-k {
+  flex: 0 0 34px;
+  color: rgba(0,0,0,0.5);
+  font-size: 10px;
+  padding-top: 1px;
+}
+.axv-libs-gradle-meta-v {
+  flex: 1;
+  min-width: 0;
+  color: rgba(0,0,0,0.72);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.axv-libs-flag {
+  display: inline-block;
+  background: rgba(59,130,246,0.1);
+  color: #1d4ed8;
+  border: 1px solid rgba(59,130,246,0.28);
+  border-radius: 4px;
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 16px;
+}
+.axv-libs-flag-sdk {
+  background: rgba(34,197,94,0.1);
+  color: #15803d;
+  border-color: rgba(34,197,94,0.28);
+}
+.axv-libs-flag-repo {
+  background: rgba(245,158,11,0.12);
+  color: #b45309;
+  border-color: rgba(245,158,11,0.3);
+}
+.axv-libs-flag-sign {
+  background: rgba(168,85,247,0.12);
+  color: #7e22ce;
+  border-color: rgba(168,85,247,0.3);
+}
+.axv-libs-dl-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 16px;
+}
+.axv-libs-dl-panel {
+  width: 100%;
+  max-width: 320px;
+  background: var(--axv-panel-bg, #fff);
+  color: var(--axv-text, #111827);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+  box-sizing: border-box;
+}
+.axv-libs-dl-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.axv-libs-field {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(0,0,0,0.6);
+}
+.axv-libs-field input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 9px;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.axv-libs-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: rgba(0,0,0,0.55);
+}
+.axv-libs-dl-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* M316：主题选择页 */
+.axv-theme-panel {
+  padding: 4px 6px;
+  overflow: auto;
+  max-height: 100%;
+}
+.axv-theme-group {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 6px 4px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.axv-theme-group:hover {
+  background: rgba(0,0,0,0.05);
+}
+.axv-theme-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  width: 100%;
+  text-align: left;
+  background: rgba(0,0,0,0.03);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 8px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+}
+.axv-theme-row:hover {
+  background: rgba(0,0,0,0.06);
+}
+.axv-theme-row.on {
+  border-color: var(--axv-primary);
+  background: var(--axv-primary-soft, rgba(103,80,164,0.1));
+}

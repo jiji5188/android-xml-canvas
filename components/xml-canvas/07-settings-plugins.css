@@ -1,0 +1,1048 @@
+/* ===== M11锛氳缃?/ 鍏充簬闈㈡澘 ===== */
+.axv-set-group {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--axv-outline);
+}
+/* M50锛氬垎缁勫彲鎶樺彔銆傞粯璁ゅ叏閮ㄦ姌鍙狅紙.open 鐢辩粍浠舵寜鐐瑰嚮鍔犱笂锛夛紝
+   鏈睍寮€鏃舵妸闄ゆ爣棰樹互澶栫殑瀛愬厓绱犲叏閮ㄨ棌鎺?鈥斺€?涓嶆敼鍙樼幇鏈?JSX 缁撴瀯銆?*/
+.axv-settings .axv-set-group:not(.open) > *:not(.axv-set-label) {
+  display: none;
+}
+.axv-set-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--axv-on-surface-variant);
+  margin-bottom: 8px;
+}
+/* 鎶樺彔鏍囬锛坆utton锛夛細鍗犳弧鏁磋锛屽皬绠ご鎸囩ず灞曞紑鐘舵€?*/
+.axv-settings .axv-set-group > button.axv-set-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: calc(100% + 12px);
+  margin: 0 -6px 8px;
+  padding: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+.axv-settings .axv-set-group > button.axv-set-label:hover {
+  background: var(--axv-hover);
+}
+.axv-settings .axv-set-group:not(.open) > button.axv-set-label {
+  margin-bottom: 0;
+}
+.axv-set-caret {
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: transform 0.16s ease;
+}
+.axv-settings .axv-set-group.open .axv-set-caret {
+  transform: rotate(90deg);
+}
+.axv-set-seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--axv-surface-sunken);
+}
+.axv-set-seg-btn {
+  flex: 1 1 0;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--axv-on-surface);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.axv-set-seg-btn.on {
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+  font-weight: 600;
+}
+.axv-set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 13px;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+}
+.axv-set-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--axv-primary);
+  cursor: pointer;
+}
+/* M37锛氳缃潰鏉块噷鐨勯鑹?婊戞潌鎺т欢 */
+.axv-set-color {
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.axv-set-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.axv-set-range input[type="range"] {
+  width: 120px;
+}
+.axv-set-range b {
+  font-size: 12px;
+  min-width: 34px;
+  text-align: right;
+  color: var(--axv-on-surface-variant);
+}
+.axv-set-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--axv-on-surface-variant);
+  margin: 6px 0 8px;
+}
+
+/* M233：插件列表 */
+.axv-plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+.axv-plugin-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  background: var(--axv-surface);
+}
+/* M376：检查更新按钮 + 启用开关 横排 */
+.axv-plugin-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.axv-plugin-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.axv-plugin-meta b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--axv-on-surface);
+}
+.axv-plugin-tag {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--axv-primary);
+  color: var(--axv-on-primary,#fff);
+  vertical-align: middle;
+}
+.axv-plugin-src {
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--axv-outline);
+  color: var(--axv-on-surface-variant);
+  vertical-align: middle;
+}
+.axv-plugin-id {
+  font-size: 11px;
+  color: var(--axv-on-surface-variant);
+  opacity: 0.8;
+}
+.axv-plugin-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-plugin-toggle input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--axv-primary);
+  cursor: pointer;
+}
+/* M376：插件项「检查更新」按钮 */
+.axv-plugin-check {
+  flex: none;
+  font-size: 11px;
+  padding: 3px 9px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 6px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface-variant);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.axv-plugin-check:hover:not(:disabled) {
+  border-color: var(--axv-primary);
+  color: var(--axv-primary);
+}
+.axv-plugin-check:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* M234：安装第三方插件 */
+.axv-plugin-install {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--axv-outline);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.axv-set-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--axv-on-surface-variant);
+}
+.axv-plugin-url {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 6px;
+  font: 12px/1.4 inherit;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+}
+.axv-installed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.axv-installed-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: var(--axv-surface);
+}
+.axv-installed-col {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 4px;
+}
+.axv-installed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.axv-set-btn-mini {
+  width: auto;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.axv-plugin-runbox {
+  border: 1px dashed var(--axv-outline);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 80px;
+  background: var(--axv-surface);
+}
+
+/* M234：安装插件弹窗（居中） */
+.axv-plugin-dlg {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  border: none;
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 360px;
+  max-width: 420px;
+  background: var(--axv-surface,#fff);
+  color: var(--axv-on-surface,#222);
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  z-index: 9999;
+}
+.axv-plugin-dlg::backdrop {
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(2px);
+}
+
+/* M235：编译器插件项 */
+.axv-compiler-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: var(--axv-surface);
+}
+.axv-compiler-item .axv-plugin-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.axv-set-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  height: 30px;
+  margin-top: 0px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.axv-set-btn:hover {
+  background: var(--axv-hover);
+}
+.axv-set-btn-danger {
+  border-color: var(--axv-danger);
+  color: var(--axv-danger);
+}
+.axv-about-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 14px 12px;
+  color: var(--axv-primary);
+}
+.axv-about-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--axv-on-surface);
+}
+.axv-about-ver {
+  font-size: 12px;
+  color: var(--axv-on-surface-variant);
+  margin-top: 2px;
+}
+
+/* M16g锛氬叧浜庨〉鐨勯」鐩?logo锛堝渾瑙掍竴鐐癸紝璺熷簲鐢ㄥ浘鏍囧悓瑙傛劅锛?*/
+.axv-about-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex: 0 0 auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+.axv-about-desc {
+  padding: 0 14px 14px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--axv-on-surface-variant);
+}
+/* M16f锛氬叧浜庨〉鐨勮嚧璋紙椤圭洰鏉ユ簮 + 寮€婧愯嚧璋㈠垪琛級 */
+.axv-credit-upstream {
+  padding: 0 14px 12px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--axv-on-surface-variant);
+}
+.axv-credit-upstream a {
+  color: var(--axv-primary);
+  font-weight: 600;
+}
+.axv-credit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.axv-credit-list li {
+  padding: 0 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--axv-on-surface-variant);
+}
+.axv-credit-list li a {
+  color: var(--axv-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+.axv-credit-list li a:hover {
+  text-decoration: underline;
+}
+.axv-credit-by {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--axv-on-surface-variant);
+}
+.axv-credit-lic {
+  margin-left: 8px;
+  font-size: 10px;
+  color: var(--axv-on-surface-variant);
+  background: var(--axv-surface-sunken);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.axv-credit-role {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--axv-on-surface-variant);
+  opacity: 0.85;
+}
+.axv-about-kv {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  font-size: 12.5px;
+  color: var(--axv-on-surface-variant);
+}
+.axv-about-kv kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--axv-outline-strong);
+  border-radius: 5px;
+  background: var(--axv-surface-sunken);
+  color: var(--axv-on-surface);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.axv-about-kv span {
+  margin-left: auto;
+}
+
+/* ===== M11锛氬凡鐢熸垚璧勬簮鍐呭祵鐗堬紙宸︿晶 tab 闈㈡澘鍐咃紝涓嶇敤寮圭獥锛?===== */
+.axv-assets-inline {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  font-size: 13px;
+}
+.axv-assets-inline .axv-assets-search {
+  margin: 8px 12px;
+}
+.axv-assets-inline .axv-assets-list {
+  padding: 0 8px 8px;
+}
+.axv-assets-inline .axv-assets-row {
+  gap: 8px;
+  padding: 6px;
+  border-radius: 8px;
+}
+.axv-assets-inline .axv-assets-thumb {
+  width: 34px;
+  height: 34px;
+}
+.axv-assets-inline .axv-assets-name {
+  font-size: 12.5px;
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.axv-assets-inline .axv-assets-sub {
+  font-size: 10.5px;
+}
+/* 绐勬爮閲?4 涓搷浣滄寜閽斁涓€琛屼細鎸ょ垎 鈫?鍏佽鎹㈣锛屾寜閽缉鍒?26 */
+.axv-assets-inline .axv-assets-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 60px;
+  gap: 2px;
+}
+.axv-assets-inline .axv-assets-actions .axv-icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+}
+.axv-assets-inline .axv-assets-actions .axv-icon-btn .msr {
+  font-size: 17px !important;
+}
+.axv-assets-inline .axv-assets-empty {
+  padding: 16px 12px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.axv-assets-inline .axv-assets-foot {
+  margin-top: auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 10px 12px;
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+
+/* M11i锛氬彲鍙屽嚮缂栬緫鐨勫舰鐘惰祫婧愯 */
+.axv-assets-row-editable {
+  cursor: pointer;
+}
+.axv-assets-row-editable:hover {
+  background: var(--axv-primary-soft, var(--axv-primary-soft));
+}
+
+/* ===== M11j锛氬浘鏍囩紪杈戝櫒锛堢敓鎴愮殑 vector drawable锛?==== */
+.axv-icon-editor {
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+.axv-icon-ed-body {
+  display: flex;
+  gap: 16px;
+  padding: 14px 16px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+.axv-icon-ed-preview {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  /* M20e锛氬簳鑹?+ 鏀剁揣鍐呰竟璺?*/
+  background-color: #ffffff14;
+  padding: 6px;
+}
+.axv-icon-ed-canvas {
+  width: 200px;
+  height: 200px;
+  border-radius: 14px;
+  border: 1px solid var(--axv-line, var(--axv-outline));
+  /* 妫嬬洏鏍煎簳锛氶€忔槑鍖哄煙鐪嬪緱娓?*/
+  background-image: linear-gradient(45deg, var(--axv-surface-sunken) 25%, transparent 25%),
+    linear-gradient(-45deg, #e8e8ee 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e8e8ee 75%),
+    linear-gradient(-45deg, transparent 75%, #e8e8ee 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.axv-icon-ed-canvas img {
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+  image-rendering: auto;
+}
+.axv-icon-ed-meta {
+  font-size: 11px;
+  color: var(--axv-muted, var(--axv-on-surface-variant));
+}
+.axv-icon-ed-form {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.axv-icon-ed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--axv-fg, var(--axv-on-surface));
+  margin: 4px 0;
+}
+.axv-icon-ed-row > span:first-child {
+  flex: 0 0 74px;
+}
+.axv-icon-ed-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-line, var(--axv-outline));
+  background: var(--axv-input-bg, var(--axv-surface));
+  color: inherit;
+  font-size: 12px;
+}
+.axv-icon-ed-two {
+  align-items: center;
+  flex: 1 1 auto;
+  display: flex;
+  gap: 8px;
+}
+/* M11k锛氬昂瀵歌緭鍏ユ鏀剁獎鍒?30px锛堢敤鎴锋寚瀹氾級 */
+.axv-icon-ed-two .axv-icon-ed-input {
+  flex: 0 0 75px;
+  width: 75px;
+  padding: 0 2px;
+  text-align: center;
+}
+.axv-icon-ed-swatches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+.axv-icon-ed-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--axv-outline);
+  cursor: pointer;
+  flex: 0 0 auto;
+  padding: 0;
+}
+.axv-icon-ed-color {
+  width: 30px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--axv-line, var(--axv-outline));
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+/* M63h锛氬浘鏍囩紪杈戝櫒鍙栬壊涔熸崲鎴愯嚜瀹氫箟 ColorField 鈫?灏哄瀵归綈鏃ф寜閽?*/
+.axv-icon-ed-swatches .axv-cf-swatch { width: 30px; height: 24px; border-radius: 6px; }
+.axv-icon-ed-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0;
+}
+/* M11l锛氭棆杞?/ 姘村钩闀滃儚 / 鍨傜洿闀滃儚 涓変釜鎸夐挳鍥哄畾 90px */
+.axv-icon-ed-btns > .axv-set-btn {
+  flex: 0 0 90px;
+  width: 90px;
+  padding: 0 4px;
+}
+.axv-icon-ed-mini {
+  margin-left: 8px;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--axv-line, var(--axv-outline));
+  background: var(--axv-input-bg, var(--axv-surface));
+  color: inherit;
+  cursor: pointer;
+}
+.axv-icon-ed-paths {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 132px;
+  overflow: auto;
+}
+.axv-icon-ed-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--axv-soft, var(--axv-surface-head));
+  cursor: pointer;
+  font-size: 11px;
+}
+.axv-icon-ed-path.on {
+  border-color: var(--axv-primary, var(--axv-primary));
+  background: var(--axv-primary-soft, var(--axv-primary-soft));
+}
+.axv-icon-ed-d {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: var(--axv-muted, var(--axv-on-surface-variant));
+}
+.axv-icon-ed-del {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--axv-muted, var(--axv-on-surface-variant));
+  cursor: pointer;
+  line-height: 1;
+}
+.axv-icon-ed-del:hover {
+  background: #d9363e22;
+  color: var(--axv-danger);
+}
+.axv-icon-ed-pathdata,
+.axv-icon-ed-raw {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-line, var(--axv-outline));
+  background: var(--axv-input-bg, var(--axv-surface));
+  color: var(--axv-title);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.axv-icon-ed-pathdata {
+  /* M11l锛氱敤鎴锋寚瀹?150px */
+  min-height: 150px;
+  color: var(--axv-title);
+}
+.axv-icon-ed-raw {
+  min-height: 160px;
+  white-space: pre;
+  overflow: auto;
+}
+.axv-icon-ed-err {
+  font-size: 11px;
+  color: var(--axv-danger);
+  margin: 2px 0;
+}
+.axv-icon-ed-val {
+  flex: 0 0 36px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+}
+@media (max-width: 720px) {
+  .axv-icon-ed-body {
+    flex-direction: column;
+  }
+  .axv-icon-ed-preview {
+    flex: 0 0 auto;
+    flex-direction: row;
+    justify-content: center;
+  }
+  .axv-icon-ed-canvas {
+    width: 120px;
+    height: 120px;
+  }
+}
+
+/* ===== M11k锛氬浘鏍囩紪杈戝櫒鏀规垚鏁撮〉鍏ㄥ睆锛堜笌褰㈢姸缂栬緫鍣ㄥ悓涓€濂楄鎰燂級===== */
+.axv-icon-page {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  background: var(--axv-surface-sunken, var(--axv-surface-head));
+}
+/* M88锛氳繑鍥炴寜閽闈㈢ + 绉诲姩绔兘鏄剧ず锛堝乏涓婏級锛屼笉鍐嶆湁鍙充笂 鉁?鈥斺€?涓?svg-board 鐨勬柟鍧楁寜閽悓娆?*/
+.axv-icon-back {
+  position: relative;
+  flex: none;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--axv-outline);
+  border-radius: 10px;
+  background: #ffffff24;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+}
+/* 36px 瑙嗚灏哄锛屼絾鍛戒腑鍖鸿ˉ鍒?44px锛圓ndroid 鏈€灏忚Е鎽稿昂瀵革級 */
+.axv-icon-back::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 14px;
+}
+.axv-icon-back:hover { background: #ffffff54; }
+.axv-icon-back:active { transform: scale(0.94); }
+.axv-icon-back .msr { font-size: 22px; }
+/* 绉诲姩绔細澶撮儴鍙暀杩斿洖鎸夐挳 + 鏍囬锛屾挙閿€/閲嶅仛浠嶅湪锛堝伐鍏锋潯閲屼篃鏈夛級 */
+@media (max-width: 840px), (pointer: coarse) and (max-width: 1024px) {
+  .axv-icon-page .axv-icon-back { display: grid; }
+  .axv-icon-page .axv-shape-head .axv-shape-title { font-size: 15px; }
+  /* 搴曢儴銆屼繚瀛樺悗绔嬪嵆鍐欏洖鈥︺€嶈鏄庯細浣嶇疆涓嶅灏辨埅鏂紝鏈€澶?2 琛岋紙鍐欏湪鍐呭眰锛岄伩鍏嶈 flex 鍧楀寲锛?*/
+  .axv-icon-page .axv-icon-page-foot-note {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    line-height: 1.45;
+    text-align: center;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+}
+.axv-icon-page-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  align-items: flex-start;
+  /* M20e锛氬崐閫忔槑鐧藉簳 */
+  background: #ffffff14;
+}
+.axv-icon-page-foot {
+  flex: 0 0 auto;
+  display: flex;
+  /* M11l锛氱珫鎺掞紙璇存槑鍦ㄤ笂銆佹寜閽湪涓嬶級锛岄珮搴﹁嚜閫傚簲 */
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  height: auto;
+  padding: 0 16px 16px;
+  border-top: 1px solid var(--axv-outline);
+  background: #ffffff24;
+  font-size: 12px;
+  color: var(--axv-muted, var(--axv-on-surface-variant));
+}
+.axv-icon-page-foot > span:last-child {
+  justify-content: flex-end;
+}
+.axv-icon-ed-pick {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--axv-line, var(--axv-outline));
+  background: var(--axv-surface, var(--axv-surface));
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.axv-icon-ed-pick:hover {
+  background: var(--axv-primary-soft, var(--axv-primary-soft));
+  border-color: var(--axv-primary, var(--axv-primary));
+  color: var(--axv-primary, var(--axv-primary));
+}
+/* 鍏ㄥ睆椤甸噷琛ㄥ崟涓嶅啀鎸ゅ湪 860px 寮圭獥鍐?*/
+.axv-icon-page .axv-icon-ed-preview {
+  flex: 0 0 240px;
+  position: sticky;
+  top: 0;
+}
+.axv-icon-page .axv-icon-ed-canvas {
+  width: 220px;
+  height: 220px;
+}
+.axv-icon-page .axv-icon-ed-form {
+  max-width: 720px;
+}
+@media (max-width: 720px) {
+  .axv-icon-page-body {
+    flex-direction: column;
+    padding: 12px;
+  }
+  .axv-icon-page .axv-icon-ed-preview {
+    flex: 0 0 auto;
+    position: static;
+    /* M20e锛氱Щ鍔ㄧ鏀规垚绔栨帓锛堜笌妗岄潰涓€鑷达紝涓嶅苟鎺掓尋锛?*/
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+  }
+  .axv-icon-page .axv-icon-ed-canvas {
+    width: 130px;
+    height: 130px;
+  }
+  .axv-icon-page .axv-icon-ed-form {
+    max-width: none;
+    width: 100%;
+  }
+}
+
+/* M11o锛氬浘鐗囬瑙堟閲岀殑銆岀紪杈戙€嶏紙鐭㈤噺鍥句笓鐢級 */
+.axv-imgprev-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 80px;
+}
+
+/* M11p锛氬浘鏍囩紪杈戝櫒鐨勬彁绀烘潯锛堢┖鍐呭 / 浼犺繘鏉ョ殑涓嶆槸 vector锛?*/
+.axv-icon-ed-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  border: 1px solid #f0c36d;
+  background: color-mix(in srgb, #f5a524 18%, var(--axv-surface));
+  color: var(--axv-warn);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.axv-icon-ed-warn .msr {
+  flex: 0 0 auto;
+  color: var(--axv-warn);
+}
+html[data-axv-theme="dark"] .axv-icon-ed-warn {
+  border-color: var(--axv-warn);
+  background: #3a2f13;
+  color: #f2d79a;
+}
+
+/* ===== M11t锛歊atingBar 鏄熸槦 / 涓嶇‘瀹氳繘搴︽潯 / SeekBar 婊戝潡鑹?===== */
+.axv-node.axv-rating {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  /* 鏄熷舰 mask锛堢櫧鑹蹭簲瑙掓槦锛岄潬 background-color 涓婅壊锛?*/
+  --axv-star-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/%3E%3C/svg%3E");
+}
+.axv-node.axv-rating::before,
+.axv-node.axv-rating::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: var(--axv-star, 36px);
+  background-repeat: repeat-x;
+  background-size: var(--axv-star, 36px) var(--axv-star, 36px);
+  -webkit-mask-image: var(--axv-star-mask);
+  mask-image: var(--axv-star-mask);
+  -webkit-mask-size: var(--axv-star, 36px) var(--axv-star, 36px);
+  mask-size: var(--axv-star, 36px) var(--axv-star, 36px);
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
+}
+.axv-node.axv-rating::before {
+  width: var(--axv-stars-w, 180px);
+  background-color: var(--axv-star-off, #dad5e0);
+}
+.axv-node.axv-rating::after {
+  width: var(--axv-rating-w, 0px);
+  background-color: var(--axv-star-on, #f5a524);
+}
+
+/* 涓嶇‘瀹氳繘搴︽潯锛?0% 瀹界殑灏忔潯鏉ュ洖璺?*/
+.axv-node.axv-indet::after {
+  animation: axv-indet-run 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes axv-indet-run {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+/* 杩涘害鏉″墠鏅壊 / SeekBar 婊戝潡鑹叉敼鎴愬彉閲忥紙鍘熸潵纭啓 #6750A4锛?*/
+.axv-node.axv-progress::after {
+  background-color: var(--axv-progress-color, #757575);
+}
+.axv-node.axv-seek::after {
+  background-color: var(--axv-seek-thumb, #757575);
+}
+
+/* M11w锛氬渾褰?ProgressBar锛堟病鏈?horizontal 鏍峰紡锛? 杞湀鐜紝涓嶆槸缁嗘潯 */
+.axv-node.axv-progress-ring {
+  border-radius: 50%;
+  border: var(--axv-ring-w, 6px) solid #e0d9e3;
+  border-top-color: var(--axv-progress-color, #757575);
+  background: transparent;
+  box-sizing: border-box;
+  animation: axv-ring-spin 1s linear infinite;
+}
+.axv-node.axv-progress-ring::after {
+  content: none;
+  display: none;
+}
+@keyframes axv-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== M16b锛氱郴缁熸帴绠?UI 鐨勬帶浠?鈥斺€?鍗犱綅娓叉煋 ===== */
+.axv-node.axv-webview,
+.axv-node.axv-video,
+.axv-node.axv-calendar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  position: relative;
+  background: #FFFFFF;
+  border: 1px dashed #B0AEB8;
+  border-radius: 8px;
+  color: #757575;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.axv-node.axv-webview::before {
+  content: "WebView 缃戦〉";
+}
+
+.axv-node.axv-video {
+  background: #212121;
+  border-color: #212121;
+  color: #FFFFFF;
+}
+
+.axv-node.axv-video::before {
+  content: "鈻?瑙嗛鐢婚潰";
+}
+
+.axv-node.axv-calendar {
+  min-height: 240px;
+  background: #FFFFFF;
+  border: 1px solid #DADCE0;
+  border-radius: 12px;
+}
+
+.axv-node.axv-calendar::before {
+  content: "CalendarView 日历（系统 UI）";
+}
+
+/* 璁℃椂鍣細鐢绘垚鏅€氭枃鏈殑鏍峰瓙 */
+.axv-node.axv-clock {
+  display: inline-block;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.axv-node.axv-clock::before {
+  content: "00:00";
+}
+

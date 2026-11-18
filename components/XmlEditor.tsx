@@ -269,7 +269,7 @@ import { Inspector } from "./Inspector";
 import { StatusBar } from "./StatusBar";
 import { LayerTree } from "./LayerTree";
 import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
-import "./xml-canvas.css";
+import "./xml-canvas/index.css";
 // M100：安卓硬件返回键 → 关闭最上层浮层（而不是直接退出 App）
 import { useBackGuard } from "./useBackGuard";
 import { installBackBridge, resetBackStack } from "@/lib/ui/back-stack";

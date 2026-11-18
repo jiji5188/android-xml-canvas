@@ -1,0 +1,219 @@
+/* Android 鍙鍖栧竷灞€缂栬緫鍣?鈥?鐢诲竷鑺傜偣鍩虹鏍峰紡锛圡1a锛?   瑕嗙洊 M3E 鏈娇鐢ㄧ殑 axv-* 鍛藉悕绌洪棿锛岄伩鍏嶄笌 M3E 鑷韩鏍峰紡鍐茬獊 */
+
+/* ===== 涓婚鑹诧紙鍞竴鏉ユ簮锛孧4j锛?====
+   瑙勫垯锛氬脊绐?闈㈡澘/鎸夐挳涓嶅啓瀛楅潰鑹插€硷紝缁熶竴鍙栬繖缁勫彉閲忋€?   鎹富棰樺彧鏀硅繖涓€鍧楋紱娣辫壊涓婚缁?<html data-axv-theme="dark"> 鍗冲彲鍏ㄥ眬鍒囨崲銆?*/
+:root {
+  --axv-primary: #04409f;
+  --axv-on-primary: #ffffff;
+  --axv-primary-soft: #e8f0fe;
+  --axv-primary-soft-border: #a8c7fa;
+  --axv-surface: #ffffff;
+  --axv-surface-head: #f7f8fa;
+  --axv-surface-sunken: #f1f3f6;
+  --axv-outline: #d8dce3;
+  --axv-outline-strong: #b9bfc9;
+  --axv-on-surface: #1d1b20;
+  --axv-on-surface-variant: #6b7280;
+  --axv-hover: rgba(0, 0, 0, 0.045);
+  --axv-scrim: rgba(20, 18, 32, 0.55);
+  --axv-danger: #b3261e;
+  --axv-ok: #1f7a3d;
+  /* M16h锛氬澹抽厤鑹?token锛堜富棰橀璁句細瑕嗙洊杩欎簺鍊硷紝瑙?lib/xml/theme-presets.ts锛?*/
+
+  --axv-app-bg: #F5F4F7;
+  --axv-toolbar-bg: #F3F3F9;
+  --axv-toolbar-soft: #E9E9F0;
+  --axv-rail-bg: #F3F3F9;
+  --axv-title: #1d1b20;
+  --axv-desc: #6b7280;
+}
+
+:root[data-axv-theme="dark"] {
+  --axv-primary: #a8c7fa;
+  --axv-on-primary: #00214d;
+  --axv-primary-soft: #1e2a3d;
+  --axv-primary-soft-border: #3a5c8f;
+  --axv-surface: #1e1e2e;
+  --axv-surface-head: #181825;
+  --axv-surface-sunken: #14141f;
+  --axv-outline: #313244;
+  --axv-outline-strong: #45455e;
+  --axv-on-surface: #cdd6f4;
+  --axv-on-surface-variant: #8a8fa3;
+  --axv-hover: rgba(255, 255, 255, 0.06);
+  --axv-scrim: rgba(0, 0, 0, 0.62);
+  --axv-danger: #f2b8b5;
+  --axv-ok: #9fd9a8;
+}
+
+.axv-node {
+  box-sizing: border-box;
+  position: relative;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  overflow: visible;
+  /* M12锛氭粴鍔ㄥ鍣ㄤ笉鏄剧ず婊氬姩鏉°€傛闈?Chrome 鐨勭粡鍏告粴鍔ㄦ潯浼氬悆鎺?15px 鍐呭瀹藉害锛?     鑰?Android 鐨勬粴鍔ㄦ潯鏄诞鍔紙fade锛夌殑銆佷笉鍗犲竷灞€ 鈫?妯″瀷鎸?824px 绠楀嚭鏉ョ殑 match_parent 瀹藉害
+     浼氳秴鍑虹湡姝ｅ唴瀹瑰尯 15px锛岃倝鐪煎氨鏄€屽乏鍙抽棿璺濅笉涓€鑷淬€佸彸杈瑰亸绐勩€嶃€*/
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.axv-node::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* 鏂囨湰绫?*/
+.axv-node.axv-text {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1em;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+/* ImageView 鍗犱綅 */
+.axv-node.axv-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 12px;
+}
+
+/* ProgressBar 姘村钩缁嗘潯 */
+.axv-node.axv-progress::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  /* M11t锛氬搴﹁窡 android:progress / max 璧帮紙鍘熸潵鍐欐 40%锛?*/
+  width: calc(var(--axv-progress, 0.4) * 100%);
+  height: 100%;
+  background: var(--axv-progress-color, #757575);
+  border-radius: inherit;
+}
+
+/* 閫氱敤 View / Space 鍗犱綅 */
+.axv-node.axv-view {
+  background: rgba(120, 120, 160, 0.12);
+  border: 1px dashed rgba(120, 120, 160, 0.35);
+  border-radius: 2px;
+}
+
+/* 瀹瑰櫒 */
+.axv-node.axv-container {
+  display: flex;
+}
+
+/* 閫変腑鎬?*/
+.axv-node.axv-selected {
+  z-index: 5;
+}
+
+/* M115锛氬閫夐檮鍔犻」 鈥斺€?绱壊铏氱嚎涓€鍦堬紝鍜屼富閫夛紙鐜懓鑹插疄绾?+ 鎵嬫焺锛夊尯鍒嗗紑 */
+.axv-node.axv-multi {
+  outline: 1.5px dashed var(--axv-multi-ink, #7C3AED) !important;
+  outline-offset: 1px;
+}
+
+/* M115锛氬閫夊伐鍏锋潯锛堢敾甯冨乏涓嬫偓娴級 */
+.axv-multibar {
+  position: fixed;
+  left: 50%;
+  bottom: 62px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: var(--axv-surface, #fff);
+  color: var(--axv-on-surface);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--axv-outline-variant, #0000001a);
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+}
+.axv-multibar-n {
+  font-size: 11px;
+  line-height: 1;
+  padding: 0 8px 0 6px;
+  color: var(--axv-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.axv-mb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  font-size: 12px;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.axv-mb-btn:hover { background: var(--axv-primary-soft, #00000010); color: var(--axv-primary); }
+.axv-mb-x { padding: 0 8px; }
+
+/* 鍥惧眰琛岋細澶氶€夐檮鍔犻」 */
+.axv-lt-row.multi {
+  background: var(--axv-primary-soft, #00000010);
+  background: color-mix(in srgb, var(--axv-primary) 14%, transparent);
+  outline: 1px dashed var(--axv-primary);
+  outline-offset: -1px;
+}
+
+/* M6a锛氬鍑哄浘鐗囨椂鍘绘帀涓€鍒囩紪杈戞€佽楗帮紙閫変腑铏氱嚎妗?/ tag 鏍囩澶?/ 鎷栨嫿楂樹寒 / 灏哄鎵嬫焺锛?*/
+.axv-exporting .axv-node.axv-selected {
+  outline: none !important;
+}
+.axv-exporting .axv-tag-head {
+  display: none !important;
+}
+.axv-exporting .axv-drop-hit {
+  outline: none !important;
+}
+.axv-exporting .axv-handle,
+.axv-exporting .axv-geom-hint,
+.axv-exporting .axv-drop-zone {
+  display: none !important;
+}
+
+/* M3e锛氶€変腑鎬佽楂樿繃鎵€鏈?elevation锛屼絾涓嶈兘楂樿繃寮圭獥/鏁撮〉瀛愰〉闈紙M4n锛氫粠 9999 闄嶅埌 900锛?   鍚﹀垯閫変腑妗嗕細鐩栦綇 DrawablePicker / ShapeEditor 杩欑被寮瑰眰锛?*/
+.axv-node.axv-selected {
+  z-index: 900 !important;
+}
+
+/* M3b / M11u锛氶€変腑楂樹寒寮哄寲 鈥斺€?铏氱嚎妗?+ 宸︿笂瑙?tag 鏍囩澶达紙鐪熷疄 DOM锛岃 XmlCanvas锛?*/
+.axv-node.axv-selected {
+  outline: 2px dashed #04409F;
+  outline-offset: -2px;
+}
+.axv-tag-head {
+  position: absolute;
+  top: -18px;
+  left: -2px;
+  z-index: 6;
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: ui-monospace, Consolas, monospace;
+  padding: 1px 6px;
+  border-radius: 4px 4px 4px 0;
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 1.4;
+  /* 鏍囩澶翠笉璇ヨ鐖剁骇鐨?flex 灞呬腑/鎷変几褰卞搷 */
+  flex: 0 0 auto;
+  margin: 0;
+  transform: none;
+}

@@ -1,0 +1,573 @@
+/* ===== 宸︿晶婊戦潰鏉匡細52px 鍥炬爣鏉?+ 鍐呭鍒?===== */
+.axv-slide-left {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 320px;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  background: var(--axv-surface-head);
+  color: var(--axv-on-surface);
+  box-shadow: 2px 0 18px rgba(0, 0, 0, 0.1);
+  transform: translateX(-102%);
+  transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+  z-index: 30;
+}
+.axv-slide-left.axv-open {
+  transform: translateX(0);
+}
+.axv-rail {
+  width: 52px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  background: var(--axv-rail-bg);
+}
+.axv-slide-left .axv-rail-btn {
+  /* M11c锛氬崰婊?rail 瀹藉害锛屾湞鐢诲竷閭ｄ晶锛堝彸锛夊仛鎴愮洿瑙掞紝鍍忔爣绛鹃〉鎺㈠嚭鏉?*/
+  width: 100%;
+  border-radius: 18px 0px 0px 18px;
+}
+.axv-rail-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  transition: background 0.12s, color 0.12s;
+}
+.axv-rail-btn:hover {
+  background: var(--axv-surface-sunken);
+}
+.axv-rail-btn.on {
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+  /* M11c锛氶€変腑鏍囩鍚戝乏鎶曢槾褰憋紝寮哄寲銆屾诞鍑恒€嶆劅 */
+  box-shadow: -2px 1px 6px 1px #0000008a;
+}
+.axv-rail-gap {
+  flex: 1;
+}
+.axv-rail-body {
+  flex: 1;
+  min-width: 0;
+  /* M60c锛歮in-height:0 璁╁唴閮ㄥ垪琛ㄨ兘鑷繁婊氾紝鑰屼笉鏄鎾戦珮鍚庤鎺?*/
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* M91d锛氭敼涓轰笉閫忔槑涓婚闈紝鍗婇€忔槑鍦ㄦ繁鑹蹭富棰樹笅浼氶€忓嚭娴呭簳 */
+  background-color: var(--axv-surface);
+}
+.axv-rail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 10px 8px 16px;
+  flex: 0 0 auto;
+}
+.axv-rail-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--axv-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-rail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.axv-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  border: none;
+  background: transparent;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  flex: 0 0 auto;
+}
+.axv-icon-btn:hover {
+  background: var(--axv-hover);
+}
+
+/* ===== 鍙充晶婊戦潰鏉匡細灞炴€?===== */
+.axv-slide-right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--axv-surface-head);
+  color: var(--axv-on-surface);
+  box-shadow: -2px 0 18px rgba(0, 0, 0, 0.1);
+  transform: translateX(102%);
+  transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1);
+  z-index: 30;
+}
+.axv-slide-right.axv-open {
+  transform: translateX(0);
+}
+.axv-slide-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 10px 8px 16px;
+  flex: 0 0 auto;
+}
+.axv-slide-head > span {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--axv-on-surface);
+}
+.axv-slide-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* M91d锛氭敼涓轰笉閫忔槑涓婚闈紝鍗婇€忔槑鍦ㄦ繁鑹蹭富棰樹笅浼氶€忓嚭娴呭簳 */
+  background-color: var(--axv-surface);
+}
+
+/* 浠ｇ爜 / 璧勬簮 缂栬緫鍣?*/
+.axv-pane {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 12px;
+  background: var(--axv-surface-head);
+  color: var(--axv-on-surface);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  tab-size: 2;
+}
+/* M31g锛歛xv-res-box锛堟墜鍐?<resources> 鍏滃簳杈撳叆妗嗭級鍙婂叾鏍峰紡宸插垹闄?*/
+
+/* ===== 缁勪欢闈㈡澘锛圡3E 娴呰壊绯荤璐达級===== */
+.axv-pp {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: var(--axv-on-surface);
+}
+.axv-pp-search {
+  padding: 4px 12px 6px;
+  position: relative;
+  flex: 0 0 auto;
+}
+.axv-pp-search input {
+  display: block;
+  width: 100%;
+  height: 40px;
+  padding: 0 14px 0 42px;
+  border-radius: 20px;
+  border: none;
+  background: var(--axv-surface-sunken);
+  color: var(--axv-on-surface);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.axv-pp-search-icon {
+  position: absolute;
+  left: 22px;
+  top: 50%;
+  transform: translateY(-42%);
+  color: var(--axv-on-surface-variant);
+  pointer-events: none;
+}
+.axv-pp-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 8px 10px;
+}
+.axv-pp-group {
+  margin-bottom: 6px;
+}
+/* M14锛氱涓€灞傘€屽簱銆嶅垎绫伙紙骞冲彴 / AndroidX / Material锛?*/
+.axv-pp-lib {
+  margin-bottom: 8px;
+  padding-bottom: 2px;
+  border-radius: 14px;
+}
+.axv-pp-lib + .axv-pp-lib {
+  border-top: 1px solid var(--axv-outline);
+  padding-top: 6px;
+}
+.axv-pp-lib-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px;
+  border: none;
+  background: var(--axv-surface-head);
+  color: var(--axv-primary);
+  cursor: pointer;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-align: left;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.axv-pp-lib-head:hover {
+  background: var(--axv-surface-sunken);
+}
+.axv-pp-lib-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-pp-lib-count,
+.axv-pp-cat-count {
+  flex: 0 0 auto;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.axv-pp-cat-count {
+  background: var(--axv-surface-sunken);
+  color: var(--axv-on-surface);
+}
+.axv-pp-caret {
+  font-size: 18px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.axv-pp-group-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 6px 0 10px;
+  border: none;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-align: left;
+  font-family: inherit;
+}
+.axv-pp-group-head:hover {
+  background: var(--axv-hover);
+}
+.axv-pp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 6px 8px 12px;
+}
+.axv-pp-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 6px 10px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--axv-surface) 94%, var(--axv-title) 6%);
+  color: var(--axv-on-surface);
+  border: none;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  min-height: 72px;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+.axv-pp-tile:hover {
+  background: var(--axv-surface-sunken);
+}
+.axv-pp-tile:active {
+  cursor: grabbing;
+  transform: scale(0.97);
+}
+.axv-pp-tile-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--axv-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.axv-pp-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--axv-on-surface-variant);
+  font-size: 13px;
+}
+.axv-pp-foot {
+  flex: 0 0 auto;
+  padding: 8px 14px 16px;
+  font-size: 11px;
+  color: var(--axv-on-surface-variant);
+  border-top: 1px solid var(--axv-outline);
+  text-align: center;
+}
+
+/* ===== 鍥惧眰鏍?===== */
+.axv-lt {
+  padding: 2px 8px 14px;
+  color: var(--axv-on-surface);
+}
+.axv-lt-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--axv-on-surface-variant);
+  font-size: 13px;
+}
+.axv-lt-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding-right: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  /* M31j锛氭嫋鎷芥槸 pointer 瀹炵幇锛岃鍐呯姝㈤€変腑/闀挎寜鑿滃崟锛屽惁鍒欐墜鏈洪暱鎸変細寮圭郴缁熻彍鍗?*/
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.axv-lt-row:hover {
+  background: color-mix(in srgb, var(--axv-primary) 6%, transparent);
+}
+.axv-lt-row.sel {
+  background: var(--axv-primary-soft);
+}
+.axv-lt-toggle {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 6px;
+}
+.axv-lt-toggle:hover {
+  background: var(--axv-hover);
+}
+.axv-lt-tag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--axv-primary);
+  white-space: nowrap;
+}
+.axv-lt-label {
+  font-size: 11px;
+  color: var(--axv-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.axv-lt-actions {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+}
+/* M35c锛氶攣瀹?鍒犻櫎涔熷彧鍦ㄩ€変腑琛屾樉绀猴紙+ JS 渚т簩娆″垽鏂級锛岄伩鍏嶆墜鎸囦綅缃垰濂借惤涓婂幓璇搷浣?*/
+.axv-lt-row.sel .axv-lt-actions {
+  display: inline-flex;
+}
+.axv-lt-actions button {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.axv-lt-actions button:hover {
+  background: var(--axv-hover);
+}
+.axv-lt-actions button.danger:hover {
+  background: color-mix(in srgb, var(--axv-danger) 14%, var(--axv-surface));
+  color: var(--axv-danger);
+}
+/* M3b锛氬凡鍦ㄩ《/搴曟椂鎸夐挳缃伆锛堢湅涓€鐪煎氨鐭ラ亾涓嶈兘鍐嶇Щ锛?*/
+.axv-lt-actions button:disabled {
+  color: var(--axv-on-surface-variant);
+  cursor: default;
+}
+/* M34锛氭嫋鎷芥墜鏌勶細濮嬬粓鍙锛堟墜鏈轰笂娌℃湁 hover锛岄潬瀹冩墠鐭ラ亾鑳芥嫋锛夈€佹寜涓?鎷栨嫿涓彉鑹层€侀攣瀹氱疆鐏帮紱touch-action none 淇濊瘉闀挎寜 220ms 鍚庤兘鎷栬€屼笉鏄粴鍒楄〃 */
+.axv-lt-handle {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--axv-on-surface-variant);
+  cursor: grab;
+  touch-action: none;
+  /* M35b锛氶粯璁ら殣钘忥紙鍙湁閫変腑琛屾墠鏄剧ず锛夛紝浣?*鍗犱綅涓嶈浣?* 鈫?鍒犻櫎鎸夐挳浣嶇疆涓嶆尓锛?     閬垮厤銆岀偣琛岄€変腑 鈫?鍒犻櫎鎸夐挳鍒氬嚭鐜板湪鎵嬫寚涓?鈫?鎶墜灏卞垹銆嶇殑璇垹 */
+  visibility: hidden;
+  pointer-events: none;
+}
+.axv-lt-handle.shown {
+  visibility: visible;
+  pointer-events: auto;
+}
+.axv-lt-handle:hover {
+  background: var(--axv-hover);
+  color: var(--axv-on-surface);
+}
+.axv-lt-handle.arming {
+  background: var(--axv-primary-soft);
+  color: var(--axv-primary);
+}
+.axv-lt-handle.on {
+  cursor: grabbing;
+  color: var(--axv-primary);
+}
+.axv-lt-handle.off {
+  color: var(--axv-on-surface-variant);
+  opacity: 0.4;
+  cursor: default;
+}
+.axv-lt-actions button:disabled:hover {
+  background: transparent;
+}
+/* M20m锛氶攣瀹氬紑鍏?+ 閿佸畾琛岀殑瑙傛劅 */
+.axv-lt-actions button.axv-lt-lock.on {
+  color: var(--axv-primary, #5b5b66);
+  background: var(--axv-hover);
+}
+.axv-lt-row.locked .axv-lt-tag,
+.axv-lt-row.locked .axv-lt-label {
+  opacity: 0.5;
+}
+.axv-lt-row.locked {
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.025) 0 6px,
+    transparent 6px 12px
+  );
+}
+.axv-lt-row.locked[draggable="true"] {
+  cursor: default;
+}
+
+/* ===== M3d锛氭嫋鎷芥帓搴忕殑钀界偣鎻愮ず ===== */
+.axv-lt-hint {
+  font-size: 11px;
+  color: var(--axv-on-surface-variant);
+  line-height: 1.5;
+  padding: 6px 10px 8px;
+  border-bottom: 1px dashed var(--axv-outline);
+  margin-bottom: 4px;
+}
+/* M31j锛氫笉鍐嶇敤 draggable 灞炴€э紝鏀圭敤鍙寜鍘嬬姸鎬佺粰 grab 鍏夋爣 */
+.axv-lt-row {
+  cursor: grab;
+}
+body.axv-lt-dragging,
+body.axv-lt-dragging .axv-lt-row {
+  cursor: grabbing !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.axv-lt-row.dragging {
+  opacity: 0.4;
+}
+/* 鎷栧埌琛屼笂鏂癸細钃濈嚎鍦ㄤ笂杈?*/
+.axv-lt-row.drop-before {
+  box-shadow: inset 0 2px 0 0 #04409F;
+}
+/* 鎷栧埌琛屼笅鏂癸細钃濈嚎鍦ㄤ笅杈?*/
+.axv-lt-row.drop-after {
+  box-shadow: inset 0 -2px 0 0 #04409F;
+}
+/* 鎷栧埌琛屼腑闂达細鏁翠釜琛屽彉钃濇锛岃〃绀恒€屾斁杩涜繖涓鍣ㄣ€?*/
+.axv-lt-row.drop-inside {
+  background: color-mix(in srgb, var(--axv-primary) 10%, transparent);
+  box-shadow: inset 0 0 0 2px #04409F;
+  border-radius: 6px;
+}
+
+/* 鎷栨斁鐩爣楂樹寒 */
+.axv-phone.axv-drop-target {
+  outline: 2px dashed #04409F;
+  outline-offset: -6px;
+}
+
+/* issue 鎻愮ず锛堟诞鍦ㄧ敾甯冧笅鏂癸級 */
+.axv-issues {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 12px;
+  max-height: 90px;
+  overflow-y: auto;
+  background: color-mix(in srgb, #f5a524 18%, var(--axv-surface));
+  color: var(--axv-warn);
+  font-size: 12px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, #F5A524 40%, var(--axv-surface));
+  border-radius: 8px;
+}
+

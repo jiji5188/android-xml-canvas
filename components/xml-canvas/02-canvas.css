@@ -1,0 +1,742 @@
+/* ===== M2c锛氱害鏉熸嫋鎷芥墜鏌?===== */
+.axv-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--axv-danger);
+  border: 2px solid var(--axv-surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: crosshair;
+  z-index: 20;
+  touch-action: none;
+}
+.axv-handle-start { left: -6px; top: 50%; margin-top: -6px; cursor: ew-resize; }
+.axv-handle-end { right: -6px; top: 50%; margin-top: -6px; cursor: ew-resize; }
+.axv-handle-top { top: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.axv-handle-bottom { bottom: -6px; left: 50%; margin-left: -6px; cursor: ns-resize; }
+.axv-handle:hover { background: #BE123C; transform: scale(1.25); }
+
+/* ===== M2d/M2k锛氳嚜鐢辨嫋鍔?+ 鍥涜竟鎷変几鎵嬫焺锛堜笉鐢ㄥ洓瑙掞紝閬垮厤瀹介珮娣峰湪涓€璧凤級 ===== */
+.axv-geom-move {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  line-height: 22px;
+  text-align: center;
+  background: var(--axv-ok);
+  color: var(--axv-on-primary);
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: grab;
+  z-index: 31;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+  user-select: none;
+  touch-action: none;
+  /* 鍗婇€忔槑锛氫笉鎶㈣瑙夛紝浣嗕粛鍦ㄤ腑闂存柟渚挎姄锛涙偓鍋?鎸変笅鎭㈠涓嶉€忔槑 */
+  opacity: 0.68;
+  transition: opacity 120ms;
+}
+.axv-geom-move:hover,
+.axv-geom-move:active {
+  opacity: 1;
+}
+.axv-geom-move:active { cursor: grabbing; }
+.axv-geom-resize {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  background: var(--axv-primary);
+  border: 2px solid var(--axv-surface);
+  border-radius: 2px;
+  z-index: 30;
+  touch-action: none;
+}
+.axv-geom-left { left: -6px; top: 50%; margin-top: -5.5px; cursor: ew-resize; }
+.axv-geom-right { right: -6px; top: 50%; margin-top: -5.5px; cursor: ew-resize; }
+.axv-geom-top { top: -6px; left: 50%; margin-left: -5.5px; cursor: ns-resize; }
+.axv-geom-bottom { bottom: -6px; left: 50%; margin-left: -5.5px; cursor: ns-resize; }
+/* 鍥涜竟鎵嬫焺鐣ュ姞楂?鍔犲锛屼究浜庣偣涓紙瀹?楂樻寜鏂瑰悜璋冿級 */
+.axv-geom-left, .axv-geom-right { height: 16px; margin-top: -8px; border-radius: 3px; }
+.axv-geom-top, .axv-geom-bottom { width: 16px; margin-left: -8px; border-radius: 3px; }
+
+/* CL 瀛愰」涓撶敤锛氱敾鍦ㄨ竟鍐呬晶锛岄伩鍏嶅拰澶栦晶鐨勭害鏉熷渾鐐癸紙鎷栫害鏉熺敤锛夋姠鐐瑰嚮 */
+.axv-geom-cl {
+  background: var(--axv-primary);
+  border-color: var(--axv-surface);
+  opacity: 0.85;
+  z-index: 31;
+}
+.axv-geom-cl:hover { opacity: 1; }
+.axv-geom-cl-left { left: 10px; top: 50%; margin-top: -8px; height: 16px; width: 8px; cursor: ew-resize; }
+.axv-geom-cl-right { right: 10px; top: 50%; margin-top: -8px; height: 16px; width: 8px; cursor: ew-resize; }
+.axv-geom-cl-top { top: 10px; left: 50%; margin-left: -8px; width: 16px; height: 8px; cursor: ns-resize; }
+.axv-geom-cl-bottom { bottom: 10px; left: 50%; margin-left: -8px; width: 16px; height: 8px; cursor: ns-resize; }
+
+/* ===== 璧勬簮鏍戯紙M30c锛歛xv-restree 鏍戝舰妗嗗凡鍒狅紝鐐瑰嚮琛屼负鍚堝苟鍒?axv-ws-list axv-proj-tree锛?=== */
+
+/* 宸︿晶璧勬簮闈㈡澘 mini 鎿嶄綔鎸夐挳锛圡30c锛氥€岄€夋嫨res鐩綍銆嶆寜閽宸插垹锛屼繚鐣?axv-rail-mini-btn 澶囩敤锛?*/
+.axv-rail-mini-btn {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 8px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.axv-rail-mini-btn:hover { background: var(--axv-hover); border-color: var(--axv-outline-strong); }
+.axv-rail-mini-btn-danger { color: var(--axv-danger); border-color: var(--axv-outline); }
+.axv-rail-mini-btn-danger:hover { background: var(--axv-hover); border-color: var(--axv-danger); }
+
+/* 棰滆壊 swatch 瑙﹀彂 color picker */
+.axv-attr-sw { position: relative; display: inline-block; width: 28px; height: 28px; border-radius: 4px; flex: 0 0 28px; }
+
+/* 鎷栨嫿涓殑涓存椂杩炵嚎锛坒ixed 鍏ㄥ睆锛屽潗鏍?= 瑙嗗彛 px锛?*/
+.axv-constraint-drag {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: visible;
+}
+.axv-constraint-drag line {
+  stroke: var(--axv-danger);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+.axv-constraint-drag circle {
+  fill: var(--axv-danger);
+}
+
+/* 鎷栫粍浠跺埌鐢诲竷涓婄殑钀界偣楂樹寒锛堝鍣?= 浼氬彉鎴愬瓙鑺傜偣锛涙櫘閫氭帶浠?= 鎻掑埌瀹冨悗闈級 */
+.axv-node.axv-drop-hit {
+  box-shadow: inset 0 0 0 2px #04409F;
+  background-color: color-mix(in srgb, var(--axv-primary) 6%, transparent);
+}
+
+/* 鐢诲竷鑸炲彴锛堟棫鐗堣鍒欏凡绉婚櫎锛岃涓嬫柟 v3 楠ㄦ灦锛?*/
+
+.axv-canvas-empty {
+  color: var(--axv-on-surface-variant);
+  font-size: 14px;
+  padding: 24px;
+  text-align: center;
+}
+
+/* ============================================================
+   缂栬緫鍣ㄩ鏋讹紙M3E 椋庢牸涓夋爮锛氬乏婊?320 / 涓棿鐢诲竷 / 鍙虫粦 320锛?   ============================================================ */
+.axv-editor {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--axv-app-bg);
+}
+.axv-main {
+  position: absolute;
+  inset: 0;
+}
+
+/* 鐢诲竷鑸炲彴 */
+.axv-stage {
+  position: absolute;
+  inset: 0;
+  background: var(--axv-app-bg);
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  /* safe center锛氭墜鏈哄睆姣斿彲瑙佸尯瀹芥椂浠庡乏渚у榻愶紝涓嶄細琚鎺夊乏杈?*/
+  justify-content: safe center;
+  /* M11f锛氶《閮ㄧ暀鐧戒氦缁?margin-top锛?2锛夌粺涓€鎺у埗锛宲adding 鍥涜竟 24 */
+  margin-top: 89px;
+  padding: 24px;
+  box-sizing: border-box;
+  /* M30b锛氬簳閮ㄧ暀鐧?24 */
+  margin-bottom: 24px;
+  transition: padding 0.22s cubic-bezier(0.2, 0, 0, 1);
+  /* M6f锛氱敾甯冭嚜鎴愬眰鍙犱笂涓嬫枃銆?     閫変腑鎬佹槸 z-index:900锛堣楂樿繃鎵€鏈?elevation锛夛紝浣嗙敾甯冭妭鐐归兘鏄?stage 鐨勫悗浠ｏ紝
+     涓嶉殧绂荤殑璇?900 浼氬弬涓庢牴灞傚彔涓婁笅鏂囷紝姣?.axv-slide-left/.axv-slide-right锛?0锛夎繕楂?     鈫?鎵嬫満涓婂睆姣斿彲瑙佸尯瀹姐€佹嫋鍒伴潰鏉垮簳涓嬫椂锛岄€変腑鐨勬帶浠朵細鐩栧湪渚ц竟鏍忎笂闈€?*/
+  isolation: isolate;
+  z-index: 1;
+  /* M6g锛氬厑璁稿弻鎸囨嵒鍚堣嚜宸辨帴绠★紙鎷?page 缂╂斁锛夛紝婊氬姩浠嶇劧鍘熺敓 */
+  touch-action: pan-x pan-y;
+}
+
+/* M6g锛氱缉鏀剧櫨鍒嗘瘮娴眰锛圕trl+婊氳疆 / 鍙屾寚鎹诲悎鏃剁煭鏆傚嚭鐜帮級 */
+.axv-zoom-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 44px;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--axv-title) 84%, transparent);
+  color: var(--axv-surface);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+}
+.axv-stage.pad-l {
+  padding-left: 340px;
+}
+.axv-stage.pad-r {
+  padding-right: 340px;
+}
+.axv-phone {
+  /* M11锛氬姞鍘氳竟妗?+ 鏇村じ寮犵殑钀藉湴闃村奖锛屾洿鍍忕湡鏈?*/
+  border: 8px solid #52525d;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 10px 20px 60px #0000007d;
+  flex: 0 0 auto;
+  /* 绔栧悜涓夋锛氱姸鎬佹爮 / 搴旂敤鍐呭鍖?/ 瀵艰埅鏍忋€傛樉寮?flex 鍒楀竷灞€ +
+     鏄庣‘楂樺害锛屾牴甯冨眬鐨?height:100% 鎵嶆湁鍙傜収鐗╋紙涔嬪墠鐖剁骇鍙湁 min-height锛?     percentage 楂樺害鐖剁骇鏃犵‘瀹氶珮搴?鈫?鏍瑰竷灞€楂樺害濉旂缉鍒板唴瀹归珮锛屽簳閮ㄧ暀绌猴級銆?*/
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== 妯℃嫙绯荤粺鐘舵€佹爮锛堟椂闂?+ 淇″彿/WiFi/鐢垫睜锛?==== */
+.axv-statusbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* M11锛氭í鍚戠暀鐧?20锛堢旱鍚戠暀 0锛氶珮搴︾敱鍐呰仈 height 瀹氭锛岀粰绾靛悜 padding 浼氭妸瀛楀帇娌★級 */
+  padding: 0 20px;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  user-select: none;
+  pointer-events: none;
+  /* 棰滆壊鐢卞唴鑱?color 鎺у埗锛堟寜鏍瑰竷灞€鑳屾櫙鎺ㄥ锛?*/
+}
+.axv-sb-time {
+  font-variant-numeric: tabular-nums;
+}
+.axv-sb-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* M11锛氱姸鎬佹爮鍥炬爣鏀惧ぇ鍒?30 */
+  font-size: 30px;
+  line-height: 1;
+}
+
+/* ===== 搴旂敤鍐呭鍖猴紙鏍瑰竷灞€濉弧杩欓噷锛?==== */
+.axv-phone-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  /* 涓嶈鍒囷細閫変腑鎻忚竟/鎵嬫焺/绾︽潫绾垮彲浠ラ湶鍑烘潵 */
+  overflow: visible;
+}
+/* 娉細涓嶇粰鏍硅妭鐐瑰姞 flex:1 鈥斺€?鍚﹀垯 wrap_content 鐨勬牴浼氳鎷変几銆?   match_parent 鐢辨ā鍨嬬粰鍑虹殑 width/height:100% 鐢熸晥锛堢埗绾у凡鏈夌‘瀹氶珮锛夈€?*/
+
+/* ===== 妯℃嫙涓夐敭瀵艰埅鏍?===== */
+.axv-navbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 24px;
+  user-select: none;
+  pointer-events: none;
+  /* 涓庣姸鎬佹爮鍚岃壊绯伙細璺熼殢鍐呰仈 color */
+  background: rgba(0, 0, 0, 0.04);
+}
+.axv-nav-btn {
+  display: grid;
+  place-items: center;
+  opacity: 0.75;
+}
+/* M20e锛氳繑鍥炴寜閽崲鎴愬儚绱犻 SVG锛圧unPreview.tsx 鍐呰仈锛夛紝灏哄璺熷鑸爮鍥炬爣鍗忚皟 */
+/* M11锛氬鑸爮鍥炬爣鏀惧ぇ 2 鍊嶏紱M20e锛氳繑鍥?1.6 鍊嶏紙36 鈫?57.6锛夛紝涓婚〉/澶氫换鍔?1.3 鍊嶏紙36 鈫?46.8锛?*/
+.axv-nav-btn svg { width: 36px; height: 36px; display: block; }
+.axv-nav-btn[title='返回'] svg { width: 57.6px; height: 57.6px; }
+.axv-nav-btn[title^='主页'] svg,
+.axv-nav-btn[title^='多任务'] svg { width: 46.8px; height: 46.8px; }
+
+/* ===== 椤堕儴鎮诞宸ュ叿鏍忥紙M6b 涓夋爮甯冨眬锛?===== */
+.axv-toolbar-v2 {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* M11d锛氳创椤讹紙鍘熸潵鏄?14px 鎮诞锛?*/
+  top: 0px;
+  display: flex;
+  align-items: center;
+  /* M6b锛氬乏鎸夐挳 | 涓棿鍙粴宸ュ叿鏍忥紙鍚冩弧鍓╀綑瀹藉害锛墊 鍙虫寜閽紱
+     M10锛歡ap 3px + 涓婚鑳屾櫙濉厖锛堟暣鏉″伐鍏锋爮锛?*/
+  gap: 3px;
+  padding: 3px 6px;
+  /* M20c锛氭仮澶嶄富棰樺彉閲忚儗鏅紙娴呰壊涓婚涓嬩负 #F3F3F9锛?*/
+  background: var(--axv-toolbar-bg);
+  /* M11锛氬伐鍏锋爮 9锛屾爣绛炬爮 10锛堟爣绛炬爮鍘嬪湪宸ュ叿鏍忎箣涓婏級 */
+  z-index: 9;
+  pointer-events: none;
+  flex-wrap: nowrap;
+}
+/* 渚ф粦灞曞紑鎸夐挳锛圡10锛氱洿鎺ユ斁鍦ㄥ伐鍏锋爮灞傦紝涓嶅啀濂?axv-tb-group锛?*/
+.axv-tb-side-btn {
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+/* 涓棿鐨勫伐鍏锋爮瀹瑰櫒锛歁11 妗岄潰涔熸敼鎴愭í鍚戞粴鍔紙鍐呭瓒呭嚭灏辨粴锛屼笉鍐嶆崲琛屽帇鍒?tab 琛岋級 */
+.axv-tb-scroll {
+  display: flex;
+  align-items: center;
+  /* M10锛歡ap 3px锛屼笌宸ュ叿鏍忎竴鑷?*/
+  gap: 3px;
+  row-gap: 3px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  /* M20c锛氫腑鍖哄簳鑹叉敼鍗婇€忔槑娣辩伆锛汳31k锛氭敼鎴愯窡宸ュ叿鏍忓ご鍚岃壊绯绘贩鐧?*/
+  background-color: color-mix(in srgb, var(--axv-surface-head) 10%, #a1a1a130);
+  /* M11h锛氫腑鍖哄渾瑙掕兌鍥?*/
+  border-radius: 20px;
+  /* 鍦嗚浼氳鎺夐灏炬寜閽殑涓ょ锛屽乏鍙崇粰 4px 缂撳啿 */
+  padding: 0 4px;
+  pointer-events: auto;
+}
+.axv-tb-scroll::-webkit-scrollbar {
+  display: none;
+}
+.axv-tb-scroll > .axv-tb-group {
+  flex: 0 0 auto;
+}
+/* M10锛氱粍鑳屾櫙閫忔槑 + 鍦嗚 0锛堟暣鏉″伐鍏锋爮缁熶竴鐢?.axv-toolbar-v2 濉厖锛?*/
+.axv-tb-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px;
+  border-radius: 0;
+  user-select: none;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: auto;
+}
+.axv-tb-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  border: none;
+  background: transparent;
+  color: var(--axv-on-surface);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  transition: background 0.12s, color 0.12s;
+}
+.axv-tb-btn:hover {
+  background: var(--axv-surface-sunken);
+}
+.axv-tb-btn.on {
+  background: var(--axv-primary-soft);
+  color: var(--axv-primary);
+}
+.axv-tb-btn:active {
+  transform: scale(0.94);
+}
+.axv-tb-btn:disabled {
+  color: var(--axv-on-surface-variant);
+  cursor: default;
+  background: transparent;
+}
+.axv-tb-btn.danger:hover {
+  background: color-mix(in srgb, var(--axv-danger) 14%, var(--axv-surface));
+  color: var(--axv-danger);
+}
+.axv-tb-select {
+  height: 24px;
+  padding: 0 12px;
+  border-radius: 20px;
+  border: none;
+  background: var(--axv-surface-sunken);
+  color: var(--axv-on-surface);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  max-width: 150px;
+  font-family: inherit;
+}
+.axv-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  color: var(--axv-on-surface);
+}
+/* M2r锛氳澶囬€夋嫨鍣紙宸ュ叿鏍忋€岃澶囥€嶄笅鎷夛紝鍒囨í灞?骞虫澘绛夊竷灞€鍙樹綋棰勮灏哄锛?*/
+.axv-device {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--axv-on-surface-variant);
+  padding: 0 8px;
+}
+.axv-device select {
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  max-width: 130px;
+  cursor: pointer;
+}
+.axv-zoom input[type="range"] {
+  width: 112px;
+  accent-color: var(--axv-primary);
+}
+.axv-zoom span {
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 42px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* M6c锛氥€屾樉绀轰笌璁惧銆嶅脊鍑洪潰鏉匡紙宸ュ叿鏍忎竴涓寜閽?鈫?璁惧 + 缂╂斁锛?   璧?createPortal 鍒?body锛宲osition: fixed 鐢辩粍浠舵寜鎸夐挳浣嶇疆绠?*/
+.axv-tb-btn.is-on {
+  background: var(--axv-primary-soft);
+  color: var(--axv-primary);
+}
+.axv-vs-panel {
+  position: fixed;
+  z-index: 80;
+  width: 260px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--axv-surface);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  color: var(--axv-on-surface);
+  font-size: 12px;
+}
+.axv-vs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.axv-vs-row + .axv-vs-row {
+  margin-top: 12px;
+}
+.axv-vs-row > label {
+  flex: 0 0 auto;
+  color: var(--axv-on-surface-variant);
+  font-weight: 600;
+}
+.axv-vs-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--axv-outline);
+  background: var(--axv-surface);
+  color: var(--axv-on-surface);
+  cursor: pointer;
+  font-family: inherit;
+}
+.axv-vs-hint {
+  margin: 5px 0 0;
+  color: var(--axv-on-surface-variant);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.axv-vs-hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  color: var(--axv-on-surface);
+  background: var(--axv-surface-head);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.axv-vs-zoom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.axv-vs-zoom > button {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  border: none;
+  background: var(--axv-surface-head);
+  color: var(--axv-on-surface);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.axv-vs-zoom > button:hover {
+  background: var(--axv-primary-soft);
+  color: var(--axv-primary);
+}
+.axv-vs-zoom input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--axv-primary);
+}
+.axv-vs-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--axv-outline);
+  color: var(--axv-on-surface-variant);
+}
+.axv-vs-foot > span {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--axv-on-surface);
+}
+.axv-vs-reset {
+  border: none;
+  background: transparent;
+  color: var(--axv-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.axv-vs-reset:hover {
+  background: var(--axv-primary-soft);
+}
+
+/* M6e锛氱紪杈戝櫒鍐呮煡鎵炬潯锛圕trl/Cmd+F锛?*/
+.axv-find {
+  position: absolute;
+  top: 8px;
+  right: 18px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: var(--axv-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.axv-find-input {
+  width: 170px;
+  border: none;
+  outline: none;
+  font-size: 12.5px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: var(--axv-surface-head);
+  color: var(--axv-on-surface);
+  font-family: inherit;
+}
+.axv-find-input:focus {
+  background: var(--axv-primary-soft);
+}
+.axv-find-count {
+  min-width: 44px;
+  text-align: right;
+  font-size: 11.5px;
+  color: var(--axv-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+.axv-find-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--axv-on-surface-variant);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.axv-find-btn .msr {
+  font-size: 18px;
+}
+.axv-find-btn:hover:not(:disabled) {
+  background: var(--axv-primary-soft);
+  color: var(--axv-primary);
+}
+.axv-find-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* M209：替换行（查找条下方第二行）+ 激活态按钮 + 文本按钮 */
+.axv-find-rep {
+  top: auto;
+  bottom: 44px;
+  left: 18px;
+  right: auto;
+}
+.axv-find-btn.is-on {
+  background: var(--axv-primary-soft);
+  color: var(--axv-primary);
+}
+.axv-find-repbtn {
+  width: auto;
+  min-width: 44px;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  font-family: inherit;
+  background: var(--axv-surface-head);
+}
+.axv-find-repbtn:disabled {
+  opacity: 0.4;
+}
+
+/* M45锛氳緭鍏ュ叧閿瘝妫€绱㈠脊绐楋紙鍏夋爣涓嬫柟/涓婃柟锛寈 璺熼殢鍏夋爣锛?*/
+.axv-sug {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* M98锛氬垪琛ㄨ嚜宸辨粦锛堜笉浼犵粰缂栬緫鍣級锛屽苟闃绘婊戝埌澶村悗杩炵潃婊氶〉闈?*/
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--axv-surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.axv-sug-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  height: auto;
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--axv-on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.axv-sug-item.sel {
+  background: var(--axv-primary-soft);
+  color: var(--axv-primary);
+}
+.axv-sug-text {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+/* M352 M3：候选第二行（方法签名/重载/归属类）——小号淡色，不抢主词 */
+.axv-sug-sub {
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--axv-on-surface-variant);
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* M99锛氬€欓€夎瘝鍒嗙被瑙掓爣锛堝０/绫?鏂?鍙?甯?寮?灞烇級鈥斺€斿崟瀛?+ 娣″簳鑹诧紝
+   26px 琛岄珮閲屼笉鎸ゆ帀鍊欓€夎瘝锛涢鑹插彧鍋氬尯鍒嗭紝涓嶆姠涓绘枃 */
+.axv-sug-kind {
+  flex: 0 0 auto;
+  font-size: 10px;
+  line-height: 14px;
+  font-family: inherit;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 2px;
+  margin-left: 6px;
+  border-radius: 3px;
+  text-align: center;
+  font-weight: 600;
+  opacity: 0.9;
+  color: #6b7280;
+  background: rgba(127, 127, 127, 0.14);
+}
+.axv-sug-kind.is-decl { color: #7c3aed; background: rgba(139, 92, 246, 0.18); }
+.axv-sug-kind.is-class { color: #2563eb; background: rgba(59, 130, 246, 0.18); }
+.axv-sug-kind.is-method { color: #059669; background: rgba(16, 185, 129, 0.18); }
+.axv-sug-kind.is-var { color: #0284c7; background: rgba(14, 165, 233, 0.18); }
+.axv-sug-kind.is-const { color: #b45309; background: rgba(245, 158, 11, 0.2); }
+.axv-sug-kind.is-ref { color: #be185d; background: rgba(236, 72, 153, 0.18); }
+.axv-sug-kind.is-prop { color: #475569; background: rgba(100, 116, 139, 0.18); }
+
+/* 鍒嗘鎺т欢锛氳兌鍥婂唴 3px 缂濓紝棣栧熬鍦嗚锛圡3E 鍚屾锛?*/
+.axv-seg {
+  display: flex;
+  gap: 3px;
+}
+.axv-seg-btn {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 12px;
+  border: none;
+  cursor: pointer;
+  background: var(--axv-surface-sunken);
+  color: var(--axv-on-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+  font-family: inherit;
+}
+.axv-seg-btn:first-child {
+  border-radius: 20px 8px 8px 20px;
+}
+.axv-seg-btn:last-child {
+  border-radius: 8px 20px 20px 8px;
+}
+.axv-seg-btn:only-child {
+  border-radius: 20px;
+}
+.axv-seg-btn.on {
+  background: var(--axv-primary);
+  color: var(--axv-on-primary);
+  font-weight: 600;
+}
+

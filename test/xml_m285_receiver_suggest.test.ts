@@ -51,3 +51,47 @@ describe("computeJavaSuggest M285（接收者类型感知）", () => {
     expect(top5).toContain("setText");
   });
 });
+
+describe("computeJavaSuggest M389（当前文件符号 + 作用域）", () => {
+  it("字段声明 `Type x;` 后能解析 receiver 类型（不要求 `=`）", () => {
+    const code = [
+      "public class M extends Activity {",
+      "    private TextView titleView;",
+      "    void f() {",
+      "        titleView.te",
+      "    }",
+      "}",
+    ].join("\n");
+    const s = computeJavaSuggest(code, { line: 4, col: 22 });
+    expect(s!.items).toContain("setText");
+  });
+  it("当前文件的局部变量打前缀时进候选（不泄漏其它方法的局部）", () => {
+    const code = [
+      "public class M {",
+      "    void onCreate() {",
+      "        int total = 10;",
+      "        tot",        // 打前缀 tot（不是全词 total）
+      "    }",
+      "}",
+    ].join("\n");
+    const s = computeJavaSuggest(code, { line: 4, col: 11 }); // 8空格 + tot(3) + 1 = col 12，取 tot 后 = col 12？8+3=11，+1=12
+    expect(s!.items).toContain("total");
+  });
+  it("其它方法的局部变量不泄漏进当前方法候选", () => {
+    const code = [
+      "public class M {",
+      "    void onPrepare() {",
+      "        int p = 5;",
+      "        p",
+      "    }",
+      "    void onResume() {",
+      "        p",
+      "    }",
+      "}",
+    ].join("\n");
+    // 光标在 onResume 里打 p（p 是 onPrepare 的局部 → 不应出现）
+    const s = computeJavaSuggest(code, { line: 7, col: 13 });
+    // p 不在候选里（作用域隔离）
+    if (s) expect(s!.items).not.toContain("p");
+  });
+});

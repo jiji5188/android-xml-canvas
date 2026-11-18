@@ -7,7 +7,7 @@
 //
 // 纯数据 + 纯函数，方便单测；不做语义分析，只按前缀过滤 + 去重。
 
-import { extractJavaTokens, type SuggestKind } from "./suggest-kind";
+import { extractJavaTokens, extractScopedSymbols, type SuggestKind } from "./suggest-kind";
 import { getLexStore } from "./lexicon";
 import { rankCandidates } from "./lexicon-rank";
 import type { Lexicon } from "./lexicon";
@@ -554,6 +554,16 @@ export function buildImportInsertMany(doc: string, fqns: string[]): ImportInsert
 
 const WORD = /[A-Za-z0-9_$]/;
 
+/** 类型名简化：`List<String>` → `List`；`android.widget.TextView` → `TextView` */
+function rawSimpleType(t: string): string {
+  let s = t.trim();
+  const lt = s.indexOf("<");
+  if (lt >= 0) s = s.slice(0, lt);
+  s = s.replace(/\[\s*\]/g, "");
+  const dot = s.lastIndexOf(".");
+  return dot >= 0 ? s.slice(dot + 1) : s;
+}
+
 /** 光标左边正在输入的词 */
 function wordBefore(doc: string, offset: number): { prefix: string; start: number } {
   let start = offset;
@@ -612,9 +622,18 @@ export function computeJavaSuggest(
     receiver = doc.slice(rs, prefixStart - 1);
     if (receiver && receiver !== "this" && /^[A-Za-z_]\w*$/.test(receiver)) {
       // 在文件里找 `X receiver` 声明拿到 X（跳过 receiver 自身那行，找类型）
-      const declRe = new RegExp("\\b([A-Za-z_][\\w.]*)\\s+" + receiver + "\\b\\s*[=(]");
+      // M389：receiver 类型解析（之前只认 `Type x =`，漏了字段声明 `Type x;`）+ 词库字段表兜底
+      const declRe = new RegExp("\\b([A-Za-z_][\\w.]*)\\s+" + receiver + "\\b\\s*[=;:]");
       const dm = declRe.exec(doc);
-      if (dm) receiverType = dm[1].replace(/^.*\./, "");
+      if (dm) receiverType = rawSimpleType(dm[1]);
+      if (!receiverType && lex) {
+        for (const [cls, set] of lex.fields) {
+          if (set.has(receiver)) {
+            receiverType = cls;
+            break;
+          }
+        }
+      }
     }
   }
   const isAt = prefix.startsWith("@");
@@ -624,6 +643,8 @@ export function computeJavaSuggest(
   // M99：本文件已有的变量/常量/方法/类型/引用排在词表前面
   //        ——写 `user` 时最想看到的是这个文件里的 userName，而不是 JDK 的 UserManager
   const tok = extractJavaTokens(doc);
+  // M389：作用域感知 —— 当前方法体内的局部变量 + 类成员（字段/常量）
+  const scoped = extractScopedSymbols(doc, offset);
   // M352 M3：候选条目带归属签名（第二行）
   const pool: { text: string; kind: SuggestKind; signature?: string }[] = [];
   const addAll = (words: string[], kind: SuggestKind) => {
@@ -636,12 +657,21 @@ export function computeJavaSuggest(
     if (lex && lex.allMethodNames.size > 0) {
       const ranked = rankCandidates(body, {
         lex,
-        currentFile: { methods: tok.methods, classes: tok.types, fields: tok.consts, vars: tok.vars },
+        // M389：当前文件符号走作用域过滤 —— 局部变量只给光标所在方法的；字段/常量类作用域处处给。
+        //   types 仍全文（类名处处可见），methods 全文（调用过的方法名作参考）。
+        currentFile: { methods: tok.methods, classes: tok.types, fields: scoped.consts, vars: [...scoped.locals, ...scoped.fields] },
         receiverType,
         receiver,
       }, { recency });
       for (const it of ranked.ui) {
         pool.push({ text: it.text, kind: it.kind === "const" ? "const" : it.kind, signature: it.signature });
+      }
+      // M389：receiver 类型能认出且是 SDK 类（词库只有项目类）→ 把该类的高频成员方法并进池子，
+      //   插到 pool 最前（比宽池子更准）。`titleView.` → setText/getText 排最前。
+      if (receiverType && receiver !== "this") {
+        const recv = methodsForType(receiverType);
+        for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method", signature: "" });
+        pool.unshift({ text: receiverType, kind: "class" });
       }
       // JDK 类型 + 关键字兜底（词库没覆盖的基础类型）
       addAll(JAVA_KEYWORDS, "decl");

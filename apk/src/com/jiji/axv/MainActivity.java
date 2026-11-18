@@ -690,7 +690,8 @@ public class MainActivity extends Activity {
                 File f = new File(path.trim());
                 String base = defaultDir().getCanonicalPath();
                 String canon = f.getCanonicalPath();
-                if (!canon.startsWith(base)) return "err:只能写在项目目录里";
+                // M384：带分隔符判断——只用 startsWith 会把 /sdcard/AndroidUIIDE2 这类同级目录也放进来
+                if (!canon.equals(base) && !canon.startsWith(base + File.separator)) return "err:只能写在项目目录里";
                 long n = KeystoreMaker.make(canon, alias, password, cn, org, years);
                 return "ok:" + n;
             } catch (Throwable t) {
@@ -706,6 +707,9 @@ public class MainActivity extends Activity {
         public String downloadLib(String urlsJson, String destAbs) {
             try {
                 if (urlsJson == null || destAbs == null || destAbs.isEmpty()) return "err:参数空";
+                // M384：目标路径不接受上跳——防止项目内容（build.gradle 坐标/扫描结果）把落盘位置带出去。
+                // 注意 M332 是故意不限制目录（项目 libs 可能在 SAF 任意路径），但「..」没有正当用途。
+                if (destAbs.contains("..")) return "err:目标路径不合法（含 ..）";
                 File f = new File(destAbs);
                 // M332：不限制必须在工作目录（项目 libs 可能在 SAF/全文件访问的任意路径）
                 java.util.List<String> urls = jsonUrlList(urlsJson);
@@ -789,6 +793,10 @@ public class MainActivity extends Activity {
             try {
                 if (name == null || name.isEmpty() || destDir == null || destDir.isEmpty()) return "err:参数空";
                 if (!hasAllFiles()) return "err:no-permission";
+                // M384：文件名必须清洗——name 可能来自 build.gradle 坐标/目录扫描结果（项目内容可被换），
+                // 带 / 或 .. 就能配合全文件权限写到任意位置。sanitize 把路径分隔符换成 _。
+                String safeName = sanitize(name);
+                if (!safeName.equals(name)) name = safeName;
                 java.util.List<String> urls = jsonUrlList(urlsJson);
                 if (urls.isEmpty()) return "err:无候选 URL";
                 File target = new File(new File(destDir), name);

@@ -58,6 +58,8 @@ export interface AxvNativeBridge {
   /** M331：原生下载（多镜像兜底）。urlsJson = JSON 数组的候选 URL；destAbs = 绝对路径。
    *  逐个尝试直到成功；成功写文件并返回 "ok:<字节>@<url>"，全失败返回 "err:<最后错误>" */
   downloadLib?(urlsJson: string, destAbs: string): string;
+  /** M385：文件哈希（"sha1" / "sha256"）→ "ok:<hex>" */
+  fileHash?(path: string, algo: string): string;
   /** M357：系统下载器（Android=DownloadManager 后台/系统通知；浏览器 JS 自行 a[download]，不会调这里）。
    *  urlsJson=候选镜像数组，name=目标文件名，destDir=目标目录（共享库绝对路径）。
    *  返回 "ok:<jobId>" / "err:no-permission" / "err:<原因>" */

@@ -710,6 +710,11 @@ public class MainActivity extends Activity {
                 // M384：目标路径不接受上跳——防止项目内容（build.gradle 坐标/扫描结果）把落盘位置带出去。
                 // 注意 M332 是故意不限制目录（项目 libs 可能在 SAF 任意路径），但「..」没有正当用途。
                 if (destAbs.contains("..")) return "err:目标路径不合法（含 ..）";
+                // M385：系统目录/其它应用私有目录/本应用私有目录一律不写
+                {
+                    String canonDest = new File(destAbs).getCanonicalPath();
+                    if (isForbiddenWriteTarget(canonDest)) return "err:目标路径不合法（受保护目录）";
+                }
                 File f = new File(destAbs);
                 // M332：不限制必须在工作目录（项目 libs 可能在 SAF/全文件访问的任意路径）
                 java.util.List<String> urls = jsonUrlList(urlsJson);
@@ -800,6 +805,8 @@ public class MainActivity extends Activity {
                 java.util.List<String> urls = jsonUrlList(urlsJson);
                 if (urls.isEmpty()) return "err:无候选 URL";
                 File target = new File(new File(destDir), name);
+                // M385：目标路径守卫（系统/私有目录不写）
+                if (isForbiddenWriteTarget(target.getCanonicalPath())) return "err:目标路径不合法（受保护目录）";
                 try { target.getParentFile().mkdirs(); } catch (Throwable ignore) {}
                 android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(android.app.DownloadManager.class);
                 if (dm == null) return "err:DownloadManager 不可用";
@@ -1846,6 +1853,49 @@ public class MainActivity extends Activity {
             if (canon.equals(r) || canon.startsWith(r + File.separator)) return true;
         }
         return false;
+    }
+
+    /** M385：下载类桥（downloadLib / systemDownload）的目标路径守卫。
+     *  这两条链路故意不限制在 allowedRoots（M332：项目 libs 可能在 SAF 任意位置），
+     *  但“任意位置”不该包括系统目录 / 其它应用私有目录 / 本应用私有目录。
+     *  项目内容（build.gradle 的 dir、坐标名）可被替换 → 路径校验是最后一道防线。 */
+    private boolean isForbiddenWriteTarget(String canon) {
+        if (canon == null || canon.isEmpty()) return true;
+        if (canon.contains("..")) return true;
+        String[] bad = {
+                "/system", "/vendor", "/apex", "/proc", "/sys", "/dev",
+                "/data/data", "/data/user", "/data/misc", "/data/system",
+        };
+        for (String b : bad) {
+            if (canon.equals(b) || canon.startsWith(b + File.separator)) return true;
+        }
+        try {
+            String own = getApplicationInfo().dataDir;
+            if (own != null && (canon.equals(own) || canon.startsWith(own + File.separator))) return true;
+        } catch (Throwable ignored) { }
+        return false;
+    }
+
+    /** M385：文件哈希（sha1/sha256）——库下载后校验用。返回 "ok:<hex>" / "err:<原因>" */
+    @JavascriptInterface
+    public String fileHash(String path, String algo) {
+        try {
+            if (path == null || path.isEmpty()) return "err:路径为空";
+            File f = new File(path);
+            if (!f.isFile()) return "err:文件不存在";
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance(
+                    "sha1".equalsIgnoreCase(algo == null ? "sha1" : algo.trim()) ? "SHA-1" : "SHA-256");
+            try (java.io.InputStream in = new java.io.FileInputStream(f)) {
+                byte[] b = new byte[8192];
+                int n;
+                while ((n = in.read(b)) > 0) md.update(b, 0, n);
+            }
+            StringBuilder sb = new StringBuilder();
+            for (byte x : md.digest()) sb.append(String.format("%02x", x));
+            return "ok:" + sb;
+        } catch (Throwable t) {
+            return "err:" + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+        }
     }
 
     private String effectiveLabel() {

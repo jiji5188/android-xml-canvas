@@ -25,6 +25,7 @@ import {
   type GradleFileTree,
 } from "@/lib/xml/gradle-deps";
 import { systemDownload } from "@/lib/xml/system-download";
+import { orderBySecurity, verifyDownloadedLib, type VerifyResult } from "@/lib/xml/lib-integrity";
 import { formatBytes, matchLibQuery, matchGradleDep, sortLibFiles, matchFileTreeInclude, normFtDir } from "@/lib/xml/libs-utils";
 
 interface LibsPanelProps {
@@ -246,25 +247,85 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     void refresh();
   }, [refresh]);
 
+  /** M385：下载后校验（Maven .sha1/.sha256）；拿不到校验和 → unverifiable（不阻断，日志写明） */
+  const verifyLib = useCallback(
+    async (urls: string[], path: string): Promise<VerifyResult> => {
+      const fileHash = native?.fileHash;
+      if (!fileHash) return { status: "unverifiable", reason: "原生 fileHash 不可用" };
+      return verifyDownloadedLib(
+        {
+          fetchText: async (u: string) => {
+            try {
+              const r = await fetch(u, { cache: "no-store" });
+              if (!r.ok) return null;
+              return await r.text();
+            } catch {
+              return null;
+            }
+          },
+          hashFile: async (p: string, algo) => {
+            try {
+              const r = String(fileHash.call(native, p, algo) || "");
+              return r.startsWith("ok:") ? r.slice(3) : null;
+            } catch {
+              return null;
+            }
+          },
+        },
+        urls,
+        path,
+      );
+    },
+    [native],
+  );
+
   /** M365：系统下载器优先（后台 + 系统通知 + 进度弹窗）；全失败则回退 HttpURLConnection
-   *  downloadLib（保证文件仍下到共享库，只是没系统通知）。返回 { ok, error?, via }。 */
+   *  downloadLib（保证文件仍下到共享库，只是没系统通知）。返回 { ok, error?, via, integrity }。 */
   const dlWithFallback = useCallback(
-    async (urls: string[], fname: string, destDir: string): Promise<{ ok: boolean; error?: string; via?: "system" | "direct" }> => {
-      const res = await systemDownload(urls, fname, destDir, { showNativeProgress: true });
+    async (urls: string[], fname: string, destDir: string): Promise<{ ok: boolean; error?: string; via?: "system" | "direct"; integrity?: VerifyResult }> => {
+      // M385：只认 https（局域网镜像例外）——http 源的 jar 可能被中间人直接换掉
+      const safeUrls = orderBySecurity(urls);
+      if (!safeUrls.length) return { ok: false, error: tr("libs.no_secure_source", "没有可用的安全下载源（仅接受 https；局域网镜像除外）") };
+      const target = `${destDir}/${fname}`;
+      const res = await systemDownload(safeUrls, fname, destDir, { showNativeProgress: true });
       if (res.missingPermission) return { ok: false, error: tr("libs.cat_no_perm", "缺 All-files-access 权限，下载不到") };
-      if (res.ok) return { ok: true, via: "system" };
+      if (res.ok) {
+        const integrity = await verifyLib(safeUrls, target);
+        if (integrity.status === "mismatch") {
+          try { native?.deleteEntry?.(target, false); } catch { /* ignore */ }
+          return { ok: false, error: tr("libs.hash_mismatch", "校验失配：文件内容与仓库校验和不一致（可能被篡改），已删除") };
+        }
+        return { ok: true, via: "system", integrity };
+      }
       // 系统下载器全失败 → 回退原生 HttpURLConnection（同步、能下到共享库）
       if (native?.downloadLib) {
         native.createEntry?.(destDir, true);
-        const target = `${destDir}/${fname}`;
         let r = "";
-        try { r = String(native.downloadLib(JSON.stringify(urls), target) ?? ""); } catch (e2) { r = "throw:" + String(e2); }
-        if (r.startsWith("ok")) return { ok: true, via: "direct" };
+        try { r = String(native.downloadLib(JSON.stringify(safeUrls), target) ?? ""); } catch (e2) { r = "throw:" + String(e2); }
+        if (r.startsWith("ok")) {
+          const integrity = await verifyLib(safeUrls, target);
+          if (integrity.status === "mismatch") {
+            try { native?.deleteEntry?.(target, false); } catch { /* ignore */ }
+            return { ok: false, error: tr("libs.hash_mismatch", "校验失配：文件内容与仓库校验和不一致（可能被篡改），已删除") };
+          }
+          return { ok: true, via: "direct", integrity };
+        }
         return { ok: false, error: r.slice(4) || tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") };
       }
       return { ok: false, error: res.error || tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") };
     },
-    [native, tr],
+    [native, tr, verifyLib],
+  );
+
+  /** M385：给提示文字拼校验结果后缀（通过才说通过；拿不到校验和就说未校验，不装成功） */
+  const integSuffix = useCallback(
+    (v?: VerifyResult) =>
+      v?.status === "ok"
+        ? tr("libs.verify_ok", "（{algo} 校验通过）", { algo: (v.algo || "sha1").toUpperCase() })
+        : v?.status === "unverifiable"
+          ? tr("libs.verify_skip", "（未校验：仓库无校验和）")
+          : "",
+    [tr],
   );
 
   const doDownload = useCallback(async () => {
@@ -282,7 +343,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       const res = await dlWithFallback([url], name, targetBase);
       if (res.ok) {
         setDlOpen(false); setDlUrl(""); setDlName("");
-        onNote?.(tr("libs.download_saved", "已保存到 {path}" + (res.via === "direct" ? "（直连下载，无系统通知）" : ""), { path: `${targetBase}/${name}` }));
+        onNote?.(tr("libs.download_saved", "已保存到 {path}" + (res.via === "direct" ? "（直连下载，无系统通知）" : ""), { path: `${targetBase}/${name}` }) + integSuffix(res.integrity));
         void refresh();
       } else {
         onNote?.(tr("libs.download_failed", "下载失败：{err}", { err: res.error || "unknown" }));
@@ -300,7 +361,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     }
     onNote?.(tr("libs.download_no_target", "当前没有可写的共享库目录（浏览器已下到 Downloads）"));
     setDlBusy(false);
-  }, [dlUrl, dlName, localDir, onNote, tr, refresh, setDlOpen, setDlUrl, setDlName, setDlBusy, dlWithFallback]);
+  }, [dlUrl, dlName, localDir, onNote, tr, refresh, setDlOpen, setDlUrl, setDlName, setDlBusy, dlWithFallback, integSuffix]);
 
   const currentList = tab === "local" ? localLibs : projectLibs;
 
@@ -357,7 +418,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         const res = await dlWithFallback(libDownloadUrls(e), fname, targetBase);
         if (res.ok) {
           setCatBusy((m) => ({ ...m, [key]: "done" }));
-          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载到共享库（去「共享库」点「应用到项目」加入项目）", { lib: e.artifact }));
+          onNote?.(tr("libs.cat_download_saved", "{lib} 已下载到共享库（去「共享库」点「应用到项目」加入项目）", { lib: e.artifact }) + integSuffix(res.integrity));
           void refresh();
         } else {
           setCatBusy((m) => ({ ...m, [key]: "err:" + (res.error || "download failed") }));
@@ -733,7 +794,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         const res = await dlWithFallback(urls, fname, targetBase);
         if (res.ok) {
           setGradleBusyKey((m) => ({ ...m, [key]: "done" }));
-          onNote?.(tr("libs.gradle_dl_done_shared", "{lib} 已下载到共享库（跨项目复用）", { lib: key }));
+          onNote?.(tr("libs.gradle_dl_done_shared", "{lib} 已下载到共享库（跨项目复用）", { lib: key }) + integSuffix(res.integrity));
           void refresh();
         } else {
           setGradleBusyKey((m) => ({ ...m, [key]: "err:" + (res.error || "download failed") }));
@@ -756,7 +817,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         return;
       }
       // 浏览器回退（web 没有共享库概念，下到浏览器 Downloads；APK 不会走这里）
-      for (const url of urls) {
+      for (const url of orderBySecurity(urls)) {
         const r = await fetchBase64(url);
         if (!r.ok) continue;
         if (targetBase && native) {
@@ -773,7 +834,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       setGradleBusyKey((m) => ({ ...m, [key]: "err:" + tr("libs.cat_all_failed", "全部镜像下载失败（网络不通或源 404）") }));
       onNote?.(tr("libs.gradle_dl_fail", "{lib} 下载失败：全部镜像都试过了（网络不通或源 404）", { lib: key }));
     },
-    [localDir, native, onNote, tr, refresh, dlWithFallback],
+    [localDir, native, onNote, tr, refresh, dlWithFallback, integSuffix],
   );
 
   /** M345：一键下载（只下尚未下载、且不在本地库的） */

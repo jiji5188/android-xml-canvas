@@ -10,7 +10,7 @@
 // 纯函数，单测覆盖。
 
 import type { Lexicon, LexMethod } from "./lexicon";
-import type { SuggestKind } from "./suggest-kind";
+import { KIND_PRIORITY, type SuggestKind } from "./suggest-kind";
 
 export interface RankCtx {
   /** 当前文件里的方法/类/字段（最便宜、最先就绪） */
@@ -179,7 +179,15 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
   }
 
   // 排序 + 截断
-  const poolArr = [...pool.values()].sort((a, b) => b.score - a.score || a.text.localeCompare(b.text));
+  // M394：同分/同来源时按类型层级排（声明>变量>常量>类>方法）——仅无 receiver 的通用场景；
+  //   有 receiver 时是成员语义，保持分数 + 文本序即可（不拿类/关键词压方法）。
+  const kindTie = !ctx.receiverType;
+  const poolArr = [...pool.values()].sort(
+    (a, b) =>
+      b.score - a.score ||
+      (kindTie ? (KIND_PRIORITY[a.kind] ?? 6) - (KIND_PRIORITY[b.kind] ?? 6) : 0) ||
+      a.text.localeCompare(b.text),
+  );
   const cappedPool = poolArr.slice(0, poolCap);
   const ui = cappedPool.slice(0, uiCap);
   return { pool: cappedPool, ui };

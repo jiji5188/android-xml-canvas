@@ -7,7 +7,7 @@
 //
 // 纯数据 + 纯函数，方便单测；不做语义分析，只按前缀过滤 + 去重。
 
-import { extractJavaTokens, extractScopedSymbols, type SuggestKind } from "./suggest-kind";
+import { extractJavaTokens, extractScopedSymbols, KIND_PRIORITY, type SuggestKind } from "./suggest-kind";
 import { getLexStore } from "./lexicon";
 import { rankCandidates } from "./lexicon-rank";
 import type { Lexicon } from "./lexicon";
@@ -795,31 +795,52 @@ export function computeJavaSuggest(
 
   const lower = body.toLowerCase();
   const seen = new Set<string>();
-  const picked: { text: string; kind: SuggestKind; signature?: string }[] = [];
-  const push = (it: { text: string; kind: SuggestKind; signature?: string }) => {
-    const key = isAt ? it.text : it.text;
+  // M394：候选带「匹配档位」（0=完全相等 / 1=前缀开头 / 2=中间包含），
+  //   最后按 [档位, 类型层级] 排 —— 用户要的：声明 > 变量 > 常量 > 类 > 方法。
+  //   先全收再排再截断（否则 24 条上限会先被方法占满，关键词根本挤不进来）。
+  const cand: { text: string; kind: SuggestKind; signature?: string; tier: number; idx: number }[] = [];
+  let seq = 0;
+  const push = (it: { text: string; kind: SuggestKind; signature?: string }, tier: number) => {
     // M99：自己不要当候选（文档 token 会把刚打的半个词也扫进来）
     // M390：关键词豁免 —— 关键词来自静态表（不是从文档扫的），不会被半截词污染；
     //   不豁免的话 `if`/`do` 这种 2 字符关键词永远弹不出来（打 1 字符不够最短，打满 2 字符=完整词被跳过）
     if ((it.text === prefix || it.text === body) && it.kind !== "decl") return;
-    if (seen.has(key) || picked.length >= MAX_ITEMS) return;
-    seen.add(key);
-    picked.push(it);
+    if (seen.has(it.text)) return;
+    seen.add(it.text);
+    cand.push({ ...it, tier, idx: seq++ });
   };
-  // 第一轮只留「前缀开头」的（最常见的匹配），不够 6 条再补「包含」的
-  // M390：完全相等的先收（打满 int 应 int 在 interface 前；动态词会被 push 的自检跳过，实际只有关键词受惠）
+  // 第一轮：完全相等（M390：打满 int 应 int 在 interface 前）
   for (const it of pool) {
-    if (it.text.toLowerCase() === lower) push(it);
+    if (it.text.toLowerCase() === lower) push(it, 0);
   }
+  // 第二轮：前缀开头
   for (const it of pool) {
-    if (it.text.toLowerCase() !== lower && it.text.toLowerCase().startsWith(lower)) push(it);
+    const t = it.text.toLowerCase();
+    if (t !== lower && t.startsWith(lower)) push(it, 1);
   }
-  if (picked.length < 6) {
+  // 第三轮：不够 6 条才补「包含」
+  if (cand.length < 6) {
     for (const it of pool) {
-      if (!it.text.toLowerCase().startsWith(lower) && it.text.toLowerCase().includes(lower)) push(it);
+      const t = it.text.toLowerCase();
+      if (!t.startsWith(lower) && t.includes(lower)) push(it, 2);
     }
   }
-  if (picked.length === 0) return null;
+  if (cand.length === 0) return null;
+  // M394：档位 → 类型层级 → 原顺序（稳定）
+  //   注意：仅在「无 receiver」的通用词库场景按 声明>变量>常量>类>方法 排。
+  //   有 receiver（fn./obj.）时是「某类的成员」语义，必须维持方法优先（receiver 方法已被 unshift 到池最前），
+  //   否则打 fn.se 会先弹关键词 sealed、打 obj.to 会先弹类 Toast（实测回归）。
+  if (receiverType) {
+    cand.sort((a, b) => a.tier - b.tier || a.idx - b.idx);
+  } else {
+    cand.sort(
+      (a, b) =>
+        a.tier - b.tier ||
+        (KIND_PRIORITY[a.kind] ?? 6) - (KIND_PRIORITY[b.kind] ?? 6) ||
+        a.idx - b.idx,
+    );
+  }
+  const picked = cand.slice(0, MAX_ITEMS);
   const items = picked.map((p) => p.text);
   const kinds = picked.map((p) => p.kind);
   // M352 M3：第二行签名统一包成 (参数)（空参数显示 "()"，一眼看出是方法且无参）

@@ -235,3 +235,19 @@ export function classifyJavaWord(word: string): SuggestKind {
   if (w.startsWith("R.")) return "ref";
   return "method";
 }
+
+/**
+ * M394：候选词类型排序权重 —— 用户要的层级：声明 > 变量 > 常量 > 类 > 方法。
+ * 同一匹配质量档内，kindPriority 小的排前面。数字越小越靠前。
+ * decl(关键字/声明) 0 → var(变量) 1 → const(常量) 2 → class(类) 3 → method(方法) 4 → 其余 5
+ */
+export const KIND_PRIORITY: Record<SuggestKind, number> = {
+  decl: 0,
+  var: 1,
+  const: 2,
+  class: 3,
+  method: 4,
+  ref: 5,
+  prop: 5,
+  plain: 6,
+};

@@ -30,6 +30,78 @@ import { ColorField } from "./ColorField";
 import { PluginPanel } from "./PluginPanel";
 import type { PluginEnabledMap } from "@/lib/plugin/store";
 import type { InstalledPlugin } from "@/lib/plugin/installer";
+import { checkPluginUpdate } from "@/lib/plugin/updates";
+
+/** M376：已安装第三方插件单行（带检查更新 / 更新） */
+function InstalledPluginRow({
+  pl,
+  onInstall,
+}: {
+  pl: InstalledPlugin;
+  onInstall: (manifestUrl: string) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const [canUpdate, setCanUpdate] = useState(false);
+
+  const check = async () => {
+    if (!pl.manifestUrl) {
+      setNote(tt("缺少 manifest 地址，无法检查更新"));
+      return;
+    }
+    setBusy(true);
+    setNote("");
+    const r = await checkPluginUpdate(pl.id, pl.version, pl.manifestUrl);
+    setBusy(false);
+    if (r.error) {
+      setCanUpdate(false);
+      setNote(tt("检查失败：{e}", { e: r.error }));
+      return;
+    }
+    if (r.hasUpdate) {
+      setCanUpdate(true);
+      setNote(tt("发现新版本 v{v}", { v: r.latest || "?" }));
+    } else {
+      setCanUpdate(false);
+      setNote(tt("已是最新版本 v{v}", { v: r.current }));
+    }
+  };
+
+  const doUpdate = async () => {
+    if (!pl.manifestUrl) return;
+    setBusy(true);
+    setNote(tt("更新中…"));
+    try {
+      await onInstall(pl.manifestUrl);
+      setCanUpdate(false);
+      setNote(tt("已更新到最新版"));
+    } catch (e) {
+      setNote(tt("更新失败：{e}", { e: (e as Error)?.message || "?" }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="axv-installed-item">
+      <b>{pl.name}</b>
+      <span className="axv-plugin-id">{pl.id} {pl.version ? "v" + pl.version : ""}</span>
+      {note ? (
+        <span className="axv-plugin-id" style={{ fontSize: 10, color: canUpdate ? "#b26a00" : undefined }}>
+          {note}
+        </span>
+      ) : null}
+      <button type="button" className="axv-plugin-check" disabled={busy} onClick={() => void check()}>
+        {busy ? tt("检查中…") : tt("检查更新")}
+      </button>
+      {canUpdate ? (
+        <button type="button" className="axv-plugin-check" disabled={busy} onClick={() => void doUpdate()}>
+          {tt("更新")}
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 export interface SettingsPanelProps {
   tr: (key: string, fallback: string) => string;
@@ -639,10 +711,7 @@ export function SettingsPanel(p: SettingsPanelProps) {
           <div className="axv-installed">
             <b>{tt("已安装第三方插件")}</b>
             {p.installedPlugins.map((pl) => (
-              <div key={pl.id} className="axv-installed-item">
-                <b>{pl.name}</b>
-                <span className="axv-plugin-id">{pl.id} {pl.version ? "v" + pl.version : ""}</span>
-              </div>
+              <InstalledPluginRow key={pl.id} pl={pl} onInstall={p.onInstallPlugin} />
             ))}
           </div>
         ) : null}

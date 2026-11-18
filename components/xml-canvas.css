@@ -5008,6 +5008,26 @@ body.axv-lt-dragging .axv-lt-row {
   accent-color: var(--axv-primary);
   cursor: pointer;
 }
+/* M376：插件项「检查更新」按钮 */
+.axv-plugin-check {
+  flex: none;
+  font-size: 11px;
+  padding: 3px 9px;
+  border: 1px solid var(--axv-outline);
+  border-radius: 6px;
+  background: var(--axv-surface);
+  color: var(--axv-on-surface-variant);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.axv-plugin-check:hover:not(:disabled) {
+  border-color: var(--axv-primary);
+  color: var(--axv-primary);
+}
+.axv-plugin-check:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 
 /* M234：安装第三方插件 */
 .axv-plugin-install {

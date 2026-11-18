@@ -36,6 +36,8 @@ export interface RankItem {
   isDeprecated?: boolean;
   /** 废弃替代 */
   alt?: string;
+  /** M396：修饰符（"public static" / "private"…），候选第二行展示 */
+  mod?: string;
   score: number;
   /** 来源（debug / 分组） */
   source: "current" | "project" | "sdk" | "third" | "jdk" | "resource";
@@ -102,8 +104,17 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
         const merged = { ...existing, ...extra, score } as RankItem;
         // M352 M3：新条目没带签名时，别把已有的第二行签名抹掉
         if (!extra?.signature) merged.signature = existing.signature;
+        // M396：新条目没带修饰符时别抹掉已有的
+        if (!extra?.mod) merged.mod = existing.mod;
         if (!extra?.originClass) merged.originClass = existing.originClass;
         pool.set(text, merged);
+      } else {
+        // M396：低分条目也把修饰符/签名补给已有条目（current 先进池没 mod，project 后进有 mod）
+        if (extra?.mod && !existing.mod) {
+          existing.mod = extra.mod;
+          if (extra.signature && !existing.signature) existing.signature = extra.signature;
+          pool.set(text, { ...existing });
+        }
       }
     } else {
       pool.set(text, {
@@ -115,6 +126,7 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
         signature: extra?.signature,
         isDeprecated: extra?.isDeprecated,
         alt: extra?.alt,
+        mod: extra?.mod,
       });
     }
   };
@@ -128,14 +140,15 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
   // 2) 项目（继承/接口合并后的方法；receiverType 能认出就按该类过滤）
   const lex = ctx.lex;
   // 方法名 → 废弃标记 + 签名（从 methods 里扫一遍，用于「无 receiver 走全项目方法名」时带第二行/废弃标记）
-  const depByName = new Map<string, { alt?: string; sig?: string; dep?: boolean }>();
+  const depByName = new Map<string, { alt?: string; sig?: string; dep?: boolean; mod?: string }>();
   for (const arr of lex.methods.values()) {
     for (const m of arr) {
       const cur = depByName.get(m.name);
       // 保留首个签名（非空优先），废弃标记任意一个为真即可
-      if (!cur) depByName.set(m.name, { alt: m.alt, sig: m.signature, dep: m.isDeprecated });
+      if (!cur) depByName.set(m.name, { alt: m.alt, sig: m.signature, dep: m.isDeprecated, mod: m.mod });
       else {
         if (!cur.sig && m.signature) cur.sig = m.signature;
+        if (!cur.mod && m.mod) cur.mod = m.mod;
         if (m.isDeprecated) {
           cur.dep = true;
           if (!cur.alt) cur.alt = m.alt;
@@ -152,13 +165,14 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
         signature: m.signature,
         isDeprecated: m.isDeprecated,
         alt: m.alt,
+        mod: m.mod,
       });
     }
   } else {
     // 没 receiver：全项目方法名（去重），带签名（第二行）+ 废弃标记
     for (const name of lex.allMethodNames) {
       const d = depByName.get(name);
-      add(name, "method", "project", { isDeprecated: !!d?.dep, alt: d?.alt, signature: d?.sig });
+      add(name, "method", "project", { isDeprecated: !!d?.dep, alt: d?.alt, signature: d?.sig, mod: d?.mod });
     }
     // 项目类名
     for (const c of lex.classes.values()) add(c.name, "class", "project", { isDeprecated: c.isDeprecated });

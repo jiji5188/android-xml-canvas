@@ -481,6 +481,28 @@ export function methodsForType(type: string): string[] {
   return arr ? [...arr] : [];
 }
 
+/** M396：整个类都是静态方法的类型 */
+const ALL_STATIC_TYPES = new Set(["Math", "Collections", "Arrays"]);
+/** M396：已知的静态方法（`类型.方法`）—— 其余按实例方法（public） */
+const STATIC_TYPE_METHODS = new Set([
+  "Toast.makeText",
+  "Log.d", "Log.e", "Log.i", "Log.v", "Log.w",
+  "String.valueOf", "String.format",
+  "Integer.parseInt", "Integer.valueOf",
+  "Long.parseLong", "Long.valueOf",
+  "Double.parseDouble", "Double.valueOf",
+  "Uri.parse", "Uri.fromFile",
+  "Bitmap.createBitmap",
+  "Thread.sleep", "Thread.currentThread",
+  "Context.getSystemService",
+]);
+
+/** M396：SDK 类型方法的修饰符（成员列表展示用）。SDK 方法默认 public；静态的补充 static */
+export function modForTypeMethod(type: string, name: string): string {
+  if (ALL_STATIC_TYPES.has(type) || STATIC_TYPE_METHODS.has(type + "." + name)) return "public static";
+  return "public";
+}
+
 /** M391：按「接收者类型」给的公开常量/字段表（`fn.VISIBLE` / `ll.VERTICAL` 之类）。
  *  只收高频的几个；每个类几个到十几个，避免表爆炸。
  *  这些是 static 常量，作为字段（var 类）进候选，kind 仍按 const。 */
@@ -513,15 +535,15 @@ export function constantsForType(type: string): string[] {
 export function resolveTypeMethodsFromLex(
   lex: Lexicon | null | undefined,
   type: string,
-): { name: string; signature?: string; isDeprecated: boolean }[] {
+): { name: string; signature?: string; isDeprecated: boolean; mod?: string }[] {
   if (!lex || !type) return [];
-  const out: { name: string; signature?: string; isDeprecated: boolean }[] = [];
+  const out: { name: string; signature?: string; isDeprecated: boolean; mod?: string }[] = [];
   const seen = new Set<string>();
   const walk = (c: string, depth: number): void => {
     if (depth > 8 || seen.has(c)) return;
     seen.add(c);
     const ms = lex.methods.get(c);
-    if (ms) for (const m of ms) out.push({ name: m.name, signature: m.signature, isDeprecated: !!m.isDeprecated });
+    if (ms) for (const m of ms) out.push({ name: m.name, signature: m.signature, isDeprecated: !!m.isDeprecated, mod: m.mod });
     const cls = lex.classes.get(c);
     if (cls) for (const p of [...cls.parents, ...cls.interfaces]) walk(p, depth + 1);
   };
@@ -734,15 +756,21 @@ export function computeJavaSuggest(
   //   直接按 receiver 类型列「公开方法 + 公开常量/字段」，不掺入全局/当前文件的泛用池，
   //   避免一上来弹一堆无关项目方法。1 字符时按前缀过滤，空时全列（限 24）。
   if (memberMode && receiverType) {
-    const items: { text: string; kind: SuggestKind; signature?: string }[] = [];
+    const items: { text: string; kind: SuggestKind; signature?: string; mod?: string }[] = [];
     const p = body.toLowerCase();
     const want = (t: string) => !p || t.toLowerCase().startsWith(p);
-    for (const m of methodsForType(receiverType)) if (want(m)) items.push({ text: m, kind: "method", signature: "" });
-    for (const c of constantsForType(receiverType)) if (want(c)) items.push({ text: c, kind: "const" });
+    for (const m of methodsForType(receiverType))
+      if (want(m)) items.push({ text: m, kind: "method", signature: "", mod: modForTypeMethod(receiverType, m) });
+    for (const c of constantsForType(receiverType)) if (want(c)) items.push({ text: c, kind: "const", mod: "public static" });
     // 项目词库里该类的方法（继承/接口）也并进来，排在 JDK 表后面
     for (const m of resolveTypeMethodsFromLex(lex, receiverType)) {
       if (want(m.name) && !items.some((x) => x.text === m.name))
-        items.push({ text: m.name, kind: "method", signature: (m.isDeprecated ? "@Deprecated " : "") + (m.signature ?? "") });
+        items.push({
+          text: m.name,
+          kind: "method",
+          signature: (m.isDeprecated ? "@Deprecated " : "") + (m.signature ?? ""),
+          mod: m.mod ?? "public",
+        });
     }
     if (items.length === 0) return null;
     const picked = items.slice(0, MAX_ITEMS);
@@ -753,7 +781,15 @@ export function computeJavaSuggest(
       kind: picked[0].kind,
       items: picked.map((x) => x.text),
       kinds: picked.map((x) => x.kind),
-      subs: picked.map((x) => (x.kind === "method" ? "(" + (x.signature ?? "") + ")" : undefined)),
+      // M396：第二行 = (参数) + 修饰符，如 `(String msg) · public static`
+      subs: picked.map(
+        (x) =>
+          x.kind === "method"
+            ? "(" + (x.signature ?? ")") + ")" + (x.mod ? " · " + x.mod : "")
+            : x.kind === "const" && x.mod
+              ? x.mod
+              : undefined,
+      ),
     };
   }
 
@@ -762,8 +798,8 @@ export function computeJavaSuggest(
   const tok = extractJavaTokens(doc);
   // M389：作用域感知 —— 当前方法体内的局部变量 + 类成员（字段/常量）
   const scoped = extractScopedSymbols(doc, offset);
-  // M352 M3：候选条目带归属签名（第二行）
-  const pool: { text: string; kind: SuggestKind; signature?: string }[] = [];
+  // M352 M3：候选条目带归属签名（第二行）；M396：再带修饰符（静态/公开/私有）
+  const pool: { text: string; kind: SuggestKind; signature?: string; mod?: string }[] = [];
   const addAll = (words: string[], kind: SuggestKind) => {
     for (const w of words) pool.push({ text: w, kind });
   };
@@ -781,13 +817,13 @@ export function computeJavaSuggest(
         receiver,
       }, { recency });
       for (const it of ranked.ui) {
-        pool.push({ text: it.text, kind: it.kind === "const" ? "const" : it.kind, signature: it.signature });
+        pool.push({ text: it.text, kind: it.kind === "const" ? "const" : it.kind, signature: it.signature, mod: it.mod });
       }
       // M389：receiver 类型能认出且是 SDK 类（词库只有项目类）→ 把该类的高频成员方法并进池子，
       //   插到 pool 最前（比宽池子更准）。`titleView.` → setText/getText 排最前。
       if (receiverType && receiver !== "this") {
         const recv = methodsForType(receiverType);
-        for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method", signature: "" });
+        for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method", signature: "", mod: modForTypeMethod(receiverType, m) });
         pool.unshift({ text: receiverType, kind: "class" });
       }
       // JDK 类型 + 关键字兜底（词库没覆盖的基础类型）
@@ -814,7 +850,7 @@ export function computeJavaSuggest(
       if (receiverType && receiver !== "this") {
         const recv = methodsForType(receiverType);
         // 逆序 unshift，保持原数组顺序（setText 在数组前 → 排在前）
-        for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method" });
+        for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method", mod: modForTypeMethod(receiverType, m) });
         pool.unshift({ text: receiverType, kind: "class" });
       }
     }
@@ -825,9 +861,9 @@ export function computeJavaSuggest(
   // M394：候选带「匹配档位」（0=完全相等 / 1=前缀开头 / 2=中间包含），
   //   最后按 [档位, 类型层级] 排 —— 用户要的：声明 > 变量 > 常量 > 类 > 方法。
   //   先全收再排再截断（否则 24 条上限会先被方法占满，关键词根本挤不进来）。
-  const cand: { text: string; kind: SuggestKind; signature?: string; tier: number; idx: number }[] = [];
+  const cand: { text: string; kind: SuggestKind; signature?: string; mod?: string; tier: number; idx: number }[] = [];
   let seq = 0;
-  const push = (it: { text: string; kind: SuggestKind; signature?: string }, tier: number) => {
+  const push = (it: { text: string; kind: SuggestKind; signature?: string; mod?: string }, tier: number) => {
     // M99：自己不要当候选（文档 token 会把刚打的半个词也扫进来）
     // M390：关键词豁免 —— 关键词来自静态表（不是从文档扫的），不会被半截词污染；
     //   不豁免的话 `if`/`do` 这种 2 字符关键词永远弹不出来（打 1 字符不够最短，打满 2 字符=完整词被跳过）
@@ -877,6 +913,9 @@ export function computeJavaSuggest(
   const items = picked.map((p) => p.text);
   const kinds = picked.map((p) => p.kind);
   // M352 M3：第二行签名统一包成 (参数)（空参数显示 "()"，一眼看出是方法且无参）
-  const subs = picked.map((p) => (p.signature !== undefined ? "(" + p.signature + ")" : undefined));
+  // M396：带修饰符的再追加 " · 修饰符"，如 `(CharSequence text) · public` / `(int i) · private static`
+  const subs = picked.map((p) =>
+    p.mod ? "(" + (p.signature ?? "") + ")" + " · " + p.mod : p.signature !== undefined ? "(" + p.signature + ")" : undefined,
+  );
   return { line: cursor.line, col, prefix, kind: kinds[0] ?? "plain", items, kinds, subs };
 }

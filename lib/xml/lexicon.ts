@@ -35,6 +35,8 @@ export interface LexMethod {
   isDeprecated?: boolean;
   /** 废弃替代（@Deprecated("use X") / javadoc 抽出来的） */
   alt?: string;
+  /** M396：修饰符串（如 "public static" / "private" / "abstract"），候选第二行展示 */
+  mod?: string;
 }
 
 /** 词库里「类」的一条记录 */
@@ -325,6 +327,17 @@ const JAVA_KEYWORDS_SET = new Set([
   "package", "import", "extends", "implements", "break", "continue", "finally", "class",
 ]);
 
+/** M396：从声明行前缀（方法名之前的部分）提取修饰符。无修饰符返回 undefined（包私有默认不标） */
+function modsOf(linePrefix: string): string | undefined {
+  const mods: string[] = [];
+  if (/\bpublic\b/.test(linePrefix)) mods.push("public");
+  else if (/\bprivate\b/.test(linePrefix)) mods.push("private");
+  else if (/\bprotected\b/.test(linePrefix)) mods.push("protected");
+  if (/\bstatic\b/.test(linePrefix)) mods.push("static");
+  if (/\babstract\b/.test(linePrefix)) mods.push("abstract");
+  return mods.length ? mods.join(" ") : undefined;
+}
+
 function parseJavaMethods(code: string, classNames: Set<string>, pkg: string, source: LexSource): Map<string, LexMethod[]> {
   const out = new Map<string, LexMethod[]>();
   const add = (cls: string, m: LexMethod) => {
@@ -353,7 +366,10 @@ function parseJavaMethods(code: string, classNames: Set<string>, pkg: string, so
     // @Deprecated
     const prelude = code.slice(Math.max(0, at - 140), at);
     const isDep = /@Deprecated/.test(prelude);
-    add(cls, { name, originClass: cls, signature: sig, isDeprecated: isDep || undefined });
+    // M396：修饰符 —— 只看方法名所在行的前缀（跨行声明取不到，宁缺勿错）
+    const lineStart = code.lastIndexOf("\n", at - 1) + 1;
+    const mod = modsOf(code.slice(lineStart, at));
+    add(cls, { name, originClass: cls, signature: sig, isDeprecated: isDep || undefined, mod });
     void pkg;
   }
   return out;
@@ -427,7 +443,10 @@ function parseKotlinMethods(code: string, classNames: Set<string>, pkg: string, 
     const cls = receiver || (braceDepthAt(code, m.index!) === 0 ? topLevelName : nearestClass(name, m.index!, classNames, code));
     const prelude = code.slice(Math.max(0, m.index! - 140), m.index!);
     const isDep = /@Deprecated/.test(prelude);
-    add(cls, { name, originClass: cls, signature: sig, isDeprecated: isDep || undefined });
+    // M396：修饰符（Kotlin：可见性 + 静态归 companion 不展开，宁缺勿错）
+    const lineStartK = code.lastIndexOf("\n", m.index! - 1) + 1;
+    const modK = modsOf(code.slice(lineStartK, m.index!));
+    add(cls, { name, originClass: cls, signature: sig, isDeprecated: isDep || undefined, mod: modK });
   }
 
   // val/var 字段

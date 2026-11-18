@@ -14,6 +14,7 @@ import { parseGradlePackage } from "@/lib/xml/project-info";
 import { packageOf } from "@/lib/xml/new-project";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { injectMissingManifestIcons } from "@/lib/xml/icon-fallback";
+import { missingGradleEntities, formatMissingList } from "@/lib/xml/pre-build-check";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { buildResNameIndex, missingResourceRefs, collectExternalImports, missingLibPackages, stubMissingRefs } from "@/lib/xml/resource-refs";
@@ -351,6 +352,30 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
                 { l: top, more: missLibs.length > 10 ? `（还有 ${missLibs.length - 10} 个）` : "" }) +
                 "\n" +
                 tt("请把这些依赖的 jar 放进项目 libs/ 目录再打包。", {}),
+              undefined, undefined, undefined, "info");
+          }
+          // M382：编译前检查①——按引用补齐后仍缺的资源（aapt2 必报 not found 的那些）。
+          //  已注入的默认图标不算缺（iconFix 补过了）。
+          const injectedKeys = new Set(iconFix.injected.map((s) => s.slice(1)));
+          const resMissing = (Array.isArray(collected.missing) ? collected.missing : [])
+            .filter((k) => !injectedKeys.has(k));
+          if (resMissing.length) {
+            const f = formatMissingList(resMissing);
+            pushBuildLog(true, tt("编译前检查：缺失资源"),
+              tt("这些资源被引用但项目里收集不到（打包会报 not found；若实际来自依赖库可忽略）：{l}{more}",
+                { l: f.shown, more: f.more > 0 ? `（还有 ${f.more} 个）` : "" }),
+              undefined, undefined, undefined, "info");
+          }
+          // M382：编译前检查②——gradle 声明的 maven 坐标必须有本地实体（设备端没有 maven）。
+          //  缺实体的包编译时必报 package does not exist（2026-11-18 cardview 事故）。
+          const missDeps = missingGradleEntities(gradlePkg, allBuildLibs.map((l) => l.rel));
+          if (missDeps.length) {
+            const f = formatMissingList(missDeps.map((d) => `${d.coord}（${d.fname}）`), 10);
+            pushBuildLog(true, tt("编译前检查：依赖缺实体"),
+              tt("build.gradle 声明了这些依赖，但项目 libs/共享库里没有对应的 jar/aar：{l}{more}",
+                { l: f.shown, more: f.more > 0 ? `（还有 ${f.more} 个）` : "" }) +
+              "\n" +
+              tt("缺实体的包编译时会报 package does not exist；去「lib 库管理 → 一键下载」补齐后再打包。", {}),
               undefined, undefined, undefined, "info");
           }
         } catch (e) { /* 预检查失败不阻断 */ }

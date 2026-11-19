@@ -1001,11 +1001,17 @@ export function addExcludesToGradle(
   );
 
   if (!braceOnSameLine) {
-    // M433b：把 { 补在依赖行行尾（Groovy/Kotlin 都要求块开在语句同行，
-    //  旧写法插独立一行 " {" → implementation 'x' + 换行 { } 是非法语法，
-    //  会在 build.gradle 里留下裸块（用户实测踩到））
-    lines[idx] = depLine.replace(/\s+$/, "") + " {";
-    lines.splice(idx + 1, 0, ...exLines, "}");
+    // M434：统一改写成用户期望的括号形式（与 M430 fixture 一致）：
+    //   groovy: implementation ('g:a:v') {   （带括号，可接 { } 块）
+    //   kts:    implementation("g:a:v") {
+    //  旧写法 append " {" 到无括号行 → implementation 'g:a:v' {（也合法，但和现有文件里
+    //  带括号的 fixture/旧文件不一致，且用户明确要求括号形式）。保留原 config 类型 + 缩进。
+    const m2 = depLine.match(/^(\s*)(implementation|api|compile|compileOnly|runtimeOnly)\s*\(?/);
+    const indent = m2 ? m2[1] : "    ";
+    const cfg = m2 ? m2[2] : "implementation";
+    if (kts) lines[idx] = `${indent}${cfg}("${coord}") {`;
+    else lines[idx] = `${indent}${cfg} ('${coord}') {`;
+    lines.splice(idx + 1, 0, ...exLines, kts ? "    }" : "}");
   } else {
     // 已有 { 块 → 在块内（下一行）插 exclude（在 } 之前）
     lines.splice(idx + 1, 0, ...exLines);

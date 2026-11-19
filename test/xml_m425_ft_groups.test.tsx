@@ -129,6 +129,41 @@ function mountLibsConf() {
   return render(<LibsPanel aiFileIo={mockIo(APP_BUILD_CONFLICT)} onNote={() => {}} tr={tr} />);
 }
 
+function mountLibsDir(appBuildText?: string, files?: Record<string, AiFileEntry[]>) {
+  const io: AiFileIo = {
+    rootLabel: () => "TestProject",
+    async list(rel: string) {
+      if (files && files[rel]) return { ok: true, items: files[rel] };
+      if (rel === "app/src/main/libs") return { ok: true, items: [{ name: "std-lib.jar", kind: "file", rel: "app/src/main/libs/std-lib.jar" }] };
+      return { ok: false, error: "no dir" };
+    },
+    async read(rel: string) {
+      if (rel === "app/build.gradle") return { ok: true, text: appBuildText ?? APP_BUILD };
+      return { ok: false, error: "no file" };
+    },
+    async write() { return { ok: false, error: "test mock" }; },
+  };
+  return render(<LibsPanel aiFileIo={io} onNote={() => {}} tr={tr} />);
+}
+
+describe("M434 fileTree 指向标准目录时文件归属正确", () => {
+  it("fileTree(dir: 'src/main/libs') → 标准目录文件进 fileTree 组，不进标准目录列表", async () => {
+    const ftBuild = `plugins { id 'com.android.application' }
+dependencies {
+    implementation fileTree(dir: 'src/main/libs', include: ['*.jar', '*.aar'])
+}`;
+    const c = mountLibsDir(ftBuild);
+    fireEvent.click(c.getByText("项目库"));
+    // 等 fileTree 组头出现（库目录 · src/main/libs）
+    await waitFor(() => expect(c.container.textContent).toContain("库目录 · src/main/libs"), { timeout: 3000 });
+    // 展开 fileTree 组 → 标准目录的 std-lib.jar 应进该组（归属修正）
+    fireEvent.click(c.container.querySelector('[title="src/main/libs"]')!);
+    await waitFor(() => expect(c.container.textContent).toContain("std-lib.jar"));
+    // 标准目录列表不再单独列它（被 fileTree 认领）
+    expect(c.container.textContent).not.toContain("标准目录（app/src/main/libs 等）");
+  });
+});
+
 describe("M425 标准目录 + 顶部按钮", () => {
   it("标准目录文件直接列出 + 列表底部无新建库目录按钮（M431 改到菜单）+ 顶部无平铺库目录按钮", async () => {
     const c = await gotoProjectTab();

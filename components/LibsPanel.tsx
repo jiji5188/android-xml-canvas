@@ -279,8 +279,16 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       if (!d) return;
       const rels = /^app(\/|$)/.test(d) ? [d] : [`app/${d}`, d];
       for (const rel of rels) {
-        if (out.some((c) => c.rel === rel)) continue;
-        out.push({ rel, abs: root ? `${root}/${rel}` : null, includes: ft.includes, ftIdx });
+        // M434：fileTree 指向标准目录（如 src/main/libs → app/src/main/libs）时，
+        // 原去重逻辑直接跳过 → 该目录文件被标成标准（src=app/src/main/libs，无 ftIdx），
+        // fileTree 组永远收不到文件。改为「升级」已有候选的 ftIdx/includes，让归属正确。
+        const ex = out.find((c) => c.rel === rel);
+        if (ex) {
+          ex.ftIdx = ftIdx;
+          ex.includes = ft.includes;
+        } else {
+          out.push({ rel, abs: root ? `${root}/${rel}` : null, includes: ft.includes, ftIdx });
+        }
       }
     });
     if (root) out[0].abs = `${root}/app/src/main/libs`;

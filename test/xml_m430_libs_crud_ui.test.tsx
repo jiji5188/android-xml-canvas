@@ -169,7 +169,7 @@ describe("M430 右键菜单", () => {
     await waitFor(() => expect(ioWrites.length).toBeGreaterThan(0));
     const written = ioWrites[ioWrites.length - 1];
     expect(written).toContain("exclude group: 'com.example', module: 'bad-module'");
-    expect(written).toMatch(/jxl:2\.6\.12'\s*\{/);
+    expect(written).toMatch(/jxl:2\.6\.12'\)\s*\{/); // M434：带括号形式 implementation ('g:a:v') {
   });
 
   it("fileTree 组头右键 → 菜单含 编辑库目录/新建库目录/移除；弹菜单后 click 不折叠", async () => {

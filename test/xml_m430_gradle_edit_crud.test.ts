@@ -30,13 +30,13 @@ const USER = [
 ].join("\n");
 
 describe("M433b addExcludesToGradle 单行依赖必须把 { 补在行尾", () => {
-  it("groovy：单行依赖 → 行尾加 { ，不留裸块", () => {
+  it("groovy：单行依赖 → 改写成带括号形式 implementation ('g:a:v') { ，不留裸块", () => {
     const [out, ok] = addExcludesToGradle(USER, { group: "androidx.appcompat", name: "appcompat", version: "1.0.0" }, [{ group: "androidx", module: "core" }], false);
     expect(ok).toBe(true);
     const lines = out.split("\n");
     const appIdx = lines.findIndex((l) => l.includes("appcompat:1.0.0"));
-    // 依赖行本身必须以 { 结尾
-    expect(lines[appIdx].trim().endsWith("{")).toBe(true);
+    // 依赖行被改写成带括号的 implementation ('...') {（用户期望格式）
+    expect(lines[appIdx].trim()).toBe("implementation ('androidx.appcompat:appcompat:1.0.0') {");
     // 紧跟 exclude，再收 }，中间不能有裸的 "{" 独立行
     expect(lines[appIdx + 1].trim()).toBe("exclude group: 'androidx', module: 'core'");
     expect(lines[appIdx + 2].trim()).toBe("}");

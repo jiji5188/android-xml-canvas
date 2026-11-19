@@ -576,6 +576,23 @@ export function insertImplementation(
   return [text.replace(/\s*$/, "") + "\n" + block, false];
 }
 
+/** M424：把 coord 对应的依赖声明行从 build.gradle 文本里整行删掉。
+ *  认 implementation|api|compile|compileOnly|runtimeOnly|testImplementation|androidTestImplementation，
+ *  groovy（implementation 'g:a:v'）和 kts（implementation("g:a:v")）都认，行尾单行注释也一起删。
+ *  返回 [新文本, 是否删了]。 */
+export function removeImplementation(text: string, coord: string): [string, boolean] {
+  const esc = coord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(
+    "^[ \\t]*(?:implementation|api|compile|compileOnly|runtimeOnly|testImplementation|androidTestImplementation)\\s*\\(?\\s*[\"']" +
+      esc +
+      "[\"']\\s*\\)?[ \\t]*(?://.*)?\\r?\\n?",
+    "m",
+  );
+  const m = text.match(re);
+  if (!m) return [text, false];
+  return [text.replace(re, ""), true];
+}
+
 /** 把仓库 url 追加进 repositories 块（没有就建）。返回 [新文本, 是否已存在]。 */
 export function insertRepoUrl(
   text: string,

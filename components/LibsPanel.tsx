@@ -20,6 +20,7 @@ import {
   insertImplementation,
   insertRepoUrl,
   mavenCoord,
+  removeImplementation,
   type GradleDep,
   type GradleUnresolved,
   type GradleFileTree,
@@ -110,6 +111,65 @@ async function listDirViaIo(io: AiFileIo, rel: string): Promise<LibFile[]> {
     }
   }
   return out;
+}
+
+/** M424：模块级读写 helper（applyMaven / removeFromProject 共用）。
+ *  native writeText 走 b64（防中文乱码）；aiFileIo 是 async，直写文本。读不到返回空串，写失败返回 false。 */
+async function readOneVia(
+  rel: string,
+  abs: string,
+  native: ReturnType<typeof nativeBridge>,
+  aiFileIo?: AiFileIo | null,
+): Promise<string> {
+  if (native?.readText) {
+    try { const t = String(native.readText?.(abs) ?? ""); if (t && !t.startsWith("err:")) return t; } catch {}
+  }
+  if (aiFileIo?.read) {
+    try { const r = await aiFileIo.read(rel); if (r.ok && r.text) return r.text; } catch {}
+  }
+  return "";
+}
+
+async function writeOneVia(
+  rel: string,
+  abs: string,
+  text: string,
+  native: ReturnType<typeof nativeBridge>,
+  aiFileIo?: AiFileIo | null,
+): Promise<boolean> {
+  if (native?.writeText) {
+    try {
+      const b64 = btoa(unescape(encodeURIComponent(text)));
+      const r = String(native.writeText?.(abs, b64) ?? "");
+      if (r && !r.startsWith("err:")) return true;
+    } catch {}
+  }
+  if (aiFileIo?.write) {
+    try {
+      const r = await aiFileIo.write(rel, text);
+      return r.ok;
+    } catch {}
+  }
+  return false;
+}
+
+/** M424：移除结果 → 提示条目（纯函数，可单测）。
+ *  四象限：
+ *   - 成功（含「本来就没文件只有声明」）：删了能删的 → remove_done
+ *   - 文件删了但声明没删成功：remove_decl_fail（提示可手动删）
+ *   - 声明删了但文件没删成：remove_decl_only
+ *   - 都没删成：remove_fail
+ *  ok = 是否要 refresh（前三种都算部分/全部成功，刷新列表现状） */
+export function removeNoteKind(o: {
+  hadFile: boolean; fileOk: boolean; declWanted: boolean; declRemoved: boolean; lastErr: string; declErr: string;
+}): { key: string; fallback: string; vars: Record<string, string>; ok: boolean } {
+  if ((o.fileOk || !o.hadFile) && (o.declRemoved || !o.declWanted))
+    return { key: "libs.remove_done", fallback: "{lib} 已从项目移除", vars: {}, ok: true };
+  if (o.fileOk && o.declWanted)
+    return { key: "libs.remove_decl_fail", fallback: "{lib} 文件已删除，但依赖声明删除失败（可在 build.gradle 里手动删 {where}）", vars: { where: o.declErr || "dependencies" }, ok: true };
+  if (o.declRemoved)
+    return { key: "libs.remove_decl_only", fallback: "{lib} 依赖声明已从 build.gradle 删除，但文件删除失败：{err}", vars: { err: o.lastErr }, ok: true };
+  return { key: "libs.remove_fail", fallback: "{lib} 移除失败：{err}", vars: { err: o.lastErr || o.declErr || "?" }, ok: false };
 }
 
 export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr }: LibsPanelProps) {
@@ -572,34 +632,11 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         return;
       }
       const root = nativeProjectRoot.replace(/[\\/]+$/, "");
-      const writeOne = async (rel: string, abs: string, text: string): Promise<boolean> => {
-        if (native?.writeText) {
-          try {
-            const b64 = btoa(unescape(encodeURIComponent(text)));
-            const r = String(native.writeText?.(abs, b64) ?? "");
-            if (r && !r.startsWith("err:")) return true;
-          } catch {}
-        }
-        if (aiFileIo?.write) {
-          try {
-            const r = await aiFileIo.write(rel, text);
-            return r.ok;
-          } catch {}
-        }
-        return false;
-      };
-      const readOne = async (rel: string, abs: string): Promise<string> => {
-        if (native?.readText) {
-          try { const t = String(native.readText?.(abs) ?? ""); if (t && !t.startsWith("err:")) return t; } catch {}
-        }
-        if (aiFileIo?.read) {
-          try { const r = await aiFileIo.read(rel); if (r.ok && r.text) return r.text; } catch {}
-        }
-        return "";
-      };
-
       setApplyBusy((m) => ({ ...m, [libName]: "maven" }));
       try {
+        // M424：读写改用模块级 helper（readOneVia/writeOneVia），逻辑同 removeFromProject
+        const writeOne = (rel: string, abs: string, text: string) => writeOneVia(rel, abs, text, native, aiFileIo);
+        const readOne = (rel: string, abs: string) => readOneVia(rel, abs, native, aiFileIo);
         // 1) app/build.gradle（groovy 优先，kts 兑底）
         let appRel = "app/build.gradle";
         let appText = await readOne(appRel, root + "/" + appRel);
@@ -641,14 +678,40 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     [nativeProjectRoot, native, aiFileIo, onNote, tr, refresh],
   );
 
-  /** 从项目移除：依次试 标准 + 旧 libs 目录，删到哪个算哪个（项目库可能来自三处任一个） */
+  /** M424：从项目完整移除 = ① 删 build.gradle 依赖声明（有对应依赖时）→ ② 删 libs 目录里的实体文件。
+   *  项目库三类条目都走这里：gradle 依赖行直接传 dep；文件行按文件名（artifact-version.ext）反查 gradleDeps。
+   *  文件删除依次试 标准 app/src/main/libs + fileTree 目录 + 兕底 项目根/libs（项目库可能来自三处任一个）。 */
   const removeFromProject = useCallback(
-    (name: string) => {
+    async (name: string, dep?: GradleDep) => {
       if (!nativeProjectRoot || !native) return;
+      const root = nativeProjectRoot.replace(/[\\/]+$/, "");
+
+      // ① 依赖声明：gradle 行传 dep；文件行按文件名反查（material-1.12.0.aar ↔ group:name:version）
+      const target = dep ?? gradleDeps.find((d) => gradleDepFname(d) === name);
+      let declRemoved = false;
+      let declErr = "";
+      if (target) {
+        const coord = `${target.group}:${target.name}:${target.version}`;
+        const rels = ["app/build.gradle", "app/build.gradle.kts", "build.gradle", "build.gradle.kts"];
+        for (const rel of rels) {
+          const abs = `${root}/${rel}`;
+          const text = await readOneVia(rel, abs, native, aiFileIo);
+          if (!text) continue;
+          const [next, hit] = removeImplementation(text, coord);
+          if (!hit) continue;
+          if (await writeOneVia(rel, abs, next, native, aiFileIo)) {
+            declRemoved = true;
+            break;
+          }
+          declErr = rel;
+        }
+      }
+
+      // ② 实体文件
       const bases = projectLibsBases.length
         ? projectLibsBases
-        : [`${nativeProjectRoot.replace(/[\\/]+$/, "")}/libs`];
-      let ok = false;
+        : [`${root}/libs`];
+      let fileOk = false;
       let lastErr = "?";
       for (const base of bases) {
         const dst = `${base}/${name}`;
@@ -660,17 +723,19 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           }
           let p: { ok?: boolean } = {};
           try { p = JSON.parse(r || "{}"); } catch { p = {}; }
-          if (p?.ok) { ok = true; break; }
+          if (p?.ok) { fileOk = true; break; }
         } catch {}
       }
-      if (ok) {
-        onNote?.(tr("libs.remove_done", "{lib} 已从项目移除", { lib: name }));
-        void refresh();
-      } else {
-        onNote?.(tr("libs.remove_fail", "{lib} 移除失败：{err}", { lib: name, err: lastErr }));
-      }
+
+      // ③ 汇总提示：文件本来就不在（只是声明行）→ 删完声明就是干净成功
+      const hadFile = presentNames.has(name);
+      const note = removeNoteKind({
+        hadFile, fileOk, declWanted: !!target, declRemoved, lastErr, declErr,
+      });
+      onNote?.(tr(note.key, note.fallback, { lib: name, ...note.vars }));
+      if (note.ok) void refresh();
     },
-    [nativeProjectRoot, native, projectLibsBases, onNote, tr, refresh],
+    [nativeProjectRoot, native, aiFileIo, gradleDeps, projectLibsBases, presentNames, onNote, tr, refresh],
   );
 
   const catGroups = useMemo(() => groupCatalog(), []);
@@ -1232,7 +1297,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                   {...((present || st === "done")
                     ? bindLongPress([
                         { key: "save", label: tr("libs.save_libs", "存 libs"), onClick: () => saveSharedToLibs(gradleDepFname(d)) },
-                        { key: "remove", label: tr("libs.remove", "移除"), danger: true, onClick: () => void removeFromProject(gradleDepFname(d)) },
+                        { key: "remove", label: tr("libs.remove", "移除"), danger: true, onClick: () => void removeFromProject(gradleDepFname(d), d) },
                       ])
                     : {})}
                 >

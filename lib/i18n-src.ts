@@ -195,6 +195,10 @@ export const SRC_EN: SrcDict = {
   "libs.apply_fail": "{lib} apply failed: {err}",
   "libs.remove_done": "{lib} removed from project",
   "libs.remove_fail": "{lib} remove failed: {err}",
+  "libs.remove_decl_fail": "{lib} file deleted, but failed to remove the dependency declaration (remove it from {where} in build.gradle manually)",
+  "{lib} 文件已删除，但依赖声明删除失败（可在 build.gradle 里手动删 {where}）": "{lib} file deleted, but failed to remove the dependency declaration (remove it from {where} in build.gradle manually)",
+  "libs.remove_decl_only": "{lib} dependency declaration removed from build.gradle, but file delete failed: {err}",
+  "{lib} 依赖声明已从 build.gradle 删除，但文件删除失败：{err}": "{lib} dependency declaration removed from build.gradle, but file delete failed: {err}",
   // M368：库管理面板优化（搜索/删除）
   // M370：项目库 tab 提示（build.gradle 配置摘要）
   // M371：项目属性弹窗 Gradle 配置区块

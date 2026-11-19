@@ -1128,13 +1128,4 @@
 .axv-prop-file-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .axv-prop-file-sum { flex: 0 0 auto; font-size: 11px; opacity: 0.55; font-family: ui-monospace, Consolas, monospace; }
 .axv-prop-dep-sep { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; opacity: 0.5; margin: 6px 2px 2px; }
-.axv-prop-body .axv-saveas-btns {
-  position: sticky;
-  bottom: -20px;
-  z-index: 4;
-  margin: 10px -16px -20px;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
-  background: color-mix(in srgb, var(--axv-surface) 90%, transparent);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid var(--axv-outline-variant);
-}
+/* M421：.axv-saveas-btns 已移到 axv-icon-page 直接子级（不再在 axv-prop-body 内），旧的 sticky 吸底规则失效，删除 */

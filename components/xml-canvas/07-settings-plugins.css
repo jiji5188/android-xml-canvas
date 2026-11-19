@@ -333,6 +333,8 @@
   font-family: inherit;
   cursor: pointer;
 }
+/* M421：按钮固定 120px（覆盖上面 width:100%），避免被容器撑满或缩太窄 */
+.axv-set-btn { width: 120px; }
 .axv-set-btn:hover {
   background: var(--axv-hover);
 }

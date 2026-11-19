@@ -943,16 +943,17 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
                 ))}
               </datalist>
 
-              <div className="axv-saveas-btns">
-                <button className="axv-set-btn" disabled={busy} onClick={guard.close}>
-                  {tt("取消")}
-                </button>
-                <button className="axv-set-btn axv-saveas-ok" disabled={busy || !dirty} onClick={() => void doSave()}>
-                  {busy ? tt("保存中…") : tt("保存")}
-                </button>
-              </div>
             </>
           ) : null}
+        </div>
+        {/* M421：保存/取消按钮移到 axv-shape-head 同级（axv-icon-page 直接子元素），不再随 body 滚动 */}
+        <div className="axv-saveas-btns">
+          <button className="axv-set-btn" disabled={busy} onClick={guard.close}>
+            {tt("取消")}
+          </button>
+          <button className="axv-set-btn axv-saveas-ok" disabled={busy || !dirty} onClick={() => void doSave()}>
+            {busy ? tt("保存中…") : tt("保存")}
+          </button>
         </div>
       </div>
       {guard.dialog}

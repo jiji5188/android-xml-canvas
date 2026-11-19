@@ -73,6 +73,26 @@ export const androidJavaToolchain: AndroidJavaToolchain = {
   id: "android-java",
   displayName: "Android (Java/Kotlin)",
   fileExtensions: [".java", ".kt", ".kts"],
+  // M412：入口页按这个挂全功能编辑器（画布 + 资源 + 清单 + 签名）
+  editorKind: "android-xml",
+
+  /**
+   * M412：目录探测——三个强信号叠加打分。
+   * 只要有 app/src/main/AndroidManifest.xml 就基本确定（10 分），
+   * 单独的 settings.gradle / res 目录只能算弱信号（不抢 JS 项目的 package.json）。
+   */
+  detect(files) {
+    const rels = files.map((f) => f.rel.replace(/\\/g, "/").toLowerCase());
+    const has = (p: string) => rels.some((r) => r === p);
+    const hasUnder = (p: string) => rels.some((r) => r.endsWith("/" + p) || r.startsWith(p));
+    let score = 0;
+    if (has("app/src/main/androidmanifest.xml")) score += 10;
+    if (has("settings.gradle") || has("settings.gradle.kts")) score += 3;
+    if (has("app/build.gradle") || has("app/build.gradle.kts")) score += 3;
+    if (hasUnder("src/main/res/")) score += 2;
+    if (rels.some((r) => /\.(java|kt)$/.test(r))) score += 1;
+    return score;
+  },
 
   capabilities: {
     hasCanvas: true,

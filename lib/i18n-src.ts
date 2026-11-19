@@ -3216,6 +3216,19 @@ export const SRC_EN: SrcDict = {
   "带 main/debug，可直接调试运行": "With main/debug; ready to debug-run",
   "新建：Activity / Java / 调试入口 / XML 布局": "New: Activity / Java / debug entry / XML layout",
 
+  // M412：项目管理入口页
+  "进入编辑器": "Open editor",
+  "工作目录读取中…": "Reading workspace…",
+  "（自选）": " (custom)",
+  "打开项目目录": "Open project folder",
+  "读取中…": "Loading…",
+  "新建 / 示例项目": "New / sample project",
+  "正在读取工作目录…": "Reading workspace…",
+  "这个浏览器拿不到目录权限。点右上角「进入编辑器」仍可编辑单文件。": "This browser cannot access folders. Tap “Open editor” at top right to edit a single file.",
+  "工作目录里还没有项目。把 Android 项目文件夹放进工作目录后点「刷新」，或直接打开一个项目目录。": "No projects in the workspace yet. Put an Android project folder there and tap “Refresh”, or open a project folder directly.",
+  " · {n} 个布局": " · {n} layouts",
+  "返回项目列表": "Back to projects",
+
 };
 
 /** 繁體 —— 只登记与英文不同的；没登记的先走英文兜底（见 t()） */

@@ -62,6 +62,8 @@ export type ToolbarProps = {
   canExportProject?: boolean;
   onExportProject?: () => void;
   snapCount?: number;
+  /** M412：返回项目管理页（不传 = 不显示返回按钮，老入口不变） */
+  onHome?: () => void;
 };
 
 export function Toolbar(props: ToolbarProps) {
@@ -97,6 +99,7 @@ export function Toolbar(props: ToolbarProps) {
     onExportProject,
     onHistory,
     snapCount,
+    onHome,
   } = props;
 
   /* M173：低频操作收进「更多」弹出菜单（M404：删掉「打开 XML / 复制 XML / 清除 res / 更换保存位置」，只留导出 res 包 + 导出可编译项目） */
@@ -167,6 +170,18 @@ export function Toolbar(props: ToolbarProps) {
             }
       }
     >
+      {/* M412：返回项目管理页（入口页模式才有）——放最左，先于左栏按钮 */}
+      {onHome ? (
+        <button
+          className="axv-tb-btn axv-tb-side-btn"
+          title={tt("返回项目列表")}
+          aria-label={tt("返回项目列表")}
+          onClick={onHome}
+        >
+          <span className="msr" aria-hidden="true" style={{ fontSize: 23 }}>arrow_back</span>
+        </button>
+      ) : null}
+
       {leftOpen ? null : (
         <button
           className="axv-tb-btn axv-tb-side-btn"

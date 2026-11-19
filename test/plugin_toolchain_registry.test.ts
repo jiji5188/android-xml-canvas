@@ -16,6 +16,7 @@ function fakeToolchain(id: Toolchain["id"], exts: string[]): Toolchain {
     id,
     displayName: id,
     fileExtensions: exts,
+    editorKind: "code",
     capabilities: {
       hasCanvas: false,
       hasRes: false,
@@ -139,6 +140,39 @@ describe("M409 android-java 适配器", () => {
     expect(ToolchainRegistry.size).toBe(2);
     expect(ToolchainRegistry.get("android-java")).not.toBeNull();
     expect(ToolchainRegistry.get("js")).not.toBeNull();
+  });
+});
+
+describe("M412 编辑器外壳 + 目录探测", () => {
+  it("editorKind：android-java 用全功能编辑器，js 用纯代码工作区", () => {
+    expect(androidJavaToolchain.editorKind).toBe("android-xml");
+    expect(jsToolchain.editorKind).toBe("code");
+  });
+
+  it("detect：Android 项目强信号叠加打分", () => {
+    const files = (rels: string[]) => rels.map((rel) => ({ rel }));
+    // 标准 Android 工程：高分
+    expect(
+      androidJavaToolchain.detect?.(
+        files(["settings.gradle", "app/build.gradle", "app/src/main/AndroidManifest.xml", "app/src/main/res/layout/activity_main.xml"]),
+      ),
+    ).toBeGreaterThanOrEqual(10);
+    // 只有 settings.gradle：弱信号，不爆分
+    expect(androidJavaToolchain.detect?.(files(["settings.gradle"]))).toBe(3);
+    // 空目录：0
+    expect(androidJavaToolchain.detect?.(files([]))).toBe(0);
+  });
+
+  it("detect：js 项目（package.json 最强信号，不与 Android 混淆）", () => {
+    const files = (rels: string[]) => rels.map((rel) => ({ rel }));
+    expect(jsToolchain.detect?.(files(["package.json", "index.js"]))).toBeGreaterThanOrEqual(8);
+    expect(jsToolchain.detect?.(files(["app/src/main/AndroidManifest.xml"]))).toBe(0);
+  });
+
+  it("detect：Windows 反斜杠路径也能认", () => {
+    expect(
+      androidJavaToolchain.detect?.([{ rel: "app\\src\\main\\AndroidManifest.xml" }]),
+    ).toBe(10);
   });
 });
 

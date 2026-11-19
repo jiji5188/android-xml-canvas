@@ -89,8 +89,11 @@ describe("M141 全局离开拦截（切文件 / 关窗口）", () => {
   });
 
   it("关窗口时挂 beforeunload（脏了才拦）", () => {
-    expect(s).toContain('window.addEventListener("beforeunload", onBefore)');
-    expect(s).toContain("if (!dirty) return;");
+    // M412：拦截已下沉到 useUnsavedLeave（isDirty 传入即生效）
+    const d = rd("components/UnsavedLeaveDialog.tsx");
+    expect(d).toContain('window.addEventListener("beforeunload", onBefore)');
+    expect(d).toContain("if (!checkDirty()) return;");
+    expect(s).toContain("isDirty: () => dirty");
   });
 
   it("保存并继续 / 不保存 两个分支都有", () => {

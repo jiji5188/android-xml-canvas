@@ -94,6 +94,7 @@ import { useDebugRun } from "./use-debug-run";
 import { DebugRunPanel } from "./DebugRunPanel";
 import { type BuildApkResult } from "@/lib/xml/native-apk";
 import { androidJavaToolchain } from "@/lib/plugin/toolchains/android-java";
+import type { ToolchainId } from "@/lib/plugin/toolchain-registry";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { ThemePickerPanel } from "./ThemePickerPanel";
@@ -158,6 +159,8 @@ export type ActiveProject = {
   dirPath?: string;
   rootPath?: string;
   handle?: unknown;
+  /** M412：工具链 id，缺省 = "android-java"（老项目兼容） */
+  toolchain?: ToolchainId;
 };
 import {
   activeFile,
@@ -293,7 +296,15 @@ import {
 
 const SCALE = 2; // 1dp = 2px
 
-export function XmlEditor() {
+/** M412：入口页（XmlAppShell）传进来的可选 props */
+export interface XmlEditorProps {
+  /** 项目管理页选中的项目：进编辑器后自动打开（只开一次） */
+  initialProject?: WsProject | null;
+  /** 返回项目管理页（不传 = 不显示返回按钮，老入口不变） */
+  onExit?: () => void;
+}
+
+export function XmlEditor({ initialProject = null, onExit }: XmlEditorProps) {
   /** 启动引导：项目（多文件）优先，没有存档时从上次的 xml 建一个单文件项目 */
   const bootRef = useRef<{ project: Project; xml: string } | null>(null);
   if (bootRef.current === null) {
@@ -1274,7 +1285,13 @@ const allDrawableNames = useMemo(() => {
     refreshWorkspace, setWsBusy, wsState,
   }));
 
-  /** 当前项目的浏览源（用 ref 拿，避免面板回调闭包里拿到旧值） */
+  const openedInitRef = useRef(false);
+  useEffect(() => {
+    if (openedInitRef.current || !initialProject) return;
+    openedInitRef.current = true;
+    void openWsProject(initialProject); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const activeProjectRef = useRef<ActiveProject | null>(null);
   useEffect(() => {
     activeProjectRef.current = activeProject;
@@ -1586,23 +1603,15 @@ const allDrawableNames = useMemo(() => {
 
   const dirty = xml !== savedMark;
 
-  /** M141：全局离开拦截 —— 切文件 / 打开新文件 / 关浏览器（未保存时） */
+  /** M141：全局离开拦截 —— 切文件 / 打开新文件 / 关浏览器（未保存时）
+   *  M412：beforeunload 拦截已下沉进 useUnsavedLeave（传 isDirty 即生效） */
   const leaveGuard = useUnsavedLeave({
     title: tt("有未保存的内容"),
     onSave: () => void doSave(),
     onDiscard: () => setSavedMark(currentXml()),
+    isDirty: () => dirty,
   });
 
-  // 关窗口 / 切后台时提示（浏览器原生 beforeunload 只能弹默认框，但必须拦，不然丢文档）
-  useEffect(() => {
-    const onBefore = (e: BeforeUnloadEvent) => {
-      if (!dirty) return;
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", onBefore);
-    return () => window.removeEventListener("beforeunload", onBefore);
-  }, [dirty]);
   // 切换/打开文件 → 当前内容就是磁盘上的基线（避免一进来就顶着「未保存」）
   useEffect(() => {
     setSavedMark(xmlRef.current);
@@ -2284,6 +2293,8 @@ const allDrawableNames = useMemo(() => {
         snapCount={snapCount}
         onSign={openSignDialog}
         canSign
+        // M412：入口页模式才有返回按钮；脏内容走三态提示（保存并返回 / 不保存 / 取消）
+        onHome={onExit ? () => leaveGuard.gate(dirty, onExit) : undefined}
       />
       </div>
 

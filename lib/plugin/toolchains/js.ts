@@ -20,6 +20,19 @@ export const jsToolchain: JsToolchain = {
   id: "js",
   displayName: "JavaScript",
   fileExtensions: [".js", ".mjs", ".cjs"],
+  // M412：纯代码工作区（无画布/资源/清单）
+  editorKind: "code",
+
+  /** M412：目录探测——package.json 是最强信号，其次是入口脚本 */
+  detect(files) {
+    const rels = files.map((f) => f.rel.replace(/\\/g, "/").toLowerCase());
+    const has = (p: string) => rels.some((r) => r === p);
+    let score = 0;
+    if (has("package.json")) score += 8;
+    if (has("index.js") || has("main.js") || has("app.js")) score += 4;
+    if (rels.some((r) => r.endsWith(".js") || r.endsWith(".mjs"))) score += 1;
+    return score;
+  },
 
   capabilities: {
     hasCanvas: false,

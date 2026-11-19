@@ -4,13 +4,15 @@
 // 和 UnsavedGuard 的区别：那个是「关子页面」，这里是「切文件 / 打开新文件 / 关窗口」
 // 全局级的拦截。按钮是 保存并继续 / 不保存继续 / 取消。
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { t as tt } from "@/lib/i18n-src";
 
 export interface UnsavedLeaveOptions {
   title?: string;
   onSave: () => void;
   onDiscard: () => void;
+  /** M412：当前文档是否脏（getter 避免闭包 stale）。传了才拦 beforeunload */
+  isDirty?: () => boolean;
 }
 
 export interface UnsavedLeave {
@@ -22,6 +24,20 @@ export interface UnsavedLeave {
 
 export function useUnsavedLeave(opts: UnsavedLeaveOptions): UnsavedLeave {
   const [pending, setPending] = useState<(() => void) | null>(null);
+
+  // M412：关窗口 / 切后台拦截下沉到这里（原在 XmlEditor 里 11 行）。
+  // 浏览器原生 beforeunload 只能弹默认框，但必须拦，不然丢文档。
+  useEffect(() => {
+    if (!opts.isDirty) return;
+    const checkDirty = opts.isDirty;
+    const onBefore = (e: BeforeUnloadEvent) => {
+      if (!checkDirty()) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBefore);
+    return () => window.removeEventListener("beforeunload", onBefore);
+  }, [opts.isDirty]);
 
   const gate = (dirty: boolean, action: () => void) => {
     if (dirty) setPending(() => action);

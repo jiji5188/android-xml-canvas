@@ -112,16 +112,39 @@ export interface ToolchainTemplateSpec {
  * build/run 的入参是 `unknown`：异质注册表必然的取舍（同 EditorMountProps.extra）。
  * 具体工具链提供类型安全的重载，见 toolchains/android-java.ts。
  */
+/**
+ * 项目探测入参：只看相对路径（不读文件内容，探测要够快）。
+ * 未来要按内容判断时再加可选的 read 回调，现在不需要。
+ */
+export interface DetectFile {
+  /** 相对项目根的路径，用 / 分隔（如 "app/src/main/AndroidManifest.xml"） */
+  rel: string;
+}
+
+/**
+ * 编辑器外壳种类。M412：入口是项目管理页，打开项目时按这个字段决定挂哪个编辑器。
+ * 注意：不要用 capabilities 反推（JAR 库项目 hasCanvas=false 但仍需全功能编辑器）。
+ */
+export type EditorKind = "android-xml" | "code";
+
 export interface Toolchain {
   id: ToolchainId;
   /** 显示名，如 "Android (Java/Kotlin)" */
   displayName: string;
   /** 归这个工具链管的源文件扩展名（含点，小写） */
   fileExtensions: string[];
+  /** M412：项目用哪个编辑器外壳（android-xml = 画布+资源+清单；code = 纯代码工作区） */
+  editorKind: EditorKind;
   capabilities: ToolchainCapabilities;
   syntax: SyntaxSpec;
   /** 新建文件模板（「＋」菜单直接渲染这个） */
   templates: ToolchainTemplateSpec[];
+  /**
+   * M412：从目录猜这是不是本工具链的项目。
+   * 返回匹配度（0 = 不是；数字越大越像），入口页取最高分的工具链。
+   * 不实现 = 不支持自动探测（只能手动指定项目类型）。
+   */
+  detect?(files: DetectFile[]): number;
   /** 当前环境能不能构建（网页版 / 无原生桥 → false） */
   canBuild(): boolean;
   /** 当前环境能不能运行/调试（可选；不支持执行的语言不实现） */

@@ -164,17 +164,23 @@ describe("Toolbar — ＋新建菜单（M404）", () => {
     expect(arrs.find((a) => a.some((it) => it.key === "activity"))).toBeUndefined();
   });
 
-  it("传 onNewItem 时菜单含三个新建项并各自回调", () => {
+  it("传 onNewItem 时菜单含四个新建项并各自回调（M405b 加调试入口类）", () => {
     const p = props({ onNewItem: vi.fn() });
     const tree = Toolbar(p) as unknown as El;
     const arrs = collectAllItems(tree as unknown as ReactNode);
     const newArr = arrs.find((a) => a.some((it) => it.key === "activity")) ?? [];
-    expect(newArr.map((it) => it.label)).toEqual(["新建 Activity 页面", "新建 Java 类", "新建 XML 布局"]);
+    expect(newArr.map((it) => it.label)).toEqual([
+      "新建 Activity 页面",
+      "新建 Java 类",
+      "新建调试入口类",
+      "新建 XML 布局",
+    ]);
     newArr.find((it) => it.key === "activity")!.onClick();
     newArr.find((it) => it.key === "java")!.onClick();
+    newArr.find((it) => it.key === "debug")!.onClick();
     newArr.find((it) => it.key === "layout")!.onClick();
     const fn = p.onNewItem as ReturnType<typeof vi.fn>;
-    expect(fn.mock.calls).toEqual([["activity"], ["java"], ["layout"]]);
+    expect(fn.mock.calls).toEqual([["activity"], ["java"], ["debug"], ["layout"]]);
   });
 });
 

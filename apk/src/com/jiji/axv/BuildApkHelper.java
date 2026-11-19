@@ -1267,19 +1267,140 @@ public class BuildApkHelper {
     }
 
     /**
-     * M416：合并两个 values XML（拼接 <resources> 标签体内的内容）。
-     *  两个文件都是 <?xml ...?><resources>...</resources> 结构，
-     *  合并后仍是一个 <resources>，内容是两者的并集。
-     *  如果同名资源（同 config）内容不同，aapt2 compile 会报冲突——
-     *  但这种情况只在两个不同库声明了同名但不同值的资源时发生，
-     *  实际上 aapt2 对 overlay 允许后者覆盖前者，这里先拼接让 aapt2 自己处理。
+     * M416/M417：合并两个 values XML。
+     *  - 顶层条目按 (tag + name) 去重，先到先得（避免 aapt2 compile「duplicate value」）
+     *  - 同名 declare-styleable 的子 attr 取并集（material 的扩展属性不丢）
+     *  - 保留并集 xmlns:* 声明（appcompat 里有 name="android:xxx" 条目，必须绑定 android 前缀）
      */
     private static String mergeValuesXml(String existing, String incoming) {
-        // 去掉 XML 声明和 <resources> 外层标签，拼接体内内容
-        String bodyA = stripResRoot(existing);
-        String bodyB = stripResRoot(incoming);
-        String decl = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
-        return decl + "<resources>\n" + bodyA + "\n" + bodyB + "\n</resources>\n";
+        java.util.LinkedHashMap<String, String> entries = new java.util.LinkedHashMap<>();
+        addEntries(existing, entries);
+        addEntries(incoming, entries);
+        // xmlns 并集（android 必备兜底）
+        java.util.LinkedHashMap<String, String> ns = new java.util.LinkedHashMap<>();
+        ns.put("xmlns:android", "http://schemas.android.com/apk/res/android");
+        collectNs(extractOpenTag(existing), ns);
+        collectNs(extractOpenTag(incoming), ns);
+        StringBuilder open = new StringBuilder("<resources");
+        for (java.util.Map.Entry<String, String> e : ns.entrySet()) {
+            open.append(' ').append(e.getKey()).append("=\"").append(e.getValue()).append('"');
+        }
+        open.append('>');
+        StringBuilder body = new StringBuilder();
+        for (String e : entries.values()) body.append(e).append('\n');
+        return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + open + "\n" + body + "</resources>\n";
+    }
+
+    /** 把一段 values XML 的顶层条目收进 entries（key = tag\0name） */
+    private static void addEntries(String xml, java.util.LinkedHashMap<String, String> entries) {
+        String body = stripResRoot(xml);
+        int i = 0, n = body.length();
+        while (i < n) {
+            int lt = body.indexOf('<', i);
+            if (lt < 0) break;
+            if (body.startsWith("<!--", lt)) {
+                int e = body.indexOf("-->", lt);
+                if (e < 0) break;
+                i = e + 3;
+                continue;
+            }
+            int ne = lt + 1;
+            while (ne < n && !Character.isWhitespace(body.charAt(ne)) && body.charAt(ne) != '>' && body.charAt(ne) != '/') ne++;
+            if (ne <= lt + 1) { i = lt + 1; continue; }
+            String tag = body.substring(lt + 1, ne);
+            int gt = body.indexOf('>', lt);
+            if (gt < 0) break;
+            boolean self = body.charAt(gt - 1) == '/';
+            int end;
+            if (self) {
+                end = gt + 1;
+            } else {
+                int close = body.indexOf("</" + tag + ">", gt);
+                if (close < 0) { i = gt + 1; continue; }
+                end = close + tag.length() + 3;
+            }
+            String elem = body.substring(lt, end);
+            String nm = attrOf(elem, "name");
+            String key = tag + '\u0000' + nm;
+            String prev = entries.get(key);
+            if (prev == null) entries.put(key, elem);
+            else if ("declare-styleable".equals(tag)) entries.put(key, mergeStyleable(prev, elem));
+            i = end;
+        }
+    }
+
+    /** 合并两个同名 declare-styleable：子元素（attr 等）按 name 取并集 */
+    private static String mergeStyleable(String a, String b) {
+        java.util.LinkedHashMap<String, String> kids = new java.util.LinkedHashMap<>();
+        for (String src : new String[] { a, b }) {
+            int gt = src.indexOf('>');
+            int close = src.lastIndexOf("</");
+            if (gt < 0 || close <= gt) continue;
+            String inner = src.substring(gt + 1, close);
+            int i = 0, n = inner.length();
+            while (i < n) {
+                int lt = inner.indexOf('<', i);
+                if (lt < 0) break;
+                if (inner.startsWith("<!--", lt)) {
+                    int e = inner.indexOf("-->", lt);
+                    if (e < 0) break;
+                    i = e + 3;
+                    continue;
+                }
+                int ne = lt + 1;
+                while (ne < n && !Character.isWhitespace(inner.charAt(ne)) && inner.charAt(ne) != '>' && inner.charAt(ne) != '/') ne++;
+                if (ne <= lt + 1) { i = lt + 1; continue; }
+                String tag = inner.substring(lt + 1, ne);
+                int g = inner.indexOf('>', lt);
+                if (g < 0) break;
+                boolean self = inner.charAt(g - 1) == '/';
+                int end;
+                if (self) {
+                    end = g + 1;
+                } else {
+                    int c = inner.indexOf("</" + tag + ">", g);
+                    if (c < 0) { i = g + 1; continue; }
+                    end = c + tag.length() + 3;
+                }
+                String el = inner.substring(lt, end);
+                String key = tag + '\u0000' + attrOf(el, "name");
+                if (!kids.containsKey(key)) kids.put(key, el);
+                i = end;
+            }
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("<declare-styleable name=\"").append(attrOf(a, "name")).append("\">");
+        for (String el : kids.values()) sb.append('\n').append(el);
+        sb.append("\n</declare-styleable>");
+        return sb.toString();
+    }
+
+    /** 取元素上 attr="..." 的属性值 */
+    private static String attrOf(String elem, String attr) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(?<![\\w:.-])" + java.util.regex.Pattern.quote(attr) + "\\s*=\\s*\"([^\"]*)\"")
+                .matcher(elem);
+        return m.find() ? m.group(1) : "";
+    }
+
+    /** 取 <resources ...> 开标签（含属性） */
+    private static String extractOpenTag(String s) {
+        String t = s.trim();
+        int declEnd = t.indexOf("?>");
+        if (declEnd >= 0) t = t.substring(declEnd + 2).trim();
+        int start = t.indexOf("<resources");
+        if (start < 0) return "";
+        int openEnd = t.indexOf('>', start);
+        if (openEnd < 0) return "";
+        return t.substring(start, openEnd + 1);
+    }
+
+    /** 收集开标签里的 xmlns:* 声明（已有不覆盖） */
+    private static void collectNs(String openTag, java.util.LinkedHashMap<String, String> out) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(xmlns:[\\w.-]+)\\s*=\\s*\"([^\"]*)\"").matcher(openTag);
+        while (m.find()) {
+            if (!out.containsKey(m.group(1))) out.put(m.group(1), m.group(2));
+        }
     }
 
     /** 去掉 <?xml ...?> 声明和 <resources ...> 外层标签，只留体内内容 */

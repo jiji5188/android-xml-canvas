@@ -130,14 +130,14 @@ function mountLibsConf() {
 }
 
 describe("M425 标准目录 + 顶部按钮", () => {
-  it("标准目录文件直接列出 + 「新建库目录」入口存在 + 顶部无平铺库目录按钮", async () => {
+  it("标准目录文件直接列出 + 列表底部无新建库目录按钮（M431 改到菜单）+ 顶部无平铺库目录按钮", async () => {
     const c = await gotoProjectTab();
     // 标准目录文件立即可见（不在折叠组里）
     expect(c.container.textContent).toContain("std-lib.jar");
     expect(c.container.textContent).toContain("app/src/main/libs/std-lib.jar");
     expect(c.container.textContent).toContain("标准目录（app/src/main/libs 等）");
-    // 新建库目录入口在列表区
-    expect(c.container.textContent).toContain("新建库目录");
+    // M431：新建库目录 / 加依赖 的常驻按钮已删，功能改到依赖行右键菜单（空项目时走空态入口）
+    expect(c.container.textContent).not.toContain("新建库目录");
     // 顶部 actions 行（搜索框同级）不再有「库目录」按钮 —— 老 UI 是文件夹图标 + 文本「库目录」直接在搜索行
     const searchRow = c.container.querySelector(".axv-libs-actions")!;
     expect(searchRow.textContent).not.toContain("库目录");

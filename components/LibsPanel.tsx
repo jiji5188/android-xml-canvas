@@ -1029,10 +1029,19 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       if (presentNames.has(gradleDepFname(d))) return false;
       return true;
     });
-    for (const d of missing) {
-      await downloadGradleDep(d);
+    if (missing.length === 0) {
+      onNote?.(tr("libs.download_all_none", "依赖都已下载，没有要补的"));
+      return;
     }
-  }, [gradleDeps, gradleBusyKey, presentNames, downloadGradleDep]);
+    setGradleBusy(true);
+    try {
+      for (const d of missing) {
+        await downloadGradleDep(d);
+      }
+    } finally {
+      setGradleBusy(false);
+    }
+  }, [gradleDeps, gradleBusyKey, presentNames, downloadGradleDep, onNote, tr]);
 
   // ===== M401/M430：统一「添加依赖」弹窗（Maven / 本地库目录 两个 tab）=====
   /** 要改哪个 fileTree 声明（null = 新建一条）；ftIncludes 多选（*.jar/*.aar…） */
@@ -1046,10 +1055,10 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   const [depBusy, setDepBusy] = useState(false);
   // M430：依赖 exclude 展开状态（key = g:n:v）
   const [depExOpen, setDepExOpen] = useState<Record<string, boolean>>({});
-  // M430：编辑依赖弹窗 / 添加 exclude 弹窗 / 编辑 fileTree
+  // M430：编辑依赖弹窗 / exclude 弹窗（add 与 edit 共用：old=null 是添加）/ 编辑 fileTree
   const [depEdit, setDepEdit] = useState<GradleDep | null>(null);
   const [editForm, setEditForm] = useState({ group: "", name: "", version: "", config: "implementation" });
-  const [exTarget, setExTarget] = useState<GradleDep | null>(null);
+  const [exTarget, setExTarget] = useState<{ dep: GradleDep; old: { group: string; module: string } | null } | null>(null);
   const [exForm, setExForm] = useState({ group: "", module: "" });
 
   const openFtModal = useCallback((idx: number | null) => {
@@ -1202,17 +1211,24 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     [applyGradleEdit, tr],
   );
 
-  /** M430：给某条依赖加一条 exclude */
+  /** M431：exclude 弹窗提交 —— old=null 是添加；old 有值是编辑（删旧+写新，一次 applyGradleEdit 内完成） */
   const submitAddExclude = useCallback(async () => {
-    const d = exTarget;
-    if (!d) return;
+    const t = exTarget;
+    if (!t) return;
     const g = exForm.group.trim();
     const m = exForm.module.trim();
     if (!g || !m) { onNote?.(tr("libs.ex_invalid", "group 和 module 都要填")); return; }
+    const coord = { group: t.dep.group, name: t.dep.name, version: t.dep.version };
+    const old = t.old;
     const ok = await applyGradleEdit(
-      (text, kts) => addExcludesToGradle(text, { group: d.group, name: d.name, version: d.version }, [{ group: g, module: m }], kts),
-      () => tr("libs.ex_added", "已加 exclude {g}:{m}", { g, m }),
-      tr("libs.ex_add_fail", "加 exclude 失败：没找到该依赖声明（或写失败）"),
+      (text, kts) => {
+        if (!old) return addExcludesToGradle(text, coord, [{ group: g, module: m }], kts);
+        const [t1, ok1] = removeExcludeFromDep(text, coord, old, kts);
+        if (!ok1) return [text, false];
+        return addExcludesToGradle(t1, coord, [{ group: g, module: m }], kts);
+      },
+      () => (old ? tr("libs.ex_edited", "exclude 已改为 {g}:{m}", { g, m }) : tr("libs.ex_added", "已加 exclude {g}:{m}", { g, m })),
+      tr(old ? "libs.ex_edit_fail" : "libs.ex_add_fail", old ? "改 exclude 失败：没找到该条目（或写失败）" : "加 exclude 失败：没找到该依赖声明（或写失败）"),
     );
     if (ok) { setExTarget(null); setExForm({ group: "", module: "" }); }
   }, [exTarget, exForm, applyGradleEdit, onNote, tr]);
@@ -1361,28 +1377,37 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>download</span>
           {tr("libs.download", "下载库文件")}
         </button>
-        <button type="button" className="axv-libs-btn" onClick={() => void refresh()}>
-          <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
-          {tr("refresh", "刷新")}
-        </button>
       </div>
 
       {/* M373：列表上方一键下载（缺的依赖在列表里直接看得到，不再弹警告条）
-          M401：左边加「库目录」（改/加 fileTree 的 dir+include）+「+」（加 maven 依赖） */}
-      {tab === "project" && gradleDeps.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "0 8px 6px" }}>
+          M431：刷新按钮移到这一行（始终渲染，任何 tab 都能刷）；一键下载仅项目 tab 有依赖时显示 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "0 8px 6px" }}>
+        {tab === "project" && gradleDeps.length > 0 && (
           <button
             type="button"
             className="axv-libs-btn primary"
-            style={{ fontSize: 11, padding: "2px 10px", whiteSpace: "nowrap", flex: 1 }}
+            style={{ fontSize: 11, padding: "4px 8px", whiteSpace: "nowrap" }}
             disabled={gradleBusy}
             onClick={() => void downloadAllGradleDeps()}
           >
             <span className="msr" aria-hidden="true" style={{ fontSize: 15, verticalAlign: "middle", marginRight: 3 }}>cloud_download</span>
             {gradleBusy ? tr("libs.downloading", "下载中…") : tr("libs.download_all", "一键下载")}
           </button>
-        </div>
-      )}
+        )}
+        <button
+          type="button"
+          className="axv-libs-btn"
+          disabled={busy || gradleBusy}
+          onClick={() => {
+            // M431b：点刷新 = 文件列表重扫 + build.gradle 重解析（外部改了 gradle 也能刷出来）
+            void refresh();
+            void scanGradleDeps();
+          }}
+        >
+          <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
+          {tr("refresh", "刷新")}
+        </button>
+      </div>
 
       <div className="axv-libs-list axv-rail-scroll">
         {tab === "local" && (
@@ -1427,7 +1452,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
             {gradleMsg && (
               <div className="axv-libs-empty" style={{ padding: "4px 8px", fontSize: 11 }}>{gradleMsg}</div>
             )}
-            {gradleScanned && gradleDeps.length === 0 && !gradleMsg && gradleUnresolved.length === 0 && gradleFileTrees.length === 0 && (
+            {gradleScanned && gradleDeps.length === 0 && !gradleMsg && gradleUnresolved.length === 0 && (
               <div className="axv-libs-empty" style={{ padding: "8px", fontSize: 11, lineHeight: 1.6 }}>
                 {tr("libs.gradle_none", "没解析到 maven 依赖（fileTree / project 除外）")}
                 <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
@@ -1478,8 +1503,18 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                     style={{ alignItems: "center" }}
                     {...bindLongPress([
                       {
+                        key: "add",
+                        label: tr("libs.dep_add_menu", "添加依赖"),
+                        onClick: () => openDepModal("maven"),
+                      },
+                      {
+                        key: "ftadd",
+                        label: tr("libs.ft_new", "新建库目录"),
+                        onClick: () => openFtModal(null),
+                      },
+                      {
                         key: "edit",
-                        label: tr("libs.dep_edit", "编辑依赖"),
+                        label: tr("libs.edit", "编辑"),
                         onClick: () => {
                           setDepEdit(d);
                           setEditForm({ group: d.group, name: d.name, version: d.version, config: d.config || "implementation" });
@@ -1488,9 +1523,9 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                       {
                         key: "exadd",
                         label: tr("libs.ex_add", "添加 exclude"),
-                        onClick: () => { setExTarget(d); setExForm({ group: "", module: "" }); },
+                        onClick: () => { setExTarget({ dep: d, old: null }); setExForm({ group: "", module: "" }); },
                       },
-                      { key: "copy", label: tr("libs.copy_coord", "复制坐标"), onClick: () => void copyCoord(key) },
+                      { key: "copy", label: tr("libs.copy", "复制"), onClick: () => void copyCoord(key) },
                       ...(present || st === "done"
                         ? [{ key: "save", label: tr("libs.save_libs", "存 libs"), onClick: () => saveSharedToLibs(gradleDepFname(d)) }]
                         : []),
@@ -1559,7 +1594,12 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                           className="axv-libs-item"
                           style={{ alignItems: "center", padding: "2px 6px", background: "rgba(0,0,0,0.02)" }}
                           {...bindLongPress([
-                            { key: "copy", label: tr("libs.copy_coord", "复制坐标"), onClick: () => void copyCoord(ex.group + ":" + ex.module) },
+                            {
+                              key: "exedit",
+                              label: tr("libs.ex_edit", "编辑 exclude"),
+                              onClick: () => { setExTarget({ dep: d, old: ex }); setExForm({ group: ex.group, module: ex.module }); },
+                            },
+                            { key: "copy", label: tr("libs.copy", "复制"), onClick: () => void copyCoord(ex.group + ":" + ex.module) },
                             { key: "del", label: tr("libs.ex_del", "删除这条 exclude"), danger: true, onClick: () => void removeOneExclude(d, ex) },
                           ])}
                         >
@@ -1595,6 +1635,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                         title={g.ft.dir}
                         {...bindLongPress([
                           { key: "edit", label: tr("libs.ft_edit", "编辑库目录"), onClick: () => openFtModal(g.index) },
+                          { key: "ftadd", label: tr("libs.ft_new", "新建库目录"), onClick: () => openFtModal(null) },
                           {
                             key: "del",
                             label: tr("libs.ft_remove", "移除这条 fileTree"),
@@ -1649,29 +1690,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                 })}
               </div>
             )}
-            {/* M430：列表底部常驻入口（不依赖已有 fileTree；空项目也能加） */}
-            <div style={{ display: "flex", gap: 6, margin: "8px 8px 4px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className="axv-libs-btn"
-                style={{ fontSize: 11, padding: "3px 10px", whiteSpace: "nowrap" }}
-                onClick={() => openDepModal("maven")}
-                title={tr("libs.dep_add", "加依赖（Maven）")}
-              >
-                <span aria-hidden="true" style={{ fontSize: 14, verticalAlign: "middle", marginRight: 3 }}>+</span>
-                {tr("libs.dep_add", "加依赖（Maven）")}
-              </button>
-              <button
-                type="button"
-                className="axv-libs-btn"
-                style={{ fontSize: 11, padding: "3px 10px", whiteSpace: "nowrap" }}
-                onClick={() => openFtModal(null)}
-                title={tr("libs.ft_new", "新建库目录（fileTree）")}
-              >
-                <span className="msr" aria-hidden="true" style={{ fontSize: 15, verticalAlign: "middle", marginRight: 3 }}>create_new_folder</span>
-                {tr("libs.ft_new", "新建库目录")}
-              </button>
-            </div>
+            {/* M431：列表底部常驻入口已删（功能在右键菜单：添加依赖；空项目时上方空态有入口） */}
             {/* 标准目录（app/src/main/libs 等，不被任何 fileTree 覆盖）的文件直接列出 */}
             {projectLibGroups.stdFiles.length > 0 && (
               <div style={{ marginTop: 4 }}>
@@ -2010,13 +2029,13 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         </div>
       )}
 
-      {/* M430：给依赖加一条 exclude */}
+      {/* M430/M431：给依赖添加 / 编辑一条 exclude */}
       {exTarget && (
         <div className="axv-libs-dl-overlay" onClick={() => setExTarget(null)}>
           <div className="axv-libs-dl-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ maxWidth: 320 }}>
-            <div className="axv-libs-dl-title">{tr("libs.ex_add", "添加 exclude")}</div>
+            <div className="axv-libs-dl-title">{exTarget.old ? tr("libs.ex_edit", "编辑 exclude") : tr("libs.ex_add", "添加 exclude")}</div>
             <div style={{ fontSize: 11, opacity: 0.6, margin: "0 0 8px", lineHeight: 1.5, wordBreak: "break-all" }}>
-              {exTarget.group}:{exTarget.name}:{exTarget.version}
+              {exTarget.dep.group}:{exTarget.dep.name}:{exTarget.dep.version}
             </div>
             <label style={{ display: "block", marginBottom: 6 }}>
               <span style={{ fontSize: 11, opacity: 0.7, display: "block", marginBottom: 2 }}>group</span>
@@ -2046,7 +2065,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
               </button>
               <button type="button" className="axv-libs-btn primary" onClick={() => void submitAddExclude()}
                 disabled={!exForm.group.trim() || !exForm.module.trim()}>
-                {tr("libs.ex_submit", "添加")}
+                {exTarget.old ? tr("save", "保存") : tr("libs.ex_submit", "添加")}
               </button>
             </div>
           </div>

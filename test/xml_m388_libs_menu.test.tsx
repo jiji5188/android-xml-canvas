@@ -127,6 +127,37 @@ describe("M388 useLongPress", () => {
     expect(onOpen.mock.calls[0][2]).toEqual([3]);
   });
 
+  it("M431b：长按/右键弹菜单后，随后的 click 被拦截（行上 onClick 不触发）；再点一次正常触发", () => {
+    const onOpen = vi.fn();
+    const onClick = vi.fn();
+    function Harness2() {
+      const bind = useLongPress<number[]>((x, y, p) => onOpen?.(x, y, p));
+      return (
+        <div data-testid="row" {...bind([1])} onClick={onClick}>
+          row
+        </div>
+      );
+    }
+    const { getByTestId } = render(<Harness2 />);
+    const row = getByTestId("row");
+    // 右键弹菜单 → click 被吃掉
+    fireEvent.contextMenu(row);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    fireEvent.click(row);
+    expect(onClick).not.toHaveBeenCalled();
+    // 再点一次（新按下）→ onClick 正常
+    fireEvent.click(row);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    // 长按弹菜单 → click 同样被吃掉
+    vi.useFakeTimers();
+    pressOn(row);
+    vi.advanceTimersByTime(500);
+    expect(onOpen).toHaveBeenCalledTimes(2);
+    fireEvent.click(row);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
   it("contextmenu 事件 → 弹 + preventDefault", () => {
     const onOpen = vi.fn();
     const { getByTestId } = render(<Harness items={[3]} onOpen={onOpen} />);

@@ -3319,6 +3319,10 @@ export const SRC_HANT: SrcDict = {
   // ---- M142 组件目录（widget-catalog）----
 
   // ---- M430 项目库逐条增删改 ----
+  "依赖都已下载，没有要补的": "All dependencies already downloaded, nothing to fetch",
+"改 exclude 失败：没找到该条目（或写失败）": "Failed to update exclude: entry not found (or write failed)",
+"exclude 已改为 {g}:{m}": "Exclude changed to {g}:{m}",
+"编辑 exclude": "Edit exclude",
   "请先打开一个项目，才能改 build.gradle": "Open a project first to edit build.gradle",
   "已复制：{t}": "Copied: {t}",
 "复制失败，请手动选中：{t}": "Copy failed, select manually: {t}",

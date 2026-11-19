@@ -94,9 +94,11 @@ export function LibsItemMenu({ state, onClose }: LibsItemMenuProps) {
 
 /** 长按/右键弹菜单的指针事件三件套。
  *  用法：const bind = useLongPress<P>((x, y, p) => ...); 行上 spread {...bind(payload)}
- *  单例 pressRef（同一时刻只有一行在被按）—— 不会因为多行各自建 ref 而泄漏。 */
+ *  单例 pressRef（同一时刻只有一行在被按）—— 不会因为多行各自建 ref 而泄漏。
+ *  M431b：长按弹菜单后拦截随后的 click（触屏抬手必发 click）——
+ *  否则挂了 onClick 的行（如 fileTree 组头折叠）会「菜单刚弹出列表又被折叠」。 */
 export function useLongPress<P>(open: (x: number, y: number, payload: P) => void) {
-  const pressRef = useRef({ timer: null as number | null, x: 0, y: 0, moved: false });
+  const pressRef = useRef({ timer: null as number | null, x: 0, y: 0, moved: false, fired: false });
 
   const cancelPress = () => {
     const st = pressRef.current;
@@ -108,6 +110,7 @@ export function useLongPress<P>(open: (x: number, y: number, payload: P) => void
 
   const bind = (payload: P) => ({
     onPointerDown: (e: React.PointerEvent) => {
+      pressRef.current.fired = false;
       if (e.button === 2) {
         e.preventDefault();
         open(e.clientX, e.clientY, payload);
@@ -122,6 +125,7 @@ export function useLongPress<P>(open: (x: number, y: number, payload: P) => void
       st.timer = window.setTimeout(() => {
         st.timer = null;
         if (st.moved) return;
+        st.fired = true;
         open(st.x, st.y, payload);
       }, 450);
       // 手机抬起/取消都靠 window（行上收不到），cancel 不清定时器（同 ProjectPanel 的注释）
@@ -137,7 +141,16 @@ export function useLongPress<P>(open: (x: number, y: number, payload: P) => void
     },
     onContextMenu: (e: React.MouseEvent) => {
       e.preventDefault();
+      pressRef.current.fired = true; // 右键弹菜单后同样拦掉紧随的 click
       open(e.clientX, e.clientY, payload);
+    },
+    // M431b：长按/右键刚弹过菜单 → 吃掉这次 click，不让行上 onClick（折叠等）跟着触发
+    onClickCapture: (e: React.MouseEvent) => {
+      if (pressRef.current.fired) {
+        e.preventDefault();
+        e.stopPropagation();
+        pressRef.current.fired = false;
+      }
     },
   });
 

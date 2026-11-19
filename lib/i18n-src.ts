@@ -1546,6 +1546,16 @@ export const SRC_EN: SrcDict = {
   "app/build.gradle（SDK·版本·特性）": "app/build.gradle (SDK · version · features)",
   "没找到 app/build.gradle": "app/build.gradle not found",
   "待加": "pending",
+  // M418：项目属性页优化（库名补全 / 折叠摘要 / settings 仓库展示）
+  "已补全为 {c}": "Completed to {c}",
+  "{n} 项": "{n} entries",
+  "{n} 个模块": "{n} modules",
+  "settings.gradle 里声明的仓库（只读）": "Repositories declared in settings.gradle (read-only)",
+  "无": "none",
+  "{n} 个仓库": "{n} repos",
+  "libs 目录（只读）": "libs/ directory (read-only)",
+  "库名或坐标，如 okhttp / com.x:y:1.0": "Lib name or coord, e.g. okhttp / com.x:y:1.0",
+
   "删除这条仓库": "Remove this repository",
   "仓库 URL，如 https://maven.aliyun.com/repository/public": "Repo URL, e.g. https://maven.aliyun.com/repository/public",
   "加到 {s}": "Add to {s}",

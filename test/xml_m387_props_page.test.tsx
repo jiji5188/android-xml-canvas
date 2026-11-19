@@ -5,7 +5,7 @@
 //    用 RTL（effect 要真跑，renderToStaticMarkup 不触加载）
 
 import { describe, expect, it, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { ProjectPropsDialog } from "@/components/ProjectPropsDialog";
 import { setAppConfigField } from "@/lib/xml/project-info";
 import type { ProjectSource } from "@/lib/xml/project-browse";
@@ -184,5 +184,65 @@ describe("M387 项目属性子页", () => {
     await new Promise((r) => setTimeout(r, 80));
     expect(document.querySelector(".axv-icon-page")).toBeTruthy();
     expect(document.querySelector(".axv-prop-form")).toBeNull();
+  }, 20000);
+});
+
+// M418：项目属性页优化（依赖简写补全 + 折叠摘要）
+const GROOVY_DEPS = `${GROOVY}
+dependencies {
+    implementation "androidx.appcompat:appcompat:1.7.0"
+}
+`;
+
+describe("M418 项目属性页优化", () => {
+  it("依赖输入库名 okhttp → 自动补全成完整坐标", async () => {
+    renderProps(GROOVY_DEPS);
+    await screen.findByText("compileSdk");
+    const box = document.querySelector(".axv-prop-add") as HTMLElement;
+    expect(box).toBeTruthy();
+    const input = box.querySelector("input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "okhttp" } });
+    fireEvent.click(box.querySelector("button") as HTMLButtonElement);
+    await waitFor(() => {
+      const depsText = document.querySelector(".axv-prop-deps")?.textContent ?? "";
+      expect(depsText).toContain("com.squareup.okhttp3:okhttp:4.12.0");
+    });
+    // 输入框清空 + 提示已补全
+    expect(input.value).toBe("");
+    expect(document.body.textContent).toContain("已补全为");
+  }, 20000);
+
+  it("完整坐标原样写入，不瞎补全", async () => {
+    renderProps(GROOVY_DEPS);
+    await screen.findByText("compileSdk");
+    const box = document.querySelector(".axv-prop-add") as HTMLElement;
+    const input = box.querySelector("input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "com.example:demo:1.2.3" } });
+    fireEvent.click(box.querySelector("button") as HTMLButtonElement);
+    await waitFor(() => {
+      expect(document.querySelector(".axv-prop-deps")?.textContent ?? "").toContain("com.example:demo:1.2.3");
+    });
+  }, 20000);
+
+  it("折叠摘要行：app 显示版本号、properties 显示空、settings 显示模块数", async () => {
+    renderProps(GROOVY);
+    await screen.findByText("compileSdk");
+    const sums = [...document.querySelectorAll(".axv-prop-file-sum")].map((e) => e.textContent ?? "");
+    expect(sums.join("|")).toContain("空"); // gradle.properties 没读到
+    expect(sums.join("|")).toContain("1.0 (1)"); // app/build.gradle：versionName (versionCode)
+  }, 20000);
+
+  it("折叠状态受控：收起 app 区后重渲染不被强制展开", async () => {
+    renderProps(GROOVY);
+    await screen.findByText("compileSdk");
+    const appSec = [...document.querySelectorAll(".axv-prop-file")].at(-1) as HTMLDetailsElement;
+    expect(appSec.open).toBe(true); // 默认展开
+    // jsdom 不会自己翻 open，手动设 + 发 toggle（组件应把状态同步成「收起」）
+    appSec.open = false;
+    fireEvent(appSec, new Event("toggle"));
+    // 触发一次重渲染（改 versionName），确认 open 没有被 React 改回 true
+    fireEvent.change(screen.getByDisplayValue("1.0"), { target: { value: "1.1" } });
+    const after = [...document.querySelectorAll(".axv-prop-file")].at(-1) as HTMLDetailsElement;
+    expect(after.open).toBe(false);
   }, 20000);
 });

@@ -124,6 +124,8 @@ export interface Toolchain {
   templates: ToolchainTemplateSpec[];
   /** 当前环境能不能构建（网页版 / 无原生桥 → false） */
   canBuild(): boolean;
+  /** 当前环境能不能运行/调试（可选；不支持执行的语言不实现） */
+  canRun?(): boolean;
   /** 构建产物 */
   build(input: unknown): Promise<ToolchainResultBase>;
   /** 运行 / 调试（可选；不支持执行的语言不实现） */

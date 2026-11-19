@@ -7,7 +7,8 @@
 
 import { useCallback, useState } from "react";
 import type { BuildApkResult } from "@/lib/xml/native-apk";
-import { buildApk, hasBuildApk, compileModeOf, installApk, shareApkFile } from "@/lib/xml/native-apk";
+import { compileModeOf, installApk, shareApkFile } from "@/lib/xml/native-apk";
+import { androidJavaToolchain } from "@/lib/plugin/toolchains/android-java";
 import { nativeBridge } from "@/lib/xml/native-save";
 import { projectSaveRoot, readAppGradle } from "@/lib/xml/project-save";
 import { parseGradlePackage } from "@/lib/xml/project-info";
@@ -142,7 +143,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
     async (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => {
       if (apkBusy) return;
       setApkResult(null);
-      if (!hasBuildApk()) {
+      if (!androidJavaToolchain.canBuild()) {
         const msg = tt("当前环境不支持打包（网页版没有 aapt2/apksig），请在手机上操作");
         setApkResult({ ok: false, step: "env", log: msg });
         // M260：早失败也要进抽屉构建日志，否则用户只看到弹窗短提示，无处回看
@@ -432,7 +433,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
               undefined, undefined, undefined, "info");
           }
         }
-        const r = await buildApk({
+        const r = await androidJavaToolchain.build({
           pkg,
           layout,
           appName: signAppName || layout,

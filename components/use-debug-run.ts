@@ -4,7 +4,7 @@
 
 import { useCallback, useState } from "react";
 import type { DebugRunResult } from "@/lib/xml/debug-run";
-import { debugCompile, debugRun, hasDebugRun } from "@/lib/xml/debug-run";
+import { androidJavaToolchain } from "@/lib/plugin/toolchains/android-java";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { collectProjectLibs, collectSharedLibs } from "@/lib/xml/project-libs";
 import { withCurrentSource } from "@/lib/xml/editor-buffer";
@@ -41,13 +41,13 @@ export function useDebugRun(deps: UseDebugRunDeps): UseDebugRunReturn {
   const { activeProject, aiFileIo, openRel, xml, resources, noteTimed, setExportNote } = deps;
   const [debugBusy, setDebugBusy] = useState(false);
   const [debugResult, setDebugResult] = useState<DebugRunResult | null>(null);
-  const canDebug = hasDebugRun();
+  const canDebug = androidJavaToolchain.canRun?.() ?? false;
 
   const doDebugRun = useCallback(
     async (o?: { entryClass?: string; entryMethod?: string; args?: string[] }) => {
       if (debugBusy) return;
       setDebugResult(null);
-      if (!hasDebugRun()) {
+      if (!androidJavaToolchain.canRun?.()) {
         const msg = tt("当前环境不支持调试运行（网页版没有 ECJ/D8），请在手机上操作");
         setDebugResult({ ok: false, step: "env", log: msg });
         noteTimed(msg, 6000);
@@ -110,7 +110,7 @@ export function useDebugRun(deps: UseDebugRunDeps): UseDebugRunReturn {
           : javaSources;
         // 6) 设备端编译成 dex
         setExportNote(tt("正在设备端编译（ECJ+D8）…"));
-        const comp = await debugCompile({
+        const comp = await androidJavaToolchain.compileDex({
           pkg,
           javaSources: finalSources,
           libs: allLibs.length ? allLibs.map((l) => ({ path: l.rel, base64: l.base64 })) : undefined,
@@ -124,7 +124,7 @@ export function useDebugRun(deps: UseDebugRunDeps): UseDebugRunReturn {
         }
         // 7) 动态加载执行
         setExportNote(tt("正在执行（动态加载 dex）…"));
-        const r = await debugRun({
+        const r = await androidJavaToolchain.runDex({
           dex: comp.dex,
           entryClass: o?.entryClass,
           entryMethod: o?.entryMethod,

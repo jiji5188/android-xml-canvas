@@ -111,6 +111,16 @@ describe("M409 android-java 适配器", () => {
     expect(r.step).toBe("env");
   });
 
+  it("无原生桥时 canRun() 为 false，compileDex/runDex 返回 env（不抛）", async () => {
+    expect(androidJavaToolchain.canRun?.()).toBe(false);
+    const c = await androidJavaToolchain.compileDex({ pkg: "com.example.app", javaSources: [] });
+    expect(c.ok).toBe(false);
+    expect(c.step).toBe("env");
+    const r = await androidJavaToolchain.runDex({ dex: [] });
+    expect(r.ok).toBe(false);
+    expect(r.step).toBe("env");
+  });
+
   it("无原生桥时 run() 返回 ok:false + step:env（不抛，也不碰 debugRun）", async () => {
     const r = await androidJavaToolchain.run({
       pkg: "com.example.app",

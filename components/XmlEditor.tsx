@@ -93,7 +93,8 @@ import { useEditorState } from "./editor-state";
 import { useBuildApk } from "./use-build-apk";
 import { useDebugRun } from "./use-debug-run";
 import { DebugRunPanel } from "./DebugRunPanel";
-import { installApk, shareApkFile, hasBuildApk, type BuildApkResult } from "@/lib/xml/native-apk";
+import { installApk, shareApkFile, type BuildApkResult } from "@/lib/xml/native-apk";
+import { androidJavaToolchain } from "@/lib/plugin/toolchains/android-java";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { ThemePickerPanel } from "./ThemePickerPanel";
@@ -2257,7 +2258,7 @@ const allDrawableNames = useMemo(() => {
         onNewItem={(kind) => void handleNewItem(kind)}
         onRun={() => setRunOpen(true)}
         realRenderAvailable={realRenderAvailable}
-        canBuildApk={hasBuildApk()}
+        canBuildApk={androidJavaToolchain.canBuild()}
         onBuildRun={() => void doBuildAndRun()}
         realRenderBusy={realRenderBusy}
         onRealRender={doRealRender}

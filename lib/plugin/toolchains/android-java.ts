@@ -49,6 +49,11 @@ export interface DebugSourceInput {
 export interface AndroidJavaToolchain extends Omit<Toolchain, "id" | "build" | "run"> {
   id: "android-java";
   build(input: BuildApkInput): Promise<BuildApkResult>;
+  /** ① 编译成 dex（两步调试的第一段，保留供需要进度提示的调用方使用） */
+  compileDex(input: DebugCompileInput): Promise<DebugCompileResult>;
+  /** ② 动态加载执行（两步调试的第二段） */
+  runDex(input: DebugRunInput): Promise<DebugRunResult>;
+  /** 两步合一（便捷入口；日志合并） */
   run(input: DebugSourceInput): Promise<DebugRunResult>;
 }
 
@@ -92,8 +97,13 @@ export const androidJavaToolchain: AndroidJavaToolchain = {
   },
 
   canBuild: () => hasBuildApk(),
+  canRun: () => hasDebugRun(),
 
   build: (input: BuildApkInput) => buildApk(input),
+
+  compileDex: (input: DebugCompileInput) => debugCompile(input),
+
+  runDex: (input: DebugRunInput) => debugRun(input),
 
   /**
    * 两步合一：先编译成 dex（失败直接返回 compile 步），再动态执行。
@@ -113,14 +123,9 @@ export const androidJavaToolchain: AndroidJavaToolchain = {
       libs: input.libs,
       candidates: input.candidates,
     };
-    const c: DebugCompileResult = await debugCompile(compileInput);
+    const c = await debugCompile(compileInput);
     if (!c.ok || !c.dex || c.dex.length === 0) {
-      return {
-        ok: false,
-        step: c.step || "compile",
-        log: c.log,
-        ms: c.bytes !== undefined ? undefined : undefined,
-      };
+      return { ok: false, step: c.step || "compile", log: c.log };
     }
     const runInput: DebugRunInput = {
       dex: c.dex,

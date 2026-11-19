@@ -4,10 +4,11 @@
 // 2) 点组头展开 → 该目录文件出现；再点收起
 // 3) 标准目录（app/src/main/libs）文件直接列出，不进 fileTree 组
 // 4) 顶部不再有「库目录」平铺按钮（改列表内组头 + 新建库目录入口）
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { LibsPanel } from "@/components/LibsPanel";
 import type { AiFileIo, AiFileEntry } from "@/lib/xml/ai-tools";
+import type { GradleDep } from "@/lib/xml/gradle-deps";
 
 const ROOT_BUILD = `buildscript { repositories { google() } }`;
 const APP_BUILD = `plugins { id 'com.android.application' }

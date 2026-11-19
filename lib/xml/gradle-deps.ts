@@ -622,15 +622,180 @@ export function insertImplementation(
  *  groovy（implementation 'g:a:v'）和 kts（implementation("g:a:v")）都认，行尾单行注释也一起删。
  *  返回 [新文本, 是否删了]。 */
 export function removeImplementation(text: string, coord: string): [string, boolean] {
+  // M430：整块删——命中坐标行后面若跟 { exclude ... } 块，一起吞掉（否则留下孤立 { } 语法错）
   const esc = coord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(
-    "^[ \\t]*(?:implementation|api|compile|compileOnly|runtimeOnly|testImplementation|androidTestImplementation)\\s*\\(?\\s*[\"']" +
+  const reLine = new RegExp(
+    "^[ \\t]*(?:implementation|api|compile|compileOnly|runtimeOnly|testImplementation|androidTestImplementation)\\s*\\(?\\s*[\\\"']" +
       esc +
-      "[\"']\\s*\\)?[ \\t]*(?://.*)?\\r?\\n?",
+      "[\\\"']\\s*\\)?[ \\t]*(?:\\{)?[ \\t]*(?://.*)?$",
+  );
+  const lines = text.split(/\r?\n/);
+  const idx = lines.findIndex((ln) => reLine.test(ln));
+  if (idx < 0) return [text, false];
+  const hasBrace = /\{[ \t]*(?:(?:\/\/).*)?$/.test(lines[idx]);
+  let end = idx;
+  if (hasBrace) {
+    let depth = 0;
+    for (let i = idx; i < lines.length; i++) {
+      for (const ch of lines[i]) {
+        if (ch === "{") depth++;
+        else if (ch === "}") depth--;
+      }
+      if (depth <= 0) {
+        end = i;
+        break;
+      }
+    }
+  }
+  const out = [...lines.slice(0, idx), ...lines.slice(end + 1)];
+  return [out.join("\n"), true];
+}
+
+/** M430：改某条依赖的坐标/配置类型，**保留**它后面的 { exclude ... } 块。
+ *  返回 [新文本, 是否改动]。 */
+export function updateImplementation(
+  text: string,
+  oldCoord: string,
+  next: { group: string; name: string; version: string; config?: string },
+  kts: boolean,
+): [string, boolean] {
+  const newCoord = `${next.group}:${next.name}:${next.version}`;
+  const esc = oldCoord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(
+    "^([ \\t]*)(implementation|api|compile|compileOnly|runtimeOnly|testImplementation|androidTestImplementation)(\\s*\\(?\\s*[\\\"'])" +
+      esc +
+      "([\\\"']\\s*\\)?)(.*)$",
     "m",
   );
   const m = text.match(re);
   if (!m) return [text, false];
+  const cfg = next.config || m[2];
+  if (oldCoord === newCoord && cfg === m[2]) return [text, false];
+  const replaced = `${m[1]}${cfg}${m[3]}${newCoord}${m[4]}${m[5]}`;
+  return [text.replace(re, () => replaced), true];
+}
+
+/** M430：从某条依赖的 { exclude } 块里删一条 exclude；块空了连壳（{ / }）一起收掉。
+ *  返回 [新文本, 是否改动]。 */
+export function removeExcludeFromDep(
+  text: string,
+  target: { group: string; name: string; version: string },
+  ex: { group: string; module: string },
+  kts: boolean,
+): [string, boolean] {
+  const coord = `${target.group}:${target.name}:${target.version}`;
+  const esc = coord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const reLine = new RegExp(
+    "^[ \\t]*(?:implementation|api|compile|compileOnly|runtimeOnly|testImplementation|androidTestImplementation)\\s*\\(?\\s*[\\\"']" +
+      esc +
+      "[\\\"']\\s*\\)?[ \\t]*\\{[ \\t]*$",
+  );
+  const lines = text.split(/\r?\n/);
+  const idx = lines.findIndex((ln) => reLine.test(ln));
+  if (idx < 0) return [text, false];
+  let end = -1;
+  let depth = 0;
+  for (let i = idx; i < lines.length; i++) {
+    for (const ch of lines[i]) {
+      if (ch === "{") depth++;
+      else if (ch === "}") depth--;
+    }
+    if (i > idx && depth <= 0) {
+      end = i;
+      break;
+    }
+  }
+  if (end < 0) return [text, false];
+  const escExG = ex.group.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escExM = ex.module.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const reG = new RegExp("exclude\\s+group\\s*:\\s*[\\\"']" + escExG + "[\\\"']\\s*,\\s*module\\s*:\\s*[\\\"']" + escExM + "[\\\"']");
+  const reK = new RegExp("exclude\\(\\s*group\\s*=\\s*\\\"" + escExG + "\\\"\\s*,\\s*module\\s*=\\s*\\\"" + escExM + "\\\"\\s*\\)");
+  const kept: string[] = [];
+  let removed = false;
+  for (let i = idx + 1; i < end; i++) {
+    const t = lines[i];
+    if (!removed && (reG.test(t) || reK.test(t))) {
+      removed = true;
+      continue;
+    }
+    kept.push(t);
+  }
+  if (!removed) return [text, false];
+  const anyLeft = kept.some((t) => /exclude/.test(t));
+  const head = lines.slice(0, idx);
+  const tail = lines.slice(end + 1);
+  const out = anyLeft
+    ? [...head, lines[idx], ...kept, lines[end], ...tail]
+    : [...head, lines[idx].replace(/[ \t]*\{[ \t]*$/, ""), ...kept.filter((t) => t.trim() !== ""), ...tail];
+  return [out.join("\n"), true];
+}
+
+/** M430：往 dependencies 里插一行（自定义行文本，insertImplementation / insertFileTree 共用） */
+function insertDepLine(text: string, depLine: string, kts: boolean): [string, boolean] {
+  if (/\bdependencies\s*\{/.test(text)) {
+    const m = text.match(/\bdependencies\s*\{/);
+    if (m) {
+      const idx = m.index! + m[0].length;
+      return [text.slice(0, idx) + `\n        ${depLine}` + text.slice(idx), false];
+    }
+  }
+  const block = `\n\ndependencies {\n    ${depLine}\n}\n`;
+  return [text.replace(/\s*$/, "") + "\n" + block, false];
+}
+
+/** M430：写一条 fileTree 声明；同 dir+includes 已存在则不动。返回 [新文本, 是否已存在]。 */
+export function insertFileTree(
+  text: string,
+  ft: { dir: string; includes: string[] },
+  kts: boolean,
+): [string, boolean] {
+  const exists = parseFileTrees(text).some(
+    (f) => f.dir === ft.dir && f.includes.join(",") === ft.includes.join(","),
+  );
+  if (exists) return [text, true];
+  const dir = ft.dir.replace(/\\/g, "/");
+  const line = kts
+    ? `implementation(fileTree(mapOf("dir" to "${dir}", "include" to listOf(${ft.includes.map((i) => `"${i}"`).join(", ")}))))`
+    : `implementation fileTree(dir: '${dir}', include: [${ft.includes.map((i) => `'${i}'`).join(", ")}])`;
+  return insertDepLine(text, line, kts);
+}
+
+/** M430：改一条已有 fileTree 的 dir / includes。返回 [新文本, 是否改动]。 */
+export function updateFileTree(
+  text: string,
+  oldDir: string,
+  next: { dir: string; includes: string[] },
+  kts: boolean,
+): [string, boolean] {
+  const lines = text.split(/\r?\n/);
+  const idx = lines.findIndex((l) => /\bfileTree\s*\(/.test(l) && new RegExp("dir\\s*:\\s*(?:file\\s*\\(\\s*)?['\"]" + oldDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "['\"]").test(l));
+  if (idx < 0) return [text, false];
+  const ln = lines[idx];
+  const dir = next.dir.replace(/\\/g, "/");
+  let out = ln;
+  if (kts) {
+    out = out.replace(/"dir"\s+to\s+"[^"]*"/, `"dir" to "${dir}"`);
+    out = out.replace(/("include"\s+to\s+listOf\s*\()([\s\S]*?)(\))/, `$1${next.includes.map((i) => `"${i}"`).join(", ")}$3`);
+  } else {
+    out = out.replace(/dir\s*:\s*(?:file\s*\(\s*)?(['"])[^'"]*\1/, `dir: '${dir}'`);
+    out = out.replace(/include\s*:\s*\[[^\]]*\]/, `include: [${next.includes.map((i) => `'${i}'`).join(", ")}]`);
+  }
+  if (out === ln) return [text, false];
+  lines[idx] = out;
+  return [lines.join("\n"), true];
+}
+
+/** M430：删一条 fileTree 声明（按 dir 定位，整行删）。返回 [新文本, 是否删除]。 */
+export function removeFileTree(text: string, dir: string): [string, boolean] {
+  const escDir = dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // groovy: implementation fileTree(dir: 'libs', ...) / kts: implementation(fileTree(mapOf("dir" to "libs", ...)))
+  const re = new RegExp(
+    "^[ \\t]*(?:implementation|api|compileOnly|runtimeOnly|compile)\\s*\\(?\\s*fileTree\\([^\\r\\n]*?(?:\"dir\"\\s+to\\s*|dir\\s*:\\s*(?:file\\(\\s*)?)['\"]" +
+      escDir +
+      "['\"][^\\r\\n]*$\\r?\\n?",
+    "m",
+  );
+  if (!re.test(text)) return [text, false];
   return [text.replace(re, ""), true];
 }
 

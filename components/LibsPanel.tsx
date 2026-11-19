@@ -21,6 +21,11 @@ import {
   insertRepoUrl,
   mavenCoord,
   removeImplementation,
+  updateImplementation,
+  removeExcludeFromDep,
+  insertFileTree,
+  updateFileTree,
+  removeFileTree,
   findDepConflicts,
   findConflictsForNew,
   addExcludesToGradle,
@@ -1029,16 +1034,23 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     }
   }, [gradleDeps, gradleBusyKey, presentNames, downloadGradleDep]);
 
-  // ===== M401：项目库 tab 顶部「库目录」（改 fileTree 的 dir+include）+「+」（加 maven 依赖）=====
+  // ===== M401/M430：统一「添加依赖」弹窗（Maven / 本地库目录 两个 tab）=====
   /** 要改哪个 fileTree 声明（null = 新建一条）；ftIncludes 多选（*.jar/*.aar…） */
-  const [ftOpen, setFtOpen] = useState(false);
   const [ftTarget, setFtTarget] = useState<number | null>(null);
   const [ftDir, setFtDir] = useState("");
   const [ftIncludes, setFtIncludes] = useState<string[]>([]);
   /** 加依赖弹窗 */
   const [depOpen, setDepOpen] = useState(false);
+  const [depModalTab, setDepModalTab] = useState<"maven" | "ft">("maven");
   const [depInput, setDepInput] = useState("");
   const [depBusy, setDepBusy] = useState(false);
+  // M430：依赖 exclude 展开状态（key = g:n:v）
+  const [depExOpen, setDepExOpen] = useState<Record<string, boolean>>({});
+  // M430：编辑依赖弹窗 / 添加 exclude 弹窗 / 编辑 fileTree
+  const [depEdit, setDepEdit] = useState<GradleDep | null>(null);
+  const [editForm, setEditForm] = useState({ group: "", name: "", version: "", config: "implementation" });
+  const [exTarget, setExTarget] = useState<GradleDep | null>(null);
+  const [exForm, setExForm] = useState({ group: "", module: "" });
 
   const openFtModal = useCallback((idx: number | null) => {
     if (!nativeProjectRoot) {
@@ -1055,7 +1067,8 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       setFtDir(ft?.dir || "");
       setFtIncludes(ft?.includes?.length ? ft.includes : ["*.jar", "*.aar"]);
     }
-    setFtOpen(true);
+    setDepModalTab("ft");
+    setDepOpen(true);
   }, [nativeProjectRoot, gradleFileTrees, onNote, tr]);
 
   /** 写 gradle 文件：native 优先（绝对路径），失败回退 aiFileIo（相对路径） */
@@ -1076,74 +1089,162 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     [nativeProjectRoot, native, aiFileIo],
   );
 
-  /** 保存 fileTree 配置：ftTarget=null 新建（追加到 app/build.gradle 的 dependencies），否则按 raw 锚定整行替换 */
+  /** M430：复制文本（坐标 / 排除项）到剪贴板 */
+  const copyCoord = useCallback(
+    async (text: string) => {
+      try {
+        if (navigator?.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text);
+          onNote?.(tr("libs.copied", "已复制：{t}", { t: text }));
+          return;
+        }
+      } catch { /* fall through */ }
+      onNote?.(tr("libs.copy_fail", "复制失败，请手动选中：{t}", { t: text }));
+    },
+    [onNote, tr],
+  );
+
+  /** M430：对 build.gradle 做文本变换并写回（app/ 优先，其次根目录；.kts 自动识别）。
+   *  读/写双通道：native 绝对路径优先，失败回退 aiFileIo 相对路径（web/SAF 项目也能改 gradle）。 */
+  const applyGradleEdit = useCallback(
+    async (
+      fn: (text: string, kts: boolean) => [string, boolean],
+      okNote: (rel: string) => string,
+      failNote: string,
+    ): Promise<boolean> => {
+      if (!nativeProjectRoot && !aiFileIo) {
+        onNote?.(tr("libs.apply_need_project", "请先打开一个项目，才能改 build.gradle"));
+        return false;
+      }
+      const root = (nativeProjectRoot || "").replace(/[\\/]+$/, "");
+      for (const rel of ["app/build.gradle", "app/build.gradle.kts", "build.gradle", "build.gradle.kts"]) {
+        let text = "";
+        if (root && native?.readText) {
+          try {
+            const t = String(native.readText(root + "/" + rel) ?? "");
+            if (t && !t.startsWith("err:")) text = t;
+          } catch { /* fall through */ }
+        }
+        if (!text && aiFileIo?.read) {
+          try {
+            const r = await aiFileIo.read(rel);
+            if (r.ok) text = r.text || "";
+          } catch { /* ignore */ }
+        }
+        if (!text) continue;
+        const [next, changed] = fn(text, rel.endsWith(".kts"));
+        if (!changed) continue;
+        if (!(await writeGradleFile(rel, next))) continue;
+        onNote?.(okNote(rel));
+        void refresh();
+        void scanGradleDeps();
+        return true;
+      }
+      onNote?.(failNote);
+      return false;
+    },
+    [nativeProjectRoot, aiFileIo, native, writeGradleFile, onNote, tr, refresh, scanGradleDeps],
+  );
+
+  /** M430：保存 fileTree 配置（新建 / 编辑），走 updateFileTree / insertFileTree 纯函数 */
   const saveFtConfig = useCallback(async () => {
-    if (!nativeProjectRoot) {
-      onNote?.(tr("libs.ft_need_project", "请先打开一个项目，才能改 build.gradle 的 fileTree"));
-      return;
-    }
     const dir = ftDir.trim();
     if (!dir) { onNote?.(tr("libs.ft_dir_empty", "目录不能为空")); return; }
     const inc = ftIncludes.map((s) => s.trim()).filter(Boolean);
-    const decl = `implementation fileTree(dir: \"${dir}\", include: [${inc.map((s) => `\"${s}\"`).join(", ")}])`;
-    const target = ftTarget === null ? null : gradleFileTrees[ftTarget];
-    const files = ["app/build.gradle", "build.gradle"];
-    if (target && ftTarget !== null) {
-      // 编辑：在含该 raw 前缀的行里做替换（多文件都有同名时改第一份）
-      const anchor = target.raw.slice(0, 20); // fileTree( + dir 片段
-      for (const rel of files) {
-        const abs = nativeProjectRoot.replace(/[\\/]+$/, "") + "/" + rel;
-        let text = "";
-        try { const t = String(native?.readText?.(abs) ?? ""); if (t && !t.startsWith("err:")) text = t; } catch {}
-        if (!text || !text.includes(anchor)) continue;
-        const lines = text.split(/\r?\n/);
-        const hi = lines.findIndex((l) => l.replace(/\s+/g, " ").includes(anchor));
-        if (hi < 0) continue;
-        const indent = (lines[hi].match(/^(\s*)/) || ["", ""])[1];
-        lines[hi] = `${indent}${decl}`;
-        if (await writeGradleFile(rel, lines.join("\n"))) {
-          onNote?.(tr("libs.ft_saved", "fileTree 已改为 dir: {d}{i}（{f}，刷新后生效）", { d: dir, i: inc.length ? "，include: " + inc.join(", ") : "", f: rel }));
-          setFtOpen(false);
-          void refresh();
-          void scanGradleDeps();
-          return;
-        }
-      }
-      onNote?.(tr("libs.ft_save_fail", "没找到含该 fileTree 的 gradle 文件（或写失败）", {}));
+    const desc = `${dir}${inc.length ? " · " + inc.join(", ") : ""}`;
+    if (ftTarget === null) {
+      let dup = false;
+      const ok = await applyGradleEdit(
+        (text, kts) => {
+          const [t, existed] = insertFileTree(text, { dir, includes: inc }, kts);
+          if (existed) { dup = true; return [text, false]; }
+          return [t, true];
+        },
+        (rel) => tr("libs.ft_added2", "已加 fileTree {d}（{f}）", { d: desc, f: rel }),
+        tr("libs.ft_save_fail2", "写 fileTree 失败：没找到可写的 build.gradle（app/build.gradle 或根目录）"),
+      );
+      if (dup && !ok) onNote?.(tr("libs.ft_dup", "该库目录配置已存在：{d}", { d: desc }));
+      if (ok) setDepOpen(false);
       return;
     }
-    // 新建：追加到 app/build.gradle 的 dependencies 块（没有就建块）
-    for (const rel of files) {
-      const abs = nativeProjectRoot.replace(/[\\/]+$/, "") + "/" + rel;
-      let text = "";
-      try { const t = String(native?.readText?.(abs) ?? ""); if (t && !t.startsWith("err:")) text = t; } catch {}
-      if (!text) continue;
-      let newText: string;
-      if (/\bdependencies\s*\{/.test(text)) {
-        const m = text.match(/\bdependencies\s*\{/);
-        const idx = (m?.index ?? 0) + (m?.[0].length ?? 0);
-        newText = text.slice(0, idx) + `\n    ${decl}` + text.slice(idx);
-      } else {
-        newText = text.replace(/\s*$/, "") + `\n\ndependencies {\n    ${decl}\n}\n`;
-      }
-      if (await writeGradleFile(rel, newText)) {
-        onNote?.(tr("libs.ft_added", "已加 fileTree dir: {d}{i}（{f}）", { d: dir, i: inc.length ? "，include: " + inc.join(", ") : "", f: rel }));
-        setFtOpen(false);
-        void refresh();
-        void scanGradleDeps();
-        return;
-      }
-    }
-    onNote?.(tr("libs.ft_save_fail", "写 fileTree 失败：没有可写的 build.gradle", {}));
-  }, [ftDir, ftIncludes, ftTarget, gradleFileTrees, native, nativeProjectRoot, onNote, tr, writeGradleFile, refresh, scanGradleDeps]);
+    const oldDir = gradleFileTrees[ftTarget]?.dir || "";
+    const ok = await applyGradleEdit(
+      (text, kts) => updateFileTree(text, oldDir, { dir, includes: inc }, kts),
+      (rel) => tr("libs.ft_saved2", "fileTree 已改为 {d}（{f}）", { d: desc, f: rel }),
+      tr("libs.ft_save_fail", "没找到含该 fileTree 的 gradle 文件（或写失败）"),
+    );
+    if (ok) setDepOpen(false);
+  }, [ftDir, ftIncludes, ftTarget, gradleFileTrees, applyGradleEdit, onNote, tr]);
+
+  /** M430：删一条 fileTree 声明 */
+  const removeFtConfig = useCallback(
+    async (dir: string) => {
+      if (!dir) return;
+      await applyGradleEdit(
+        (text, kts) => removeFileTree(text, dir),
+        (rel) => tr("libs.ft_removed", "已移除库目录 {d} 的 fileTree 声明（{f}）", { d: dir, f: rel }),
+        tr("libs.ft_remove_fail", "没找到该 fileTree 声明（或写失败）"),
+      );
+    },
+    [applyGradleEdit, tr],
+  );
+
+  /** M430：删掉某条依赖的某一条 exclude */
+  const removeOneExclude = useCallback(
+    async (d: GradleDep, ex: { group: string; module: string }) => {
+      await applyGradleEdit(
+        (text, kts) =>
+          removeExcludeFromDep(text, { group: d.group, name: d.name, version: d.version }, ex, kts),
+        () => tr("libs.ex_removed", "已删 exclude {g}:{m}", { g: ex.group, m: ex.module }),
+        tr("libs.ex_remove_fail", "没找到该 exclude 条目（或写失败）"),
+      );
+    },
+    [applyGradleEdit, tr],
+  );
+
+  /** M430：给某条依赖加一条 exclude */
+  const submitAddExclude = useCallback(async () => {
+    const d = exTarget;
+    if (!d) return;
+    const g = exForm.group.trim();
+    const m = exForm.module.trim();
+    if (!g || !m) { onNote?.(tr("libs.ex_invalid", "group 和 module 都要填")); return; }
+    const ok = await applyGradleEdit(
+      (text, kts) => addExcludesToGradle(text, { group: d.group, name: d.name, version: d.version }, [{ group: g, module: m }], kts),
+      () => tr("libs.ex_added", "已加 exclude {g}:{m}", { g, m }),
+      tr("libs.ex_add_fail", "加 exclude 失败：没找到该依赖声明（或写失败）"),
+    );
+    if (ok) { setExTarget(null); setExForm({ group: "", module: "" }); }
+  }, [exTarget, exForm, applyGradleEdit, onNote, tr]);
+
+  /** M430：保存「编辑依赖」（改坐标 / 配置类型，保 exclude 块） */
+  const submitDepEdit = useCallback(async () => {
+    const d = depEdit;
+    if (!d) return;
+    const g = editForm.group.trim();
+    const n = editForm.name.trim();
+    const v = editForm.version.trim();
+    if (!g || !n || !v) { onNote?.(tr("libs.dep_edit_invalid", "group / artifact / version 都不能为空")); return; }
+    const cfg = editForm.config || "implementation";
+    const ok = await applyGradleEdit(
+      (text, kts) =>
+        updateImplementation(text, `${d.group}:${d.name}:${d.version}`, { group: g, name: n, version: v, config: cfg }, kts),
+      () => tr("libs.dep_edited", "依赖已改为 {c}", { c: `${cfg} ${g}:${n}:${v}` }),
+      tr("libs.dep_edit_fail", "改依赖失败：没找到该声明（或写失败）"),
+    );
+    if (ok) setDepEdit(null);
+  }, [depEdit, editForm, applyGradleEdit, onNote, tr]);
+
 
   /** M401：加 maven 依赖弹窗——解析输入，去重后写 build.gradle 的 implementation + settings.gradle 的 repositories */
-  const openDepModal = useCallback(() => {
+  const openDepModal = useCallback((tab: "maven" | "ft" = "maven") => {
     if (!nativeProjectRoot) {
       onNote?.(tr("libs.apply_need_project", "请先打开一个项目，才能应用库"));
       return;
     }
     setDepInput("");
+    setDepModalTab(tab);
+    if (tab === "ft") { setFtTarget(null); setFtDir(""); setFtIncludes(["*.jar", "*.aar"]); }
     setDepOpen(true);
   }, [nativeProjectRoot, onNote, tr]);
 
@@ -1270,17 +1371,6 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           M401：左边加「库目录」（改/加 fileTree 的 dir+include）+「+」（加 maven 依赖） */}
       {tab === "project" && gradleDeps.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "0 8px 6px" }}>
-          {/* M425：fileTree 配置改在列表里二级展示（库目录·dir 组头 + 编辑按钮），这里只留 + 加依赖 / 一键下载 */}
-          <button
-            type="button"
-            className="axv-libs-btn"
-            style={{ fontSize: 11, padding: "2px 8px", whiteSpace: "nowrap", flex: "0 0 auto" }}
-            onClick={() => openDepModal()}
-            title={tr("libs.dep_add", "加依赖")}
-          >
-            <span aria-hidden="true" style={{ fontSize: 14, verticalAlign: "middle", marginRight: 3 }}>+</span>
-            {tr("libs.dep_add", "加依赖")}
-          </button>
           <button
             type="button"
             className="axv-libs-btn primary"
@@ -1338,8 +1428,16 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
               <div className="axv-libs-empty" style={{ padding: "4px 8px", fontSize: 11 }}>{gradleMsg}</div>
             )}
             {gradleScanned && gradleDeps.length === 0 && !gradleMsg && gradleUnresolved.length === 0 && gradleFileTrees.length === 0 && (
-              <div className="axv-libs-empty" style={{ padding: "4px 8px", fontSize: 11 }}>
+              <div className="axv-libs-empty" style={{ padding: "8px", fontSize: 11, lineHeight: 1.6 }}>
                 {tr("libs.gradle_none", "没解析到 maven 依赖（fileTree / project 除外）")}
+                <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                  <button type="button" className="axv-libs-btn" style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => openDepModal("maven")}>
+                    + {tr("libs.dep_add", "加依赖（Maven）")}
+                  </button>
+                  <button type="button" className="axv-libs-btn" style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => openFtModal(null)}>
+                    + {tr("libs.ft_new", "新建库目录")}
+                  </button>
+                </div>
               </div>
             )}
             {gradleUnresolved.length > 0 && (
@@ -1366,53 +1464,119 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                 </div>
               </div>
             ))}
-            {/* M372：fileTree 不再显示声明行 —— dir 并入候选目录、按 include 过滤后直接列库文件 */}
+            {/* M430：maven 依赖行 —— 有 exclude 的可展开，长按菜单支持编辑/加排除/复制/移除 */}
             {gradleDeps.filter((d) => matchGradleDep(d, libQuery)).map((d) => {
               const key = d.group + ":" + d.name + ":" + d.version;
               const st = gradleBusyKey[key] || "";
               const present = presentNames.has(gradleDepFname(d));
+              const exs = d.excludes || [];
+              const exOpen = !!depExOpen[key];
               return (
-                <div
-                  key={key}
-                  className="axv-libs-item"
-                  style={{ alignItems: "center" }}
-                  {...((present || st === "done")
-                    ? bindLongPress([
-                        { key: "save", label: tr("libs.save_libs", "存 libs"), onClick: () => saveSharedToLibs(gradleDepFname(d)) },
-                        { key: "remove", label: tr("libs.remove", "移除"), danger: true, onClick: () => void removeFromProject(gradleDepFname(d), d) },
-                      ])
-                    : {})}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
-                      {(present || st === "done") && <span style={{ color: "#1a7f37", marginRight: 4 }}>✓</span>}
-                      {d.name}
-                      <span style={{ opacity: 0.55, marginLeft: 6, fontSize: 11 }}>{d.version}</span>
-                      <span style={{ opacity: 0.4, marginLeft: 6, fontSize: 10 }}>{d.config}</span>
+                <div key={key}>
+                  <div
+                    className="axv-libs-item"
+                    style={{ alignItems: "center" }}
+                    {...bindLongPress([
+                      {
+                        key: "edit",
+                        label: tr("libs.dep_edit", "编辑依赖"),
+                        onClick: () => {
+                          setDepEdit(d);
+                          setEditForm({ group: d.group, name: d.name, version: d.version, config: d.config || "implementation" });
+                        },
+                      },
+                      {
+                        key: "exadd",
+                        label: tr("libs.ex_add", "添加 exclude"),
+                        onClick: () => { setExTarget(d); setExForm({ group: "", module: "" }); },
+                      },
+                      { key: "copy", label: tr("libs.copy_coord", "复制坐标"), onClick: () => void copyCoord(key) },
+                      ...(present || st === "done"
+                        ? [{ key: "save", label: tr("libs.save_libs", "存 libs"), onClick: () => saveSharedToLibs(gradleDepFname(d)) }]
+                        : []),
+                      { key: "remove", label: tr("libs.remove", "移除"), danger: true, onClick: () => void removeFromProject(gradleDepFname(d), d) },
+                    ])}
+                  >
+                    {exs.length > 0 ? (
+                      <button
+                        type="button"
+                        aria-label={tr("libs.ex_toggle", "展开 / 收起 exclude")}
+                        onClick={() => setDepExOpen((m) => ({ ...m, [key]: !m[key] }))}
+                        style={{ background: "none", border: "none", padding: 0, marginRight: 2, cursor: "pointer", display: "flex" }}
+                      >
+                        <span className="msr" aria-hidden="true" style={{ fontSize: 18, opacity: 0.6 }}>
+                          {exOpen ? "expand_more" : "chevron_right"}
+                        </span>
+                      </button>
+                    ) : null}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="axv-libs-item-name" style={{ fontSize: 12 }}>
+                        {(present || st === "done") && <span style={{ color: "#1a7f37", marginRight: 4 }}>✓</span>}
+                        {d.name}
+                        <span style={{ opacity: 0.55, marginLeft: 6, fontSize: 11 }}>{d.version}</span>
+                        <span style={{ opacity: 0.4, marginLeft: 6, fontSize: 10 }}>{d.config}</span>
+                        {exs.length > 0 && (
+                          <span
+                            style={{
+                              marginLeft: 6, fontSize: 9, padding: "0 4px", borderRadius: 3,
+                              background: "rgba(0,0,0,0.07)", color: "#555", whiteSpace: "nowrap",
+                            }}
+                          >
+                            {tr("libs.ex_badge", "exclude {n}", { n: exs.length })}
+                          </span>
+                        )}
+                      </div>
+                      <div className="axv-libs-item-rel" style={{ fontSize: 10, opacity: 0.6 }} title={key}>
+                        {d.group}
+                      </div>
                     </div>
-                    <div className="axv-libs-item-rel" style={{ fontSize: 10, opacity: 0.6 }} title={key}>
-                      {d.group}
-                    </div>
+                    {present || st === "done" ? (
+                      <span style={{ fontSize: 11, color: "#1a7f37", whiteSpace: "nowrap", marginRight: 6 }}>
+                        {tr("libs.cat_present", "已下载")}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="axv-libs-btn"
+                        style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
+                        disabled={st === "downloading"}
+                        onClick={() => void downloadGradleDep(d)}
+                      >
+                        {st === "downloading" ? tr("libs.downloading", "下载中…") : tr("libs.cat_download", "下载")}
+                      </button>
+                    )}
+                    {st && st.startsWith("err:") && (
+                      <span style={{ fontSize: 10, color: "#c62828", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={st.slice(4)}>
+                        ✗ {st.slice(4)}
+                      </span>
+                    )}
                   </div>
-                  {present || st === "done" ? (
-                    <span style={{ fontSize: 11, color: "#1a7f37", whiteSpace: "nowrap", marginRight: 6 }}>
-                      {tr("libs.cat_present", "已下载")}
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="axv-libs-btn"
-                      style={{ whiteSpace: "nowrap", fontSize: 11, padding: "2px 8px", marginRight: 6 }}
-                      disabled={st === "downloading"}
-                      onClick={() => void downloadGradleDep(d)}
-                    >
-                      {st === "downloading" ? tr("libs.downloading", "下载中…") : tr("libs.cat_download", "下载")}
-                    </button>
-                  )}
-                  {st && st.startsWith("err:") && (
-                    <span style={{ fontSize: 10, color: "#c62828", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={st.slice(4)}>
-                      ✗ {st.slice(4)}
-                    </span>
+                  {exOpen && exs.length > 0 && (
+                    <div style={{ paddingLeft: 26 }}>
+                      {exs.map((ex) => (
+                        <div
+                          key={ex.group + ":" + ex.module}
+                          className="axv-libs-item"
+                          style={{ alignItems: "center", padding: "2px 6px", background: "rgba(0,0,0,0.02)" }}
+                          {...bindLongPress([
+                            { key: "copy", label: tr("libs.copy_coord", "复制坐标"), onClick: () => void copyCoord(ex.group + ":" + ex.module) },
+                            { key: "del", label: tr("libs.ex_del", "删除这条 exclude"), danger: true, onClick: () => void removeOneExclude(d, ex) },
+                          ])}
+                        >
+                          <div style={{ flex: 1, minWidth: 0, fontSize: 10, opacity: 0.75, fontFamily: "monospace", wordBreak: "break-all" }}>
+                            {ex.group} : {ex.module}
+                          </div>
+                          <button
+                            type="button"
+                            title={tr("libs.ex_del", "删除这条 exclude")}
+                            onClick={() => void removeOneExclude(d, ex)}
+                            style={{ background: "none", border: "none", color: "#c62828", fontSize: 14, padding: "0 4px", cursor: "pointer", lineHeight: 1 }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               );
@@ -1429,6 +1593,15 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                         style={{ alignItems: "center", cursor: "pointer", background: "rgba(0,0,0,0.03)" }}
                         onClick={() => setFtExpanded((m) => ({ ...m, [g.index]: !m[g.index] }))}
                         title={g.ft.dir}
+                        {...bindLongPress([
+                          { key: "edit", label: tr("libs.ft_edit", "编辑库目录"), onClick: () => openFtModal(g.index) },
+                          {
+                            key: "del",
+                            label: tr("libs.ft_remove", "移除这条 fileTree"),
+                            danger: true,
+                            onClick: () => void removeFtConfig(g.ft.dir),
+                          },
+                        ])}
                       >
                         <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
                           {open ? "expand_more" : "chevron_right"}
@@ -1476,12 +1649,22 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                 })}
               </div>
             )}
-            {/* 新建库目录入口（fileTree 未覆盖时也能加一条） */}
-            <div style={{ margin: "4px 8px" }}>
+            {/* M430：列表底部常驻入口（不依赖已有 fileTree；空项目也能加） */}
+            <div style={{ display: "flex", gap: 6, margin: "8px 8px 4px", flexWrap: "wrap" }}>
               <button
                 type="button"
                 className="axv-libs-btn"
-                style={{ fontSize: 11, padding: "2px 8px", whiteSpace: "nowrap" }}
+                style={{ fontSize: 11, padding: "3px 10px", whiteSpace: "nowrap" }}
+                onClick={() => openDepModal("maven")}
+                title={tr("libs.dep_add", "加依赖（Maven）")}
+              >
+                <span aria-hidden="true" style={{ fontSize: 14, verticalAlign: "middle", marginRight: 3 }}>+</span>
+                {tr("libs.dep_add", "加依赖（Maven）")}
+              </button>
+              <button
+                type="button"
+                className="axv-libs-btn"
+                style={{ fontSize: 11, padding: "3px 10px", whiteSpace: "nowrap" }}
                 onClick={() => openFtModal(null)}
                 title={tr("libs.ft_new", "新建库目录（fileTree）")}
               >
@@ -1673,48 +1856,153 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           </div>
         </div>
       )}
-      {/* M401：库目录（fileTree dir+include）编辑弹窗 */}
-      {ftOpen && (
-        <div className="axv-libs-dl-overlay" onClick={() => setFtOpen(false)}>
-          <div className="axv-libs-dl-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ maxWidth: 300 }}>
-            <div className="axv-libs-dl-title">{ftTarget === null ? tr("libs.ft_new", "库目录") : tr("libs.ft_edit", "库目录")}</div>
-            <div style={{ fontSize: 11, opacity: 0.6, margin: "4px 0 8px", lineHeight: 1.5 }}>
-              {tr("libs.ft_hint", "dir 是 build.gradle fileTree 的库目录（相对模块目录 app/，也可写全路径 app/libs）；include 是文件后缀名通配符。")}
+      {/* M430：统一「添加依赖」弹窗 —— Maven 库 / 本地库目录 两个 tab */}
+      {depOpen && (
+        <div className="axv-libs-dl-overlay" onClick={() => setDepOpen(false)}>
+          <div className="axv-libs-dl-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ maxWidth: 340 }}>
+            <div className="axv-libs-dl-title">{tr("libs.add_dep_title", "添加依赖")}</div>
+            <div style={{ display: "flex", gap: 6, margin: "6px 0 10px" }}>
+              <button
+                type="button"
+                className={"axv-libs-btn" + (depModalTab === "maven" ? " primary" : "")}
+                style={{ flex: 1, fontSize: 12 }}
+                onClick={() => setDepModalTab("maven")}
+              >
+                {tr("libs.tab_maven", "Maven 库")}
+              </button>
+              <button
+                type="button"
+                className={"axv-libs-btn" + (depModalTab === "ft" ? " primary" : "")}
+                style={{ flex: 1, fontSize: 12 }}
+                onClick={() => setDepModalTab("ft")}
+              >
+                {tr("libs.tab_ft", "本地库目录")}
+              </button>
             </div>
-            <label className="axv-libs-dl-label" style={{ display: "block", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, opacity: 0.7, display: "block", marginBottom: 2 }}>{tr("libs.ft_dir", "目录（dir）")}</span>
-              <input
-                className="axv-libs-dl-input"
-                type="text"
-                value={ftDir}
-                onChange={(e) => setFtDir(e.target.value)}
-                placeholder={tr("libs.dir_ph", "libs 或 ../libs")}
-                style={{ width: "100%", padding: "5px 8px", fontSize: 12, boxSizing: "border-box", border: "1px solid #ddd", borderRadius: 4 }}
-              />
-            </label>
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>{tr("libs.ft_include", "后缀名（include，可多选）")}</div>
-              {["*.jar", "*.aar", "*.so", "*.zip"].map((p) => (
-                <label key={p} style={{ display: "inline-flex", alignItems: "center", gap: 4, marginRight: 10, fontSize: 12 }}>
+
+            {depModalTab === "maven" ? (
+              <>
+                <div style={{ fontSize: 11, opacity: 0.6, margin: "0 0 8px", lineHeight: 1.5, wordBreak: "break-all" }}>
+                  {tr("libs.dep_hint", "一行一个，格式 group:artifact:version，例如 org.json:json:20231013。只输库名时按内置目录找坐标；已存在的依赖自动跳过。写进 build.gradle 的 implementation，仓库地址写进 settings.gradle；缺实体文件的依赖在列表里显示「下载」。")}
+                </div>
+                <textarea
+                  className="axv-libs-dl-input"
+                  value={depInput}
+                  onChange={(e) => setDepInput(e.target.value)}
+                  placeholder="com.google.code.gson:gson:2.10.1"
+                  rows={4}
+                  style={{ width: "100%", padding: "5px 8px", fontSize: 12, boxSizing: "border-box", border: "1px solid #ddd", borderRadius: 4, fontFamily: "monospace" }}
+                />
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
+                  <button type="button" className="axv-libs-btn" onClick={() => setDepOpen(false)}>
+                    {tr("cancel", "取消")}
+                  </button>
+                  <button type="button" className="axv-libs-btn primary" onClick={() => void submitNewDep()}
+                    disabled={depBusy || !depInput.trim()}>
+                    {depBusy ? tr("libs.downloading", "处理中…") : tr("libs.dep_submit", "添加")}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 11, opacity: 0.6, margin: "0 0 8px", lineHeight: 1.5 }}>
+                  {tr("libs.ft_hint", "dir 是 build.gradle fileTree 的库目录（相对模块目录 app/，也可写全路径 app/libs）；include 是文件后缀名通配符。")}
+                </div>
+                <label className="axv-libs-dl-label" style={{ display: "block", marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, opacity: 0.7, display: "block", marginBottom: 2 }}>{tr("libs.ft_dir", "目录（dir）")}</span>
                   <input
-                    type="checkbox"
-                    checked={ftIncludes.includes(p)}
-                    onChange={(e) =>
-                      setFtIncludes((prev) =>
-                        e.target.checked ? [...prev, p] : prev.filter((x) => x !== p),
-                      )
-                    }
+                    className="axv-libs-dl-input"
+                    type="text"
+                    value={ftDir}
+                    onChange={(e) => setFtDir(e.target.value)}
+                    placeholder={tr("libs.dir_ph", "libs 或 ../libs")}
+                    list="axv-ft-dir-list"
+                    style={{ width: "100%", padding: "5px 8px", fontSize: 12, boxSizing: "border-box", border: "1px solid #ddd", borderRadius: 4 }}
                   />
-                  {p}
+                  <datalist id="axv-ft-dir-list">
+                    <option value="libs" />
+                    <option value="app/libs" />
+                    <option value="app/src/main/libs" />
+                  </datalist>
                 </label>
-              ))}
-            </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>{tr("libs.ft_include", "后缀名（include，可多选）")}</div>
+                  {["*.jar", "*.aar", "*.so", "*.zip"].map((p) => (
+                    <label key={p} style={{ display: "inline-flex", alignItems: "center", gap: 4, marginRight: 10, fontSize: 12 }}>
+                      <input
+                        type="checkbox"
+                        checked={ftIncludes.includes(p)}
+                        onChange={(e) =>
+                          setFtIncludes((prev) =>
+                            e.target.checked ? [...prev, p] : prev.filter((x) => x !== p),
+                          )
+                        }
+                      />
+                      {p}
+                    </label>
+                  ))}
+                </div>
+                {ftDir.trim() && (
+                  <div style={{ fontSize: 10, opacity: 0.55, marginBottom: 6, fontFamily: "monospace", wordBreak: "break-all" }}>
+                    {`implementation fileTree(dir: '${ftDir.trim()}', include: [${ftIncludes.map((i) => `'${i}'`).join(", ")}])`}
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
+                  <button type="button" className="axv-libs-btn" onClick={() => setDepOpen(false)}>
+                    {tr("cancel", "取消")}
+                  </button>
+                  <button type="button" className="axv-libs-btn primary" onClick={() => void saveFtConfig()}
+                    disabled={!ftDir.trim()}>
+                    {tr("save", "保存")}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* M430：编辑依赖（改坐标 / 配置类型，保留 exclude 块） */}
+      {depEdit && (
+        <div className="axv-libs-dl-overlay" onClick={() => setDepEdit(null)}>
+          <div className="axv-libs-dl-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ maxWidth: 320 }}>
+            <div className="axv-libs-dl-title">{tr("libs.dep_edit", "编辑依赖")}</div>
+            {(["group", "name", "version"] as const).map((k) => (
+              <label key={k} style={{ display: "block", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, opacity: 0.7, display: "block", marginBottom: 2 }}>
+                  {k === "group" ? "group" : k === "name" ? "artifact" : "version"}
+                </span>
+                <input
+                  className="axv-libs-dl-input"
+                  type="text"
+                  value={editForm[k]}
+                  onChange={(e) => setEditForm((p) => ({ ...p, [k]: e.target.value }))}
+                  style={{ width: "100%", padding: "5px 8px", fontSize: 12, boxSizing: "border-box", border: "1px solid #ddd", borderRadius: 4 }}
+                />
+              </label>
+            ))}
+            <label style={{ display: "block", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, opacity: 0.7, display: "block", marginBottom: 2 }}>{tr("libs.dep_config", "配置类型")}</span>
+              <select
+                value={editForm.config}
+                onChange={(e) => setEditForm((p) => ({ ...p, config: e.target.value }))}
+                style={{ width: "100%", padding: "5px 8px", fontSize: 12, boxSizing: "border-box", border: "1px solid #ddd", borderRadius: 4 }}
+              >
+                {["implementation", "api", "compileOnly", "runtimeOnly"].map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </label>
+            {depEdit.excludes?.length ? (
+              <div style={{ fontSize: 10, opacity: 0.6, marginBottom: 4 }}>
+                {tr("libs.dep_edit_keep_ex", "该依赖有 {n} 条 exclude，改坐标后原样保留", { n: depEdit.excludes.length })}
+              </div>
+            ) : null}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-              <button type="button" className="axv-libs-btn" onClick={() => setFtOpen(false)}>
+              <button type="button" className="axv-libs-btn" onClick={() => setDepEdit(null)}>
                 {tr("cancel", "取消")}
               </button>
-              <button type="button" className="axv-libs-btn primary" onClick={() => void saveFtConfig()}
-                disabled={!ftDir.trim()}>
+              <button type="button" className="axv-libs-btn primary" onClick={() => void submitDepEdit()}>
                 {tr("save", "保存")}
               </button>
             </div>
@@ -1722,29 +2010,43 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         </div>
       )}
 
-      {/* M401：加 maven 依赖弹窗 */}
-      {depOpen && (
-        <div className="axv-libs-dl-overlay" onClick={() => setDepOpen(false)}>
+      {/* M430：给依赖加一条 exclude */}
+      {exTarget && (
+        <div className="axv-libs-dl-overlay" onClick={() => setExTarget(null)}>
           <div className="axv-libs-dl-panel" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" style={{ maxWidth: 320 }}>
-            <div className="axv-libs-dl-title">{tr("libs.dep_add", "加 maven 依赖")}</div>
-            <div style={{ fontSize: 11, opacity: 0.6, margin: "4px 0 8px", lineHeight: 1.5, wordBreak: "break-all" }}>
-              {tr("libs.dep_hint", "一行一个，格式 group:artifact:version，例如 org.json:json:20231013。只输库名时按内置目录找坐标；已存在的依赖自动跳过。写进 build.gradle 的 implementation，仓库地址写进 settings.gradle；缺实体文件的依赖在列表里显示「下载」。")}
+            <div className="axv-libs-dl-title">{tr("libs.ex_add", "添加 exclude")}</div>
+            <div style={{ fontSize: 11, opacity: 0.6, margin: "0 0 8px", lineHeight: 1.5, wordBreak: "break-all" }}>
+              {exTarget.group}:{exTarget.name}:{exTarget.version}
             </div>
-            <textarea
-              className="axv-libs-dl-input"
-              value={depInput}
-              onChange={(e) => setDepInput(e.target.value)}
-              placeholder="com.google.code.gson:gson:2.10.1"
-              rows={4}
-              style={{ width: "100%", padding: "5px 8px", fontSize: 12, boxSizing: "border-box", border: "1px solid #ddd", borderRadius: 4, fontFamily: "monospace" }}
-            />
+            <label style={{ display: "block", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, opacity: 0.7, display: "block", marginBottom: 2 }}>group</span>
+              <input
+                className="axv-libs-dl-input"
+                type="text"
+                value={exForm.group}
+                onChange={(e) => setExForm((p) => ({ ...p, group: e.target.value }))}
+                placeholder="com.android.support"
+                style={{ width: "100%", padding: "5px 8px", fontSize: 12, boxSizing: "border-box", border: "1px solid #ddd", borderRadius: 4 }}
+              />
+            </label>
+            <label style={{ display: "block", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, opacity: 0.7, display: "block", marginBottom: 2 }}>module</span>
+              <input
+                className="axv-libs-dl-input"
+                type="text"
+                value={exForm.module}
+                onChange={(e) => setExForm((p) => ({ ...p, module: e.target.value }))}
+                placeholder="support-v4"
+                style={{ width: "100%", padding: "5px 8px", fontSize: 12, boxSizing: "border-box", border: "1px solid #ddd", borderRadius: 4 }}
+              />
+            </label>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-              <button type="button" className="axv-libs-btn" onClick={() => setDepOpen(false)}>
+              <button type="button" className="axv-libs-btn" onClick={() => setExTarget(null)}>
                 {tr("cancel", "取消")}
               </button>
-              <button type="button" className="axv-libs-btn primary" onClick={() => void submitNewDep()}
-                disabled={depBusy || !depInput.trim()}>
-                {depBusy ? tr("libs.downloading", "处理中…") : tr("libs.dep_submit", "添加")}
+              <button type="button" className="axv-libs-btn primary" onClick={() => void submitAddExclude()}
+                disabled={!exForm.group.trim() || !exForm.module.trim()}>
+                {tr("libs.ex_submit", "添加")}
               </button>
             </div>
           </div>

@@ -3317,6 +3317,37 @@ export const SRC_HANT: SrcDict = {
   "重做 (Ctrl+Shift+Z)": "重做 (Ctrl+Shift+Z)",
 
   // ---- M142 组件目录（widget-catalog）----
+
+  // ---- M430 项目库逐条增删改 ----
+  "请先打开一个项目，才能改 build.gradle": "Open a project first to edit build.gradle",
+  "已复制：{t}": "Copied: {t}",
+"复制失败，请手动选中：{t}": "Copy failed, select manually: {t}",
+"已加 fileTree {d}（{f}）": "fileTree added: {d} ({f})",
+"写 fileTree 失败：没找到可写的 build.gradle（app/build.gradle 或根目录）": "Failed to write fileTree: no writable build.gradle (app/build.gradle or root)",
+"该库目录配置已存在：{d}": "This lib dir is already declared: {d}",
+"fileTree 已改为 {d}（{f}）": "fileTree updated to {d} ({f})",
+"已移除库目录 {d} 的 fileTree 声明（{f}）": "Removed fileTree for {d} ({f})",
+"没找到该 fileTree 声明（或写失败）": "fileTree declaration not found (or write failed)",
+"已删 exclude {g}:{m}": "Removed exclude {g}:{m}",
+"没找到该 exclude 条目（或写失败）": "Exclude entry not found (or write failed)",
+"group 和 module 都要填": "Both group and module are required",
+"已加 exclude {g}:{m}": "Added exclude {g}:{m}",
+"加 exclude 失败：没找到该依赖声明（或写失败）": "Failed to add exclude: dependency declaration not found (or write failed)",
+"group / artifact / version 都不能为空": "group / artifact / version are all required",
+"依赖已改为 {c}": "Dependency updated to {c}",
+"改依赖失败：没找到该声明（或写失败）": "Failed to update dependency: declaration not found (or write failed)",
+"加依赖（Maven）": "Add dependency (Maven)",
+"编辑依赖": "Edit dependency",
+"添加 exclude": "Add exclude",
+"复制坐标": "Copy coordinates",
+"展开 / 收起 exclude": "Expand / collapse excludes",
+"删除这条 exclude": "Delete this exclude",
+"移除这条 fileTree": "Remove this fileTree",
+"添加依赖": "Add dependency",
+"Maven 库": "Maven library",
+"本地库目录": "Local lib folder",
+"配置类型": "Configuration",
+"该依赖有 {n} 条 exclude，改坐标后原样保留": "This dependency has {n} excludes; they are kept when changing coordinates",
 };
 
 /** 日本語 —— 只登记与英文不同的；没登记的先走英文兜底（见 t()） */

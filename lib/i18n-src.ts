@@ -1554,6 +1554,7 @@ export const SRC_EN: SrcDict = {
   "{n} 个仓库": "{n} repos",
   "libs 目录（只读）": "libs/ directory (read-only)",
   "库名或坐标，如 okhttp / com.x:y:1.0": "Lib name or coord, e.g. okhttp / com.x:y:1.0",
+  "无": "none",
 
   "删除这条仓库": "Remove this repository",
   "仓库 URL，如 https://maven.aliyun.com/repository/public": "Repo URL, e.g. https://maven.aliyun.com/repository/public",
@@ -1764,7 +1765,6 @@ export const SRC_EN: SrcDict = {
   "onClick=\"{action}\" → 返回": "onClick=\"{action}\" → back",
   "(空)": "(empty)",
   "找不到布局 \"{action}\"（可用：{list}）": "Layout \"{action}\" not found (available: {list})",
-  "无": "none",
   "本屏可交互控件 {n} 个": "{n} interactive widgets on this screen",
   "运行": "Run",
   "横竖屏切换（Ctrl+R）": "Toggle orientation (Ctrl+R)",

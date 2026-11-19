@@ -753,7 +753,9 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
                   <summary>
                     <span className="axv-prop-file-t">{tt("build.gradle（根·仓库）")}</span>
                     <span className="axv-prop-file-sum">
-                      {tt("{n} 个仓库", { n: parseRepoScope(rootBuildText, "buildscript").length + parseRepoScope(rootBuildText, "allprojects").length })}
+                      {parseRepoScope(rootBuildText, "buildscript").length + parseRepoScope(rootBuildText, "allprojects").length > 0
+                        ? tt("{n} 个仓库", { n: parseRepoScope(rootBuildText, "buildscript").length + parseRepoScope(rootBuildText, "allprojects").length })
+                        : tt("无")}
                     </span>
                   </summary>
                   {gradleMeta && gradleMeta.classpath.length > 0 && (

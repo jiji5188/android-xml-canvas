@@ -415,7 +415,7 @@
   user-select: none;
 }
 .axv-prop-file > summary::-webkit-details-marker { display: none; }
-.axv-prop-file > summary::after { content: "\u25B8"; margin-left: auto; opacity: 0.5; font-size: 10px; transition: transform 0.15s; }
+.axv-prop-file > summary::after { content: "▸"; margin-left: auto; opacity: 0.5; font-size: 10px; transition: transform 0.15s; }
 .axv-prop-file[open] > summary::after { transform: rotate(90deg); }
 .axv-prop-file > *:not(summary) { padding: 0 10px 8px; }
 .axv-prop-props { display: flex; flex-direction: column; gap: 6px; }
@@ -1119,6 +1119,11 @@
 .axv-prop-form-2col .axv-saveas-field { margin-top: 8px; }
 
 /* M418：项目属性页优化 —— 摘要行 / libs 分组 / 保存栏吸底 */
+/* M419：修复折叠区被压扁重叠 —— axv-prop-body 是纵向 flex 容器，
+   子项 .axv-prop-file 自带 overflow:hidden → 自动最小尺寸变 0，
+   内容超出视口时 flex-shrink 把它压到 17px，三个折叠区叠在一起。
+   让直接子项不参与收缩，超出交给容器滚动（overflow:auto）。 */
+.axv-prop-body > * { flex-shrink: 0; }
 .axv-prop-file > summary { display: flex; align-items: center; gap: 8px; }
 .axv-prop-file-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .axv-prop-file-sum { flex: 0 0 auto; font-size: 11px; opacity: 0.55; font-family: ui-monospace, Consolas, monospace; }

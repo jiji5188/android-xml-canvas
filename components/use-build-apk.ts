@@ -313,7 +313,9 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         // M428：build.gradle 的 exclude 配置真正用上——被 exclude 的 module 不进 classpath
         // （用户真实场景：material:1.0.0 exclude com.android.support:support-*，物理存在的 support-*.jar 必须剔掉）
         const gradleExcludes = gradleDepParsed.deps.flatMap((d) => d.excludes ?? []);
-        const exRes = applyExcludes(dedupedLibs, gradleExcludes);
+        // M435：exclude 只排传递依赖，直接声明的库永不被排（Gradle 语义）
+        const directNames = new Set(gradleDepParsed.deps.map((d) => d.name.toLowerCase()));
+        const exRes = applyExcludes(dedupedLibs, gradleExcludes, directNames);
         const allBuildLibs = exRes.kept;
         if (exRes.dropped.length) {
           libNotes.push(

@@ -169,10 +169,13 @@ export function filterSharedByDeps(
  *  shared / project libs 里的被排库（真实项目 app/libs 常带 support-*.jar）必须按 exclude 剔掉，
  *  否则和 androidx 重名类冲突（用户真实场景：material:1.0.0 exclude com.android.support:support-*）。
  *  匹配规则：库文件名的 artifact 基名（support-compat-28.0.0.jar → support-compat）=== exclude.module。
+ *  M435：exclude 只排「传递依赖」，绝不能排「项目直接声明的依赖」——Gradle 里直接声明优先。
+ *  传 directNames（build.gradle 里 implementation/api 的 artifact 基名集）时，命中即保。
  *  返回 { kept, dropped }：dropped 用于构建日志展示「谁被 exclude 排了」。 */
 export function applyExcludes(
   libs: ProjectLib[],
   excludes: { group: string; module: string }[],
+  directNames?: Set<string>,
 ): { kept: ProjectLib[]; dropped: { name: string; by: string }[] } {
   if (!excludes.length) return { kept: libs, dropped: [] };
   const byModule = new Map<string, string>(); // module → "group:module"（日志用）
@@ -183,7 +186,8 @@ export function applyExcludes(
     const fname = lib.rel.split("/").pop() || lib.rel;
     const info = libArtifactInfo(fname);
     const hit = byModule.get(info.base);
-    if (hit) dropped.push({ name: fname, by: hit });
+    // M435：直接声明的依赖永不被 exclude（Gradle 语义：exclude 只作用于传递依赖）
+    if (hit && !(directNames && directNames.has(info.base.toLowerCase()))) dropped.push({ name: fname, by: hit });
     else kept.push(lib);
   }
   return { kept, dropped };

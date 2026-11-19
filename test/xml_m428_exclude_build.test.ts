@@ -73,4 +73,26 @@ describe("M428 applyExcludes", () => {
     expect(r.kept).toHaveLength(0);
     expect(r.dropped).toHaveLength(1);
   });
+
+  it("M435：直接声明的依赖永不被 exclude（Gradle 语义：exclude 只排传递依赖）", () => {
+    // 真实事故：material 的 exclude appcompat + 项目直接声明 appcompat → appcompat 必须保留，
+    //  否则 appcompat 资源全缺（Animation.AppCompat.Dialog / TextAppearance.AppCompat not found）
+    const libs = [
+      lib("app/libs/appcompat-1.7.0.aar"),
+      lib("app/libs/material-1.12.0.aar"),
+      lib("app/libs/support-compat-28.0.0.jar"),
+    ];
+    const excludes = [
+      { group: "androidx.appcompat", module: "appcompat" },
+      { group: "com.android.support", module: "support-compat" },
+    ];
+    const directNames = new Set(["appcompat", "material"]);
+    const r = applyExcludes(libs, excludes, directNames);
+    // appcompat 直接声明 → 保住；support-compat 未直接声明 → 剔掉
+    expect(r.kept.map((x) => x.rel)).toEqual([
+      "app/libs/appcompat-1.7.0.aar",
+      "app/libs/material-1.12.0.aar",
+    ]);
+    expect(r.dropped.map((d) => d.name)).toEqual(["support-compat-28.0.0.jar"]);
+  });
 });

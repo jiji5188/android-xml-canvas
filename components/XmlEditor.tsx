@@ -59,7 +59,6 @@ import { loadSnaps, pushSnap, SNAP_LABEL_SAVE } from "@/lib/xml/snapshots";
 import { loadBaseline, planWrite, saveBaseline, snapshotBeforeWrite } from "@/lib/xml/safe-write";
 import { useUnsavedLeave } from "@/components/UnsavedLeaveDialog";
 import { vectorToDataUrl } from "@/lib/xml/vector-svg";
-import { sanitizeResName } from "@/lib/xml/resname";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
@@ -100,7 +99,7 @@ import { collectProjectRes } from "@/lib/xml/res-collect";
 import { ThemePickerPanel } from "./ThemePickerPanel";
 import { openThemePreviewNative } from "@/lib/xml/theme-preview-bridge";
 import { writeThemeIntoValues, type AndroidThemePreset } from "@/lib/xml/android-theme-presets";
-import { projectSaveRoot, projectFileExists, readProjectFile, readAppGradle, saveProjectFile, saveResFiles, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
+import { projectSaveRoot, projectFileExists, readProjectFile, readAppGradle, saveProjectFile, resAbs, RES_PREFIX } from "@/lib/xml/project-save";
 import { parseAppIconConfig } from "@/lib/xml/app-icon";
 import { nativeBridge } from "@/lib/xml/native-save";
 import { codeOnlyNotice, detectDocKind, looksLikeJavaSource, looksLikeKotlin } from "@/lib/xml/doc-kind";
@@ -231,7 +230,7 @@ import {
   wrapSiblings,
   canUnwrap,
 } from "@/lib/xml/clip";
-import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, LS_KEY_LAST_FILE, LS_KEY_SAMPLE, LS_KEY_APP_ICON, lsGet, lsSet, lsGetJson, lsSetJson } from "@/lib/xml/storage";
+import { LS_KEY_XML, LS_KEY_RES, LS_KEY_ICONS, LS_KEY_PROJECT, LS_KEY_LAST_FILE, LS_KEY_SAMPLE, lsGet, lsSet, lsGetJson, lsSetJson } from "@/lib/xml/storage";
 import { readLastRel, writeLastRel } from "@/lib/xml/last-rel";
 import { SAMPLES } from "@/lib/xml/samples";
 
@@ -248,6 +247,7 @@ import { usePanels } from "./use-panels";
 import { useXmlProjectState } from "./use-xml-project";
 import { useXmlProjectFns } from "./use-xml-project-fns";
 import { useIconShapeActions } from "./use-icon-shape-actions";
+import { useResEditors } from "./use-res-editors";
 import { useSelectionOps } from "./use-selection-ops";
 import { useLints } from "./use-lints";
 import { useCanvasOps } from "./use-canvas-ops";
@@ -749,6 +749,22 @@ export function XmlEditor() {
     setExportNote,
     flashNote,
   }));
+
+  /** M366 step：资源编辑器（drawable/图标）保存逻辑 → components/use-res-editors.ts */
+  const { onCloseShape, onResShapeSave, onCloseIcon, onAppIconGen, onResIconSave } =
+    useResEditors(() => ({
+      resIcon,
+      resShape,
+      setResIcon,
+      setResShape,
+      setAppIconRes,
+      setGeneratedDrawables,
+      projRoot,
+      onRenameAsset,
+      commitAttr,
+      setExportNote,
+      flashNote,
+    }));
 
   const resources: ResourceTable = useMemo(() => {
     // 顺序：内置默认 → 上传 res/ 里的 values（真实 color/dimen/string）→ 用户手贴片段（最高优先）
@@ -2441,29 +2457,9 @@ const allDrawableNames = useMemo(() => {
               value: `@drawable/${resShape.name}`,
               forceTree: resShape.forceTree,
             },
-            onClose: () => setResShape(null),
-            onSave: (resourceName, shapeXml) => {
-            const safe = sanitizeResName(resourceName, "bg");
-            setGeneratedDrawables((m) => ({ ...m, [safe]: shapeXml }));
-            setResShape(null);
-            const file = safe + ".xml";
-            // M172：有打开的项目就直接写进它的 res/drawable，不只存内存
-            if (projRoot) {
-              void saveResFiles(projRoot, [{ path: `drawable/${file}`, text: shapeXml }]).then((r) => {
-                flashNote(
-                  r.ok
-                    ? tt("已保存 res/drawable/{file}，已写入项目 res 目录", { file })
-                    : tt("已保存到内存，但写入项目失败：{reason}", {
-                        reason: r.failed[0] || tt("目录不可写"),
-                      }),
-                  4200,
-                );
-              });
-            } else {
-              setExportNote(tt("已保存 res/drawable/{file}", { file }));
-              window.setTimeout(() => setExportNote(" "), 3200);
-            }
-          }}}
+            onClose: onCloseShape,
+            onSave: onResShapeSave,
+          }}
         />
       ) : null}
 
@@ -2476,84 +2472,13 @@ const allDrawableNames = useMemo(() => {
             name: resIcon.name,
             existingXml: resIcon.xml,
             existingNames: allDrawableNames,
-            onClose: () => setResIcon(null),
+            onClose: onCloseIcon,
             extra: {
               initialAppIcon: appIconInit ?? undefined,
-              onAppIcon: ({
-                files,
-                bgColor,
-                contentDp,
-              }: {
-                files: { path: string; text: string }[];
-                bgColor: string;
-                contentDp: number;
-              }) => {
-            // M171：把 4 个图标文件存起来（给 res.zip / 真机渲染用），有项目就直接写进它的 res/
-            const map: Record<string, string> = {};
-            for (const f of files) map[f.path] = f.text;
-            setAppIconRes(map);
-            // M174：记住上次的参数，刷新/重开后面板直接显示
-            lsSet(LS_KEY_APP_ICON, JSON.stringify({ bgColor, contentDp }));
-            const total = files.length;
-            if (projRoot) {
-              void saveResFiles(
-                projRoot,
-                files.map((f) => ({ path: f.path, text: f.text })),
-              ).then((r) => {
-                setExportNote(
-                  r.ok
-                    ? tt("已设为应用图标：{n}/{total} 个文件写入 res/（背景 {color}）", {
-                        n: r.written,
-                        total: r.total,
-                        color: bgColor,
-                      })
-                    : tt("生成成功但写入失败：{reason}", {
-                        reason: r.failed[0] || tt("目录不可写"),
-                      }),
-                );
-                window.setTimeout(() => setExportNote(""), 6000);
-              });
-            } else {
-              setExportNote(
-                tt("已生成 {n} 个图标文件（背景 {color}），导 res.zip 或真机渲染时一起带走", {
-                  n: total,
-                  color: bgColor,
-                }),
-              );
-              window.setTimeout(() => setExportNote(""), 6000);
-            }
-            }
+              onAppIcon: onAppIconGen,
             },
-          onSave: (safeName, iconXml) => {
-            const oldName = resIcon.name;
-            setGeneratedDrawables((m) => {
-              const next = { ...m };
-              if (safeName !== oldName) delete next[oldName];
-              next[safeName] = iconXml;
-              return next;
-            });
-            if (safeName !== oldName) onRenameAsset(oldName, safeName);
-            // M11p：从属性面板「图标编辑」进来的话，保存后把属性指向这个资源
-            if (resIcon.attr) commitAttr(resIcon.attr, "@drawable/" + safeName);
-            setResIcon(null);
-            const file = safeName + ".xml";
-            // M172：有打开的项目就直接写进它的 res/drawable，不只存内存
-            if (projRoot) {
-              void saveResFiles(projRoot, [{ path: `drawable/${file}`, text: iconXml }]).then((r) => {
-                setExportNote(
-                  r.ok
-                    ? tt("已保存 res/drawable/{file}，已写入项目 res 目录", { file })
-                    : tt("已保存到内存，但写入项目失败：{reason}", {
-                        reason: r.failed[0] || tt("目录不可写"),
-                      }),
-                );
-                window.setTimeout(() => setExportNote(""), 4200);
-              });
-            } else {
-              setExportNote(tt("已保存 res/drawable/{file}", { file }));
-              window.setTimeout(() => setExportNote(" "), 3200);
-            }
-          }}}
+            onSave: onResIconSave,
+          }}
         />
       ) : null}
 

@@ -46,6 +46,8 @@ interface LibFile {
   name: string;
   rel: string;
   size?: number;
+  /** M425：产生该文件的候选目录 rel（标准 libs / fileTree dir），用于项目库 tab 按目录分组展示 */
+  src?: string;
 }
 
 type LibTab = "local" | "project" | "catalog";
@@ -61,6 +63,8 @@ interface ProjectLibCandidate {
   rel: string;
   abs: string | null;
   includes: string[];
+  /** M425：对应哪个 fileTree（gradleFileTrees 下标），undefined=标准 libs */
+  ftIdx?: number;
 }
 
 async function fetchBase64(url: string): Promise<{ b64: string; ok: boolean; error?: string; size?: number }> {
@@ -190,6 +194,8 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   const [gradleFileTrees, setGradleFileTrees] = useState<GradleFileTree[]>([]);
   const [gradleBusyKey, setGradleBusyKey] = useState<Record<string, string>>({});
   const [gradleMsg, setGradleMsg] = useState<string | null>(null);
+  /** M425：项目库 tab 里 fileTree 目录组折叠状态（按 gradleFileTrees 下标） */
+  const [ftExpanded, setFtExpanded] = useState<Record<number, boolean>>({});
   // M388：表项次要动作（存 libs/删除/移除/应用到项目）走长按弹菜单，不再挂内联按钮
   const [libMenu, setLibMenu] = useState<LibsItemMenuState | null>(null);
   const closeLibMenu = useCallback(() => setLibMenu(null), []);
@@ -258,15 +264,15 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       { rel: "app/src/main/libs", abs: null, includes: [] },
     ];
     const root = (nativeProjectRoot || "").replace(/[\\/]+$/, "");
-    for (const ft of gradleFileTrees) {
+    gradleFileTrees.forEach((ft, ftIdx) => {
       const d = normFtDir(ft.dir);
-      if (!d) continue;
+      if (!d) return;
       const rels = /^app(\/|$)/.test(d) ? [d] : [`app/${d}`, d];
       for (const rel of rels) {
         if (out.some((c) => c.rel === rel)) continue;
-        out.push({ rel, abs: root ? `${root}/${rel}` : null, includes: ft.includes });
+        out.push({ rel, abs: root ? `${root}/${rel}` : null, includes: ft.includes, ftIdx });
       }
-    }
+    });
     if (root) out[0].abs = `${root}/app/src/main/libs`;
     return out;
   }, [nativeProjectRoot, gradleFileTrees]);
@@ -289,15 +295,15 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           for (const c of projectLibCandidates) {
             if (!c.abs) continue;
             native.createEntry?.(c.abs, true);
-            const items = listDirViaNative(c.abs).filter((f) => matchFileTreeInclude(f.name, c.includes));
+            const items = listDirViaNative(c.abs).filter((f) => matchFileTreeInclude(f.name, c.includes)).map((f) => ({ ...f, src: c.rel }));
             all = all.concat(items);
           }
           setProjectLibs(all);
         } else if (aiFileIo) {
           let all: LibFile[] = [];
           for (const c of projectLibCandidates) {
-            const items = await listDirViaIo(aiFileIo, c.rel);
-            all = all.concat(items.filter((f) => matchFileTreeInclude(f.name, c.includes)));
+            const items = (await listDirViaIo(aiFileIo, c.rel)).filter((f) => matchFileTreeInclude(f.name, c.includes)).map((f) => ({ ...f, src: c.rel }));
+            all = all.concat(items);
           }
           setProjectLibs(all);
         } else {
@@ -436,6 +442,41 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
   const visibleList = useMemo(
     () => sortLibFiles(currentList.filter((f) => matchLibQuery(f.name, f.rel, libQuery))),
     [currentList, libQuery],
+  );
+  /** M425：项目库文件按来源目录分组——fileTree 目录各成一组（可折叠），标准 libs 单独。
+   *  每个 file 的 src 是候选目录 rel；候选 rel 的 ftIdx 告诉它属于哪个 fileTree。 */
+  const projectLibGroups = useMemo(() => {
+    const q = libQuery;
+    const match = (f: LibFile) => matchLibQuery(f.name, f.rel, q);
+    const srcToFtIdx = new Map<string, number | undefined>();
+    for (const c of projectLibCandidates) srcToFtIdx.set(c.rel, c.ftIdx);
+    const ftGroups: { ft: GradleFileTree; index: number; files: LibFile[] }[] = [];
+    for (let i = 0; i < gradleFileTrees.length; i++) {
+      const files = projectLibs.filter((f) => f.src !== undefined && srcToFtIdx.get(f.src) === i && match(f));
+      ftGroups.push({ ft: gradleFileTrees[i], index: i, files: sortLibFiles(files) });
+    }
+    const stdFiles = projectLibs.filter((f) => {
+      if (f.src === undefined) return true;
+      const idx = srcToFtIdx.get(f.src);
+      return idx === undefined && match(f);
+    });
+    return { ftGroups, stdFiles: sortLibFiles(stdFiles) };
+  }, [projectLibs, gradleFileTrees, projectLibCandidates, libQuery]);
+
+  /** M425：项目库单个文件行（fileTree 组 / 标准组公用）——行内无按钮，长按弹「移除」 */
+  const renderProjectFileRow = (f: LibFile) => (
+    <div key={f.rel} className="axv-libs-item" {...bindLongPress([
+      { key: "remove", label: tr("libs.remove", "移除"), danger: true, onClick: () => void removeFromProject(f.name) },
+    ])}>
+      <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>archive</span>
+      <div className="axv-libs-item-text">
+        <div className="axv-libs-item-name">
+          {f.name}
+          <span style={{ opacity: 0.5, marginLeft: 6, fontSize: 10 }}>{formatBytes(f.size) || ""}</span>
+        </div>
+        <div className="axv-libs-item-rel">{f.rel}</div>
+      </div>
+    </div>
   );
   // 删除共享库文件（deleteEntry + 确认；项目库不提供删，避免误删工程内文件）
   const [deleteBusy, setDeleteBusy] = useState<string | null>(null);
@@ -1187,29 +1228,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           M401：左边加「库目录」（改/加 fileTree 的 dir+include）+「+」（加 maven 依赖） */}
       {tab === "project" && gradleDeps.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "0 8px 6px" }}>
-          <button
-            type="button"
-            className="axv-libs-btn"
-            style={{ fontSize: 11, padding: "2px 8px", whiteSpace: "nowrap" }}
-            onClick={() => openFtModal(null)}
-            title={tr("libs.ft_new", "库目录")}
-          >
-            <span className="msr" aria-hidden="true" style={{ fontSize: 15, verticalAlign: "middle", marginRight: 3 }}>folder</span>
-            {tr("libs.ft_new", "库目录")}
-          </button>
-          {gradleFileTrees.map((ft, i) => (
-            <button
-              key={ft.dir + "|" + ft.includes.join(",") + i}
-              type="button"
-              className="axv-libs-btn"
-              style={{ fontSize: 11, padding: "2px 8px", whiteSpace: "nowrap" }}
-              onClick={() => openFtModal(i)}
-              title={ft.dir}
-            >
-              <span className="msr" aria-hidden="true" style={{ fontSize: 15, verticalAlign: "middle", marginRight: 3 }}>folder</span>
-              {tr("libs.ft_edit", "库目录")}·{ft.dir || "?"}
-            </button>
-          ))}
+          {/* M425：fileTree 配置改在列表里二级展示（库目录·dir 组头 + 编辑按钮），这里只留 + 加依赖 / 一键下载 */}
           <button
             type="button"
             className="axv-libs-btn"
@@ -1335,6 +1354,87 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                 </div>
               );
             })}
+            {/* M425：fileTree 配置二级列表 —— 组头可折叠，展开显示该目录下的库文件；组头右侧编辑按钮 */}
+            {gradleFileTrees.length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                {projectLibGroups.ftGroups.map((g) => {
+                  const open = !!ftExpanded[g.index];
+                  return (
+                    <div key={"ft" + g.index}>
+                      <div
+                        className="axv-libs-item"
+                        style={{ alignItems: "center", cursor: "pointer", background: "rgba(0,0,0,0.03)" }}
+                        onClick={() => setFtExpanded((m) => ({ ...m, [g.index]: !m[g.index] }))}
+                        title={g.ft.dir}
+                      >
+                        <span className="msr" aria-hidden="true" style={{ fontSize: 18 }}>
+                          {open ? "expand_more" : "chevron_right"}
+                        </span>
+                        <div className="axv-libs-item-text">
+                          <div className="axv-libs-item-name" style={{ fontWeight: 600 }}>
+                            {tr("libs.ft_group", "库目录")} · {g.ft.dir || "?"}
+                            <span style={{ opacity: 0.5, marginLeft: 6, fontSize: 10 }}>
+                              ({g.files.length})
+                            </span>
+                          </div>
+                          <div className="axv-libs-item-rel" style={{ opacity: 0.6 }}>
+                            {g.ft.includes.length
+                              ? tr("libs.ft_inc", "include: {inc}", { inc: g.ft.includes.join(", ") })
+                              : tr("libs.ft_include_all", "include: 全部 jar/aar")}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="axv-libs-btn"
+                          style={{ fontSize: 11, padding: "2px 8px", whiteSpace: "nowrap", flex: "0 0 auto" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openFtModal(g.index);
+                          }}
+                          title={tr("libs.ft_edit", "编辑库目录")}
+                        >
+                          <span className="msr" aria-hidden="true" style={{ fontSize: 15, verticalAlign: "middle", marginRight: 3 }}>edit</span>
+                          {tr("libs.edit", "编辑")}
+                        </button>
+                      </div>
+                      {open && (
+                        g.files.length > 0 ? (
+                          <div style={{ paddingLeft: 14 }}>
+                            {g.files.map((f) => renderProjectFileRow(f))}
+                          </div>
+                        ) : (
+                          <div className="axv-libs-empty" style={{ padding: "2px 8px 6px 30px", fontSize: 11 }}>
+                            {tr("libs.ft_empty", "该目录下暂无库文件（把 jar/aar 放进去后点刷新）")}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {/* 新建库目录入口（fileTree 未覆盖时也能加一条） */}
+            <div style={{ margin: "4px 8px" }}>
+              <button
+                type="button"
+                className="axv-libs-btn"
+                style={{ fontSize: 11, padding: "2px 8px", whiteSpace: "nowrap" }}
+                onClick={() => openFtModal(null)}
+                title={tr("libs.ft_new", "新建库目录（fileTree）")}
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 15, verticalAlign: "middle", marginRight: 3 }}>create_new_folder</span>
+                {tr("libs.ft_new", "新建库目录")}
+              </button>
+            </div>
+            {/* 标准目录（app/src/main/libs 等，不被任何 fileTree 覆盖）的文件直接列出 */}
+            {projectLibGroups.stdFiles.length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                <div style={{ fontSize: 10, opacity: 0.6, margin: "2px 6px 4px" }}>
+                  {tr("libs.std_dir", "标准目录（app/src/main/libs 等）")}
+                </div>
+                {projectLibGroups.stdFiles.map((f) => renderProjectFileRow(f))}
+              </div>
+            )}
           </>
         )}
         {tab === "catalog" ? (
@@ -1419,7 +1519,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
               ? ` (${tr("libs.empty_hint", "需先打开项目目录")})`
               : ""}
           </div>
-        ) : (
+        ) : tab === "local" ? (
           visibleList.map((f) => {
             const applied = projectNames.has(f.name);
             const ab = applyBusy[f.name];
@@ -1467,7 +1567,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
               </div>
             );
           })
-        )}
+        ) : null}
         {busy && <div className="axv-libs-loading">{tr("loading", "加载中…")}</div>}
       </div>
 

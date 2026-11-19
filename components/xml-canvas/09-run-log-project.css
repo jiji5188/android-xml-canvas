@@ -342,9 +342,9 @@
 .axv-saveas-btns {
   justify-content: space-evenly;
   gap: 8px;
-  margin-top: 6px;
+  border-top: 1px solid var(--axv-outline);
+  padding: 10px;
   display: flex;
-  margin-bottom: 12px;
 }
 .axv-saveas-btns .axv-set-btn { padding: 7px 14px; font-size: 12.5px; }
 .axv-saveas-ok { background: var(--axv-primary); color: var(--axv-on-primary); border-color: var(--axv-primary); }
@@ -494,12 +494,7 @@ html[data-axv-theme="dark"] .axv-struct-warn {
   max-height: none;
   overflow: auto;
 }
-.axv-proj-now-foot {
-  display: flex;
-  gap: 12px;
-  padding: 6px 9px 0px;
-  border-top: 1px solid var(--axv-outline-variant, #00000010);
-}
+/* M422：axv-proj-now-foot 元素已删（“打开其他项目/新建项目”入口随 tab 栏一起移除），规则清理 */
 .axv-ws-item-static {
   cursor: default;
 }

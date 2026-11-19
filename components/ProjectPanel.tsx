@@ -1681,8 +1681,38 @@ function writeScopePref(s: ProjectScope): void {
   }
 }
 
+/** M422：把当前项目的 fileOps ctx 转成 ProjectSaveRoot（native 绝对路径 / web 目录句柄） */
+function saveRootOfFileOps(ops: FileOpsCtx | null): ProjectSaveRoot | null {
+  if (!ops) return null;
+  if (ops.backend === "native") {
+    const base = String(ops.root).replace(/\/+$/, "");
+    if (!base.startsWith("/")) return null;
+    return { kind: "native", base };
+  }
+  return { kind: "handle", handle: ops.root };
+}
+
 export function ProjectPanel(p: ProjectPanelProps) {
-  const { tr, tab, onTab, wsState, wsBusy, wsMsg, projects, metaOf, projectSource } = p;
+  const { tr, projectSource } = p;
+  /** M422：当前项目属性弹窗状态（axv-proj-now-head 的属性按钮打开） */
+  const [propsFor, setPropsFor] = useState<{ item: WsProject; source: ProjectSource } | null>(null);
+  /** 当前项目对应的 WsProject：native 从 fileOps.root（项目目录绝对路径）推文件夹名；web 用项目目录句柄 */
+  const curItem = useMemo<WsProject | null>(() => {
+    if (!projectSource) return null;
+    if (p.fileOps?.backend === "native") {
+      const dirPath = String(p.fileOps.root).replace(/\/+$/, "");
+      const folder = dirPath.split(/[/\\]/).pop() || p.projectName;
+      return { name: folder, kind: "dir", rel: folder, layoutCount: 0, dirPath };
+    }
+    if (p.fileOps?.backend === "web") {
+      return { name: p.projectName, kind: "dir", rel: p.projectName, layoutCount: 0, handle: p.fileOps.root };
+    }
+    return null;
+  }, [projectSource, p.fileOps, p.projectName]);
+  const openProps = () => {
+    if (!curItem || !projectSource) return;
+    setPropsFor({ item: curItem, source: projectSource });
+  };
   /** M182：当前项目树的分段视图（布局 / 资源 / 代码 / 全部） */
   const [scope, setScope] = useState<ProjectScope>(() => readScopePref());
   const pickScope = (s: ProjectScope) => {
@@ -1692,37 +1722,6 @@ export function ProjectPanel(p: ProjectPanelProps) {
 
   return (
     <div className="axv-rail-scroll axv-rail-fill">
-      {/* M16i：项目管理两个 tab（M24：「工作目录」→「项目列表」） */}
-      <div className="axv-proj-tabs">
-        <button
-          className={"axv-proj-tab" + (tab === "projects" ? " on" : "")}
-          onClick={() => {
-            onTab("projects");
-            void p.onRefresh();
-          }}
-        >
-          {tr("proj.list", "项目列表")}
-        </button>
-        <button
-          className={"axv-proj-tab" + (tab === "current" ? " on" : "")}
-          onClick={() => onTab("current")}
-        >
-          {tr("proj.current", "当前项目")}
-        </button>
-      </div>
-
-      {tab === "projects" ? <ProjectsTab p={p} /> : (
-        <>
-          {/* M30c：foot 放到 axv-proj-now 的前面 */}
-          <div className="axv-proj-now-foot">
-            <button className="axv-ws-link" onClick={() => void p.onOpenDir()}>
-              {tr("proj.openAnother", "打开其他项目…")}
-            </button>
-            <button className="axv-ws-link" onClick={() => p.onNewProject(p.projectName || "MyApp")}>
-              {tr("proj.new", "新建项目")}
-            </button>
-          </div>
-
           {/* M24：当前项目结构 */}
           <div className="axv-proj-now">
             <div className="axv-proj-now-head">
@@ -1741,6 +1740,15 @@ export function ProjectPanel(p: ProjectPanelProps) {
                 onClick={() => void p.onRefreshProject()}
               >
                 <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>refresh</span>
+              </button>
+              <button
+                className="axv-ws-mini"
+                title={tt("项目属性")}
+                aria-label={tt("项目属性")}
+                disabled={!curItem || !projectSource}
+                onClick={openProps}
+              >
+                <span className="msr" aria-hidden="true" style={{ fontSize: 16 }}>tune</span>
               </button>
             </div>
 
@@ -1833,8 +1841,24 @@ export function ProjectPanel(p: ProjectPanelProps) {
           <div style={{ padding: "8px 12px 4px", fontSize: 12, color: "var(--axv-on-surface-variant)", lineHeight: 1.5 }}>
             {tt("点上方结构树里的文件直接打开（drawable 形状 → 绘制编辑器，vector/图片 → 预览）。")}
           </div>
-        </>
-      )}
+
+      {/* M422：项目属性弹窗（当前项目） */}
+      {propsFor && curItem ? (
+        <ProjectPropsDialog
+          item={propsFor.item}
+          source={propsFor.source}
+          saveRoot={saveRootOfFileOps(p.fileOps ?? null)}
+          fileOpsCtx={p.fileOps}
+          iconUrl={p.projectIconUrl ?? null}
+          onRenameProject={p.onRenameProject}
+          onSaved={() => {
+            setPropsFor(null);
+            void p.onRefreshProject();
+          }}
+          onPkgSynced={p.onPkgSynced}
+          onClose={() => setPropsFor(null)}
+        />
+      ) : null}
     </div>
   );
 }

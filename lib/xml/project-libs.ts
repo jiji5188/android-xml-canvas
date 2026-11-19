@@ -164,6 +164,31 @@ export function filterSharedByDeps(
   return { kept, excluded, matched };
 }
 
+/** M428：把 build.gradle 里的 exclude 配置真正用上——命中 exclude.module 的库从 classpath 里排掉。
+ *  设备端没有 Gradle，exclude 的直接语义（排传递依赖）我们没做传递解析；但物理上已经躺在
+ *  shared / project libs 里的被排库（真实项目 app/libs 常带 support-*.jar）必须按 exclude 剔掉，
+ *  否则和 androidx 重名类冲突（用户真实场景：material:1.0.0 exclude com.android.support:support-*）。
+ *  匹配规则：库文件名的 artifact 基名（support-compat-28.0.0.jar → support-compat）=== exclude.module。
+ *  返回 { kept, dropped }：dropped 用于构建日志展示「谁被 exclude 排了」。 */
+export function applyExcludes(
+  libs: ProjectLib[],
+  excludes: { group: string; module: string }[],
+): { kept: ProjectLib[]; dropped: { name: string; by: string }[] } {
+  if (!excludes.length) return { kept: libs, dropped: [] };
+  const byModule = new Map<string, string>(); // module → "group:module"（日志用）
+  for (const e of excludes) byModule.set(e.module.toLowerCase(), `${e.group}:${e.module}`);
+  const kept: ProjectLib[] = [];
+  const dropped: { name: string; by: string }[] = [];
+  for (const lib of libs) {
+    const fname = lib.rel.split("/").pop() || lib.rel;
+    const info = libArtifactInfo(fname);
+    const hit = byModule.get(info.base);
+    if (hit) dropped.push({ name: fname, by: hit });
+    else kept.push(lib);
+  }
+  return { kept, dropped };
+}
+
 /** 原生通道列目录（绝对路径，同步） */
 function nativeListDir(abs: string): { ok: boolean; items?: { name: string; kind: string; path?: string }[] } {
   let json: string | null = null;

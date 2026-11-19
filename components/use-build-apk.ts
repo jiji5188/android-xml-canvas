@@ -26,7 +26,7 @@ import type { RenderFile } from "@/lib/xml/native-render";
 import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, rPackagesFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
 import { axvRuntimeSources, injectAxvLogProvider } from "@/lib/xml/axv-runtime";
 import { autofixJavaSources } from "@/lib/xml/java-autofix";
-import { collectProjectLibs, collectSharedLibs, dedupAarVersions, filterSharedByDeps } from "@/lib/xml/project-libs";
+import { collectProjectLibs, collectSharedLibs, dedupAarVersions, filterSharedByDeps, applyExcludes } from "@/lib/xml/project-libs";
 import { showNativeProgress, setNativeProgress, closeNativeDialog } from "@/lib/xml/system-download";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
@@ -306,9 +306,21 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         const rawBuildLibs = [...filteredShared, ...projectLibsArr];
         // M414：aar 多版本去重（material-1.12.0 + material-1.0.0 同进 overlay → aapt2 link
         // 「conflicting value for configuration」真机事故；只留最高版）
-        const { kept: allBuildLibs, dropped } = dedupAarVersions(rawBuildLibs);
+        const { kept: dedupedLibs, dropped } = dedupAarVersions(rawBuildLibs);
         if (dropped.length) {
           libNotes.push(`aar 多版本去重：跳过 ${dropped.length} 个 → ` + dropped.map((d) => `${d.name}（${d.reason}）`).join("；"));
+        }
+        // M428：build.gradle 的 exclude 配置真正用上——被 exclude 的 module 不进 classpath
+        // （用户真实场景：material:1.0.0 exclude com.android.support:support-*，物理存在的 support-*.jar 必须剔掉）
+        const gradleExcludes = gradleDepParsed.deps.flatMap((d) => d.excludes ?? []);
+        const exRes = applyExcludes(dedupedLibs, gradleExcludes);
+        const allBuildLibs = exRes.kept;
+        if (exRes.dropped.length) {
+          libNotes.push(
+            `exclude 过滤：按 build.gradle 排掉 ${exRes.dropped.length} 个 → ` +
+              exRes.dropped.slice(0, 8).map((d) => `${d.name}（${d.by}）`).join("、") +
+              (exRes.dropped.length > 8 ? "…" : ""),
+          );
         }
         // M383：依赖库收集明细——一眼看出“为什么 classpath 是 0 个库”（上次真实事故）
         pushBuildLog(

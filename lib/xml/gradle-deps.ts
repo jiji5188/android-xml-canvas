@@ -28,6 +28,8 @@ export interface GradleDep {
   raw: string;
   config: string;
   isAar: boolean;
+  /** M428：该依赖后面 { exclude ... } 块排掉的传递依赖（group:module）；没有则 undefined */
+  excludes?: { group: string; module: string }[];
 }
 
 /** 解析不出准确版本、因此不自动下载的条目 */
@@ -64,6 +66,40 @@ const FORM_B = new RegExp(
 const CONFIG_HEAD = new RegExp("^(?:" + CONFIGS + ")\\b");
 const CONFIG_NAME = new RegExp("^(" + CONFIGS + ")\\b");
 const SKIP = /\bfileTree\b|\bproject\s*\(|platform\s*\(/;
+
+/** M428：依赖行（含同行或下一行）的 { exclude ... } 块提取 group/module。
+ *  groovy：exclude group: 'x', module: 'y'  /  kts：exclude(group = "x", module = "y")
+ *  从 startIdx 行开始，track 花括号深度，仅在 depth>=1（块内）时收集 exclude。 */
+function collectExcludes(lines: string[], startIdx: number): { group: string; module: string }[] {
+  const out: { group: string; module: string }[] = [];
+  const reGroovy = /exclude\s+group\s*:\s*["']([^"']+)["']\s*,\s*module\s*:\s*["']([^"']+)["']/g;
+  const reKts = /exclude\(\s*group\s*=\s*"([^"]+)"\s*,\s*module\s*=\s*"([^"]+)"\s*\)/g;
+  let depth = 0;
+  let sawBrace = false;
+  for (let i = startIdx; i < lines.length; i++) {
+    const raw = lines[i];
+    const t = raw.trim();
+    for (const ch of raw) {
+      if (ch === "{") { depth++; sawBrace = true; }
+      else if (ch === "}") depth--;
+    }
+    // 块内才收集
+    if (depth >= 1) {
+      reGroovy.lastIndex = 0; reKts.lastIndex = 0;
+      let mm: RegExpExecArray | null;
+      while ((mm = reGroovy.exec(t))) out.push({ group: mm[1], module: mm[2] });
+      while ((mm = reKts.exec(t))) out.push({ group: mm[1], module: mm[2] });
+    }
+    // 已看到 { 且回到 0 → 结束
+    if (sawBrace && depth <= 0) break;
+    // 还没看到 { → 只容许再看下一行是否以 { 开头（下行开块）
+    if (!sawBrace) {
+      const next = (lines[i + 1] ?? "").trim();
+      if (!next.startsWith("{")) break;
+    }
+  }
+  return out;
+}
 
 // 变量声明：def x = 'v' | ext.x = 'v' | rootProject.ext.x = 'v' | x = 'v'
 const VAR_DECL = /^(?:def\s+|ext\.|rootProject\.ext\.)?([A-Za-z_]\w*)\s*=\s*(['"])(.*?)\2\s*$/;
@@ -117,8 +153,10 @@ export function parseGradleDepsDetailed(text: string): GradleParseResult {
   const deps: GradleDep[] = [];
   const unresolved: GradleUnresolved[] = [];
   const seen = new Set<string>();
+  const allLines = text.split(/\r?\n/);
 
-  for (const rawLine of text.split(/\r?\n/)) {
+  for (let li = 0; li < allLines.length; li++) {
+    const rawLine = allLines[li];
     const line = rawLine.replace(/\/\/.*$/, "").trim();
     if (!line || !CONFIG_HEAD.test(line)) continue;
     if (SKIP.test(line)) continue;
@@ -167,6 +205,8 @@ export function parseGradleDepsDetailed(text: string): GradleParseResult {
     const key = g.value + ":" + n.value + ":" + v.value;
     if (seen.has(key)) continue;
     seen.add(key);
+    // M428：读该依赖后面的 { exclude ... } 块，记录被排的传递依赖（含同行开块）
+    const excludes = collectExcludes(allLines, li);
     deps.push({
       group: g.value,
       name: n.value,
@@ -174,6 +214,7 @@ export function parseGradleDepsDetailed(text: string): GradleParseResult {
       raw: rawLine.trim(),
       config,
       isAar: isAarOf(g.value),
+      ...(excludes.length > 0 ? { excludes } : {}),
     });
   }
   return { deps, unresolved };
@@ -715,7 +756,7 @@ export function findConflictsForNew(
  *  target 是 g:n:v（定位现有行），excludes 是要排的 {group,module} 列表。
  *  groovy: implementation 'g:n:v' → implementation 'g:n:v' {\n    exclude group: 'g', module: 'm'\n}
  *  kts:    implementation(\"g:n:v\") → implementation(\"g:n:v\") {\n    exclude(group = \\"g\\\", module = \\"m\\\")\n}
- *  若行已有 { exclude ... } 块，追加进去（幂等：已有同 group+module 则跳过）。 */
+ *  M428：三种现有形态都能处理（单行无块 / 同行开块 / 下行开块），幂等不重复。 */
 export function addExcludesToGradle(
   text: string,
   target: { group: string; name: string; version: string },
@@ -723,24 +764,60 @@ export function addExcludesToGradle(
   kts: boolean,
 ): [string, boolean] {
   const coord = target.group + ":" + target.name + ":" + target.version;
-  let changed = false;
   const lines = text.split(/\r?\n/);
-  const newLines = lines.map((ln) => {
-    const m = ln.match(/^\s*(?:implementation|api|compile|compileOnly|runtimeOnly)\s*\(?\s*["'](\S+)["']\s*\)?\s*$/);
-    if (!m) return ln;
-    if (m[1] !== coord) return ln;
-    if (/\{|exclude/.test(ln)) return ln;
-    const exLines = excludes.map((e) =>
-      kts
-        ? `            exclude(group = "${e.group}", module = "${e.module}")`
-        : `        exclude group: '${e.group}', module: '${e.module}'`,
-    );
-    // groovy: { ... } 缩进 4，exclude 行 8；kts: { ... } 缩进 4，exclude 行 12
+  const reLine = new RegExp(
+    "^\\s*(?:implementation|api|compile|compileOnly|runtimeOnly)\\s*\\(?\\s*[" +
+      String.fromCharCode(34) + "," + String.fromCharCode(39) +
+      "]\\s*" +
+      coord.replace(/\./g, "\\.") +
+      "\\s*[" +
+      String.fromCharCode(34) + "," + String.fromCharCode(39) +
+      "]\\s*\\)?\\s*(\\{)?$",
+  );
+  const idx = lines.findIndex((ln) => ln.match(reLine) !== null);
+  if (idx < 0) return [text, false];
+  const depLine = lines[idx];
+  const m = depLine.match(reLine)!;
+  const braceOnSameLine = !!m[1];
+
+  // 收集已有 exclude（目标行 + 其后 { 块内）
+  const existing: { group: string; module: string }[] = [];
+  const reG = /exclude\s+group\s*:\s*["']([^"']+)["']\s*,\s*module\s*:\s*["']([^"']+)["']/g;
+  const reK = /exclude\(\s*group\s*=\s*"([^"]+)"\s*,\s*module\s*=\s*"([^"]+)"\s*\)/g;
+  const scan = (s: string) => {
+    let mm;
+    reG.lastIndex = 0; reK.lastIndex = 0;
+    while ((mm = reG.exec(s))) existing.push({ group: mm[1], module: mm[2] });
+    while ((mm = reK.exec(s))) existing.push({ group: mm[1], module: mm[2] });
+  };
+  scan(depLine);
+  if (braceOnSameLine) {
+    let depth = 0;
+    for (let i = idx + 1; i < lines.length; i++) {
+      const t = lines[i];
+      scan(t);
+      for (const ch of t) { if (ch === "{") depth++; else if (ch === "}") { depth--; if (depth <= 0) break; } }
+      if (depth <= 0) break;
+    }
+  }
+  const haveKeys = new Set(existing.map((e) => e.group + ":" + e.module));
+  const toAdd = excludes.filter((e) => !haveKeys.has(e.group + ":" + e.module));
+  if (toAdd.length === 0) return [text, false];
+
+  const exLines = toAdd.map((e) =>
+    kts
+      ? `            exclude(group = "${e.group}", module = "${e.module}")`
+      : `        exclude group: '${e.group}', module: '${e.module}'`,
+  );
+
+  if (!braceOnSameLine) {
+    // 无 { 在同行 → 追加完整 { exclude } 块（groovy 紧凑 / kts 下行）
     const openPad = kts ? "    {" : " {";
     const closePad = kts ? "    }" : "}";
-    const suffix = "\n" + openPad + "\n" + exLines.join("\n") + "\n" + closePad;
-    changed = true;
-    return ln + suffix;
-  });
-  return [newLines.join("\n"), changed];
+    lines.splice(idx + 1, 0, openPad, ...exLines, closePad);
+  } else {
+    // 已有 { 块 → 在块内（下一行）插 exclude（在 } 之前）
+    lines.splice(idx + 1, 0, ...exLines);
+  }
+  return [lines.join("\n"), true];
 }

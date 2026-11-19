@@ -1551,7 +1551,6 @@ export const SRC_EN: SrcDict = {
   "{n} 项": "{n} entries",
   "{n} 个模块": "{n} modules",
   "settings.gradle 里声明的仓库（只读）": "Repositories declared in settings.gradle (read-only)",
-  "无": "none",
   "{n} 个仓库": "{n} repos",
   "libs 目录（只读）": "libs/ directory (read-only)",
   "库名或坐标，如 okhttp / com.x:y:1.0": "Lib name or coord, e.g. okhttp / com.x:y:1.0",

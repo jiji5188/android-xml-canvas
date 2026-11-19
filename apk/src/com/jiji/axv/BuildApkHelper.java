@@ -133,10 +133,10 @@ public class BuildApkHelper {
             }
             log.append("资源 ").append(written).append(" 个文件\n");
 
-            // M278/P1-1：aar 的 res/ 也要进 aapt2（androidx aar 的 theme/drawable 等，缺了 R.style.* 全炸）
-            // M350：改成「一个 aar 一个独立 overlay」而不是合并进同一目录——
-            // 各 aar 的默认 values 文件名相同（values/values.xml），合并时“已存在不覆盖”会丢掉后面所有 aar 的默认值（本地化目录能进来）→ aapt2 link 报 “removing resource without required default value” + exit 1
-            java.util.List<File> aarResDirs = extractAarResDirs(libs, root, log);
+            // M416：所有 aar 的 res 合并到同一目录树（values XML 拼接，其它覆盖），
+            //  解决 aapt2 link「conflicting value for configuration」（两个 aar 都声明同名 styleable）。
+            //  旧 M350 的独立 overlay 方案在 appcompat + material 同存时撞 styleable 结构冲突。
+            File aarMerged = mergeAarResTree(libs, root, log);
 
             File man = new File(root, "AndroidManifest.xml");
             // M262：优先用项目里的 AndroidManifest.xml 原文（aapt2 link 会直接读它，不再合成只含 ShellActivity 的清单）。
@@ -219,18 +219,16 @@ public class BuildApkHelper {
                 dumpLayoutHeads(resDir, log);
                 return jsonFail("compile", log);
             }
-            // M350：每个 aar 的 res 单独 compile 成 overlay zip（不跟项目 res 混在同一目录里）
-            java.util.List<File> aarCompiled = new java.util.ArrayList<>();
-            for (int i = 0; i < aarResDirs.size(); i++) {
-                File ad = aarResDirs.get(i);
-                File az = new File(root, "compiled_aar" + i + ".zip");
-                int ca = runAapt2(bin, root, new String[] { "compile", "--dir", ad.getAbsolutePath(),
-                        "-o", az.getAbsolutePath() }, log);
+            // M416：aar 合并目录单独 compile 成一个 overlay zip（不再各自独立）
+            File aarCompiledZip = null;
+            if (aarMerged != null) {
+                aarCompiledZip = new File(root, "compiled_aar_mrg.zip");
+                int ca = runAapt2(bin, root, new String[] { "compile", "--dir", aarMerged.getAbsolutePath(),
+                        "-o", aarCompiledZip.getAbsolutePath() }, log);
                 if (ca != 0) {
-                    log.append("aar overlay 编译失败（第 ").append(i + 1).append(" 个，").append(ca).append("）：").append(ad.getName()).append("\n");
+                    log.append("aar 合并资源编译失败（").append(ca).append("）\n");
                     return jsonFail("compile", log);
                 }
-                aarCompiled.add(az);
             }
             logStage(log, "资源链接（aapt2 link）");
             File unsigned = new File(root, "unsigned.apk");
@@ -245,7 +243,7 @@ public class BuildApkHelper {
             linkArgs.add("--java"); linkArgs.add(genDir.getAbsolutePath());
             linkArgs.add("--custom-package"); linkArgs.add(pkg);
             linkArgs.add(compiled.getAbsolutePath());
-            for (File z : aarCompiled) linkArgs.add(z.getAbsolutePath());
+            if (aarCompiledZip != null) linkArgs.add(aarCompiledZip.getAbsolutePath());
             int c2 = runAapt2(bin, root, linkArgs.toArray(new String[0]), log);
             if (c2 != 0) return jsonFail("link", log);
             if (!unsigned.isFile()) return jsonFail("link", log);
@@ -1155,46 +1153,47 @@ public class BuildApkHelper {
     /** M278/P1-1：把 libs 里 aar 的 res/** 合并进 aapt2 资源目录（drawable/values 等）。
      *  同名资源：项目自己的优先（先写 aar，后写项目——这里在写完项目 res 之后调，
      *  所以 aar 的 res 不覆盖已有同名文件，只补缺的）。 */
-    /** M350：每个 aar 的 res/ 展开到独立目录（root/aarres/aarN），返回非空目录列表。
-     *  不做任何去重/覆盖逻辑——各 aar 完全隔离，aapt2 link 时用 --auto-add-overlay 按顺序叠加
-     *  （后面的 aar 覆盖前面的同名资源；同一 aar 内部无冲突）。
-     *  旧 mergeAarRes 合进同一目录 + “已存在不覆盖”会把后面 aar 的 values/values.xml（默认值）
-     *  整个丢掉（本地化 values-xx/values.xml 能进来）→ link 时 “removing resource without required default value” → exit 1。 */
-    private java.util.List<File> extractAarResDirs(JSONArray libs, File root, StringBuilder log) {
-        java.util.List<File> out = new java.util.ArrayList<>();
-        if (libs == null || libs.length() == 0) return out;
-        File base = new File(root, "aarres");
-        // 清掉上次构建残留，避免旧 aar 资源混进新包
-        deleteRec(base);
-        // M414：同名 artifact 多版本（material-1.12.0 + material-1.0.0）同进 overlay →
-        // aapt2 link「conflicting value for configuration」。JS 收集层（dedupAarVersions）
-        // 已去重，这里再兜一道：按「artifact 基名」（文件名去掉 -数字…-版本 段）分组，组内留版本号最大的。
-        int total = 0;
-        java.util.List<String> dropIdx = new java.util.ArrayList<>();
+    /**
+     * M416：把所有 aar 的 res/ 合并进同一个目录树（aarres_merged），
+     *  解决 aapt2 link「conflicting value for configuration」（两个不同 aar 都声明同名 styleable 时
+     *  各自独立 overlay 会撞结构冲突；合并成一棵树后 aapt2 compile 只看到一套 values，不再冲突）。
+     *  合并规则：
+     *   - values/values-XX/values-land 等 XML 文件：拼接 <resources> 标签体内的内容（不丢默认值）
+     *   - 其它文件（drawable/layout/anim）：后面 aar 覆盖前面
+     *   - M414 同名 artifact 多版本去重保留（只收最高版）
+     *  返回单个合并目录（无 aar 时返回 null）。
+     */
+    private File mergeAarResTree(JSONArray libs, File root, StringBuilder log) {
+        if (libs == null || libs.length() == 0) return null;
+        File merged = new File(root, "aarres_merged");
+        deleteRec(merged);
+        merged.mkdirs();
+
+        // M414：同名 artifact 多版本去重（material-1.12.0 + material-1.0.0 只留 1.12.0）
         java.util.List<String> aarIdx = new java.util.ArrayList<>();
         for (int i = 0; i < libs.length(); i++) {
             JSONObject lj = libs.optJSONObject(i);
             if (lj == null) continue;
-            String lp = lj.optString("path", "");
-            if (!lp.endsWith(".aar")) continue;
+            if (!lj.optString("path", "").endsWith(".aar")) continue;
             aarIdx.add(String.valueOf(i));
         }
-        // 分组：base → 该组里版本最高的 idx（无版本号视为 0，同版本先出现的赢 = 共享库优先）
         java.util.Map<String, Integer> bestByBase = new java.util.LinkedHashMap<>();
         for (String idx : aarIdx) {
             JSONObject lj = libs.optJSONObject(Integer.parseInt(idx));
             String artBase = artifactBase(lj.optString("path", ""));
             Integer prev = bestByBase.get(artBase);
-            if (prev == null || compareVer(verOf(lj.optString("path", "")), verOf(libs.optJSONObject(prev).optString("path", ""))) > 0) {
+            if (prev == null || compareVer(verOf(lj.optString("path", "")),
+                    verOf(libs.optJSONObject(prev).optString("path", ""))) > 0) {
                 bestByBase.put(artBase, Integer.parseInt(idx));
             }
         }
+        java.util.List<String> dropIdx = new java.util.ArrayList<>();
         for (String idx : aarIdx) {
             JSONObject lj = libs.optJSONObject(Integer.parseInt(idx));
             String artBase = artifactBase(lj.optString("path", ""));
             if (!String.valueOf(bestByBase.get(artBase)).equals(idx)) dropIdx.add(idx);
         }
-        if (dropIdx.size() > 0) {
+        if (!dropIdx.isEmpty()) {
             StringBuilder sb = new StringBuilder();
             sb.append("aar 多版本去重：跳过 ").append(dropIdx.size()).append(" 个 → ");
             for (int k = 0; k < dropIdx.size(); k++) {
@@ -1203,10 +1202,12 @@ public class BuildApkHelper {
             }
             log.append(sb).append('\n');
         }
-        for (int i = 0; i < libs.length(); i++) {
-            if (dropIdx.contains(String.valueOf(i))) continue; // M414：被更高版取代，不展开
+
+        int total = 0;
+        for (String idxStr : aarIdx) {
+            int i = Integer.parseInt(idxStr);
+            if (dropIdx.contains(idxStr)) continue;
             JSONObject lj = libs.optJSONObject(i);
-            if (lj == null) continue;
             String libPath = lj.optString("path", "");
             String b64 = lj.optString("base64", "");
             if (!libPath.endsWith(".aar") || b64.isEmpty()) continue;
@@ -1216,7 +1217,6 @@ public class BuildApkHelper {
                 File aarTmp = new File(root, ".aar" + i + ".tmp");
                 writeBytes(aarTmp, data);
                 int n = 0;
-                File dstDir = new File(base, "aar" + i);
                 try (java.util.zip.ZipFile zf = new java.util.zip.ZipFile(aarTmp)) {
                     java.util.Enumeration<? extends java.util.zip.ZipEntry> en = zf.entries();
                     while (en.hasMoreElements()) {
@@ -1224,10 +1224,19 @@ public class BuildApkHelper {
                         String name = ze.getName();
                         if (ze.isDirectory() || !name.startsWith("res/")) continue;
                         String rel = name.substring(4);
-                        File dst = new File(dstDir, rel);
+                        File dst = new File(merged, rel);
                         dst.getParentFile().mkdirs();
-                        try (InputStream is = zf.getInputStream(ze)) {
-                            writeBytes(dst, readAll(is));
+                        // M416：values 目录下的 XML 合并拼接（不覆盖）
+                        boolean isValues = isValuesXml(rel);
+                        if (isValues && dst.isFile()) {
+                            String existing = readUtf8(dst);
+                            byte[] inc = readAll(zf.getInputStream(ze));
+                            String incoming = new String(inc, java.nio.charset.StandardCharsets.UTF_8);
+                            writeUtf8(dst, mergeValuesXml(existing, incoming));
+                        } else {
+                            try (InputStream is = zf.getInputStream(ze)) {
+                                writeBytes(dst, readAll(is));
+                            }
                         }
                         n++;
                     }
@@ -1235,16 +1244,60 @@ public class BuildApkHelper {
                     aarTmp.delete();
                 }
                 if (n > 0) {
-                    out.add(dstDir);
                     total += n;
-                    log.append("aar overlay：").append(libPath).append(" → ").append(n).append(" 个资源（独立目录，link 时叠加）\n");
+                    log.append("aar 资源合并：").append(libPath).append(" → ").append(n).append(" 个\n");
                 }
             } catch (Throwable ignored) {
-                log.append("aar overlay 展开失败（跳过）：").append(libPath).append("\n");
+                log.append("aar 资源展开失败（跳过）：").append(libPath).append("\n");
             }
         }
-        if (total > 0) log.append("aar 资源共 ").append(total).append(" 个（").append(out.size()).append(" 个 overlay）\n");
-        return out;
+        if (total > 0) log.append("aar 资源共 ").append(total).append(" 个（合并到 ").append(merged.getName()).append("）\n");
+        return total > 0 ? merged : null;
+    }
+
+    /** M416：是否 values 目录下的 XML（values/、values-v21/、values-land/ 等） */
+    private static boolean isValuesXml(String rel) {
+        String path = rel.toLowerCase();
+        if (!path.endsWith(".xml")) return false;
+        // 第一个路径段以 values 开头
+        int slash = path.indexOf('/');
+        if (slash < 0) return false;
+        String dir = path.substring(0, slash);
+        return dir.startsWith("values");
+    }
+
+    /**
+     * M416：合并两个 values XML（拼接 <resources> 标签体内的内容）。
+     *  两个文件都是 <?xml ...?><resources>...</resources> 结构，
+     *  合并后仍是一个 <resources>，内容是两者的并集。
+     *  如果同名资源（同 config）内容不同，aapt2 compile 会报冲突——
+     *  但这种情况只在两个不同库声明了同名但不同值的资源时发生，
+     *  实际上 aapt2 对 overlay 允许后者覆盖前者，这里先拼接让 aapt2 自己处理。
+     */
+    private static String mergeValuesXml(String existing, String incoming) {
+        // 去掉 XML 声明和 <resources> 外层标签，拼接体内内容
+        String bodyA = stripResRoot(existing);
+        String bodyB = stripResRoot(incoming);
+        String decl = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+        return decl + "<resources>\n" + bodyA + "\n" + bodyB + "\n</resources>\n";
+    }
+
+    /** 去掉 <?xml ...?> 声明和 <resources ...> 外层标签，只留体内内容 */
+    private static String stripResRoot(String s) {
+        String t = s.trim();
+        // 去掉 XML 声明
+        int declEnd = t.indexOf("?>");
+        if (declEnd >= 0) t = t.substring(declEnd + 2).trim();
+        // 去掉 <resources ...> 开标签
+        int start = t.indexOf("<resources");
+        if (start < 0) return t;
+        int openEnd = t.indexOf('>', start);
+        if (openEnd < 0) return t;
+        t = t.substring(openEnd + 1);
+        // 去掉 </resources> 闭标签
+        int closeStart = t.lastIndexOf("</resources>");
+        if (closeStart >= 0) t = t.substring(0, closeStart);
+        return t.trim();
     }
 
     /** M414：aar 文件名的 artifact 基名（material-1.12.0.aar → material；无版本段 → 原名） */

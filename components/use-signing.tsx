@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, type RefObject } from "react";
 import { projectSaveRoot, projectFileExists, readProjectFile, readAppGradle, saveProjectFile } from "@/lib/xml/project-save";
+import { installApk, shareApkFile } from "@/lib/xml/native-apk";
 import type { ActiveProject } from "./XmlEditor";
 import { readSigningFromGradle } from "@/lib/xml/signing";
 import { readStoredSigning, writeStoredSigning, clearStoredSigning, type StoredSigning } from "@/lib/xml/sign-store";
@@ -121,6 +122,38 @@ export function useSigning(deps: SigningDeps) {
     [activeProject, gradleRelForSign],
   );
 
+  /** M410：签名弹窗里的四个交互（安装/分享/清除/临时提示）从 XmlEditor JSX 搬进来 */
+  const onInstallApk = useCallback(
+    (p: string) => {
+      const r = installApk(p);
+      setExportNote(r.ok ? tt("已调起系统安装器") : tt("安装失败：{msg}", { msg: r.msg || "" }));
+    },
+    [tt, setExportNote],
+  );
+
+  const onShareApk = useCallback(
+    (p: string) => {
+      const r = shareApkFile(p);
+      setExportNote(r.ok ? tt("已调起分享") : tt("分享失败：{msg}", { msg: r.msg || "" }));
+    },
+    [tt, setExportNote],
+  );
+
+  const onForgetSigning = useCallback(() => {
+    clearStoredSigning(activeProject?.name);
+    setSignStoredRev((v) => v + 1);
+    setExportNote(tt("已清除本机记住的签名配置"));
+  }, [activeProject?.name, tt, setExportNote]);
+
+  /** 弹窗内的一次性提示（比全局 flashNote 短，且不等同 exportNote 的持久行为） */
+  const onSignNote = useCallback(
+    (m: string, ms = 2400) => {
+      setExportNote(m);
+      window.setTimeout(() => setExportNote(""), ms);
+    },
+    [setExportNote],
+  );
+
   return {
     signDialogOpen, setSignDialogOpen,
     gradleForSign, gradleRelForSign, signRootMissing, signKeystoreExists, signAppName, signIconDefault,
@@ -128,6 +161,7 @@ export function useSigning(deps: SigningDeps) {
     openSignDialog, makeKeystoreOnDevice, noteTimed, writeGradleForSign,
     onRemember: (s: StoredSigning) => writeStoredSigning(activeProject?.name, s),
     onForget: () => { clearStoredSigning(activeProject?.name); setSignStoredRev((v) => v + 1); },
+    onInstallApk, onShareApk, onForgetSigning, onSignNote,
   };
 }
 // readAppName 从 project-rename 引入，供 openSignDialog 使用

@@ -85,14 +85,14 @@ import { nativeNewProjectIO, webNewProjectIO, nativeVerifyProject } from "@/lib/
 import { pickXmlFile } from "@/lib/xml/save-as";
 import { buildSaveFiles, buildRealRenderFiles, downloadLayout, downloadResZip, nextSaveAction, saveAs as saveAsBundle, saveBack as saveBackPure, type SaveInput } from "@/lib/xml/save-flow";
 import { hasRealRender, renderReal, prepareFiles } from "@/lib/xml/native-render";
-import { readStoredSigning, writeStoredSigning, clearStoredSigning } from "@/lib/xml/sign-store";
+import { readStoredSigning, writeStoredSigning } from "@/lib/xml/sign-store";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { withCurrentSource, withCurrentXml } from "@/lib/xml/editor-buffer";
 import { useEditorState } from "./editor-state";
 import { useBuildApk } from "./use-build-apk";
 import { useDebugRun } from "./use-debug-run";
 import { DebugRunPanel } from "./DebugRunPanel";
-import { installApk, shareApkFile, type BuildApkResult } from "@/lib/xml/native-apk";
+import { type BuildApkResult } from "@/lib/xml/native-apk";
 import { androidJavaToolchain } from "@/lib/plugin/toolchains/android-java";
 import { parseGradlePackage } from "@/lib/xml/project-info";
 import { collectProjectRes } from "@/lib/xml/res-collect";
@@ -1216,8 +1216,9 @@ const allDrawableNames = useMemo(() => {
   const signing = useSigning({ activeProject, tt, setExportNote, noteTimerRef });
   const {
     signDialogOpen, setSignDialogOpen,
-    gradleForSign, signRootMissing, signKeystoreExists, signAppName, signIconDefault, signStored, setSignStoredRev,
-    openSignDialog, makeKeystoreOnDevice, noteTimed, writeGradleForSign, onRemember, onForget,
+    gradleForSign, signRootMissing, signKeystoreExists, signAppName, signIconDefault, signStored,
+    openSignDialog, makeKeystoreOnDevice, noteTimed, writeGradleForSign, onRemember,
+    onInstallApk, onShareApk, onForgetSigning, onSignNote,
   } = signing;
   /** M212：导入 APK 换资源重签面板 */
   const [repackOpen, setRepackOpen] = useState(false);
@@ -2377,31 +2378,18 @@ const allDrawableNames = useMemo(() => {
           onBuildApk={doBuildApk}
           apkBusy={apkBusy}
           apkResult={apkResult}
-          onInstallApk={(p) => {
-            const r = installApk(p);
-            setExportNote(r.ok ? tt("已调起系统安装器") : tt("安装失败：{msg}", { msg: r.msg || "" }));
-          }}
+          onInstallApk={onInstallApk}
           onWriteGradle={writeGradleForSign}
           stored={signStored}
           onRemember={(s) => writeStoredSigning(activeProject?.name, s)}
-          onShareApk={(p) => {
-            const r = shareApkFile(p);
-            setExportNote(r.ok ? tt("已调起分享") : tt("分享失败：{msg}", { msg: r.msg || "" }));
-          }}
+          onShareApk={onShareApk}
           onOpenRepack={() => {
             setSignDialogOpen(false);
             setRepackOpen(true);
           }}
-          onForget={() => {
-            clearStoredSigning(activeProject?.name);
-            setSignStoredRev((v) => v + 1);
-            setExportNote(tt("已清除本机记住的签名配置"));
-          }}
+          onForget={onForgetSigning}
           onClose={() => setSignDialogOpen(false)}
-          onNote={(m, ms = 2400) => {
-            setExportNote(m);
-            window.setTimeout(() => setExportNote(""), ms);
-          }}
+          onNote={onSignNote}
         />
       )}
       {repackOpen && (

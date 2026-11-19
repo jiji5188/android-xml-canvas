@@ -16,10 +16,10 @@ function countLines(rel: string): number {
   return readFileSync(path.join(ROOT, rel), "utf8").split("\n").length;
 }
 
-// 当前水位（2026-11-19 M405b 时点）。
-// 历史：早期峰值 6001 → M366 系列拆到 2559 → 之后平稳（2536~2583）。
+// 当前水位（2026-11-19 M410 时点，-75 行后锁住）。
+// 历史：6001 → M366 拆到 2559 → 平稳 2536~2584 → M410 2509。
 const LIMITS: Record<string, number> = {
-  "components/XmlEditor.tsx": 2650,
+  "components/XmlEditor.tsx": 2510,
 };
 
 describe("M408 行数护栏：主组件不许再暴涨", () => {

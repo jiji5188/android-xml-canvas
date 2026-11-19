@@ -46,9 +46,9 @@ describe("M427 addExcludesToGradle", () => {
     const text = "dependencies {\n    implementation 'com.example:lib:1.0'\n}";
     const [out, changed] = addExcludesToGradle(text, { group: "com.example", name: "lib", version: "1.0" }, [{ group: "com.other", module: "lib" }], false);
     expect(changed).toBe(true);
-    expect(out).toContain("implementation 'com.example:lib:1.0'");
+    expect(out).toContain("implementation ('com.example:lib:1.0')"); // M434：统一改写成带括号形式
     expect(out).toContain("exclude group: 'com.other', module: 'lib'");
-    expect(out).toMatch(/implementation 'com\.example:lib:1\.0'\s*\{/);
+    expect(out).toMatch(/implementation \('com\.example:lib:1\.0'\)\s*\{/);
   });
 
   it("kts：implementation( ) 形式追加 exclude(group=, module=)", () => {

@@ -90,7 +90,7 @@ export function ProjectHome({ onOpenProject, onOpenEditor }: ProjectHomeProps) {
   const loading = wsBusy;
 
   return (
-    <div style={S.page}>
+    <div style={S.page} className="axv-home">
       <div style={S.head}>
         <div style={S.title}>{tt("我的项目")}</div>
         <button type="button" style={{ ...S.btn, border: "none", background: "transparent", color: "#04409F" }} onClick={onOpenEditor}>

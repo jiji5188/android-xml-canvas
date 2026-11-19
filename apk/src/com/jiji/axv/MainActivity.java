@@ -180,7 +180,7 @@ public class MainActivity extends Activity {
                         "(function(){try{"
                                 + "var b=document.body;"
                                 + "var t=b?b.innerText.trim():'';"
-                                + "var ok=!!document.querySelector('.axv-phone, .axv-stage, .axv-editor');"
+                                + "var ok=!!document.querySelector('.axv-phone, .axv-stage, .axv-editor, .axv-home');"
                                 + "var js=document.querySelectorAll('script').length;"
                                 + "return (ok?1:0)+'|'+t.length+'|'+(document.title||'')+'|'+js;"
                                 + "}catch(e){return '-2|-2|'+e.message+'|0';}})()",
@@ -188,8 +188,12 @@ public class MainActivity extends Activity {
                             String v = value == null ? "" : value.replace("\"", "");
                             String[] parts = v.split("\\|");
                             boolean rendered = parts.length > 0 && "1".equals(parts[0].trim());
+                            // M413：第二段是 innerText 长度——内容不止一屏文字量就不算白屏，
+                            // 选择器只是辅助信号（M412 首页换了根节点 class，旧哨点会误报）
+                            int textLen = 0;
+                            try { if (parts.length > 1) textLen = Integer.parseInt(parts[1].trim()); } catch (Exception ignored) { }
                             note("probe(" + delayOrFlag + "): " + v);
-                            if (!rendered && delayOrFlag != 0) {
+                            if (!rendered && textLen < 60 && delayOrFlag != 0) {
                                 showDiag("编辑器没有渲染出来（" + v + "）");
                             }
                         });

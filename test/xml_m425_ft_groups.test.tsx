@@ -15,14 +15,22 @@ dependencies {
     implementation 'com.example:cool-lib:1.0.0'
     implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
 }`;
+/** M426 冲突样例：同名多版本 + 跨 group 同名 */
+const APP_BUILD_CONFLICT = `plugins { id 'com.android.application' }
+dependencies {
+    implementation 'com.example:cool-lib:1.0.0'
+    implementation 'com.example:cool-lib:2.0.0'
+    implementation 'com.other:cool-lib:1.5.0'
+    implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
+}`;
 
-function mockIo(): AiFileIo {
+function mockIo(appBuildText?: string): AiFileIo {
   const files: Record<string, AiFileEntry[]> = {
     "app/src/main/libs": [{ name: "std-lib.jar", kind: "file", rel: "app/src/main/libs/std-lib.jar" }],
     "app/libs": [{ name: "ft-lib.aar", kind: "file", rel: "app/libs/ft-lib.aar" }],
   };
   const texts: Record<string, string> = {
-    "app/build.gradle": APP_BUILD,
+    "app/build.gradle": appBuildText ?? APP_BUILD,
   };
   return {
     rootLabel: () => "TestProject",
@@ -93,6 +101,34 @@ describe("M425 项目库 fileTree 二级列表", () => {
     expect(c.container.textContent).not.toContain("ft-lib.aar");
   });
 
+  it("无冲突时不显示黄条", async () => {
+    const c = await gotoProjectTab();
+    expect(c.container.textContent).not.toContain("依赖冲突");
+  });
+
+  it("M426：同名多版本 + 跨 group 同名 → 黄条列出冲突", async () => {
+    const c = mountLibsConf();
+    // 切到项目库 tab
+    fireEvent.click(c.getByText("项目库"));
+    await waitFor(() => expect(c.container.textContent).toContain("cool-lib"), { timeout: 3000 });
+    // 黄条出现
+    expect(c.container.textContent).toContain("依赖冲突");
+    // 版本冲突文案（cool-lib 多版本）
+    expect(c.container.textContent).toContain("多版本");
+    expect(c.container.textContent).toContain("com.example:cool-lib:1.0.0");
+    expect(c.container.textContent).toContain("com.example:cool-lib:2.0.0");
+    // 跨 group 同名文案
+    expect(c.container.textContent).toContain("同名来自不同 group");
+    expect(c.container.textContent).toContain("com.example:cool-lib");
+    expect(c.container.textContent).toContain("com.other:cool-lib");
+  });
+});
+
+function mountLibsConf() {
+  return render(<LibsPanel aiFileIo={mockIo(APP_BUILD_CONFLICT)} onNote={() => {}} tr={tr} />);
+}
+
+describe("M425 标准目录 + 顶部按钮", () => {
   it("标准目录文件直接列出 + 「新建库目录」入口存在 + 顶部无平铺库目录按钮", async () => {
     const c = await gotoProjectTab();
     // 标准目录文件立即可见（不在折叠组里）

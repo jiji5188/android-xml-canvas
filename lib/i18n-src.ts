@@ -212,6 +212,13 @@ export const SRC_EN: SrcDict = {
   "{lib} 文件已删除，但依赖声明删除失败（可在 build.gradle 里手动删 {where}）": "{lib} file deleted, but failed to remove the dependency declaration (remove it from {where} in build.gradle manually)",
   "libs.remove_decl_only": "{lib} dependency declaration removed from build.gradle, but file delete failed: {err}",
   "{lib} 依赖声明已从 build.gradle 删除，但文件删除失败：{err}": "{lib} dependency declaration removed from build.gradle, but file delete failed: {err}",
+  // M426：依赖冲突提示
+  "libs.dep_conflict": "Dependency conflicts: {n}",
+  "依赖冲突：{n} 处": "Dependency conflicts: {n}",
+  "libs.dep_conflict_version": "{a} has multiple versions: {v} (Gradle picks one per resolution rules; unify to latest manually)",
+  "{a} 多版本：{v}（Gradle 会按规则取一个，建议手动统一到最新）": "{a} has multiple versions: {v} (Gradle picks one per resolution rules; unify to latest manually)",
+  "libs.dep_conflict_name": "{a} comes from different groups: {g} (watch for package name collision)",
+  "{a} 同名来自不同 group：{g}（注意包名冲突）": "{a} comes from different groups: {g} (watch for package name collision)",
   // M368：库管理面板优化（搜索/删除）
   // M370：项目库 tab 提示（build.gradle 配置摘要）
   // M371：项目属性弹窗 Gradle 配置区块

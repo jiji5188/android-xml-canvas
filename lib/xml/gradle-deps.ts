@@ -619,3 +619,44 @@ export function insertRepoUrl(
   const block = `\n\nrepositories {\n    ${repoLine}\n}\n`;
   return [text.replace(/\s*$/, "") + "\n" + block, false];
 }
+
+/** M426：依赖冲突检测——同名 artifact 多版本 + 不同 group 同名 artifact */
+export interface DepConflict {
+  /** 冲突类型：version=同 group:name 多版本 / name=跨 group 同名 artifact */
+  kind: 'version' | 'name';
+  /** 涉及坐标列表（group:name[:version]） */
+  coords: string[];
+  /** 用于展示的简短 artifact 名 */
+  artifact: string;
+}
+
+/** 检测 GradleDep 列表里的冲突：
+ *  - 同 group:name 出现多个不同 version → 'version' 冲突
+ *  - 不同 group 同 artifact name（跨 group 同名库）→ 'name' 警告 */
+export function findDepConflicts(deps: GradleDep[]): DepConflict[] {
+  const out: DepConflict[] = [];
+  const byGn = new Map<string, { g: string; n: string; vs: string[] }>();
+  for (const d of deps) {
+    const key = d.group + ':' + d.name;
+    const e = byGn.get(key);
+    if (!e) byGn.set(key, { g: d.group, n: d.name, vs: [d.version] });
+    else if (!e.vs.includes(d.version)) e.vs.push(d.version);
+  }
+  for (const e of byGn.values()) {
+    if (e.vs.length > 1) {
+      out.push({ kind: 'version', artifact: e.n, coords: e.vs.map((v) => e.g + ':' + e.n + ':' + v) });
+    }
+  }
+  const byName = new Map<string, Set<string>>();
+  for (const d of deps) {
+    const s = byName.get(d.name) || new Set<string>();
+    s.add(d.group);
+    byName.set(d.name, s);
+  }
+  for (const [n, gs] of byName) {
+    if (gs.size > 1) {
+      out.push({ kind: 'name', artifact: n, coords: [...gs].map((g) => g + ':' + n) });
+    }
+  }
+  return out;
+}

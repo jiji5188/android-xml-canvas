@@ -21,9 +21,11 @@ import {
   insertRepoUrl,
   mavenCoord,
   removeImplementation,
+  findDepConflicts,
   type GradleDep,
   type GradleUnresolved,
   type GradleFileTree,
+  type DepConflict,
 } from "@/lib/xml/gradle-deps";
 import { systemDownload } from "@/lib/xml/system-download";
 import { orderBySecurity, verifyDownloadedLib, type VerifyResult } from "@/lib/xml/lib-integrity";
@@ -462,6 +464,9 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
     });
     return { ftGroups, stdFiles: sortLibFiles(stdFiles) };
   }, [projectLibs, gradleFileTrees, projectLibCandidates, libQuery]);
+
+  /** M426：maven 依赖冲突（同名多版本 / 跨 group 同名）——项目库 tab 顶部黄条提示 */
+  const depConflicts = useMemo(() => findDepConflicts(gradleDeps), [gradleDeps]);
 
   /** M425：项目库单个文件行（fileTree 组 / 标准组公用）——行内无按钮，长按弹「移除」 */
   const renderProjectFileRow = (f: LibFile) => (
@@ -1266,6 +1271,27 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
                 ? gradleFileTrees.map((f) => f.dir).join(", ")
                 : tr("libs.none", "无"),
             })}
+          </div>
+        )}
+        {/* M426：依赖冲突黄条——同名多版本 / 跨 group 同名 */}
+        {tab === "project" && depConflicts.length > 0 && (
+          <div style={{ background: "#fff3cd", border: "1px solid #ffc107", borderRadius: 6, margin: "4px 8px 6px", padding: "6px 8px", fontSize: 11, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 600, color: "#856404", marginBottom: 4 }}>
+              {tr("libs.dep_conflict", "依赖冲突：{n} 处", { n: depConflicts.length })}
+            </div>
+            {depConflicts.map((c, i) => (
+              <div key={i} style={{ color: "#856404", marginBottom: 2, wordBreak: "break-all" }}>
+                {c.kind === "version"
+                  ? tr("libs.dep_conflict_version", "{a} 多版本：{v}（Gradle 会按规则取一个，建议手动统一到最新）", {
+                      a: c.artifact,
+                      v: c.coords.join(", "),
+                    })
+                  : tr("libs.dep_conflict_name", "{a} 同名来自不同 group：{g}（注意包名冲突）", {
+                      a: c.artifact,
+                      g: c.coords.join(", "),
+                    })}
+              </div>
+            ))}
           </div>
         )}
         {/* M372：build.gradle 解析出的引用库直接进列表（打开项目自动解析，无需按钮） */}

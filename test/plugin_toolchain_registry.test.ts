@@ -1,0 +1,130 @@
+// test/plugin_toolchain_registry.test.ts — M409：工具链插件化骨架
+//
+// 只测「注册表 + 能力位 + 零行为变更的适配器」，不测真实构建（真机才有原生桥）。
+import { beforeEach, describe, expect, it } from "vitest";
+import type { Toolchain } from "@/lib/plugin/toolchain-registry";
+import { ToolchainRegistry } from "@/lib/plugin/toolchain-registry";
+import {
+  androidJavaToolchain,
+  registerBuiltinToolchains,
+} from "@/lib/plugin/toolchains/android-java";
+
+function fakeToolchain(id: Toolchain["id"], exts: string[]): Toolchain {
+  return {
+    id,
+    displayName: id,
+    fileExtensions: exts,
+    capabilities: {
+      hasCanvas: false,
+      hasRes: false,
+      hasManifest: false,
+      hasGradle: false,
+      artifact: "script",
+      runMode: "interpret",
+    },
+    syntax: { name: id, extensions: exts, lineComment: ["#"] },
+    templates: [],
+    canBuild: () => true,
+    build: async () => ({ ok: true }),
+  };
+}
+
+describe("M409 ToolchainRegistry", () => {
+  beforeEach(() => {
+    ToolchainRegistry.reset();
+  });
+
+  it("注册 / 按 id 取 / size", () => {
+    ToolchainRegistry.register(fakeToolchain("c", [".c", ".h"]));
+    ToolchainRegistry.register(fakeToolchain("python", [".py"]));
+    expect(ToolchainRegistry.size).toBe(2);
+    expect(ToolchainRegistry.get("c")?.displayName).toBe("c");
+    expect(ToolchainRegistry.get("python")).not.toBeNull();
+    expect(ToolchainRegistry.get("js")).toBeNull();
+  });
+
+  it("重复注册同 id 覆盖（幂等）", () => {
+    ToolchainRegistry.register(fakeToolchain("c", [".c"]));
+    ToolchainRegistry.register(fakeToolchain("c", [".c", ".h"]));
+    expect(ToolchainRegistry.size).toBe(1);
+    expect(ToolchainRegistry.get("c")?.fileExtensions).toEqual([".c", ".h"]);
+  });
+
+  it("按文件名找工具链（大小写不敏感、路径也能喂）", () => {
+    ToolchainRegistry.register(androidJavaToolchain as unknown as Toolchain);
+    expect(ToolchainRegistry.forFile("MainActivity.java")?.id).toBe("android-java");
+    expect(ToolchainRegistry.forFile("src\\com\\x\\Foo.KT")?.id).toBe("android-java");
+    expect(ToolchainRegistry.forFile("build.gradle.kts")?.id).toBe("android-java");
+    expect(ToolchainRegistry.forFile("main.py")).toBeNull();
+  });
+
+  it("空文件名返回 null（不抛）", () => {
+    ToolchainRegistry.register(fakeToolchain("c", [".c"]));
+    expect(ToolchainRegistry.forFile("")).toBeNull();
+  });
+
+  it("reset 清空", () => {
+    ToolchainRegistry.register(fakeToolchain("ts", [".ts"]));
+    ToolchainRegistry.reset();
+    expect(ToolchainRegistry.size).toBe(0);
+    expect(ToolchainRegistry.ids()).toEqual([]);
+  });
+});
+
+describe("M409 android-java 适配器", () => {
+  it("能力位：全开 + APK + dex", () => {
+    expect(androidJavaToolchain.capabilities).toEqual({
+      hasCanvas: true,
+      hasRes: true,
+      hasManifest: true,
+      hasGradle: true,
+      artifact: "apk",
+      runMode: "dex",
+    });
+  });
+
+  it("语法：Java / 双斜杠行注释", () => {
+    expect(androidJavaToolchain.syntax.name).toBe("Java");
+    expect(androidJavaToolchain.syntax.lineComment).toEqual(["//"]);
+    expect(androidJavaToolchain.syntax.blockComment).toEqual(["/*", "*/"]);
+  });
+
+  it("模板来自 NEW_FILE_CATEGORIES（含 M405b 的 java-debug）", () => {
+    const keys = androidJavaToolchain.templates.map((t) => t.key);
+    expect(keys.length).toBeGreaterThan(0);
+    expect(keys).toContain("java:java-debug");
+  });
+
+  it("网页/无原生桥环境：canBuild() 为 false", () => {
+    expect(androidJavaToolchain.canBuild()).toBe(false);
+  });
+
+  it("无原生桥时 build() 返回 ok:false + step:env（不抛）", async () => {
+    const r = await androidJavaToolchain.build({
+      pkg: "com.example.app",
+      layout: "activity_main",
+      files: [],
+      keystore: "/tmp/k.p12",
+      storePass: "x",
+    });
+    expect(r.ok).toBe(false);
+    expect(r.step).toBe("env");
+  });
+
+  it("无原生桥时 run() 返回 ok:false + step:env（不抛，也不碰 debugRun）", async () => {
+    const r = await androidJavaToolchain.run({
+      pkg: "com.example.app",
+      javaSources: [{ path: "com/example/app/Main.java", code: "class Main {}" }],
+    });
+    expect(r.ok).toBe(false);
+    expect(r.step).toBe("env");
+  });
+
+  it("registerBuiltinToolchains 幂等注册", () => {
+    ToolchainRegistry.reset();
+    registerBuiltinToolchains();
+    registerBuiltinToolchains();
+    expect(ToolchainRegistry.size).toBe(1);
+    expect(ToolchainRegistry.get("android-java")).not.toBeNull();
+  });
+});

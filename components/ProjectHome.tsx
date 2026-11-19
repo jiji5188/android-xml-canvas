@@ -25,6 +25,9 @@ export interface ProjectHomeProps {
   onOpenEditor: () => void;
 }
 
+/** 稳定的空 setter：不能写成内联箭头（见下方注释） */
+const NOOP = () => {};
+
 const S: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
@@ -66,18 +69,25 @@ const S: Record<string, React.CSSProperties> = {
 };
 
 export function ProjectHome({ onOpenProject, onOpenEditor }: ProjectHomeProps) {
+  // ⚠️ 必须是稳定引用：传内联箭头会让 refreshWorkspace(useCallback) 每帧换身份，
+  // 进而触发 use-workspace-refresh 里的刷新 effect 无限重跑（卡在「读取中」）。
   const {
     wsState, wsProjects, wsBusy, projMeta,
     refreshWorkspace, pickCustomDir,
-  } = useXmlProjectState({ leftView: "res", setWsMsg: () => {} });
+  } = useXmlProjectState({ leftView: "res", setWsMsg: NOOP });
 
   // 进页面刷一次；12s 静默轮询由 use-workspace-refresh 自带（leftView=res）
   useEffect(() => {
+    // 进页面刷一次；12s 静默轮询由 use-workspace-refresh 自带（leftView=res）
     void refreshWorkspace();
+    // M413：不再传 refreshWorkspace 作依赖——它的 useCallback deps 里有 setWsMsg，
+    // 调用方每帧传新引用会连坐导致本 hook 的 effect 死循环
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const unsupported = wsState?.mode === "unsupported";
+  /** busy = 正在读取；M413 修好循环后它只会持续几百 ms，不会再卡死 */
+  const loading = wsBusy;
 
   return (
     <div style={S.page}>
@@ -101,9 +111,9 @@ export function ProjectHome({ onOpenProject, onOpenEditor }: ProjectHomeProps) {
           <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>create_new_folder</span>
           {tt("打开项目目录")}
         </button>
-        <button type="button" style={S.btn} onClick={() => void refreshWorkspace()} disabled={wsBusy}>
+        <button type="button" style={S.btn} onClick={() => void refreshWorkspace()} disabled={loading}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>refresh</span>
-          {wsBusy ? tt("读取中…") : tt("刷新")}
+          {loading ? tt("读取中…") : tt("刷新")}
         </button>
         <button type="button" style={S.btn} onClick={onOpenEditor}>
           <span className="msr" aria-hidden="true" style={{ fontSize: 17 }}>add</span>
@@ -111,9 +121,9 @@ export function ProjectHome({ onOpenProject, onOpenEditor }: ProjectHomeProps) {
         </button>
       </div>
 
-      <div style={S.msg}>{wsBusy ? tt("正在读取工作目录…") : ""}</div>
+      <div style={S.msg}>{loading ? tt("正在读取工作目录…") : ""}</div>
 
-      {wsProjects.length === 0 && !wsBusy ? (
+      {wsProjects.length === 0 && !loading ? (
         <div style={S.empty}>
           {unsupported
             ? tt("这个浏览器拿不到目录权限。点右上角「进入编辑器」仍可编辑单文件。")

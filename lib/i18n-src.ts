@@ -3228,6 +3228,7 @@ export const SRC_EN: SrcDict = {
   "工作目录里还没有项目。把 Android 项目文件夹放进工作目录后点「刷新」，或直接打开一个项目目录。": "No projects in the workspace yet. Put an Android project folder there and tap “Refresh”, or open a project folder directly.",
   " · {n} 个布局": " · {n} layouts",
   "返回项目列表": "Back to projects",
+  "目录读取超时，点「刷新」重试或直接「进入编辑器」": "Directory read timed out. Tap “Refresh” to retry or go straight to the editor",
 
 };
 

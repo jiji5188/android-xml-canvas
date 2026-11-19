@@ -62,8 +62,12 @@ export function useWorkspaceRefresh(d: WorkspaceRefreshDeps) {
         // 只有手动刷新才重新问一次。
         const info: WsInfo = quiet && wsInfoRef.current ? wsInfoRef.current : await wsInfo();
         wsInfoRef.current = info;
-        const infoSig = `${info.mode}:${info.label}:${info.custom ? 1 : 0}:${info.allFiles ? 1 : 0}`;
-        if (!quiet || infoSig !== wsInfoSigRef.current) {
+        // M413：签名带上 permission（web 端权限态会变）。
+        // ⚠️ 绝不能「非静默就强 setWsState」：旧写法 `!quiet || sig !== ...` 让每次手动刷新
+        // 都产生新对象 → use-workspace-refresh 的刷新 effect 依赖 wsState → 立即再刷一次 →
+        // 死循环（桌面 30 次/秒；手机上 JNI 慢表现为「列表永远刷不出来」）。
+        const infoSig = `${info.mode}:${info.label}:${info.custom ? 1 : 0}:${info.allFiles ? 1 : 0}:${info.permission ?? ""}`;
+        if (infoSig !== wsInfoSigRef.current) {
           wsInfoSigRef.current = infoSig;
           setWsState(info);
         }
@@ -102,7 +106,10 @@ export function useWorkspaceRefresh(d: WorkspaceRefreshDeps) {
     //（旧逻辑两个 tab 都无条件刷 → 手机上每次点「设置」都走一遍同步 JNI）
     if (leftView === "res") void refreshWorkspace();
     else if (leftView === "settings" && !wsState) void refreshWorkspace();
-  }, [leftView, refreshWorkspace, wsState]);
+    // M413：依赖里去掉 wsState（wsState 已改为签名不变就不 set，双保险；
+    // 真有人再加 setWsState，也不会重触这个 effect）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leftView, refreshWorkspace]);
 
   /* M60：订阅「后台补齐的完整项目列表」——快速列表先出卡片，完整探测回来后
      自动替换成带 mainPath/精确计数的版本（并继续跑图标/名称分析） */

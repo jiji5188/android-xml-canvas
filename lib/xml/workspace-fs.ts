@@ -69,14 +69,20 @@ const KEY = "workspace";
 const KEY_PROJECT = "project";
 
 function openDb(): Promise<IDBDatabase> {
+  // M412：open 挂起超时 3s（个别 WebView 里 IDB 打开会卡死，不能让 wsInfo 跟着永不返回 →
+  // 项目管理页永远「读取中…」）。超时 = 当作没有存档目录，走空白项目兜底。
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1);
+    const t = setTimeout(() => {
+      try { req.onupgradeneeded = null; req.onsuccess = null; req.onerror = null; } catch { /* ignore */ }
+      reject(new Error("idb open timeout"));
+    }, 3000);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { clearTimeout(t); resolve(req.result); };
+    req.onerror = () => { clearTimeout(t); reject(req.error); };
   });
 }
 

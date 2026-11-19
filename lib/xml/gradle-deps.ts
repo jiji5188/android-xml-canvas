@@ -917,6 +917,31 @@ export function findConflictsForNew(
   return out;
 }
 
+/** M433b：把冲突的处理落到【新依赖】上（旧实现加在旧依赖自己身上 → 自我排除 → 构建侧把库整个丢掉）。
+ *  跨 group 同名 → 给新依赖加 exclude（排旧 group:module，防传递链带回旧库）；
+ *  同 group:name 多版本 → exclude 自己没意义，直接删旧坐标行（M430 removeImplementation）。
+ *  返回 [新文本, 实际变更条数]。 */
+export function applyConflictExcludes(
+  text: string,
+  newDep: { group: string; name: string; version: string },
+  conflicts: ConflictForNew[],
+  kts: boolean,
+): [string, number] {
+  let cur = text;
+  let changed = 0;
+  for (const c of conflicts) {
+    const isSelf = c.exclude.group === newDep.group && c.exclude.module === newDep.name;
+    if (isSelf) {
+      const [next, ok] = removeImplementation(cur, mavenCoord(c.existing.group, c.existing.name, c.existing.version));
+      if (ok) { cur = next; changed++; }
+    } else {
+      const [next, ok] = addExcludesToGradle(cur, newDep, [c.exclude], kts);
+      if (ok) { cur = next; changed++; }
+    }
+  }
+  return [cur, changed];
+}
+
 /** M427：给 build.gradle 里某条 dependency 行追加 exclude 块。
  *  target 是 g:n:v（定位现有行），excludes 是要排的 {group,module} 列表。
  *  groovy: implementation 'g:n:v' → implementation 'g:n:v' {\n    exclude group: 'g', module: 'm'\n}
@@ -976,10 +1001,11 @@ export function addExcludesToGradle(
   );
 
   if (!braceOnSameLine) {
-    // 无 { 在同行 → 追加完整 { exclude } 块（groovy 紧凑 / kts 下行）
-    const openPad = kts ? "    {" : " {";
-    const closePad = kts ? "    }" : "}";
-    lines.splice(idx + 1, 0, openPad, ...exLines, closePad);
+    // M433b：把 { 补在依赖行行尾（Groovy/Kotlin 都要求块开在语句同行，
+    //  旧写法插独立一行 " {" → implementation 'x' + 换行 { } 是非法语法，
+    //  会在 build.gradle 里留下裸块（用户实测踩到））
+    lines[idx] = depLine.replace(/\s+$/, "") + " {";
+    lines.splice(idx + 1, 0, ...exLines, "}");
   } else {
     // 已有 { 块 → 在块内（下一行）插 exclude（在 } 之前）
     lines.splice(idx + 1, 0, ...exLines);

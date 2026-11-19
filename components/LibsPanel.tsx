@@ -29,6 +29,7 @@ import {
   findDepConflicts,
   findConflictsForNew,
   addExcludesToGradle,
+  applyConflictExcludes,
   type GradleDep,
   type GradleUnresolved,
   type GradleFileTree,
@@ -721,19 +722,10 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         }
         if (appText) {
           let [newApp, existed] = insertImplementation(appText, coord, kts);
-          // M427：给冲突的旧 dep 加 exclude（排掉同名库，避免传递带入旧版本）
+          // M427/M433b：给【新依赖】加 exclude 排掉旧的同名库（旧依赖不能自我排除）
           if (conflicts.length > 0) {
-            for (const c of conflicts) {
-              const oldCoord = mavenCoord(c.existing.group, c.existing.name, c.existing.version);
-              const [withEx, exChanged] = addExcludesToGradle(
-                newApp,
-                { group: c.existing.group, name: c.existing.name, version: c.existing.version },
-                [c.exclude],
-                kts,
-              );
-              if (exChanged) newApp = withEx;
-              else break;
-            }
+            const [withEx] = applyConflictExcludes(newApp, { group: newG, name: newN, version: newV }, conflicts, kts);
+            newApp = withEx;
           }
           const ok = await writeOne(appRel, root + "/" + appRel, newApp);
           if (ok && !existed)

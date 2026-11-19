@@ -4,11 +4,14 @@ import {
   removeImplementation,
   updateImplementation,
   removeExcludeFromDep,
+  addExcludesToGradle,
+  applyConflictExcludes,
   insertFileTree,
   updateFileTree,
   removeFileTree,
   parseFileTrees,
   parseGradleDepsDetailed,
+  type ConflictForNew,
 } from "@/lib/xml/gradle-deps";
 
 const USER = [
@@ -25,6 +28,122 @@ const USER = [
   "    implementation fileTree(dir: 'libs', include: ['*.jar'])",
   "}",
 ].join("\n");
+
+describe("M433b addExcludesToGradle 单行依赖必须把 { 补在行尾", () => {
+  it("groovy：单行依赖 → 行尾加 { ，不留裸块", () => {
+    const [out, ok] = addExcludesToGradle(USER, { group: "androidx.appcompat", name: "appcompat", version: "1.0.0" }, [{ group: "androidx", module: "core" }], false);
+    expect(ok).toBe(true);
+    const lines = out.split("\n");
+    const appIdx = lines.findIndex((l) => l.includes("appcompat:1.0.0"));
+    // 依赖行本身必须以 { 结尾
+    expect(lines[appIdx].trim().endsWith("{")).toBe(true);
+    // 紧跟 exclude，再收 }，中间不能有裸的 "{" 独立行
+    expect(lines[appIdx + 1].trim()).toBe("exclude group: 'androidx', module: 'core'");
+    expect(lines[appIdx + 2].trim()).toBe("}");
+    expect(lines.some((l) => l.trim() === "{")).toBe(false);
+    // 括号平衡
+    expect((out.match(/\{/g) || []).length).toBe((out.match(/\}/g) || []).length);
+    // 仍能被 parser 读出 exclude
+    const dep = parseGradleDepsDetailed(out).deps.find((d) => d.name === "appcompat");
+    expect(dep?.excludes).toEqual([{ group: "androidx", module: "core" }]);
+  });
+
+  it("kts：单行依赖 → 行尾加 { 且 kts 语法", () => {
+    const src = ["dependencies {", '    implementation("androidx.appcompat:appcompat:1.0.0")', "}"].join("\n");
+    const [out, ok] = addExcludesToGradle(src, { group: "androidx.appcompat", name: "appcompat", version: "1.0.0" }, [{ group: "androidx", module: "core" }], true);
+    expect(ok).toBe(true);
+    expect(out).toContain('implementation("androidx.appcompat:appcompat:1.0.0") {');
+    expect(out).toContain('exclude(group = "androidx", module = "core")');
+    expect((out.match(/\{/g) || []).length).toBe((out.match(/\}/g) || []).length);
+  });
+
+  it("已有同行 { 块 → 只补 exclude，不加第二层括号", () => {
+    const src = [
+      "dependencies {",
+      "    implementation('com.x:y:1.0.0') {",
+      "    }",
+      "}",
+    ].join("\n");
+    const [out, ok] = addExcludesToGradle(src, { group: "com.x", name: "y", version: "1.0.0" }, [{ group: "a", module: "b" }], false);
+    expect(ok).toBe(true);
+    expect((out.match(/implementation/g) || []).length).toBe(1);
+    expect(out).toContain("exclude group: 'a', module: 'b'");
+    expect((out.match(/\{/g) || []).length).toBe((out.match(/\}/g) || []).length);
+  });
+
+  it("重复调用幂等：同 exclude 不重复写", () => {
+    const first = addExcludesToGradle(USER, { group: "androidx.appcompat", name: "appcompat", version: "1.0.0" }, [{ group: "androidx", module: "core" }], false)[0];
+    const [second, ok2] = addExcludesToGradle(first, { group: "androidx.appcompat", name: "appcompat", version: "1.0.0" }, [{ group: "androidx", module: "core" }], false);
+    expect(ok2).toBe(false);
+    expect((second.match(/exclude group/g) || []).length).toBe(5);
+  });
+});
+
+describe("M433b applyConflictExcludes：冲突处理落在新依赖上，不自我排除", () => {
+  it("跨 group 同名 → 新依赖行尾开 { 块，exclude 旧 group:module；旧行不动", () => {
+    const src = [
+      "dependencies {",
+      "    implementation 'com.android.support:support-compat:28.0.0'",
+      "    implementation 'androidx.appcompat:appcompat:1.7.0'",
+      "}",
+    ].join("\n");
+    const conflicts: ConflictForNew[] = [
+      {
+        kind: "name",
+        newCoord: "androidx.appcompat:appcompat:1.7.0",
+        existing: { group: "com.android.support", name: "support-compat", version: "28.0.0" } as never,
+        exclude: { group: "com.android.support", module: "support-compat" },
+        why: "cross group same artifact",
+      },
+    ];
+    const [out, changed] = applyConflictExcludes(src, { group: "androidx.appcompat", name: "appcompat", version: "1.7.0" }, conflicts, false);
+    expect(changed).toBe(1);
+    const lines = out.split("\n");
+    const oldIdx = lines.findIndex((l) => l.includes("support-compat:28.0.0"));
+    expect(lines[oldIdx].trim()).toBe("implementation 'com.android.support:support-compat:28.0.0'");
+    const newIdx = lines.findIndex((l) => l.includes("appcompat:1.7.0"));
+    expect(lines[newIdx].trim().endsWith("{")).toBe(true);
+    expect(lines[newIdx + 1].trim()).toBe("exclude group: 'com.android.support', module: 'support-compat'");
+    expect((out.match(/\{/g) || []).length).toBe((out.match(/\}/g) || []).length);
+    // 解析后：新依赖带 exclude，旧依赖不变
+    const deps = parseGradleDepsDetailed(out).deps;
+    const newDep = deps.find((d) => d.name === "appcompat" && d.version === "1.7.0")!;
+    expect(newDep.excludes).toEqual([{ group: "com.android.support", module: "support-compat" }]);
+  });
+
+  it("同 group:name 多版本 → 删旧坐标行（exclude 自己没意义）", () => {
+    const src = [
+      "dependencies {",
+      "    implementation 'androidx.appcompat:appcompat:1.0.0'",
+      "    implementation 'androidx.appcompat:appcompat:1.7.0'",
+      "}",
+    ].join("\n");
+    const conflicts: ConflictForNew[] = [
+      {
+        kind: "version",
+        newCoord: "androidx.appcompat:appcompat:1.7.0",
+        existing: { group: "androidx.appcompat", name: "appcompat", version: "1.0.0" } as never,
+        exclude: { group: "androidx.appcompat", module: "appcompat" },
+        why: "same artifact different version",
+      },
+    ];
+    const [out, changed] = applyConflictExcludes(src, { group: "androidx.appcompat", name: "appcompat", version: "1.7.0" }, conflicts, false);
+    expect(changed).toBe(1);
+    expect(out).not.toContain("appcompat:1.0.0");
+    expect(out).toContain("appcompat:1.7.0");
+    // 新版行不带 exclude 块
+    const lines = out.split("\n");
+    const newIdx = lines.findIndex((l) => l.includes("appcompat:1.7.0"));
+    expect(lines[newIdx].trim()).toBe("implementation 'androidx.appcompat:appcompat:1.7.0'");
+  });
+
+  it("无冲突 → 文本原样", () => {
+    const src = ["dependencies {", "    implementation 'a:b:1.0'", "}"].join("\n");
+    const [out, changed] = applyConflictExcludes(src, { group: "a", name: "b", version: "1.0" }, [], false);
+    expect(changed).toBe(0);
+    expect(out).toBe(src);
+  });
+});
 
 describe("M430 removeImplementation 整块删", () => {
   it("单行依赖 → 只删那一行", () => {

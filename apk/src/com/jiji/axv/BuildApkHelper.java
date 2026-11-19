@@ -1166,8 +1166,45 @@ public class BuildApkHelper {
         File base = new File(root, "aarres");
         // 清掉上次构建残留，避免旧 aar 资源混进新包
         deleteRec(base);
+        // M414：同名 artifact 多版本（material-1.12.0 + material-1.0.0）同进 overlay →
+        // aapt2 link「conflicting value for configuration」。JS 收集层（dedupAarVersions）
+        // 已去重，这里再兜一道：按「artifact 基名」（文件名去掉 -数字…-版本 段）分组，组内留版本号最大的。
         int total = 0;
+        java.util.List<String> dropIdx = new java.util.ArrayList<>();
+        java.util.List<String> aarIdx = new java.util.ArrayList<>();
         for (int i = 0; i < libs.length(); i++) {
+            JSONObject lj = libs.optJSONObject(i);
+            if (lj == null) continue;
+            String lp = lj.optString("path", "");
+            if (!lp.endsWith(".aar")) continue;
+            aarIdx.add(String.valueOf(i));
+        }
+        // 分组：base → 该组里版本最高的 idx（无版本号视为 0，同版本先出现的赢 = 共享库优先）
+        java.util.Map<String, Integer> bestByBase = new java.util.LinkedHashMap<>();
+        for (String idx : aarIdx) {
+            JSONObject lj = libs.optJSONObject(Integer.parseInt(idx));
+            String artBase = artifactBase(lj.optString("path", ""));
+            Integer prev = bestByBase.get(artBase);
+            if (prev == null || compareVer(verOf(lj.optString("path", "")), verOf(libs.optJSONObject(prev).optString("path", ""))) > 0) {
+                bestByBase.put(artBase, Integer.parseInt(idx));
+            }
+        }
+        for (String idx : aarIdx) {
+            JSONObject lj = libs.optJSONObject(Integer.parseInt(idx));
+            String artBase = artifactBase(lj.optString("path", ""));
+            if (!String.valueOf(bestByBase.get(artBase)).equals(idx)) dropIdx.add(idx);
+        }
+        if (dropIdx.size() > 0) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("aar 多版本去重：跳过 ").append(dropIdx.size()).append(" 个 → ");
+            for (int k = 0; k < dropIdx.size(); k++) {
+                if (k > 0) sb.append("；");
+                sb.append(new File(libs.optJSONObject(Integer.parseInt(dropIdx.get(k))).optString("path", "")).getName());
+            }
+            log.append(sb).append('\n');
+        }
+        for (int i = 0; i < libs.length(); i++) {
+            if (dropIdx.contains(String.valueOf(i))) continue; // M414：被更高版取代，不展开
             JSONObject lj = libs.optJSONObject(i);
             if (lj == null) continue;
             String libPath = lj.optString("path", "");
@@ -1208,6 +1245,44 @@ public class BuildApkHelper {
         }
         if (total > 0) log.append("aar 资源共 ").append(total).append(" 个（").append(out.size()).append(" 个 overlay）\n");
         return out;
+    }
+
+    /** M414：aar 文件名的 artifact 基名（material-1.12.0.aar → material；无版本段 → 原名） */
+    private static String artifactBase(String libPath) {
+        String p = libPath.toLowerCase();
+        int slash = p.lastIndexOf('/');
+        String fname = slash >= 0 ? p.substring(slash + 1) : p;
+        if (fname.endsWith(".aar")) fname = fname.substring(0, fname.length() - 4);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(.+?)-(\\d+(?:\\.\\d+)*(?:-[0-9a-z.]+)?)$").matcher(fname);
+        return m.matches() ? m.group(1) : fname;
+    }
+
+    /** M414：从 aar 文件名取版本段（material-1.12.0.aar → 1.12.0；无版本段 → 0） */
+    private static String verOf(String libPath) {
+        String p = libPath.toLowerCase();
+        int slash = p.lastIndexOf('/');
+        String fname = slash >= 0 ? p.substring(slash + 1) : p;
+        if (fname.endsWith(".aar")) fname = fname.substring(0, fname.length() - 4);
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(.+?)-(\\d+(?:\\.\\d+)*(?:-[0-9a-z.]+)?)$").matcher(fname);
+        if (m.matches()) return m.group(2).replaceAll("-[0-9a-z.]+$", "");
+        return "0";
+    }
+
+    /** M414：版本号比较（逐段数字比，短段补 0） */
+    private static int compareVer(String verA, String verB) {
+        String[] pa = verA.split("\\.");
+        String[] pb = verB.split("\\.");
+        int n = Math.max(pa.length, pb.length);
+        for (int i = 0; i < n; i++) {
+            int a = i < pa.length ? parseIntSafe(pa[i]) : 0;
+            int b = i < pb.length ? parseIntSafe(pb[i]) : 0;
+            if (a != b) return Integer.compare(a, b);
+        }
+        return 0;
+    }
+
+    private static int parseIntSafe(String s) {
+        try { return Integer.parseInt(s); } catch (Exception e) { return 0; }
     }
 
     /** 递归删目录（清 aarres 残留用，只删我们自己建的 cache 目录） */

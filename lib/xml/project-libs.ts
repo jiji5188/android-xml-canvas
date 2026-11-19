@@ -39,6 +39,66 @@ const MAX_TOTAL = 40 * 1024 * 1024;
 export const LIBS_BASE = "app/src/main/libs";
 const isLibFile = (name: string) => /\.(jar|aar)$/i.test(name);
 
+/**
+ * M414：同名库多版本去重（保留最高版）。
+ * 共享库目录里同时有 material-1.12.0.aar 和 material-1.0.0.aar 时，
+ * 两个都进 aar overlay → aapt2 link 报「conflicting value for configuration」（真机实测）。
+ * 规则：按文件名去掉扩展名后的「artifact 基名」（最后一个 -数字 段之前）分组，
+ * 组内保留版本号最大的；同版本保留先出现的（共享库优先）。
+ * 只有 .aar 去重（资源 overlay 会撞）；jar 由 M283 的包级去重处理，不动。
+ * 返回 { kept, dropped: [{name, reason}] }，reason 写进构建日志。
+ */
+export function dedupAarVersions(libs: ProjectLib[]): {
+  kept: ProjectLib[];
+  dropped: { name: string; reason: string }[];
+} {
+  const parseVer = (name: string): { base: string; ver: number[] | null } => {
+    const bare = name.replace(/\.aar$/i, "").toLowerCase();
+    // 末尾的版本段：-1.12.0 / -1.0 / 带 SNAPSHOT 的也算
+    const m = bare.match(/^(.+?)-(\d+(?:\.\d+)*(?:-[0-9a-z.]+)?)$/);
+    if (!m) return { base: bare, ver: null };
+    const ver = m[2]
+      .replace(/-[0-9a-z.]+$/, "")
+      .split(".")
+      .map((x) => parseInt(x, 10) || 0);
+    return { base: m[1], ver };
+  };
+  const cmpVer = (a: number[], b: number[]) => {
+    const n = Math.max(a.length, b.length);
+    for (let i = 0; i < n; i++) {
+      const d = (a[i] || 0) - (b[i] || 0);
+      if (d !== 0) return d;
+    }
+    return 0;
+  };
+  const best = new Map<string, { lib: ProjectLib; name: string; ver: number[] | null }>();
+  const kept: ProjectLib[] = [];
+  const dropped: { name: string; reason: string }[] = [];
+  libs.forEach((lib) => {
+    const fname = lib.rel.split("/").pop() || lib.rel;
+    if (!/\.aar$/i.test(fname)) { kept.push(lib); return; }
+    const p = parseVer(fname);
+    const cur = best.get(p.base);
+    if (!cur) {
+      best.set(p.base, { lib, name: fname, ver: p.ver });
+      kept.push(lib);
+      return;
+    }
+    const c = p.ver && cur.ver ? cmpVer(p.ver, cur.ver) : 0;
+    if (c > 0) {
+      // 新的高于已收的：替换（把旧的那个从 kept 移除并记 dropped）
+      const idx = kept.indexOf(cur.lib);
+      if (idx >= 0) kept.splice(idx, 1);
+      dropped.push({ name: cur.name, reason: `被更高版 ${fname} 取代` });
+      best.set(p.base, { lib, name: fname, ver: p.ver });
+      kept.push(lib);
+    } else {
+      dropped.push({ name: fname, reason: `保留更高版 ${cur.name}` });
+    }
+  });
+  return { kept, dropped };
+}
+
 /** 原生通道列目录（绝对路径，同步） */
 function nativeListDir(abs: string): { ok: boolean; items?: { name: string; kind: string; path?: string }[] } {
   let json: string | null = null;

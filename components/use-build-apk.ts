@@ -25,7 +25,7 @@ import type { RenderFile } from "@/lib/xml/native-render";
 import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, rPackagesFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
 import { axvRuntimeSources, injectAxvLogProvider } from "@/lib/xml/axv-runtime";
 import { autofixJavaSources } from "@/lib/xml/java-autofix";
-import { collectProjectLibs, collectSharedLibs } from "@/lib/xml/project-libs";
+import { collectProjectLibs, collectSharedLibs, dedupAarVersions } from "@/lib/xml/project-libs";
 import { showNativeProgress, setNativeProgress, closeNativeDialog } from "@/lib/xml/system-download";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
@@ -280,7 +280,13 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         const projectLibsArr = Array.isArray(libsRes?.libs) ? libsRes.libs : [];
         const sharedLibsArr = Array.isArray(sharedLibs) ? sharedLibs : [];
         // M398：共享库在前 —— 同名 jar 共享库赢（BuildApkHelper 的 ECJ classpath / R8 M283 去重都保首个）
-        const allBuildLibs = [...sharedLibsArr, ...projectLibsArr];
+        const rawBuildLibs = [...sharedLibsArr, ...projectLibsArr];
+        // M414：aar 多版本去重（material-1.12.0 + material-1.0.0 同进 overlay → aapt2 link
+        // 「conflicting value for configuration」真机事故；只留最高版）
+        const { kept: allBuildLibs, dropped } = dedupAarVersions(rawBuildLibs);
+        if (dropped.length) {
+          libNotes.push(`aar 多版本去重：跳过 ${dropped.length} 个 → ` + dropped.map((d) => `${d.name}（${d.reason}）`).join("；"));
+        }
         // M383：依赖库收集明细——一眼看出“为什么 classpath 是 0 个库”（上次真实事故）
         pushBuildLog(
           true,

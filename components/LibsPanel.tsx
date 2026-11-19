@@ -22,6 +22,8 @@ import {
   mavenCoord,
   removeImplementation,
   findDepConflicts,
+  findConflictsForNew,
+  addExcludesToGradle,
   type GradleDep,
   type GradleUnresolved,
   type GradleFileTree,
@@ -679,6 +681,27 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
       }
       const root = nativeProjectRoot.replace(/[\\/]+$/, "");
       setApplyBusy((m) => ({ ...m, [libName]: "maven" }));
+      // M427：加依赖前检测与现有依赖的冲突（同名多版本 / 跨 group 同名），确认后给旧 dep 加 exclude
+      const [newG, newN, newV] = coord.split(":");
+      const conflicts = findConflictsForNew(gradleDeps, { group: newG, name: newN, version: newV });
+      if (conflicts.length > 0) {
+        const detail = conflicts.map((c) => {
+          const old = mavenCoord(c.existing.group, c.existing.name, c.existing.version);
+          return c.kind === "version"
+            ? tr("libs.conflict_version", "{old} → 排掉同名 {mod}（避免传递带入旧版）", { old, mod: c.existing.name })
+            : tr("libs.conflict_name", "{old} 与新依赖同名 {mod}（跨 group）", { old, mod: c.existing.name });
+        }).join("\n");
+        const okConfirm = window.confirm(
+          tr("libs.conflict_confirm", "检测到 {n} 处依赖冲突，确认用 exclude 排掉旧的同名库？\n\n{detail}\n\n（继续 = 加新依赖 + 排旧；取消 = 仍加新依赖，不加 exclude）", {
+            n: conflicts.length,
+            detail,
+          }),
+        );
+        if (!okConfirm) {
+          // 用户取消 → 仍加新依赖（不排旧），但提示冲突存在
+          onNote?.(tr("libs.conflict_skip", "已跳过 exclude（{n} 处冲突未处理），新依赖已加入", { n: conflicts.length }));
+        }
+      }
       try {
         // M424：读写改用模块级 helper（readOneVia/writeOneVia），逻辑同 removeFromProject
         const writeOne = (rel: string, abs: string, text: string) => writeOneVia(rel, abs, text, native, aiFileIo);
@@ -692,7 +715,21 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
           kts = true;
         }
         if (appText) {
-          const [newApp, existed] = insertImplementation(appText, coord, kts);
+          let [newApp, existed] = insertImplementation(appText, coord, kts);
+          // M427：给冲突的旧 dep 加 exclude（排掉同名库，避免传递带入旧版本）
+          if (conflicts.length > 0) {
+            for (const c of conflicts) {
+              const oldCoord = mavenCoord(c.existing.group, c.existing.name, c.existing.version);
+              const [withEx, exChanged] = addExcludesToGradle(
+                newApp,
+                { group: c.existing.group, name: c.existing.name, version: c.existing.version },
+                [c.exclude],
+                kts,
+              );
+              if (exChanged) newApp = withEx;
+              else break;
+            }
+          }
           const ok = await writeOne(appRel, root + "/" + appRel, newApp);
           if (ok && !existed)
             onNote?.(tr("libs.maven_written", "{lib} 已写入 maven 坐标 {coord}（不拷文件，防源码膨胀）", { lib: libName, coord }));
@@ -721,7 +758,7 @@ export function LibsPanel({ aiFileIo, nativeProjectRoot, refreshKey, onNote, tr 
         onNote?.(tr("libs.apply_fail", "{lib} 应用失败：{err}", { lib: libName, err: "写 maven 配置" }));
       }
     },
-    [nativeProjectRoot, native, aiFileIo, onNote, tr, refresh],
+    [nativeProjectRoot, native, aiFileIo, onNote, tr, refresh, gradleDeps],
   );
 
   /** M424：从项目完整移除 = ① 删 build.gradle 依赖声明（有对应依赖时）→ ② 删 libs 目录里的实体文件。

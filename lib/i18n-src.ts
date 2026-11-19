@@ -219,6 +219,15 @@ export const SRC_EN: SrcDict = {
   "{a} 多版本：{v}（Gradle 会按规则取一个，建议手动统一到最新）": "{a} has multiple versions: {v} (Gradle picks one per resolution rules; unify to latest manually)",
   "libs.dep_conflict_name": "{a} comes from different groups: {g} (watch for package name collision)",
   "{a} 同名来自不同 group：{g}（注意包名冲突）": "{a} comes from different groups: {g} (watch for package name collision)",
+  // M427：加依赖时冲突确认 + exclude
+  "libs.conflict_version": "{old} → exclude same-name {mod} (avoid pulling old version transitively)",
+  "{old} → 排掉同名 {mod}（避免传递带入旧版）": "{old} → exclude same-name {mod} (avoid pulling old version transitively)",
+  "libs.conflict_name": "{old} shares name {mod} with the new dep (different group)",
+  "{old} 与新依赖同名 {mod}（跨 group）": "{old} shares name {mod} with the new dep (different group)",
+  "libs.conflict_confirm": "Detected {n} dependency conflict(s). Use exclude to drop the old same-name libs?\n\n{detail}\n\n(Continue = add new dep + exclude old; Cancel = add new dep only)",
+  "检测到 {n} 处依赖冲突，确认用 exclude 排掉旧的同名库？\n\n{detail}\n\n（继续 = 加新依赖 + 排旧；取消 = 仍加新依赖，不加 exclude）": "Detected {n} dependency conflict(s). Use exclude to drop the old same-name libs?\n\n{detail}\n\n(Continue = add new dep + exclude old; Cancel = add new dep only)",
+  "libs.conflict_skip": "Skipped exclude ({n} conflict(s) unhandled); new dep added anyway",
+  "已跳过 exclude（{n} 处冲突未处理），新依赖已加入": "Skipped exclude ({n} conflict(s) unhandled); new dep added anyway",
   // M368：库管理面板优化（搜索/删除）
   // M370：项目库 tab 提示（build.gradle 配置摘要）
   // M371：项目属性弹窗 Gradle 配置区块

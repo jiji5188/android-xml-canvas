@@ -660,3 +660,87 @@ export function findDepConflicts(deps: GradleDep[]): DepConflict[] {
   }
   return out;
 }
+
+/** M427：加依赖时的冲突检测 —— 新依赖和现有依赖的同名/多版本冲突。
+ *  返回每个冲突：类型 + 需要 exclude 的旧坐标（从旧 dep 里排掉同名 artifact） */
+export interface ConflictForNew {
+  /** version=同 group:name 不同版本 / name=跨 group 同名 */
+  kind: 'version' | 'name';
+  /** 新依赖坐标 */
+  newCoord: string;
+  /** 冲突的现有依赖（要被加 exclude 的那条） */
+  existing: GradleDep;
+  /** 要 exclude 的 { group, module }（module = 现有依赖的 name，避免传递带入同名库） */
+  exclude: { group: string; module: string };
+  /** 人话 */
+  why: string;
+}
+
+/** 给新依赖找冲突（只看直接依赖层面，不解析传递依赖） */
+export function findConflictsForNew(
+  deps: GradleDep[],
+  newDep: { group: string; name: string; version: string },
+): ConflictForNew[] {
+  const out: ConflictForNew[] = [];
+  const newCoord = newDep.group + ':' + newDep.name + ':' + newDep.version;
+  for (const d of deps) {
+    // 完全相同坐标不算冲突（幂等加同一条）
+    if (d.group === newDep.group && d.name === newDep.name && d.version === newDep.version) continue;
+    // 同 group 同 name 不同版本 → 版本冲突
+    if (d.group === newDep.group && d.name === newDep.name) {
+      out.push({
+        kind: 'version',
+        newCoord,
+        existing: d,
+        exclude: { group: d.group, module: d.name },
+        why: 'same artifact, different version (' + d.version + ' vs ' + newDep.version + ')',
+      });
+      continue;
+    }
+    // 跨 group 同名 artifact → 名字冲突
+    if (d.name === newDep.name && d.group !== newDep.group) {
+      out.push({
+        kind: 'name',
+        newCoord,
+        existing: d,
+        exclude: { group: d.group, module: d.name },
+        why: 'same artifact name from a different group (' + d.group + ' vs ' + newDep.group + ')',
+      });
+    }
+  }
+  return out;
+}
+
+/** M427：给 build.gradle 里某条 dependency 行追加 exclude 块。
+ *  target 是 g:n:v（定位现有行），excludes 是要排的 {group,module} 列表。
+ *  groovy: implementation 'g:n:v' → implementation 'g:n:v' {\n    exclude group: 'g', module: 'm'\n}
+ *  kts:    implementation(\"g:n:v\") → implementation(\"g:n:v\") {\n    exclude(group = \\"g\\\", module = \\"m\\\")\n}
+ *  若行已有 { exclude ... } 块，追加进去（幂等：已有同 group+module 则跳过）。 */
+export function addExcludesToGradle(
+  text: string,
+  target: { group: string; name: string; version: string },
+  excludes: { group: string; module: string }[],
+  kts: boolean,
+): [string, boolean] {
+  const coord = target.group + ":" + target.name + ":" + target.version;
+  let changed = false;
+  const lines = text.split(/\r?\n/);
+  const newLines = lines.map((ln) => {
+    const m = ln.match(/^\s*(?:implementation|api|compile|compileOnly|runtimeOnly)\s*\(?\s*["'](\S+)["']\s*\)?\s*$/);
+    if (!m) return ln;
+    if (m[1] !== coord) return ln;
+    if (/\{|exclude/.test(ln)) return ln;
+    const exLines = excludes.map((e) =>
+      kts
+        ? `            exclude(group = "${e.group}", module = "${e.module}")`
+        : `        exclude group: '${e.group}', module: '${e.module}'`,
+    );
+    // groovy: { ... } 缩进 4，exclude 行 8；kts: { ... } 缩进 4，exclude 行 12
+    const openPad = kts ? "    {" : " {";
+    const closePad = kts ? "    }" : "}";
+    const suffix = "\n" + openPad + "\n" + exLines.join("\n") + "\n" + closePad;
+    changed = true;
+    return ln + suffix;
+  });
+  return [newLines.join("\n"), changed];
+}

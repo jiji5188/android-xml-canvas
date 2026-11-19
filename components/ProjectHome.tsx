@@ -13,9 +13,13 @@
 // 新建项目也先留在编辑器里（编辑器的 createNewProject 依赖编辑器 state），
 // 「新建 / 更多」暂时进编辑器操作。
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useXmlProjectState } from "./use-xml-project";
 import type { WsProject } from "@/lib/xml/workspace";
+import { fileOpsCtxOf, projectSourceFromWorkspaceItem, type ProjectSource } from "@/lib/xml/project-browse";
+import { deleteEntry } from "@/lib/xml/file-ops";
+import type { ProjectSaveRoot } from "@/lib/xml/project-save";
+import { ProjectPropsDialog } from "@/components/ProjectPropsDialog";
 import { t as tt } from "@/lib/i18n-src";
 
 export interface ProjectHomeProps {
@@ -66,6 +70,11 @@ const S: Record<string, React.CSSProperties> = {
   cardSub: { fontSize: 12, color: "#6B6F76", marginTop: 2 },
   empty: { width: "100%", maxWidth: 560, padding: "32px 16px", borderRadius: 14, border: "1px dashed #C9CFD8", textAlign: "center", color: "#6B6F76", fontSize: 14, lineHeight: 1.8 },
   msg: { width: "100%", maxWidth: 560, fontSize: 12, color: "#B3541E", minHeight: 16, marginBottom: 8 },
+  mask: { position: "fixed", inset: 0, zIndex: 900, background: "transparent" },
+  menu: { position: "fixed", zIndex: 901, minWidth: 150, padding: 4, borderRadius: 10, background: "#FFFFFF", border: "1px solid #E3E6EB", boxShadow: "0 4px 16px rgba(0,0,0,.12)" },
+  menuItem: { display: "block", width: "100%", padding: "9px 12px", borderRadius: 8, border: "none", background: "transparent", color: "#1B1B1F", fontSize: 13.5, fontWeight: 500, cursor: "pointer", textAlign: "left" },
+  menuItemDanger: { color: "#B3261E" },
+  menuHint: { display: "block", fontSize: 11, color: "#9AA0A8", marginTop: 2, fontWeight: 400 },
 };
 
 export function ProjectHome({ onOpenProject, onOpenEditor }: ProjectHomeProps) {
@@ -75,6 +84,87 @@ export function ProjectHome({ onOpenProject, onOpenEditor }: ProjectHomeProps) {
     wsState, wsProjects, wsBusy, projMeta,
     refreshWorkspace, pickCustomDir,
   } = useXmlProjectState({ leftView: "res", setWsMsg: NOOP });
+
+  /** M423：卡片长按菜单（打开 / 项目属性 / 删除） */
+  const [menu, setMenu] = useState<{ x: number; y: number; item: WsProject } | null>(null);
+  /** M423：项目属性弹窗 */
+  const [propsFor, setPropsFor] = useState<{ item: WsProject; source: ProjectSource; saveRoot: ProjectSaveRoot | null } | null>(null);
+  const [msgLocal, setMsgLocal] = useState("");
+  const pressRef = useRef<{ timer: number | null; x: number; y: number; moved: boolean; fired: boolean }>({
+    timer: null, x: 0, y: 0, moved: false, fired: false,
+  });
+  const cancelPress = () => {
+    const st = pressRef.current;
+    if (st.timer !== null) {
+      window.clearTimeout(st.timer);
+      st.timer = null;
+    }
+  };
+  useEffect(() => cancelPress, []);
+
+  /** 长按 450ms / 鼠标右键 → 弹菜单（同 ProjectPanel 卡片菜单的模式） */
+  const beginPress = (e: React.PointerEvent, it: WsProject) => {
+    if (e.button === 2) {
+      e.preventDefault();
+      setMenu({ x: e.clientX, y: e.clientY, item: it });
+      return;
+    }
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const st = pressRef.current;
+    cancelPress();
+    st.x = e.clientX;
+    st.y = e.clientY;
+    st.moved = false;
+    st.fired = false;
+    st.timer = window.setTimeout(() => {
+      st.timer = null;
+      st.fired = true;
+      if (st.moved) return;
+      setMenu({ x: st.x, y: st.y, item: it });
+    }, 450);
+    window.addEventListener("pointerup", cancelPress, { once: true });
+  };
+
+  /** 属性：从卡片项现读 source（同 ProjectPanel openProps） */
+  const openProps = async (it: WsProject) => {
+    setMenu(null);
+    const src = await projectSourceFromWorkspaceItem(it);
+    if (!src) {
+      setMsgLocal(tt("这个项目读不了（可能不是目录，或权限已失效）"));
+      return;
+    }
+    const ops = fileOpsCtxOf(it);
+    let saveRoot: ProjectSaveRoot | null = null;
+    if (ops) {
+      if (ops.backend === "native") {
+        const base = String(ops.root).replace(/\/+$/, "");
+        if (base.startsWith("/")) saveRoot = { kind: "native", base };
+      } else {
+        saveRoot = { kind: "handle", handle: ops.root };
+      }
+    }
+    setPropsFor({ item: it, source: src, saveRoot });
+  };
+
+  /** 删除整个项目目录（仅 native：需要绝对路径的父目录作为操作根） */
+  const doDelete = async (it: WsProject) => {
+    setMenu(null);
+    if (!it.dirPath) {
+      setMsgLocal(tt("网页版不支持删项目，请用 APK。"));
+      return;
+    }
+    const clean = it.dirPath.replace(/[/\\]+$/, "");
+    const parent = clean.replace(/[/\\][^/\\]+$/, "");
+    const base = clean.split(/[/\\]/).pop() || it.name;
+    if (!window.confirm(tt("确定删除项目「{name}」？整个目录连同源码一起删，不能撤销。", { name: it.name }))) return;
+    const r = await deleteEntry({ backend: "native", root: parent }, base, true);
+    if (!r.ok) {
+      setMsgLocal(tt("删除失败：{msg}", { msg: r.reason || tt("未知错误") }));
+      return;
+    }
+    setMsgLocal(tt("已删除 {name}", { name: it.name }));
+    void refreshWorkspace();
+  };
 
   // 进页面刷一次；12s 静默轮询由 use-workspace-refresh 自带（leftView=res）
   useEffect(() => {
@@ -121,7 +211,7 @@ export function ProjectHome({ onOpenProject, onOpenEditor }: ProjectHomeProps) {
         </button>
       </div>
 
-      <div style={S.msg}>{loading ? tt("正在读取工作目录…") : ""}</div>
+      <div style={S.msg}>{msgLocal || (loading ? tt("正在读取工作目录…") : "")}</div>
 
       {wsProjects.length === 0 && !loading ? (
         <div style={S.empty}>
@@ -134,12 +224,33 @@ export function ProjectHome({ onOpenProject, onOpenEditor }: ProjectHomeProps) {
       <div style={S.list}>
         {wsProjects.map((it) => {
           const meta = projMeta[it.rel];
+          const canDelete = !!it.dirPath;
           return (
             <button
               key={it.kind + ":" + it.rel}
               type="button"
               style={S.card}
-              onClick={() => onOpenProject(it)}
+              onPointerDown={(e) => beginPress(e, it)}
+              onPointerMove={(e) => {
+                const st = pressRef.current;
+                if (st.timer !== null && (Math.abs(e.clientX - st.x) > 10 || Math.abs(e.clientY - st.y) > 10)) {
+                  st.moved = true;
+                  cancelPress();
+                }
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, item: it });
+              }}
+              onClick={() => {
+                // M423：长按已触发菜单时，吞掉随后的 click（否则点菜单位置会把项目也打开）
+                if (pressRef.current.fired) {
+                  pressRef.current.fired = false;
+                  return;
+                }
+                onOpenProject(it);
+              }}
+              onPointerCancel={cancelPress}
             >
               <span style={S.icon}>
                 {meta?.iconUrl ? (
@@ -164,6 +275,71 @@ export function ProjectHome({ onOpenProject, onOpenEditor }: ProjectHomeProps) {
           );
         })}
       </div>
+
+      {/* M423：卡片长按菜单（打开 / 项目属性 / 删除项目） */}
+      {menu ? (
+        <>
+          <div style={S.mask} onClick={() => setMenu(null)} />
+          <div
+            role="menu"
+            style={{
+              ...S.menu,
+              left: Math.max(6, Math.min(menu.x, window.innerWidth - 156)),
+              top: Math.max(6, Math.min(menu.y, window.innerHeight - 150)),
+            }}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              style={S.menuItem}
+              onClick={() => {
+                setMenu(null);
+                onOpenProject(menu.item);
+              }}
+            >
+              {tt("打开")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              style={S.menuItem}
+              onClick={() => void openProps(menu.item)}
+            >
+              {tt("项目属性")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              style={{ ...S.menuItem, ...S.menuItemDanger }}
+              disabled={!canDeleteOf(menu.item)}
+              onClick={() => void doDelete(menu.item)}
+            >
+              {tt("删除项目")}
+              {!canDeleteOf(menu.item) ? <span style={S.menuHint}>{tt("网页版不支持，请用 APK")}</span> : null}
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {/* M423：项目属性弹窗（从卡片菜单进，不带 onRenameProject —— 改目录名走编辑器内） */}
+      {propsFor ? (
+        <ProjectPropsDialog
+          item={propsFor.item}
+          source={propsFor.source}
+          saveRoot={propsFor.saveRoot}
+          fileOpsCtx={fileOpsCtxOf(propsFor.item)}
+          onSaved={() => {
+            setPropsFor(null);
+            void refreshWorkspace();
+          }}
+          onClose={() => setPropsFor(null)}
+        />
+      ) : null}
     </div>
   );
+}
+
+/** 与 ProjectPanel 卡片菜单同规则：只有 native 目录项目可删 */
+function canDeleteOf(it: WsProject): boolean {
+  return !!it.dirPath;
 }

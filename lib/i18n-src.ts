@@ -1124,6 +1124,7 @@ export const SRC_EN: SrcDict = {
   "没找到匹配「{q}」的文件": "No files match “{q}”",
   "结果太多，只显示前 200 个，请输入更长的关键词": "Too many results; showing the first 200. Use a longer keyword.",
   "项目属性": "Project properties",
+  "删除项目": "Delete project",
   "正在读取项目信息…": "Reading project info…",
   "没找到 build.gradle / strings.xml，只能改项目名。": "build.gradle / strings.xml not found; only the project name can be changed.",
   "应用图标：res/mipmap-anydpi-v26/ic_launcher.xml（在图标编辑器里改）": "App icon: res/mipmap-anydpi-v26/ic_launcher.xml (edit it in the icon editor)",

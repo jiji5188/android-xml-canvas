@@ -12,6 +12,7 @@ import { androidJavaToolchain } from "@/lib/plugin/toolchains/android-java";
 import { nativeBridge } from "@/lib/xml/native-save";
 import { projectSaveRoot, readAppGradle } from "@/lib/xml/project-save";
 import { parseGradlePackage } from "@/lib/xml/project-info";
+import { parseGradleDepsDetailed } from "@/lib/xml/gradle-deps";
 import { packageOf } from "@/lib/xml/new-project";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { injectMissingManifestIcons } from "@/lib/xml/icon-fallback";
@@ -25,7 +26,7 @@ import type { RenderFile } from "@/lib/xml/native-render";
 import { deriveLauncherFromSources, findLauncherActivity, readProjectManifest, forceManifestPkg, dominantJavaPackage, rPackageFromSources, rPackagesFromSources, parseManifestLauncher } from "@/lib/xml/find-launcher";
 import { axvRuntimeSources, injectAxvLogProvider } from "@/lib/xml/axv-runtime";
 import { autofixJavaSources } from "@/lib/xml/java-autofix";
-import { collectProjectLibs, collectSharedLibs, dedupAarVersions } from "@/lib/xml/project-libs";
+import { collectProjectLibs, collectSharedLibs, dedupAarVersions, filterSharedByDeps } from "@/lib/xml/project-libs";
 import { showNativeProgress, setNativeProgress, closeNativeDialog } from "@/lib/xml/system-download";
 import { pickProjectLayout } from "@/lib/xml/pick-layout";
 import { buildRealRenderFiles, type SaveInput } from "@/lib/xml/save-flow";
@@ -279,8 +280,30 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         const sharedLibs = await collectSharedLibs(libNotes);
         const projectLibsArr = Array.isArray(libsRes?.libs) ? libsRes.libs : [];
         const sharedLibsArr = Array.isArray(sharedLibs) ? sharedLibs : [];
+        // M415：共享库按项目依赖过滤——build.gradle 声明了依赖时，只收声明的 artifact
+        // （声明版本精确匹配优先，否则最高版）；没声明任何依赖时保持老行为全收
+        let filteredShared = sharedLibsArr;
+        const gradleDepParsed = parseGradleDepsDetailed(gradlePkg || "");
+        const declaredDeps = [
+          ...gradleDepParsed.deps.map((d) => ({ name: d.name, version: d.version })),
+          ...gradleDepParsed.unresolved.map((u) => ({
+            name: (u.coord.split(":")[1] || "").toLowerCase(),
+            version: "",
+          })),
+        ];
+        if (declaredDeps.length) {
+          const fr = filterSharedByDeps(sharedLibsArr, declaredDeps);
+          filteredShared = fr.kept;
+          libNotes.push(
+            `按项目依赖过滤共享库：声明 ${declaredDeps.length} 个 → 收 ${fr.kept.length} 个` +
+              (fr.matched.length
+                ? `（${fr.matched.slice(0, 6).map((m) => `${m.declared}→${m.file}`).join("、")}${fr.matched.length > 6 ? "…" : ""}）`
+                : "") +
+              (fr.excluded.length ? `，排除未声明 ${fr.excluded.length} 个：${fr.excluded.slice(0, 8).join("、")}${fr.excluded.length > 8 ? "…" : ""}` : ""),
+          );
+        }
         // M398：共享库在前 —— 同名 jar 共享库赢（BuildApkHelper 的 ECJ classpath / R8 M283 去重都保首个）
-        const rawBuildLibs = [...sharedLibsArr, ...projectLibsArr];
+        const rawBuildLibs = [...filteredShared, ...projectLibsArr];
         // M414：aar 多版本去重（material-1.12.0 + material-1.0.0 同进 overlay → aapt2 link
         // 「conflicting value for configuration」真机事故；只留最高版）
         const { kept: allBuildLibs, dropped } = dedupAarVersions(rawBuildLibs);

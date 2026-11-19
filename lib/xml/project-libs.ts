@@ -39,12 +39,38 @@ const MAX_TOTAL = 40 * 1024 * 1024;
 export const LIBS_BASE = "app/src/main/libs";
 const isLibFile = (name: string) => /\.(jar|aar)$/i.test(name);
 
+/** M415：库名解析（material-1.12.0.aar → { base:"material", ver:[1,12,0], verStr:"1.12.0" }；无版本段 → ver:null） */
+export function libArtifactInfo(fname: string): {
+  base: string;
+  ver: number[] | null;
+  verStr: string;
+} {
+  const bare = fname.replace(/\.(jar|aar)$/i, "").toLowerCase();
+  // 末尾的版本段：-1.12.0 / -1.0 / 带 SNAPSHOT 的也算
+  const m = bare.match(/^(.+?)-(\d+(?:\.\d+)*(?:-[0-9a-z.]+)?)$/);
+  if (!m) return { base: bare, ver: null, verStr: "" };
+  const verStr = m[2].replace(/-[0-9a-z.]+$/, "");
+  const ver = verStr.split(".").map((x) => parseInt(x, 10) || 0);
+  return { base: m[1], ver, verStr };
+}
+
+/** M415：版本号比较（逐段数字比，短段补 0；null 视为 0） */
+export function cmpLibVer(a: number[] | null, b: number[] | null): number {
+  const pa = a || [];
+  const pb = b || [];
+  const n = Math.max(pa.length, pb.length);
+  for (let i = 0; i < n; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
 /**
  * M414：同名库多版本去重（保留最高版）。
  * 共享库目录里同时有 material-1.12.0.aar 和 material-1.0.0.aar 时，
  * 两个都进 aar overlay → aapt2 link 报「conflicting value for configuration」（真机实测）。
- * 规则：按文件名去掉扩展名后的「artifact 基名」（最后一个 -数字 段之前）分组，
- * 组内保留版本号最大的；同版本保留先出现的（共享库优先）。
+ * 规则：按 artifact 基名分组，组内保留版本号最大的；同版本保留先出现的（共享库优先）。
  * 只有 .aar 去重（资源 overlay 会撞）；jar 由 M283 的包级去重处理，不动。
  * 返回 { kept, dropped: [{name, reason}] }，reason 写进构建日志。
  */
@@ -52,39 +78,20 @@ export function dedupAarVersions(libs: ProjectLib[]): {
   kept: ProjectLib[];
   dropped: { name: string; reason: string }[];
 } {
-  const parseVer = (name: string): { base: string; ver: number[] | null } => {
-    const bare = name.replace(/\.aar$/i, "").toLowerCase();
-    // 末尾的版本段：-1.12.0 / -1.0 / 带 SNAPSHOT 的也算
-    const m = bare.match(/^(.+?)-(\d+(?:\.\d+)*(?:-[0-9a-z.]+)?)$/);
-    if (!m) return { base: bare, ver: null };
-    const ver = m[2]
-      .replace(/-[0-9a-z.]+$/, "")
-      .split(".")
-      .map((x) => parseInt(x, 10) || 0);
-    return { base: m[1], ver };
-  };
-  const cmpVer = (a: number[], b: number[]) => {
-    const n = Math.max(a.length, b.length);
-    for (let i = 0; i < n; i++) {
-      const d = (a[i] || 0) - (b[i] || 0);
-      if (d !== 0) return d;
-    }
-    return 0;
-  };
   const best = new Map<string, { lib: ProjectLib; name: string; ver: number[] | null }>();
   const kept: ProjectLib[] = [];
   const dropped: { name: string; reason: string }[] = [];
   libs.forEach((lib) => {
     const fname = lib.rel.split("/").pop() || lib.rel;
     if (!/\.aar$/i.test(fname)) { kept.push(lib); return; }
-    const p = parseVer(fname);
+    const p = libArtifactInfo(fname);
     const cur = best.get(p.base);
     if (!cur) {
       best.set(p.base, { lib, name: fname, ver: p.ver });
       kept.push(lib);
       return;
     }
-    const c = p.ver && cur.ver ? cmpVer(p.ver, cur.ver) : 0;
+    const c = cmpLibVer(p.ver, cur.ver);
     if (c > 0) {
       // 新的高于已收的：替换（把旧的那个从 kept 移除并记 dropped）
       const idx = kept.indexOf(cur.lib);
@@ -97,6 +104,64 @@ export function dedupAarVersions(libs: ProjectLib[]): {
     }
   });
   return { kept, dropped };
+}
+
+/**
+ * M415：共享库按项目依赖过滤（用户明确要求：编译器要按项目依赖配置去编译，
+ * 不是「共享库里有什么全塞进去」）。
+ * declared = build.gradle 里 implementation/api 解析出的 { name, version }（version 可空）。
+ * 规则：
+ *   - 共享库按 artifact 基名分组；基名在声明集里才收：声明版本和文件版本完全一致优先，
+ *     否则取最高版（同版先到先得 = 目录优先级）
+ *   - 基名没被任何声明引用 → 整组排除（避免未声明库进 classpath / overlay）
+ *   - 同一基名被多次声明也只收一个文件（第一个声明赢）
+ * 返回 { kept, excluded, matched }，matched 用于日志「声明 X → 用了 Y」。
+ */
+export function filterSharedByDeps(
+  shared: ProjectLib[],
+  declared: { name: string; version: string }[],
+): {
+  kept: ProjectLib[];
+  excluded: string[];
+  matched: { declared: string; file: string }[];
+} {
+  // 分组：基名 → [{lib, info}]（保序：目录优先级）
+  const groups = new Map<string, { lib: ProjectLib; info: ReturnType<typeof libArtifactInfo> }[]>();
+  for (const lib of shared) {
+    const fname = lib.rel.split("/").pop() || lib.rel;
+    const info = libArtifactInfo(fname);
+    const g = groups.get(info.base);
+    if (g) g.push({ lib, info });
+    else groups.set(info.base, [{ lib, info }]);
+  }
+  const kept: ProjectLib[] = [];
+  const excluded: string[] = [];
+  const matched: { declared: string; file: string }[] = [];
+  const usedBase = new Set<string>();
+  for (const d of declared) {
+    const base = (d.name || "").toLowerCase();
+    if (!base || usedBase.has(base)) continue;
+    const g = groups.get(base);
+    if (!g || g.length === 0) continue;
+    usedBase.add(base);
+    // 声明版本精确匹配优先，否则最高版
+    let pick = d.version ? g.find((x) => x.info.verStr === d.version.toLowerCase()) : undefined;
+    if (!pick) {
+      pick = g.reduce((acc, x) => (cmpLibVer(x.info.ver, acc.info.ver) > 0 ? x : acc));
+    }
+    kept.push(pick.lib);
+    matched.push({ declared: `${d.name}:${d.version || "*"}`, file: pick.lib.rel.split("/").pop() || pick.lib.rel });
+    for (const x of g) {
+      if (x.lib !== pick.lib) excluded.push(x.info.verStr ? `${x.info.base}-${x.info.verStr}` : x.info.base);
+    }
+  }
+  // 没被声明引用的组全排除
+  for (const [base, g] of groups) {
+    if (!usedBase.has(base)) {
+      for (const x of g) excluded.push(x.info.verStr ? `${base}-${x.info.verStr}` : base);
+    }
+  }
+  return { kept, excluded, matched };
 }
 
 /** 原生通道列目录（绝对路径，同步） */

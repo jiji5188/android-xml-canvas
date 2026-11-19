@@ -126,8 +126,8 @@ export interface Toolchain {
   canBuild(): boolean;
   /** 当前环境能不能运行/调试（可选；不支持执行的语言不实现） */
   canRun?(): boolean;
-  /** 构建产物 */
-  build(input: unknown): Promise<ToolchainResultBase>;
+  /** 构建产物（可选；纯脚本语言没有构建步，如 JavaScript） */
+  build?(input: unknown): Promise<ToolchainResultBase>;
   /** 运行 / 调试（可选；不支持执行的语言不实现） */
   run?(input: unknown): Promise<ToolchainResultBase>;
 }

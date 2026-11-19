@@ -15,12 +15,11 @@ import type {
   DebugRunResult,
 } from "@/lib/xml/debug-run";
 import { debugCompile, debugRun, hasDebugRun } from "@/lib/xml/debug-run";
-import { NEW_FILE_CATEGORIES } from "@/lib/xml/new-file";
 import type {
   Toolchain,
   ToolchainTemplateSpec,
 } from "../toolchain-registry";
-import { ToolchainRegistry } from "../toolchain-registry";
+import { NEW_FILE_CATEGORIES } from "@/lib/xml/new-file";
 
 /**
  * 「运行」的源输入：工具链内部先编译成 dex，再动态执行。
@@ -141,7 +140,4 @@ export const androidJavaToolchain: AndroidJavaToolchain = {
   },
 };
 
-/** 注册内置工具链（和 registerBuiltinEditors 同风格，幂等：重复注册覆盖） */
-export function registerBuiltinToolchains(): void {
-  ToolchainRegistry.register(androidJavaToolchain as unknown as Toolchain);
-}
+/** 旧导出兼容：注册入口已移到 toolchains/index.ts */

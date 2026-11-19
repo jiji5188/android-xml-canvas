@@ -6,8 +6,10 @@ import type { Toolchain } from "@/lib/plugin/toolchain-registry";
 import { ToolchainRegistry } from "@/lib/plugin/toolchain-registry";
 import {
   androidJavaToolchain,
+  jsToolchain,
   registerBuiltinToolchains,
-} from "@/lib/plugin/toolchains/android-java";
+} from "@/lib/plugin/toolchains";
+import { buildJsWorkerScript, hasJsRun } from "@/lib/xml/js-run";
 
 function fakeToolchain(id: Toolchain["id"], exts: string[]): Toolchain {
   return {
@@ -130,11 +132,59 @@ describe("M409 android-java 适配器", () => {
     expect(r.step).toBe("env");
   });
 
-  it("registerBuiltinToolchains 幂等注册", () => {
+  it("registerBuiltinToolchains 幂等注册（android-java + js 两个）", () => {
     ToolchainRegistry.reset();
     registerBuiltinToolchains();
     registerBuiltinToolchains();
-    expect(ToolchainRegistry.size).toBe(1);
+    expect(ToolchainRegistry.size).toBe(2);
     expect(ToolchainRegistry.get("android-java")).not.toBeNull();
+    expect(ToolchainRegistry.get("js")).not.toBeNull();
+  });
+});
+
+describe("M409 JavaScript 工具链（第二门语言）", () => {
+  it("能力位：无画布/资源/清单/Gradle，artifact=script，runMode=interpret", () => {
+    expect(jsToolchain.capabilities).toEqual({
+      hasCanvas: false,
+      hasRes: false,
+      hasManifest: false,
+      hasGradle: false,
+      artifact: "script",
+      runMode: "interpret",
+    });
+  });
+
+  it("无构建步：canBuild=false 且 build 未实现（纯脚本）", () => {
+    expect(jsToolchain.canBuild()).toBe(false);
+    // 窄类型下不声明 build（纯脚本无构建步），运行时属性确实不存在
+    expect((jsToolchain as unknown as { build?: unknown }).build).toBeUndefined();
+  });
+
+  it("forFile 能命中 .js/.mjs/.cjs，且不会误抢 .java", () => {
+    ToolchainRegistry.reset();
+    registerBuiltinToolchains();
+    expect(ToolchainRegistry.forFile("src/app.js")?.id).toBe("js");
+    expect(ToolchainRegistry.forFile("m.mjs")?.id).toBe("js");
+    expect(ToolchainRegistry.forFile("c.cjs")?.id).toBe("js");
+    expect(ToolchainRegistry.forFile("Main.java")?.id).toBe("android-java");
+  });
+
+  it("Node 环境无 Worker：canRun=false，run() 返回 ok:false + step:env", async () => {
+    expect(hasJsRun()).toBe(false);
+    expect(jsToolchain.canRun?.()).toBe(false);
+    const r = await jsToolchain.run({ code: "console.log(1)" });
+    expect(r.ok).toBe(false);
+    expect(r.step).toBe("env");
+  });
+
+  it("Worker 脚本包含控制台重定向 / main 调用 / 异常上报", () => {
+    const src = buildJsWorkerScript("function main(a){return a.length}", ["x"]);
+    expect(src).toContain("console");
+    expect(src).toContain("postMessage");
+    expect(src).toContain("main(args)");
+    expect(src).toContain("AsyncFunction");
+    // 源码 / 参数以 JSON 字面量嵌入（不会被当代码执行）
+    expect(src).toContain(JSON.stringify("function main(a){return a.length}"));
+    expect(src).toContain(JSON.stringify(["x"]));
   });
 });

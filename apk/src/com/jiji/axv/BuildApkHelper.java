@@ -651,8 +651,25 @@ public class BuildApkHelper {
         // M283：去重——同一个 jar 可能被以两个名字进 assets/androidx（历史缓存错位）或 libs/+androidx 重叠，
         // 两个不同路径同内容 → R8 报「Type X defined multiple times」。按「长度+前 64KB 摘要」去重（便宜，不读全文件）。
         java.util.List<String> jarSigs = new java.util.ArrayList<>();
+        // M436：按「artifact 基名」去重——共享库/项目 libs 里已有 appcompat 时，内置 androidx 插件包里的
+        //  旧 appcompat 必须跳过（不同版本内容 SHA 不同，content-dedup 不命中 → D8 duplicate type）。
+        java.util.Set<String> libBases = new java.util.HashSet<>();
+        for (String j : libJars) {
+            String bn = jarBaseName(j);
+            if (bn != null) libBases.add(bn);
+        }
         for (String j : libJars) addDedupedJar(d8Args, j, jarSigs, log);
-        if (androidxJars != null) for (String a : androidxJars) addDedupedJar(d8Args, a, jarSigs, log);
+        if (androidxJars != null) {
+            for (String a : androidxJars) {
+                String bn = jarBaseName(a);
+                if (bn != null && libBases.contains(bn)) {
+                    log.append("  去重：跳过内置 androidx 的 ").append(new File(a).getName())
+                         .append("（项目/共享库已有同名 ").append(bn).append("）\n");
+                    continue;
+                }
+                addDedupedJar(d8Args, a, jarSigs, log);
+            }
+        }
         java.lang.reflect.Method d8Method = d8.getMethod("dex", String[].class, java.util.List.class);
         boolean d8Ok = Boolean.valueOf((Boolean) d8Method.invoke(null, d8Args.toArray(new String[0]), d8Log));
         if (!d8Ok || d8Log.size() > 0) {
@@ -1863,6 +1880,22 @@ public class BuildApkHelper {
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /** M436：从 jar 路径取 artifact 基名（appcompat-1.7.0-classes.jar → appcompat；material-1.12.0.jar → material；core-ktx-1.13.1-classes.jar → core-ktx）。
+     *  去 .jar/.aar/-classes.jar 后缀 + 尾部 -数字 版本段。无法解析返回 null。 */
+    private static String jarBaseName(String path) {
+        if (path == null) return null;
+        String name = new File(path).getName();
+        if (name.endsWith("-classes.jar")) name = name.substring(0, name.length() - 12);
+        else if (name.endsWith("-classes.aar")) name = name.substring(0, name.length() - 12);
+        else if (name.endsWith(".jar")) name = name.substring(0, name.length() - 4);
+        else if (name.endsWith(".aar")) name = name.substring(0, name.length() - 4);
+        // 去尾部 -x.y.z 版本段（material-1.12.0 → material；core-ktx-1.13.1 → core-ktx）
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(.+?)-\\d+(\\.\\d+)*$").matcher(name);
+        if (m.find()) name = m.group(1);
+        if (name.isEmpty()) return null;
+        return name.toLowerCase();
     }
 
     /** M283：D8 程序输入去重。按「文件长度 + 前 64KB 的摘要」判同内容，避免同一 jar 被两个不同

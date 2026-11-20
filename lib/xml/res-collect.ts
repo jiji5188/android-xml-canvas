@@ -261,19 +261,24 @@ export async function collectProjectRes(
   };
 
   /** M159：图片（png/webp）——读 base64，真机侧写字节，不再当成缺资源 */
-  const findDirImage = async (type: string, name: string): Promise<{ path: string; base64: string } | null> => {
-    if (!io.readBase64) return null;
+  const findDirImage = async (type: string, name: string, all = false): Promise<{ path: string; base64: string }[]> => {
+    if (!io.readBase64) return [];
     const dirs2 = dirs.filter((d) => d === type || d.startsWith(`${type}-`)).sort();
+    const found: { path: string; base64: string }[] = [];
     for (const dir of dirs2) {
       for (const ext of ["png", "webp", "jpg", "jpeg"]) {
         const path = `${dir}/${name}.${ext}`;
         if (have.has(path)) continue;
         reads++;
         const r = await io.readBase64(`${resRel}/${path}`);
-        if (r.ok && r.base64) return { path, base64: r.base64 };
+        if (r.ok && r.base64) {
+          found.push({ path, base64: r.base64 });
+          if (!all) return found;
+        }
       }
+      if (!all && found.length) break;
     }
-    return null;
+    return found;
   };
 
   let queue = [
@@ -311,20 +316,32 @@ export async function collectProjectRes(
       }
 
       const hit = await findDirFile(ref.type, ref.name);
-      if (!hit) {
-        const img = await findDirImage(ref.type, ref.name);
-        if (img) {
-          if (addFile(img.path, "", img.base64)) defs.add(key);
-          else missing.add(key);
-        } else {
-          missing.add(key);
+      if (hit) {
+        if (addFile(hit.path, hit.text)) {
+          defs.add(key);
+          next.push(...refsIn(hit.text));
+          // M459b：mipmap/drawable 的 anydpi-v26 adaptive XML 之外，
+          // 密度目录的 PNG（hdpi/xhdpi/...）也必须收集——
+          // minSdk < 26 时 API 24/25 设备读不到 anydpi-v26，需要密度 PNG 做 fallback
+          if (ref.type === "mipmap" || ref.type === "drawable") {
+            const imgs = await findDirImage(ref.type, ref.name, true);
+            for (const im of imgs) addFile(im.path, "", im.base64);
+          }
         }
         continue;
       }
-      if (addFile(hit.path, hit.text)) {
-        defs.add(key);
-        next.push(...refsIn(hit.text));
+      const imgs = await findDirImage(ref.type, ref.name, true);
+      if (imgs.length) {
+        let ok = false;
+        for (const im of imgs) {
+          if (addFile(im.path, "", im.base64)) ok = true;
+        }
+        if (ok) defs.add(key);
+        else missing.add(key);
+      } else {
+        missing.add(key);
       }
+      continue;
     }
     queue = next;
   }
@@ -356,8 +373,8 @@ export async function collectProjectRes(
       missing.delete(key);
       continue;
     }
-    const img = await findDirImage(type, name);
-    if (img && addFile(img.path, "", img.base64)) {
+    const imgs = await findDirImage(type, name);
+    if (imgs.length && addFile(imgs[0].path, "", imgs[0].base64)) {
       defs.add(key);
       missing.delete(key);
     }

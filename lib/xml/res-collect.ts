@@ -121,6 +121,10 @@ export function dedupeValuesFiles(files: RenderFile[], projectDefs?: Set<string>
  * 把 files 里引用但没定义的资源从项目 res 递归补齐。
  * @param io     项目 IO（APK native bridge / 浏览器 FSA），为空则原样返回
  * @param docRel 当前文档相对路径，用来定位 res 根
+ * @param fullScan M460：全量 res 扫描——把 res 下所有非 values 目录的文件都带进包
+ *  （AIDE/Android Studio 是整个 res 目录全打；我们以前只收「XML 引用到的」，
+ *  Java 代码 R.raw.xxx / R.drawable.xxx 引用但没被任何 XML 引用的资源全漏包，
+ *  → ECJ 编译 R.raw 报 cannot be resolved → 「Java 编译失败」）
  */
 export async function collectProjectRes(
   io: AiFileIo | null,
@@ -130,6 +134,8 @@ export async function collectProjectRes(
   /** M380：额外参与“引用扫描”的文本（如 AndroidManifest.xml）
    *  —— manifest 里的 @mipmap/app、@drawable/... 也是资源引用，不扫就会 aapt2 link 报 not found。 */
   extraTexts: string[] = [],
+  /** M460：全量 res 扫描（打包链路传 true；渲染预览保持 false 走引用跟随） */
+  fullScan = false,
 ): Promise<CollectResult> {
   const files = input.map((f) => ({ ...f }));
   if (!io) return { files, missing: [], added: 0, resRel: "" };
@@ -175,6 +181,40 @@ export async function collectProjectRes(
     added++;
     return true;
   };
+
+  // M460：全量 res 扫描（fullScan=true）。values 目录跳过——下面的 M159 逻辑专门处理
+  //  （要记 projectValueDefs / valuesCache，全量扫会跳过这些副作用）。
+  //  xml 读文本；其它一律走 readBase64（png/mp3/ogg/wav/ttf/... 二进制）。
+  //  reads>800 + budget 双限流，防超大项目把 IO 卡死。
+  if (fullScan) {
+    for (const dir of dirs) {
+      if (added >= budget || reads > 800) break;
+      if (/^values/.test(dir)) continue;
+      let items: { name: string; kind: "file" | "dir" }[] = [];
+      try {
+        const r = await io.list(`${resRel}/${dir}`);
+        if (r.ok && r.items) items = r.items.map((it) => ({ name: it.name, kind: it.kind }));
+      } catch {
+        continue;
+      }
+      for (const it of items) {
+        if (added >= budget || reads > 800) break;
+        if (it.kind !== "file") continue;
+        const rel = `${dir}/${it.name}`;
+        if (have.has(rel)) continue;
+        reads++;
+        if (/\.xml$/i.test(it.name)) {
+          const r = await io.read(`${resRel}/${rel}`);
+          if (r.ok && r.text) addFile(rel, r.text);
+        } else if (io.readBase64) {
+          const r = await io.readBase64(`${resRel}/${rel}`);
+          if (r.ok && r.base64) addFile(rel, "", r.base64);
+        }
+      }
+    }
+    // 全量收进来的文件也要算「已定义」，否则引用循环把它们误判成 missing → 生成无用占位
+    for (const k of definedIn(files)) defs.add(k);
+  }
 
   /** M159：项目自己的 values/*.xml 先全带上（true render 依赖样式/主题/颜色），
    *  同时记下它们定义了哪些资源 —— 合并来的 values/res_values.xml 要按它们去重。 */

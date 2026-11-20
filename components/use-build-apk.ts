@@ -222,8 +222,12 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           aiFileIo,
           openRel,
           buildRealRenderFiles(baseInput),
-          160,
+          // M460：全量 res 扫描——AIDE/AS 是整个 res 目录全打，我们以前只收 XML 引用到的，
+          //  Java 里 R.raw.xxx / R.drawable.xxx 引用但没被任何 XML 引用的资源全漏包
+          //  → ECJ 编译 R.raw 报 cannot be resolved → 「Java 编译失败」。budget 放宽到 800。
+          800,
           manifestInfo.text ? [manifestInfo.text] : [],
+          true,
         );
         // M458：资源收集透明化——res 根没定位到时以前静默跳过，mipmap 全部漏包，日志里查无此因
         if (!collected.resRel) {

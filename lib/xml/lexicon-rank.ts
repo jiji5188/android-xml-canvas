@@ -38,6 +38,10 @@ export interface RankItem {
   alt?: string;
   /** M396：修饰符（"public static" / "private"…），候选第二行展示 */
   mod?: string;
+  /** M441：方法返回类型（raw 简名），候选说明行展示 */
+  ret?: string;
+  /** M441：类的全限定名，候选说明行展示 */
+  fqn?: string;
   score: number;
   /** 来源（debug / 分组） */
   source: "current" | "project" | "sdk" | "third" | "jdk" | "resource";
@@ -106,6 +110,9 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
         if (!extra?.signature) merged.signature = existing.signature;
         // M396：新条目没带修饰符时别抹掉已有的
         if (!extra?.mod) merged.mod = existing.mod;
+        // M441：返回类型 / 全限定名同理
+        if (!extra?.ret) merged.ret = existing.ret;
+        if (!extra?.fqn) merged.fqn = existing.fqn;
         if (!extra?.originClass) merged.originClass = existing.originClass;
         pool.set(text, merged);
       } else {
@@ -113,6 +120,15 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
         if (extra?.mod && !existing.mod) {
           existing.mod = extra.mod;
           if (extra.signature && !existing.signature) existing.signature = extra.signature;
+          pool.set(text, { ...existing });
+        }
+        // M441：返回类型 / 全限定名也分别补（互不依赖）
+        if (extra?.ret && !existing.ret) {
+          existing.ret = extra.ret;
+          pool.set(text, { ...existing });
+        }
+        if (extra?.fqn && !existing.fqn) {
+          existing.fqn = extra.fqn;
           pool.set(text, { ...existing });
         }
       }
@@ -127,6 +143,8 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
         isDeprecated: extra?.isDeprecated,
         alt: extra?.alt,
         mod: extra?.mod,
+        ret: extra?.ret,
+        fqn: extra?.fqn,
       });
     }
   };
@@ -140,15 +158,16 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
   // 2) 项目（继承/接口合并后的方法；receiverType 能认出就按该类过滤）
   const lex = ctx.lex;
   // 方法名 → 废弃标记 + 签名（从 methods 里扫一遍，用于「无 receiver 走全项目方法名」时带第二行/废弃标记）
-  const depByName = new Map<string, { alt?: string; sig?: string; dep?: boolean; mod?: string }>();
+  const depByName = new Map<string, { alt?: string; sig?: string; dep?: boolean; mod?: string; ret?: string }>();
   for (const arr of lex.methods.values()) {
     for (const m of arr) {
       const cur = depByName.get(m.name);
       // 保留首个签名（非空优先），废弃标记任意一个为真即可
-      if (!cur) depByName.set(m.name, { alt: m.alt, sig: m.signature, dep: m.isDeprecated, mod: m.mod });
+      if (!cur) depByName.set(m.name, { alt: m.alt, sig: m.signature, dep: m.isDeprecated, mod: m.mod, ret: m.ret });
       else {
         if (!cur.sig && m.signature) cur.sig = m.signature;
         if (!cur.mod && m.mod) cur.mod = m.mod;
+        if (!cur.ret && m.ret) cur.ret = m.ret;
         if (m.isDeprecated) {
           cur.dep = true;
           if (!cur.alt) cur.alt = m.alt;
@@ -166,16 +185,17 @@ export function rankCandidates(prefix: string, ctx: RankCtx, opts: RankOpts = {}
         isDeprecated: m.isDeprecated,
         alt: m.alt,
         mod: m.mod,
+        ret: m.ret,
       });
     }
   } else {
     // 没 receiver：全项目方法名（去重），带签名（第二行）+ 废弃标记
     for (const name of lex.allMethodNames) {
       const d = depByName.get(name);
-      add(name, "method", "project", { isDeprecated: !!d?.dep, alt: d?.alt, signature: d?.sig, mod: d?.mod });
+      add(name, "method", "project", { isDeprecated: !!d?.dep, alt: d?.alt, signature: d?.sig, mod: d?.mod, ret: d?.ret });
     }
-    // 项目类名
-    for (const c of lex.classes.values()) add(c.name, "class", "project", { isDeprecated: c.isDeprecated });
+    // 项目类名（M441：带上全限定名，候选说明行展示完整类名）
+    for (const c of lex.classes.values()) add(c.name, "class", "project", { isDeprecated: c.isDeprecated, fqn: c.fqn });
   }
 
   // 3) 资源（@drawable/ 等）

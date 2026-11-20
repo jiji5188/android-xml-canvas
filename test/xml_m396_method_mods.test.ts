@@ -41,13 +41,13 @@ describe("M396 方法修饰符标注", () => {
     const r = suggest(["public class M {", "    void f() {", "        loa", "    }", "}"], 3);
     expect(subOf(r, "load")).toBe("() · public");
   });
-  it("private static 方法 → `(int a, int b) · private static`", () => {
+  it("private static 方法 → `int (int a, int b) · private static`（M441 带返回类型）", () => {
     const r = suggest(["public class M {", "    void f() {", "        cal", "    }", "}"], 3);
-    expect(subOf(r, "calc")).toBe("(int a, int b) · private static");
+    expect(subOf(r, "calc")).toBe("int (int a, int b) · private static");
   });
-  it("public static 方法 → `(String s) · public static`", () => {
+  it("public static 方法 → `String (String s) · public static`（M441 带返回类型）", () => {
     const r = suggest(["public class M {", "    void f() {", "        bui", "    }", "}"], 3);
-    expect(subOf(r, "buildName")).toBe("(String s) · public static");
+    expect(subOf(r, "buildName")).toBe("String (String s) · public static");
   });
   it("protected 方法 → `· protected`", () => {
     const r = suggest(["public class M {", "    void f() {", "        onB", "    }", "}"], 3);

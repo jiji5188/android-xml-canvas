@@ -62,6 +62,7 @@ import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
 import { computeSuggest } from "@/lib/xml/keyword-suggest";
 import { computeJavaSuggest, JAVA_SYMBOLS, importForType, buildImportInsertMany } from "@/lib/xml/java-vocab";
+import { placeCtxMenu, estimateCtxMenuHeight } from "@/lib/xml/ctx-menu-position";
 import { buildJavaAcceptTemplate } from "@/lib/xml/java-templates";
 import { loadRecency, recordUsage } from "@/lib/xml/lex-recency";
 import { getLexStore, type Lexicon } from "@/lib/xml/lexicon";
@@ -656,6 +657,9 @@ export function CodeEditor({
     setCtxMenu(null);
     setCtxDocShow(null);
   }, []);
+  /** M441：updateListener 里要用（那处在建 editor 时只捕获一次闭包）→ 走 ref 拿最新引用 */
+  const closeCtxMenuRef = useRef(closeCtxMenu);
+  closeCtxMenuRef.current = closeCtxMenu;
 
   /* M437：菜单打开时，点面板外任何地方（编辑器任意位置 / 工具栏 / 页面空白）都关闭菜单。
    * 关键点（用户明确要求「不影响输入」）：只关闭、不 preventDefault → 点击照常落到目标上，
@@ -818,8 +822,26 @@ export function CodeEditor({
       // 转相对 .axv-code-body 坐标
       const br = body.getBoundingClientRect();
       const x = Math.max(4, Math.min(clientX - br.left, br.width - 176));
-      const y = Math.max(4, Math.min(clientY - br.top, br.height - 40));
-      setCtxMenu({ x, y, items });
+      // M441：菜单整体避开「当前行」——按当前行的视觉矩形，放到行上方或行下方，
+      //   顶部/底部空间不够时才镀回可视区内（允许压边，但不再盖住光标那一行）
+      let lineTop = clientY - br.top;
+      let lineBottom = clientY - br.top;
+      const v = viewRef.current;
+      if (v) {
+        const pos = v.posAtCoords({ x: clientX, y: clientY });
+        if (pos != null) {
+          const ln = v.state.doc.lineAt(pos);
+          const cTop = v.coordsAtPos(ln.from);
+          const cBot = v.coordsAtPos(ln.to);
+          if (cTop) lineTop = Math.min(lineTop, cTop.top - br.top);
+          if (cBot) lineBottom = Math.max(lineBottom, cBot.bottom - br.top);
+          else if (cTop) lineBottom = Math.max(lineBottom, cTop.bottom - br.top);
+        }
+      }
+      // 菜单高度估算：项目 padding 8+8 / 每个 item 8+8+行高 ~33 / gap 2
+      const menuH = estimateCtxMenuHeight(items.length);
+      const placed = placeCtxMenu({ top: lineTop, bottom: lineBottom }, menuH, br.height);
+      setCtxMenu({ x, y: placed.top, items });
     },
     [selectionText, cursorToken, ctxCopy, ctxCut, ctxPaste, ctxSelectAll, ctxFind, value, langRef, tt],
   );
@@ -1230,6 +1252,8 @@ export function CodeEditor({
             // M57:记下「本次变更是我自己发出的」,父层回灌同一个 value 时不要回写
             lastEmittedRef.current = s;
             onChangeRef.current(s);
+            // M441：一输入文字就销毁长按/右键菜单（菜单开着时按键盘输入，菜单会挡着看结果）
+            closeCtxMenuRef.current?.();
           }
           if (u.selectionSet || u.docChanged) {
             const head = u.state.selection.main.head;

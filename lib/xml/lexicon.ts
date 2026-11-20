@@ -37,6 +37,8 @@ export interface LexMethod {
   alt?: string;
   /** M396：修饰符串（如 "public static" / "private" / "abstract"），候选第二行展示 */
   mod?: string;
+  /** M441：返回类型（raw 简名；void / Unit 不存）。候选说明行展示「这个方法返回什么」 */
+  ret?: string;
 }
 
 /** 词库里「类」的一条记录 */
@@ -369,10 +371,33 @@ function parseJavaMethods(code: string, classNames: Set<string>, pkg: string, so
     // M396：修饰符 —— 只看方法名所在行的前缀（跨行声明取不到，宁缺勿错）
     const lineStart = code.lastIndexOf("\n", at - 1) + 1;
     const mod = modsOf(code.slice(lineStart, at));
-    add(cls, { name, originClass: cls, signature: sig, isDeprecated: isDep || undefined, mod });
+    // M441：返回类型（void 不存 —— 没有返回值可展示）
+    const retType = ret === "void" ? undefined : ret;
+    add(cls, { name, originClass: cls, signature: sig, isDeprecated: isDep || undefined, mod, ret: retType });
     void pkg;
   }
   return out;
+}
+
+/** M441：`)` 之后的 `: Type` → Kotlin 返回类型（Unit/Nothing 视为无返回值） */
+function kotlinReturnType(code: string, open: number): string | undefined {
+  if (open < 0) return undefined;
+  let depth = 0;
+  let i = open;
+  for (; i < code.length; i++) {
+    const c = code[i];
+    if (c === "(") depth++;
+    else if (c === ")") {
+      depth--;
+      if (depth === 0) break;
+    }
+  }
+  const tail = code.slice(i + 1, i + 220);
+  const m = /^\s*:\s*([A-Za-z_$][\w$.]*\s*(?:<[^<>]*>)?)/.exec(tail);
+  if (!m) return undefined;
+  const t = rawTypeName(m[1]);
+  if (!t || t === "Unit" || t === "Nothing") return undefined;
+  return t;
 }
 
 /** 从 open 处取到匹配的 ) 的参数串 */
@@ -446,17 +471,28 @@ function parseKotlinMethods(code: string, classNames: Set<string>, pkg: string, 
     // M396：修饰符（Kotlin：可见性 + 静态归 companion 不展开，宁缺勿错）
     const lineStartK = code.lastIndexOf("\n", m.index! - 1) + 1;
     const modK = modsOf(code.slice(lineStartK, m.index!));
-    add(cls, { name, originClass: cls, signature: sig, isDeprecated: isDep || undefined, mod: modK });
+    // M441：返回类型 —— `fun foo(...): Type`（`)` 之后可选 `: Type`）；Unit/Nothing 不存
+    const retK = kotlinReturnType(code, open);
+    add(cls, { name, originClass: cls, signature: sig, isDeprecated: isDep || undefined, mod: modK, ret: retK });
   }
 
-  // val/var 字段
-  const fieldRe = /\b(val|var)\s+([a-z_][\w$]*)\s*[:=]/g;
+  // val/var 字段（M441：能推出的类型顺带当 ret 存 —— 属性建议就显示它的类型）
+  const fieldRe = /\b(val|var)\s+([a-z_][\w$]*)\s*(?::\s*([A-Za-z_$][\w$.]*\s*(?:<[^<>]*>)?))?\s*[:=]/g;
   while ((m = fieldRe.exec(code)) !== null) {
     const name = m[2];
     const cls = braceDepthAt(code, m.index!) === 0 ? topLevelName : nearestClass(name, m.index!, classNames, code);
+    const explicit = m[3] ? rawTypeName(m[3]) : undefined;
+    let inferred: string | undefined;
+    if (!explicit) {
+      // `val x = Foo(...)` → Foo
+      const rhs = code.slice(m.index! + m[0].length, m.index! + m[0].length + 120);
+      const im = /^\s*(?:[A-Z][\w$.]*\s*<[^<>]*>\s*)?([A-Z][\w$.]*)\s*\(/.exec(rhs);
+      if (im) inferred = rawTypeName(im[1]);
+    }
+    const retProp = explicit || inferred;
     let arr = out.get(cls);
     if (!arr) out.set(cls, (arr = []));
-    if (!arr.some((x) => x.name === name)) arr.push({ name, originClass: cls });
+    if (!arr.some((x) => x.name === name)) arr.push({ name, originClass: cls, ret: retProp });
   }
   void pkg;
   void source;

@@ -37,6 +37,16 @@ describe("M448 块标记线 = 每块一条贯穿线（{ 到 } 不断开）", () 
     expect(blk.includes("bottom"), "M448 起不再需要 bottom:0（高度已贯穿到块尾）").toBe(false);
   });
 
+  it("M449：竖线跳过起始行/结束行（top 偏移 1 行，不压到 { 和 } 的文字）", () => {
+    const blk = bglBlock();
+    expect(/top:\s*"calc\(var\(--bgl-t/.test(blk), "top 必须用 --bgl-t 偏移行数（不能是 0）").toBe(true);
+    const deco = SRC.match(/export function buildBlockGuidesDeco[\s\S]{0,1200}/);
+    const body = deco![0];
+    expect(body.includes("--bgl-t:1"), "装饰必须写 --bgl-t:1（跳起始行）").toBe(true);
+    expect(/g\.endLine[^;]*-\s*g\.startLine\s*-\s*1/.test(body), "中间行数 = endLine - startLine - 1").toBe(true);
+    expect(body.includes("if (n < 1) continue"), "中间没行（{ } 紧邻）时不能画").toBe(true);
+  });
+
   it("宽度保持 1px（M446 用户明确要求）+ 列位公式不变", () => {
     const blk = bglBlock();
     expect(/width:\s*"1px"/.test(blk), "::before 必须 width:1px").toBe(true);

@@ -164,11 +164,13 @@ const errLineField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-/* ===== M442/M446/M448：代码块花括号的「纵向标记线」（begin > end）=====
+/* ===== M442/M446/M448/M449：代码块花括号的「纵向标记线」（begin > end）=====
  *  多行 {…} 块 → 在「块的起始行」放一个 line 装饰（.axv-bgl），
  *  CSS ::before 画一条 1px 竖线，高度 = 块行数 × 行高 —— 一条元素贯穿整个块，
  *  视觉上就是「从 { 那行一直到 } 那行」的一对线，不会在行边界断开（M448：旧版
  *  每行一段 ::before，行间亚像素缝隙让用户看到「断线」）。
+ *  M449（用户要求）：竖线要「跳过起始行和结束行」—— 只画在 { 与 } 之间的行上，
+ *  不压到 { 和 } 这两行的文字（top 偏移 1 行、高度 = 中间行数）。
  *  竖线横向位置 = 缩进列 × 字宽；按深度写 --bgl-d，CSS/JS 用深度调透明度，
  *  嵌套越深越淡，不同层级一眼可分（M448 用户要求）。
  *  Java 文件启用（XML 无花括号块语义，不会画线）；渲染条数按深度 + 总数截断，避免满屏。 */
@@ -179,7 +181,9 @@ export function blockGuideAlpha(depth: number): number {
 }
 
 /** 把跨行花括号块算成 CodeMirror 装饰：每个块只在「起始行」放一个 line 装饰
- *  （class axv-bgl，带 CSS 变量 --bgl-c 列号 / --bgl-l 行数 / --bgl-d 深度 / --bgl-a 透明度）
+ *  （class axv-bgl，带 CSS 变量 --bgl-c 列号 / --bgl-t 顶部偏移行数 / --bgl-l 行数 / --bgl-d 深度 / --bgl-a 透明度）
+ *  M449：--bgl-t 固定 1（跳起始行），--bgl-l = 中间行数（endLine - startLine - 1），
+ *        即竖线只画在「{ 的下一行」到「} 的上一行」之间；中间没行（紧邻）就不画。
  *  ⚠️ line 装饰必须用单点 .range(L.from)（零长度），传 (from,to) 会抛
  *     "Line decoration ranges must be zero-length" → 每次输入事务失败 → 输不了文字（M442 踩过） */
 export function buildBlockGuidesDeco(doc: { lines: number; line(n: number): { from: number; to: number }; toString(): string }): DecorationSet {
@@ -189,13 +193,15 @@ export function buildBlockGuidesDeco(doc: { lines: number; line(n: number): { fr
   const ranges: Range<Decoration>[] = [];
   for (const g of picked) {
     if (g.startLine > doc.lines) continue;
+    // M449：跳过 { 行和 } 行 —— 只画中间那几行
+    const n = Math.min(g.endLine, doc.lines) - g.startLine - 1;
+    if (n < 1) continue;
     const L = doc.line(g.startLine);
-    const n = Math.min(g.endLine, doc.lines) - g.startLine + 1;
     ranges.push(
       Decoration.line({
         class: "axv-bgl",
         attributes: {
-          "style": `--bgl-c:${g.col};--bgl-l:${n};--bgl-d:${g.depth};--bgl-a:${blockGuideAlpha(g.depth).toFixed(2)};`,
+          "style": `--bgl-c:${g.col};--bgl-t:1;--bgl-l:${n};--bgl-d:${g.depth};--bgl-a:${blockGuideAlpha(g.depth).toFixed(2)};`,
         },
       }).range(L.from),
     );
@@ -462,12 +468,15 @@ const cmTheme = EditorView.theme({
   // M448：装饰从「块内每行一段」改成「每块一段、在起始行画高度=行数×行高的一条线」——
   //       旧写法在行边界有亚像素缝隙，用户看到「断线」；现在一条元素贯穿 {→} 整块，
   //       且按深度 --bgl-d 调透明度（外层 0.55 / 内层递减，最深 0.18），不同层级可区分。
+  // M449：竖线要「跳过起始行和结束行」—— 只画在 { 与 } 之间的行上，
+  //       不压到 { 那行的文字，也不压到 } 那行的文字。--bgl-t = 顶部偏移行数（1），
+  //       --bgl-l = 中间行数，故 top = 1 行高，height = 中间行数 × 行高。
   ".axv-bgl": {
     position: "relative",
     "&::before": {
       content: '""',
       position: "absolute",
-      top: "0",
+      top: "calc(var(--bgl-t, 1) * var(--axv-code-lh, 21px))",
       height: "calc(var(--bgl-l, 1) * var(--axv-code-lh, 21px))",
       width: "1px",
       left: "calc(14px + var(--bgl-c, 0) * var(--axv-code-chw, 0.6em))",

@@ -63,6 +63,8 @@ import type { EditorLang } from "@/lib/xml/editor-lang";
 import { computeSuggest } from "@/lib/xml/keyword-suggest";
 import { computeJavaSuggest, JAVA_SYMBOLS, importForType, buildImportInsertMany } from "@/lib/xml/java-vocab";
 import { placeCtxMenu, estimateCtxMenuHeight } from "@/lib/xml/ctx-menu-position";
+import { computeBlockGuides, pickRenderedGuides } from "@/lib/xml/block-guides";
+import { zoomFromPinch, pointerDist, CODE_ZOOM_INIT } from "@/lib/xml/code-zoom";
 import { buildJavaAcceptTemplate } from "@/lib/xml/java-templates";
 import { loadRecency, recordUsage } from "@/lib/xml/lex-recency";
 import { getLexStore, type Lexicon } from "@/lib/xml/lexicon";
@@ -158,6 +160,46 @@ const errLineField = StateField.define<DecorationSet>({
       if (e.is(setErrLines)) next = buildErrDeco(tr.state.doc, e.value);
     }
     return next;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
+/* ===== M442：代码块花括号的「纵向标记线」（begin > end）=====
+ *  多行 {…} 块 → 在「块内每行」放一个 mark 装饰（.axv-bgl），CSS ::before 画 1px 竖线。
+ *  竖线横向位置 = 缩进列 × 字宽；块内每行都画，视觉上连成一条纵向参考线（begin > end）。
+ *  用 mark + CSS 而非 Widget（@codemirror/view 该版本不导出 Widget）。
+ *  Java 文件启用（XML 无花括号块语义，不会画线）；渲染条数按深度 + 总数截断，避免满屏。 */
+
+/** 把跨行花括号块算成 CodeMirror 装饰：块内每行一个 mark（class axv-bgl，带 CSS 变量） */
+function buildBlockGuidesDeco(doc: { lines: number; line(n: number): { from: number; to: number }; toString(): string }): DecorationSet {
+  const all = computeBlockGuides(doc.toString());
+  const picked = pickRenderedGuides(all, 8, 60);
+  if (picked.length === 0) return Decoration.none;
+  const ranges: Range<Decoration>[] = [];
+  for (const g of picked) {
+    if (g.startLine > doc.lines) continue;
+    for (let ln = g.startLine; ln <= Math.min(g.endLine, doc.lines); ln++) {
+      const L = doc.line(ln);
+      ranges.push(
+        Decoration.line({
+          class: "axv-bgl",
+          attributes: {
+            "style": `--bgl-c:${g.col};--bgl-l:${g.endLine - g.startLine + 1};`,
+          },
+        }).range(L.from, L.to),
+      );
+    }
+  }
+  return Decoration.set(ranges, true);
+}
+
+const blockGuidesField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    // 只在 doc 变化时重算；lang==='java' 由调用方通过 compartment 门控（这里总是算，Java/非 Java 都安全，
+    // 非 Java 文件里花括号块少、不会画线）
+    if (!tr.docChanged) return deco;
+    return buildBlockGuidesDeco(tr.state.doc);
   },
   provide: (f) => EditorView.decorations.from(f),
 });
@@ -294,6 +336,9 @@ const cmTheme = EditorView.theme({
     fontSize: "var(--axv-code-font-size, 13px)",
     backgroundColor: "var(--axv-code-bg, var(--axv-surface))",
     color: "var(--axv-code-fg, var(--axv-on-surface))",
+    // M442：纵向标记线尺寸基准（字宽/行高）—— widget 用 calc(列×chw)、高=行×lh
+    "--axv-code-chw": "calc(var(--axv-code-font-size, 13px) * 0.6)",
+    "--axv-code-lh": "21px",
   },
   ".cm-scroller": {
     fontFamily: '"Cascadia Code", "JetBrains Mono", Consolas, monospace',
@@ -401,6 +446,12 @@ const cmTheme = EditorView.theme({
     outline: "1px solid var(--axv-primary)",
   },
   "&.cm-focused": { outline: "none" },
+  // M442：代码块纵向标记线（花括号 begin > end 的缩进参考线）
+  // line 装饰类落在块内每行（.cm-line），box-shadow inset 在「缩进列」画 1px 竖线，
+  // 纵向贯穿全块（top/bottom -2px 让相邻行接上）。
+  ".axv-bgl": {
+    boxShadow: "inset calc(14px + var(--bgl-c, 0) * var(--axv-code-chw, 0.6em) + 0.5px) 0 0 -0.5px var(--axv-code-bgl, rgba(11, 95, 165, 0.25))",
+  },
 });
 
 const cmHl = HighlightStyle.define([
@@ -899,6 +950,63 @@ export function CodeEditor({
     };
   }, [openCtxMenu]);
 
+  /* M442：双指撒合缩放代码编辑框（只缩放编辑器内文字 fontSize，不影响页面框架）
+   * 监听 .axv-cm 上的 pointer 事件：两指按下记录起点距离 + 当前字号，移动时按比例算新字号，
+   * 写进 --axv-code-font-size（cmTheme / fontTheme 都用这个变量 → 文字缩放，布局不变）。
+   * 捏合中 preventDefault 避免页面滚动。 */
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const pointers = new Map<number, { x: number; y: number }>();
+    let startDist = 0;
+    let startFont = CODE_ZOOM_INIT;
+    let pinching = false;
+
+    const curFont = (): number => {
+      const cs = getComputedStyle(host);
+      const v = parseFloat(cs.getPropertyValue("--axv-code-font-size"));
+      return v > 0 ? v : CODE_ZOOM_INIT;
+    };
+    const setFont = (px: number) => {
+      host.style.setProperty("--axv-code-font-size", px + "px");
+    };
+
+    const onDown = (e: PointerEvent) => {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        startDist = pointerDist(a, b);
+        startFont = curFont();
+        pinching = startDist > 24; // 两指足够开才认撒合（避免误触）
+        e.preventDefault();
+      }
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinching && pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        const nd = pointerDist(a, b);
+        setFont(zoomFromPinch(startFont, startDist, nd));
+        e.preventDefault();
+      }
+    };
+    const onUp = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinching = false;
+    };
+    host.addEventListener("pointerdown", onDown);
+    host.addEventListener("pointermove", onMove);
+    host.addEventListener("pointerup", onUp);
+    host.addEventListener("pointercancel", onUp);
+    return () => {
+      host.removeEventListener("pointerdown", onDown);
+      host.removeEventListener("pointermove", onMove);
+      host.removeEventListener("pointerup", onUp);
+      host.removeEventListener("pointercancel", onUp);
+    };
+  }, []);
+
   /* ===== M45:算候选 + 算光标坐标 → 定位弹窗 ===== */
   const refreshSuggest = useCallback(() => {
     const v = viewRef.current;
@@ -1176,6 +1284,8 @@ export function CodeEditor({
         cmTheme,
         fontTheme,
         errLineField,
+        // M442：代码块花括号的纵向标记线（begin > end，多行 {…} 块画一条缩进参考线）
+        blockGuidesField,
         // M202：精确错误装饰（波浪下划线，整行无列号时退回行标色）
         diagField,
         // M45:候选列表开着时抢下方向键/回车/取消,未开时完全透明

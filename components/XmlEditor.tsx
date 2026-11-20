@@ -63,7 +63,7 @@ import { HistoryPanel } from "@/components/HistoryPanel";
 import { repairGeneratedVectors } from "@/lib/xml/icon-vectors";
 import { getIconVectorWysiwyg, looksLikeGlyfVector } from "@/lib/xml/font-glyph";
 import { hasIcon } from "@/lib/xml/icon-vectors";
-import { workspaceLabel, copyTextNative, writeTextNative } from "@/lib/xml/native-save";
+import { workspaceLabel, copyTextNative, writeTextNative, nativeAvailable } from "@/lib/xml/native-save";
 import { yieldToUi } from "@/lib/xml/native-async";
 import { perfMark, perfTimer, heapMB, perfLogPath } from "@/lib/xml/perf-log";
 import { DEFAULT_ICON_URL } from "@/lib/xml/default-icon";
@@ -1849,6 +1849,7 @@ const allDrawableNames = useMemo(() => {
         onClearRuntimeLog={clearRuntimeLogsCb}
         forceView={apkForceView}
         onOpenChange={setDrawerOpen}
+        collapseOnKeyboard={nativeAvailable()}
         insetLeft={isMobile ? undefined : leftOpen ? 320 : 0}
         insetRight={isMobile ? undefined : rightOpen ? 320 : 0}
         statusSlot={

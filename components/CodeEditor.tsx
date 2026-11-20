@@ -15,6 +15,7 @@ import { t as tt } from "@/lib/i18n-src";
 import { diagRanges as calcDiagRanges, type DiagInfo } from "@/lib/xml/diag-deco";
 import { symbolDoc } from "@/lib/xml/java-doc";
 import { codeHint } from "@/lib/xml/diag-hints";
+import { useOutsidePointerdown } from "./use-outside-pointerdown";
 import { Compartment, EditorState, Prec, Range, RangeSet, SelectionRange, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
@@ -641,11 +642,18 @@ export function CodeEditor({
   const longPressTimer = useRef<number | null>(null);
   const longPressPos = useRef<{ x: number; y: number } | null>(null);
   const longPressMoved = useRef(false);
+  /** M437：菜单面板 DOM，用于判断点击是否在面板外（点外面要关掉菜单） */
+  const ctxMenuRef = useRef<HTMLDivElement | null>(null);
 
   const closeCtxMenu = useCallback(() => {
     setCtxMenu(null);
     setCtxDocShow(null);
   }, []);
+
+  /* M437：菜单打开时，点面板外任何地方（编辑器任意位置 / 工具栏 / 页面空白）都关闭菜单。
+   * 关键点（用户明确要求「不影响输入」）：只关闭、不 preventDefault → 点击照常落到目标上，
+   * 光标该移到哪就移到哪。实现抽到 useOutsidePointerdown（M437 可独立单测）。 */
+  useOutsidePointerdown(ctxMenu !== null, ctxMenuRef, closeCtxMenu);
 
   /** 当前选区文本（长按时捕获，避免菜单打开后选区变化） */
   const selectionText = useCallback((): string => {
@@ -1642,6 +1650,7 @@ export function CodeEditor({
         {/* M404：长按/右键弹出菜单（复制/粘贴/剪切/全选/查找/查看文档） */}
         {ctxMenu ? (
           <div
+            ref={ctxMenuRef}
             className="axv-code-ctx"
             role="menu"
             style={{ left: ctxMenu.x, top: ctxMenu.y }}

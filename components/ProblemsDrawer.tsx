@@ -59,9 +59,12 @@ export interface ProblemsDrawerProps {
   forceView?: { open: boolean; tab: DrawerPanel } | null;
   /** M256：抽屉展开/收起时回调，父组件可用它调高度（手机端避免遮住代码区） */
   onOpenChange?: (open: boolean) => void;
+  /** M438：APK 里软键盘弹出时自动收起抽屉（否则键盘把底部抽屉顶到屏中间挡住代码）。
+   *  只在原生壳里传 true（nativeAvailable()）；web 不受影响。 */
+  collapseOnKeyboard?: boolean;
 }
 
-export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, onClearRuntimeLog, statusSlot, insetLeft, insetRight, tr, forceView, onOpenChange }: ProblemsDrawerProps) {
+export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, onClearRuntimeLog, statusSlot, insetLeft, insetRight, tr, forceView, onOpenChange, collapseOnKeyboard }: ProblemsDrawerProps) {
   const [open, setOpenRaw] = useState(false);
   // M256：包装 setter，同步通知父组件（手机端要调代码区高度避免被遮）
   const setOpen = (next: boolean | ((o: boolean) => boolean)) => {
@@ -69,6 +72,34 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, o
     setOpenRaw(v);
     onOpenChange?.(v);
   };
+  /* M438：软键盘弹出 → 自动收起抽屉。两条检测路互补：
+   *   ① visualViewport 缩水 ≥120px（adjustResize 生效时最准）
+   *   ② focusin 命中输入框/contenteditable（adjustPan 下视口不缩也能拦到；
+   *      抽屉内部无输入框，不会误伤抽屉自己的交互）
+   * 只收起、不自动展开 —— 用户手点把手重新打开不受干扰。 */
+  const setOpenKb = useRef(setOpen);
+  setOpenKb.current = setOpen;
+  useEffect(() => {
+    if (!collapseOnKeyboard) return;
+    const collapse = () => setOpenKb.current(false);
+    const onVvResize = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      if (window.innerHeight - vv.height >= 120) collapse();
+    };
+    const onFocusIn = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable || t.hasAttribute("contenteditable")) collapse();
+    };
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", onVvResize);
+    document.addEventListener("focusin", onFocusIn);
+    return () => {
+      vv?.removeEventListener("resize", onVvResize);
+      document.removeEventListener("focusin", onFocusIn);
+    };
+  }, [collapseOnKeyboard]);
   const [tab, setTab] = useState<DrawerPanel>("problems");
   // M252：外部强制查看（打包完成后自动打开到对应 tab）。用一个 ref 记上一次的
   // forceView，变化时同步 open/tab；用户手动操作后会解除锁定。

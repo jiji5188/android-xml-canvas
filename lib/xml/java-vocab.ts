@@ -727,8 +727,10 @@ function subForItem(it: SubItem, docSym: ReturnType<typeof extractDocSymbolTypes
   if (it.kind === "method") {
     const ret = it.ret ?? retTypeOf(docSym, t);
     if (ret) {
-      // `CharSequence (int start, int end) · public`
-      return (it.signature ? `${ret} (${it.signature})` : ret) + modSuffix;
+      // M442/M443：`public (…) · String`（修饰符在前，返回类型最后用 · 连；无签名则 `public · String` / `String`）
+      const sig = it.signature ? " (" + it.signature + ")" : "";
+      const lead = it.mod ? it.mod + sig : sig;
+      return (lead ? lead + " · " : "") + ret;
     }
     if (it.signature !== undefined) return "(" + it.signature + ")" + modSuffix;
     return it.mod || undefined;

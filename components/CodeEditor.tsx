@@ -448,10 +448,9 @@ const cmTheme = EditorView.theme({
     outline: "1px solid var(--axv-primary)",
   },
   "&.cm-focused": { outline: "none" },
-  // M442/M446：代码块纵向标记线（花括号块内的缩进参考线）
-  // 修正（M446）：旧写法用 `box-shadow: inset Xpx 0 0 -0.5px` —— inset 阴影的 offset-x
-  // 会把「从左边缘到 X」整块填色，负 spread 只缩 0.5px，结果是一条宽 X-0.5px 的色带（不是 1px 线）。
-  // 现改为绝对定位 ::before：width:1px + left:calc(14px + 列×字宽)，真正 1px、位置准。
+  // M446/M447：代码块纵向标记线（花括号块内的缩进参考线）
+  // M446：旧写法 box-shadow inset 会把整块填色（宽色带）→ 改 ::before + width:1px。
+  // M447：颜色太淡（alpha 0.35，灰底主题几乎看不见）→ 加深到 0.55，仍可由 --axv-code-bgl 覆盖。
   ".axv-bgl": {
     position: "relative",
     "&::before": {
@@ -461,7 +460,7 @@ const cmTheme = EditorView.theme({
       bottom: "0",
       width: "1px",
       left: "calc(14px + var(--bgl-c, 0) * var(--axv-code-chw, 0.6em))",
-      background: "var(--axv-code-bgl, rgba(11, 95, 165, 0.35))",
+      background: "var(--axv-code-bgl, rgba(11, 95, 165, 0.55))",
       pointerEvents: "none",
     },
   },

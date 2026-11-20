@@ -43,4 +43,13 @@ describe("M446 块标记线必须真 1px", () => {
   it("装饰层每行带 --bgl-c 变量（样式与数据对齐）", () => {
     expect(SRC.includes("--bgl-c:"), "buildBlockGuidesDeco 必须给每行写 --bgl-c").toBe(true);
   });
+
+  it("M447 线颜色不能太淡（alpha ≥ 0.45，否则灰底主题上看不见）", () => {
+    const blk = bglBlock();
+    const m = blk.match(/rgba?\([^)]*?([0-9.]+)\s*\)/);
+    expect(m, ".axv-bgl 找不到 rgba(...) 颜色").toBeTruthy();
+    const nums = (m as RegExpMatchArray)[1];
+    const alpha = Number(nums);
+    expect(alpha, `fallback 颜色 alpha=${alpha} 太淡（M447 用户实测几乎看不见）`).toBeGreaterThanOrEqual(0.45);
+  });
 });

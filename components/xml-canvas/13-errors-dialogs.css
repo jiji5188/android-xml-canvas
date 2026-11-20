@@ -908,3 +908,56 @@
   border-color: var(--axv-primary);
   background: var(--axv-primary-soft, rgba(103,80,164,0.1));
 }
+
+
+/* M445：构建日志错误定位列表（点击 → 打开文件跳行） */
+.axv-drawer-locwrap {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 150px;
+  overflow-y: auto;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+.axv-drawer-locrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 4px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--axv-ink, #222);
+}
+.axv-drawer-locrow:hover { background: var(--axv-primary-soft, rgba(103,80,164,0.1)); }
+.axv-drawer-locfile {
+  font-weight: 600;
+  font-family: var(--axv-mono, ui-monospace, monospace);
+  color: var(--axv-primary, #6750a4);
+  flex: 0 0 auto;
+  max-width: 38%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-drawer-locline {
+  font-family: var(--axv-mono, ui-monospace, monospace);
+  color: var(--axv-err, #d32f2f);
+  flex: 0 0 auto;
+  min-width: 34px;
+}
+.axv-drawer-locmsg {
+  color: var(--axv-ink, #333);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}

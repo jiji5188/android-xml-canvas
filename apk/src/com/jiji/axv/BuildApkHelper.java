@@ -930,6 +930,7 @@ public class BuildApkHelper {
         java.util.LinkedHashMap<String, Integer> missingTypes = new java.util.LinkedHashMap<>();
         int errors = 0, warnings = 0;
         String curFile = null;
+        int curLine = 0; // M445：当前诊断行号
         boolean curIsError = true;
         boolean msgTaken = false;
         for (String l : lines) {
@@ -939,6 +940,7 @@ public class BuildApkHelper {
                 if (curIsError) errors++; else warnings++;
                 String full = m.group(2).replace('\\', '/');
                 curFile = full.substring(full.lastIndexOf('/') + 1);
+                curLine = Integer.parseInt(m.group(3)); // M445：记录当前诊断的行号，输出时带上便于精准定位
                 java.util.LinkedHashMap<String, Integer> bucket = byFile.get(curFile);
                 if (bucket == null) { bucket = new java.util.LinkedHashMap<>(); byFile.put(curFile, bucket); }
                 msgTaken = false;
@@ -989,8 +991,10 @@ public class BuildApkHelper {
             }
             java.util.LinkedHashMap<String, Integer> bucket = byFile.get(curFile);
             if (bucket != null) {
-                Integer old = bucket.get(msg);
-                bucket.put(msg, old == null ? 1 : old + 1);
+                // M445：同文件同行同消息合并；不同行分开（带上行号便于定位）
+                String key = curLine > 0 ? ("L" + curLine + "  " + msg) : msg;
+                Integer old = bucket.get(key);
+                bucket.put(key, old == null ? 1 : old + 1);
             }
         }
         StringBuilder sb = new StringBuilder();

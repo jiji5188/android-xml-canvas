@@ -48,8 +48,10 @@ export function formatJava(src: string, opts: JavaFormatOpts = {}): string {
     // 计算本行「逻辑开始前」的深度（用于缩进）
     const opens = (line.match(/\{/g) || []).length;
     const closes = (line.match(/\}/g) || []).length;
-    // 关闭行的缩进应落在“关闭后”的深度（} 归到父块层级）；其他行用当前深度
-    const indentForLine = closes > 0 && opens === 0 ? Math.max(0, depth - closes) : depth;
+    // 关闭行（含 `} else {` / `} catch {` 这种同行关闭+开块）整行用「关闭后深度」——
+    // `}` 归到父块层级，同行的 else/开块部分也按父级对齐，避免比父级多缩进一级。
+    // 其余行用当前深度。
+    const indentForLine = closes > 0 ? Math.max(0, depth - closes) : depth;
 
     // 更新深度：统计花括号（简化：只看裸 { }）
     if (opens === 0 && closes > 0) depth = Math.max(0, depth - closes);

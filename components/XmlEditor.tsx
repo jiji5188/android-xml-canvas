@@ -246,6 +246,7 @@ import { LeftRail, type LeftView } from "./LeftRail";
 import { LibsPanel } from "./LibsPanel";
 import { ProblemsDrawer } from "./ProblemsDrawer";
 import { useBuildLogs } from "./use-build-logs";
+import { makeOpenFileLine } from "./use-open-file-line";
 import { usePanels } from "./use-panels";
 import { useXmlProjectState } from "./use-xml-project";
 import { useXmlProjectFns } from "./use-xml-project-fns";
@@ -1654,8 +1655,7 @@ const allDrawableNames = useMemo(() => {
   useBackGuard(runOpen, () => setRunOpen(false), "run-preview");
   useBackGuard(histPanelOpen, () => setHistPanelOpen(false), "history-panel");
   useBackGuard(usesPanel !== null, () => setUsesPanel(null), "usages-panel");
-
-
+  const openBuildErrFile = makeOpenFileLine({ activeProject: activeProjectRef.current, openRel, jumpToCodeLine, loadEntry, setExportNote, tt });
 
   return (
     <div
@@ -1843,6 +1843,7 @@ const allDrawableNames = useMemo(() => {
         problems={(lints ?? []).map((l) => ({ line: l.line ?? 1, msg: l.message }))}
         onGotoLine={(ln) => gotoLine(ln)}
         buildLogs={buildLogs}
+        onGotoFileLine={openBuildErrFile}
         runtimeLogs={runtimeLogs}
         onClearRuntimeLog={clearRuntimeLogsCb}
         forceView={apkForceView}

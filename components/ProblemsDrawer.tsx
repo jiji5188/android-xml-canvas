@@ -10,6 +10,45 @@ import { runtimeLogText, type RuntimeLogEntry } from "@/lib/xml/runtime-log";
 
 export type DrawerPanel = "problems" | "build-log" | "runtime";
 
+/**
+ * M445：从构建日志文本里解析「可定位的错误条目」。
+ * native BuildApkHelper.fmtEcjLog 输出形如：
+ *   ● MainActivity.java
+ *       L42  The import com.foo.Bar cannot be resolved（×2）
+ *   ● SecondActivity.java
+ *       L7  未声明的变量: x
+ * 解析出 { file, line, msg }。没有 L 前缀的旧格式 → line=0（仍可展示，不可跳转）。
+ */
+export function parseBuildLogLocs(log: string | undefined | null): Array<{ file: string; line: number; msg: string }> {
+  if (!log) return [];
+  const out: Array<{ file: string; line: number; msg: string }> = [];
+  let curFile = "";
+  for (const raw of log.split(/\n/)) {
+    const l = raw.trim();
+    if (!l) continue;
+    // ● 文件头
+    if (/^●\s+(.+)$/.test(l)) {
+      curFile = l.replace(/^●\s+/, "").trim();
+      continue;
+    }
+    // 缺依赖/缺类/缺资源提示段（非定位条目，跳过）——已 trim，不再带前导空格（i18n-ignore：解析模式非文案）
+    if (/^缺依赖提示|^缺类提示|^缺资源提示|^ECJ 结果|^需手动|^放进 libs|^（内置|^- |^…|^（/.test(l)) continue; // i18n-ignore
+    // L{line}  消息（可能带 （×N））
+    const m = l.match(/^L(\d+)\s{1,4}(\S.*)$/);
+    if (m && curFile) {
+      let msg = m[2].replace(/\s*（×\d+）\s*$/, "");
+      out.push({ file: curFile, line: parseInt(m[1], 10), msg });
+      continue;
+    }
+    // 无 L 前缀的错误消息（旧格式 / warning）
+    if (curFile && !/^- |^…|^（/.test(l)) {
+      out.push({ file: curFile, line: 0, msg: l.replace(/\s*（×\d+）\s*$/, "") });
+    }
+  }
+  // 只保留有定位价值的（错误条目），上限 40
+  return out.slice(0, 40);
+}
+
 interface DrawerTabDef {
   key: DrawerPanel;
   label: string;
@@ -45,6 +84,8 @@ export interface ProblemsDrawerProps {
   onGotoLine: (line: number) => void;
   /** M191：构建日志列表（新在前）；没有就不显示小点 */
   buildLogs?: BuildLogEntry[];
+  /** M445：点击构建日志里的错误定位（文件:行）→ 打开该文件并跳到行。传了就渲染可点击定位列表 */
+  onGotoFileLine?: (rel: string, line: number) => void;
   /** M288：被打出来的 App 通过广播发过来的运行日志 */
   runtimeLogs?: RuntimeLogEntry[];
   /** M288：清空运行日志 */
@@ -67,7 +108,7 @@ export interface ProblemsDrawerProps {
   hideOnKeyboard?: boolean;
 }
 
-export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, onClearRuntimeLog, statusSlot, insetLeft, insetRight, tr, forceView, onOpenChange, hideOnKeyboard }: ProblemsDrawerProps) {
+export function ProblemsDrawer({ problems, onGotoLine, buildLogs, onGotoFileLine, runtimeLogs, onClearRuntimeLog, statusSlot, insetLeft, insetRight, tr, forceView, onOpenChange, hideOnKeyboard }: ProblemsDrawerProps) {
   const [open, setOpenRaw] = useState(false);
   // M256：包装 setter，同步通知父组件（手机端要调代码区高度避免被遮）
   const setOpen = (next: boolean | ((o: boolean) => boolean)) => {
@@ -360,6 +401,27 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, o
                         {tr("drawer.log.copy", "复制")}
                       </button>
                     </summary>
+                    {onGotoFileLine ? (() => {
+                      const locs = parseBuildLogLocs(l.log);
+                      return locs.length > 0 ? (
+                        <ul className="axv-drawer-locwrap" aria-label={tr("drawer.log.locs", "错误定位")}>
+                          {locs.map((it, k) => (
+                            <li key={k}>
+                              <button
+                                type="button"
+                                className="axv-drawer-locrow"
+                                onClick={() => onGotoFileLine(it.file, it.line)}
+                                title={it.line > 0 ? tr("drawer.log.locrow.hint", "点击打开文件并跳到该行") : ""}
+                              >
+                                <span className="axv-drawer-locfile">{it.file}</span>
+                                <span className="axv-drawer-locline">{it.line > 0 ? "L" + it.line : ""}</span>
+                                <span className="axv-drawer-locmsg">{it.msg}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null;
+                    })() : null}
                     <pre className="axv-drawer-log">{l.log || l.logFile || tr("drawer.log.none", "本次没有输出日志")}</pre>
                   </details>
                 ))}

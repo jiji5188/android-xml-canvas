@@ -1,71 +1,224 @@
 Manifest-Version: 1.0
 
 Name: AndroidManifest.xml
-SHA-256-Digest: G3retVktTpOZdX6pqy5rN6wFPwH9/IDplRi76FhIoZk=
+SHA-256-Digest: vwukkNvT7nzb0hM3jRJbHyf0qj2zOvkLHJL8CA8iAg0=
+
+Name: assets/androidx/activity-1.0.0.aar
+SHA-256-Digest: fwhyPsq++6YW1gxxSw6aMTAb1NB5L8x5RsFHnFf9LSg=
+
+Name: assets/androidx/androidx-preview.bin.gz
+SHA-256-Digest: y3vXXgw+hWycEQZWFcODVMcofmcMPQZHq8pYZjp8roU=
+
+Name: assets/androidx/annotation-experimental-1.0.0.jar
+SHA-256-Digest: C6rpdV98r1KqgM0EMkuRupOvVdTR0X3MmntT2Z73wBY=
+
+Name: assets/androidx/appcompat-1.0.0.jar
+SHA-256-Digest: NNFUqSZqki+seTxi1bMnFwRH2x33qH8ONeTv/Z7ZpXo=
+
+Name: assets/androidx/asynclayoutinflater-1.0.0.jar
+SHA-256-Digest: NtYYRrcpt4GZl5HTcP8v7nLmK3MlYg/NjAAxuhdjWlc=
+
+Name: assets/androidx/cardview-1.0.0.jar
+SHA-256-Digest: /vHZJ/ZnCRkBlL55QCEjivJl3EG8FyHNBNhfJVblqJw=
+
+Name: assets/androidx/collection-1.0.0.jar
+SHA-256-Digest: nI0Re1wrwSChzf64V+BbSVsWw2ATVwNypwj3gn46yfk=
+
+Name: assets/androidx/constraintlayout-1.0.0.aar
+SHA-256-Digest: DfcUwLUeVHEOv3RutGnTMxdruzyyn4B3XcPKTrMWJRI=
+
+Name: assets/androidx/coordinatorlayout-1.0.0.jar
+SHA-256-Digest: xMRdBbdVm+oJujE+51n+J18GXsralgJ7zWq4WxPx4QU=
+
+Name: assets/androidx/core-1.0.0.jar
+SHA-256-Digest: wj1UPgsai0J7jVyA2yDF9q5cOnsdSF3JV7tyjxCh9po=
+
+Name: assets/androidx/cursoradapter-1.0.0.jar
+SHA-256-Digest: +ZvH4WK/+qYnOXNgbky4n9IcfNlftPWjPHLuiTm9fTE=
+
+Name: assets/androidx/customview-1.0.0.jar
+SHA-256-Digest: MZ+QTV7kufqdTwdV/MhUmg3ZpXZRBkjj4xr+EMLPj8A=
+
+Name: assets/androidx/documentfile-1.0.0.jar
+SHA-256-Digest: l2yGYyY/T631hKfTmlUE2bzGDoVXM/Jf1OywedeN4gY=
+
+Name: assets/androidx/drawerlayout-1.0.0.jar
+SHA-256-Digest: K07gs/lHomBbq7v59qM02zvOxKcvgRoJfvT7zXLrDOc=
+
+Name: assets/androidx/exifinterface-1.0.0.aar
+SHA-256-Digest: mWgUmEyzPZCSEGTIZ9CsQd/6EKEEitplKIHCEyZgI5c=
+
+Name: assets/androidx/fragment-1.0.0.jar
+SHA-256-Digest: SpYwy9v1mdO2kCZM1tRDPsgWGeqi3oxXbooQf3lwd1A=
+
+Name: assets/androidx/interpolator-1.0.0.jar
+SHA-256-Digest: BB1l6FZkRbl6KudBInzgWrZ4PHg6g+b7Fz2KvJ6r1Vs=
+
+Name: assets/androidx/legacy-support-core-utils-1.0.0.jar
+SHA-256-Digest: +c7wFs4YGc8mRtAi1nvcchHG5g1fyPOZ25RLAmkWVC4=
+
+Name: assets/androidx/lifecycle-livedata-2.0.0.jar
+SHA-256-Digest: SyeLeE0HGKM8Z38Y6f9QsETsAymi4dXZ+Tptio9vx2c=
+
+Name: assets/androidx/lifecycle-livedata-core-2.0.0.jar
+SHA-256-Digest: UKRFT0H8DiP4xylxDusL9I1Cf8G8DBMTlu1iQUCVJ4U=
+
+Name: assets/androidx/lifecycle-runtime-2.0.0.jar
+SHA-256-Digest: FOwx8rX40+sdsftmQDXj7kS3+PP6kcBytszEHNR4sd8=
+
+Name: assets/androidx/lifecycle-service-2.0.0.jar
+SHA-256-Digest: e616GIgErepvofNdXvmbcF8gvZPsrd5IR2D/hrU1/vw=
+
+Name: assets/androidx/lifecycle-viewmodel-2.0.0.jar
+SHA-256-Digest: +zSln6MfODHpOg0+nPgsLyie4/8873GFo8ekIcvMRxo=
+
+Name: assets/androidx/loader-1.0.0.jar
+SHA-256-Digest: H3Wzy3liE2LDua26fT+Y64HM7DyeCSe+27l1dcVTd1E=
+
+Name: assets/androidx/localbroadcastmanager-1.0.0.jar
+SHA-256-Digest: DvFRtBkXNIeN7In3wqCI+eCwAiyyqSrMMzFTnnfrH/M=
+
+Name: assets/androidx/percentlayout-1.0.0.jar
+SHA-256-Digest: 0lLoFYFv0tpUHqn4ghNnsaoAdpEe0DC9wGSoedaq7nE=
+
+Name: assets/androidx/print-1.0.0.jar
+SHA-256-Digest: W/0JN9/KPnulIqmW030OPsUUrIKaETHeXo1KollDYfk=
+
+Name: assets/androidx/recyclerview-1.0.0.jar
+SHA-256-Digest: auxFFw0pCoQ0d/qkbGXEYifpMit36v18Bv1YD3Kfrj0=
+
+Name: assets/androidx/savedstate-1.0.0.aar
+SHA-256-Digest: IafUvPa9uUrXuSg4AVKTALT7uICMpPGR4M3Ob9jkcFo=
+
+Name: assets/androidx/swiperefreshlayout-1.0.0.jar
+SHA-256-Digest: DF27d2k36x1j6ExSC6zLRlwnzR1zI5MtWRop6O2VAmw=
+
+Name: assets/androidx/transition-1.0.0.jar
+SHA-256-Digest: HDaKFAm4sofmDonaX1sAqpY3Lj+CnPOMfkI+gDGnIB8=
+
+Name: assets/androidx/vectordrawable-1.0.0.jar
+SHA-256-Digest: DmvaycCHAwlAfddpca1yIbMlmlwI344lVx6QlZ3EVSk=
+
+Name: assets/androidx/viewpager-1.0.0.jar
+SHA-256-Digest: FPdCnP+fL1BCGjayN6HeNdiiyN7/y+HgFjxuUaLe/lY=
+
+Name: assets/androidx/viewpager2-1.0.0.aar
+SHA-256-Digest: 6VwAMdTMJHzUgZbGKH5Y0s7lTZx5uFr+p8kJIDMCda8=
+
+Name: assets/apksig/signer.bin.gz
+SHA-256-Digest: WcdoizF6yQJ6m7vtWCRf9NOItc4hPtM+ewW9yuh+SEs=
+
+Name: assets/compiler/android.jar.gz
+SHA-256-Digest: KWeq7ugNibatIqD20bu17RQCMCa31xWVjL+LZ0qX6cE=
+
+Name: assets/compiler/manifest.json
+SHA-256-Digest: mlFNAtO7R+k8b2OpoRj8YtkOv2JrYD1hrLqOKCHrqp4=
+
+Name: assets/compiler/msgs.bin.gz
+SHA-256-Digest: 6374FWjRcHpDci8Ldlb7OTssykkODjBrOJBgBFTLqyA=
+
+Name: assets/compiler/tool1.bin.gz
+SHA-256-Digest: mvtZ6TOVlAoS1SnXoUB4a2VD+ROL9vuqBaxq2AGG414=
+
+Name: assets/compiler/tool2.bin.gz
+SHA-256-Digest: CXVJyGr0voDjBg6khEY0eBYO9ktkpTWNG4sbsk7iqhk=
+
+Name: assets/fw/framework-res-stub.apk.gz
+SHA-256-Digest: NNyh2LVyuLJWSQHyu31KlquFtHDUZ/HU7Kq1Nr09QlE=
+
+Name: assets/shell/shell.bin.gz
+SHA-256-Digest: 5njVHLh19L91XeUrEAP1G4/nittC9XtbwPwt14LMEAQ=
 
 Name: assets/www/.nojekyll
 SHA-256-Digest: 47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
 
 Name: assets/www/404.html
-SHA-256-Digest: tZMua5N7d+KH0gVJ9itbkVZPZCH4HzDiSKX1hLsEv6o=
+SHA-256-Digest: r2qDV7wwu0vvAWsnwGsmss0ML443+/ODLXrxC8ICD8c=
 
 Name: assets/www/404/index.html
-SHA-256-Digest: tZMua5N7d+KH0gVJ9itbkVZPZCH4HzDiSKX1hLsEv6o=
+SHA-256-Digest: r2qDV7wwu0vvAWsnwGsmss0ML443+/ODLXrxC8ICD8c=
 
 Name: assets/www/__next.__PAGE__.txt
-SHA-256-Digest: /gNGLBJ/eQG4f4GLN8Q312DEA+NxbUr8wqwolYaVkSI=
+SHA-256-Digest: rL52e6zHLIT1EH4OmaoRBxkBk12n0N9bMiloy5eAiXs=
 
 Name: assets/www/__next._full.txt
-SHA-256-Digest: W7DmGmlaCE/kG14Mr8Q/5l0Cqe8Jjij6IHbG+PA8P4o=
+SHA-256-Digest: fhD+j/ZJwY4lsGurPNssdt93Bnw3p8i8EtwX//qo6Qo=
 
 Name: assets/www/__next._tree.txt
-SHA-256-Digest: n4juuhRyvwk8SlCPUAyyUGtrn5v63oixQtU+GP2kCf4=
+SHA-256-Digest: QBg9kB+2xAnRf6dYFJZCO1+eZfqSSxng2seAy67YPCU=
 
-Name: assets/www/_next/static/HE3IlcgDHWFlvGalsfwUy/_buildManifest.js
+Name: assets/www/_next/static/YgiG2mJ6wH9jnIbC9nKP6/_buildManifest.js
 SHA-256-Digest: lHbgr9P52mimTm7FhjEZH9PqymLJ9aN351F/6aieWeo=
 
-Name: assets/www/_next/static/HE3IlcgDHWFlvGalsfwUy/_clientMiddlewareM
+Name: assets/www/_next/static/YgiG2mJ6wH9jnIbC9nKP6/_clientMiddlewareM
  anifest.js
 SHA-256-Digest: VIPjKV3DXf4p6pMu/IU0HJFvEP94/1sOll4ANxCJOko=
 
-Name: assets/www/_next/static/HE3IlcgDHWFlvGalsfwUy/_ssgManifest.js
+Name: assets/www/_next/static/YgiG2mJ6wH9jnIbC9nKP6/_ssgManifest.js
 SHA-256-Digest: Z49s4suAsf5y/GfnQSvm4qtq2ggxEbZPfEDTXjy6XgA=
+
+Name: assets/www/_next/static/chunks/07tw_951fh6k6.js
+SHA-256-Digest: DVhN+sSycqE1btwTtUJYyOYG1wDuzbGX4T9uhRJGAQw=
+
+Name: assets/www/_next/static/chunks/09tek0th10p7t.css
+SHA-256-Digest: RAQXXJ8phNu3sTvuzHENqKld/VjDfS3AutalqQ0rxxY=
 
 Name: assets/www/_next/static/chunks/0cz1d0mv5g_q7.js
 SHA-256-Digest: CXPB1kyIrcjjyVBBDLWLKI9yEY1ZZbeASUON648vloM=
 
-Name: assets/www/_next/static/chunks/0umf92h1sb77c.js
-SHA-256-Digest: xBDQ8lQ+CAdo/BT3OyvR/fED4mlW6XMDkLXkHE+1/4s=
+Name: assets/www/_next/static/chunks/0hhb7vbvlw3bd.js
+SHA-256-Digest: 3Wdr3XydiWVP5ps8nXZ66K8z11ApykYUdIjK4GQgHGw=
 
-Name: assets/www/_next/static/chunks/13m-p47tta5dn.js
-SHA-256-Digest: HkZN1sd5fpP6suBIVF2SzJK8HQAOAe+bkiWEYUrxBog=
+Name: assets/www/_next/static/chunks/0jtyhkyg1265a.js
+SHA-256-Digest: jmyzvFOJClsyC2s0oThhHUoMx/jbirhMTGqL49xi5fA=
 
-Name: assets/www/_next/static/chunks/19wg2q9r2_sev.js
-SHA-256-Digest: MD7el2Ee+5iAB5VLGp1ZBE3sTm9A69iKXb8ICovH/ro=
+Name: assets/www/_next/static/chunks/0l05_htmex06l.js
+SHA-256-Digest: LUacMWj5On+Cj85apTq7dS4+q9qSOHGwmCHvlyheAxU=
 
-Name: assets/www/_next/static/chunks/1c0mhc5ebbn3y.js
-SHA-256-Digest: eADJrieybgu1oOdIZ9nK7LQ3Y+CrviNjeDNaDwGbkVE=
+Name: assets/www/_next/static/chunks/0wfurka9errm3.js
+SHA-256-Digest: VX4hc+52Bp39V3JDMfwJ9MEBptH6Yg+OGUK2AJ7k38o=
 
-Name: assets/www/_next/static/chunks/26w0rfem0_m0n.css
-SHA-256-Digest: yPU8d92Rc3RZxcK6Z4EdVIkSOz/V2HN3cPIAJYCJQ+0=
+Name: assets/www/_next/static/chunks/10n0tzkopdki_.js
+SHA-256-Digest: SGiGq5O5AxopMsBi+0aJtF0Oez02MmfoKg+zlBAa4xA=
 
-Name: assets/www/_next/static/chunks/2khxl0v1q4i6n.js
-SHA-256-Digest: iF/WihnKHcAAGMrmkLB81GM3GkY/BPizS1WQo/7BijM=
+Name: assets/www/_next/static/chunks/13_gwplpk4o27.js
+SHA-256-Digest: pTq4vj6y0Xrj+QsgBZ8IgnX5ou4QdCN5ZvE72d2ygcY=
 
-Name: assets/www/_next/static/chunks/2le17i3icx5s4.js
-SHA-256-Digest: UAGKmUaSoDKiPcCsYaaanwfd62OktW2zIvkVDIJK3bs=
+Name: assets/www/_next/static/chunks/1cf_d-w52sbw1.js
+SHA-256-Digest: vpbONlDHHHAnz159Gq4MkBp/ecF86Z8pcFhB8E04jo4=
 
-Name: assets/www/_next/static/chunks/2odrw9bciaeid.css
-SHA-256-Digest: qY1EhKgfxDSoSrZudNMgCfyCNftDDhTg+xuGThiQiWg=
+Name: assets/www/_next/static/chunks/1e9x40rqk22fx.js
+SHA-256-Digest: gAAFt0HwhCBtdidm7Ngu67Kl4R9zT+sQUM9gPLS0jy4=
+
+Name: assets/www/_next/static/chunks/1kvejhxbi4u7g.js
+SHA-256-Digest: YD2+b7bqzsyLCQkXFj0xqjQayh3lsxehMYkGQkolarM=
+
+Name: assets/www/_next/static/chunks/26mbzvzlfst6h.js
+SHA-256-Digest: y3A6g1LHNxB4A/qM4kz7LVYFmDI6Vh/DlSIG5pDmInc=
+
+Name: assets/www/_next/static/chunks/2hvu86fc4pqak.js
+SHA-256-Digest: YcEPrSOj4OqWEI+oT+gwrYW80rIuXE2rPLSYza33Sg8=
+
+Name: assets/www/_next/static/chunks/2q6sp_k3ium5t.js
+SHA-256-Digest: 1OHUazmwYgFhxtmeQ6FWggY0r8Amb7AbfGtLzgSHWVA=
+
+Name: assets/www/_next/static/chunks/342_6xq4aiezb.css
+SHA-256-Digest: bLg6BlKv7v0owD2PlcAwVKMzk09imLdy6Y9znLJUxEw=
 
 Name: assets/www/_next/static/chunks/3831x1zqu8hf9.js
 SHA-256-Digest: TyyY1UQnRUnmzkTVrjMlzHQZERR8JYyp2A76tWVQL6Q=
 
-Name: assets/www/_next/static/chunks/3fuuprnqquc9m.js
-SHA-256-Digest: 7Tibl8MuYGYnPw+txy8V97w5cbSdrUm8VpzJiUUfyT4=
+Name: assets/www/_next/static/chunks/39_j1bdzreq0m.js
+SHA-256-Digest: oMt6SlP70B2h6kxTfVbgbrzvnT/dbnnLeySAnHC0H4I=
 
-Name: assets/www/_next/static/chunks/turbopack-3-ry682tkyiqk.js
-SHA-256-Digest: i7tYy/1GM8HYKMa8N7wyq8dooUnAGx38T1Ex/YEnRVE=
+Name: assets/www/_next/static/chunks/3qfy96eoyh-ek.js
+SHA-256-Digest: DxPuzHVwL6BZ8EdjbPiBSsu3rK83AuddWDXvhaSVKLE=
+
+Name: assets/www/_next/static/chunks/3ua5g22pvbv6v.js
+SHA-256-Digest: +g7GrPfXtZMXoKVSGxSI+3CHkAvEcwAfERFdevZ7Yvg=
+
+Name: assets/www/_next/static/chunks/turbopack-2u1d16houkiyo.js
+SHA-256-Digest: Q5vn8HXWm79RDOygnLwIVpVr5vEmj0CUiiVmFI4T3gc=
 
 Name: assets/www/_next/static/media/apple-icon.31dut5udfppxl.png
 SHA-256-Digest: KZilpA0xu67BkKPGZ7AbYatUHiUc63iQzZCYHEfrbvo=
@@ -77,19 +230,19 @@ Name: assets/www/_next/static/media/icon.0y-g__g6r5sdd.svg
 SHA-256-Digest: w5rkhtAVCLJMnOqnZQXdyXQ62YdtWFoBNsRZguHpiUY=
 
 Name: assets/www/_not-found/__next._full.txt
-SHA-256-Digest: 0BWm4hM2mQDU5+ANzUcAtyZ0wd0a1YbQAFMmuFCr0aY=
+SHA-256-Digest: LYk+qljR/z2Qf2wTkkPZrQkJJ5tc7eDatce8dlMhB+s=
 
 Name: assets/www/_not-found/__next._not-found/__PAGE__.txt
-SHA-256-Digest: ur3JtDiE/nBB+h4ZOm49dgAwTHThJTyosTj567zY2p4=
+SHA-256-Digest: gefwLEEvvG90/wSNc8i1aIz57H4amFGh/rBTjxpmrlI=
 
 Name: assets/www/_not-found/__next._tree.txt
-SHA-256-Digest: FoEXY5i5gTZ0DOf9c+v6aBzZqn5HkgPPjEEyUfWyheA=
+SHA-256-Digest: 6S9Q7gkM297rAhX979W8nhPJoF9oRPKvUF1Rc3bHw60=
 
 Name: assets/www/_not-found/index.html
-SHA-256-Digest: tZMua5N7d+KH0gVJ9itbkVZPZCH4HzDiSKX1hLsEv6o=
+SHA-256-Digest: r2qDV7wwu0vvAWsnwGsmss0ML443+/ODLXrxC8ICD8c=
 
 Name: assets/www/_not-found/index.txt
-SHA-256-Digest: 0BWm4hM2mQDU5+ANzUcAtyZ0wd0a1YbQAFMmuFCr0aY=
+SHA-256-Digest: LYk+qljR/z2Qf2wTkkPZrQkJJ5tc7eDatce8dlMhB+s=
 
 Name: assets/www/agent.md
 SHA-256-Digest: hW4IlRdAdJnMZvTNoIeJ+4my3lCXIi1nPChQ2cB3cak=
@@ -113,10 +266,10 @@ Name: assets/www/icons/icon-512.png
 SHA-256-Digest: j2XwCviH4LjM57ZgBvz8mqN18OauaYa4Mqw8rH/FkGo=
 
 Name: assets/www/index.html
-SHA-256-Digest: CPfV6bhEKMbHeuVZvGumfHDeJqqW45ug+ZkRyh9wE6w=
+SHA-256-Digest: y/ZRuP8/UtodVLH8wSfrNALewa8rCV/XhVX5V1v0SKE=
 
 Name: assets/www/index.txt
-SHA-256-Digest: W7DmGmlaCE/kG14Mr8Q/5l0Cqe8Jjij6IHbG+PA8P4o=
+SHA-256-Digest: fhD+j/ZJwY4lsGurPNssdt93Bnw3p8i8EtwX//qo6Qo=
 
 Name: assets/www/logo-preview.png
 SHA-256-Digest: oVE4TUWvoDvfTuq3VX4zvH/s6oRnG8xa+ldIaQBxcUE=
@@ -148,26 +301,35 @@ SHA-256-Digest: 8m7Jg/clqL419CegShBHNKqQ1LaGMRX831cnjp7j65g=
 Name: assets/www/og.png
 SHA-256-Digest: qQTuE7eaJraRXcD8UBEuVSekYijSjwYqDjJ4RLJ3Ac8=
 
+Name: assets/www/preview-res.apk
+SHA-256-Digest: fPTkBZlN4p7Od8+gr6Rlu7zTp10kM3zzVE+AYNlNrHo=
+
 Name: assets/www/samples/all-widgets.xml
 SHA-256-Digest: oVRPxDPha7+y1PeWO+60ufd8g6Q9g/tdIVx6oQuPClE=
 
+Name: assets/www/sdk-api-index.json
+SHA-256-Digest: xZtOv6205F69DC6uqcxLnGPVd4yP1udqOYIVngkLiEY=
+
 Name: assets/www/xml/__next._full.txt
-SHA-256-Digest: su+hg3WszCb+a4eg8mC1KjaTp2agjPDRfBKpSotwxro=
+SHA-256-Digest: hnq025o9Uy8dJyjs0jhLY7Jl2nbhyQ6D3c7K18akrNQ=
 
 Name: assets/www/xml/__next._tree.txt
-SHA-256-Digest: 2RESF/SIEyoHHR7O70QDlXpstjSBsbxg91cp/NPubDY=
+SHA-256-Digest: oebC4BdrZ7ERKPzDRkXoaiTKcWPZku0O8Y5395Zwcvo=
 
 Name: assets/www/xml/__next.xml/__PAGE__.txt
-SHA-256-Digest: tbvJ9eafPpVAduZYOoAvCvyVn+ZlpTABP8uJ/0ZRr+w=
+SHA-256-Digest: ya2RlRntcw2X5VNvwILsDdIKQZFTLu+DFjms9z/+XHM=
 
 Name: assets/www/xml/index.html
-SHA-256-Digest: eC6B1d19vv6ByxiYbqg1VGG40s9HQsFeiVhkPRx5Ylg=
+SHA-256-Digest: rPdz6ZvYD5mVlMdLnRHrA24ikxZgG6xnW7TTAHeYhA0=
 
 Name: assets/www/xml/index.txt
-SHA-256-Digest: su+hg3WszCb+a4eg8mC1KjaTp2agjPDRfBKpSotwxro=
+SHA-256-Digest: hnq025o9Uy8dJyjs0jhLY7Jl2nbhyQ6D3c7K18akrNQ=
 
 Name: classes.dex
-SHA-256-Digest: IR/zK6x43ntZDYeBVOn81/Q+sat0YMqgLfETPLFXcxM=
+SHA-256-Digest: XvV0NJc6b+s5um+SDqpwAwVAAK+mHLUJ9X9ytXBVzsA=
+
+Name: lib/arm64-v8a/libaapt2.so
+SHA-256-Digest: vizqYYFGePep5hv4GKZmbmCXp9Z9bBlJik16ppC8QVE=
 
 Name: res/drawable/ic_launcher.xml
 SHA-256-Digest: qES4EEe2TIyFI3ttEG9N1wmAg4Y5mjx3Sjzub3LBJl4=

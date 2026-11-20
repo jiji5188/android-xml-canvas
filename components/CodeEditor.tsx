@@ -164,13 +164,22 @@ const errLineField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-/* ===== M442：代码块花括号的「纵向标记线」（begin > end）=====
- *  多行 {…} 块 → 在「块内每行」放一个 mark 装饰（.axv-bgl），CSS ::before 画 1px 竖线。
- *  竖线横向位置 = 缩进列 × 字宽；块内每行都画，视觉上连成一条纵向参考线（begin > end）。
- *  用 mark + CSS 而非 Widget（@codemirror/view 该版本不导出 Widget）。
+/* ===== M442/M446/M448：代码块花括号的「纵向标记线」（begin > end）=====
+ *  多行 {…} 块 → 在「块的起始行」放一个 line 装饰（.axv-bgl），
+ *  CSS ::before 画一条 1px 竖线，高度 = 块行数 × 行高 —— 一条元素贯穿整个块，
+ *  视觉上就是「从 { 那行一直到 } 那行」的一对线，不会在行边界断开（M448：旧版
+ *  每行一段 ::before，行间亚像素缝隙让用户看到「断线」）。
+ *  竖线横向位置 = 缩进列 × 字宽；按深度写 --bgl-d，CSS/JS 用深度调透明度，
+ *  嵌套越深越淡，不同层级一眼可分（M448 用户要求）。
  *  Java 文件启用（XML 无花括号块语义，不会画线）；渲染条数按深度 + 总数截断，避免满屏。 */
 
-/** 把跨行花括号块算成 CodeMirror 装饰：块内每行一个 line 装饰（class axv-bgl，带 CSS 变量）
+/** M448：按深度算竖线透明度 —— 外层深、内层淡，最低 0.18 保证最内层也看得见 */
+export function blockGuideAlpha(depth: number): number {
+  return Math.max(0.18, 0.55 - 0.13 * (depth - 1));
+}
+
+/** 把跨行花括号块算成 CodeMirror 装饰：每个块只在「起始行」放一个 line 装饰
+ *  （class axv-bgl，带 CSS 变量 --bgl-c 列号 / --bgl-l 行数 / --bgl-d 深度 / --bgl-a 透明度）
  *  ⚠️ line 装饰必须用单点 .range(L.from)（零长度），传 (from,to) 会抛
  *     "Line decoration ranges must be zero-length" → 每次输入事务失败 → 输不了文字（M442 踩过） */
 export function buildBlockGuidesDeco(doc: { lines: number; line(n: number): { from: number; to: number }; toString(): string }): DecorationSet {
@@ -180,17 +189,16 @@ export function buildBlockGuidesDeco(doc: { lines: number; line(n: number): { fr
   const ranges: Range<Decoration>[] = [];
   for (const g of picked) {
     if (g.startLine > doc.lines) continue;
-    for (let ln = g.startLine; ln <= Math.min(g.endLine, doc.lines); ln++) {
-      const L = doc.line(ln);
-      ranges.push(
-        Decoration.line({
-          class: "axv-bgl",
-          attributes: {
-            "style": `--bgl-c:${g.col};--bgl-l:${g.endLine - g.startLine + 1};`,
-          },
-        }).range(L.from),
-      );
-    }
+    const L = doc.line(g.startLine);
+    const n = Math.min(g.endLine, doc.lines) - g.startLine + 1;
+    ranges.push(
+      Decoration.line({
+        class: "axv-bgl",
+        attributes: {
+          "style": `--bgl-c:${g.col};--bgl-l:${n};--bgl-d:${g.depth};--bgl-a:${blockGuideAlpha(g.depth).toFixed(2)};`,
+        },
+      }).range(L.from),
+    );
   }
   return Decoration.set(ranges, true);
 }
@@ -448,20 +456,24 @@ const cmTheme = EditorView.theme({
     outline: "1px solid var(--axv-primary)",
   },
   "&.cm-focused": { outline: "none" },
-  // M446/M447：代码块纵向标记线（花括号块内的缩进参考线）
+  // M442/M446/M448：代码块纵向标记线（花括号块内的缩进参考线）
   // M446：旧写法 box-shadow inset 会把整块填色（宽色带）→ 改 ::before + width:1px。
-  // M447：颜色太淡（alpha 0.35，灰底主题几乎看不见）→ 加深到 0.55，仍可由 --axv-code-bgl 覆盖。
+  // M447：颜色太淡（alpha 0.35）→ 加深。
+  // M448：装饰从「块内每行一段」改成「每块一段、在起始行画高度=行数×行高的一条线」——
+  //       旧写法在行边界有亚像素缝隙，用户看到「断线」；现在一条元素贯穿 {→} 整块，
+  //       且按深度 --bgl-d 调透明度（外层 0.55 / 内层递减，最深 0.18），不同层级可区分。
   ".axv-bgl": {
     position: "relative",
     "&::before": {
       content: '""',
       position: "absolute",
       top: "0",
-      bottom: "0",
+      height: "calc(var(--bgl-l, 1) * var(--axv-code-lh, 21px))",
       width: "1px",
       left: "calc(14px + var(--bgl-c, 0) * var(--axv-code-chw, 0.6em))",
-      background: "var(--axv-code-bgl, rgba(11, 95, 165, 0.55))",
+      background: "var(--axv-code-bgl, rgb(11 95 165 / var(--bgl-a, 0.55)))",
       pointerEvents: "none",
+      zIndex: "1",
     },
   },
 });

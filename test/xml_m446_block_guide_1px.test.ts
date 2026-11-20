@@ -44,12 +44,12 @@ describe("M446 块标记线必须真 1px", () => {
     expect(SRC.includes("--bgl-c:"), "buildBlockGuidesDeco 必须给每行写 --bgl-c").toBe(true);
   });
 
-  it("M447 线颜色不能太淡（alpha ≥ 0.45，否则灰底主题上看不见）", () => {
+  it("M447 线颜色不能太淡（最外层 alpha ≥ 0.45；M448 起按深度递减）", () => {
     const blk = bglBlock();
     const m = blk.match(/rgba?\([^)]*?([0-9.]+)\s*\)/);
-    expect(m, ".axv-bgl 找不到 rgba(...) 颜色").toBeTruthy();
-    const nums = (m as RegExpMatchArray)[1];
-    const alpha = Number(nums);
-    expect(alpha, `fallback 颜色 alpha=${alpha} 太淡（M447 用户实测几乎看不见）`).toBeGreaterThanOrEqual(0.45);
+    expect(m, ".axv-bgl 找不到 rgba/rgb(...) 颜色").toBeTruthy();
+    const alpha = Number((m as RegExpMatchArray)[1]);
+    // M448：颜色改用 rgb(11 95 165 / var(--bgl-a, 0.55))，最外层 0.55（M447 定档）
+    expect(alpha, `最外层 fallback alpha=${alpha} 太淡（M447 用户实测几乎看不见）`).toBeGreaterThanOrEqual(0.45);
   });
 });

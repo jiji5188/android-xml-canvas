@@ -7,6 +7,25 @@ import { parseShapeDrawable } from "./shape";
 import { androidColorToCss } from "./color-argb";
 import { vectorToDataUrl } from "./vector-svg";
 
+/** M457：资源表核心字段防御——部分解析的表（如只上传了 styles/drawable 没解析 values）
+ *  里 colors/strings/dimens 等可能是 undefined，直接下标访问会抛异常 → 整棵渲染树崩
+ *  （运行调试白屏）。统一在这里归一成 Record，下游 resolveSize/resolveColor/resolveText 全部免疫。 */
+function safeRecords(res: ResourceTable): Record<string, Record<string, unknown> | undefined> {
+  return {
+    colors: res.colors ?? {},
+    strings: res.strings ?? {},
+    dimens: res.dimens ?? {},
+    colorsNight: res.colorsNight ?? {},
+    themeAttrs: res.themeAttrs ?? {},
+    themeAttrsNight: res.themeAttrsNight ?? {},
+    stringArrays: res.stringArrays ?? {},
+    styles: res.styles ?? {},
+    drawableXml: res.drawableXml ?? {},
+    drawables: res.drawables ?? {},
+    stringsByLocale: res.stringsByLocale ?? {},
+  };
+}
+
 export type ResolvedAttrs = Record<string, string | number | boolean | SizeSpec | null | import("./shape").ShapeStyle>;
 
 /** 尺寸类属性解析：match_parent/wrap_content/0dp/具体值/引用 */
@@ -18,13 +37,14 @@ export type SizeSpec =
   | { kind: "px"; value: number };
 
 export function resolveSize(raw: string, res: ResourceTable, issues: XmlIssue[], path: string, prop: string): SizeSpec {
+  const r = safeRecords(res) as Record<string, Record<string, unknown>>;
   const v = raw.trim();
   if (v === "match_parent" || v === "fill_parent") return { kind: "match" };
   if (v === "wrap_content") return { kind: "wrap" };
   if (v === "0dp" || v === "0dip" || v === "0") return { kind: "zero" };
   if (v.startsWith("@dimen/")) {
     const name = v.slice("@dimen/".length);
-    const n = res.dimens[name];
+    const n = r.dimens[name] as number | undefined;
     if (n === undefined) {
       issues.push({ level: "warn", nodePath: path, message: `${prop} 引用 @dimen/${name} 未定义，按 0dp 兜底` });
       return { kind: "zero" };
@@ -52,6 +72,11 @@ function argbToCss(hex: string): string {
 }
 
 export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[], path: string, prop: string): string {
+  const r = safeRecords(res) as Record<string, Record<string, unknown>>;
+  const colors = r.colors as Record<string, string>;
+  const colorsNight = r.colorsNight as Record<string, string>;
+  const themeAttrs = r.themeAttrs as Record<string, string>;
+  const themeAttrsNight = r.themeAttrsNight as Record<string, string>;
   const v = raw.trim();
   if (v === "" || v === "@null") return "transparent";
   if (v.startsWith("#")) return argbToCss(v);
@@ -65,7 +90,7 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
   if (v.startsWith("@color/")) {
     const name = v.slice("@color/".length);
     // M92：深色模式优先用 values-night/colors.xml
-    const c = (res.nightMode ? res.colorsNight?.[name] : undefined) ?? res.colors[name];
+    const c = (res.nightMode ? colorsNight[name] : undefined) ?? colors[name];
     // M4v：颜色表里存的是项目原值（很多项目写 #AARRGGBB）——必须转成 CSS，
     // 否则浏览器把 8 位当 #RRGGBBAA，#FF212121 会变成半透明红
     if (c !== undefined) return argbToCss(c);
@@ -76,17 +101,17 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
     const name = v.slice("?attr/".length);
     // M2x：上传的主题（styles.xml 里 Theme* 的 item）最优先——相当于运行时主题注入
     // M92：深色模式先看 values-night 那套
-    const themeV = (res.nightMode ? res.themeAttrsNight?.[name] : undefined) ?? res.themeAttrs?.[name];
+    const themeV = (res.nightMode ? themeAttrsNight[name] : undefined) ?? themeAttrs[name];
     if (themeV !== undefined) {
       if (themeV.startsWith("@color/") || themeV.startsWith("#")) return resolveColor(themeV, res, issues, path, prop);
       if (themeV.startsWith("?attr/")) return themeV; // 嵌套引用不再深入，保持原样交给 CSS
       issues.push({ level: "warn", nodePath: path, message: `?attr/${name} 主题值 "${themeV}" 无法解析，用兜底色` });
       return "#888888";
     }
-    const c = res.colors[name]; // 主题属性名与 color 名同名时命中颜色表
+    const c = colors[name]; // 主题属性名与 color 名同名时命中颜色表
     if (c !== undefined) return argbToCss(c);
     // 常见 Material3 主题属性→默认色（未上传 styles 时的预览兜底）
-    const themeAttrs: Record<string, string> = {
+    const m3Fallback: Record<string, string> = {
       colorPrimary: "#757575",
       colorOnPrimary: "#FFFFFF",
       colorPrimaryContainer: "#E6E6E9",
@@ -101,7 +126,7 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
       textColorPrimary: "#1D1B20",
       textColorSecondary: "#49454F",
     };
-    if (themeAttrs[name] !== undefined) return themeAttrs[name];
+    if (m3Fallback[name] !== undefined) return m3Fallback[name];
     issues.push({ level: "warn", nodePath: path, message: `${prop} 引用 ?attr/${name} 未定义，用兜底色` });
     return "#888888";
   }
@@ -125,18 +150,21 @@ export function resolveColor(raw: string, res: ResourceTable, issues: XmlIssue[]
 
 /** M93：按当前预览语言取文案（未命中回落默认 values） */
 export function localeString(res: ResourceTable, name: string): string | undefined {
+  const r = safeRecords(res) as Record<string, Record<string, unknown>>;
+  const stringsByLocale = r.stringsByLocale as Record<string, Record<string, string>>;
+  const strings = r.strings as Record<string, string>;
   const loc = res.locale;
   if (loc) {
-    const bucket = res.stringsByLocale?.[loc];
+    const bucket = stringsByLocale[loc];
     if (bucket && bucket[name] !== undefined) return bucket[name];
     // zh-rCN 退 zh、en-rUS 退 en
     const base = loc.split("-")[0];
     if (base && base !== loc) {
-      const b2 = res.stringsByLocale?.[base];
+      const b2 = stringsByLocale[base];
       if (b2 && b2[name] !== undefined) return b2[name];
     }
   }
-  return res.strings[name];
+  return strings[name];
 }
 
 /** 文本解析：字面量 / @string/xxx / 兜底 */

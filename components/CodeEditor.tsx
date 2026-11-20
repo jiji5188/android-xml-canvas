@@ -97,6 +97,9 @@ export interface CodeEditorProps {
   hoverTip?: (raw: string) => string | null;
   /** M405:运行调试（Java 页）—— 设备端 ECJ+D8 编 dex 动态执行 main/debug，结果打到编辑器下方调试日志 */
   onDebugRun?: () => void;
+  /** M438b：软键盘弹出（APK）—— 隐藏悬浮的错误说明面板（hover 提示 / 问题卡片 / 长按菜单 / 文档浮层），
+   *  避免键盘把浮层顶到屏幕中间挡视线。父层（XmlEditor）用 useSoftKeyboard(nativeAvailable()) 检测。 */
+  hideOnKeyboard?: boolean;
 }
 
 /** M76:在一份文本里找全部匹配(大小写不敏感,上限 500 条,空 query 返回空) */
@@ -496,6 +499,7 @@ export function CodeEditor({
   lexRef,
   hoverTip,
   onDebugRun,
+  hideOnKeyboard,
 }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
@@ -514,6 +518,9 @@ export function CodeEditor({
   const onCursorLineRef = useRef(onCursorLine);
   const onRefClickRef = useRef(onRefClick);
   const hoverTipRef = useRef(hoverTip);
+  /** M438b：软键盘弹起中（hideOnKeyboard）—— hover tooltip 回调读它，避免重建 CM extensions */
+  const hideOnKeyboardRef = useRef(!!hideOnKeyboard);
+  hideOnKeyboardRef.current = !!hideOnKeyboard;
   onChangeRef.current = onChange;
   /** M202：ref 包装，供 view 创建 effect 使用 */
   const diagClickRef = useRef<((e: MouseEvent) => void) | null>(null);
@@ -654,6 +661,19 @@ export function CodeEditor({
    * 关键点（用户明确要求「不影响输入」）：只关闭、不 preventDefault → 点击照常落到目标上，
    * 光标该移到哪就移到哪。实现抽到 useOutsidePointerdown（M437 可独立单测）。 */
   useOutsidePointerdown(ctxMenu !== null, ctxMenuRef, closeCtxMenu);
+
+  /* M438b：软键盘弹出（APK）→ 销毁所有悬浮面板（长按菜单/文档浮层/问题卡片），
+   * 键盘收起不自动恢复（用户重新长按/点错误条再打开）。 */
+  const [wasHideKb, setWasHideKb] = useState(false);
+  useEffect(() => {
+    if (hideOnKeyboard) {
+      setWasHideKb(true);
+      closeCtxMenu();
+      setDiagIdx(-1);
+    } else if (wasHideKb) {
+      setWasHideKb(false); // 键盘已收，解除「被强制收起」记录
+    }
+  }, [hideOnKeyboard, closeCtxMenu, wasHideKb]);
 
   /** 当前选区文本（长按时捕获，避免菜单打开后选区变化） */
   const selectionText = useCallback((): string => {
@@ -1057,7 +1077,9 @@ export function CodeEditor({
             : [],
         ),
         // M209：悬停提示——光标落在已知 token（资源/方法/变量）上，父层给提示就弹
+        // M438b：软键盘弹出（APK）期间不弹 hover tooltip（键盘会把它顶到屏幕中间挡视线）
         hoverTooltip((view) => {
+          if (hideOnKeyboardRef.current) return null; // 键盘弹起中 → 悬浮提示全关
           const fn = hoverTipRef.current;
           if (!fn) return null;
           const { state } = view;

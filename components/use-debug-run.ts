@@ -26,6 +26,12 @@ export interface UseDebugRunDeps {
   resources: ResourceTable;
   noteTimed: (msg: string, ms?: number) => void;
   setExportNote: (msg: string) => void;
+  /** M440：调试日志回写面板——编译日志 → 「构建日志」tab；运行输出 → 「运行日志」tab。
+   *  它们本来就是同一个东西的两半：编译日志跟打包编译同性质，运行输出跟 App 运行日志同性质。 */
+  pushDebugLog?: (
+    entry: Omit<import("./ProblemsDrawer").BuildLogEntry, "kind">,
+    kind?: "build" | "debug",
+  ) => void;
 }
 
 export interface UseDebugRunReturn {
@@ -38,7 +44,7 @@ export interface UseDebugRunReturn {
 }
 
 export function useDebugRun(deps: UseDebugRunDeps): UseDebugRunReturn {
-  const { activeProject, aiFileIo, openRel, xml, resources, noteTimed, setExportNote } = deps;
+  const { activeProject, aiFileIo, openRel, xml, resources, noteTimed, setExportNote, pushDebugLog } = deps;
   const [debugBusy, setDebugBusy] = useState(false);
   const [debugResult, setDebugResult] = useState<DebugRunResult | null>(null);
   const canDebug = androidJavaToolchain.canRun?.() ?? false;
@@ -119,6 +125,11 @@ export function useDebugRun(deps: UseDebugRunDeps): UseDebugRunReturn {
         if (!comp.ok || !comp.dex || comp.dex.length === 0) {
           const msg = tt("编译失败：{log}", { log: (comp.log || "").split("\n").slice(-6).join("\n") });
           setDebugResult({ ok: false, step: comp.step || "compile", log: comp.log || msg });
+          // M440：编译日志 → 「构建日志」tab（跟打包编译日志同性质）
+          pushDebugLog?.(
+            { id: String(Date.now()), ok: false, stage: tt("调试编译失败（{step}）", { step: comp.step || "compile" }), log: comp.log || msg },
+            "build",
+          );
           noteTimed(msg, 8000);
           return;
         }
@@ -132,24 +143,34 @@ export function useDebugRun(deps: UseDebugRunDeps): UseDebugRunReturn {
           candidates: cands,
         });
         setDebugResult(r);
+        // M440：运行输出 → 「运行日志」tab（跟 App 运行日志同性质）
+        pushDebugLog?.({
+          id: String(Date.now()),
+          ok: r.ok,
+          stage: r.ok ? tt("调试运行成功（{ms}ms）", { ms: String(r.ms ?? 0) }) : tt("调试运行失败（{step}）", { step: r.step || "?" }),
+          ms: r.ms,
+          log: [r.stdout, r.stderr, r.returnValue, r.exception, r.stackTrace].filter(Boolean).join("\n"),
+        }, "debug");
         if (r.ok) {
           noteTimed(tt("调试运行成功（{ms}ms）", { ms: String(r.ms ?? 0) }), 5000);
         } else {
           const top = r.exception || (r.log || "").split("\n").slice(-4).join(" | ");
-          noteTimed(tt("调试运行{step}：{e}", { step: r.step || "", e: top.slice(0, 200) }), 10000);
+          noteTimed(tt("调试运行{step}：{e}", { step: r.step || "", e: top.slice(0, 200) }), 6000);
         }
         return r;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         const bad: DebugRunResult = { ok: false, step: "js", log: msg };
         setDebugResult(bad);
-        noteTimed(tt("调试运行失败：{m}", { m: msg }), 10000);
+        // M440：失败也推送（运行日志 tab 能看到完整错误）
+        pushDebugLog?.({ id: String(Date.now()), ok: false, stage: tt("调试运行异常（js）"), log: msg }, "debug");
+        noteTimed(tt("调试运行失败：{m}", { m: msg }), 6000);
         return bad;
       } finally {
         setDebugBusy(false);
       }
     },
-    [debugBusy, activeProject, aiFileIo, openRel, xml, resources, noteTimed, setExportNote],
+    [debugBusy, activeProject, aiFileIo, openRel, xml, resources, noteTimed, setExportNote, pushDebugLog],
   );
 
   return { debugBusy, debugResult, doDebugRun, canDebug };

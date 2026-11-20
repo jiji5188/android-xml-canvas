@@ -34,6 +34,8 @@ export interface BuildLogEntry {
   logFile?: string;
   files?: number;
   bytes?: number;
+  /** M440：日志类型——build（默认，进「构建日志」tab）/ debug（Java 调试运行，进「运行日志」tab） */
+  kind?: "build" | "debug";
 }
 
 export interface ProblemsDrawerProps {
@@ -59,12 +61,13 @@ export interface ProblemsDrawerProps {
   forceView?: { open: boolean; tab: DrawerPanel } | null;
   /** M256：抽屉展开/收起时回调，父组件可用它调高度（手机端避免遮住代码区） */
   onOpenChange?: (open: boolean) => void;
-  /** M438：APK 里软键盘弹出时自动收起抽屉（否则键盘把底部抽屉顶到屏中间挡住代码）。
-   *  只在原生壳里传 true（nativeAvailable()）；web 不受影响。 */
-  collapseOnKeyboard?: boolean;
+  /** M438：父层检测到软键盘弹出时传 true → 抽屉自动收起（避免键盘把底部抽屉顶到屏中间挡代码）。
+   *  检测在调用方（XmlEditor 顶层 useSoftKeyboard，M438b 一份监听同时服务抽屉 + 悬浮面板），
+   *  组件自身不再挂监听。web 环境不传（false/undefined）→ 行为不变。 */
+  hideOnKeyboard?: boolean;
 }
 
-export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, onClearRuntimeLog, statusSlot, insetLeft, insetRight, tr, forceView, onOpenChange, collapseOnKeyboard }: ProblemsDrawerProps) {
+export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, onClearRuntimeLog, statusSlot, insetLeft, insetRight, tr, forceView, onOpenChange, hideOnKeyboard }: ProblemsDrawerProps) {
   const [open, setOpenRaw] = useState(false);
   // M256：包装 setter，同步通知父组件（手机端要调代码区高度避免被遮）
   const setOpen = (next: boolean | ((o: boolean) => boolean)) => {
@@ -72,34 +75,19 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, o
     setOpenRaw(v);
     onOpenChange?.(v);
   };
-  /* M438：软键盘弹出 → 自动收起抽屉。两条检测路互补：
-   *   ① visualViewport 缩水 ≥120px（adjustResize 生效时最准）
-   *   ② focusin 命中输入框/contenteditable（adjustPan 下视口不缩也能拦到；
-   *      抽屉内部无输入框，不会误伤抽屉自己的交互）
-   * 只收起、不自动展开 —— 用户手点把手重新打开不受干扰。 */
+  /* M438/M438b：父层检测到软键盘弹出（hideOnKeyboard=true）→ 自动收起抽屉。
+   * 只收起、不自动展开 —— 键盘收起后用户手点把手重新打开，不被干扰。 */
   const setOpenKb = useRef(setOpen);
   setOpenKb.current = setOpen;
+  const [wasHideKb, setWasHideKb] = useState(false);
   useEffect(() => {
-    if (!collapseOnKeyboard) return;
-    const collapse = () => setOpenKb.current(false);
-    const onVvResize = () => {
-      const vv = window.visualViewport;
-      if (!vv) return;
-      if (window.innerHeight - vv.height >= 120) collapse();
-    };
-    const onFocusIn = (e: FocusEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (!t) return;
-      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable || t.hasAttribute("contenteditable")) collapse();
-    };
-    const vv = window.visualViewport;
-    vv?.addEventListener("resize", onVvResize);
-    document.addEventListener("focusin", onFocusIn);
-    return () => {
-      vv?.removeEventListener("resize", onVvResize);
-      document.removeEventListener("focusin", onFocusIn);
-    };
-  }, [collapseOnKeyboard]);
+    if (hideOnKeyboard) {
+      setWasHideKb(true);
+      setOpenKb.current(false);
+    } else if (wasHideKb) {
+      setWasHideKb(false); // 键盘已收，解除「被强制收起」记录，后续不受影响
+    }
+  }, [hideOnKeyboard]);
   const [tab, setTab] = useState<DrawerPanel>("problems");
   // M252：外部强制查看（打包完成后自动打开到对应 tab）。用一个 ref 记上一次的
   // forceView，变化时同步 open/tab；用户手动操作后会解除锁定。
@@ -142,7 +130,7 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, o
             {statusSlot}
           </div>
         ) : null}
-        {buildLogs && buildLogs.length > 0 ? (
+        {buildLogs && buildLogs.some((l) => l.kind !== "debug") ? (
           <span className="axv-drawer-logdot" title={tr("drawer.log.has", "有构建日志")} />
         ) : null}
         {TABS.map((t) => (
@@ -162,11 +150,24 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, o
             </span>
             {tr("drawer.tab." + t.key, t.label)}
             {t.key === "problems" && n > 0 ? <span className="axv-drawer-badge">{n}</span> : null}
-            {t.key === "build-log" && buildLogs && buildLogs.length > 0 ? (
+            {t.key === "build-log" && buildLogs && buildLogs.some((l) => l.kind !== "debug") ? (
               <span className="axv-drawer-badge axv-drawer-badge-log" aria-hidden="true" />
             ) : null}
-            {t.key === "runtime" && runtimeLogs && runtimeLogs.length > 0 ? (
-              <span className="axv-drawer-badge">{runtimeLogs.length > 99 ? "99+" : runtimeLogs.length}</span>
+            {t.key === "runtime" &&
+            ((runtimeLogs && runtimeLogs.length > 0) ||
+              (buildLogs && buildLogs.some((l) => l.kind === "debug"))) ? (
+              <span className="axv-drawer-badge">
+                {
+                  (
+                    (runtimeLogs?.length || 0) +
+                    buildLogs!.filter((l) => l.kind === "debug").length
+                  ) >
+                  99
+                    ? "99+"
+                    : (runtimeLogs?.length || 0) +
+                      buildLogs!.filter((l) => l.kind === "debug").length
+                }
+              </span>
             ) : null}
           </button>
         ))}
@@ -174,47 +175,113 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, o
       {open ? (
         <div className="axv-drawer-body">
           {tab === "runtime" ? (
-            /* M288：运行日志（生成的 APK 广播过来的生命周期/崩溃/自定义日志） */
-            runtimeLogs && runtimeLogs.length > 0 ? (
-              <div className="axv-drawer-logwrap">
-                <div className="axv-drawer-logbar">
-                  <span className="axv-drawer-line">
-                    {tr("drawer.runtime.count", "{n} 条", { n: runtimeLogs.length })}
-                  </span>
-                  <button
-                    type="button"
-                    className="axv-drawer-logcopy"
-                    onClick={() => {
-                      const txt = runtimeLogText(runtimeLogs);
-                      void (async () => {
-                        try {
-                          await navigator.clipboard.writeText(txt);
-                        } catch {
-                          const ta = document.createElement("textarea");
-                          ta.value = txt;
-                          ta.style.position = "fixed";
-                          ta.style.opacity = "0";
-                          document.body.appendChild(ta);
-                          ta.select();
-                          document.execCommand("copy");
-                          ta.remove();
+            /* M288：运行日志（生成的 APK 广播过来的生命周期/崩溃/自定义日志）
+               M440：Java 调试运行日志（buildLogs 里 kind==='debug'）也并进这个 tab 显示——
+               它们本质都是「Java 代码在设备上执行」的输出，放同一个面板 */
+            (() => {
+              const debugLogs = (buildLogs || []).filter((l) => l.kind === "debug");
+              const hasContent = (runtimeLogs && runtimeLogs.length > 0) || debugLogs.length > 0;
+              if (!hasContent) {
+                return (
+                  <div className="axv-drawer-empty">
+                    {tr("drawer.runtime.empty", "还没有收到运行日志：在手机上运行你打包出来的 App，日志会自动出现在这里（同一个 App 内发送，无需连接电脑）。")}
+                  </div>
+                );
+              }
+              return (
+                <div className="axv-drawer-logwrap">
+                  {debugLogs.length > 0 ? (
+                    <div>
+                      <details
+                        className={
+                          "axv-drawer-logcard" +
+                          (debugLogs[0].ok ? "" : " axv-drawer-logcard-err") +
+                          " axv-drawer-logcard-latest"
                         }
-                      })();
-                    }}
-                  >
-                    {tr("drawer.log.copy", "复制")}
-                  </button>
-                  <button type="button" className="axv-drawer-logcopy" onClick={() => onClearRuntimeLog?.()}>
-                    {tr("drawer.runtime.clear", "清空")}
-                  </button>
+                        open={!(runtimeLogs && runtimeLogs.length > 0)}
+                      >
+                        <summary>
+                          <span className="axv-drawer-logdot" aria-hidden="true" />
+                          {debugLogs[0].stage || tr("drawer.log.debug", "Java 调试运行")}
+                          {typeof debugLogs[0].ms === "number" ? " · " + debugLogs[0].ms + "ms" : ""}
+                          {debugLogs[0].ok ? "" : " · " + tr("drawer.log.fail", "失败")}
+                          <button
+                            type="button"
+                            className="axv-drawer-logcopy"
+                            title={tr("drawer.log.copy", "复制构建日志")}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const txt = debugLogs[0].log || "";
+                              void (async () => {
+                                try {
+                                  await navigator.clipboard.writeText(txt);
+                                } catch {
+                                  const ta = document.createElement("textarea");
+                                  ta.value = txt;
+                                  ta.style.position = "fixed";
+                                  ta.style.opacity = "0";
+                                  document.body.appendChild(ta);
+                                  ta.select();
+                                  document.execCommand("copy");
+                                  ta.remove();
+                                }
+                              })();
+                              const btn = e.currentTarget as HTMLElement;
+                              btn.classList.add("axv-drawer-logcopy-ok");
+                              btn.textContent = tr("drawer.log.copied", "已复制");
+                              window.setTimeout(() => {
+                                btn.classList.remove("axv-drawer-logcopy-ok");
+                                btn.textContent = tr("drawer.log.copy", "复制");
+                              }, 1600);
+                            }}
+                          >
+                            {tr("drawer.log.copy", "复制")}
+                          </button>
+                        </summary>
+                        <pre className="axv-drawer-log">{debugLogs[0].log || tr("drawer.log.none", "本次没有输出日志")}</pre>
+                      </details>
+                    </div>
+                  ) : null}
+                  {runtimeLogs && runtimeLogs.length > 0 ? (
+                    <div className="axv-drawer-logbar">
+                      <span className="axv-drawer-line">
+                        {tr("drawer.runtime.count", "{n} 条", { n: runtimeLogs.length })}
+                      </span>
+                      <button
+                        type="button"
+                        className="axv-drawer-logcopy"
+                        onClick={() => {
+                          const txt = runtimeLogText(runtimeLogs);
+                          void (async () => {
+                            try {
+                              await navigator.clipboard.writeText(txt);
+                            } catch {
+                              const ta = document.createElement("textarea");
+                              ta.value = txt;
+                              ta.style.position = "fixed";
+                              ta.style.opacity = "0";
+                              document.body.appendChild(ta);
+                              ta.select();
+                              document.execCommand("copy");
+                              ta.remove();
+                            }
+                          })();
+                        }}
+                      >
+                        {tr("drawer.log.copy", "复制")}
+                      </button>
+                      <button type="button" className="axv-drawer-logcopy" onClick={() => onClearRuntimeLog?.()}>
+                        {tr("drawer.runtime.clear", "清空")}
+                      </button>
+                    </div>
+                  ) : null}
+                  {runtimeLogs && runtimeLogs.length > 0 ? (
+                    <pre className="axv-drawer-log">{runtimeLogText(runtimeLogs)}</pre>
+                  ) : null}
                 </div>
-                <pre className="axv-drawer-log">{runtimeLogText(runtimeLogs)}</pre>
-              </div>
-            ) : (
-              <div className="axv-drawer-empty">
-                {tr("drawer.runtime.empty", "还没有收到运行日志：在手机上运行你打包出来的 App，日志会自动出现在这里（同一个 App 内发送，无需连接电脑）。")}
-              </div>
-            )
+              );
+            })()
           ) : tab === "problems" ? (
             n === 0 ? (
               <div className="axv-drawer-empty">{tr("drawer.none", "当前没有检测到问题")}</div>
@@ -238,10 +305,12 @@ export function ProblemsDrawer({ problems, onGotoLine, buildLogs, runtimeLogs, o
               </ul>
             )
           ) : (
-            /* M188b：构建日志；M260：最新一条默认展开（编译/打包输出点开抽屉就能直接看到），旧条目折叠 */
+            /* M188b：构建日志；M260：最新一条默认展开（编译/打包输出点开抽屉就能直接看到），旧条目折叠
+               M440：buildLogs 按 kind 分片——「构建日志」tab 只列 kind!=='debug'（APK 打包/渲染/资源），
+               调试运行日志（kind==='debug'）进「运行日志」tab（跟被打出的 App 的运行日志放一起，它们本来就是一个东西） */
             buildLogs && buildLogs.length > 0 ? (
               <div className="axv-drawer-logwrap">
-                {buildLogs.slice(0, 20).map((l, i) => (
+                {buildLogs.filter((l) => l.kind !== "debug").slice(0, 20).map((l, i) => (
                   <details
                     key={l.id}
                     open={i === 0}

@@ -528,7 +528,8 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           } else {
             installMsg = tt("APK 已生成：{name}", { name: r.name || "" });
           }
-          noteTimed(base + suffix + (installMsg ? "\n" + installMsg : ""), 12000);
+          // M440：弹窗提示缩短——编译/打包结果日志都在「构建日志」抽屉里看，toast 只给短提醒别挡事
+          noteTimed(base + suffix + (installMsg ? "\n" + installMsg : ""), 5000);
         } else {
           pushBuildLog(false, tt("打包失败（{step}）", { step: r.step || "?" }), r.log);
           const topErr = extractTopErrors(r.log || "", 3);
@@ -537,7 +538,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
             (topErr ? "\n" + topErr : "") +
             "\n" +
             tt("详细错误在「问题/日志」抽屉 →「构建日志」查看", {}),
-            15000,
+            8000,
           );
         }
         return r;
@@ -546,7 +547,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         const bad: BuildApkResult = { ok: false, step: "js", log: msg };
         setApkResult(bad);
         pushBuildLog(false, tt("打包失败（js）"), msg);
-        noteTimed(tt("打包失败：{msg}", { msg }), 12000);
+        noteTimed(tt("打包失败：{msg}", { msg }), 5000);
         return bad;
       } finally {
         setApkBusy(false);

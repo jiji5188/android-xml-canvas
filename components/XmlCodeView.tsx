@@ -62,6 +62,9 @@ export interface XmlCodeViewProps {
   onDebugRun?: () => void;
   /** M405：是否显示调试按钮（仅 Java 且有设备端编译能力时） */
   showDebugRun?: boolean;
+  /** M438b：软键盘弹出（APK）——悬浮的错误说明面板（hover 提示/问题卡片/长按菜单/文档浮层）隐藏，
+   *  避免键盘把浮层顶到屏幕中间挡视线。XmlEditor 顶层 useSoftKeyboard(nativeAvailable()) 检测。 */
+  hideOnKeyboard?: boolean;
 }
 
 export function XmlCodeView(props: XmlCodeViewProps) {
@@ -121,6 +124,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           indent={props.indent}
           resNames={props.resNames}
           onDebugRun={props.showDebugRun ? props.onDebugRun : undefined}
+          hideOnKeyboard={props.hideOnKeyboard}
         />
       )}
       {/* M405：调试日志面板（编辑器下方，仅代码页） */}

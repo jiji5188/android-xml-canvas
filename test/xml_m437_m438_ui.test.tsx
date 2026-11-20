@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 // M437：代码编辑器长按菜单「点外面关闭」—— 通用钩子 useOutsidePointerdown 单测
-// M438：日志/问题抽屉在 APK（软键盘弹出）时自动收起 —— ProblemsDrawer + collapseOnKeyboard
+// M438/M438b：软键盘弹起（APK）→ ① 底部日志抽屉收起 ② 悬浮错误说明面板隐藏
 //
 // 用户需求原话（2026-11-20）：
 //   "如果用户不选择菜单项时点击菜单面板外围（如代码编辑器任意位置）可以销毁弹窗，不影响输入"
 //   "代码编辑器下方的日志输出抽屉在 APK 版本中弹出输入法时自动收起抽屉"
+//   "弹出输入法时自动收起抽屉和隐藏 悬浮的错误说明面板"
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useCallback, useRef, useState } from "react";
 import { useOutsidePointerdown } from "@/components/use-outside-pointerdown";
+import { useSoftKeyboard } from "@/components/use-soft-keyboard";
 import { ProblemsDrawer } from "@/components/ProblemsDrawer";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
@@ -96,18 +98,132 @@ describe("M437 useOutsidePointerdown（点外面关菜单，不影响输入）",
   });
 });
 
-/* ============ M438 ProblemsDrawer collapseOnKeyboard ============ */
+/* ============ M438b useSoftKeyboard（键盘检测钩子） ============ */
+
+/** jsdom 没有 visualViewport：装一个可控桩（高度可改 + 手动触发 resize）。返回 vv 与清理函数。 */
+function installVv() {
+  const listeners: Array<() => void> = [];
+  const vv = {
+    _h: window.innerHeight,
+    _ls: listeners,
+    get height() {
+      return vv._h;
+    },
+    addEventListener(_t: string, fn: () => void) {
+      listeners.push(fn);
+    },
+    removeEventListener(_t: string, fn: () => void) {
+      const i = listeners.indexOf(fn);
+      if (i >= 0) listeners.splice(i, 1);
+    },
+  };
+  Object.defineProperty(window, "visualViewport", { value: vv, configurable: true });
+  return {
+    vv,
+    fireResize: () => listeners.forEach((fn) => fn()),
+    cleanup: () => {
+      delete (window as unknown as Record<string, unknown>).visualViewport;
+    },
+  };
+}
+
+function KbProbe({ enabled }: { enabled: boolean }) {
+  const kb = useSoftKeyboard(enabled);
+  return <span data-testid="kb">{kb ? "on" : "off"}</span>;
+}
+
+describe("M438b useSoftKeyboard（软键盘是否弹出）", () => {
+  it("enabled=false（web/桌面）→ 恒 off，focusin 也不开", () => {
+    const { cleanup: vvClean } = installVv();
+    try {
+      render(<KbProbe enabled={false} />);
+      expect(screen.getByTestId("kb").textContent).toBe("off");
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      fireEvent.focusIn(input);
+      expect(screen.getByTestId("kb").textContent).toBe("off");
+      input.remove();
+    } finally {
+      vvClean();
+    }
+  });
+
+  it("输入框 focusin → on；焦点移到按钮 → off", () => {
+    const { cleanup: vvClean } = installVv();
+    try {
+      render(<KbProbe enabled />);
+      expect(screen.getByTestId("kb").textContent).toBe("off");
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      act(() => { fireEvent.focusIn(input); });
+      expect(screen.getByTestId("kb").textContent).toBe("on");
+      const btn = document.createElement("button");
+      document.body.appendChild(btn);
+      act(() => { fireEvent.focusIn(btn); });
+      expect(screen.getByTestId("kb").textContent).toBe("off");
+      input.remove();
+      btn.remove();
+    } finally {
+      vvClean();
+    }
+  });
+
+  it("CodeMirror 的 contenteditable focusin 也算弹键盘", () => {
+    const { cleanup: vvClean } = installVv();
+    try {
+      render(<KbProbe enabled />);
+      const cm = document.createElement("div");
+      cm.setAttribute("contenteditable", "true");
+      document.body.appendChild(cm);
+      act(() => { fireEvent.focusIn(cm); });
+      expect(screen.getByTestId("kb").textContent).toBe("on");
+      cm.remove();
+    } finally {
+      vvClean();
+    }
+  });
+
+  it("visualViewport 缩水 ≥120px → on；恢复 → off", () => {
+    const { vv, fireResize, cleanup: vvClean } = installVv();
+    try {
+      render(<KbProbe enabled />);
+      expect(screen.getByTestId("kb").textContent).toBe("off");
+      vv._h = window.innerHeight - 250;
+      act(() => fireResize());
+      expect(screen.getByTestId("kb").textContent).toBe("on");
+      vv._h = window.innerHeight;
+      act(() => fireResize());
+      expect(screen.getByTestId("kb").textContent).toBe("off");
+    } finally {
+      vvClean();
+    }
+  });
+
+  it("小幅缩水（<120px）不算弹键盘", () => {
+    const { vv, fireResize, cleanup: vvClean } = installVv();
+    try {
+      render(<KbProbe enabled />);
+      vv._h = window.innerHeight - 60;
+      act(() => fireResize());
+      expect(screen.getByTestId("kb").textContent).toBe("off");
+    } finally {
+      vvClean();
+    }
+  });
+});
+
+/* ============ M438 ProblemsDrawer hideOnKeyboard ============ */
 
 const noTr = (key: string, fallback: string) => fallback;
 
-function Drawer({ onOpenChange, collapseOnKeyboard }: { onOpenChange?: (o: boolean) => void; collapseOnKeyboard?: boolean }) {
+function Drawer({ onOpenChange, hideOnKeyboard }: { onOpenChange?: (o: boolean) => void; hideOnKeyboard?: boolean }) {
   return (
     <ProblemsDrawer
       problems={[]}
       onGotoLine={() => {}}
       tr={noTr}
       onOpenChange={onOpenChange}
-      collapseOnKeyboard={collapseOnKeyboard}
+      hideOnKeyboard={hideOnKeyboard}
     />
   );
 }
@@ -121,127 +237,38 @@ function isDrawerOpen() {
   return document.querySelector(".axv-drawer")?.classList.contains("axv-drawer-open") ?? false;
 }
 
-describe("M438 抽屉软键盘自动收起（APK）", () => {
-  it("collapseOnKeyboard=false（web）：focusin 不收起", () => {
-    render(<Drawer collapseOnKeyboard={false} />);
+describe("M438 ProblemsDrawer hideOnKeyboard（键盘弹起 → 抽屉收起）", () => {
+  it("hideOnKeyboard=false：抽屉照常可开", () => {
+    render(<Drawer hideOnKeyboard={false} />);
     openDrawer();
     expect(isDrawerOpen()).toBe(true);
-    const input = document.createElement("input");
-    document.body.appendChild(input);
-    input.focus();
-    expect(isDrawerOpen()).toBe(true);
-    input.remove();
   });
 
-  it("collapseOnKeyboard=true：输入框 focusin（模拟弹键盘）→ 抽屉自动收起 + 通知父组件", () => {
+  it("hideOnKeyboard=true → 抽屉自动收起 + 通知父组件", () => {
     const onOpenChange = vi.fn();
-    render(<Drawer collapseOnKeyboard onOpenChange={onOpenChange} />);
+    const { rerender } = render(<Drawer hideOnKeyboard={false} onOpenChange={onOpenChange} />);
     openDrawer();
     expect(isDrawerOpen()).toBe(true);
-    const input = document.createElement("input");
-    document.body.appendChild(input);
-    fireEvent.focusIn(input);
+    rerender(<Drawer hideOnKeyboard onOpenChange={onOpenChange} />);
     expect(isDrawerOpen()).toBe(false);
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
-    input.remove();
   });
 
-  it("contenteditable（CodeMirror）focusin 也收起", () => {
-    render(<Drawer collapseOnKeyboard />);
+  it("收起后仍可手动重新打开（只收不锁）", () => {
+    const { rerender } = render(<Drawer hideOnKeyboard={false} />);
     openDrawer();
-    const cm = document.createElement("div");
-    // 用 "true"（jsdom 对 "plaintext-only" 这种新值不识别，isContentEditable 会返 false）
-    cm.setAttribute("contenteditable", "true");
-    document.body.appendChild(cm);
-    act(() => { fireEvent.focusIn(cm); });
+    rerender(<Drawer hideOnKeyboard />);
     expect(isDrawerOpen()).toBe(false);
-    cm.remove();
-  });
-
-  it("点普通按钮 focusin 不收起（不是输入控件）", () => {
-    render(<Drawer collapseOnKeyboard />);
-    openDrawer();
-    const btn = document.createElement("button");
-    document.body.appendChild(btn);
-    fireEvent.focusIn(btn);
-    expect(isDrawerOpen()).toBe(true);
-    btn.remove();
-  });
-
-  it("收起后仍可用把手重新打开（只收不锁）", () => {
-    render(<Drawer collapseOnKeyboard />);
-    openDrawer();
-    const input = document.createElement("input");
-    document.body.appendChild(input);
-    fireEvent.focusIn(input);
-    expect(isDrawerOpen()).toBe(false);
-    input.remove();
     openDrawer();
     expect(isDrawerOpen()).toBe(true);
   });
-});
 
-/* ============ M438 visualViewport 路径（键盘弹起 adjustResize）============ */
-
-describe("M438b visualViewport 缩水收起（键盘弹起，adjustResize 模式）", () => {
-  function installVv() {
-    type Vv = {
-      _h: number;
-      _ls: Array<() => void>;
-      height: number;
-      addEventListener: (t: string, fn: () => void) => void;
-      removeEventListener: (t: string, fn: () => void) => void;
-    };
-    const vv: Vv = {
-      _h: window.innerHeight,
-      _ls: [],
-      get height() {
-        return this._h;
-      },
-      addEventListener(_t: string, fn: () => void) {
-        this._ls.push(fn);
-      },
-      removeEventListener(_t: string, fn: () => void) {
-        const i = this._ls.indexOf(fn);
-        if (i >= 0) this._ls.splice(i, 1);
-      },
-    };
-    Object.defineProperty(window, "visualViewport", { value: vv, configurable: true });
-    return vv;
-  }
-
-  it("vv.height 比 innerHeight 小 ≥120 → 收起；键盘收起（vv 恢复）不自动打开", () => {
-    const vv = installVv();
-    try {
-      render(<Drawer collapseOnKeyboard />);
-      openDrawer();
-      expect(isDrawerOpen()).toBe(true);
-      // 键盘弹起：vv.height 缩小 200（act 包裹：state 更新同步刷 DOM）
-      vv._h = window.innerHeight - 200;
-      act(() => { vv._ls.forEach((fn) => fn()); });
-      expect(isDrawerOpen()).toBe(false);
-      // 键盘收起：vv.height 恢复 → 不应该自动重新打开（只收不展开）
-      vv._h = window.innerHeight;
-      act(() => { vv._ls.forEach((fn) => fn()); });
-      expect(isDrawerOpen()).toBe(false);
-      // 手动重开仍可用
-      openDrawer();
-      expect(isDrawerOpen()).toBe(true);
-    } finally {
-      delete (window as unknown as Record<string, unknown>).visualViewport;
-    }
-  });
-
-  it("vv 缩水 <120px（普通横滚条等小幅变化）不收起", () => {
-    const vv = installVv();
-    try {
-      render(<Drawer collapseOnKeyboard />);
-      openDrawer();
-      vv._h = window.innerHeight - 60;
-      act(() => { vv._ls.forEach((fn) => fn()); });
-      expect(isDrawerOpen()).toBe(true);
-    } finally {
-      delete (window as unknown as Record<string, unknown>).visualViewport;
-    }
+  it("键盘收起（hideOnKeyboard 回 false）不会自动打开抽屉", () => {
+    const { rerender } = render(<Drawer hideOnKeyboard={false} />);
+    openDrawer();
+    rerender(<Drawer hideOnKeyboard />);
+    expect(isDrawerOpen()).toBe(false);
+    rerender(<Drawer hideOnKeyboard={false} />);
+    expect(isDrawerOpen()).toBe(false); // 只收不展开
   });
 });

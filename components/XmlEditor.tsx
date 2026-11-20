@@ -291,9 +291,6 @@ import {
   type EditorTheme,
 } from "@/lib/xml/editor-theme";
 
-
-
-
 const SCALE = 2; // 1dp = 2px
 
 /** M412：入口页（XmlAppShell）传进来的可选 props */
@@ -1426,7 +1423,7 @@ const allDrawableNames = useMemo(() => {
   const {
     buildLogs, setBuildLogs, apkForceView, setApkForceView,
     runtimeLogs, setRuntimeLogs, drawerOpen, setDrawerOpen,
-    clearRuntimeLogsCb, pushApkBuildLog,
+    clearRuntimeLogsCb, pushApkBuildLog, kbHide, pushDebugLog,
   } = useBuildLogs();
 
     /** M3：生成正式 Android 布局 XML 并下载。导出前检查：结构错误阻断；语义提示允许忽略继续
@@ -1472,6 +1469,7 @@ const allDrawableNames = useMemo(() => {
     resources,
     noteTimed,
     setExportNote,
+    pushDebugLog,
   });
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [debugEntry, setDebugEntry] = useState<{ cls: string; method: string } | null>(null);
@@ -1849,7 +1847,7 @@ const allDrawableNames = useMemo(() => {
         onClearRuntimeLog={clearRuntimeLogsCb}
         forceView={apkForceView}
         onOpenChange={setDrawerOpen}
-        collapseOnKeyboard={nativeAvailable()}
+        hideOnKeyboard={kbHide}
         insetLeft={isMobile ? undefined : leftOpen ? 320 : 0}
         insetRight={isMobile ? undefined : rightOpen ? 320 : 0}
         statusSlot={
@@ -1887,6 +1885,7 @@ const allDrawableNames = useMemo(() => {
         open={mobileTab === "xml" || mobileTab === "values"}
         isMobile={isMobile}
         drawerOpen={drawerOpen}
+        hideOnKeyboard={kbHide}
         leftOpen={leftOpen}
         rightOpen={rightOpen}
         value={xml}

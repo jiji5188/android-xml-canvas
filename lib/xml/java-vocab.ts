@@ -327,6 +327,15 @@ export const JAVA_IMPORTS: Record<string, string> = {
   BaseAdapter: "android.widget.BaseAdapter",
   Adapter: "android.widget.Adapter",
   Toolbar: "android.widget.Toolbar",
+  // M455：监听器匿名类模板要用到的类型（自动补 import）
+  AdapterView: "android.widget.AdapterView",
+  AbsListView: "android.widget.AbsListView",
+  CompoundButton: "android.widget.CompoundButton",
+  RatingBar: "android.widget.RatingBar",
+  SearchView: "android.widget.SearchView",
+  MediaPlayer: "android.media.MediaPlayer",
+  KeyEvent: "android.view.KeyEvent",
+  DragEvent: "android.view.DragEvent",
   // android.view
   View: "android.view.View",
   ViewGroup: "android.view.ViewGroup",

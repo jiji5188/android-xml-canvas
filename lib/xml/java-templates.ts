@@ -68,6 +68,92 @@ export const EVENT_OVERRIDES: Record<string, { params: string; ret?: string }> =
 export interface AcceptTemplate {
   text: string;
   cursor: number;
+  /** M455：模板自带调用括号 —— 用户已打了 "(" 就一起吃掉，避免 "((" 重复 */
+  consumeTrailingParen?: boolean;
+}
+
+/** M455：监听器 setter → 整个匿名实现类（`btn.setOnClickListener` 接受候选后直接展开） */
+export interface ListenerSpec {
+  /** `new XXX()` 的接口名（带外部类前缀，如 View.OnClickListener） */
+  iface: string;
+  /** 接口必须实现的方法（多方法接口按顺序全部带出） */
+  methods: { name: string; params: string; ret?: string }[];
+}
+
+export const LISTENER_SETTERS: Record<string, ListenerSpec> = {
+  // View 家族
+  setOnClickListener: { iface: "View.OnClickListener", methods: [{ name: "onClick", params: "View v" }] },
+  setOnLongClickListener: { iface: "View.OnLongClickListener", methods: [{ name: "onLongClick", params: "View v", ret: "boolean" }] },
+  setOnTouchListener: { iface: "View.OnTouchListener", methods: [{ name: "onTouch", params: "View v, MotionEvent event", ret: "boolean" }] },
+  setOnFocusChangeListener: { iface: "View.OnFocusChangeListener", methods: [{ name: "onFocusChange", params: "View v, boolean hasFocus" }] },
+  setOnKeyListener: { iface: "View.OnKeyListener", methods: [{ name: "onKey", params: "View v, int keyCode, KeyEvent event", ret: "boolean" }] },
+  setOnHoverListener: { iface: "View.OnHoverListener", methods: [{ name: "onHover", params: "View v, MotionEvent event", ret: "boolean" }] },
+  setOnDragListener: { iface: "View.OnDragListener", methods: [{ name: "onDrag", params: "View v, DragEvent event", ret: "boolean" }] },
+  setOnScrollChangeListener: { iface: "View.OnScrollChangeListener", methods: [{ name: "onScrollChange", params: "View v, int scrollX, int scrollY, int oldScrollX, int oldScrollY" }] },
+  setOnGenericMotionListener: { iface: "View.OnGenericMotionListener", methods: [{ name: "onGenericMotion", params: "View v, MotionEvent event", ret: "boolean" }] },
+  // 列表 / 适配器
+  setOnItemClickListener: { iface: "AdapterView.OnItemClickListener", methods: [{ name: "onItemClick", params: "AdapterView<?> parent, View view, int position, long id" }] },
+  setOnItemLongClickListener: { iface: "AdapterView.OnItemLongClickListener", methods: [{ name: "onItemLongClick", params: "AdapterView<?> parent, View view, int position, long id", ret: "boolean" }] },
+  setOnItemSelectedListener: {
+    iface: "AdapterView.OnItemSelectedListener",
+    methods: [
+      { name: "onItemSelected", params: "AdapterView<?> parent, View view, int position, long id" },
+      { name: "onNothingSelected", params: "AdapterView<?> parent" },
+    ],
+  },
+  setOnScrollListener: {
+    iface: "AbsListView.OnScrollListener",
+    methods: [
+      { name: "onScrollStateChanged", params: "AbsListView view, int scrollState" },
+      { name: "onScroll", params: "AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount" },
+    ],
+  },
+  // 控件专属
+  setOnCheckedChangeListener: { iface: "CompoundButton.OnCheckedChangeListener", methods: [{ name: "onCheckedChanged", params: "CompoundButton buttonView, boolean isChecked" }] },
+  setOnSeekBarChangeListener: {
+    iface: "SeekBar.OnSeekBarChangeListener",
+    methods: [
+      { name: "onProgressChanged", params: "SeekBar seekBar, int progress, boolean fromUser" },
+      { name: "onStartTrackingTouch", params: "SeekBar seekBar" },
+      { name: "onStopTrackingTouch", params: "SeekBar seekBar" },
+    ],
+  },
+  setOnRatingBarChangeListener: { iface: "RatingBar.OnRatingBarChangeListener", methods: [{ name: "onRatingChanged", params: "RatingBar ratingBar, float rating, boolean fromUser" }] },
+  setOnEditorActionListener: { iface: "TextView.OnEditorActionListener", methods: [{ name: "onEditorAction", params: "TextView v, int actionId, KeyEvent event", ret: "boolean" }] },
+  addTextChangedListener: {
+    iface: "TextWatcher",
+    methods: [
+      { name: "beforeTextChanged", params: "CharSequence s, int start, int count, int after" },
+      { name: "onTextChanged", params: "CharSequence s, int start, int before, int count" },
+      { name: "afterTextChanged", params: "Editable s" },
+    ],
+  },
+  // 菜单 / 搜索 / 多媒体
+  setOnMenuItemClickListener: { iface: "MenuItem.OnMenuItemClickListener", methods: [{ name: "onMenuItemClick", params: "MenuItem item", ret: "boolean" }] },
+  setOnQueryTextListener: {
+    iface: "SearchView.OnQueryTextListener",
+    methods: [
+      { name: "onQueryTextSubmit", params: "String query", ret: "boolean" },
+      { name: "onQueryTextChange", params: "String newText", ret: "boolean" },
+    ],
+  },
+  setOnPreparedListener: { iface: "MediaPlayer.OnPreparedListener", methods: [{ name: "onPrepared", params: "MediaPlayer mp" }] },
+  setOnCompletionListener: { iface: "MediaPlayer.OnCompletionListener", methods: [{ name: "onCompletion", params: "MediaPlayer mp" }] },
+  setOnErrorListener: { iface: "MediaPlayer.OnErrorListener", methods: [{ name: "onError", params: "MediaPlayer mp, int what, int extra", ret: "boolean" }] },
+};
+
+/** 拼监听器匿名类模板：第一行不重复缩进（替换起点在行首缩进之后），%in%/%base%/| 语义同语句块 */
+function buildListenerTemplate(name: string, spec: ListenerSpec): string {
+  const lines: string[] = [`${name}(new ${spec.iface}() {`];
+  spec.methods.forEach((m, i) => {
+    if (i > 0) lines.push("");
+    lines.push("%in%@Override");
+    lines.push(`%in%public ${m.ret ?? "void"} ${m.name}(${m.params}) {`);
+    lines.push(i === 0 ? "%in2%|" : "%in2%");
+    lines.push("%in%}");
+  });
+  lines.push("%base%});");
+  return lines.join("\n");
 }
 
 /**
@@ -84,7 +170,11 @@ export function buildJavaAcceptTemplate(
 ): AcceptTemplate | null {
   const unit = indent.includes("\t") ? "\t" : SPACES;
   const expand = (tmpl: string): AcceptTemplate => {
-    const body = tmpl.replace(/%in%/g, indent + unit).replace(/%base%/g, indent);
+    // %in2% = 当前缩进 + 两级（监听器匿名类的 onClick 体）；先于 %in% 替换
+    const body = tmpl
+      .replace(/%in2%/g, indent + unit + unit)
+      .replace(/%in%/g, indent + unit)
+      .replace(/%base%/g, indent);
     const i = body.indexOf("|");
     return { text: body.replace("|", ""), cursor: i >= 0 ? i : body.length };
   };
@@ -98,6 +188,11 @@ export function buildJavaAcceptTemplate(
     const o = EVENT_OVERRIDES[item];
     const ret = o.ret ?? "void";
     return expand(`@Override\n%base%public ${ret} ${item}(${o.params}) {\n%in%|\n%base%}`);
+  }
+  // 3) M455：监听器 setter → 整个匿名实现类（接受时吃掉已打的 "("，并自动补接口外部类 import）
+  if (kind === "method" && LISTENER_SETTERS[item]) {
+    const r = expand(buildListenerTemplate(item, LISTENER_SETTERS[item]));
+    return { ...r, consumeTrailingParen: true };
   }
   return null;
 }

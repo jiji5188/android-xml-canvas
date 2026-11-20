@@ -65,7 +65,7 @@ import { computeJavaSuggest, JAVA_SYMBOLS, importForType, buildImportInsertMany 
 import { placeCtxMenu, estimateCtxMenuHeight } from "@/lib/xml/ctx-menu-position";
 import { computeBlockGuides, pickRenderedGuides } from "@/lib/xml/block-guides";
 import { zoomFromPinch, pointerDist, CODE_ZOOM_INIT } from "@/lib/xml/code-zoom";
-import { buildJavaAcceptTemplate } from "@/lib/xml/java-templates";
+import { buildJavaAcceptTemplate, LISTENER_SETTERS } from "@/lib/xml/java-templates";
 import { loadRecency, recordUsage } from "@/lib/xml/lex-recency";
 import { getLexStore, type Lexicon } from "@/lib/xml/lexicon";
 import { KIND_LABEL, KIND_NAME, type SuggestKind } from "@/lib/xml/suggest-kind";
@@ -1159,28 +1159,42 @@ export function CodeEditor({
       //   只在「前面不是点号」时生效：`x.onClick` 是调用，不该展开方法体
       let insertText = item;
       let cursorOffset = item.length;
-      if (langRef.current === "java" && !(from > 0 && docStr[from - 1] === ".")) {
+      let toPos = head;
+      // M455：监听器 setter 例外 —— `btn.setOnClickListener` 正是最常用的展开场景，
+      //   不受「前面是点号不展开」限制；其它模板仍维持 M397 的点号守卫
+      const isListenerSetter = langRef.current === "java" && LISTENER_SETTERS[item] !== undefined;
+      if (langRef.current === "java" && (isListenerSetter || !(from > 0 && docStr[from - 1] === "."))) {
         const line = v.state.doc.lineAt(from);
         const indent = (line.text.match(/^[ \t]*/) ?? [""])[0];
         const tpl = buildJavaAcceptTemplate(item, s.kinds?.[idx] ?? "plain", indent);
         if (tpl) {
           insertText = tpl.text;
           cursorOffset = tpl.cursor;
+          // M455：模板自带调用括号；用户已打了 "(" 就一起替换掉，避免 "((" 叠罗汉
+          if (tpl.consumeTrailingParen && docStr[head] === "(") toPos = head + 1;
         }
       }
       let anchor = from + cursorOffset;
       // M273：选中一个类（如 TextView）且文件没 import → 自动补 import 声明
       if (langRef.current === "java") {
+        const fqns: string[] = [];
         const fqn = importForType(item);
-        if (fqn) {
-          const imp = buildImportInsertMany(docStr, [fqn]);
+        if (fqn) fqns.push(fqn);
+        // M455：监听器模板展开时，接口外部类（View / AdapterView / CompoundButton…）也一并补 import
+        if (isListenerSetter) {
+          const outer = LISTENER_SETTERS[item].iface.split(".")[0];
+          const outerFqn = importForType(outer);
+          if (outerFqn && outerFqn !== fqn) fqns.push(outerFqn);
+        }
+        if (fqns.length > 0) {
+          const imp = buildImportInsertMany(docStr, fqns);
           if (imp && imp.pos <= from) {
             changes.push({ from: imp.pos, insert: imp.text });
             anchor += imp.text.length;
           }
         }
       }
-      changes.push({ from, to: head, insert: insertText });
+      changes.push({ from, to: toPos, insert: insertText });
       v.dispatch({
         changes,
         selection: { anchor },

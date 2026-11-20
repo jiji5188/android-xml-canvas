@@ -57,6 +57,12 @@ export interface CollectResult {
   added: number;
   /** M159：找不到、已用占位实现顶上的资源（能编译，但看不到原图） */
   stubbed?: string[];
+  /** M458：定位到的 res 根（相对项目根，不含尾斜杠）；空串 = 没找到，项目磁盘资源完全没参与 */
+  resRel?: string;
+  /** M458：res 根下扫到的资源子目录数（构建日志用） */
+  dirsCount?: number;
+  /** M458：res 定位/列举异常的原因（正常时不返回） */
+  warn?: string;
 }
 
 /* M159：res_values.xml 是「上传/合并的 values」的落地文件；现在项目自己的 values/*.xml
@@ -126,7 +132,7 @@ export async function collectProjectRes(
   extraTexts: string[] = [],
 ): Promise<CollectResult> {
   const files = input.map((f) => ({ ...f }));
-  if (!io) return { files, missing: [], added: 0 };
+  if (!io) return { files, missing: [], added: 0, resRel: "" };
 
   // 空文本 / 无内容的条目不能算“资源已存在”：它们出现在上传缓存里但实际没内容，
   // 会让后续查找和占位全部跳过，最后 aapt2 报 xxx not found
@@ -140,9 +146,11 @@ export async function collectProjectRes(
   try {
     info = await scanResDirs(io, docRel);
   } catch {
-    return { files, missing: [], added: 0 };
+    // M458：以前这里静默返回——res 没定位到，mipmap/values 全被跳过，打包日志一个字都不提
+    return { files, missing: [], added: 0, resRel: "", warn: "res-scan-error" };
   }
-  if (!info.resRel) return { files, missing: [], added: 0 };
+  if (!info.resRel)
+    return { files, missing: [], added: 0, resRel: "", warn: "res-root-not-found" };
   // scanResDirs 可能返回带尾斜杠的根（docRel 切出来的），偶尔还会列出空目录 → 归一化后重列一次
   const resRel = info.resRel.replace(/\/+$/, "");
   let dirs = info.dirs;
@@ -535,5 +543,12 @@ export async function collectProjectRes(
     );
   }
 
-  return { files: dedupeValuesFiles(files, projectValueDefs), missing: [...missing].sort(), added, stubbed };
+  return {
+    files: dedupeValuesFiles(files, projectValueDefs),
+    missing: [...missing].sort(),
+    added,
+    stubbed,
+    resRel,
+    dirsCount: dirs.length,
+  };
 }

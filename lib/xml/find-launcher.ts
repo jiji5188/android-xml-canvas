@@ -33,11 +33,32 @@ export interface ProjectManifestInfo {
 export async function readProjectManifest(
   io: AiFileIo | null | undefined,
   fallbackPkg = "",
+  /** M458：当前打开文件相对路径——从它推导 res/ 兄弟目录、java 源码的 main 目录，
+   *  作为额外的 manifest 候选（嵌套目录项目以前三个固定候选全部漏掉） */
+  docRel?: string | null,
 ): Promise<ProjectManifestInfo> {
   if (!io) return { rel: "", text: "", pkg: fallbackPkg, launcher: "" };
   let rel = "";
   let text = "";
-  for (const cand of CANDIDATES) {
+  // M458：动态候选（按出现顺序去重）
+  const cands: string[] = [];
+  const candSeen = new Set<string>();
+  const addCand = (c: string) => {
+    if (c && !candSeen.has(c)) {
+      candSeen.add(c);
+      cands.push(c);
+    }
+  };
+  for (const c of CANDIDATES) addCand(c);
+  const norm = (docRel || "").replace(/\\/g, "/");
+  if (norm) {
+    const ri = norm.lastIndexOf("/res/");
+    if (ri >= 0) addCand(norm.slice(0, ri + 5).replace(/\/res$/, "") + "/AndroidManifest.xml");
+    const mi = norm.lastIndexOf("/main/");
+    if (mi >= 0) addCand(norm.slice(0, mi + 6) + "AndroidManifest.xml");
+    addCand(norm);
+  }
+  for (const cand of cands) {
     try {
       const r = await io.read(cand);
       if (r.ok && r.text && /<manifest/i.test(r.text)) {

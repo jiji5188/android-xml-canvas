@@ -50,6 +50,21 @@ export function hasResFile(files: RenderFile[], type: string, name: string): boo
   return files.some((f) => re.test(f.path || ""));
 }
 
+/** M458：一批文件里，manifest 各图标引用实际进包的是哪些路径（供构建日志「图标进包」明细） */
+export function iconFilesForRefs(
+  files: RenderFile[],
+  refs: { type: string; name: string }[],
+): string[] {
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const out: string[] = [];
+  for (const r of refs) {
+    const re = new RegExp(`^${esc(r.type)}(-[^/]+)?/${esc(r.name)}\\.(xml|png|jpg|jpeg|webp|gif)$`, "i");
+    const hit = files.find((f) => re.test(f.path || ""));
+    if (hit) out.push(hit.path);
+  }
+  return out;
+}
+
 /** 补齐 manifest 引用但项目里没有的图标：返回新文件清单 + 补了哪些（供构建日志） */
 export function injectMissingManifestIcons(
   files: RenderFile[],

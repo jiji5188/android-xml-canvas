@@ -15,7 +15,7 @@ import { parseGradlePackage } from "@/lib/xml/project-info";
 import { parseGradleDepsDetailed } from "@/lib/xml/gradle-deps";
 import { packageOf } from "@/lib/xml/new-project";
 import { collectProjectRes } from "@/lib/xml/res-collect";
-import { injectMissingManifestIcons } from "@/lib/xml/icon-fallback";
+import { injectMissingManifestIcons, manifestIconRefs, iconFilesForRefs } from "@/lib/xml/icon-fallback";
 import { missingGradleEntities, formatMissingList } from "@/lib/xml/pre-build-check";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
@@ -205,7 +205,19 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         //  以前 collectProjectRes 只扫布局文件的引用，manifest 引用的图标不进包 →
         //  aapt2 link 报 “resource mipmap/app not found / failed processing manifest”。
         //  必须在收集资源前读出来，作为额外引用源传进去。
-        const manifestInfo = await readProjectManifest(aiFileIo, pkg);
+        // M458：带 openRel 推导 res 兄弟目录 / main 目录候选（嵌套目录项目以前固定三条全漏）
+        const manifestInfo = await readProjectManifest(aiFileIo, pkg, openRel);
+        if (!manifestInfo.text) {
+          // 静默丢清单 = 桌面绿机器人图标的真凶：合成清单没有 android:icon，图标引用也进不了收集
+          pushBuildLog(
+            false,
+            tt("未读到项目清单（AndroidManifest.xml）"),
+            tt(
+              "试了 <项目根>/AndroidManifest.xml、app/src/main/、src/main/ 和当前文档推导的 res 兄弟目录都没找到。本次打包用合成清单：清单里的图标、主题、权限、label 全部丢失，桌面会显示系统默认图标。请确认项目目录结构是标准 Android 工程。",
+              {},
+            ),
+          );
+        }
         const collected = await collectProjectRes(
           aiFileIo,
           openRel,
@@ -213,6 +225,32 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           160,
           manifestInfo.text ? [manifestInfo.text] : [],
         );
+        // M458：资源收集透明化——res 根没定位到时以前静默跳过，mipmap 全部漏包，日志里查无此因
+        if (!collected.resRel) {
+          pushBuildLog(
+            false,
+            tt("项目 res 目录未定位"),
+            tt(
+              "没找到 res 根目录（试了 app/src/main/res、src/main/res、res 和当前文档所在 res/）——项目磁盘上的资源（含 mipmap 图标）一个都没进包，只带了编辑器内的资源。项目目录结构如果不是标准 Android 工程，请检查。",
+              {},
+            ),
+          );
+        } else {
+          pushBuildLog(
+            true,
+            tt("资源收集"),
+            tt("res 根：{r}（{n} 个资源目录），新收 {a} 个文件，清单共 {t} 个", {
+              r: collected.resRel,
+              n: String(collected.dirsCount ?? 0),
+              a: String(collected.added),
+              t: String(collected.files.length),
+            }),
+            undefined,
+            undefined,
+            undefined,
+            "info",
+          );
+        }
         const relNow = (openRel || input.name || "").replace(/\\/g, "/");
         const withCurrent = /\.xml$/i.test(relNow) ? withCurrentXml(collected.files, relNow, xml) : collected.files;
         // M380：manifest 引用的图标（@mipmap/app / @mipmap/app_round）项目里确实没有时，
@@ -230,6 +268,40 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           );
         }
         const files = iconFix.files;
+        // M458：图标进包明细——项目自带 / 已注入兜底 / 完全没图标，一眼看清桌面会显示什么
+        {
+          const refs = manifestIconRefs(manifestInfo.text);
+          const injectedPaths = new Set(iconFix.injected.map((s) => s.replace(/^@/, "") + ".xml"));
+          const iconIn = iconFilesForRefs(files, refs).filter((p) => !injectedPaths.has(p));
+          if (refs.length === 0) {
+            pushBuildLog(
+              false,
+              tt("包内无图标资源"),
+              tt("清单没写 android:icon（或没读到清单）——打包后桌面显示系统默认图标。请在 manifest 的 application 节点加 android:icon（如 @mipmap/ic_launcher），并保证 res 里有对应图标文件。", {}),
+            );
+          } else if (iconIn.length) {
+            pushBuildLog(
+              true,
+              tt("图标进包明细"),
+              tt("项目图标已进包：{l}{more}", {
+                l: iconIn.slice(0, 6).join("、"),
+                more: iconIn.length > 6 ? "…" : "",
+              }),
+              undefined,
+              undefined,
+              undefined,
+              "info",
+            );
+          } else {
+            pushBuildLog(
+              false,
+              tt("清单图标未进包"),
+              tt("manifest 引用的图标 {r} 在包内找不到，桌面将显示系统默认图标。确认 res 里确实有这些文件（图标编辑器生成的是 mipmap-anydpi-v26/ 下 4 个文件）。", {
+                r: refs.map((x) => `@${x.type}/${x.name}`).join("、"),
+              }),
+            );
+          }
+        }
         const dexGot = await collectProjectDex(aiFileIo);
         const dexFiles = numberDexFiles(dexGot).map((d) => ({ name: d.name, base64: d.base64 }));
         if (dexGot.length) {

@@ -3359,6 +3359,19 @@ export const SRC_HANT: SrcDict = {
 "本地库目录": "Local lib folder",
 "配置类型": "Configuration",
 "该依赖有 {n} 条 exclude，改坐标后原样保留": "This dependency has {n} excludes; they are kept when changing coordinates",
+// M458：打包日志资源/图标透明化（res 根定位、manifest 读取、图标进包明细）
+"未读到项目清单（AndroidManifest.xml）": "Project manifest (AndroidManifest.xml) not found",
+"试了 <项目根>/AndroidManifest.xml、app/src/main/、src/main/ 和当前文档推导的 res 兄弟目录都没找到。本次打包用合成清单：清单里的图标、主题、权限、label 全部丢失，桌面会显示系统默认图标。请确认项目目录结构是标准 Android 工程。": "Searched <project root>/AndroidManifest.xml, app/src/main/, src/main/ and the res-sibling dir derived from the open file. Building with a synthetic manifest: icon, theme, permissions and label are all lost, launcher will show the default system icon. Check that the project layout is a standard Android project.",
+"项目 res 目录未定位": "Project res directory not located",
+"没找到 res 根目录（试了 app/src/main/res、src/main/res、res 和当前文档所在 res/）——项目磁盘上的资源（含 mipmap 图标）一个都没进包，只带了编辑器内的资源。项目目录结构如果不是标准 Android 工程，请检查。": "No res root found (tried app/src/main/res, src/main/res, res and the res/ of the open file). No project resources (incl. mipmap icons) made it into the APK - only in-editor resources were used. Verify the project layout is a standard Android project.",
+"资源收集": "Resource collection",
+"res 根：{r}（{n} 个资源目录），新收 {a} 个文件，清单共 {t} 个": "res root: {r} ({n} res dirs), {a} new files collected, {t} in the list",
+"包内无图标资源": "No icon resources in APK",
+"清单没写 android:icon（或没读到清单）——打包后桌面显示系统默认图标。请在 manifest 的 application 节点加 android:icon（如 @mipmap/ic_launcher），并保证 res 里有对应图标文件。": "Manifest has no android:icon (or the manifest was not read) - the launcher will show the default system icon. Add android:icon (e.g. @mipmap/ic_launcher) to the application node and make sure the icon files exist in res.",
+"图标进包明细": "Icon in APK",
+"项目图标已进包：{l}{more}": "Project icon included: {l}{more}",
+"清单图标未进包": "Manifest icon not in APK",
+"manifest 引用的图标 {r} 在包内找不到，桌面将显示系统默认图标。确认 res 里确实有这些文件（图标编辑器生成的是 mipmap-anydpi-v26/ 下 4 个文件）。": "Icon(s) referenced by the manifest ({r}) are missing from the APK - the launcher will show the default system icon. Make sure these files really exist in res (the icon editor generates 4 files under mipmap-anydpi-v26/).",
 };
 
 /** 日本語 —— 只登记与英文不同的；没登记的先走英文兜底（见 t()） */

@@ -73,6 +73,36 @@ export function typeFromDescriptor(desc) {
   return base + "[]".repeat(dim);
 }
 
+/**
+ * 方法描述符 → 参数类型串（如 `(ILjava/lang/String;J)V` → `int, String, long`；无参 → ""）。
+ * M453：候选主行要显示「方法名(参数)」。
+ */
+export function paramsFromDescriptor(desc) {
+  if (!desc) return "";
+  const open = desc.indexOf("(");
+  const close = desc.lastIndexOf(")");
+  if (open < 0 || close <= open) return "";
+  const inner = desc.slice(open + 1, close);
+  const out = [];
+  let i = 0;
+  while (i < inner.length) {
+    let j = i;
+    while (inner[j] === "[") j++;
+    const dims = j - i;
+    if (inner[j] === "L") {
+      const semi = inner.indexOf(";", j);
+      if (semi < 0) break;
+      const fq = inner.slice(j + 1, semi);
+      out.push(fq.slice(fq.lastIndexOf("/") + 1).split("$").pop() + "[]".repeat(dims));
+      i = semi + 1;
+    } else {
+      out.push((PRIM_TYPE[inner[j]] || inner[j]) + "[]".repeat(dims));
+      i = j + 1;
+    }
+  }
+  return out.join(", ");
+}
+
 /** 跳过 count 个 attribute（每个 name_idx(2)+length(4)+data(length)） */
 function skipAttributes(buf, r, count) {
   for (let a = 0; a < count; a++) {
@@ -122,6 +152,7 @@ export function parseClassInfo(buf) {
     const attrs = buf.readUInt16BE(r + 6);
     const name = utf8.get(nameIdx) || "";
     const ret = typeFromDescriptor(utf8.get(descIdx) || "");
+    const params = paramsFromDescriptor(utf8.get(descIdx) || "");
     // 检查方法属性里有没有 "Deprecated"
     let hasDep = false;
     let ar = r + 8;
@@ -134,7 +165,7 @@ export function parseClassInfo(buf) {
     }
     r = ar;
     if (name && name !== "<init>" && name !== "<clinit>" && (mAccess & 0x0001)) {
-      methods.push({ name, isDeprecated: hasDep, ret });
+      methods.push({ name, isDeprecated: hasDep, ret, params });
     }
   }
 

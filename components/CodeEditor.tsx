@@ -130,6 +130,8 @@ interface SugState {
   kinds?: SuggestKind[];
   /** M352 M3:与 items 对应的第二行（方法签名/重载/归属类） */
   subs?: (string | undefined)[];
+  /** M453:与 items 对应的主行参数（`name(参数)`；无签名信息为 undefined） */
+  sigs?: (string | undefined)[];
   prefix: string;
   placement: Placement;
   width: number;
@@ -1094,7 +1096,12 @@ export function CodeEditor({
       return;
     }
     const rect = body.getBoundingClientRect();
-    const size = estimateSuggestSize(ctx.items);
+    // M453：宽度估算要用「名 + (参数)」的显示串
+    const sigsOf = "sigs" in ctx ? (ctx as { sigs?: (string | undefined)[] }).sigs : undefined;
+    const display = ctx.items.map((t, i) =>
+      sigsOf?.[i] !== undefined ? t + "(" + sigsOf[i] + ")" : t,
+    );
+    const size = estimateSuggestSize(display);
     const placement = placeSuggest(
       {
         left: coords.left - rect.left,
@@ -1111,9 +1118,15 @@ export function CodeEditor({
       kind: ctx.kind,
       kinds: ctx.kinds,
       subs: "subs" in ctx ? (ctx as { subs?: (string | undefined)[] }).subs : undefined,
+      // M453：主行 `name(参数)` 的参数（与 items 对齐；无签名信息为 undefined）
+      sigs: "sigs" in ctx ? (ctx as { sigs?: (string | undefined)[] }).sigs : undefined,
       prefix: ctx.prefix,
       placement,
-      width: size.width,
+      // M453：宽度按「名 + (参数)」估算，并夹到容器宽（不超过编辑器）
+      width: Math.min(
+        size.width,
+        Math.max(estimateSuggestSize([]).width, rect.width - 8),
+      ),
     });
   }, [setSugBoth]);
 
@@ -1701,7 +1714,13 @@ export function CodeEditor({
                 }}
               >
                 <span className="axv-sug-text">
-                  {it}
+                  {/* M453：主行 = 方法名 + (参数)，参数淡色不抢主词 */}
+                  <span className="axv-sug-main">
+                    {it}
+                    {k === "method" && sug.sigs?.[i] !== undefined ? (
+                      <span className="axv-sug-args">({sug.sigs[i] as string})</span>
+                    ) : null}
+                  </span>
                   {sug.subs?.[i] ? (
                     <span className="axv-sug-sub" title={sug.subs[i] as string}>
                       {sug.subs[i] as string}

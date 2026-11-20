@@ -91,12 +91,15 @@ function main() {
           // M451：按 FQN 存方法。同名跨包（如 android.os.Handler vs java.util.logging.Handler）
           // 不再把方法并进同一个 simple-name 桶 → 避免补全里出现「别的包同名类的方法」。
           let e2 = byFqn.get(fqn);
-          if (!e2) byFqn.set(fqn, (e2 = { pkg, methods: new Set(), dm: new Set(), rets: new Map(), d: false }));
+          if (!e2)
+            byFqn.set(fqn, (e2 = { pkg, methods: new Set(), dm: new Set(), rets: new Map(), params: new Map(), d: false }));
           for (const m of info.methods) {
             e2.methods.add(m.name);
             if (m.isDeprecated) e2.dm.add(m.name);
             // M452：同名重载只记第一个非 void 返回类型（候选列表展示够用）
             if (m.ret && m.ret !== "void" && !e2.rets.has(m.name)) e2.rets.set(m.name, m.ret);
+            // M453：参数类型串（无参记 ""，主行显示 `name()`）；同名重载取参数最多的
+            if (m.params !== undefined && !e2.params.has(m.name)) e2.params.set(m.name, m.params);
           }
           if (info.classDeprecated) e2.d = true;
           let list = simpleToFqns.get(simple);
@@ -134,6 +137,7 @@ function main() {
       d: c.d ? 1 : 0,
       m: [...c.methods].sort(),
       ...(c.rets.size ? { r: Object.fromEntries([...c.rets.entries()].sort((a, b) => a[0].localeCompare(b[0]))) } : {}),
+      ...(c.params.size ? { p: Object.fromEntries([...c.params.entries()].sort((a, b) => a[0].localeCompare(b[0]))) } : {}),
       ...(c.dm.size ? { dm: [...c.dm].sort() } : {}),
     };
   }

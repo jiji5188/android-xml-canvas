@@ -33,9 +33,11 @@ describe("M352 M3：候选第二行（方法签名 subs）", () => {
     expect(out).toBeTruthy();
     const idx = out!.items.indexOf("loadData");
     expect(idx).toBeGreaterThanOrEqual(0);
-    // 第二行签名含参数（已包成 (String url, int n)）
-    expect(out!.subs).toBeTruthy();
-    expect(out!.subs![idx] || "").toMatch(/String/);
+    // M453：参数已移到主行（sigs），说明行只留「修饰符 · 返回类型」
+    expect(out!.sigs).toBeTruthy();
+    expect(out!.sigs![idx]).toBe("String url, int n");
+    // void 方法无返回类型 → 说明行只剩修饰符（loadData 是 public）
+    expect(out!.subs![idx]).toBe("public");
   });
 
   it("rankCandidates 无 receiver 时也保留签名（不只 deprecated 才有）", () => {

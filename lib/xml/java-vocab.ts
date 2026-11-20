@@ -540,6 +540,15 @@ function retMapForType(lex: Lexicon | undefined | null, type: string | null | un
   return m;
 }
 
+/** M453：receiver 类型的参数类型表（name → "Runnable, long"，无参 = ""），用于给静态表里的裸方法名补参数 */
+function sigMapForType(lex: Lexicon | undefined | null, type: string | null | undefined): Map<string, string> {
+  const m = new Map<string, string>();
+  if (!lex || !type) return m;
+  for (const x of resolveTypeMethodsFromLex(lex, type))
+    if (x.signature !== undefined && !m.has(x.name)) m.set(x.name, x.signature);
+  return m;
+}
+
 /** 项目词库里某类型的成员方法（含继承/接口），返回 {name, signature, isDeprecated}。SDK 类不在词库 → 空 */
 export function resolveTypeMethodsFromLex(
   lex: Lexicon | null | undefined,
@@ -733,14 +742,9 @@ function subForItem(it: SubItem, docSym: ReturnType<typeof extractDocSymbolTypes
     return undefined;
   }
   if (it.kind === "method") {
+    // M453：参数已移到主行 `name(参数)`，说明行只留「修饰符 · 返回类型」
     const ret = it.ret ?? retTypeOf(docSym, t);
-    if (ret) {
-      // M442/M443：`public (…) · String`（修饰符在前，返回类型最后用 · 连；无签名则 `public · String` / `String`）
-      const sig = it.signature ? " (" + it.signature + ")" : "";
-      const lead = it.mod ? it.mod + sig : sig;
-      return (lead ? lead + " · " : "") + ret;
-    }
-    if (it.signature !== undefined) return "(" + it.signature + ")" + modSuffix;
+    if (ret) return it.mod ? it.mod + " · " + ret : ret;
     return it.mod || undefined;
   }
   if (it.kind === "const" && it.mod) return it.mod;
@@ -757,7 +761,7 @@ export function computeJavaSuggest(
   cursor: { line: number; col: number },
   lex?: Lexicon, // M352：项目词库（传了就走打分排序；没传保留旧行为）
   recency?: Map<string, number>, // M352 M3：使用记忆（近期选中过的高分）
-): { line: number; col: number; prefix: string; kind: SuggestKind; items: string[]; kinds: SuggestKind[]; subs?: (string | undefined)[] } | null {
+): { line: number; col: number; prefix: string; kind: SuggestKind; items: string[]; kinds: SuggestKind[]; subs?: (string | undefined)[]; sigs?: (string | undefined)[] } | null {
   const lines = doc.split("\n");
   const li = Math.max(0, Math.min(cursor.line - 1, lines.length - 1));
   const lineText = lines[li] ?? "";
@@ -820,10 +824,18 @@ export function computeJavaSuggest(
     const items: { text: string; kind: SuggestKind; signature?: string; mod?: string; ret?: string }[] = [];
     const p = body.toLowerCase();
     const want = (t: string) => !p || t.toLowerCase().startsWith(p);
-    // M452：静态表只有方法名，返回类型从词库（SDK 索引）补
+    // M452/M453：静态表只有方法名，返回类型 / 参数从词库（SDK 索引）补
     const retMap = retMapForType(lex, receiverType);
+    const sigMap = sigMapForType(lex, receiverType);
     for (const m of methodsForType(receiverType))
-      if (want(m)) items.push({ text: m, kind: "method", signature: "", mod: modForTypeMethod(receiverType, m), ret: retMap.get(m) });
+      if (want(m))
+        items.push({
+          text: m,
+          kind: "method",
+          signature: sigMap.has(m) ? sigMap.get(m) : undefined,
+          mod: modForTypeMethod(receiverType, m),
+          ret: retMap.get(m),
+        });
     for (const c of constantsForType(receiverType)) if (want(c)) items.push({ text: c, kind: "const", mod: "public static" });
     // 项目词库里该类的方法（继承/接口）也并进来，排在 JDK 表后面
     for (const m of resolveTypeMethodsFromLex(lex, receiverType)) {
@@ -831,7 +843,7 @@ export function computeJavaSuggest(
         items.push({
           text: m.name,
           kind: "method",
-          signature: (m.isDeprecated ? "@Deprecated " : "") + (m.signature ?? ""),
+          signature: m.signature,
           mod: m.mod ?? "public",
           ret: m.ret,
         });
@@ -845,8 +857,8 @@ export function computeJavaSuggest(
       kind: picked[0].kind,
       items: picked.map((x) => x.text),
       kinds: picked.map((x) => x.kind),
-      // M396：第二行 = (参数) + 修饰符，如 `(String msg) · public static`
-      // M441：能拿到返回类型就写成 `CharSequence (int start) · public`（一眼看出方法返回什么）
+      // M453：主行显示 `name(参数)`；说明行只留「修饰符 · 返回类型」
+      sigs: picked.map((x) => (x.kind === "method" && x.signature !== undefined ? x.signature : undefined)),
       subs: picked.map((x) => subForItem(x, docSym, lex, offset)),
     };
   }
@@ -882,7 +894,16 @@ export function computeJavaSuggest(
       if (receiverType && receiver !== "this") {
         const recv = methodsForType(receiverType);
         const retMap = retMapForType(lex, receiverType);
-        for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method", signature: "", mod: modForTypeMethod(receiverType, m), ret: retMap.get(m) });
+        // M453：参数也从词库（SDK 索引）补，主行显示 `name(参数)`
+        const sigMap = sigMapForType(lex, receiverType);
+        for (const m of [...recv].reverse())
+          pool.unshift({
+            text: m,
+            kind: "method",
+            signature: sigMap.has(m) ? sigMap.get(m) : undefined,
+            mod: modForTypeMethod(receiverType, m),
+            ret: retMap.get(m),
+          });
         pool.unshift({ text: receiverType, kind: "class", fqn: JAVA_IMPORTS[receiverType] ?? lex.classes.get(receiverType)?.fqn });
       }
       // JDK 类型 + 关键字兜底（词库没覆盖的基础类型）
@@ -971,9 +992,11 @@ export function computeJavaSuggest(
   const picked = cand.slice(0, MAX_ITEMS);
   const items = picked.map((p) => p.text);
   const kinds = picked.map((p) => p.kind);
-  // M352 M3：第二行签名统一包成 (参数)（空参数显示 "()"，一眼看出是方法且无参）
+  // M453：主行 `name(参数)`（只有方法带参数；无签名信息则不带括号）
+  const sigs = picked.map((p) => (p.kind === "method" && p.signature !== undefined ? p.signature : undefined));
   // M396：带修饰符的再追加 " · 修饰符"，如 `(CharSequence text) · public` / `(int i) · private static`
   // M441：变量→声明类型；方法→返回类型；类→完整类名（查不到退回签名/修饰符）
+  // M453：方法的参数已移到主行，说明行只留「修饰符 · 返回类型」
   const subs = picked.map((p) => subForItem(p, docSym, lex, offset));
-  return { line: cursor.line, col, prefix, kind: kinds[0] ?? "plain", items, kinds, subs };
+  return { line: cursor.line, col, prefix, kind: kinds[0] ?? "plain", items, kinds, subs, sigs };
 }

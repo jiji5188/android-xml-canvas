@@ -667,6 +667,18 @@
   gap: 1px;
   min-width: 0;
 }
+/* M453：主行 = 方法名 + (参数)；参数淡色，超宽时 ellipsis */
+.axv-sug-main {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.axv-sug-args {
+  color: var(--axv-on-surface-variant);
+  opacity: 0.72;
+}
 /* M352 M3：候选第二行（方法签名/重载/归属类）——小号淡色，不抢主词 */
 .axv-sug-sub {
   font-size: 10px;

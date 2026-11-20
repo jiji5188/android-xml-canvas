@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   estimateSuggestSize,
   placeSuggest,
+  SUG_MAX_W,
   SUG_ITEM_H,
   SUG_MAX_H,
 } from "@/lib/xml/suggest-position";
@@ -82,11 +83,11 @@ describe("estimateSuggestSize", () => {
     expect(many.height).toBe(SUG_MAX_H);
   });
 
-  it("宽度随内容增长但有上限", () => {
+  it("宽度随内容增长但有上限（M453：上限 420）", () => {
     const narrow = estimateSuggestSize(["ab"]);
     const wide = estimateSuggestSize(["app:layout_constraintHorizontal_bias"]);
     expect(wide.width).toBeGreaterThan(narrow.width);
-    expect(wide.width).toBeLessThanOrEqual(320);
+    expect(wide.width).toBeLessThanOrEqual(SUG_MAX_W);
   });
 
   it("空列表也有最小尺寸", () => {

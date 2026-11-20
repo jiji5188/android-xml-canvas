@@ -108,7 +108,8 @@ export function placeSuggest(
 export const SUG_ITEM_H = 26;
 export const SUG_PAD_Y = 8;
 export const SUG_MIN_W = 180;
-export const SUG_MAX_W = 320;
+/** M453：参数进主行后内容变长，上限 320 → 420（仍会被容器宽夹住） */
+export const SUG_MAX_W = 420;
 /** 用户指定：弹窗最大高度 320px（超出滚） */
 export const SUG_MAX_H = 320;
 

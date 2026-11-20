@@ -173,6 +173,8 @@ export function useLints(getDeps: () => LintsDeps): LintsResult {
           idTag: javaResEnv.idTag,
           // M351：项目里其它文件声明过的方法名（getTitle 这种自己的方法不能被当成拼写错）
           knownMethods: D.projMethods,
+          // M454：SDK 真方法（getItemAtPosition 等 17k 个）不算拼写错，否则会被配成另一个真方法误报
+          sdkMethods: D.lexRef.current?.allMethodNames,
           // M352：项目词库里的类名（同包类/项目类）—— 用了但不 import 不该报「缺 import」/「未知符号」
           allowNames: (D.lexRef.current ? [...D.lexRef.current.classes.values()].map((c) => c.name) : []),
         }).map((j: any) => ({

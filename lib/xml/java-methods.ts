@@ -144,6 +144,11 @@ export const KNOWN_METHODS: string[] = [
   // 列表 / 适配器
   "getItem", "getItemId", "getItemCount", "getView", "getChildCount", "getChildAt", "getFirstVisiblePosition",
   "getLastVisiblePosition", "getCurrentItem", "getAdapterPosition", "getItemPosition", "getChildAdapterPosition",
+  // M454：AdapterView / ListView 真方法（以前漏收 → getItemAtPosition 被配成 getItemPosition 误报）
+  "getItemAtPosition", "getPositionForView", "pointToPosition", "getSelectedItemPosition", "getSelectedItemId",
+  "getSelectedView", "setSelection", "setSelectionFromTop", "getCount", "getHeaderViewCount",
+  "getFooterViewsCount", "setEmptyView", "getEmptyView", "addHeaderView", "addFooterView",
+  "performItemClick",
   // ViewPager2 / TabLayout / 滑动器（set↔get 成对，补全避免 setCurrentItem 被当未知/拼错）
   "setCurrentItem", "setOffscreenPageLimit", "getOffscreenPageLimit", "setCurrentTab", "getCurrentTab",
   "addTab", "removeTab", "getTabAt", "setTabSelected", "setSelected", "registerOnPageChangeCallback",
@@ -215,6 +220,9 @@ export interface MethodTypo {
 export interface FindMethodTyposOpts {
   /** 跳过这些名字（本文件 / 项目其它文件里定义的方法） */
   declared?: Iterable<string>;
+  /** M454：SDK 真实方法名（词库 allMethodNames）——真方法永不当拼写错，
+   *  否则白名单没收录的方法（如 getItemAtPosition）会被编辑距离配成另一个真方法（getItemPosition）→ 误报 */
+  sdkMethods?: Iterable<string>;
 }
 
 /** Java 关键字（在声明识别里当「类型 token」时要排除：return foo( / else if( 都不是声明） */
@@ -253,6 +261,8 @@ export function collectDeclaredMethods(code: string, into: Set<string> = new Set
 /** 在代码里找「调用名拼错」的地方 */
 export function findMethodTypos(code: string, opts: FindMethodTyposOpts = {}): MethodTypo[] {
   const declared = new Set<string>([...opts.declared ?? []]);
+  // M454：SDK 真方法集合（getItemAtPosition / getPositionForView 这类白名单没收录的，不能报拼写错）
+  const sdk = new Set<string>(opts.sdkMethods ?? []);
   // 本文件声明的方法（`void foo(` / `public String bar(`）不算拼错
   collectDeclaredMethods(code, declared);
 
@@ -260,7 +270,7 @@ export function findMethodTypos(code: string, opts: FindMethodTyposOpts = {}): M
   const seen = new Set<string>();
   const lines = code.split("\n");
   const check = (name: string, lineNo: number, colNo: number) => {
-    if (KNOWN.has(name) || declared.has(name) || seen.has(name)) return;
+    if (KNOWN.has(name) || declared.has(name) || sdk.has(name) || seen.has(name)) return;
     // M185b：短名（≤ 3 字符，如 put / get / add / run）不查 ——
     // 编辑距离只有 2 时几乎必误报（put→post），而这些短方法名本来就不是拼写坑
     if (name.length <= 3) return;

@@ -170,8 +170,10 @@ const errLineField = StateField.define<DecorationSet>({
  *  用 mark + CSS 而非 Widget（@codemirror/view 该版本不导出 Widget）。
  *  Java 文件启用（XML 无花括号块语义，不会画线）；渲染条数按深度 + 总数截断，避免满屏。 */
 
-/** 把跨行花括号块算成 CodeMirror 装饰：块内每行一个 mark（class axv-bgl，带 CSS 变量） */
-function buildBlockGuidesDeco(doc: { lines: number; line(n: number): { from: number; to: number }; toString(): string }): DecorationSet {
+/** 把跨行花括号块算成 CodeMirror 装饰：块内每行一个 line 装饰（class axv-bgl，带 CSS 变量）
+ *  ⚠️ line 装饰必须用单点 .range(L.from)（零长度），传 (from,to) 会抛
+ *     "Line decoration ranges must be zero-length" → 每次输入事务失败 → 输不了文字（M442 踩过） */
+export function buildBlockGuidesDeco(doc: { lines: number; line(n: number): { from: number; to: number }; toString(): string }): DecorationSet {
   const all = computeBlockGuides(doc.toString());
   const picked = pickRenderedGuides(all, 8, 60);
   if (picked.length === 0) return Decoration.none;
@@ -186,7 +188,7 @@ function buildBlockGuidesDeco(doc: { lines: number; line(n: number): { from: num
           attributes: {
             "style": `--bgl-c:${g.col};--bgl-l:${g.endLine - g.startLine + 1};`,
           },
-        }).range(L.from, L.to),
+        }).range(L.from),
       );
     }
   }

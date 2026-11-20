@@ -11,6 +11,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { clearResIndex } from "@/lib/xml/res-index";
+import { invalidateNativeProjectCache } from "@/lib/xml/workspace";
 import {
   activeFile,
   updateFileXml,
@@ -283,6 +285,10 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
       D.setProjectRev((n) => n + 1);
       D.setProjectTab("current");
       D.setWsActiveName("");
+      // M459：切项目时清理跨项目缓存——res-index 模块级 60s 缓存 + workspace 原生缓存，
+      //  避免把上一个项目的资源索引 / 文件列表带进当前项目
+      clearResIndex();
+      invalidateNativeProjectCache();
       // M144：优先恢复「上次打开的文件」，读不到才退回主布局
       const prefer = preferRel ?? readLastRel(opened.dirPath || opened.name);
       let restored = false;
@@ -305,6 +311,9 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
   const openWsProject = useCallback(
     async (item: WsProject) => {
       D.setWsBusy(true);
+      // M459：打开新项目前清缓存（res-index 60s 模块缓存 + workspace 原生缓存）
+      clearResIndex();
+      invalidateNativeProjectCache();
       try {
         if (item.kind === "file") {
           const r = await wsOpenProject(item);

@@ -5,6 +5,8 @@
 
 import { useCallback } from "react";
 import { createProject } from "@/lib/xml/multi-file";
+import { clearResIndex } from "@/lib/xml/res-index";
+import { invalidateNativeProjectCache } from "@/lib/xml/workspace";
 import {
   createAndroidProject,
   safeProjectName,
@@ -66,6 +68,9 @@ export function useProjectCreate(getDeps: () => ProjectCreateDeps) {
       ].join("\n");
 
       // 先把应用内状态切过去（落盘失败也不影响继续编辑）
+      // M459：新建项目也清缓存，避免上一个项目的 res-index / workspace 残留
+      clearResIndex();
+      invalidateNativeProjectCache();
       d.setProject((p: any) => ({ ...createProject(name, { name: "activity_main.xml", xml: tpl }), name }));
       d.setXmlAndTrack(tpl);
       d.setSelectedPath(null);

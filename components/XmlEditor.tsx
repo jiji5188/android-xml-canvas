@@ -570,12 +570,19 @@ export function XmlEditor({ initialProject = null, onExit }: XmlEditorProps) {
     installBackBridge();
     return () => resetBackStack();
   }, []);
+  /* ===== M455：编辑器最底层返回键（先占位注册，保证浮层在上面）=====
+   * 栈是后进先出，这里的 guard 必须比左栅/弹窗都先注册，否则返回键会跳过面板直接到它。
+   * 真正的处理函数在 leaveGuard 创建后写入 ref（那里才有 dirty / onExit）。 */
+  const exitBackRef = useRef<(() => void) | null>(null);
+  useBackGuard(!!onExit, () => exitBackRef.current?.(), "exit-editor");
   useBackGuard(leftOpen, () => setLeftOpen(false), "left-panel");
   useBackGuard(resShape !== null, () => setResShape(null), "shape-editor");
   useBackGuard(resIcon !== null, () => setResIcon(null), "icon-editor");
   useBackGuard(editingTheme !== null, () => setEditingTheme(null), "theme-dialog");
   useBackGuard(exportOpen, () => setExportOpen(false), "export-dialog");
   useBackGuard(addModalOpen, () => setAddModalOpen(false), "add-attr");
+  useBackGuard(newProjOpen, () => setNewProjOpen(false), "new-project");
+  useBackGuard(saveAsOpen, () => setSaveAsOpen(false), "save-as");
   useBackGuard(newProjOpen, () => setNewProjOpen(false), "new-project");
   useBackGuard(saveAsOpen, () => setSaveAsOpen(false), "save-as");
 
@@ -1610,6 +1617,11 @@ const allDrawableNames = useMemo(() => {
     onDiscard: () => setSavedMark(currentXml()),
     isDirty: () => dirty,
   });
+
+  /* M455：编辑器返回键的实际处理 —— 脏内容弹提示，干净直接回项目列表 */
+  exitBackRef.current = onExit
+    ? () => leaveGuard.gate(dirty, onExit)
+    : null;
 
   // 切换/打开文件 → 当前内容就是磁盘上的基线（避免一进来就顶着「未保存」）
   useEffect(() => {

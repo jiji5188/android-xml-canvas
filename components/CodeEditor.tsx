@@ -1496,7 +1496,21 @@ export function CodeEditor({
     if (value === lastEmittedRef.current) return;
     const cur = v.state.doc.toString();
     if (cur === value) return;
-    v.dispatch({ changes: { from: 0, to: cur.length, insert: value } });
+    // M456：全文档替换时保留原光标（行号夹到范围、列号夹到行长）。
+    // 之前不带 selection：CM6 全文档 replace 会把光标重置到位置 0（第 1 行第 0 列），
+    // 表现为「输入过程中光标偶尔跳回开头」（格式化/外部改动/撤销重做后父层回灌触发）。
+    const head = v.state.selection.main.head;
+    const ln = v.state.doc.lineAt(head);
+    const newLines = value.split("\n");
+    const clampedLine = Math.min(ln.number, newLines.length);
+    // 目标行的起点 = 前面各行（不含本行）长度 + 各自的换行符
+    const newHead =
+      newLines.slice(0, Math.max(0, clampedLine - 1)).reduce((n, l) => n + l.length + 1, 0) +
+      Math.min(ln.text.length - (head - ln.from), newLines[clampedLine - 1]?.length ?? 0);
+    v.dispatch({
+      changes: { from: 0, to: cur.length, insert: value },
+      selection: { anchor: newHead },
+    });
   }, [value]);
 
   /* ===== 语法切换 ===== */

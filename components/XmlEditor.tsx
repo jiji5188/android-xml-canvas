@@ -278,6 +278,7 @@ import { WIDGET_MAP, DRAG_WIDGET_MIME, type WidgetDef } from "./widget-catalog";
 import "./xml-canvas/index.css";
 // M100：安卓硬件返回键 → 关闭最上层浮层（而不是直接退出 App）
 import { useBackGuard } from "./useBackGuard";
+import { useEditorExitBack } from "./use-editor-exit-back";
 import { installBackBridge, resetBackStack } from "@/lib/ui/back-stack";
 import { readableOn, deviceById } from "@/lib/xml/theme";
 import { DEFAULT_RENDER_THEME, type RenderTheme } from "@/lib/xml/theme";
@@ -570,11 +571,7 @@ export function XmlEditor({ initialProject = null, onExit }: XmlEditorProps) {
     installBackBridge();
     return () => resetBackStack();
   }, []);
-  /* ===== M455：编辑器最底层返回键（先占位注册，保证浮层在上面）=====
-   * 栈是后进先出，这里的 guard 必须比左栅/弹窗都先注册，否则返回键会跳过面板直接到它。
-   * 真正的处理函数在 leaveGuard 创建后写入 ref（那里才有 dirty / onExit）。 */
-  const exitBackRef = useRef<(() => void) | null>(null);
-  useBackGuard(!!onExit, () => exitBackRef.current?.(), "exit-editor");
+  const { leaveGuardRef, dirtyRef } = useEditorExitBack(onExit);
   useBackGuard(leftOpen, () => setLeftOpen(false), "left-panel");
   useBackGuard(resShape !== null, () => setResShape(null), "shape-editor");
   useBackGuard(resIcon !== null, () => setResIcon(null), "icon-editor");
@@ -1609,19 +1606,10 @@ const allDrawableNames = useMemo(() => {
 
   const dirty = xml !== savedMark;
 
-  /** M141：全局离开拦截 —— 切文件 / 打开新文件 / 关浏览器（未保存时）
-   *  M412：beforeunload 拦截已下沉进 useUnsavedLeave（传 isDirty 即生效） */
-  const leaveGuard = useUnsavedLeave({
-    title: tt("有未保存的内容"),
-    onSave: () => void doSave(),
-    onDiscard: () => setSavedMark(currentXml()),
-    isDirty: () => dirty,
-  });
-
-  /* M455：编辑器返回键的实际处理 —— 脏内容弹提示，干净直接回项目列表 */
-  exitBackRef.current = onExit
-    ? () => leaveGuard.gate(dirty, onExit)
-    : null;
+  /** M141：全局离开拦截 —— 切文件 / 打开新文件 / 关浏览器（未保存时）；M412：beforeunload 拦截已下沉 */
+  const leaveGuard = useUnsavedLeave({ title: tt("有未保存的内容"), onSave: () => void doSave(), onDiscard: () => setSavedMark(currentXml()), isDirty: () => dirty });
+  leaveGuardRef.current = leaveGuard;
+  dirtyRef.current = () => dirty;
 
   // 切换/打开文件 → 当前内容就是磁盘上的基线（避免一进来就顶着「未保存」）
   useEffect(() => {

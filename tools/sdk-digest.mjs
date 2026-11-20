@@ -64,7 +64,8 @@ function main() {
   fs.mkdirSync(tmpDir, { recursive: true });
   execSync(`tar -xf "${jar}" -C "${tmpDir}"`, { stdio: "pipe", shell: "cmd.exe" });
 
-  const classes = new Map(); // simple → { pkg, fqn, d, m:Set, dm:Set }
+  const byFqn = new Map(); // fqn → { pkg, methods:Set, dm:Set, d:bool }
+  const simpleToFqns = new Map(); // simple → Set<fqn>
   let nFiles = 0;
   for (const sub of ["android", "java", "javax"]) {
     const root = path.join(tmpDir, sub);
@@ -87,26 +88,52 @@ function main() {
           }
           if (!info) continue;
           nFiles++;
-          let c = classes.get(simple);
-          if (!c) classes.set(simple, (c = { pkg, fqn, d: 0, m: new Set(), dm: new Set() }));
+          // M451：按 FQN 存方法。同名跨包（如 android.os.Handler vs java.util.logging.Handler）
+          // 不再把方法并进同一个 simple-name 桶 → 避免补全里出现「别的包同名类的方法」。
+          let e2 = byFqn.get(fqn);
+          if (!e2) byFqn.set(fqn, (e2 = { pkg, methods: new Set(), dm: new Set(), rets: new Map(), d: false }));
           for (const m of info.methods) {
-            c.m.add(m.name);
-            if (m.isDeprecated) c.dm.add(m.name);
+            e2.methods.add(m.name);
+            if (m.isDeprecated) e2.dm.add(m.name);
+            // M452：同名重载只记第一个非 void 返回类型（候选列表展示够用）
+            if (m.ret && m.ret !== "void" && !e2.rets.has(m.name)) e2.rets.set(m.name, m.ret);
           }
-          if (info.classDeprecated) c.d = 1;
+          if (info.classDeprecated) e2.d = true;
+          let list = simpleToFqns.get(simple);
+          if (!list) simpleToFqns.set(simple, (list = new Set()));
+          list.add(fqn);
         }
       }
     };
     walk(root);
   }
 
+  // M451：同名跨包时，为每个 simple 选一个「首选 FQN」，只发该 FQN 的方法（不再并包）。
+  // 选择规则：① android.* 优先；② 方法多的（更核心）；③ 同分按 fqn 字母序。
+  const pickFqn = (cand) => {
+    const arr = [...cand];
+    arr.sort((a, b) => {
+      const ap = byFqn.get(a).pkg.startsWith("android.") ? 0 : 1;
+      const bp = byFqn.get(b).pkg.startsWith("android.") ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      const am = byFqn.get(a).methods.size;
+      const bm = byFqn.get(b).methods.size;
+      if (am !== bm) return bm - am;
+      return a.localeCompare(b);
+    });
+    return arr[0];
+  };
+
   const classOut = {};
-  for (const [simple, c] of classes.entries()) {
+  for (const [simple, cand] of simpleToFqns.entries()) {
+    const chosen = pickFqn(cand);
+    const c = byFqn.get(chosen);
     classOut[simple] = {
       pkg: c.pkg,
-      fqn: c.fqn,
-      d: c.d,
-      m: [...c.m].sort(),
+      fqn: chosen,
+      d: c.d ? 1 : 0,
+      m: [...c.methods].sort(),
+      ...(c.rets.size ? { r: Object.fromEntries([...c.rets.entries()].sort((a, b) => a[0].localeCompare(b[0]))) } : {}),
       ...(c.dm.size ? { dm: [...c.dm].sort() } : {}),
     };
   }

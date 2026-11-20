@@ -115,6 +115,25 @@ describe("M352 M2 真实 SDK 索引（若存在）", () => {
     // View 的废弃方法应被标出（给删除线候选）
     expect(lex.deprecated.size).toBeGreaterThan(0);
   });
+
+  // M451：同名跨包不再并方法。searchHandler. 曾经弹出 java.util.logging.Handler 的
+  // getEncoding/getErrorManager/getFilter/getFormatter/getLevel —— android.os.Handler 没有这些方法。
+  it("M451 真实索引 Handler 方法不被同名跨包类污染（android.os.Handler）", () => {
+    if (!fs.existsSync(idxPath)) {
+      expect(true).toBe(true);
+      return;
+    }
+    const idx = JSON.parse(fs.readFileSync(idxPath, "utf8")) as SdkIndex;
+    const h = idx.classes["Handler"];
+    expect(h, "真实索引里必须有 Handler 条目").toBeTruthy();
+    expect(h!.fqn).toBe("android.os.Handler");
+    // android.os.Handler 自己的方法必须都在
+    const mustHave = ["post", "postDelayed", "removeCallbacks", "obtainMessage", "handleMessage"];
+    for (const m of mustHave) expect(h!.m, `Handler 必须含 ${m}`).toContain(m);
+    // java.util.logging.Handler 的方法绝不出现（这就是用户看到的脏补全）
+    const mustNotHave = ["getEncoding", "getErrorManager", "getFilter", "getFormatter", "getLevel", "publish", "isLoggable", "setEncoding", "flush"];
+    for (const m of mustNotHave) expect(h!.m, `Handler 不能含 logging 方法 ${m}`).not.toContain(m);
+  });
 });
 
 describe("M352 M2 loadSdkLexicon（fetch 注入）", () => {

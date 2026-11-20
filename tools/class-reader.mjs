@@ -48,6 +48,31 @@ function readConstantPool(buf) {
   return { utf8, end: q };
 }
 
+/** 基本类型描述符 → Java 类型名 */
+const PRIM_TYPE = { V: "void", Z: "boolean", B: "byte", C: "char", S: "short", I: "int", J: "long", F: "float", D: "double" };
+
+/**
+ * 方法描述符 → 返回类型简名（如 `(I)Ljava/lang/String;` → String，`()[B` → byte[]）。
+ * M452：候选列表要展示「这个方法返回什么」。
+ */
+export function typeFromDescriptor(desc) {
+  if (!desc) return "";
+  const p = desc.lastIndexOf(")");
+  let t = p >= 0 ? desc.slice(p + 1) : desc;
+  let dim = 0;
+  while (t.startsWith("[")) {
+    dim++;
+    t = t.slice(1);
+  }
+  let base;
+  if (PRIM_TYPE[t]) base = PRIM_TYPE[t];
+  else if (t.startsWith("L") && t.endsWith(";")) {
+    const fq = t.slice(1, -1);
+    base = fq.slice(fq.lastIndexOf("/") + 1).split("$").pop();
+  } else base = t;
+  return base + "[]".repeat(dim);
+}
+
 /** 跳过 count 个 attribute（每个 name_idx(2)+length(4)+data(length)） */
 function skipAttributes(buf, r, count) {
   for (let a = 0; a < count; a++) {
@@ -93,8 +118,10 @@ export function parseClassInfo(buf) {
   for (let m = 0; m < methodsCount; m++) {
     const mAccess = buf.readUInt16BE(r);
     const nameIdx = buf.readUInt16BE(r + 2);
+    const descIdx = buf.readUInt16BE(r + 4);
     const attrs = buf.readUInt16BE(r + 6);
     const name = utf8.get(nameIdx) || "";
+    const ret = typeFromDescriptor(utf8.get(descIdx) || "");
     // 检查方法属性里有没有 "Deprecated"
     let hasDep = false;
     let ar = r + 8;
@@ -107,7 +134,7 @@ export function parseClassInfo(buf) {
     }
     r = ar;
     if (name && name !== "<init>" && name !== "<clinit>" && (mAccess & 0x0001)) {
-      methods.push({ name, isDeprecated: hasDep });
+      methods.push({ name, isDeprecated: hasDep, ret });
     }
   }
 

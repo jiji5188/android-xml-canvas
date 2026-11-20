@@ -532,6 +532,14 @@ export function constantsForType(type: string): string[] {
   return [...out];
 }
 
+/** M452：receiver 类型的方法返回类型表（name → ret），用于给静态表里的裸方法名补返回类型 */
+function retMapForType(lex: Lexicon | undefined | null, type: string | null | undefined): Map<string, string> {
+  const m = new Map<string, string>();
+  if (!lex || !type) return m;
+  for (const x of resolveTypeMethodsFromLex(lex, type)) if (x.ret && !m.has(x.name)) m.set(x.name, x.ret);
+  return m;
+}
+
 /** 项目词库里某类型的成员方法（含继承/接口），返回 {name, signature, isDeprecated}。SDK 类不在词库 → 空 */
 export function resolveTypeMethodsFromLex(
   lex: Lexicon | null | undefined,
@@ -812,8 +820,10 @@ export function computeJavaSuggest(
     const items: { text: string; kind: SuggestKind; signature?: string; mod?: string; ret?: string }[] = [];
     const p = body.toLowerCase();
     const want = (t: string) => !p || t.toLowerCase().startsWith(p);
+    // M452：静态表只有方法名，返回类型从词库（SDK 索引）补
+    const retMap = retMapForType(lex, receiverType);
     for (const m of methodsForType(receiverType))
-      if (want(m)) items.push({ text: m, kind: "method", signature: "", mod: modForTypeMethod(receiverType, m) });
+      if (want(m)) items.push({ text: m, kind: "method", signature: "", mod: modForTypeMethod(receiverType, m), ret: retMap.get(m) });
     for (const c of constantsForType(receiverType)) if (want(c)) items.push({ text: c, kind: "const", mod: "public static" });
     // 项目词库里该类的方法（继承/接口）也并进来，排在 JDK 表后面
     for (const m of resolveTypeMethodsFromLex(lex, receiverType)) {
@@ -871,7 +881,8 @@ export function computeJavaSuggest(
       //   插到 pool 最前（比宽池子更准）。`titleView.` → setText/getText 排最前。
       if (receiverType && receiver !== "this") {
         const recv = methodsForType(receiverType);
-        for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method", signature: "", mod: modForTypeMethod(receiverType, m) });
+        const retMap = retMapForType(lex, receiverType);
+        for (const m of [...recv].reverse()) pool.unshift({ text: m, kind: "method", signature: "", mod: modForTypeMethod(receiverType, m), ret: retMap.get(m) });
         pool.unshift({ text: receiverType, kind: "class", fqn: JAVA_IMPORTS[receiverType] ?? lex.classes.get(receiverType)?.fqn });
       }
       // JDK 类型 + 关键字兜底（词库没覆盖的基础类型）

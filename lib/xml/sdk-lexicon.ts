@@ -14,6 +14,8 @@ export interface SdkClassEntry {
   d?: 1;
   /** 方法名 */
   m: string[];
+  /** M452：方法名 → 返回类型简名（void 不存）。候选说明行展示「这个方法返回什么」 */
+  r?: Record<string, string>;
   /** 废弃方法名 */
   dm?: string[];
 }
@@ -45,10 +47,12 @@ export function sdkIndexToLexicon(idx: SdkIndex): Lexicon {
     if (!lex.classes.has(simple)) lex.classes.set(simple, cls);
     if (e.fqn) lex.classesByFqn.set(e.fqn, cls);
     const dm = new Set(e.dm || []);
+    const rm = e.r || {};
     const ms: LexMethod[] = (e.m || []).map((name) => ({
       name,
       originClass: simple,
       isDeprecated: dm.has(name) ? true : undefined,
+      ret: rm[name] || undefined,
     }));
     if (ms.length) lex.methods.set(simple, ms);
     for (const m of ms) {

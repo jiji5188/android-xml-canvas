@@ -1278,7 +1278,7 @@ const allDrawableNames = useMemo(() => {
     histRef, syncHist, flushTextTimer,
     setSelectedPath, setExportNote, setOpenRel, setXmlAndTrack, applyExternalState,
     openRelRef, xmlRef, projectRef,
-    setGeneratedDrawables, setSampleValues,
+    setGeneratedDrawables, setSampleValues, setResExtras,
     setWsActiveName, setWsMsg,
     activeProjectRef, setSaveOrigin, setActiveProject, setProjectRev, setProjectTab, projMeta,
     refreshWorkspace, setWsBusy, wsState,

@@ -49,4 +49,17 @@ describe("M466 切项目清文件 tabs", () => {
     // 确认它没有沿用旧 p.files（是全量替换不是 append）
     expect(b).not.toMatch(/files:\s*\[.*\.\.\./);
   });
+  it("M466 clearCrossProject 清 resExtras / generatedDrawables / sampleValues（跨项目资源残留）", () => {
+    const s = fs.readFileSync(path.join(root, "components/use-xml-project-fns.ts"), "utf8");
+    const ci = s.indexOf("const clearCrossProject");
+    expect(ci).toBeGreaterThan(-1);
+    const cb = s.slice(ci, s.indexOf("[D]", ci) + 10);
+    expect(cb).toContain("D.setResExtras(null)");
+    expect(cb).toContain("D.setGeneratedDrawables({})");
+    expect(cb).toContain('D.setSampleValues("")');
+    // activateProject 里调了
+    const ai = s.indexOf("const activateProject");
+    const ab = s.slice(ai, s.indexOf("[loadEntry, clearCrossProject, D]", ai));
+    expect(ab).toContain("clearCrossProject()");
+  });
 });

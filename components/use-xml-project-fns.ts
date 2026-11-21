@@ -69,6 +69,8 @@ export interface XmlProjectFnsDeps {
   // C 画布
   setGeneratedDrawables: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setSampleValues: (v: string) => void;
+  /** M466：资源索引（切项目时清掉，避免旧项目 res 串到新项目 R 表 / 预览） */
+  setResExtras: React.Dispatch<React.SetStateAction<ResourceExtras | null>>;
   // 面板
   setWsActiveName: (v: string) => void;
   setWsMsg: (v: string) => void;
@@ -123,6 +125,15 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  /** M466：切项目/载入示例时清掉跨项目残留——resExtras（旧项目资源索引会串进 R 表 / 预览）+
+   *  generatedDrawables + sampleValues。与 M459 的模块级缓存清理（clearResIndex/invalidateNativeProjectCache）
+   *  互补：那边清的是 60s 模块缓存，这里清的是 React 状态里的旧项目资源。 */
+  const clearCrossProject = useCallback(() => {
+    D.setResExtras(null);
+    D.setGeneratedDrawables({});
+    D.setSampleValues("");
+  }, [D]);
 
   const loadEntry = useCallback(
     async (source: ProjectSource, entry: BrowseEntry) => {
@@ -291,6 +302,8 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
       invalidateNativeProjectCache();
       // M466：切项目时清空上一项目的文件 tabs（Project.files），避免新页面还留着旧项目的已打开文件误导用户
       D.setProject({ name, files: [], activeId: "" });
+      // M466：清跨项目残留资源（resExtras / generatedDrawables / sampleValues）
+      clearCrossProject();
       // M144：优先恢复「上次打开的文件」，读不到才退回主布局
       const prefer = preferRel ?? readLastRel(opened.dirPath || opened.name);
       let restored = false;
@@ -306,7 +319,7 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
       if (main) await loadEntry(opened.source, main);
       else if (!restored) D.setWsMsg(tt("已打开《{name}》，但里面没找到 layout xml", { name }));
     },
-    [loadEntry, D],
+    [loadEntry, clearCrossProject, D],
   );
 
   /** M25d：项目列表里点一项 —— 打开这个项目（网页端也能直接读工作目录里的文件夹） */
@@ -327,6 +340,8 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
           D.setWsActiveName(item.name);
           // M466：清掉上一项目残留的文件 tabs，避免跨项目误导
           D.setProject({ name: item.name, files: [], activeId: "" });
+          // M466：清跨项目残留资源
+          clearCrossProject();
           if (item.target) D.setSaveOrigin({ kind: "native", target: item.target, name: item.name });
           else if (item.handle) D.setSaveOrigin({ kind: "handle", handle: item.handle, name: item.name });
           else D.setSaveOrigin(null);
@@ -346,7 +361,7 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
         D.setWsBusy(false);
       }
     },
-    [activateProject, D],
+    [activateProject, clearCrossProject, D],
   );
 
   /** M24：打开一个项目目录（弹系统选择器），成功后切到「当前项目」 */
@@ -413,6 +428,8 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
     (key: string) => {
       const p = sampleProjectByKey(key);
       if (!p) return;
+      // M466：先清掉上一项目残留资源（resExtras / 旧 generatedDrawables / 旧 sampleValues）
+      clearCrossProject();
       D.setXmlAndTrack(p.layout);
       D.setGeneratedDrawables((m) => ({ ...p.drawables, ...m }));
       D.setSampleValues(p.values ?? "");
@@ -426,19 +443,21 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
       );
       window.setTimeout(() => D.setExportNote(""), 4600);
     },
-    [D],
+    [clearCrossProject, D],
   );
 
   const applyBlankTemplate = useCallback(
     (key: string) => {
       const b = SAMPLE_BLANKS.find((t) => t.key === key);
       if (!b) return;
+      // M466：先清掉上一项目残留资源
+      clearCrossProject();
       D.setXmlAndTrack(b.layout);
       D.setSelectedPath(null);
       // M466：清掉上一项目残留的文件 tabs
       D.setProject({ name: b.name ?? "new", files: [], activeId: "" });
     },
-    [D],
+    [clearCrossProject, D],
   );
 
   /** M9：多文件切换 —— 先把当前编辑内容回写到项目，再切到目标文件，撤销栈跟着文件走 */

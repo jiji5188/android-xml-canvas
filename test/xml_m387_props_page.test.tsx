@@ -98,11 +98,18 @@ describe("M387 setAppConfigField", () => {
     expect(r.text).toContain("compileSdk = 34");
   });
 
-  it("缺 versionCode：拒绝瞎插（它属于 defaultConfig）", () => {
+  it("M461：versionCode 缺失 → 插 android 顶层（无 defaultConfig 时兜底）", () => {
     const t = `android {\n    namespace "x"\n}\n`;
     const r = setAppConfigField(t, "versionCode", "9");
-    expect(r.ok).toBe(false);
-    expect(r.msg).toContain("versionCode");
+    expect(r.ok).toBe(true);
+    expect(r.text).toMatch(/versionCode 9/);
+  });
+
+  it("M461：versionCode 缺失且有 defaultConfig → 插 defaultConfig", () => {
+    const t = `android {\n    namespace "x"\n    defaultConfig {\n        minSdk 24\n    }\n}\n`;
+    const r = setAppConfigField(t, "versionCode", "9");
+    expect(r.ok).toBe(true);
+    expect(r.text).toMatch(/defaultConfig \{[\s\S]*?versionCode 9/);
   });
 
   it("没有 android { 块：报错不硬改", () => {

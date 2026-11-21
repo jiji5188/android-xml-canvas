@@ -498,6 +498,9 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
         }
       }
       // 3.5) M387：SDK/版本表单字段（compileSdk/minSdk/targetSdk/versionCode/versionName）
+      // M461：单字段写入失败不再 return（以前会卡住第 4 步 saveRel，连成功的包名改动都写不进盘）。
+      //  改为收集失败信息，第 4 步照常写盘已成功的改动，最后统一提示哪些字段没写进去。
+      const gradleFieldErrors: string[] = [];
       if (gradle && gradleTextToSave !== null) {
         const kts = gradle.rel.endsWith(".kts");
         const fields: AppConfigField[] = ["compileSdk", "minSdk", "targetSdk", "versionCode", "versionName"];
@@ -506,8 +509,8 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
           if (val === (origin.gradle[f] || "").trim()) continue;
           const r = setAppConfigField(gradleTextToSave, f, val, kts);
           if (!r.ok) {
-            setMsg(tt("build.gradle 改 {f} 失败：{m}", { f, m: r.msg || "" }));
-            return;
+            gradleFieldErrors.push(tt("{f}：{m}", { f, m: r.msg || "" }));
+            continue;
           }
           gradleTextToSave = r.text;
         }
@@ -520,8 +523,8 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
           if (v === undefined) continue;
           const r = setBuildFeature(gradleTextToSave, k, v, kts);
           if (!r.ok) {
-            setMsg(tt("buildFeatures 改 {k} 失败：{m}", { k, m: r.msg || "" }));
-            return;
+            gradleFieldErrors.push(tt("buildFeatures.{k}：{m}", { k, m: r.msg || "" }));
+            continue;
           }
           gradleTextToSave = r.text;
         }
@@ -604,8 +607,16 @@ export function ProjectPropsDialog(p: ProjectPropsDialogProps) {
       p.onSaved();
       // 保留第 3 步的包名同步详情（「已保存」会把具体结果冲掉）：
       // 有同步结果就展示它，没有就展示「已保存」
-      setMsg(pkgDetail ?? tt("已保存"));
-      window.setTimeout(() => p.onClose(), 550);
+      // M461：单字段失败不再中止保存，最后统一提示哪些没写进 build.gradle
+      let savedMsg = pkgDetail ?? tt("已保存");
+      if (gradleFieldErrors.length) {
+        savedMsg += tt("\n⚠ {n} 项没写进 build.gradle：{l}", {
+          n: gradleFieldErrors.length,
+          l: gradleFieldErrors.join("；"),
+        });
+      }
+      setMsg(savedMsg);
+      window.setTimeout(() => p.onClose(), gradleFieldErrors.length ? 4000 : 550);
     } finally {
       setBusy(false);
     }

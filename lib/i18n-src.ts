@@ -1594,6 +1594,7 @@ export const SRC_EN: SrcDict = {
   "仓库 URL，如 https://maven.aliyun.com/repository/public": "Repo URL, e.g. https://maven.aliyun.com/repository/public",
   "加到 {s}": "Add to {s}",
   "buildFeatures 改 {k} 失败：{m}": "Failed to set buildFeatures {k}: {m}",
+  "\n⚠ {n} 项没写进 build.gradle：{l}": "\n⚠ {n} field(s) not written to build.gradle: {l}",
   "gradle.properties 写入失败。": "Failed to write gradle.properties.",
   "仓库 {s} 找不到对应文件": "No target file found for repo scope {s}",
   "加仓库失败：{m}": "Failed to add repository: {m}",

@@ -85,16 +85,25 @@ export function setAppConfigField(
       return { ok: true, text: text.replace(re, rep) };
     }
   }
-  // 字段缺失：SDK 类可插 android { 顶层；其余报错
+  // 字段缺失：SDK 类可插 android { 顶层；version/namespace/applicationId 插 defaultConfig { }
   const m = /(^|\n)([ \t]*)android\s*\{/.exec(text);
   if (!m) return { ok: false, text, msg: "build.gradle 里没找到 android { } 块" };
-  if (!field.endsWith("Sdk")) {
-    return { ok: false, text, msg: `build.gradle 里没有 ${field}（它在 defaultConfig 里，请手动加）` };
+  if (field.endsWith("Sdk")) {
+    const lineEnd = text.indexOf("\n", m.index);
+    if (lineEnd < 0) return { ok: false, text, msg: "android { 块格式异常" };
+    const indent = m[2] + "    ";
+    const line = kts ? `${indent}${field} = ${v}` : `${indent}${field} ${v}`;
+    return { ok: true, text: text.slice(0, lineEnd + 1) + line + "\n" + text.slice(lineEnd + 1) };
   }
-  const lineEnd = text.indexOf("\n", m.index);
-  if (lineEnd < 0) return { ok: false, text, msg: "android { 块格式异常" };
-  const indent = m[2] + "    ";
-  const line = kts ? `${indent}${field} = ${v}` : `${indent}${field} ${v}`;
+  // M461：versionCode/versionName/namespace/applicationId 缺失时插 defaultConfig { }（找不到就插 android 顶层）
+  const dc = /(^|\n)([ \t]*)defaultConfig\s*\{/.exec(text);
+  const anchor = dc ?? m;
+  const anchorEnd = anchor.index + anchor[0].length - 1; // 指向「{」
+  const lineEnd = text.indexOf("\n", anchorEnd);
+  if (lineEnd < 0) return { ok: false, text, msg: "gradle 块格式异常，插不进" };
+  const indent = (anchor[2] || m[2]) + "    ";
+  const valStr = quoted ? `"${v}"` : v;
+  const line = kts ? `${indent}${field} = ${valStr}` : `${indent}${field} ${valStr}`;
   return { ok: true, text: text.slice(0, lineEnd + 1) + line + "\n" + text.slice(lineEnd + 1) };
 }
 

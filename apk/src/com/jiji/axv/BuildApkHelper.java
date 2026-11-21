@@ -635,10 +635,18 @@ public class BuildApkHelper {
         logStage(log, "Java 编译（ECJ）");
         java.lang.reflect.Method ecjCompile = ecj.getMethod("compile", String[].class, java.util.List.class);
         boolean ecjOk = Boolean.valueOf((Boolean) ecjCompile.invoke(null, ecjArgs, ecjLog));
+        String ecjText = "";
         if (!ecjOk || ecjLog.size() > 0) {
-            log.append(fmtEcjLog(ecjLog, 60, androidxJars != null && !androidxJars.isEmpty(), appPkg));
+            ecjText = fmtEcjLog(ecjLog, 60, androidxJars != null && !androidxJars.isEmpty(), appPkg);
+            log.append(ecjText);
         }
-        if (!ecjOk) throw new IOException("Java 编译失败（看上面 ECJ 的报错行）—— 已中止打包，不会偷偷生成只显示布局的壳包");
+        if (!ecjOk) {
+            // M469：ECJ 报 0 个可解析错误但仍失败 → 多半是编译器内部异常 / 内存不足，给明确指引而不是「看上面」
+            boolean noParsedError = ecjText.contains("0 个错误");
+            throw new IOException(noParsedError
+                    ? "Java 编译失败：ECJ 没有给出可定位的错误（常见原因是设备内存不足或编译器内部异常）。先把上方「ECJ 原始输出」发我；也可关掉其它 App 释放内存后重试"
+                    : "Java 编译失败（看上面 ECJ 的报错行）—— 已中止打包，不会偷偷生成只显示布局的壳包");
+        }
         logStage(log, "dex 链接（D8）");
         File dexDir = new File(root, "jex");
         dexDir.mkdirs();
@@ -940,6 +948,8 @@ public class BuildApkHelper {
         // M277：两类额外归集——缺资源（改 res/ 能修） vs 缺类（要补 jar）
         java.util.LinkedHashMap<String, Integer> missingRes = new java.util.LinkedHashMap<>();
         java.util.LinkedHashMap<String, Integer> missingTypes = new java.util.LinkedHashMap<>();
+        // M469：诊断头之外无法归类的原始行（ECJ 内部异常/OOM/参数错误）单独收集，不能静默丢弃
+        java.util.List<String> orphans = new java.util.ArrayList<>();
         int errors = 0, warnings = 0;
         String curFile = null;
         int curLine = 0; // M445：当前诊断行号
@@ -958,7 +968,14 @@ public class BuildApkHelper {
                 msgTaken = false;
                 continue;
             }
-            if (curFile == null || msgTaken) continue;
+            if (curFile == null) {
+                // M469：还没遇到任何「N. ERROR in ...」诊断头就出现的行 = 编译器自身输出（异常/内存/参数），
+                // 以前这里直接 continue 丢掉 → 失败时只显示「0 个错误」，用户根本看不到真因
+                String o = l.trim();
+                if (o.length() > 0 && !o.startsWith("^") && !o.matches("^-{3,}$")) orphans.add(o);
+                continue;
+            }
+            if (msgTaken) continue;
             String t = l.trim();
             if (t.isEmpty() || t.startsWith("^") || t.matches("^-{3,}$")) continue;
             if (l.startsWith("\t") || l.startsWith("    ")) continue; // 源码片段行
@@ -1032,6 +1049,16 @@ public class BuildApkHelper {
                     if (rest > 0) sb.append("    …（本文件还有 ").append(rest).append(" 条）\n");
                     break;
                 }
+            }
+        }
+        // M469：无法归类的原始输出原样展示（否则 ECJ 非诊断失败时用户只看到「0 个错误」无从排查）
+        if (!orphans.isEmpty()) {
+            sb.append("ECJ 原始输出（未能归类为诊断，常见于编译器内部异常/内存不足/参数错误）：\n");
+            int oc = 0;
+            for (String o : orphans) {
+                if (oc >= maxEntries) { sb.append("  …（已截断，共 ").append(orphans.size()).append(" 行）\n"); break; }
+                sb.append("  ").append(o).append('\n');
+                oc++;
             }
         }
         // M271：过滤掉「项目自己的包」——appPkg 的前缀/自身不该当缺依赖列出来

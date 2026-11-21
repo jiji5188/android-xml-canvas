@@ -16,6 +16,7 @@ import { parseGradleDepsDetailed } from "@/lib/xml/gradle-deps";
 import { packageOf } from "@/lib/xml/new-project";
 import { collectProjectRes } from "@/lib/xml/res-collect";
 import { injectMissingManifestIcons, manifestIconRefs, iconFilesForRefs } from "@/lib/xml/icon-fallback";
+import { dropBrokenAdaptiveIcons } from "@/lib/xml/adaptive-icon-fix";
 import { missingGradleEntities, formatMissingList } from "@/lib/xml/pre-build-check";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";
 import { loadProjectJavaFiles } from "@/lib/xml/java-files";
@@ -272,11 +273,27 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           );
         }
         const files = iconFix.files;
+        // M463：坏 adaptive icon（mipmap-anydpi-v26 引用的 drawable 缺失）剔除，让密度 PNG 接管
+        //  —— 用户定义的图标在 mipmap-hdpi/…，adaptive XML 背景被 stub 成透明就成「默认图标」
+        const adaptiveFix = dropBrokenAdaptiveIcons(files);
+        const finalFiles = adaptiveFix.files;
+        if (adaptiveFix.dropped.length) {
+          pushBuildLog(
+            true,
+            tt("剔除坏 adaptive icon"),
+            tt("mipmap-anydpi-v26 里这些 adaptive icon 引用的 drawable 缺失（会被渲染成默认图标），已剔除改用密度 PNG：{l}", { l: adaptiveFix.dropped.join("、") }),
+            undefined,
+            undefined,
+            undefined,
+            "info",
+          );
+        }
         // M458：图标进包明细——项目自带 / 已注入兜底 / 完全没图标，一眼看清桌面会显示什么
+        // M463：用 finalFiles（坏 adaptive 已剔除）——剔了之后密度 PNG 会进包，明细要反映真实情况
         {
           const refs = manifestIconRefs(manifestInfo.text);
           const injectedPaths = new Set(iconFix.injected.map((s) => s.replace(/^@/, "") + ".xml"));
-          const iconIn = iconFilesForRefs(files, refs).filter((p) => !injectedPaths.has(p));
+          const iconIn = iconFilesForRefs(finalFiles, refs).filter((p) => !injectedPaths.has(p));
           if (refs.length === 0) {
             pushBuildLog(
               false,
@@ -441,7 +458,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
         }
         setExportNote(tt("正在编译资源并签名（设备端，约十几秒）…"));
         setNativeProgress("build", tt("编译资源并签名…"), -1);
-        const prep = prepareFiles(layout, files);
+        const prep = prepareFiles(layout, finalFiles);
         if (prep.blocked) {
           setApkResult({ ok: false, step: "compile", log: prep.blocked });
           pushBuildLog(false, tt("打包失败（compile）"), prep.blocked);

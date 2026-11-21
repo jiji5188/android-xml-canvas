@@ -3373,6 +3373,8 @@ export const SRC_HANT: SrcDict = {
 "图标进包明细": "Icon in APK",
 "项目图标已进包：{l}{more}": "Project icon included: {l}{more}",
 "清单图标未进包": "Manifest icon not in APK",
+  "剔除坏 adaptive icon": "Dropped broken adaptive icon",
+  "mipmap-anydpi-v26 里这些 adaptive icon 引用的 drawable 缺失（会被渲染成默认图标），已剔除改用密度 PNG：{l}": "These adaptive icons in mipmap-anydpi-v26 reference missing drawables (would render as default icon), dropped to use density PNGs: {l}",
 "manifest 引用的图标 {r} 在包内找不到，桌面将显示系统默认图标。确认 res 里确实有这些文件（图标编辑器生成的是 mipmap-anydpi-v26/ 下 4 个文件）。": "Icon(s) referenced by the manifest ({r}) are missing from the APK - the launcher will show the default system icon. Make sure these files really exist in res (the icon editor generates 4 files under mipmap-anydpi-v26/).",
 };
 

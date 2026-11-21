@@ -289,6 +289,8 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
       //  避免把上一个项目的资源索引 / 文件列表带进当前项目
       clearResIndex();
       invalidateNativeProjectCache();
+      // M466：切项目时清空上一项目的文件 tabs（Project.files），避免新页面还留着旧项目的已打开文件误导用户
+      D.setProject({ name, files: [], activeId: "" });
       // M144：优先恢复「上次打开的文件」，读不到才退回主布局
       const prefer = preferRel ?? readLastRel(opened.dirPath || opened.name);
       let restored = false;
@@ -323,6 +325,8 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
           }
           D.setXmlAndTrack(r.text);
           D.setWsActiveName(item.name);
+          // M466：清掉上一项目残留的文件 tabs，避免跨项目误导
+          D.setProject({ name: item.name, files: [], activeId: "" });
           if (item.target) D.setSaveOrigin({ kind: "native", target: item.target, name: item.name });
           else if (item.handle) D.setSaveOrigin({ kind: "handle", handle: item.handle, name: item.name });
           else D.setSaveOrigin(null);
@@ -415,6 +419,8 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
       // M149：记住示例项目，重启后恢复它的 values/drawable（不记 key 就全裸显示 @string/@drawable）
       lsSet(LS_KEY_SAMPLE, key);
       D.setSelectedPath(null);
+      // M466：载入示例/新模板时清掉上一项目残留的文件 tabs
+      D.setProject({ name: p.name, files: [], activeId: "" });
       D.setExportNote(
         tt("已载入示例项目「{name}」· {lib}，自带 {n} 个 drawable", { name: p.name, lib: p.library, n: Object.keys(p.drawables).length }),
       );
@@ -429,6 +435,8 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
       if (!b) return;
       D.setXmlAndTrack(b.layout);
       D.setSelectedPath(null);
+      // M466：清掉上一项目残留的文件 tabs
+      D.setProject({ name: b.name ?? "new", files: [], activeId: "" });
     },
     [D],
   );

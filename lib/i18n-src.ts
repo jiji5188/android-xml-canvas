@@ -3372,6 +3372,8 @@ export const SRC_HANT: SrcDict = {
 "包内无图标资源": "No icon resources in APK",
 "清单没写 android:icon（或没读到清单）——打包后桌面显示系统默认图标。请在 manifest 的 application 节点加 android:icon（如 @mipmap/ic_launcher），并保证 res 里有对应图标文件。": "Manifest has no android:icon (or the manifest was not read) - the launcher will show the default system icon. Add android:icon (e.g. @mipmap/ic_launcher) to the application node and make sure the icon files exist in res.",
 "图标进包明细": "Icon in APK",
+"⚠ 缺少资源依赖库": "⚠ Missing resource dependency",
+"以下库的资源被已选中的 aar 依赖，但共享库目录里没有，aapt2 链接会失败：{list}。请在「库」面板下载这些库后重新打包。": "These libraries' resources are required by the selected aars but missing from the shared library directory — aapt2 link will fail: {list}. Download them in the Libraries panel and rebuild.",
 "项目图标已进包：{l}{more}": "Project icon included: {l}{more}",
 "清单图标未进包": "Manifest icon not in APK",
   "剔除坏 adaptive icon": "Dropped broken adaptive icon",

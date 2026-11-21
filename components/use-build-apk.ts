@@ -394,6 +394,26 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
                 : "") +
               (fr.excluded.length ? `，排除未声明 ${fr.excluded.length} 个：${fr.excluded.slice(0, 8).join("、")}${fr.excluded.length > 8 ? "…" : ""}` : ""),
           );
+          // M467：资源传递依赖补齐（cardview 等）——不补的话 aapt2 link 会报 style/CardView not found
+          if (fr.addedTransitive?.length) {
+            libNotes.push(
+              `按资源依赖补齐 ${fr.addedTransitive.length} 个：` +
+                fr.addedTransitive.map((m) => `${m.name}（${m.file}）`).join("、"),
+            );
+          }
+          if (fr.missingTransitive?.length) {
+            pushBuildLog(
+              true,
+              tt("⚠ 缺少资源依赖库"),
+              tt("以下库的资源被已选中的 aar 依赖，但共享库目录里没有，aapt2 链接会失败：{list}。请在「库」面板下载这些库后重新打包。", {
+                list: fr.missingTransitive.join("、"),
+              }),
+              undefined,
+              undefined,
+              undefined,
+              "info",
+            );
+          }
         }
         // M398：共享库在前 —— 同名 jar 共享库赢（BuildApkHelper 的 ECJ classpath / R8 M283 去重都保首个）
         const rawBuildLibs = [...filteredShared, ...projectLibsArr];

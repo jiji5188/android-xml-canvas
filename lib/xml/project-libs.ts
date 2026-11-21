@@ -117,6 +117,58 @@ export function dedupAarVersions(libs: ProjectLib[]): {
  *   - 同一基名被多次声明也只收一个文件（第一个声明赢）
  * 返回 { kept, excluded, matched }，matched 用于日志「声明 X → 用了 Y」。
  */
+/**
+ * M467：aar 资源传递依赖表（只列会带 res/ 的传递依赖，jar-only 的省略）。
+ *
+ * 背景（真机事故）：用户项目 build.gradle 只声明了 material / appcompat / percentlayout，
+ * M415 只保留直接声明的库 → cardview 被排掉 → aapt2 link 报：
+ *   error: resource style/CardView (aka com.momo.ReturnSystem:style/CardView) not found.
+ *   aarres_merged/values/values.xml:3996: error: style attribute 'attr/cardElevation' not found.
+ *   error: failed linking references.
+ * 因为 material 的 Widget.MaterialComponents.CardView 继承 Widget.CardView，
+ * 而 Widget.CardView / cardElevation / cardBackgroundColor 都定义在 cardview aar 里。
+ *
+ * 这些在 Gradle 里是「传递依赖」，本就该进包；设备端不做 POM 解析，这里用静态表覆盖常见组合。
+ * 解析规则：filterSharedByDeps 从已保留的库出发做 BFS，只补 shared/ 里确实存在的（不下载）。
+ */
+export const AAR_RES_DEPS: Record<string, string[]> = {
+  material: [
+    "appcompat",
+    "cardview",
+    "recyclerview",
+    "coordinatorlayout",
+    "viewpager",
+    "viewpager2",
+    "drawerlayout",
+    "vectordrawable",
+    "transition",
+    "constraintlayout",
+    "fragment",
+    "activity",
+    "core",
+  ],
+  appcompat: ["vectordrawable", "fragment", "activity", "core", "drawerlayout"],
+  "material-components": ["material", "cardview", "recyclerview", "coordinatorlayout", "appcompat"],
+  recyclerview: ["core", "customview"],
+  coordinatorlayout: ["core", "customview", "appcompat"],
+  viewpager2: ["recyclerview", "fragment", "core"],
+  viewpager: ["core", "customview"],
+  drawerlayout: ["core", "customview"],
+  constraintlayout: ["constraintlayout-core", "core"],
+  transition: ["core"],
+  "percentlayout": [],
+};
+
+/** M467：缺了它 aapt2 link 必报 not found 的关键资源 aar（缺失时要在构建日志里提示下载）。
+ *  只列实践中真正被 style/attr 引用、缺失即炸的；fragment/core 这类纯逻辑库不列（避免误报）。 */
+export const RES_CRITICAL_AARS = new Set([
+  "cardview",
+  "recyclerview",
+  "coordinatorlayout",
+  "appcompat",
+  "material",
+]);
+
 export function filterSharedByDeps(
   shared: ProjectLib[],
   declared: { name: string; version: string }[],
@@ -124,6 +176,10 @@ export function filterSharedByDeps(
   kept: ProjectLib[];
   excluded: string[];
   matched: { declared: string; file: string }[];
+  /** M467：因资源传递依赖被补进来的库（不在 build.gradle 直接声明里，但被保留的 aar 需要其资源） */
+  addedTransitive: { name: string; file: string }[];
+  /** M467：保留库需要但其 aar 在 shared 里根本不存在（aapt2 link 必失败）——需提示用户下载 */
+  missingTransitive: string[];
 } {
   // 分组：基名 → [{lib, info}]（保序：目录优先级）
   const groups = new Map<string, { lib: ProjectLib; info: ReturnType<typeof libArtifactInfo> }[]>();
@@ -137,31 +193,67 @@ export function filterSharedByDeps(
   const kept: ProjectLib[] = [];
   const excluded: string[] = [];
   const matched: { declared: string; file: string }[] = [];
+  const addedTransitive: { name: string; file: string }[] = [];
+  const missingTransitive: string[] = [];
   const usedBase = new Set<string>();
-  for (const d of declared) {
-    const base = (d.name || "").toLowerCase();
-    if (!base || usedBase.has(base)) continue;
+
+  /** 从某基名的组里挑一个（声明版本精确匹配优先，否则最高版），加入 kept */
+  const pickFromGroup = (base: string, wantVer: string): ProjectLib | null => {
     const g = groups.get(base);
-    if (!g || g.length === 0) continue;
-    usedBase.add(base);
-    // 声明版本精确匹配优先，否则最高版
-    let pick = d.version ? g.find((x) => x.info.verStr === d.version.toLowerCase()) : undefined;
+    if (!g || g.length === 0) return null;
+    let pick = wantVer ? g.find((x) => x.info.verStr === wantVer.toLowerCase()) : undefined;
     if (!pick) {
       pick = g.reduce((acc, x) => (cmpLibVer(x.info.ver, acc.info.ver) > 0 ? x : acc));
     }
     kept.push(pick.lib);
-    matched.push({ declared: `${d.name}:${d.version || "*"}`, file: pick.lib.rel.split("/").pop() || pick.lib.rel });
+    usedBase.add(base);
     for (const x of g) {
       if (x.lib !== pick.lib) excluded.push(x.info.verStr ? `${x.info.base}-${x.info.verStr}` : x.info.base);
     }
+    return pick.lib;
+  };
+
+  for (const d of declared) {
+    const base = (d.name || "").toLowerCase();
+    if (!base || usedBase.has(base)) continue;
+    const picked = pickFromGroup(base, d.version);
+    if (!picked) continue;
+    matched.push({ declared: `${d.name}:${d.version || "*"}`, file: picked.rel.split("/").pop() || picked.rel });
   }
-  // 没被声明引用的组全排除
+
+  // M467：资源传递依赖闭包——material/appcompat 等 aar 的 values 会引用其它 aar 的 style/attr
+  // （如 material 的 Widget.MaterialComponents.CardView 继承 Widget.CardView，属性 cardElevation 在 cardview aar），
+  // 只保留直接声明的库会让 aapt2 link 报「resource style/CardView not found / failed linking references」。
+  // 做法：从已保留的库出发，把 AAR_RES_DEPS 里列出的、shared 中确实存在的传递依赖一并保留（BFS）。
+  const queue: string[] = [...usedBase];
+  const seenDep = new Set<string>(usedBase);
+  while (queue.length) {
+    const cur = queue.shift() as string;
+    const deps = AAR_RES_DEPS[cur];
+    if (!deps) continue;
+    for (const dep of deps) {
+      if (seenDep.has(dep)) continue;
+      seenDep.add(dep);
+      if (groups.has(dep)) {
+        const picked = pickFromGroup(dep, "");
+        if (picked) {
+          addedTransitive.push({ name: dep, file: picked.rel.split("/").pop() || picked.rel });
+          queue.push(dep);
+        }
+      } else if (RES_CRITICAL_AARS.has(dep)) {
+        // 关键资源 aar 缺失：aapt2 link 必失败，明确报告让 UI 提示下载
+        missingTransitive.push(dep);
+      }
+    }
+  }
+
+  // 没被声明引用、也不是传递依赖的组全排除
   for (const [base, g] of groups) {
     if (!usedBase.has(base)) {
       for (const x of g) excluded.push(x.info.verStr ? `${base}-${x.info.verStr}` : base);
     }
   }
-  return { kept, excluded, matched };
+  return { kept, excluded, matched, addedTransitive, missingTransitive };
 }
 
 /** M428：把 build.gradle 里的 exclude 配置真正用上——命中 exclude.module 的库从 classpath 里排掉。

@@ -13,6 +13,8 @@ import {
   type SaveInput,
 } from "@/lib/xml/save-flow";
 import { RES_PREFIX, readProjectFile, saveResFiles, saveProjectFile } from "@/lib/xml/project-save";
+import { isManifestPath, looksLikeManifest } from "@/lib/xml/manifest-edit";
+import { syncManifestGradleAfterSave } from "@/lib/xml/manifest-gradle-sync";
 import { planWrite, loadBaseline, snapshotBeforeWrite, saveBaseline } from "@/lib/xml/safe-write";
 import { nativeBridge, writeTextNative } from "@/lib/xml/native-save";
 import { activeFile } from "@/lib/xml/multi-file";
@@ -156,6 +158,25 @@ export function useSaveDomain(getDeps: () => SaveDomainDeps) {
     [getDeps],
   );
 
+  /** M462：manifest 保存成功后，把 package/versionCode/versionName 同步进 build.gradle。
+   *  不是 manifest（路径和内容都看）或没有工程根 → 返回 ""。同步成功返回提示后缀。 */
+  const syncManifestGradle = useCallback(
+    async (xmlText: string): Promise<string> => {
+      const d = getDeps();
+      if (!d.projRoot) return "";
+      if (!isManifestPath(d.openRel) && !looksLikeManifest(xmlText)) return "";
+      try {
+        const r = await syncManifestGradleAfterSave(d.projRoot, xmlText);
+        if (!r.synced || !r.changed.length) return "";
+        const label = r.changed.map((c) => (c === "package" ? tt("包名") : c)).join("、");
+        return tt("；已同步 build.gradle：{l}", { l: label });
+      } catch {
+        return "";
+      }
+    },
+    [getDeps],
+  );
+
   /** M37b：非布局文件（manifest / values / menu …）—— 整文件原位写回，不生成任何布局/依赖资源 */
   const saveRawFile = useCallback(
     async (forceExternal = false): Promise<boolean> => {
@@ -186,7 +207,8 @@ export function useSaveDomain(getDeps: () => SaveDomainDeps) {
         snapshotBeforeWrite(target, disk, xml);
         if (writeTextNative(target, xml)) {
           saveBaseline(target, xml);
-          flashNote(tt("已保存 {name}（原路径）", { name }), 3200);
+          const syncNote = await syncManifestGradle(xml);
+          flashNote(tt("已保存 {name}（原路径）", { name }) + syncNote, 3600);
           markSaved(xml);
           return true;
         }
@@ -212,7 +234,8 @@ export function useSaveDomain(getDeps: () => SaveDomainDeps) {
         if (ok) {
           saveBaseline(openRel, xml);
           bumpResCache();
-          flashNote(tt("已保存 {name} → {rel}", { name, rel: openRel }), 3600);
+          const syncNote = await syncManifestGradle(xml);
+          flashNote(tt("已保存 {name} → {rel}", { name, rel: openRel }) + syncNote, 4200);
           markSaved(xml);
           return true;
         }
@@ -241,7 +264,7 @@ export function useSaveDomain(getDeps: () => SaveDomainDeps) {
       );
       return false;
     },
-    [getDeps],
+    [getDeps, syncManifestGradle],
   );
 
   const doSave = useCallback(async () => {

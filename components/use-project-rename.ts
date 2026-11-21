@@ -57,12 +57,15 @@ export function useProjectRename(d: ProjectRenameDeps) {
       const stringsRel = "app/src/main/res/values/strings.xml";
       const themesRel = "app/src/main/res/values/themes.xml";
       const manifestRel = "app/src/main/AndroidManifest.xml";
-      const settingsRel = "settings.gradle";
+      // M462b：settings.gradle / settings.gradle.kts 都认（KTS 工程同步 rootProject.name）
+      const settingsGroovy = await readOne("settings.gradle");
+      const settingsKts = settingsGroovy === null ? await readOne("settings.gradle.kts") : null;
+      const settingsSrc = settingsGroovy ?? settingsKts;
+      const settingsRel = settingsKts !== null ? "settings.gradle.kts" : "settings.gradle";
 
       const stringsSrc = await readOne(stringsRel);
       const themesSrc = await readOne(themesRel);
       const manifestSrc = await readOne(manifestRel);
-      const settingsSrc = await readOne(settingsRel);
 
       const oldTheme = themesSrc ? readThemeName(themesSrc) : null;
       const newTheme = dirChanged ? `Theme.${newDir}` : oldTheme;

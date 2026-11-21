@@ -1639,6 +1639,7 @@ export const SRC_EN: SrcDict = {
   "；另有 {n} 个依赖资源，可用「另存到文件夹」一起写出": "; {n} more dependency resource(s) can be written together via “Save to folder”",
   "所选文件夹": "selected folder",
   "已保存 {name}（原路径）": "Saved {name} (original path)",
+  "；已同步 build.gradle：{l}": "; synced build.gradle: {l}",
   "修复 {n} 处": "Fix {n}",
   "有 {n} 处可自动修复": "{n} issue(s) can be auto-fixed",
   "已修复 {n} 处（可撤销）": "Fixed {n} issue(s) (undoable)",

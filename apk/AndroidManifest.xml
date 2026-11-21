@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.jiji.axv"
-    android:versionCode="488"
-    android:versionName="1.18.70">
+    android:versionCode="489"
+    android:versionName="1.18.71">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 

@@ -53,6 +53,8 @@ public class BuildApkHelper {
             String manifestText = p.optString("manifestText", "");
             // M286：JS 侧已把 provider 节点插进项目清单；只有合成清单的分支才需要 Java 侧再插一次
             boolean axvLog = p.optBoolean("axvLog", false);
+            // M464（方案 A）：发布模式 = 不注壳 dex、不注 ShellActivity、不注运行日志 → APK 与 gradle 等价
+            boolean releaseMode = p.optBoolean("releaseMode", false);
             String ksPath = p.optString("keystore", "");
             String storePass = p.optString("storePass", "");
             String alias = p.optString("alias", "");
@@ -160,7 +162,8 @@ public class BuildApkHelper {
                         + "</manifest>\n";
                 manContent = ensureManifestPkg(manContent, pkg, log);
                 // M286：合成清单分支里把运行日志 provider 也挂上（JS 侧对已有清单已插过，不会重复）
-                if (axvLog) {
+                // M464：发布模式不注壳/不注日志
+                if (axvLog && !releaseMode) {
                     String prov =
                             "    <provider\n"
                                     + "        android:name=\"" + pkg + ".axvlog.AxvLogProvider\"\n"
@@ -174,12 +177,13 @@ public class BuildApkHelper {
                     log.append("已注入 AXV 运行日志抽屉（provider 挂到合成清单）\n");
                 }
             } else {
-                // 项目清单没有 MAIN/LAUNCHER 时，把 ShellActivity 注进去兜底（老行为），否则装完没有图标/打不开
+                // M464（方案 A）：发布模式完全尊重项目清单——不注 ShellActivity（连没有 LAUNCHER 也不补）。
+                // 调试模式保持老行为：项目清单没有 MAIN/LAUNCHER 时把 ShellActivity 注进去兜底，否则装完没有图标/打不开
                 String content = manifestText;
                 boolean hasLauncher =
                         content.contains("android.intent.action.MAIN") &&
                                 content.contains("android.intent.category.LAUNCHER");
-                if (!hasLauncher) {
+                if (!hasLauncher && !releaseMode) {
                     String shellBlock =
                             "    <activity android:name=\"com.jiji.axv.shell.ShellActivity\" android:exported=\"true\">\n"
                                     + "      <meta-data android:name=\"axv.layout\" android:value=\"" + xmlAttr(layout) + "\" />\n"
@@ -321,9 +325,17 @@ public class BuildApkHelper {
                     throw ce;
                 }
             }
-            ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), extraDex, packed);
-            log.append("注入壳 dex + ").append(extraDex.size()).append(" 个项目 dex，打包后 ")
-                    .append(packed.length()).append(" 字节\n");
+            step = "package";
+            // M464（方案 A）：发布模式不注壳 dex → APK 里只有用户代码 + 库，与 gradle 构建等价
+            if (releaseMode) {
+                ApkPack.addDexAndAlign(unsigned, null, extraDex, packed);
+                log.append("发布包模式：未注入壳 dex，仅打包 ").append(extraDex.size()).append(" 个项目 dex，打包后 ")
+                        .append(packed.length()).append(" 字节\n");
+            } else {
+                ApkPack.addDexAndAlign(unsigned, readAssetGz("shell/shell.bin.gz"), extraDex, packed);
+                log.append("注入壳 dex + ").append(extraDex.size()).append(" 个项目 dex，打包后 ")
+                        .append(packed.length()).append(" 字节\n");
+            }
             appendResMissLog(log);
 
             step = "sign";

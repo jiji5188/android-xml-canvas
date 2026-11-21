@@ -1420,6 +1420,7 @@ export const SRC_EN: SrcDict = {
   "调试签名": "Debug signing",
   "调试包使用 /AndroidUIIDE/axv-debug.keystore（首次打包自动生成，之后每次复用同一个调试签名）。": "Debug builds use /AndroidUIIDE/axv-debug.keystore (auto-created on first build, then reused).",
   "发布包模式（未注入调试日志）": "Release mode (no debug log injected)",
+  "当前指定了自定义 keystore，按发布包处理：不注壳 dex、不注「▤ 日志」抽屉，包体与 gradle 构建等价。": "Custom keystore detected: treated as release build — no shell dex, no log drawer; APK is equivalent to a gradle build.",
   "当前指定了自定义 keystore，按发布包处理：不往 App 里植入「▤ 日志」抽屉，保持包体干净。": "Custom keystore detected: treated as release, no debug log drawer injected.",
   "详细错误在「问题/日志」抽屉 →「构建日志」查看": "See details in the Problems/Logs drawer → Build log",
   "（已编译 {n} 个 Java 类，注入 {d} 个 dex）": "(compiled {n} Java classes, injected {d} dex)",

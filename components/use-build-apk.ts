@@ -70,7 +70,7 @@ export interface UseBuildApkDeps {
 export interface UseBuildApkReturn {
   apkBusy: boolean;
   apkResult: BuildApkResult | null;
-  doBuildApk: (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => Promise<BuildApkResult | undefined>;
+  doBuildApk: (o: { storeFile: string; storePass: string; alias: string; keyPass?: string; withShell?: boolean }) => Promise<BuildApkResult | undefined>;
 }
 
 /** M188b：没可写根时签名配置存 localStorage 草稿 */
@@ -142,7 +142,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
   const [apkResult, setApkResult] = useState<BuildApkResult | null>(null);
 
   const doBuildApk = useCallback(
-    async (o: { storeFile: string; storePass: string; alias: string; keyPass?: string }) => {
+    async (o: { storeFile: string; storePass: string; alias: string; keyPass?: string; withShell?: boolean }) => {
       if (apkBusy) return;
       setApkResult(null);
       if (!androidJavaToolchain.canBuild()) {
@@ -564,8 +564,10 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
                 : tt("已生成日志类，但清单里没找到 <application> 无法挂上 provider（注入失败：{r}）。App 仍能跑，只是没有日志抽屉。", { r: String(inj.reason || "?") }),
               undefined, undefined, undefined, "info");
           } else {
+            // M464（方案 A）：发布包 = 干净标准包（不注壳 dex、不注 ShellActivity、不注日志抽屉）→ 与 gradle 构建等价，
+            // 用户拿去装到手机 / 发应用商店 / 用别的编辑器重新打包都能用
             pushBuildLog(true, tt("发布包模式（未注入调试日志）"),
-              tt("当前指定了自定义 keystore，按发布包处理：不往 App 里植入「▤ 日志」抽屉，保持包体干净。", {}),
+              tt("当前指定了自定义 keystore，按发布包处理：不注壳 dex、不注「▤ 日志」抽屉，包体与 gradle 构建等价。", {}),
               undefined, undefined, undefined, "info");
           }
         }
@@ -584,6 +586,7 @@ export function useBuildApk(deps: UseBuildApkDeps): UseBuildApkReturn {
           launchActivity: manifest || "",
           manifestText: manifestTextForBuild || "",
           axvLog: axvLogOn,
+          releaseMode: typeof o.withShell === "boolean" ? !o.withShell : isRelease,
           libs: allBuildLibs.length ? allBuildLibs.map((l) => ({ path: l.rel, base64: l.base64 })) : undefined,
           rPackages: rPackagesFromSources(javaSources),
         });

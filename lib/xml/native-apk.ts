@@ -40,6 +40,8 @@ export interface BuildApkInput {
   rPackages?: string[];
   /** M286：是否注入「运行日志抽屉」（日志/生命周期/崩溃），默认 false */
   axvLog?: boolean;
+  /** M464（方案 A）：发布包模式 = 不注壳 dex / 不注 ShellActivity / 不注日志抽屉 → APK 与 gradle 构建等价。默认 false（带壳，老行为） */
+  releaseMode?: boolean;
 }
 
 export interface BuildApkResult {

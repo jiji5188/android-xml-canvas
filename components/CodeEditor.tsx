@@ -740,8 +740,8 @@ export function CodeEditor({
   const composing = useCallback(() => !!viewRef.current?.composing, []);
 
   /* ===== M404:长按弹出菜单（复制 / 粘贴 / 剪切 / 全选 / 查找 / 文档）=====
-   * 触屏长按 450ms（或鼠标右键）在按压点弹菜单；有选区才出「剪切」；
-   * 选中的 token 能被 hoverTip 解析出文档时多出「文档」项。
+   * 复制/粘贴/剪切/全选/查找/文档。M470 起改为「选完文本松手才弹」（见 lib/xml/code-sel-menu.ts），
+   * 右键（桌面）直接弹；无选区不弹。
    * 位置限制在 .axv-code-body 里（相对定位）。 */
   const [ctxMenu, setCtxMenu] = useState<{
     x: number;
@@ -754,6 +754,20 @@ export function CodeEditor({
   const selPointerDown = useRef(false);
   const selMenuTimer = useRef<number | null>(null);
   const selMenuSuppressed = useRef(false);
+  /** M471：粘贴失败提示（拿不到剪贴板内容时，不静默） */
+  const [pasteNote, setPasteNote] = useState<string | null>(null);
+  const pasteNoteTimer = useRef<number | null>(null);
+  const showPasteNote = useCallback((msg: string) => {
+    setPasteNote(msg);
+    if (pasteNoteTimer.current !== null) window.clearTimeout(pasteNoteTimer.current);
+    pasteNoteTimer.current = window.setTimeout(() => {
+      setPasteNote(null);
+      pasteNoteTimer.current = null;
+    }, 2400);
+  }, []);
+  useEffect(() => () => {
+    if (pasteNoteTimer.current !== null) window.clearTimeout(pasteNoteTimer.current);
+  }, []);
   /** M437：菜单面板 DOM，用于判断点击是否在面板外（点外面要关掉菜单） */
   const ctxMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -839,20 +853,49 @@ export function CodeEditor({
     closeCtxMenu();
   }, [selectionText, closeCtxMenu]);
 
+  /* M471：粘贴取内容三级降级（Android WebView 默认没有 clipboard-read 权限，旧实现
+     只走 ① 且失败静默 → 永远粘不进来）：
+     ① Clipboard API；② 临时 <textarea> + execCommand("paste")（系统剪贴板）；
+     ③ 全失败 → 提示「粘贴失败」（i18n 已有该键），不再静默。 */
+  const pasteFallbackRef = useRef<HTMLTextAreaElement | null>(null);
   const ctxPaste = useCallback(async () => {
     const v = viewRef.current;
     if (!v) {
       closeCtxMenu();
       return;
     }
+    // ① Clipboard API（https / 已授权环境）
     let text = "";
     try {
       text = await navigator.clipboard.readText();
     } catch {
-      closeCtxMenu();
-      return;
+      text = "";
+    }
+    // ② 系统剪贴板：焦点必须真正落在临时 textarea 上才触发（否则贴到别处）
+    if (!text) {
+      let fa = pasteFallbackRef.current;
+      if (!fa) {
+        fa = document.createElement("textarea");
+        fa.setAttribute("autocapitalize", "off");
+        fa.setAttribute("autocorrect", "off");
+        fa.setAttribute("spellcheck", "false");
+        fa.style.cssText =
+          "position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none;";
+        document.body.appendChild(fa);
+        pasteFallbackRef.current = fa;
+      }
+      try {
+        fa.focus({ preventScroll: true });
+        if (document.activeElement === fa && document.execCommand("paste")) {
+          text = fa.value;
+        }
+      } catch {
+        /* 个别旧 WebView 会直接抛，进 ③ */
+      }
     }
     if (!text) {
+      // ③ 拿不到内容（权限被挡 / 剪贴板为空）
+      showPasteNote(tt("粘贴失败"));
       closeCtxMenu();
       return;
     }
@@ -860,7 +903,7 @@ export function CodeEditor({
     v.dispatch({ changes: { from: sel.from, to: sel.head, insert: text } });
     closeCtxMenu();
     v.focus();
-  }, [closeCtxMenu]);
+  }, [closeCtxMenu, showPasteNote, tt]);
 
   const ctxSelectAll = useCallback(() => {
     const v = viewRef.current;
@@ -1990,6 +2033,12 @@ export function CodeEditor({
                 {it.label}
               </button>
             ))}
+          </div>
+        ) : null}
+        {/* M471：粘贴失败提示（拿不到剪贴板内容时不再静默） */}
+        {pasteNote ? (
+          <div className="axv-code-pastenote" role="status">
+            {pasteNote}
           </div>
         ) : null}
         {ctxDocShow ? (

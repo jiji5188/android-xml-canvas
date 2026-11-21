@@ -17,6 +17,23 @@
 }
 
 /* M404：代码编辑器长按/右键弹出菜单（复制/粘贴/剪切/全选/查找/查看文档） */
+.axv-code-pastenote {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 6px 14px;
+  background: var(--axv-surface-sunken, #2a2933);
+  color: var(--axv-on-surface, #f4f4f8);
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 8px;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
 .axv-code-ctx {
   position: absolute;
   z-index: 40;

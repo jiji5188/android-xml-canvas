@@ -125,11 +125,11 @@ export function renameFile(p: Project, id: string, rawName: string): Project {
  * 删的是当前文件时，自动切到相邻文件。
  */
 export function removeFile(p: Project, id: string): Project {
-  if (p.files.length <= 1) return p;
   const idx = p.files.findIndex((f) => f.id === id);
   if (idx < 0) return p;
   const files = p.files.filter((f) => f.id !== id);
-  const activeId = p.activeId === id ? files[Math.min(idx, files.length - 1)].id : p.activeId;
+  // M468：允许关到 0 个（最后一个 tab 也可关/删）；0 个时 activeId 置 ""
+  const activeId = p.activeId === id ? (files.length ? files[Math.min(idx, files.length - 1)].id : "") : p.activeId;
   return { ...p, files, activeId };
 }
 

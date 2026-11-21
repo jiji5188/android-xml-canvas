@@ -133,9 +133,20 @@ describe("XmlCodeView — M30b 底部工具条已移除", () => {
     expect(all.find((e) => e.type === "select")).toBeUndefined();
   });
 
-  it("只有一层容器 + 编辑器两个元素", () => {
+  it("容器 + 代码包裹层 + 编辑器（M468 起多一层 .axv-code-wrap）", () => {
     const { all } = render();
-    expect(all.length).toBe(2);
-    expect(String((all[0] as El).props.className)).toBe("axv-mob-xml");
+    // 外层 .axv-mob-xml + 包裹 .axv-code-wrap + CodeEditor 根（无 empty 时无提示条）
+    const cls = (e: El) => String(e.props.className ?? "");
+    expect(all.find((e) => cls(e) === "axv-mob-xml")).toBeDefined();
+    expect(all.find((e) => cls(e) === "axv-code-wrap")).toBeDefined();
+  });
+
+  it("empty=true 时显示「未打开文件」提示条（M468）", () => {
+    const { all } = render({ empty: true });
+    const text = all
+      .filter((e) => typeof e.props.children === "string")
+      .map((e) => e.props.children as string)
+      .join(" ");
+    expect(text).toContain("未打开文件");
   });
 });

@@ -137,30 +137,31 @@ describe("M43 ManifestEditor 内容", () => {
   });
 });
 
-describe("M174 B 图标声明一键修复", () => {
+describe("M174 B 图标声明一键修复（M468 改为只对缺 icon 触发）", () => {
+  // M468：缺 android:icon 才提示；@drawable / 缺 roundIcon 不再误报
   const BAD = `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.demo.app">
-    <application android:label="Demo" android:icon="@mipmap/old_logo">
+    <application android:label="Demo">
         <activity android:name=".MainActivity" />
     </application>
 </manifest>
 `;
 
-  it("图标不规范时列出问题 + 给一键修复按钮", () => {
+  it("缺 android:icon 时列出问题 + 给一键修复按钮", () => {
     const html = renderToStaticMarkup(<ManifestEditor xml={BAD} onChange={() => {}} />);
     expect(html).toContain("图标声明不规范");
     expect(html).toContain("一键修复");
     expect(html).toContain("axv-mf-fix");
-    expect(html).toContain("roundIcon");
+    expect(html).toContain("没有 android:icon");
   });
 
-  it("图标已规范时不显示修复块", () => {
+  it("图标已声明（含 @drawable）时不显示修复块", () => {
     const OK = MANIFEST.replace(
       'android:icon="@mipmap/ic_launcher"',
-      'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"',
+      'android:icon="@drawable/ic_launcher" android:roundIcon="@drawable/ic_launcher_round"',
     );
     const html = renderToStaticMarkup(<ManifestEditor xml={OK} onChange={() => {}} />);
-    expect(html).toContain('value="@mipmap/ic_launcher"');
+    expect(html).toContain('value="@drawable/ic_launcher"');
     expect(html).not.toContain("图标声明不规范");
     expect(html).not.toContain("axv-mf-fix-btn");
   });

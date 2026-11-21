@@ -9,6 +9,7 @@
 
 import type { LintIssue } from "@/lib/xml/lint";
 import type { EditorLang } from "@/lib/xml/editor-lang";
+import { t as tt } from "@/lib/i18n-src";
 import { CodeEditor } from "./CodeEditor";
 import { ValuesEditor } from "./ValuesEditor";
 import { ManifestEditor } from "./ManifestEditor";
@@ -23,6 +24,8 @@ export interface XmlCodeViewProps {
 
   value: string;
   onChange: (next: string) => void;
+  /** M468：关掉最后一个 tab 后 files=[]、没有活动文件 → 代码视图顶部显示「未打开文件」提示，不白屏 */
+  empty?: boolean;
   errors?: LintIssue[];
   focusLine?: number;
   focusTick?: number;
@@ -106,29 +109,37 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           reservedNames={props.reservedNames}
         />
       ) : (
-        <CodeEditor
-          // M76：按文件重挂 —— 不重挂的话 history() 会跨文件，A 文件里 Ctrl+Z 能把 B 文件的内容撤回来
-          key={props.fileKey || "code"}
-          className="axv-code-fill"
-          value={props.value}
-          onChange={props.onChange}
-          errors={props.errors}
-          onFixAll={props.onFixAll}
-          onFixOne={props.onFixOne}
-          focusLine={props.focusLine}
-          focusTick={props.focusTick}
-          onCursorLine={props.onCursorLine}
-          onFormat={props.onFormat}
-          onRefClick={props.onRefClick}
-          lexRef={props.lexRef}
-          hoverTip={props.hoverTip}
-          lang={props.lang}
-          indent={props.indent}
-          resNames={props.resNames}
-          rIndex={props.rIndex}
-          onDebugRun={props.showDebugRun ? props.onDebugRun : undefined}
-          hideOnKeyboard={props.hideOnKeyboard}
-        />
+        <div className="axv-code-wrap">
+          {props.empty ? (
+            <div className="axv-code-empty">
+              <span className="msr" aria-hidden="true">description</span>
+              <span>{tt("未打开文件，点左侧结构树打开一个" )}</span>
+            </div>
+          ) : null}
+          <CodeEditor
+            // M76：按文件重挂 —— 不重挂的话 history() 会跨文件，A 文件里 Ctrl+Z 能把 B 文件的内容撤回来
+            key={props.fileKey || "code"}
+            className="axv-code-fill"
+            value={props.value}
+            onChange={props.onChange}
+            errors={props.errors}
+            onFixAll={props.onFixAll}
+            onFixOne={props.onFixOne}
+            focusLine={props.focusLine}
+            focusTick={props.focusTick}
+            onCursorLine={props.onCursorLine}
+            onFormat={props.onFormat}
+            onRefClick={props.onRefClick}
+            lexRef={props.lexRef}
+            hoverTip={props.hoverTip}
+            lang={props.lang}
+            indent={props.indent}
+            resNames={props.resNames}
+            rIndex={props.rIndex}
+            onDebugRun={props.showDebugRun ? props.onDebugRun : undefined}
+            hideOnKeyboard={props.hideOnKeyboard}
+          />
+        </div>
       )}
       {/* M405：调试日志面板（编辑器下方，仅代码页） */}
       {props.codeSlot}

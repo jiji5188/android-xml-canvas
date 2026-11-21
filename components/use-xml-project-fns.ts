@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { clearResIndex } from "@/lib/xml/res-index";
 import { invalidateNativeProjectCache } from "@/lib/xml/workspace";
+import type { ResourceExtras } from "@/lib/xml/resdir";
 import {
   activeFile,
   updateFileXml,
@@ -491,22 +492,26 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
 
   const deleteActiveFile = useCallback(() => {
     const cur = activeFile(D.project);
-    if (!cur || D.project.files.length <= 1) {
-      D.setExportNote(tt("项目里只剩最后一个文件，删不了（先新建一个）"));
-      window.setTimeout(() => D.setExportNote(""), 3600);
-      return;
-    }
+    if (!cur) return;
+    // M468：最后一个文件也可删（不再"先新建一个"限制）
     if (!window.confirm(tt("删除「{name}」？该文件内容会丢失。", { name: cur.name }))) return;
     D.flushTextTimer();
     D.setProject((p) => {
       const withSaved = updateFileXml(p, p.activeId, D.xml);
       const next = removeFile(withSaved, cur.id);
-      const target = activeFile(next)!;
-      D.setXml(target.xml);
-      D.histRef.current = diffHistoryInit(target.xml);
-      D.syncHist();
-      D.setSelectedPath(null);
-      D.applyExternalState(target);
+      const target = activeFile(next);
+      if (target) {
+        D.setXml(target.xml);
+        D.histRef.current = diffHistoryInit(target.xml);
+        D.syncHist();
+        D.setSelectedPath(null);
+        D.applyExternalState(target);
+      } else {
+        D.setXml("");
+        D.histRef.current = diffHistoryInit("");
+        D.syncHist();
+        D.setSelectedPath(null);
+      }
       return next;
     });
     D.setExportNote(tt("已删除「{name}」", { name: cur.name }));
@@ -516,17 +521,25 @@ export function useXmlProjectFns(getDeps: () => XmlProjectFnsDeps): XmlProjectFn
   /** M291：关闭当前文件 tab（不确认、不删盘，仅从项目里摘掉；剩最后一个时不动） */
   const closeActiveFile = useCallback(() => {
     const cur = activeFile(D.project);
-    if (!cur || D.project.files.length <= 1) return;
+    if (!cur) return;
     D.flushTextTimer();
     D.setProject((p) => {
       const withSaved = updateFileXml(p, p.activeId, D.xml);
       const next = removeFile(withSaved, cur.id);
-      const target = activeFile(next)!;
-      D.setXml(target.xml);
-      D.histRef.current = diffHistoryInit(target.xml);
-      D.syncHist();
-      D.setSelectedPath(null);
-      D.applyExternalState(target);
+      const target = activeFile(next);
+      if (target) {
+        D.setXml(target.xml);
+        D.histRef.current = diffHistoryInit(target.xml);
+        D.syncHist();
+        D.setSelectedPath(null);
+        D.applyExternalState(target);
+      } else {
+        // M468：关掉最后一个 tab → 文件列表清空，编辑器回到「未打开文件」态（xml 置空，避免残留旧内容无 tab 可对应）
+        D.setXml("");
+        D.histRef.current = diffHistoryInit("");
+        D.syncHist();
+        D.setSelectedPath(null);
+      }
       return next;
     });
     D.setExportNote(tt("已关闭「{name}」", { name: cur.name }));

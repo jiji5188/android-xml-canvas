@@ -1,5 +1,5 @@
 // test/xml_multi_file.test.ts
-// 多文件项目：纯数据层的增删改查与边界（同名、最后一个不能删、损坏数据回落）
+// 多文件项目：纯数据层的增删改查与边界（同名、M468 起可关到 0 个、损坏数据回落）
 
 import { describe, expect, it } from "vitest";
 import {
@@ -64,9 +64,11 @@ describe("多文件项目", () => {
     expect(after.activeId).toBe(a.id);
   });
 
-  it("最后一个文件删不掉", () => {
+  it("M468：最后一个文件也能删（关到 0 个，activeId 置空）", () => {
     const p = p0();
-    expect(removeFile(p, p.files[0].id)).toBe(p);
+    const after = removeFile(p, p.files[0].id);
+    expect(after.files).toHaveLength(0);
+    expect(after.activeId).toBe("");
   });
 
   it("renameFile 规整 + 去重", () => {

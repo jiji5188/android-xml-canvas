@@ -86,13 +86,17 @@ describe("M171 应用图标生成", () => {
     );
   });
 
-  it("清单检查：缺 icon / 指错 / 缺 roundIcon", () => {
+  it("清单检查：缺 icon 报一条；@drawable / 缺 roundIcon 不再误报（M468）", () => {
     const good = `<application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" />`;
     expect(checkManifestIcon(good)).toEqual([]);
     const noIcon = `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:label="x" /></manifest>`;
-    expect(checkManifestIcon(noIcon).length).toBe(2);
-    const wrong = `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:icon="@drawable/logo" /></manifest>`;
-    expect(checkManifestIcon(wrong).join()).toContain("@drawable/logo");
+    expect(checkManifestIcon(noIcon)).toHaveLength(1);
+    expect(checkManifestIcon(noIcon)[0]).toContain("没有 android:icon");
+    // M468：@drawable/ic_launcher 是合法引用，不再报"不是 @mipmap"；roundIcon 缺失也不再当问题
+    const drawable = `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:icon="@drawable/ic_launcher" android:roundIcon="@drawable/ic_launcher_round" /></manifest>`;
+    expect(checkManifestIcon(drawable)).toEqual([]);
+    const noRound = `<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:icon="@mipmap/ic_launcher" /></manifest>`;
+    expect(checkManifestIcon(noRound)).toEqual([]);
   });
 });
 

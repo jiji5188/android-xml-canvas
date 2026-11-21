@@ -1889,7 +1889,7 @@ const allDrawableNames = useMemo(() => {
         leftOpen={leftOpen}
         rightOpen={rightOpen}
         value={xml}
-        onChange={onChangeXmlText}
+        onChange={onChangeXmlText} empty={!currentFile}
         errors={lints}
         focusLine={focusLine}
         focusTick={focusTick}

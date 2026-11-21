@@ -240,11 +240,10 @@ export function checkManifestIcon(manifest: string, iconName = "ic_launcher"): s
   const icon = manifest.match(/android:icon\s*=\s*"([^"]*)"/);
   if (!icon) {
     out.push(`清单里没有 android:icon，装出来的图标会是系统默认图标`);
-  } else if (!icon[1].includes(`mipmap/${iconName}`) && !icon[1].includes("mipmap-")) {
-    out.push(`清单里 android:icon="${icon[1]}"，不是 @mipmap/${iconName}`);
   }
-  const round = manifest.match(/android:roundIcon\s*=\s*"([^"]*)"/);
-  if (!round) out.push(`清单里没有 android:roundIcon，部分厂商桌面圆形图标会用 icon 顶替`);
+  // M468：@drawable/ic_launcher 是合法引用（很多项目这么写，aapt2 正常解析），
+  // 不再因"不是 @mipmap"误报；roundIcon 也是可选的，缺失不再当"问题"（避免一键修复面板总亮着）。
+  // 真正的坏引用（资源不存在）由 aapt2 link 报错兜底，这里只管"缺 icon"这一种硬伤。
   return out;
 }
 

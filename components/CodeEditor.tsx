@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { t as tt } from "@/lib/i18n-src";
 import { diagRanges as calcDiagRanges, type DiagInfo } from "@/lib/xml/diag-deco";
 import { symbolDoc } from "@/lib/xml/java-doc";
+import { SEL_MENU_AFTER_UP_MS, SEL_MENU_SETTLE_MS, shouldOpenSelMenu } from "@/lib/xml/code-sel-menu";
 import { codeHint } from "@/lib/xml/diag-hints";
 import { useOutsidePointerdown } from "./use-outside-pointerdown";
 import { Compartment, EditorState, Prec, Range, RangeSet, SelectionRange, StateEffect, StateField } from "@codemirror/state";
@@ -749,9 +750,10 @@ export function CodeEditor({
   } | null>(null);
   /** M404:文档浮层（选中类/方法的 Javadoc/KDoc + 签名，或资源引用说明），非 null 时渲染 */
   const [ctxDocShow, setCtxDocShow] = useState<{ title: string; body: string } | null>(null);
-  const longPressTimer = useRef<number | null>(null);
-  const longPressPos = useRef<{ x: number; y: number } | null>(null);
-  const longPressMoved = useRef(false);
+  /** M470：长按菜单改「选完文本松手才弹」——按住状态 / 选区稳定性计时 / 程序改选区抑制 三个 ref */
+  const selPointerDown = useRef(false);
+  const selMenuTimer = useRef<number | null>(null);
+  const selMenuSuppressed = useRef(false);
   /** M437：菜单面板 DOM，用于判断点击是否在面板外（点外面要关掉菜单） */
   const ctxMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -867,6 +869,8 @@ export function CodeEditor({
       return;
     }
     const len = v.state.doc.length;
+    // M470：「全选」是程序改选区，别让 selectionchange 兜底逻辑把菜单又弹回来
+    selMenuSuppressed.current = true;
     v.dispatch({ selection: { anchor: 0, head: len }, effects: EditorView.scrollIntoView(0) });
     closeCtxMenu();
     v.focus();
@@ -948,58 +952,122 @@ export function CodeEditor({
     [selectionText, cursorToken, ctxCopy, ctxCut, ctxPaste, ctxSelectAll, ctxFind, value, langRef, tt],
   );
 
-  /* M404:长按监听（.axv-cm 上的 pointerdown 起 450ms 计时，移动/抬起取消；右键直接弹） */
+  /* M470：长按菜单改为「用户选完文本、松开后才弹」（旧 M404 是 pointerdown 后 450ms 就弹，
+   * 正拖选时菜单已经盖住正文 → 用户要求改）。
+   *   ① 按下不弹；抬起时若已有选区 → 弹（位置取选区末端那一行）
+   *   ② 拖选择手柄（pointerup 不一定落在编辑器上）用 document 的 selectionchange 兜底：
+   *      选区停止变化 SEL_MENU_SETTLE_MS 后才弹
+   *   ③ 右键（桌面）仍直接弹；④ 无选区一律不弹（判定见 lib/xml/code-sel-menu.ts） */
+  const openCtxMenuAtSelection = useCallback(
+    (fallback?: { x: number; y: number }) => {
+      const v = viewRef.current;
+      if (!v) return;
+      const sel = v.state.selection.main;
+      if (sel.empty) return;
+      const c = v.coordsAtPos(sel.head);
+      if (c) openCtxMenu(c.left, c.bottom + 2);
+      else if (fallback) openCtxMenu(fallback.x, fallback.y);
+    },
+    [openCtxMenu],
+  );
+
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const cancel = () => {
-      if (longPressTimer.current !== null) {
-        window.clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
+    const clearTimer = () => {
+      if (selMenuTimer.current !== null) {
+        window.clearTimeout(selMenuTimer.current);
+        selMenuTimer.current = null;
       }
-      longPressMoved.current = false;
-      longPressPos.current = null;
     };
-    const onDown = (e: PointerEvent) => {
-      if (e.button === 2) return; // 右键走 onContextMenu
-      longPressPos.current = { x: e.clientX, y: e.clientY };
-      longPressMoved.current = false;
-      if (longPressTimer.current !== null) window.clearTimeout(longPressTimer.current);
-      longPressTimer.current = window.setTimeout(() => {
-        if (longPressMoved.current || !longPressPos.current) return;
-        const p = longPressPos.current;
-        longPressTimer.current = null;
-        e.preventDefault();
-        openCtxMenu(p.x, p.y);
-      }, 450);
+    const gate = (suppressed = false): boolean =>
+      shouldOpenSelMenu({
+        selectionEmpty: !viewRef.current || viewRef.current.state.selection.main.empty,
+        pointerDown: selPointerDown.current,
+        menuOpen: ctxMenuRef.current !== null,
+        suppressed,
+      });
+    const onDown = () => {
+      selPointerDown.current = true;
+      clearTimer();
     };
-    const onMove = (e: PointerEvent) => {
-      if (!longPressPos.current) return;
-      const dx = Math.abs(e.clientX - longPressPos.current.x);
-      const dy = Math.abs(e.clientY - longPressPos.current.y);
-      if (dx > 12 || dy > 12) {
-        longPressMoved.current = true;
-        cancel();
-      }
+    const onUp = (e: PointerEvent) => {
+      selPointerDown.current = false;
+      clearTimer();
+      if (!gate()) return;
+      // 等选区在 DOM 里落定再量坐标（否则 coordsAtPos 可能还是旧的一帧）
+      window.setTimeout(() => {
+        if (selPointerDown.current || !gate()) return;
+        openCtxMenuAtSelection({ x: e.clientX, y: e.clientY });
+      }, SEL_MENU_AFTER_UP_MS);
+    };
+    const onCancel = () => {
+      selPointerDown.current = false;
+      clearTimer();
+    };
+    /* 拖选时手指可能在编辑器外抬起/开始 → host 上收不到事件，「按住」状态会卡住，
+     * 用 window 兜底重置（只重置不弹，避免点工具栏时误弹） */
+    const outOfHost = (t: EventTarget | null): boolean => {
+      const n = t as Node | null;
+      return !n || !host.contains(n);
+    };
+    const onWinDown = (e: PointerEvent) => {
+      if (!outOfHost(e.target)) return;
+      selPointerDown.current = false;
+      clearTimer();
+    };
+    const onWinUp = (e: PointerEvent) => {
+      if (!selPointerDown.current || !outOfHost(e.target)) return;
+      selPointerDown.current = false;
+      clearTimer();
     };
     const onCtx = (e: MouseEvent) => {
       e.preventDefault();
       openCtxMenu(e.clientX, e.clientY);
     };
+    // 选区变化兜底：拖选择手柄/双击选词时，pointerup 不一定落在编辑器上
+    const onSelChange = () => {
+      if (selMenuSuppressed.current) {
+        selMenuSuppressed.current = false;
+        return;
+      }
+      if (selPointerDown.current) return; // 还在按着，绝不弹
+      const s = window.getSelection();
+      if (!s || s.rangeCount === 0 || s.isCollapsed) {
+        clearTimer();
+        return;
+      }
+      const node = s.getRangeAt(0).commonAncestorContainer;
+      const el = node.nodeType === 1 ? (node as Element) : node.parentElement;
+      if (!el || !host.contains(el)) return; // 选区在别处，不管
+      if (!gate()) return;
+      clearTimer();
+      selMenuTimer.current = window.setTimeout(() => {
+        selMenuTimer.current = null;
+        if (!gate()) return;
+        openCtxMenuAtSelection();
+      }, SEL_MENU_SETTLE_MS);
+    };
     host.addEventListener("pointerdown", onDown);
-    host.addEventListener("pointermove", onMove);
-    host.addEventListener("pointerup", cancel);
-    host.addEventListener("pointercancel", cancel);
+    host.addEventListener("pointerup", onUp);
+    host.addEventListener("pointercancel", onCancel);
     host.addEventListener("contextmenu", onCtx);
+    document.addEventListener("selectionchange", onSelChange);
+    window.addEventListener("pointerdown", onWinDown, true);
+    window.addEventListener("pointerup", onWinUp, true);
+    window.addEventListener("pointercancel", onWinUp, true);
     return () => {
       host.removeEventListener("pointerdown", onDown);
-      host.removeEventListener("pointermove", onMove);
-      host.removeEventListener("pointerup", cancel);
-      host.removeEventListener("pointercancel", cancel);
+      host.removeEventListener("pointerup", onUp);
+      host.removeEventListener("pointercancel", onCancel);
       host.removeEventListener("contextmenu", onCtx);
-      cancel();
+      document.removeEventListener("selectionchange", onSelChange);
+      window.removeEventListener("pointerdown", onWinDown, true);
+      window.removeEventListener("pointerup", onWinUp, true);
+      window.removeEventListener("pointercancel", onWinUp, true);
+      clearTimer();
     };
-  }, [openCtxMenu]);
+  }, [openCtxMenu, openCtxMenuAtSelection]);
 
   /* M442：双指撒合缩放代码编辑框（只缩放编辑器内文字 fontSize，不影响页面框架）
    * 监听 .axv-cm 上的 pointer 事件：两指按下记录起点距离 + 当前字号，移动时按比例算新字号，

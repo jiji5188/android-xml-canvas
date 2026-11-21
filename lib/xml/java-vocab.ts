@@ -13,6 +13,7 @@ import { rankCandidates } from "./lexicon-rank";
 import type { Lexicon } from "./lexicon";
 import { KNOWN_METHODS } from "./java-methods";
 import { extractDocSymbolTypes, varTypeAt, retTypeOf, fqnOf } from "./doc-symbol-types";
+import { rTableTypes, type RIndex } from "./r-index";
 
 export interface JavaSymbol {
   label: string;
@@ -770,6 +771,7 @@ export function computeJavaSuggest(
   cursor: { line: number; col: number },
   lex?: Lexicon, // M352：项目词库（传了就走打分排序；没传保留旧行为）
   recency?: Map<string, number>, // M352 M3：使用记忆（近期选中过的高分）
+  rIndex?: RIndex | null, // M465：项目 R 表索引（R. / R.layout. 候选）
 ): { line: number; col: number; prefix: string; kind: SuggestKind; items: string[]; kinds: SuggestKind[]; subs?: (string | undefined)[]; sigs?: (string | undefined)[] } | null {
   const lines = doc.split("\n");
   const li = Math.max(0, Math.min(cursor.line - 1, lines.length - 1));
@@ -787,11 +789,27 @@ export function computeJavaSuggest(
   let receiverType: string | null = null;
   const { prefix, start: prefixStart } = wordBefore(doc, offset);
   const afterDot = prefixStart > 0 && doc[prefixStart - 1] === ".";
+  // M465：R 表引用（R. / R.layout. / R.string.xxx）
+  let rMode: "table" | "names" | null = null;
+  let rType = "";
   if (afterDot) {
     // 当前词紧跟在 . 后面 → 取 . 左边的标识符
     let rs = prefixStart - 1;
-    while (rs > 0 && /[A-Za-z0-9_]/.test(doc[rs - 1])) rs--;
+    while (rs > 0 && /[A-Za-z0-9_$]/.test(doc[rs - 1])) rs--;
     receiver = doc.slice(rs, prefixStart - 1);
+    // M465：receiver 就是 R → 列类型表；receiver 是类型且前面是「R.」→ 列该类型资源名
+    if (rIndex) {
+      if (receiver === "R") rMode = "table";
+      else if (rs > 0 && doc[rs - 1] === ".") {
+        let ps = rs - 1;
+        let qs = ps;
+        while (qs > 0 && /[A-Za-z0-9_$]/.test(doc[qs - 1])) qs--;
+        if (doc.slice(qs, ps) === "R" && rIndex[receiver]?.length) {
+          rMode = "names";
+          rType = receiver;
+        }
+      }
+    }
     if (receiver && receiver !== "this" && receiver !== "super" && /^[A-Za-z_]\w*$/.test(receiver)) {
       // 在文件里找 `X receiver` 声明拿到 X（跳过 receiver 自身那行，找类型）
       // M389：receiver 类型解析（之前只认 `Type x =`，漏了字段声明 `Type x;`）+ 词库字段表兜底
@@ -816,15 +834,48 @@ export function computeJavaSuggest(
   }
   const isAt = prefix.startsWith("@");
   const body = isAt ? prefix.slice(1) : prefix;
-  // M395：receiver 解析不到类型、又不是 this/super → 不弹候选。
+
+  // M465：R 表候选——R. 列类型（layout/string/...）；R.layout. 列该项目里的资源名
+  if (rMode && rIndex) {
+    const lp = body.toLowerCase();
+    const wantR = (t: string) => !lp || t.toLowerCase().startsWith(lp);
+    if (rMode === "table") {
+      const types = rTableTypes(rIndex).filter(wantR).slice(0, MAX_ITEMS);
+      if (!types.length) return null;
+      return {
+        line: cursor.line,
+        col,
+        prefix,
+        kind: "const",
+        items: types,
+        kinds: types.map(() => "const" as SuggestKind),
+        subs: types.map((t) => `R.${t} · ${(rIndex[t] || []).length} 项`),
+        sigs: types.map(() => undefined),
+      };
+    }
+    const names = (rIndex[rType] || []).filter(wantR).slice(0, MAX_ITEMS);
+    if (!names.length) return null;
+    const pickedNames = names;
+    return {
+      line: cursor.line,
+      col,
+      prefix,
+      kind: "const",
+      items: pickedNames,
+      kinds: pickedNames.map(() => "const" as SuggestKind),
+      subs: pickedNames.map((n) => `R.${rType}.${n}`),
+      sigs: pickedNames.map(() => undefined),
+    };
+  }
+  // M395：receiver 解析不到类型、又不是 this/super → 不弹候选（M465：R 表分支已提前返回，此处排除 rMode 避免重复）
   //   否则会退回通用池，把「本类方法」当成 j 的成员弹出来（用户实测：j 未声明时打 j.my 弹出 myMethod）。
-  if (afterDot && receiver && receiver !== "this" && receiver !== "super" && !receiverType) return null;
+  if (afterDot && receiver && receiver !== "this" && receiver !== "super" && !receiverType && !rMode) return null;
   // M392：普通词放开成 1 字母就弹（之前是 ≥2）。
   //   依据：候选池已按「词库 + 作用域」收窄过（类名只弹 import/项目里出现过的，变量只弹本方法+本类，方法没有类前提就不弹类里方法），
   //   且弹窗本身有最大高度（超了内部滚动，不会满屏）——所以 1 字母弹 10~20 条完全可接受，少打一个字更顺。
   //   memberMode（receiver 点号后）仍允许空前缀直接列成员。
   const memberMode = !isAt && !!receiverType && body.length < 2;
-  if (body.length < 1 && !isAt && !memberMode) return null;
+  if (body.length < 1 && !isAt && !memberMode && !rMode) return null;
 
   // M391：成员列表模式 —— `fn.` 刚打完点号（body 为空）或打了 1 个字母，
   //   直接按 receiver 类型列「公开方法 + 公开常量/字段」，不掺入全局/当前文件的泛用池，

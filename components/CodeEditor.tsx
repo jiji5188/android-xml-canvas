@@ -92,6 +92,8 @@ export interface CodeEditorProps {
   indent?: number;
   /** M45:资源名候选(@drawable/xxx 补全用),不传就只用文档里的 token */
   resNames?: string[];
+  /** M465：R 表索引（R. / R.layout. 候选列出项目资源引用） */
+  rIndex?: Record<string, string[]>;
   /** M101:Ctrl/Cmd + 点击资源引用时回调(raw 如 `@string/app_name` / `R.id.btn`) */
   onRefClick?: (raw: string) => void;
   /** M352：项目词库 ref（XmlEditor 建好塞进来；没有就走 getLexStore / 旧行为） */
@@ -592,6 +594,7 @@ export function CodeEditor({
   lang = "xml",
   indent = 4,
   resNames,
+  rIndex,
   onRefClick,
   lexRef,
   hoverTip,
@@ -655,6 +658,9 @@ export function CodeEditor({
   const pressRef = useRef<{ i: number; x: number; y: number; top: number } | null>(null);
   const resNamesRef = useRef<string[] | undefined>(resNames);
   resNamesRef.current = resNames;
+  // M465：R 表索引 ref（R. / R.layout. 候选）
+  const rIndexRef = useRef<Record<string, string[]> | undefined>(rIndex);
+  rIndexRef.current = rIndex;
 
   const errLines = useMemo(() => {
     const m = new Map<number, string>();
@@ -1077,7 +1083,7 @@ export function CodeEditor({
     const lex = lexRef?.current ?? getLexStore().current;
     const ctx =
       langRef.current === "java"
-        ? computeJavaSuggest(v.state.doc.toString(), { line: line.number, col }, lex && lex.allMethodNames.size > 0 ? lex : undefined, loadRecency())
+        ? computeJavaSuggest(v.state.doc.toString(), { line: line.number, col }, lex && lex.allMethodNames.size > 0 ? lex : undefined, loadRecency(), rIndexRef.current)
         : computeSuggest(v.state.doc.toString(), { line: line.number, col }, resNamesRef.current);
     if (!ctx) {
       setSugBoth(null);

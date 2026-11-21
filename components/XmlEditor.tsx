@@ -35,6 +35,7 @@ import {
 } from "@/lib/xml/history";
 import { mergeResourceFragment, DEFAULT_RESOURCES } from "@/lib/xml/resources";
 import { buildResourceExtras, backfillDrawableXml, type ResourceExtras, type ResTreeDir, type ResTreeFile } from "@/lib/xml/resdir";
+import { useRIndex } from "@/components/use-r-index";
 import { loadProjectResForDoc, loadProjectResIndexCached, mergeProjectExtras, invalidateProjectRes } from "@/lib/xml/project-res";
 import { collectProjectDex, numberDexFiles } from "@/lib/xml/project-dex";import { loadProjectJavaFiles } from "@/lib/xml/java-files";
 import { buildLexicon, type Lexicon } from "@/lib/xml/lexicon";
@@ -554,7 +555,6 @@ export function XmlEditor({ initialProject = null, onExit }: XmlEditorProps) {
     if (!/\.xml$/i.test(seg)) return "activity_main";
     return seg.replace(/\.xml$/i, "") || "activity_main";
   }, [openRel]);
-
   const [showIssues, setShowIssues] = useState(true);
 
   /** M366 step18：插件域（内置开关/第三方安装/编译器更新）→ components/use-plugins.ts */
@@ -582,7 +582,6 @@ export function XmlEditor({ initialProject = null, onExit }: XmlEditorProps) {
   useBackGuard(saveAsOpen, () => setSaveAsOpen(false), "save-as");
   useBackGuard(newProjOpen, () => setNewProjOpen(false), "new-project");
   useBackGuard(saveAsOpen, () => setSaveAsOpen(false), "save-as");
-
   // M25d/M31 项目分析（analyzeProjects + analyzed/analyzing refs）已下沉 → components/use-xml-project.ts
   // M309：工作目录刷新/12s 轮询/恢复上次项目 + 手选/默认目录 也已下沉 → components/use-xml-project.ts
 
@@ -598,7 +597,6 @@ export function XmlEditor({ initialProject = null, onExit }: XmlEditorProps) {
    *   那是 CM6 自己的增量解析器，跟这条管线无关）。切回预览/停手后才重新算。 */
   const previewActive = mobileTab === "preview" || mobileTab === "values";
   const parsedForRender = previewActive ? parsedXml : "";
-
 
   // M305：diff 撤销/重做域 → components/use-diff-history.ts
   const { histInfo, histRef, textTimer, syncHist, lastCommitRef, commitHistory, flushTextTimer, canUndo, canRedo, commitPendingText, undo, redo } = useDiffHistory({ setXml, liveXmlRef, flushXml });
@@ -1236,7 +1234,6 @@ const allDrawableNames = useMemo(() => {
   /** M212：导入 APK 换资源重签面板 */
   const [repackOpen, setRepackOpen] = useState(false);
 
-
   /** M366 step15：右侧「检查器」tab 域（rightTab/inspMeasured/ResizeObserver effect/inspWarnings）
    *  → components/use-inspector.ts */
   const {
@@ -1495,7 +1492,6 @@ const allDrawableNames = useMemo(() => {
     await doBuildApk({ storeFile: "", storePass: "", alias: "", keyPass: "" });
   }, [doBuildApk]);
 
-
   /** M36：当前打开项目的可写根（有则保存一律落进 <项目>/app/src/main/res/） */
   const projRoot = useMemo(() => projectSaveRoot(activeProject), [activeProject]);
 
@@ -1505,8 +1501,11 @@ const allDrawableNames = useMemo(() => {
     setExportNote, tr, setProjectRev, bumpResCache,
   }));
 
-  /** 把当前内容整包写进当前项目的 res 目录（layout + 依赖 drawable/values） */
-  /** M312：保存域（saveIntoProject / saveBack / saveAsTo / saveRawFile / doSave / M201 外部改动拦截）→ components/use-save-domain.ts */
+  // M465：R 表索引（resExtras 树 + 生成的 drawable）→ Java 候选 R. / R.layout. 列出项目资源引用
+  const rIndex = useRIndex(resExtras, generatedDrawables);
+
+  /** M312：保存域（saveIntoProject / saveBack / saveAsTo / saveRawFile / doSave / M201 外部改动拦截）→ components/use-save-domain.ts
+   *  把当前内容整包写进当前项目的 res 目录（layout + 依赖 drawable/values） */
   const { saveIntoProject, loadDiskIntoEditor, saveBack, saveAsTo, saveRawFile, doSave } = useSaveDomain(() => ({
     projRoot,
     xml,
@@ -1937,6 +1936,7 @@ const allDrawableNames = useMemo(() => {
           const cur = (openRel || "").replace(/^[^/]*\//, "");
           return topLevelNamesFromFiles(files, cur);
         }, [resExtras, openRel])}
+          rIndex={rIndex}
         view={mobileTab === "values" ? viewKind ?? "code" : "code"}
         fileKey={openRel || saveOrigin?.name || ""}
         onNote={flashNote}

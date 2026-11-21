@@ -47,6 +47,8 @@ export interface XmlCodeViewProps {
   indent?: number;
   /** M45：项目 res 资源名（drawable/values 等目录下的文件名），喂给关键词弹窗的 @引用补全 */
   resNames?: string[];
+  /** M465：R 表索引（R. / R.layout. 候选列出项目资源引用） */
+  rIndex?: Record<string, string[]>;
   /** M39/M42：当前页 —— values 文件的键值对表格（`axv-val`）还是代码编辑器（`axv-code-fill`） */
   view?: "code" | "values" | "manifest";
   /** M39：文件身份（切文件时重置视图模式） */
@@ -123,6 +125,7 @@ export function XmlCodeView(props: XmlCodeViewProps) {
           lang={props.lang}
           indent={props.indent}
           resNames={props.resNames}
+          rIndex={props.rIndex}
           onDebugRun={props.showDebugRun ? props.onDebugRun : undefined}
           hideOnKeyboard={props.hideOnKeyboard}
         />
